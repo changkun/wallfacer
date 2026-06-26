@@ -847,7 +847,7 @@ func TestParse_AgentSessionWindowDays(t *testing.T) {
 
 func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
 	// Non-numeric and negative values fall back to the default 30 so the
-	// planning UI always has a sane starting window. This matches how the
+	// agent-session cost UI always has a sane starting window. This matches how the
 	// other int knobs treat malformed input.
 	for _, tc := range []struct {
 		name string

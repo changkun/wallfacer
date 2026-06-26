@@ -231,7 +231,7 @@ func TestGetUsageStats_MultipleTasksAggregated(t *testing.T) {
 	}
 }
 
-// --- Planning merge ---
+// --- Agent-session merge ---
 
 // usageResponseFromHandler calls GetUsageStats with the given URL and decodes
 // the response.
@@ -252,10 +252,10 @@ func usageResponseFromHandler(t *testing.T, h *Handler, url string) usageRespons
 
 func TestUsage_NoPlanningRecords(t *testing.T) {
 	h := newTestHandler(t)
-	// No planning dir on disk — response must not include a planning key.
+	// No agent-session dir on disk — response must not include an agent-session key.
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
 	if _, ok := resp.BySubAgent[store.SandboxActivityAgentSession]; ok {
-		t.Errorf("BySubAgent[planning] should be absent, got %+v", resp.BySubAgent[store.SandboxActivityAgentSession])
+		t.Errorf("BySubAgent[agent-session] should be absent, got %+v", resp.BySubAgent[store.SandboxActivityAgentSession])
 	}
 	if resp.Total.CostUSD != 0 || resp.Total.InputTokens != 0 {
 		t.Errorf("Total should be zero, got %+v", resp.Total)
@@ -280,16 +280,16 @@ func TestUsage_PlanningMergedIntoBySubAgent(t *testing.T) {
 
 	got, ok := resp.BySubAgent[store.SandboxActivityAgentSession]
 	if !ok {
-		t.Fatal("BySubAgent[planning] missing")
+		t.Fatal("BySubAgent[agent-session] missing")
 	}
 	if got.InputTokens != 160 || got.OutputTokens != 65 || got.CacheReadInputTokens != 10 {
-		t.Errorf("planning sums wrong: %+v", got)
+		t.Errorf("agent-session sums wrong: %+v", got)
 	}
 	if got.CostUSD != 0.08 {
-		t.Errorf("planning cost = %v, want 0.08", got.CostUSD)
+		t.Errorf("agent-session cost = %v, want 0.08", got.CostUSD)
 	}
 	if resp.Total.InputTokens != 160 || resp.Total.OutputTokens != 65 || resp.Total.CostUSD != 0.08 {
-		t.Errorf("Total should include planning usage: %+v", resp.Total)
+		t.Errorf("Total should include agent-session usage: %+v", resp.Total)
 	}
 }
 
@@ -341,10 +341,10 @@ func TestUsage_PlanningAcrossMultipleGroups(t *testing.T) {
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
 	got := resp.BySubAgent[store.SandboxActivityAgentSession]
 	if got.InputTokens != 100 || got.OutputTokens != 30 {
-		t.Errorf("planning tokens across groups = %+v, want sum", got)
+		t.Errorf("agent-session tokens across groups = %+v, want sum", got)
 	}
 	if got.CostUSD != 0.06 {
-		t.Errorf("planning cost = %v, want 0.06", got.CostUSD)
+		t.Errorf("agent-session cost = %v, want 0.06", got.CostUSD)
 	}
 }
 
@@ -359,6 +359,6 @@ func TestUsage_TaskCountUnchangedByPlanning(t *testing.T) {
 
 	resp := usageResponseFromHandler(t, h, "/api/usage?days=0")
 	if resp.TaskCount != 0 {
-		t.Errorf("TaskCount = %d, want 0 (planning rounds must not count as tasks)", resp.TaskCount)
+		t.Errorf("TaskCount = %d, want 0 (agent-session rounds must not count as tasks)", resp.TaskCount)
 	}
 }

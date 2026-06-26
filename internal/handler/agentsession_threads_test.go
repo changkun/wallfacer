@@ -15,7 +15,7 @@ import (
 )
 
 func TestMaybeAutoTitleThread(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	tm := h.agentSession.Sessions()
 	id := tm.List(false)[0].ID // default "Chat 1"
 
@@ -45,7 +45,7 @@ func TestMaybeAutoTitleThread(t *testing.T) {
 }
 
 func TestMaybeAutoTitleThread_Skips(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	tm := h.agentSession.Sessions()
 	id := tm.List(false)[0].ID
 
@@ -68,20 +68,20 @@ func TestMaybeAutoTitleThread_Skips(t *testing.T) {
 	}
 }
 
-// newPlannerHandlerWithThreads returns a handler backed by a planner
+// newAgentSessionHandlerWithThreads returns a handler backed by an agent session
 // whose ThreadManager is rooted at a temp directory. Tests use this to
 // exercise the thread CRUD routes without spinning up a real sandbox.
-func newPlannerHandlerWithThreads(t *testing.T) *Handler {
+func newAgentSessionHandlerWithThreads(t *testing.T) *Handler {
 	t.Helper()
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 	return h
 }
 
-func TestListPlanningThreads_DefaultChat1(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestListAgentSessions_DefaultChat1(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/agent/sessions", nil)
 	h.ListAgentSessions(rec, req)
@@ -106,8 +106,8 @@ func TestListPlanningThreads_DefaultChat1(t *testing.T) {
 	}
 }
 
-func TestListPlanningThreads_BusyThreadID(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestListAgentSessions_BusyThreadID(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 	id := h.agentSession.Sessions().List(false)[0].ID
 
 	get := func() string {
@@ -131,8 +131,8 @@ func TestListPlanningThreads_BusyThreadID(t *testing.T) {
 	}
 }
 
-func TestCreateRenameArchivePlanningThread(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestCreateRenameArchiveAgentSession(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	// Create.
 	rec := httptest.NewRecorder()
@@ -196,8 +196,8 @@ func TestCreateRenameArchivePlanningThread(t *testing.T) {
 	}
 }
 
-func TestDeletePlanningThread(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestDeleteAgentSession(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	// Create a thread to delete.
 	rec := httptest.NewRecorder()
@@ -248,8 +248,8 @@ func TestDeletePlanningThread(t *testing.T) {
 	}
 }
 
-func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestDeleteAgentSession_RejectsInFlight(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 	// Archive a thread so it is deletable, then mark it busy.
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/agent/sessions",
@@ -273,8 +273,8 @@ func TestDeletePlanningThread_RejectsInFlight(t *testing.T) {
 	}
 }
 
-func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestArchiveAgentSession_RejectsInFlight(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 	threads := h.agentSession.Sessions().List(false)
 	id := threads[0].ID
 	// Simulate an exec in flight owned by this thread.
@@ -291,10 +291,10 @@ func TestArchivePlanningThread_RejectsInFlight(t *testing.T) {
 	}
 }
 
-// TestPatchPlanningThread_Activate confirms the activate path sets the
+// TestPatchAgentSession_Activate confirms the activate path sets the
 // active thread via the unified PATCH endpoint.
-func TestPatchPlanningThread_Activate(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestPatchAgentSession_Activate(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	// Create a second thread so there is a non-active target to activate.
 	rec := httptest.NewRecorder()
@@ -318,10 +318,10 @@ func TestPatchPlanningThread_Activate(t *testing.T) {
 	}
 }
 
-// TestPatchPlanningThread_RejectsEmptyBody confirms a body with neither
+// TestPatchAgentSession_RejectsEmptyBody confirms a body with neither
 // name nor a recognized state returns 400.
-func TestPatchPlanningThread_RejectsEmptyBody(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestPatchAgentSession_RejectsEmptyBody(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 	id := h.agentSession.Sessions().List(false)[0].ID
 
 	rec := httptest.NewRecorder()
@@ -390,7 +390,7 @@ func TestUndoPlanningRound_NoCommitsForThread(t *testing.T) {
 // focused_task pins it to task-mode and that the list endpoint returns the
 // correct mode and task_id fields.
 func TestCreateThread_TaskMode(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 
 	// Create a real task in the store so focused_task validation passes.
 	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
@@ -457,7 +457,7 @@ func TestCreateThread_TaskMode(t *testing.T) {
 // TestCreateThread_TaskMode_UnknownTask verifies that creating a thread with
 // a non-existent focused_task returns 404.
 func TestCreateThread_TaskMode_UnknownTask(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 
 	body := strings.NewReader(`{"name":"Orphan","focused_task":"00000000-0000-0000-0000-000000000001"}`)
 	rec := httptest.NewRecorder()
@@ -468,10 +468,10 @@ func TestCreateThread_TaskMode_UnknownTask(t *testing.T) {
 	}
 }
 
-// TestListPlanningThreads_DefaultMode verifies that the initial "Chat 1"
+// TestListAgentSessions_DefaultMode verifies that the initial "Chat 1"
 // thread has mode "spec" and no task_id.
-func TestListPlanningThreads_DefaultMode(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestListAgentSessions_DefaultMode(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/agent/sessions", nil)
@@ -512,7 +512,7 @@ func pinThreadToTask(t *testing.T, tm *agentsession.Manager, threadID, taskID st
 }
 
 func TestCascade_ArchiveOnTaskLeavesBacklog(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	ctx := context.Background()
 
 	// Create a backlog task.
@@ -521,7 +521,7 @@ func TestCascade_ArchiveOnTaskLeavesBacklog(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	// Pin the planner thread to this task.
+	// Pin the agent session thread to this task.
 	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
@@ -554,7 +554,7 @@ func TestCascade_ArchiveOnTaskLeavesBacklog(t *testing.T) {
 }
 
 func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	ctx := context.Background()
 
 	// Create a done task so we can archive it.
@@ -566,7 +566,7 @@ func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
 		t.Fatalf("ForceUpdateTaskStatus: %v", err)
 	}
 
-	// Pin the planner thread to this task.
+	// Pin the agent session thread to this task.
 	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
@@ -608,7 +608,7 @@ func TestCascade_UnarchivesOnTaskUnarchive(t *testing.T) {
 }
 
 func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	ctx := context.Background()
 
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "re-archive test"})
@@ -657,7 +657,7 @@ func TestCascade_ManuallyUnarchivedThreadStaysAfterTaskReArchive(t *testing.T) {
 }
 
 func TestUpdateTaskPromptTool_FailsOnCascadeArchivedThread(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	ctx := context.Background()
 
 	// Create a backlog task.

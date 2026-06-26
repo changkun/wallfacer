@@ -1652,7 +1652,7 @@ func TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared(t *testing.T) {
 }
 
 func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	h.SetAutopilot(true)
 
 	ctx := context.Background()
@@ -1662,7 +1662,7 @@ func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	// Pin the planner thread to this task and mark it busy (in-flight turn).
+	// Pin the agent session thread to this task and mark it busy (in-flight turn).
 	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {

@@ -291,7 +291,7 @@ func seedPromptRound(t *testing.T, h *Handler, taskID uuid.UUID, threadID string
 
 func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 
@@ -361,7 +361,7 @@ func TestUndo_TaskMode_RewindsLastRound(t *testing.T) {
 
 func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 
@@ -423,7 +423,7 @@ func TestUndo_TaskMode_RepeatedUndo(t *testing.T) {
 
 func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 
@@ -462,7 +462,7 @@ func TestUndo_FileMode_Unchanged(t *testing.T) {
 
 	h := newStaticWorkspaceHandler(t, []string{ws})
 	// Attach a planner whose active thread is in spec-mode (no FocusedTask).
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 
@@ -500,7 +500,7 @@ func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
 	h := newTestHandler(t)
 	h.workspaces = []string{ws}
 
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 

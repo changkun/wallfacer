@@ -788,7 +788,7 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 	}
 }
 
-// TestShutdown_WithPlannerRunning verifies that Shutdown stops the planner
+// TestShutdown_WithPlannerRunning verifies that Shutdown stops the agent session
 // when it is running.
 func TestShutdown_WithPlannerRunning(t *testing.T) {
 	configDir := t.TempDir()
@@ -804,7 +804,7 @@ func TestShutdown_WithPlannerRunning(t *testing.T) {
 		EnvFile:   envFile,
 	}, testFS(t), testFS(t))
 
-	// Planner is initialized but not running, so Shutdown should handle it.
+	// Agent session is initialized but not running, so Shutdown should handle it.
 	sc.Shutdown()
 }
 
