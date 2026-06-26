@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/agon/pkg/adversarial"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
@@ -1066,4 +1068,88 @@ func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCan
 	}
 	h.incAutopilotAction("auto_submitter", "submitted")
 	return true
+}
+
+// tryAutoAgon scans all waiting tasks that have a SessionID and have not yet
+// been verified by agon (AgonUnresolved == nil), then fires a goroutine for
+// each. Does nothing when agon is disabled.
+func (h *Handler) tryAutoAgon(ctx context.Context) {
+	if !h.AgonEnabled() {
+		return
+	}
+
+	var candidates []store.Task
+	h.forCurrentStore(func(s *store.Store, _ []string) {
+		candidates = s.ListWaitingTasksWithSession(ctx)
+	})
+
+	for _, t := range candidates {
+		t := t // capture loop variable
+		go func() {
+			if err := h.runAgon(ctx, t); err != nil {
+				logger.Handler.Warn("agon: verification run failed",
+					"task", t.ID, "error", err)
+			}
+		}()
+	}
+}
+
+// agonForkCount is the number of independent critic forks per run.
+// agonMaxRounds is the per-fork round cap. agonCostCap is the soft token budget.
+// All are deliberately conservative defaults for initial rollout.
+const (
+	agonForkCount = 2
+	agonMaxRounds = 4
+	agonCostCap   = 50000
+)
+
+// runAgon executes one agon adversarial verification run for a task and
+// persists the result. The task must have a non-nil SessionID and at least
+// one worktree path. Returns nil on success; on error the AgonUnresolved
+// field is left nil so the next tick retries.
+func (h *Handler) runAgon(ctx context.Context, t store.Task) error {
+	if t.SessionID == nil || *t.SessionID == "" {
+		return nil
+	}
+	if len(t.WorktreePaths) == 0 {
+		return nil
+	}
+
+	// Use the first worktree as cwd. Most tasks have one; multi-repo tasks
+	// will use the first alphabetically (consistent with other automation paths).
+	var cwd string
+	for _, p := range t.WorktreePaths {
+		cwd = p
+		break
+	}
+
+	diff := generateWorktreeDiff(t.WorktreePaths)
+
+	input := adversarial.VerifyInput{
+		TaskPrompt:    t.Prompt,
+		Criteria:      "", // populated from Task.Criteria when test-criteria spec lands
+		SessionID:     *t.SessionID,
+		DiffPatch:     diff,
+		Cwd:           cwd,
+		StateDir:      filepath.Join(cwd, ".agon"),
+		ForkCount:     agonForkCount,
+		MaxRounds:     agonMaxRounds,
+		CostCapTokens: agonCostCap,
+	}
+
+	result, err := h.verifier.Verify(ctx, input)
+	if err != nil {
+		return err
+	}
+	if result == nil {
+		// Verifier skipped (e.g., no session). Do not mark as run.
+		return nil
+	}
+
+	var s *store.Store
+	h.forCurrentStore(func(st *store.Store, _ []string) { s = st })
+	if s == nil {
+		return fmt.Errorf("agon: no active store for task %s", t.ID)
+	}
+	return s.UpdateTaskAgon(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir)
 }

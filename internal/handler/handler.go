@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/agon/pkg/adversarial"
+	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -133,11 +135,16 @@ type Handler struct {
 	// out). Nil until SetCoordinationLogout. Guarded by snapshotMu.
 	coordLogout func()
 
-	autopilot  atomic.Bool
-	autotest   atomic.Bool
-	autosubmit atomic.Bool
-	autosync   atomic.Bool
-	autopush   atomic.Bool
+	autopilot   atomic.Bool
+	autotest    atomic.Bool
+	autosubmit  atomic.Bool
+	autosync    atomic.Bool
+	autopush    atomic.Bool
+	agonEnabled atomic.Bool
+
+	// verifier drives adversarial post-run verification (agon). It is set
+	// once in NewHandler and never mutated; AgonEnabled() is the runtime gate.
+	verifier adversarial.Verifier
 
 	// breakers holds per-watcher circuit breakers. Keyed by watcher name
 	// (e.g. "auto-promote"). These are transient and auto-heal; they do not
@@ -281,6 +288,8 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		}
 		return cfg.MaxTestParallelTasks
 	})
+	// Initialize the agon verifier once; AgonEnabled() is the runtime gate.
+	h.verifier = wadversarial.NewAgonVerifier(r, harness.Claude)
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)
@@ -690,6 +699,12 @@ func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }
 
 // SetAutotest enables or disables auto-test mode.
 func (h *Handler) SetAutotest(enabled bool) { h.autotest.Store(enabled) }
+
+// AgonEnabled returns whether adversarial verification (agon) is active.
+func (h *Handler) AgonEnabled() bool { return h.agonEnabled.Load() }
+
+// SetAgon enables or disables adversarial verification (agon).
+func (h *Handler) SetAgon(enabled bool) { h.agonEnabled.Store(enabled) }
 
 // AutosubmitEnabled returns whether auto-submit mode is active.
 func (h *Handler) AutosubmitEnabled() bool { return h.autosubmit.Load() }

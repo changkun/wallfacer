@@ -258,6 +258,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"autosubmit":                h.AutosubmitEnabled(),
 		"autosync":                  h.AutosyncEnabled(),
 		"autopush":                  h.AutopushEnabled(),
+		"agon":                      h.AgonEnabled(),
 		"ideation_exploit_ratio":    h.IdeationExploitRatio(),
 		"ideation_categories":       h.runner.IdeationCategories(),
 		"ideation_ignore_patterns":  h.runner.IdeationIgnorePatterns(),
@@ -322,6 +323,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Autosubmit           *bool             `json:"autosubmit"`
 		Autosync             *bool             `json:"autosync"`
 		Autopush             *bool             `json:"autopush"`
+		Agon                 *bool             `json:"agon"`
 		Ideation             *bool             `json:"ideation"`               // retired; accepted for old clients but ignored
 		IdeationInterval     *int              `json:"ideation_interval"`      // retired; accepted for old clients but ignored
 		IdeationExploitRatio *float64          `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
@@ -344,6 +346,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	applyBoolToggle(context.Background(), req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	applyBoolToggle(context.Background(), req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
+	applyBoolToggle(context.Background(), req.Agon, h.SetAgon, h.AgonEnabled, h.tryAutoAgon)
 	// Persist any toggle changes to the viewed group so switching away
 	// and back does not reset the user's automation choices, and a
 	// different group on this server stays manual unless the user turns
@@ -375,6 +378,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		"autosubmit":             h.AutosubmitEnabled(),
 		"autosync":               h.AutosyncEnabled(),
 		"autopush":               h.AutopushEnabled(),
+		"agon":                   h.AgonEnabled(),
 		"ideation_exploit_ratio": h.IdeationExploitRatio(),
 		"ideation_categories":    h.runner.IdeationCategories(),
 	}
