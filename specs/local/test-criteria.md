@@ -1,6 +1,6 @@
 ---
 title: Task Test Criteria for Post-Run Verification
-status: drafted
+status: stale
 depends_on: []
 affects:
   - internal/store/models.go
