@@ -19,13 +19,15 @@ import (
 type HarnessCritic struct {
 	runner runner.Interface
 	sb     harness.ID
+	cwd    string // worktree the critic runs in; overrides CriticInput.Cwd
 }
 
 // NewHarnessCritic returns a Critic backed by wallfacer's runner.
 // sb is the harness to use for critic invocations; pass harness.Claude for
-// the default path.
-func NewHarnessCritic(r runner.Interface, sb harness.ID) adversarial.Critic {
-	return &HarnessCritic{runner: r, sb: sb}
+// the default path. cwd is the working directory the critic runs in (a
+// throwaway worktree); when empty, the critic falls back to CriticInput.Cwd.
+func NewHarnessCritic(r runner.Interface, sb harness.ID, cwd string) adversarial.Critic {
+	return &HarnessCritic{runner: r, sb: sb, cwd: cwd}
 }
 
 // Round assembles the critic prompt and runs it as a one-shot agent call in
@@ -37,7 +39,11 @@ func (c *HarnessCritic) Round(ctx context.Context, in adversarial.CriticInput) (
 	if deadline <= 0 {
 		deadline = 5 * time.Minute
 	}
-	text, err := c.runner.RunCriticRound(ctx, prompt, c.sb, in.Cwd, deadline)
+	cwd := c.cwd
+	if cwd == "" {
+		cwd = in.Cwd
+	}
+	text, err := c.runner.RunCriticRound(ctx, prompt, c.sb, cwd, deadline)
 	if err != nil {
 		return nil, err
 	}

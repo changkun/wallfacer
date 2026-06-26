@@ -2,6 +2,7 @@ package adversarial
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"latere.ai/x/agon/pkg/adversarial"
@@ -50,13 +51,24 @@ func (v *AgonVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (
 	}
 	proposer := NewSessionProposer(in.SessionID, in.Cwd)
 
+	// Critics run in a throwaway worktree at the task's HEAD, not in.Cwd (the
+	// real worktree). wallfacer's claude harness runs agents with
+	// --dangerously-skip-permissions, so a critic in the real tree could write
+	// to it and run tests that the commit pipeline would stage. Fail the run
+	// rather than fall back to the unsafe real-tree path.
+	criticCwd, cleanup, err := newCriticWorktree(in.Cwd)
+	if err != nil {
+		return nil, fmt.Errorf("agon: create critic worktree: %w", err)
+	}
+	defer cleanup()
+
 	engine := &adversarial.Engine{
 		StateDir:  in.StateDir,
 		Cwd:       in.Cwd,
 		ForkCount: in.ForkCount,
 		Proposer:  proposer,
 		NewCritic: func(forkIdx int) adversarial.Critic {
-			return NewHarnessCritic(v.runner, v.criticHarnessForFork(forkIdx))
+			return NewHarnessCritic(v.runner, v.criticHarnessForFork(forkIdx), criticCwd)
 		},
 		MaxRounds:   in.MaxRounds,
 		CostCap:     in.CostCapTokens,
