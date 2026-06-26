@@ -210,4 +210,43 @@ describe('useChatSession deferred chat creation', () => {
     await flush();
     expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'hello')).toBe(true);
   });
+
+  it('a message queued mid-turn survives the post-turn history reload when it drains', async () => {
+    await mount();
+    const agentStore = useAgentStore();
+    agentStore.threads = {
+      a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: 0 },
+    };
+    agentStore.threadOrder = ['a'];
+    await session.switchToThread('a');
+    await flush();
+
+    // Start a turn so the thread is streaming. The stream endpoint returns 204,
+    // so the turn stays open via a scheduled retry rather than finishing.
+    await session.sendMessage('first');
+    await flush();
+    expect(session.streaming.value).toBe(true);
+
+    // Queue a follow-up while the turn is in flight.
+    await session.sendMessage('queued');
+    await flush();
+    expect(agentStore.threads['a'].queue.length).toBe(1);
+
+    // Gate the history reload that the turn's completion will trigger, so we can
+    // resolve it after the queued message drains (reproducing the wipe).
+    messagesGate = new Promise<void>((r) => { releaseGate = r; });
+
+    // Drive the stream to completion: the retry fires a second 204, which ends
+    // the turn. finishStreaming drains the queued message (optimistic bubble)
+    // and then reloads history.
+    await vi.advanceTimersByTimeAsync(500);
+    expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'queued')).toBe(true);
+
+    // The gated reload resolves with the server's pre-queue history. It must not
+    // clobber the just-drained message.
+    releaseGate!();
+    messagesGate = null;
+    await flush();
+    expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'queued')).toBe(true);
+  });
 });

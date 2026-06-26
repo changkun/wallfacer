@@ -308,7 +308,6 @@ export function useChatSession(): ChatSession {
     if (interrupted) {
       interruptedAt.value = renderedMessages.value.length - 1;
     }
-    drainNextQueued();
     if (!interrupted) {
       if (finishedThread && finishedThread !== activeThreadId.value) {
         const t = threads.value[finishedThread];
@@ -320,6 +319,12 @@ export function useChatSession(): ChatSession {
       }
       if (finishedThread) refreshTitleSoon(finishedThread);
     }
+    // Drain AFTER kicking off the reload above. A drained message targeting the
+    // active thread pushes an optimistic bubble and bumps historyToken, which
+    // invalidates that still-in-flight reload so it cannot resolve later and
+    // wipe the freshly queued message. Draining first would let the reload
+    // capture a fresh token and clobber the optimistic bubble.
+    drainNextQueued();
   }
 
   // After a thread's first turn the backend auto-titles it, replacing the
