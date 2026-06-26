@@ -788,9 +788,9 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 	}
 }
 
-// TestShutdown_WithPlannerRunning verifies that Shutdown stops the agent session
+// TestShutdown_WithAgentSessionRunning verifies that Shutdown stops the agent session
 // when it is running.
-func TestShutdown_WithPlannerRunning(t *testing.T) {
+func TestShutdown_WithAgentSessionRunning(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
