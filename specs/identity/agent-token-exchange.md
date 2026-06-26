@@ -1,6 +1,6 @@
 ---
 title: Agent Token Exchange
-status: drafted
+status: stale
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - internal/store/
 effort: medium
 created: 2026-04-19
-updated: 2026-06-25
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

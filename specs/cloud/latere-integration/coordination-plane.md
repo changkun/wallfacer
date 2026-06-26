@@ -1,6 +1,6 @@
 ---
 title: Cloud Coordination Plane
-status: drafted
+status: stale
 depends_on:
   - specs/identity/auth-by-default.md
 affects:
@@ -11,7 +11,7 @@ affects:
   - frontend/src/
 effort: xlarge
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

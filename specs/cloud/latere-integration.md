@@ -1,6 +1,6 @@
 ---
 title: Latere Platform Integration
-status: drafted
+status: stale
 depends_on:
   - specs/identity/authentication.md
   - specs/foundations/sandbox-backends.md
@@ -13,7 +13,7 @@ affects:
   - internal/runner/
 effort: large
 created: 2026-05-30
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
