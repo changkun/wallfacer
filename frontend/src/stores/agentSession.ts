@@ -1,5 +1,5 @@
-// Planning store — central state for the Plan view (spec tree, focused
-// spec, planning chat threads, streaming state). The Vue replacement for
+// Agent store — central state for the Plan view (spec tree, focused
+// spec, agent-session chat threads, streaming state). The Vue replacement for
 // the globals scattered across ui/js/spec-mode.js, ui/js/spec-explorer.js,
 // and ui/js/planning-chat.js.
 
@@ -356,7 +356,7 @@ export const useAgentStore = defineStore('agentSession', () => {
       activeThreadId.value = wantActive in next ? wantActive : (order[0] ?? '');
       busyThreadId.value = res.busy_thread_id ?? '';
     } catch (e) {
-      console.error('planning threads:', e);
+      console.error('agent sessions:', e);
     }
   }
 

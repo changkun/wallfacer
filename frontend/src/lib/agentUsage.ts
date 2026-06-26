@@ -1,5 +1,5 @@
-// Token-usage parsing for planning chat turns. Mirrors the backend's
-// internal/planner/usage.go ExtractUsage so the UI and server agree on a turn's
+// Token-usage parsing for agent-session chat turns. Mirrors the backend's
+// internal/agentsession/usage.go ExtractUsage so the UI and server agree on a turn's
 // usage. Usage lives only in the terminal stream-json "result" frame; reasoning
 // /thinking tokens are not reported separately by the API — they are part of
 // output_tokens.

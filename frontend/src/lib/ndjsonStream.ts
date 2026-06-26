@@ -1,4 +1,4 @@
-// Incremental NDJSON stream parser for the planning chat.
+// Incremental NDJSON stream parser for the agent-session chat.
 //
 // The one-shot extractAssistantText / extractError / parseActivity / hasActivity
 // helpers each re-split and re-JSON.parse the WHOLE accumulated buffer. Calling

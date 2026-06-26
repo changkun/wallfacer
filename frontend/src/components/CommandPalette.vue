@@ -19,7 +19,7 @@ const emit = defineEmits<{
 const router = useRouter();
 const route = useRoute();
 const taskStore = useTaskStore();
-const planning = useAgentStore();
+const agentStore = useAgentStore();
 const ui = useUiStore();
 
 const query = ref('');
@@ -197,9 +197,9 @@ const docMatches = computed<DocRow[]>(() => {
 const specMatches = computed<SpecNode[]>(() => {
   const q = query.value.trim();
   // On empty query, dump the spec tree (matches OLD's open-state Plan group).
-  if (!q) return planning.tree.filter((n) => n.spec).slice(0, 20);
+  if (!q) return agentStore.tree.filter((n) => n.spec).slice(0, 20);
   const scored: { node: SpecNode; score: number }[] = [];
-  for (const n of planning.tree) {
+  for (const n of agentStore.tree) {
     const title = n.spec?.title || n.path;
     const rt = fuzzyMatch(title, q);
     const rp = fuzzyMatch(n.path, q);
@@ -265,7 +265,7 @@ watch(
       remoteResults.value = [];
       activeIndex.value = 0;
       // Load the spec tree once so the Plan section can match (best-effort).
-      if (!planning.tree.length) void planning.fetchTree();
+      if (!agentStore.tree.length) void agentStore.fetchTree();
       nextTick(() => inputRef.value?.focus());
     } else {
       // Clear pending server search when closing.

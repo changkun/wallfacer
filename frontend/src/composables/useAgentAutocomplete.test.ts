@@ -1,4 +1,4 @@
-// The planning composer's @-mention autocomplete now delegates query detection
+// The agent composer's @-mention autocomplete now delegates query detection
 // and ranking to the shared lib/mentions helpers, so it ranks identically to the
 // other mention surface (basename-prefix first) instead of an unranked substring
 // match. This test pins that ranking.

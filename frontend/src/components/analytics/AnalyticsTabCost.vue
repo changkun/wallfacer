@@ -345,7 +345,7 @@ watch(agentSessionWindowDays, () => fetchAndRender());
               <AppSelect
                 v-model="agentSessionWindowDays"
                 :options="WINDOW_OPTIONS"
-                aria-label="Planning window"
+                aria-label="Agent session cost window"
               />
             </label>
           </div>

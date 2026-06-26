@@ -14,7 +14,7 @@ describe('i18n dictionaries', () => {
 
   // Execution moved from containers to host processes; the marketing copy must
   // not reintroduce container-era language or non-existent CLI surfaces. Bare
-  // "sandbox" stays allowed (harness abstraction, planning sandbox). Em dashes
+  // "sandbox" stays allowed (harness abstraction, agent session). Em dashes
   // are banned per house style: use commas, periods, colons, or hyphens.
   it('contains no stale container-era copy, dead commands, or em dashes', () => {
     const banned = [/container/i, /podman/i, /docker/i, /sandbox image/i, /wallfacer exec\b/i, /容器/, /沙箱镜像/, /&mdash;/i, /—/];

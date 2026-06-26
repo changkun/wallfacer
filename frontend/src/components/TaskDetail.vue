@@ -1971,7 +1971,7 @@ const isArchived = computed(() => !!props.task.archived);
 }
 .ta-stat--total .ta-stat__label { color: var(--text); font-weight: 600; }
 
-/* Pretty agent-activity rows (mirrors the planning chat's pcp-activity). */
+/* Pretty agent-activity rows (mirrors the agent chat's pcp-activity). */
 .ta-activity-log {
   display: flex;
   flex-direction: column;

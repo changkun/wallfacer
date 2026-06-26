@@ -111,12 +111,12 @@ describe('useChatSession deferred chat creation', () => {
 
   it('opens a blank draft without creating a server thread', async () => {
     await mount();
-    const planning = useAgentStore();
+    const agentStore = useAgentStore();
     // Land on an existing thread with content so we can prove it blanks.
-    planning.threads = {
+    agentStore.threads = {
       a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: 0 },
     };
-    planning.threadOrder = ['a'];
+    agentStore.threadOrder = ['a'];
     await session.switchToThread('a');
     await flush();
     expect(session.renderedMessages.value.length).toBe(1);
@@ -125,14 +125,14 @@ describe('useChatSession deferred chat creation', () => {
     await flush();
 
     expect(session.draft.value).toBe(true);
-    expect(planning.activeThreadId).toBe('');
+    expect(agentStore.activeThreadId).toBe('');
     expect(session.renderedMessages.value.length).toBe(0);
     expect(threadCreateCount()).toBe(0);
   });
 
   it('creates the thread on first send and keeps the user bubble', async () => {
     await mount();
-    const planning = useAgentStore();
+    const agentStore = useAgentStore();
 
     await session.createThread();
     await flush();
@@ -143,21 +143,21 @@ describe('useChatSession deferred chat creation', () => {
 
     expect(threadCreateCount()).toBe(1);
     expect(messagePostCount()).toBe(1);
-    expect(planning.activeThreadId).toBe('new-1');
+    expect(agentStore.activeThreadId).toBe('new-1');
     expect(session.draft.value).toBe(false);
     expect(session.renderedMessages.value.some((b) => b.role === 'user' && b.rawText === 'hello there')).toBe(true);
   });
 
   it('detaches a streaming thread on draft entry so the first message sends', async () => {
     await mount();
-    const planning = useAgentStore();
+    const agentStore = useAgentStore();
     // Thread "a" is mid-stream when the user clicks "New chat".
-    planning.streaming = true;
-    planning.streamingThreadId = 'a';
+    agentStore.streaming = true;
+    agentStore.streamingThreadId = 'a';
 
     await session.createThread();
     await flush();
-    expect(planning.streaming).toBe(false);
+    expect(agentStore.streaming).toBe(false);
 
     await session.sendMessage('first message');
     await flush();
@@ -165,20 +165,20 @@ describe('useChatSession deferred chat creation', () => {
     // Promoted and sent — not enqueued into the detached stream.
     expect(threadCreateCount()).toBe(1);
     expect(messagePostCount()).toBe(1);
-    expect(planning.threads['new-1']?.queue.length ?? 0).toBe(0);
+    expect(agentStore.threads['new-1']?.queue.length ?? 0).toBe(0);
   });
 
   it('a stale history load that resolves after a send does not wipe the message', async () => {
     await mount();
-    const planning = useAgentStore();
-    planning.threads = {
+    const agentStore = useAgentStore();
+    agentStore.threads = {
       a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: 0 },
     };
-    planning.threadOrder = ['a'];
+    agentStore.threadOrder = ['a'];
 
     // Block the history GET, then activate "a" so its load hangs in flight.
     messagesGate = new Promise<void>((r) => { releaseGate = r; });
-    planning.activeThreadId = 'a';
+    agentStore.activeThreadId = 'a';
     await nextTick();
 
     // Send while that load is still pending: bumps the history token.

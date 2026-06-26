@@ -64,7 +64,7 @@
   overflow: hidden;
 }
 
-/* Suppress the redundant "PLANNING CHAT" header row in chat-first —
+/* Suppress the redundant "CHAT" header row in chat-first —
    the thread tab bar already labels the pane and the card framing
    makes the explicit header look like visual noise. */
 .spec-mode-container[data-layout="chat-first"] .spec-chat-stream__header {

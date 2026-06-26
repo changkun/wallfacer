@@ -1,4 +1,4 @@
-// Pure helpers for rendering planning-chat message bubbles. Extracted from
+// Pure helpers for rendering agent-session chat message bubbles. Extracted from
 // AgentChatPanel.vue so they can be unit-tested in isolation and reused
 // by the streaming code path (which also needs to parse incoming NDJSON).
 import { renderMarkdown } from './markdown';
