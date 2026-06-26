@@ -291,7 +291,7 @@ defineExpose({
           </div>
         </div>
         <div class="scp-header-actions">
-          <button type="button" class="scp-iconbtn" title="Clear conversation" @click="chat.clearHistory">⌫</button>
+          <button type="button" class="scp-iconbtn scp-iconbtn--new" title="New chat" @click="newSession">+</button>
           <button type="button" class="scp-iconbtn" title="Hide chat (C)" @click="toggle">✕</button>
         </div>
       </header>
