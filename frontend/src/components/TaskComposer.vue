@@ -281,10 +281,6 @@ async function submit() {
   }
 }
 
-function clear() {
-  prompt.value = '';
-}
-
 function onKeydown(e: KeyboardEvent) {
   // The mention dropdown gets first crack at arrows / Enter / Tab / Escape.
   if (mentions.onKeydown(e, e.target as HTMLTextAreaElement)) return;
@@ -450,14 +446,6 @@ function onInput(e: Event) {
         @click="collapse"
       >
         Cancel
-      </button>
-      <button
-        type="button"
-        class="composer__btn composer__btn--ghost"
-        :disabled="!prompt.trim() || submitting"
-        @click="clear"
-      >
-        Clear
       </button>
       <button
         type="submit"
