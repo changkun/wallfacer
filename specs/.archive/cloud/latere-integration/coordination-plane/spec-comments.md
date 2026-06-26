@@ -1,6 +1,6 @@
 ---
 title: Inline Spec Comments
-status: complete
+status: archived
 depends_on:
   - specs/cloud/latere-integration/coordination-plane.md
 affects:

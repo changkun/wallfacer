@@ -1,6 +1,6 @@
 ---
 title: Spec Comments Git Export
-status: vague
+status: archived
 depends_on:
   - specs/cloud/latere-integration/coordination-plane/spec-comments.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - frontend/src/components/plan/
 effort: medium
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---
