@@ -86,3 +86,26 @@ describe('tasks store tasksById', () => {
     expect(badge?.blocking).toBe('Build deps');
   });
 });
+
+describe('tasks store done column ordering', () => {
+  it('orders done tasks by last updated time, most recent first', () => {
+    const store = useTaskStore();
+    store.setTasks([
+      { id: 'old', status: 'done', updated_at: '2026-06-01T00:00:00Z' } as Task,
+      { id: 'new', status: 'done', updated_at: '2026-06-26T00:00:00Z' } as Task,
+      { id: 'mid', status: 'cancelled', updated_at: '2026-06-15T00:00:00Z' } as Task,
+    ]);
+
+    expect(store.done.map(t => t.id)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('falls back to created_at when updated_at is missing', () => {
+    const store = useTaskStore();
+    store.setTasks([
+      { id: 'a', status: 'done', created_at: '2026-06-01T00:00:00Z' } as Task,
+      { id: 'b', status: 'done', created_at: '2026-06-10T00:00:00Z' } as Task,
+    ]);
+
+    expect(store.done.map(t => t.id)).toEqual(['b', 'a']);
+  });
+});
