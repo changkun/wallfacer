@@ -20,6 +20,7 @@ import (
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newTestServer creates an in-process HTTP server backed by a real store and a
@@ -34,7 +35,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 		t.Fatalf("write env file: %v", err)
 	}
 
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

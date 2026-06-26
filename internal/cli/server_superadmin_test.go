@@ -9,7 +9,7 @@ import (
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // fakeAuthProvider satisfies the handler.AuthProvider interface well
@@ -34,7 +34,7 @@ func (fakeAuthProvider) AuthURL() string { return "https://auth.latere.ai" }
 func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 	t.Helper()
 	workdir := t.TempDir()
-	s, err := store.NewFileStore(workdir + "/data")
+	s, err := storetest.NewFileStore(t, workdir+"/data")
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}

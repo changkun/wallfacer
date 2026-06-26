@@ -14,7 +14,7 @@ import (
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // TestContractRoutes_AllRegisteredInMux verifies that every route declared in
@@ -29,7 +29,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestRefineRoutesRemoved(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

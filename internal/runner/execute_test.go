@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // setupRunnerWithCmd creates a Store and Runner for testing with a custom
@@ -36,7 +37,7 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 		}
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

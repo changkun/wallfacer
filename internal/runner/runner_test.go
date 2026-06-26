@@ -14,6 +14,7 @@ import (
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -72,7 +73,7 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +117,7 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 func newTestRunner(t *testing.T) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +146,7 @@ func TestHostCodexAuthStatus_Valid(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +165,7 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newFiltStore returns a FileStore and a helper that inserts a task with
@@ -16,7 +17,7 @@ import (
 func newFiltStore(t *testing.T) (*store.Store, func(orgID, createdBy string) uuid.UUID) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -43,7 +44,7 @@ func newFiltStore(t *testing.T) (*store.Store, func(orgID, createdBy string) uui
 // from the JSON tag layout or the clone helper generator.
 func TestTask_CreatedByAndOrgID_RoundTrip(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestTask_CreatedByAndOrgID_RoundTrip(t *testing.T) {
 	s.WaitCompaction()
 
 	// Reopen from disk.
-	s2, err := store.NewFileStore(dir)
+	s2, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore (reopen): %v", err)
 	}

@@ -12,6 +12,7 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // registerTestBinding installs a binding under a test-only slug and
@@ -30,7 +31,7 @@ func registerTestBinding(t *testing.T, slug string, b agentBinding) {
 func newAgentTestRunner(t *testing.T) (*Runner, *MockSandboxBackend, *store.Store) {
 	t.Helper()
 	dir := t.TempDir()
-	s, err := store.NewFileStore(dir)
+	s, err := storetest.NewFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}

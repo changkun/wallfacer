@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // buildFakeAgentForTest compiles the sandbox package's fakeagent helper into
@@ -30,7 +31,7 @@ func buildFakeAgentForTest(t *testing.T) string {
 func newStoreForTest(t *testing.T) *store.Store {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewFileStore(dataDir)
+	s, err := storetest.NewFileStore(t, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
