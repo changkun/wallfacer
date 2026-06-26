@@ -727,7 +727,9 @@ async function submitFeedback() {
   if (!text || submittingFeedback.value) return;
   submittingFeedback.value = true;
   try {
-    await api('POST', `/api/tasks/${props.task.id}/feedback`, { feedback: text });
+    // The handler decodes json:"message"; sending `feedback` left the message
+    // empty and the request 400'd ("message is required").
+    await api('POST', `/api/tasks/${props.task.id}/feedback`, { message: text });
     feedback.value = '';
   } catch (e) {
     console.error('feedback:', e);
