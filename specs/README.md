@@ -41,7 +41,7 @@ Shared Design - 4 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
   ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
   ○ Token & Cost Optimization      ○ Extensible Prompts
-  ○ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
+  ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -194,7 +194,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [harness-abstraction/pi.md](shared/harness-abstraction/pi.md) | **Complete** | Both | Pi (earendil-works coding agent) harness, JSON mode. Shipped: `harness.Pi` adapter, `launchPi` host wiring, config/UI surfacing, docs, unit + build-tag-gated e2e tests. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | Drafted | Both | Cache observability, `--resume` correctness audit, host-side shell output compression (RTK as a PATH wrapper, not an image build), consumption regression model, budgeting. Cost-visibility tiles already shipped. |
 | [extensible-prompts.md](shared/extensible-prompts.md) | Vague | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. |
-| [agent-session-vocabulary.md](shared/agent-session-vocabulary.md) | Drafted | Both | Generalize the "planning" chat machinery (`internal/planner/`, `PlanningThread`, `usePlanningStore`, `/api/planning/*`) onto one `AgentSession` / `useAgentStore` vocabulary. Keeps genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrates routes, storage, env, and localStorage with a one-time shim. |
+| [agent-session-vocabulary.md](shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
 
 ### Why these are shared
