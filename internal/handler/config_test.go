@@ -108,6 +108,13 @@ func newTestHandlerWithWorkspaces(t *testing.T) (*Handler, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Drain background trace compaction before t.TempDir's RemoveAll runs;
+	// otherwise a terminal-state transition (e.g. undispatch cancelling a
+	// backlog task) schedules a compaction goroutine that writes traces/
+	// while cleanup deletes the dir ("directory not empty"). Registered
+	// before r.WaitBackground so it runs after it (LIFO), draining any
+	// compaction the runner scheduled.
+	t.Cleanup(s.Close)
 
 	envPath := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(envPath, []byte{}, 0644); err != nil {
