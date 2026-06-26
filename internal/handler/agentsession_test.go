@@ -16,7 +16,7 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-func TestGetPlanningStatus_NilPlanner(t *testing.T) {
+func TestGetAgentSessionStatus_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 	// h.agentSession is nil by default — should return running: false.
 
@@ -37,7 +37,7 @@ func TestGetPlanningStatus_NilPlanner(t *testing.T) {
 	}
 }
 
-func TestGetPlanningStatus_WithPlanner(t *testing.T) {
+func TestGetAgentSessionStatus_WithAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 	h.agentSession = agentsession.New(agentsession.Config{Command: "podman"})
 
@@ -59,7 +59,7 @@ func TestGetPlanningStatus_WithPlanner(t *testing.T) {
 	}
 }
 
-func TestStartPlanning_NilPlanner(t *testing.T) {
+func TestStartAgentSession_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
@@ -71,7 +71,7 @@ func TestStartPlanning_NilPlanner(t *testing.T) {
 	}
 }
 
-func TestStopPlanning_NilPlanner(t *testing.T) {
+func TestStopAgentSession_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
@@ -91,7 +91,7 @@ func TestStopPlanning_NilPlanner(t *testing.T) {
 	}
 }
 
-func TestStopPlanning_WithPlanner(t *testing.T) {
+func TestStopAgentSession_WithAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 	h.agentSession = agentsession.New(agentsession.Config{Command: "podman"})
 
@@ -112,23 +112,23 @@ func TestStopPlanning_WithPlanner(t *testing.T) {
 	}
 }
 
-func TestSetPlanner(t *testing.T) {
+func TestSetAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 	if h.agentSession != nil {
-		t.Fatal("expected nil planner by default")
+		t.Fatal("expected nil agent session by default")
 	}
 
 	p := agentsession.New(agentsession.Config{Command: "podman"})
 	h.SetAgentSession(p)
 
 	if h.agentSession != p {
-		t.Error("SetAgentSession did not set the planner field")
+		t.Error("SetAgentSession did not set the agent session field")
 	}
 }
 
-// --- Planning Messages ---
+// --- Agent Messages ---
 
-func newPlannerWithStore(t *testing.T) *agentsession.Runtime {
+func newAgentSessionWithStore(t *testing.T) *agentsession.Runtime {
 	t.Helper()
 	return agentsession.New(agentsession.Config{
 		Command:     "podman",
@@ -137,9 +137,9 @@ func newPlannerWithStore(t *testing.T) *agentsession.Runtime {
 	})
 }
 
-func TestGetPlanningMessages_Empty(t *testing.T) {
+func TestGetAgentMessages_Empty(t *testing.T) {
 	h := newTestHandler(t)
-	h.agentSession = newPlannerWithStore(t)
+	h.agentSession = newAgentSessionWithStore(t)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/agent/messages", nil)
@@ -158,9 +158,9 @@ func TestGetPlanningMessages_Empty(t *testing.T) {
 	}
 }
 
-func TestGetPlanningMessages_WithHistory(t *testing.T) {
+func TestGetAgentMessages_WithHistory(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
 	cs := p.ActiveConversation()
@@ -190,9 +190,9 @@ func TestGetPlanningMessages_WithHistory(t *testing.T) {
 	}
 }
 
-func TestGetPlanningMessages_Pagination(t *testing.T) {
+func TestGetAgentMessages_Pagination(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
 	cs := p.ActiveConversation()
@@ -221,7 +221,7 @@ func TestGetPlanningMessages_Pagination(t *testing.T) {
 	}
 }
 
-func TestGetPlanningMessages_NilPlanner(t *testing.T) {
+func TestGetAgentMessages_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
@@ -233,11 +233,11 @@ func TestGetPlanningMessages_NilPlanner(t *testing.T) {
 	}
 }
 
-func TestSendPlanningMessage_AutoStarts(t *testing.T) {
+func TestSendAgentMessage_AutoStarts(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
-	// Planner not started — should auto-start and return 202.
+	// agent session not started — should auto-start and return 202.
 	// The exec will fail in the background (no backend) but the
 	// HTTP response is 202 immediately.
 
@@ -251,9 +251,9 @@ func TestSendPlanningMessage_AutoStarts(t *testing.T) {
 	}
 }
 
-func TestSendPlanningMessage_Busy(t *testing.T) {
+func TestSendAgentMessage_Busy(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	p.SetBusy(true, "")
 	h.agentSession = p
@@ -276,9 +276,9 @@ func TestSendPlanningMessage_Busy(t *testing.T) {
 	}
 }
 
-func TestSendPlanningMessage_EmptyMessage(t *testing.T) {
+func TestSendAgentMessage_EmptyMessage(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	h.agentSession = p
 
@@ -292,9 +292,9 @@ func TestSendPlanningMessage_EmptyMessage(t *testing.T) {
 	}
 }
 
-func TestClearPlanningMessages(t *testing.T) {
+func TestClearAgentMessages(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
 	cs := p.ActiveConversation()
@@ -314,7 +314,7 @@ func TestClearPlanningMessages(t *testing.T) {
 	}
 }
 
-func TestClearPlanningMessages_NilPlanner(t *testing.T) {
+func TestClearAgentMessages_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
@@ -328,9 +328,9 @@ func TestClearPlanningMessages_NilPlanner(t *testing.T) {
 
 // --- Stream ---
 
-func TestStreamPlanningMessages_NotBusy(t *testing.T) {
+func TestStreamAgentMessages_NotBusy(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
 	rec := httptest.NewRecorder()
@@ -342,7 +342,7 @@ func TestStreamPlanningMessages_NotBusy(t *testing.T) {
 	}
 }
 
-func TestStreamPlanningMessages_NilPlanner(t *testing.T) {
+func TestStreamAgentMessages_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
@@ -354,9 +354,9 @@ func TestStreamPlanningMessages_NilPlanner(t *testing.T) {
 	}
 }
 
-func TestStreamPlanningMessages_LiveData(t *testing.T) {
+func TestStreamAgentMessages_LiveData(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
 	// Simulate a live log with some data, then close it.
@@ -384,9 +384,9 @@ func TestStreamPlanningMessages_LiveData(t *testing.T) {
 
 // --- Commands ---
 
-func TestGetPlanningCommands(t *testing.T) {
+func TestGetAgentCommands(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.SetAgentSession(p)
 
 	rec := httptest.NewRecorder()
@@ -425,9 +425,9 @@ func TestGetPlanningCommands(t *testing.T) {
 	}
 }
 
-func TestGetPlanningCommands_NilRegistry(t *testing.T) {
+func TestGetAgentCommands_NilRegistry(t *testing.T) {
 	h := newTestHandler(t)
-	// No planner set — commandRegistry is nil.
+	// No agent session set — commandRegistry is nil.
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/agent/commands", nil)
@@ -440,9 +440,9 @@ func TestGetPlanningCommands_NilRegistry(t *testing.T) {
 
 // --- Interrupt ---
 
-func TestInterruptPlanningMessage_NotBusy(t *testing.T) {
+func TestInterruptAgentMessage_NotBusy(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 	// Not busy — should return 409.
 
@@ -455,9 +455,9 @@ func TestInterruptPlanningMessage_NotBusy(t *testing.T) {
 	}
 }
 
-func TestInterruptPlanningMessage_Busy(t *testing.T) {
+func TestInterruptAgentMessage_Busy(t *testing.T) {
 	h := newTestHandler(t)
-	p := newPlannerWithStore(t)
+	p := newAgentSessionWithStore(t)
 	_ = p.Start(context.Background())
 	p.SetBusy(true, "")
 	_ = p.StartLiveLog()
@@ -472,14 +472,14 @@ func TestInterruptPlanningMessage_Busy(t *testing.T) {
 	}
 
 	if p.IsBusy() {
-		t.Error("planner should not be busy after interrupt")
+		t.Error("agent session should not be busy after interrupt")
 	}
 	if p.LogReader("") != nil {
 		t.Error("live log should be nil after interrupt")
 	}
 }
 
-func TestInterruptPlanningMessage_NilPlanner(t *testing.T) {
+func TestInterruptAgentMessage_NilAgentSession(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := httptest.NewRecorder()
@@ -491,11 +491,11 @@ func TestInterruptPlanningMessage_NilPlanner(t *testing.T) {
 	}
 }
 
-// --- Planning round usage persistence ---
+// --- Agent-session round usage persistence ---
 
-// planningSuccessStdout builds a stream-json result line with the supplied
+// agentRoundStdout builds a stream-json result line with the supplied
 // tokens and cost. It matches the shape emitted by the agent container.
-func planningSuccessStdout(input, output, cacheRead, cacheCreation int, cost float64) []byte {
+func agentRoundStdout(input, output, cacheRead, cacheCreation int, cost float64) []byte {
 	payload := map[string]any{
 		"type":           "result",
 		"stop_reason":    "end_turn",
@@ -514,11 +514,11 @@ func planningSuccessStdout(input, output, cacheRead, cacheCreation int, cost flo
 	return b
 }
 
-func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
+func TestAgentSessionHandler_PersistsRoundUsage(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
-	raw := planningSuccessStdout(120, 40, 15, 5, 0.0123)
+	raw := agentRoundStdout(120, 40, 15, 5, 0.0123)
 	h.persistAgentRoundUsage(raw)
 
 	key := store.AgentSessionGroupKey([]string{ws})
@@ -546,19 +546,19 @@ func TestPlanningHandler_PersistsRoundUsage(t *testing.T) {
 		t.Errorf("sandbox: got %q, want claude", got.Sandbox)
 	}
 	if got.SubAgent != store.SandboxActivityAgentSession {
-		t.Errorf("sub_agent: got %q, want planning", got.SubAgent)
+		t.Errorf("sub_agent: got %q, want agent-session", got.SubAgent)
 	}
 	if got.Turn != 1 {
 		t.Errorf("turn: got %d, want 1", got.Turn)
 	}
 }
 
-func TestPlanningHandler_IncrementsTurn(t *testing.T) {
+func TestAgentSessionHandler_IncrementsTurn(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
-	h.persistAgentRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
-	h.persistAgentRoundUsage(planningSuccessStdout(20, 8, 0, 0, 0.002))
+	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001))
+	h.persistAgentRoundUsage(agentRoundStdout(20, 8, 0, 0, 0.002))
 
 	key := store.AgentSessionGroupKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -573,7 +573,7 @@ func TestPlanningHandler_IncrementsTurn(t *testing.T) {
 	}
 }
 
-func TestPlanningHandler_FailedExecDoesNotPersist(t *testing.T) {
+func TestAgentSessionHandler_FailedExecDoesNotPersist(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
@@ -648,7 +648,7 @@ func TestArchivedSpecGuard(t *testing.T) {
 	}
 }
 
-func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
+func TestAgentSessionHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
@@ -662,13 +662,13 @@ func TestPlanningHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	h.configDir = blocker
 
 	// Must not panic.
-	h.persistAgentRoundUsage(planningSuccessStdout(10, 5, 0, 0, 0.001))
+	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001))
 }
 
-// TestSendPlanningMessage_BothFocusedFields verifies that setting both
+// TestSendAgentMessage_BothFocusedFields verifies that setting both
 // focused_spec and focused_task in a single message is rejected with 422.
-func TestSendPlanningMessage_BothFocusedFields(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestSendAgentMessage_BothFocusedFields(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	body := strings.NewReader(`{"message":"hi","focused_spec":"specs/foo.md","focused_task":"11111111-1111-1111-1111-111111111111"}`)
 	rec := httptest.NewRecorder()
@@ -680,10 +680,10 @@ func TestSendPlanningMessage_BothFocusedFields(t *testing.T) {
 	}
 }
 
-// TestSendPlanningMessage_UnknownFocusedTask verifies that a focused_task
+// TestSendAgentMessage_UnknownFocusedTask verifies that a focused_task
 // pointing to a non-existent task returns 404.
-func TestSendPlanningMessage_UnknownFocusedTask(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestSendAgentMessage_UnknownFocusedTask(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	body := strings.NewReader(`{"message":"hi","focused_task":"00000000-0000-0000-0000-000000000001"}`)
 	rec := httptest.NewRecorder()
@@ -695,10 +695,10 @@ func TestSendPlanningMessage_UnknownFocusedTask(t *testing.T) {
 	}
 }
 
-// TestSendPlanningMessage_ModeMismatch verifies that sending a spec-mode
+// TestSendAgentMessage_ModeMismatch verifies that sending a spec-mode
 // message to a task-mode thread (and vice versa) returns 409.
-func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+func TestSendAgentMessage_ModeMismatch(t *testing.T) {
+	h := newAgentSessionHandlerWithThreads(t)
 
 	// Create a task so we have a valid task ID.
 	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
@@ -749,7 +749,7 @@ func TestSendPlanningMessage_ModeMismatch(t *testing.T) {
 
 func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 	ctx := context.Background()
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  "original prompt",
 		Timeout: 15,
@@ -811,7 +811,7 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 
 func TestUpdateTaskPromptTool_WrongThreadMode(t *testing.T) {
 	ctx := context.Background()
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  "original",
 		Timeout: 15,
@@ -839,7 +839,7 @@ func TestUpdateTaskPromptTool_MismatchedTaskID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create task A (pinned in thread) and task B (sent in request).
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	taskA, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "A", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask A: %v", err)
@@ -874,7 +874,7 @@ func TestUpdateTaskPromptTool_MismatchedTaskID(t *testing.T) {
 
 func TestUpdateTaskPromptTool_ResumeHintOnWaiting(t *testing.T) {
 	ctx := context.Background()
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  "original",
 		Timeout: 15,
@@ -950,7 +950,7 @@ func TestTaskPromptRefine_TemplateFieldsPopulated(t *testing.T) {
 }
 
 func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	tm := h.agentSession.Sessions()
 	threads := tm.List(false)
 	if len(threads) == 0 {
@@ -973,7 +973,7 @@ func TestIsTaskLocked_TrueDuringTurn(t *testing.T) {
 		t.Error("isTaskLockedByAgent: want false when not busy")
 	}
 
-	// Mark the planner busy on this thread.
+	// Mark the agent session busy on this thread.
 	h.agentSession.SetBusy(true, threadID)
 	defer h.agentSession.SetBusy(false, "")
 

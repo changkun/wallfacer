@@ -447,7 +447,7 @@ func TestTestVerification_NoCriteria(t *testing.T) {
 	}
 }
 
-// TestRenderSpec verifies that the planning template renders without error
+// TestRenderSpec verifies that the spec template renders without error
 // and contains key phrases.
 func TestRenderSpec(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
@@ -519,7 +519,7 @@ func TestPackageLevelSpecSystemPrompts(t *testing.T) {
 // TestPromptRegistry_SpecOverridable exercises the full
 // write → render → delete → render cycle for both planning_system_*
 // templates. Required by agent-system-prompts.md so that users can
-// customize the planning agent's framing without forking the binary.
+// customize the agent's framing without forking the binary.
 func TestPromptRegistry_SpecOverridable(t *testing.T) {
 	for _, name := range []string{"spec_system_empty", "spec_system_nonempty"} {
 		t.Run(name, func(t *testing.T) {

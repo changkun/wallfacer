@@ -77,7 +77,7 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 	}
 }
 
-// TestIdeationTaskBillsUsageOnce verifies the no-planner (ephemeral) path bills
+// TestIdeationTaskBillsUsageOnce verifies the no-agent-session (ephemeral) path bills
 // the brainstorm agent's usage/cost exactly once. Previously runAgent's
 // auto-billing AND the manual block in runIdeationTask both charged the same
 // turn, doubling Usage.CostUSD and writing two Turn-1 idea_agent records.
@@ -1198,11 +1198,11 @@ func TestIdeationHistoryRound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Planner-based ideation
+// Agent-session-based ideation
 // ---------------------------------------------------------------------------
 
-// TestIdeationViaPlanner verifies that when a planner is set on the runner,
-// RunIdeation routes through runIdeationViaPlanner and the planner is
+// TestIdeationViaPlanner verifies that when an agent session is set on the runner,
+// RunIdeation routes through runIdeationViaPlanner and the agent session is
 // auto-started.
 func TestIdeationViaPlanner(t *testing.T) {
 	ideas := []IdeateResult{
@@ -1212,7 +1212,7 @@ func TestIdeationViaPlanner(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	// Create a planner backed by the same sandbox backend the runner uses.
+	// Create an agent session backed by the same sandbox backend the runner uses.
 	p := agentsession.New(agentsession.Config{
 		Backend:     r.backend,
 		Command:     r.command,
@@ -1221,9 +1221,9 @@ func TestIdeationViaPlanner(t *testing.T) {
 	})
 	r.SetAgentSession(p)
 
-	// Planner is not started — auto-start should happen inside RunIdeation.
+	// Agent session is not started — auto-start should happen inside RunIdeation.
 	if p.IsRunning() {
-		t.Fatal("planner should not be running before RunIdeation")
+		t.Fatal("agent session should not be running before RunIdeation")
 	}
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
@@ -1237,11 +1237,11 @@ func TestIdeationViaPlanner(t *testing.T) {
 
 	resultIdeas, _, _, _, _, err := r.RunIdeation(ctx, task.ID, "brainstorm prompt")
 	if err != nil {
-		t.Fatalf("RunIdeation via planner: %v", err)
+		t.Fatalf("RunIdeation via agent session: %v", err)
 	}
 
 	if !p.IsRunning() {
-		t.Error("planner should have been auto-started by RunIdeation")
+		t.Error("agent session should have been auto-started by RunIdeation")
 	}
 
 	if len(resultIdeas) != 1 {
@@ -1253,7 +1253,7 @@ func TestIdeationViaPlanner(t *testing.T) {
 }
 
 // TestIdeationViaPlannerCodexFallbackSkipped verifies that when running
-// through the planner, Codex fallback is skipped (logged, not retried).
+// through the agent session, Codex fallback is skipped (logged, not retried).
 func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
 	// Simulate a token limit error output.
 	tokenLimitOutput := `{"result":"Error: token limit exceeded","session_id":"ideate-sess","stop_reason":"end_turn","is_error":true,"subtype":"token_limit","total_cost_usd":0.001}`
@@ -1274,21 +1274,21 @@ func TestIdeationViaPlannerCodexFallbackSkipped(t *testing.T) {
 	// fail, which is expected.
 	_, _, output, _, _, _ := r.RunIdeation(ctx, uuid.Nil, "brainstorm prompt")
 
-	// If we got output, the planner path was used (no codex retry).
+	// If we got output, the agent session path was used (no codex retry).
 	if output != nil && !output.IsError {
-		t.Error("expected error output from token-limited planner run")
+		t.Error("expected error output from token-limited agent-session run")
 	}
 }
 
 // TestIdeationFallsBackToEphemeralWithoutPlanner verifies that RunIdeation
-// uses the ephemeral container path when no planner is set.
+// uses the ephemeral container path when no agent session is set.
 func TestIdeationFallsBackToEphemeralWithoutPlanner(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Improve docs", Prompt: "Update README.", ImpactScore: 75},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	_, r := setupRunnerWithCmd(t, nil, cmd)
-	// No planner set — should use ephemeral path.
+	// No agent session set — should use ephemeral path.
 
 	ctx := context.Background()
 	resultIdeas, _, _, _, _, err := r.RunIdeation(ctx, uuid.Nil, "brainstorm prompt")

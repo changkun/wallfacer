@@ -596,7 +596,7 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 	}
 }
 
-// --- Planning section ---
+// --- Agent-session section ---
 
 func TestAggregatePlanningStats_EmptyDir(t *testing.T) {
 	configDir := t.TempDir()
@@ -748,8 +748,8 @@ func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
 	}}
 	baseline := aggregateStats(tasks, noSummary)
 
-	// Now aggregate again with planning records present. Execution buckets
-	// must be byte-for-byte equal to the baseline (after clearing Planning).
+	// Now aggregate again with agent-session records present. Execution buckets
+	// must be byte-for-byte equal to the baseline (after clearing AgentSessions).
 	withPlanning := aggregateStats(tasks, noSummary)
 	configDir := t.TempDir()
 	ws := []string{"/repo/x"}
@@ -757,24 +757,24 @@ func TestGetStats_ExecutionUnchangedByPlanning(t *testing.T) {
 	if err := store.AppendAgentSessionUsage(configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: now, CostUSD: 0.99, InputTokens: 9999, OutputTokens: 9999,
 	}); err != nil {
-		t.Fatalf("seed planning: %v", err)
+		t.Fatalf("seed agent-session: %v", err)
 	}
 	withPlanning.AgentSessions = aggregateAgentSessionStats(configDir, ws, time.Time{})
 
-	// Zero out the Planning field on both sides, then compare the rest
+	// Zero out the AgentSessions field on both sides, then compare the rest
 	// via JSON round-trip to catch any silent drift in execution buckets.
 	baseline.AgentSessions = nil
 	withPlanning.AgentSessions = nil
 	wantJSON, _ := json.Marshal(baseline)
 	gotJSON, _ := json.Marshal(withPlanning)
 	if string(wantJSON) != string(gotJSON) {
-		t.Errorf("execution buckets drifted when planning data is present\nbaseline: %s\n     got: %s", wantJSON, gotJSON)
+		t.Errorf("execution buckets drifted when agent-session data is present\nbaseline: %s\n     got: %s", wantJSON, gotJSON)
 	}
 }
 
 func TestGetStats_PlanningEndpoint(t *testing.T) {
-	// Integration-flavored: seed planning records under the handler's configDir,
-	// call GetStats over HTTP, and assert the Planning section appears in the
+	// Integration-flavored: seed agent-session records under the handler's configDir,
+	// call GetStats over HTTP, and assert the AgentSessions section appears in the
 	// JSON response.
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
@@ -783,7 +783,7 @@ func TestGetStats_PlanningEndpoint(t *testing.T) {
 	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, OutputTokens: 5, CostUSD: 0.01,
 	}); err != nil {
-		t.Fatalf("seed planning: %v", err)
+		t.Fatalf("seed agent-session: %v", err)
 	}
 
 	rec := httptest.NewRecorder()
@@ -798,13 +798,13 @@ func TestGetStats_PlanningEndpoint(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if resp.AgentSessions == nil {
-		t.Fatal("Planning should not be nil")
+		t.Fatal("AgentSessions should not be nil")
 	}
 	stat, ok := resp.AgentSessions[key]
 	if !ok {
-		t.Fatalf("no planning entry for active group key %q", key)
+		t.Fatalf("no agent-session entry for active group key %q", key)
 	}
 	if stat.RoundCount != 1 || stat.Usage.CostUSD != 0.01 {
-		t.Errorf("planning entry wrong: %+v", stat)
+		t.Errorf("agent-session entry wrong: %+v", stat)
 	}
 }

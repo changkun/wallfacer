@@ -4494,7 +4494,7 @@ func TestCreateTask_FlowFieldPersisted(t *testing.T) {
 }
 
 func TestPatchTask_RejectedWhenLocked(t *testing.T) {
-	h := newPlannerHandlerWithThreads(t)
+	h := newAgentSessionHandlerWithThreads(t)
 	ctx := context.Background()
 
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "lock test"})
