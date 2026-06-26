@@ -106,10 +106,22 @@ const outOfSync = computed(() => outOfSyncCount(threads.value));
 const optedIn = ref(false);
 const coordToggleAvailable = ref(false);
 const enabling = ref(false);
-// signedIn gates the whole comment surface: when the user is not signed in, no
-// comment chrome appears at all. coordState drives the connection indicator.
-const signedIn = ref(false);
+// coordSignedIn reflects the COORDINATION connector's token (token.json on the
+// instance): true when a usable wire token exists. It is necessary but not
+// sufficient to show the comment surface. coordState drives the connection
+// indicator.
+const coordSignedIn = ref(false);
 const coordState = ref<string>('');
+
+// browserSignedIn is the BROWSER session principal (GET /api/me). The two auth
+// states diverge: a logged-out browser on a machine that still holds a token.json
+// would otherwise show a working comment box and submit as the token's owner
+// (the coordinator stamps the connector identity, not the browser's). Gate the
+// surface on the browser session too, so the comment chrome matches the
+// "Sign in" state and a logged-out user cannot comment.
+const browserSignedIn = computed(() => !!auth.me?.principal_id);
+// signedIn is the combined gate: both a wire token and a browser session.
+const signedIn = computed(() => coordSignedIn.value && browserSignedIn.value);
 
 async function fetchStatus() {
   try {
@@ -118,11 +130,11 @@ async function fetchStatus() {
     }>('GET', '/api/coordination/status');
     optedIn.value = !!s.opted_in;
     coordToggleAvailable.value = !!s.available;
-    signedIn.value = !!s.signed_in;
+    coordSignedIn.value = !!s.signed_in;
     coordState.value = s.state || '';
   } catch {
     coordToggleAvailable.value = false;
-    signedIn.value = false;
+    coordSignedIn.value = false;
     coordState.value = '';
   }
 }
