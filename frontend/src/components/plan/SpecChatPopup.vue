@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// SpecChatPopup — the planning chat as a floating, draggable, resizable popup
+// SpecChatPopup — the agent chat as a floating, draggable, resizable popup
 // that hovers over the focused spec view (Plan page). Replaces the old docked
 // chat column so the spec tree and focused view reclaim the full width. Open
 // state, position, and size persist to localStorage. Built from the shared chat
@@ -11,8 +11,8 @@ import { useChatSession } from '../../composables/useChatSession';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
 
-const planning = useAgentStore();
-const { threads, threadOrder, activeThreadId } = storeToRefs(planning);
+const agentStore = useAgentStore();
+const { threads, threadOrder, activeThreadId } = storeToRefs(agentStore);
 
 const chat = useChatSession();
 

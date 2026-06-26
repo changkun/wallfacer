@@ -18,7 +18,7 @@ withDefaults(defineProps<{ chatVisible: boolean; chatEnabled?: boolean }>(), {
 });
 const emit = defineEmits<{ toggleChat: []; focusSibling: [path: string]; sendChat: [text: string] }>();
 
-const planning = useAgentStore();
+const agentStore = useAgentStore();
 const tasks = useTaskStore();
 const toast = useToastStore();
 const dialog = useDialogStore();
@@ -26,7 +26,7 @@ const router = useRouter();
 const {
   focusedSpecPath, focusedIsIndex, focusedNode, tree, staleCandidates,
   focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
-} = storeToRefs(planning);
+} = storeToRefs(agentStore);
 
 const staleCandidate = computed(() =>
   focusedSpecPath.value ? staleCandidates.value[focusedSpecPath.value] : undefined,
@@ -42,7 +42,7 @@ const affects = computed(() => focusedNode.value?.spec?.affects ?? []);
 const changedAffects = computed(() => new Set(staleCandidate.value?.files ?? []));
 
 function focusRelated(path: string) {
-  planning.focusSpec(path);
+  agentStore.focusSpec(path);
 }
 function shortSpecPath(p: string): string {
   return p.replace(/^specs\//, '').replace(/\.md$/, '');
@@ -310,7 +310,7 @@ async function onStaleCandidateAction(action: 'stale' | 'dismiss-stale') {
   actionBusy.value = true;
   try {
     await api('POST', '/api/specs/transition', { action, path: focusedSpecPath.value });
-    await planning.fetchStaleCandidates();
+    await agentStore.fetchStaleCandidates();
     await loadCurrent();
     toast.push(action === 'stale' ? 'Spec marked stale' : 'Stale candidate dismissed', { kind: 'success' });
   } catch (e) {

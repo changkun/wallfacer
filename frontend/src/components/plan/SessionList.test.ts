@@ -31,13 +31,13 @@ const DAY = 86_400_000;
 
 async function mount(updatedA = Date.now(), updatedB = Date.now()) {
   setActivePinia(createPinia());
-  const planning = useAgentStore();
-  planning.threads = {
+  const agentStore = useAgentStore();
+  agentStore.threads = {
     a: { id: 'a', name: 'Alpha', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: updatedA },
     b: { id: 'b', name: 'Beta', archived: false, mode: '', task_id: '', unread: false, scrollTop: 0, queue: [], enqueuedAt: 0, lastViewedAt: 0, created: 0, updated: updatedB },
   };
-  planning.threadOrder = ['a', 'b'];
-  planning.activeThreadId = 'a';
+  agentStore.threadOrder = ['a', 'b'];
+  agentStore.activeThreadId = 'a';
 
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -46,7 +46,7 @@ async function mount(updatedA = Date.now(), updatedB = Date.now()) {
   await nextTick();
   await nextTick(); // let onMounted refreshBusy resolve
   await nextTick();
-  return planning;
+  return agentStore;
 }
 
 beforeEach(() => { document.body.innerHTML = ''; });
@@ -67,9 +67,9 @@ describe('SessionList running spinner', () => {
   });
 
   it('spins the locally-streaming thread immediately', async () => {
-    const planning = await mount();
-    planning.streaming = true;
-    planning.streamingThreadId = 'a';
+    const agentStore = await mount();
+    agentStore.streaming = true;
+    agentStore.streamingThreadId = 'a';
     await nextTick();
     expect(rowFor('Alpha')!.querySelector('.chat-session-spinner')).not.toBeNull();
   });

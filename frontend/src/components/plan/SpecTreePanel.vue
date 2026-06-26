@@ -10,20 +10,20 @@ import { useUiStore } from '../../stores/ui';
 import { useDialogStore } from '../../stores/dialog';
 import AppSelect from '../AppSelect.vue';
 
-const planning = useAgentStore();
+const agentStore = useAgentStore();
 const taskStore = useTaskStore();
 const ui = useUiStore();
 const dialog = useDialogStore();
 const {
   tree, treeProgress, treeIndex, treeLoading,
   focusedSpecPath, focusedIsIndex, focusedTaskId, staleCandidates,
-} = storeToRefs(planning);
+} = storeToRefs(agentStore);
 
 const rescanning = ref(false);
 async function onRescanStaleness() {
   rescanning.value = true;
   try {
-    await planning.fetchStaleCandidates();
+    await agentStore.fetchStaleCandidates();
   } finally {
     rescanning.value = false;
   }
@@ -43,7 +43,7 @@ async function onDismissAllStaleness() {
   if (!ok) return;
   rescanning.value = true;
   try {
-    await planning.dismissAllStaleCandidates();
+    await agentStore.dismissAllStaleCandidates();
   } finally {
     rescanning.value = false;
   }
@@ -123,7 +123,7 @@ async function openTaskPrompt(entry: TaskPromptEntry) {
   // Pull the freshest prompt from the in-memory tasks store if available.
   const cached = taskStore.tasks.find(t => t.id === entry.task_id);
   const prompt = cached?.prompt ?? entry.title;
-  await planning.openPlanForTask(entry.task_id, entry.title, prompt);
+  await agentStore.openPlanForTask(entry.task_id, entry.title, prompt);
 }
 
 function persistExpanded() {
@@ -255,11 +255,11 @@ function toggleNode(path: string) {
 }
 
 function selectNode(node: SpecNode) {
-  planning.focusSpec(node.path);
+  agentStore.focusSpec(node.path);
 }
 
 function selectIndex() {
-  if (treeIndex.value) planning.focusIndex();
+  if (treeIndex.value) agentStore.focusIndex();
 }
 
 function setStatusFilter(v: string) {
@@ -403,7 +403,7 @@ async function adoptDocNodes() {
         errors.push(`${path}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    await planning.fetchTree();
+    await agentStore.fetchTree();
     if (errors.length > 0) {
       await dialog.alert(`Adopted ${paths.length - errors.length}. ${errors.length} failed:\n${errors.join('\n')}`);
     }
@@ -420,7 +420,7 @@ async function adoptDocNodes() {
 
 onMounted(() => {
   void loadTaskPrompts();
-  void planning.fetchStaleCandidates();
+  void agentStore.fetchStaleCandidates();
 });
 
 // Keep the Task Prompts list fresh against the SSE-synced task store: reload
