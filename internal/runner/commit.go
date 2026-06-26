@@ -498,9 +498,7 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 		return "", fmt.Errorf("commit message agent: %s", msg)
 	}
 
-	msg := strings.TrimSpace(output.Result)
-	msg = strings.Trim(msg, "`")
-	msg = strings.TrimSpace(msg)
+	msg := sanitizeCommitMessage(output.Result)
 	if msg == "" {
 		return "", fmt.Errorf("commit message agent returned blank result")
 	}
@@ -527,13 +525,79 @@ func parseCommitMessageResult(o *agentOutput) (any, error) {
 		}
 		return "", fmt.Errorf("%s", msg)
 	}
-	msg := strings.TrimSpace(o.Result)
-	msg = strings.Trim(msg, "`")
-	msg = strings.TrimSpace(msg)
+	msg := sanitizeCommitMessage(o.Result)
 	if msg == "" {
 		return "", fmt.Errorf("blank result")
 	}
 	return msg, nil
+}
+
+// sanitizeCommitMessage normalizes raw commit-message agent output into a bare
+// commit message. Despite the prompt asking for raw text, agents sometimes
+// prefix a conversational preamble ("here is the commit message:") and wrap
+// the message in a markdown code fence. When the whole message is fenced, its
+// contents are extracted; otherwise surrounding whitespace and backticks are
+// trimmed.
+func sanitizeCommitMessage(raw string) string {
+	msg := strings.TrimSpace(raw)
+	if block, ok := extractFencedBlock(msg); ok {
+		msg = strings.TrimSpace(block)
+	}
+	// Strip wrapping inline-code backticks only from a single-line message; a
+	// multi-line body may legitimately contain a fenced snippet ending in ```.
+	if !strings.Contains(msg, "\n") {
+		msg = strings.Trim(msg, "`")
+	}
+	return strings.TrimSpace(msg)
+}
+
+// extractFencedBlock returns the contents of a markdown code fence that wraps
+// the entire commit message, with ok reporting whether such a fence was found.
+// The closing fence is optional: models occasionally emit an unterminated
+// fence after a preamble.
+//
+// To avoid mangling a legitimate message whose body happens to contain a
+// fenced snippet, a fence is only unwrapped when it opens the output — either
+// as the first non-empty line, or preceded solely by a conversational
+// preamble. A subject-shaped first line means the fence belongs to the body
+// and is left intact.
+func extractFencedBlock(s string) (string, bool) {
+	lines := strings.Split(s, "\n")
+	firstContentIdx, fenceIdx := -1, -1
+	for i, line := range lines {
+		t := strings.TrimSpace(line)
+		if t == "" {
+			continue
+		}
+		if firstContentIdx == -1 {
+			firstContentIdx = i
+		}
+		if strings.HasPrefix(t, "```") {
+			fenceIdx = i
+			break
+		}
+	}
+	if fenceIdx == -1 {
+		return "", false
+	}
+	if fenceIdx != firstContentIdx && !looksLikePreamble(lines[firstContentIdx]) {
+		return "", false
+	}
+	for j := fenceIdx + 1; j < len(lines); j++ {
+		if strings.TrimSpace(lines[j]) == "```" {
+			return strings.Join(lines[fenceIdx+1:j], "\n"), true
+		}
+	}
+	return strings.Join(lines[fenceIdx+1:], "\n"), true
+}
+
+// looksLikePreamble reports whether line is conversational lead-in text rather
+// than a commit subject line. Commit subjects are short (<=72 runes) and
+// single-clause; preambles run long or trail off with a colon ("here is the
+// commit message:").
+func looksLikePreamble(line string) bool {
+	t := strings.TrimSpace(line)
+	return strings.HasSuffix(t, ":") || len([]rune(t)) > 72
 }
 
 // generateCommitMessage runs a lightweight container to produce a descriptive

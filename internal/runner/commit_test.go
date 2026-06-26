@@ -155,6 +155,95 @@ func TestGenerateCommitMessageNDJSON(t *testing.T) {
 	}
 }
 
+// TestGenerateCommitMessageStripsPreambleAndFence is a regression test for a
+// task whose generated commit message was committed verbatim as a
+// conversational preamble plus an unterminated markdown code fence wrapping the
+// real message (commit ac04fc9d). The boundary must return only the clean
+// subject and body.
+func TestGenerateCommitMessageStripsPreambleAndFence(t *testing.T) {
+	const dirty = "The diff wasn't captured in git yet. Based on the task description (add a \"new chat\" button next to the popup, remove the clear button from top right), here is the commit message:\n\n```\n" +
+		"feat(frontend): surface new-chat button in popup, drop clear button\n\n" +
+		"Add a new-chat button directly in the SpecChatPopup header so users\n" +
+		"can start a fresh thread without opening the thread title menu.\n"
+	payload, err := json.Marshal(map[string]any{
+		"result":      dirty,
+		"session_id":  "abc",
+		"stop_reason": "end_turn",
+		"is_error":    false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := fakeCmdScript(t, string(payload), 0)
+	runner := runnerWithCmd(t, cmd)
+
+	msg, err := runner.generateCommitMessage(context.Background(), uuid.New(), "add new-chat button", "frontend/x.vue | 10 ++--", "")
+	if err != nil {
+		t.Fatalf("generateCommitMessage error: %v", err)
+	}
+
+	const wantSubject = "feat(frontend): surface new-chat button in popup, drop clear button"
+	if !strings.HasPrefix(msg, wantSubject) {
+		t.Fatalf("expected message to start with clean subject; got:\n%q", msg)
+	}
+	if strings.Contains(msg, "```") {
+		t.Fatalf("expected code fence to be stripped; got:\n%q", msg)
+	}
+	if strings.Contains(msg, "diff wasn't captured") {
+		t.Fatalf("expected preamble to be stripped; got:\n%q", msg)
+	}
+}
+
+// TestSanitizeCommitMessage exercises the fence/preamble extraction edge cases,
+// most importantly that a legitimate message whose body contains a fenced
+// snippet is left intact (the fence must not be unwrapped when a real subject
+// line precedes it).
+func TestSanitizeCommitMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "plain message untouched",
+			in:   "internal/runner: fix commit message\n\nDetails here.",
+			want: "internal/runner: fix commit message\n\nDetails here.",
+		},
+		{
+			name: "surrounding backticks trimmed",
+			in:   "`internal/runner: fix thing`",
+			want: "internal/runner: fix thing",
+		},
+		{
+			name: "preamble plus unterminated fence",
+			in:   "Here is the commit message:\n\n```\ninternal/runner: fix thing\n\nBody line.\n",
+			want: "internal/runner: fix thing\n\nBody line.",
+		},
+		{
+			name: "fence as first line",
+			in:   "```\ninternal/runner: fix thing\n```",
+			want: "internal/runner: fix thing",
+		},
+		{
+			name: "language-tagged fence",
+			in:   "```text\ninternal/runner: fix thing\n```",
+			want: "internal/runner: fix thing",
+		},
+		{
+			name: "body with fenced snippet kept intact",
+			in:   "internal/foo: add example\n\nUsage:\n\n```\nfoo --bar\n```",
+			want: "internal/foo: add example\n\nUsage:\n\n```\nfoo --bar\n```",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeCommitMessage(tt.in); got != tt.want {
+				t.Fatalf("sanitizeCommitMessage()\n got: %q\nwant: %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // hostStageAndCommit integration tests
 // ---------------------------------------------------------------------------
