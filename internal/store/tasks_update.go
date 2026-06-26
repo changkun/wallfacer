@@ -206,6 +206,18 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	})
 }
 
+// UpdateTaskAgon persists agon adversarial-verification results onto a task.
+// unresolved is 0 for a clean run; headline holds the highest-contention claim.
+// sessionDir is the absolute path to the .agon/sessions/<id>/ folder.
+func (s *Store) UpdateTaskAgon(_ context.Context, id uuid.UUID, unresolved int, headline, sessionDir string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.AgonUnresolved = &unresolved
+		t.AgonHeadline = headline
+		t.AgonSessionDir = sessionDir
+		return nil
+	})
+}
+
 // AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
 // and records the contribution under the named sub-agent in UsageBreakdown.
 // agent should be one of the SandboxActivity constants.
