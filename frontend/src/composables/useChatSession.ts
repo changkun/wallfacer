@@ -302,6 +302,9 @@ export function useChatSession(): ChatSession {
     runMermaid();
     const finishedThread = streamingThreadId.value;
     streamingThreadId.value = '';
+    // The turn is done; drop the local busy marker. A queued message drained
+    // below re-sets it via sendMessage.
+    busyThreadId.value = '';
     if (interrupted) {
       interruptedAt.value = renderedMessages.value.length - 1;
     }
@@ -413,6 +416,14 @@ export function useChatSession(): ChatSession {
         return;
       }
       streamingThreadId.value = targetId;
+      // Mark the thread busy locally the moment we start a turn. busyThreadId is
+      // otherwise only set by the server poll, which the docked tab surface does
+      // not run — so without this a thread-switch (or tab/route switch) away and
+      // back could not tell the turn was still running and would fail to
+      // re-attach. finishStreaming clears it when we read the turn to completion;
+      // if we instead switch away first (detaching the reader without finishing),
+      // re-attaching on switch-back replays to EOF and clears it then.
+      busyThreadId.value = targetId;
       startStreaming();
     } catch (e) {
       appendSystem('Error: ' + (e instanceof Error ? e.message : String(e)));
@@ -787,19 +798,33 @@ export function useChatSession(): ChatSession {
   });
 
   // Re-attach to a thread's live stream when it's the one viewed and the server
-  // reports it as running (busyThreadId). The in-flight turn isn't persisted, so
-  // without this, returning to a session that's still working shows it empty.
-  // StreamAgentMessages replays the in-flight turn from the start. Fires both
-  // on thread switch and when the busy poll discovers the active thread is busy.
-  watch([activeThreadId, busyThreadId], () => {
+  // (or our own optimistic marker) reports it as running. The in-flight turn
+  // isn't persisted, so without this, returning to a session that's still working
+  // shows it empty. StreamAgentMessages replays the in-flight turn from the start.
+  //
+  // Guard on the *local* streamHandle, not the shared `streaming` flag: that flag
+  // lives in the store and survives this composable's unmount, so after a tab or
+  // route switch a fresh instance sees it stale-true with no reader attached.
+  // streamHandle is per-instance, so `!streamHandle` correctly means "this
+  // instance isn't already reading the stream" and lets us re-attach despite the
+  // stale flag, while staying idempotent during an active turn.
+  function attachToBusyThread(): boolean {
     if (
-      !streaming.value &&
       activeThreadId.value &&
-      busyThreadId.value === activeThreadId.value
+      busyThreadId.value === activeThreadId.value &&
+      !streamHandle
     ) {
       streamingThreadId.value = activeThreadId.value;
       startStreaming();
+      return true;
     }
+    return false;
+  }
+
+  // Fires both on thread switch and when the busy poll discovers the active
+  // thread is busy.
+  watch([activeThreadId, busyThreadId], () => {
+    attachToBusyThread();
   });
 
   function runMermaid() {
@@ -842,6 +867,16 @@ export function useChatSession(): ChatSession {
   onMounted(async () => {
     await agentStore.loadThreads();
     await loadHistory();
+    // A prior chat surface (or this surface before a tab/route switch) may have
+    // torn down its live reader while leaving the shared `streaming` flag set.
+    // The re-attach watch won't fire here because the store values are unchanged
+    // across the remount, so reconcile explicitly: re-attach if the server still
+    // reports the active thread running, otherwise clear the stale flag so we
+    // don't show a frozen spinner for a turn that finished while we were away.
+    if (!attachToBusyThread() && !streamHandle) {
+      streaming.value = false;
+      streamingThreadId.value = '';
+    }
   });
 
   onUnmounted(() => {
