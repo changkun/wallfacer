@@ -1418,10 +1418,15 @@ func requiresStore(name string) bool {
 // principal when auth is configured. The spec-comment surface reads and writes
 // the coordination relay, which serves the connector's cached threads regardless
 // of the browser session, so a logged-out browser must be rejected at the data
-// layer (not just hidden in the SPA). See RequirePrincipalMiddleware.
+// layer (not just hidden in the SPA). SubmitFeedback joins it: the inline
+// diff-review surface (gutter comments batched into one feedback message) is
+// restricted to signed-in users, gated server-side the same way — and since
+// feedback is a single message string whether composed inline or in the Overview
+// textarea, gating the one route covers both paths. Local mode (HasAuth false) is
+// a no-op, preserving permissive single-user runs. See RequirePrincipalMiddleware.
 func requiresPrincipal(name string) bool {
 	switch name {
-	case "ListSpecComments", "SubmitSpecComment", "StreamSpecComments":
+	case "ListSpecComments", "SubmitSpecComment", "StreamSpecComments", "SubmitFeedback":
 		return true
 	default:
 		return false
