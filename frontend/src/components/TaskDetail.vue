@@ -538,6 +538,26 @@ function relativeTime(iso: string): string {
 
 const elapsedDisplay = computed(() => relativeTime(props.task.updated_at));
 
+// Single in-flight action guard. Each action button fires an API call and then
+// relies on the `task-updated` SSE delta to transition the panel into its next
+// state. Until that round-trip lands there is a brief window with no feedback in
+// which the same button could be clicked again (e.g. POSTing /done twice).
+// `busyAction` records which action is running so its button shows a spinner and
+// every action button disables — the click registers instantly.
+const busyAction = ref('');
+const busy = computed(() => busyAction.value !== '');
+async function runAction(key: string, fn: () => Promise<void>) {
+  if (busyAction.value) return;
+  busyAction.value = key;
+  try {
+    await fn();
+  } catch (e) {
+    console.error(`task action ${key}:`, e);
+  } finally {
+    busyAction.value = '';
+  }
+}
+
 async function startTask() {
   await api('PATCH', `/api/tasks/${props.task.id}`, { status: 'in_progress' });
 }
@@ -569,6 +589,9 @@ async function retryTask() {
 }
 async function completeTask() {
   await api('POST', `/api/tasks/${props.task.id}/done`);
+  // The action's own hint promises "commit and close"; dismiss the panel once
+  // the request lands so the kanban returns to focus on the board.
+  emit('close');
 }
 async function resumeTask() {
   await api('POST', `/api/tasks/${props.task.id}/resume`);
@@ -1354,7 +1377,7 @@ async function submitReview() {
                 <div class="mdl-h">Actions</div>
 
                 <div v-if="isBacklog" class="aside-action-group">
-                  <button type="button" class="aside-action aside-action--primary" @click="startTask">
+                  <button type="button" class="aside-action aside-action--primary" :class="{ 'is-busy': busyAction === 'start' }" :disabled="busy" @click="runAction('start', startTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Start task</span>
@@ -1419,7 +1442,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isWaiting" class="aside-action-group">
-                  <button type="button" class="aside-action aside-action--success" @click="completeTask">
+                  <button type="button" class="aside-action aside-action--success" :class="{ 'is-busy': busyAction === 'done' }" :disabled="busy" @click="runAction('done', completeTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#10003;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Mark as Done</span>
@@ -1429,7 +1452,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isFailed && task.session_id" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="resumeTask">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'resume' }" :disabled="busy" @click="runAction('resume', resumeTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#8635;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Resume</span>
@@ -1439,7 +1462,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isWaiting || isDone || isFailed" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="testTask">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'test' }" :disabled="busy" @click="runAction('test', testTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Test</span>
@@ -1449,7 +1472,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="budgetExceeded && (isWaiting || isFailed)" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="raiseBudget">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'budget' }" :disabled="busy" @click="runAction('budget', raiseBudget)">
                     <span class="aside-action__icon" aria-hidden="true">&#36;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Raise budget</span>
@@ -1459,7 +1482,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isWaiting || isFailed" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="syncTask">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'sync' }" :disabled="busy" @click="runAction('sync', syncTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#8645;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Sync</span>
@@ -1469,7 +1492,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isFailed || isCancelled" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="retryTask">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'retry' }" :disabled="busy" @click="runAction('retry', retryTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#8634;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Retry</span>
@@ -1479,7 +1502,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="(isDone || isCancelled) && !isArchived" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="archiveTask">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'archive' }" :disabled="busy" @click="runAction('archive', archiveTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Archive</span>
@@ -1489,7 +1512,7 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isArchived" class="aside-action-group">
-                  <button type="button" class="aside-action" @click="unarchiveTask">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'unarchive' }" :disabled="busy" @click="runAction('unarchive', unarchiveTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Unarchive</span>
@@ -1502,7 +1525,7 @@ async function submitReview() {
                   <button
                     type="button"
                     class="aside-action aside-action--warn"
-                    :disabled="cancelling"
+                    :disabled="cancelling || busy"
                     @click="cancelTask"
                   >
                     <span class="aside-action__icon" aria-hidden="true">{{ cancelling ? '…' : '⏹' }}</span>
@@ -1514,7 +1537,7 @@ async function submitReview() {
                 </div>
 
                 <div class="aside-action-group">
-                  <button type="button" class="aside-action aside-action--danger" @click="deleteTask">
+                  <button type="button" class="aside-action aside-action--danger" :class="{ 'is-busy': busyAction === 'delete' }" :disabled="busy" @click="runAction('delete', deleteTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
                     <span class="aside-action__body">
                       <span class="aside-action__label">Delete</span>
