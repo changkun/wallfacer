@@ -1,6 +1,6 @@
 ---
 title: RBAC Scope Matrix
-status: drafted
+status: stale
 depends_on:
   - specs/identity/multi-user-collaboration.md
   - specs/identity/authentication.md

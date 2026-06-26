@@ -1,6 +1,6 @@
 ---
 title: Task Test Criteria for Post-Run Verification
-status: stale
+status: drafted
 depends_on: []
 affects:
   - internal/store/models.go
@@ -36,13 +36,13 @@ Persist a single user-defined, free-form `Criteria` string on the task, settable
 
 ## Current State (cited)
 
-- `internal/store/models.go:262` `Task` struct holds `Prompt` and the other persisted fields. There is no criteria field. (The old `Goal` field this spec's predecessor mirrored was removed.)
+- `internal/store/models.go:261` `Task` struct holds `Prompt` (`:265`) and the other persisted fields. There is no criteria field. (The old `Goal` field this spec's predecessor mirrored was removed.)
 - `internal/store/tasks_create_delete.go:30` `TaskCreateOptions` and `:70` `CreateTaskWithOptions` build the task on create; no criteria field flows through.
-- `internal/store/tasks_update.go:301` `UpdateTaskBacklog` edits prompt/timeout/budget for backlog tasks via a positional-parameter signature.
-- `internal/handler/tasks.go`: create handler request struct (`:178`) and opts (`:225`); batch opts (`:537`); PATCH request struct (`:597`) and the backlog-edit gate condition (`:677`) plus its `UpdateTaskBacklog` call (`:694`).
-- `internal/handler/execute.go:651` resolves criteria from `req.Criteria` only, then calls `buildTestPrompt` (`:682`).
-- `internal/prompts/prompts.go:423` `TestData.Criteria` and `internal/prompts/test.tmpl:6` guard the `## Acceptance Criteria` block with `{{if .Criteria}}`. These already render criteria correctly; no change needed.
-- Frontend: `frontend/src/components/TaskComposer.vue:206` `sharedOpts` (create payload); `frontend/src/stores/tasks.ts:104` `createTask` / `:128` `batchCreateTasks` bodies, `:151` generic `patchTask` passthrough; `frontend/src/components/TaskDetail.vue:557` `testTask()` (per-run criteria dialog) and `:604-622` the backlog edit-prompt PATCH save.
+- `internal/store/tasks_update.go:310` `UpdateTaskBacklog` edits prompt/timeout/budget for backlog tasks via a positional-parameter signature.
+- `internal/handler/tasks.go`: create handler request struct (`:176`) and opts (`:225`); batch opts (`batchTaskInput` struct at `:265`, `batchCreateRequest` at `:279`); PATCH request struct (`:595`); backlog-edit gate condition (`:677`) plus its `UpdateTaskBacklog` call (`:694`).
+- `internal/handler/execute.go:682` `TestTask` resolves criteria from `req.Criteria` only (`:725` `buildTestPrompt(task.Prompt, req.Criteria, ...)`); no fallback to any persisted field.
+- `internal/prompts/prompts.go:425` `TestData` struct / `:427` `Criteria string` field, and `internal/prompts/test.tmpl:6` guard the `## Acceptance Criteria` block with `{{if .Criteria}}`. These already render criteria correctly; no change needed.
+- Frontend: `frontend/src/components/TaskComposer.vue:227` `sharedOpts` (create payload); `frontend/src/stores/tasks.ts:118` `createTask` / `:143` `batchCreateTasks` bodies, `:167` generic `patchTask` passthrough; `frontend/src/components/TaskDetail.vue:599` `testTask()` (per-run criteria dialog) and `:664` `saveBacklogEdit` (the backlog edit PATCH save).
 - `frontend/src/api/types.ts:22` `Task` interface has `prompt` but no criteria field.
 
 The gap: criteria exist per-request but are never persisted, so the auto-tester cannot use them.
@@ -83,7 +83,7 @@ No new routes. The existing `POST /api/tasks`, `POST /api/tasks/batch`, `PATCH /
 
 Two call sites build the test prompt. The persisted field becomes the fallback:
 
-- Manual / per-run, `internal/handler/execute.go:651`:
+- Manual / per-run, `internal/handler/execute.go:725` (currently `buildTestPrompt(task.Prompt, req.Criteria, ...)`):
 
   ```go
   criteria := strings.TrimSpace(req.Criteria)
@@ -93,7 +93,7 @@ Two call sites build the test prompt. The persisted field becomes the fallback:
   testPrompt := buildTestPrompt(task.Prompt, criteria, implResult, diff)
   ```
 
-- Auto-tester, `internal/handler/tasks_autopilot.go:767`: replace the empty string with the persisted value:
+- Auto-tester, `internal/handler/tasks_autopilot.go:771` (currently `buildTestPrompt(t.Prompt, "", ...)`): replace the empty string with the persisted value:
 
   ```go
   testPrompt := buildTestPrompt(t.Prompt, t.Criteria, implResult, diff)
