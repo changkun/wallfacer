@@ -141,8 +141,23 @@ jobs:
           kubectl -n latere set image deployment/wallfacerd \
             wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
           kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
-      - name: Smoke production
-        run: BASE_URL=https://wf.latere.ai tools/smoke/release.sh
+      - name: Smoke production & capture evidence
+        env:
+          BASE_URL: https://wf.latere.ai
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOY_URL: https://wf.latere.ai
+          OUTPUT_MD: release-evidence.md
+        run: tools/smoke/release.sh
+      - name: Mirror evidence to the run summary
+        run: cat release-evidence.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence
+          path: release-evidence.md
+          if-no-files-found: error
 
   release:
     needs: [binary, deploy]
@@ -153,6 +168,11 @@ jobs:
           path: dist
           pattern: wallfacer-*
           merge-multiple: true
+      - name: Download release evidence
+        uses: actions/download-artifact@v8
+        with:
+          name: release-evidence
+          path: evidence
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -163,7 +183,15 @@ jobs:
           # Pre-releases: any tag with a -suffix (v0.0.7-alpha.6, v1.0.0-rc.1).
           prerelease=""
           [[ "$TAG" == *-* ]] && prerelease="--prerelease"
+          # Body = GitHub's auto-generated changelog since the previous tag,
+          # followed by the deploy evidence captured by the smoke job. The
+          # evidence only exists because deploy was green, so its presence is
+          # itself proof prod shipped before the release published.
+          gh api "repos/${GH_REPO}/releases/generate-notes" \
+            -f tag_name="$TAG" --jq .body > notes.md
+          printf '\n\n' >> notes.md
+          cat evidence/release-evidence.md >> notes.md
           gh release create "$TAG" $prerelease \
-            --generate-notes \
             --title "Wallfacer $TAG" \
+            --notes-file notes.md \
             dist/*
