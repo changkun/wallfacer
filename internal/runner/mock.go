@@ -10,6 +10,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
@@ -237,6 +238,12 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 		return m.AssessDriftFn(ctx, specBody, affects, changedFiles, diff)
 	}
 	return spec.DriftVerdict{}, nil
+}
+
+// RunCriticRound returns ("", nil) for the mock; tests that need critic output
+// should set a custom RunCriticRoundFn.
+func (m *MockRunner) RunCriticRound(_ context.Context, _ string, _ harness.ID, _ time.Duration) (string, error) {
+	return "", nil
 }
 
 // GenerateAgentSessionTitle delegates to GenerateAgentSessionTitleFn when
