@@ -80,21 +80,32 @@ opt-in / diff-size gating), not by weakening the critic.
 - [x] **Circuit breaker + store-safe writes.** `"auto-agon"` breaker; capture the
   owning `*store.Store` at scan time; persist only when the task is still
   `waiting`. _(commit: harden auto-agon)_
-- [ ] **agon: read-only proposer option.** Add `claude.WithProposerReadOnly()`
-  (restrict `--allowedTools` to read-only) so importers can run a non-mutating
-  proposer. Update agon `specs/37` / add a sibling spec.
-- [ ] **`.agon` relocation.** `StateDir` → wallfacer data dir keyed by task ID;
-  update the manual-trigger response path.
-- [ ] **Critic worktree access + per-fork diversity.** `RunCriticRound` runs the
-  critic against a throwaway worktree; `HarnessCritic` threads `Cwd`; the
-  `criticFactory` picks a harness by `forkIdx`.
+- [x] **`.agon` relocation + deterministic cwd.** `StateDir` →
+  `<worktreesDir>/<taskID>/.agon` (beside the worktree, never committed);
+  `primaryWorktree` picks a stable cwd. _(commit: place agon state beside the
+  worktree)_
+- [x] **Critic code access (read) + per-fork diversity.** `HarnessCritic` threads
+  `Cwd` (→ `RunCriticRound` sets the agent `WorkDir`) so the critic reads the
+  full codebase, not just the patch; `AgonVerifier` rotates critic harnesses
+  (Claude/Codex) by `forkIdx`. _(commit: run critics in the worktree…)_
+- [ ] **Critics that run tests (coupled follow-up).** The `claude -p` critic is
+  read-only by default, so today it *reads* the codebase but cannot build/run
+  tests. Enabling that needs an **agon** change (critic driver opts into
+  Bash/test tools) **and** the **throwaway `git worktree`** isolation so test
+  side-effects never touch the real tree. Enabling tools also re-introduces the
+  proposer mutation risk, so it ships together with:
+- [ ] **agon: read-only proposer option.** `claude.WithProposerReadOnly()`
+  (restrict tools) so the fork-session proposer can argue/concede but never edit
+  the live worktree. Update agon `specs/37` / add a sibling spec. (Currently
+  low-urgency: headless `claude --print` auto-denies write tools by default, so
+  the proposer is already effectively read-only until tools are opted in.)
 - [ ] **Usage attribution.** `RunCriticRound` returns `TokenUsage`;
   `HarnessCritic` populates `CriticResult.Usage`; `runAgon` accumulates onto the
   task so agon cost is visible to budgets/dashboards.
+- [ ] **Config knobs.** Expose `ForkCount`/`MaxRounds`/`CostCapTokens` in
+  `GET/PATCH /api/config` (the token-budget dial).
 - [ ] **Reset `AgonUnresolved` on resume.** Mirror the test-result reset once the
   resume → re-verify lifecycle is traced; currently deferred.
-- [ ] **Config knobs.** Expose `ForkCount`/`MaxRounds`/`CostCapTokens` in
-  `GET/PATCH /api/config`.
 - [ ] **Criteria threading (goal #7).** Blocked on `Task.Criteria`
   ([[test-criteria]]); wire when it lands, do not ship a hardcoded `""`.
 
