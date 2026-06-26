@@ -797,7 +797,7 @@ func TestParseTerminalEnabledFalse(t *testing.T) {
 
 // --- AgentSessionWindowDays ---
 
-func TestParse_PlanningWindowDaysDefault(t *testing.T) {
+func TestParse_AgentSessionWindowDaysDefault(t *testing.T) {
 	path := writeEnvFile(t, ``)
 	cfg, err := envconfig.Parse(path)
 	if err != nil {
@@ -808,7 +808,7 @@ func TestParse_PlanningWindowDaysDefault(t *testing.T) {
 	}
 }
 
-func TestParse_PlanningWindowDays(t *testing.T) {
+func TestParse_AgentSessionWindowDays_DeprecatedAlias(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		raw  string
@@ -833,7 +833,8 @@ func TestParse_PlanningWindowDays(t *testing.T) {
 
 // TestParse_AgentSessionWindowDays covers the canonical env var name. The
 // deprecated alias WALLFACER_PLANNING_WINDOW_DAYS is exercised by
-// TestParse_PlanningWindowDays above; both must set the same field.
+// TestParse_AgentSessionWindowDays_DeprecatedAlias above; both must set the
+// same field.
 func TestParse_AgentSessionWindowDays(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_AGENT_SESSION_WINDOW_DAYS=21")
 	cfg, err := envconfig.Parse(path)
@@ -845,7 +846,7 @@ func TestParse_AgentSessionWindowDays(t *testing.T) {
 	}
 }
 
-func TestParse_PlanningWindowDaysInvalid(t *testing.T) {
+func TestParse_AgentSessionWindowDaysInvalid(t *testing.T) {
 	// Non-numeric and negative values fall back to the default 30 so the
 	// agent-session cost UI always has a sane starting window. This matches how the
 	// other int knobs treat malformed input.
