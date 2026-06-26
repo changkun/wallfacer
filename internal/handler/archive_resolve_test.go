@@ -64,7 +64,7 @@ func TestResolveSpecArchiveFallback(t *testing.T) {
 }
 
 func TestArchiveSpec_RelocatesToArchiveAndBack(t *testing.T) {
-	repo := initPlanningTestRepo(t)
+	repo := initGitTestRepo(t)
 	h, ws := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	drafted := strings.Replace(testSpecValidated, "status: validated", "status: drafted", 1)
 	writeTestSpec(t, ws, "specs/local/target.md", drafted)

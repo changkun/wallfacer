@@ -28,7 +28,7 @@ func seedPlanningCommit(t *testing.T, ws string, n int, summary string) {
 }
 
 func TestUndoPlanningRound_Success(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# foo\n")
 	seedPlanningCommit(t, ws, 1, "drafted foo")
 
@@ -89,7 +89,7 @@ func TestUndoPlanningRound_Success(t *testing.T) {
 // aborted with a 409 conflict and spec-mode undo could never walk back past the
 // first round.
 func TestUndoPlanningRound_RepeatedUndo(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# foo\n")
 	seedPlanningCommit(t, ws, 1, "drafted foo")
 	writeSpec(t, ws, "bar.md", "# bar\n")
@@ -147,7 +147,7 @@ func TestUndoPlanningRound_RepeatedUndo(t *testing.T) {
 }
 
 func TestUndoPlanningRound_NoPlanningCommits(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 
 	h := newStaticWorkspaceHandler(t, []string{ws})
 	rec := httptest.NewRecorder()
@@ -163,7 +163,7 @@ func TestUndoPlanningRound_NoPlanningCommits(t *testing.T) {
 }
 
 func TestUndoPlanningRound_WithDirtyWorkingTree(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# foo initial\n")
 	seedPlanningCommit(t, ws, 1, "drafted foo")
 
@@ -195,7 +195,7 @@ func TestUndoPlanningRound_WithDirtyWorkingTree(t *testing.T) {
 }
 
 func TestUndoPlanningRound_DispatchAware(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
@@ -452,7 +452,7 @@ func TestUndo_TaskMode_NothingToUndo(t *testing.T) {
 }
 
 func TestUndo_FileMode_Unchanged(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# foo\n")
 	// Seed a planning commit with an explicit thread trailer so the lookup
 	// can match it when a thread ID is passed via ?thread=.
@@ -491,7 +491,7 @@ func TestUndo_FileMode_Unchanged(t *testing.T) {
 }
 
 func TestUndo_TaskMode_DoesNotTouchGit(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	// Seed a planning commit in the workspace so there is commit history.
 	writeSpec(t, ws, "existing.md", "# existing\n")
 	seedPlanningCommit(t, ws, 1, "existing spec")

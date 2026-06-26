@@ -54,14 +54,14 @@ func readSpecStatus(t *testing.T, ws, relPath string) string {
 	return string(s.Status)
 }
 
-// initPlanningTestRepo creates a temp git repo with one initial commit so
+// initGitTestRepo creates a temp git repo with one initial commit so
 // HEAD exists and `git log` returns without error.
-func initPlanningTestRepo(t *testing.T) string {
+func initGitTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	runGit(t, dir, "init", "-b", "main")
-	runGit(t, dir, "config", "user.email", "planning-test@example.com")
-	runGit(t, dir, "config", "user.name", "Planning Test")
+	runGit(t, dir, "config", "user.email", "test@example.com")
+	runGit(t, dir, "config", "user.name", "Test User")
 	runGit(t, dir, "config", "commit.gpgsign", "false")
 	// Pin line-ending behaviour so stash/pop round-trips preserve the bytes
 	// we wrote on Windows runners (git's default core.autocrlf=true there
@@ -123,7 +123,7 @@ func gitHeadMessage(t *testing.T, dir string) string {
 }
 
 func TestCommitPlanningRound_DirtySpecs(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "# Foo\n")
 
 	round, err := commitPlanningRound(context.Background(), ws, "user asked to draft foo", "drafted foo", nil, "")
@@ -166,7 +166,7 @@ func TestCommitPlanningRound_DirtySpecs(t *testing.T) {
 }
 
 func TestCommitPlanningRound_NoOp(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	before := gitLogSubjects(t, ws)
 
 	round, err := commitPlanningRound(context.Background(), ws, "noop prompt", "nothing changed", nil, "")
@@ -184,7 +184,7 @@ func TestCommitPlanningRound_NoOp(t *testing.T) {
 }
 
 func TestCommitPlanningRound_RoundNumbering(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 
 	// Three rounds, each adding a spec file.
 	writeSpec(t, ws, "a.md", "a\n")
@@ -226,7 +226,7 @@ func TestCommitPlanningRound_RoundNumbering(t *testing.T) {
 }
 
 func TestCommitPlanningRound_SubjectTruncation(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "foo\n")
 
 	// 200-char summary on a single line; subject should truncate at
@@ -256,7 +256,7 @@ func TestCommitPlanningRound_SubjectTruncation(t *testing.T) {
 }
 
 func TestCommitPlanningRound_PrimaryPathFromEpic(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	// Multiple files all under the same epic directory — primary path
 	// should become the common dir, not "specs".
 	writeSpec(t, ws, "local/auth/overview.md", "a\n")
@@ -277,7 +277,7 @@ func TestCommitPlanningRound_PrimaryPathFromEpic(t *testing.T) {
 }
 
 func TestCommitPlanningRound_PrimaryPathMixedTracks(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	// Two files in different tracks — common prefix collapses to "specs".
 	writeSpec(t, ws, "local/foo.md", "a\n")
 	writeSpec(t, ws, "cloud/bar.md", "b\n")
@@ -297,7 +297,7 @@ func TestCommitPlanningRound_PrimaryPathMixedTracks(t *testing.T) {
 }
 
 func TestCommitPlanningRound_SubjectSkipsFrontmatterAndHeadings(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "foo\n")
 
 	// Frontmatter, heading, blank lines, and a real paragraph. Subject
@@ -323,7 +323,7 @@ func TestCommitPlanningRound_SubjectSkipsFrontmatterAndHeadings(t *testing.T) {
 }
 
 func TestCommitPlanningRound_FallbackSubjectForEmptySummary(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
 	if _, err := commitPlanningRound(context.Background(), ws, "user prompt", "   \n\n---\n\n", nil, ""); err != nil {
@@ -342,7 +342,7 @@ func TestCommitPlanningRound_FallbackSubjectForEmptySummary(t *testing.T) {
 }
 
 func TestCommitPlanningRound_AgentGeneratedMessage(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
 	// Stub generator returns a scope-prefixed message as the commit agent
@@ -378,7 +378,7 @@ func TestCommitPlanningRound_AgentGeneratedMessage(t *testing.T) {
 }
 
 func TestCommitPlanningRound_AgentMissingScopeGetsSpliced(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
 	// Agent produced a correct scope-prefixed subject but forgot the (plan) scope.
@@ -398,7 +398,7 @@ func TestCommitPlanningRound_AgentMissingScopeGetsSpliced(t *testing.T) {
 }
 
 func TestCommitPlanningRound_AgentErrorFallsBack(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "foo.md", "x\n")
 
 	gen := func(_ context.Context, _ prompts.CommitData) (string, error) {
@@ -422,7 +422,7 @@ func TestCommitPlanningRound_SanitizesAgentFencedOutput(t *testing.T) {
 	// with more prose. Without sanitization the primary-path scope got
 	// spliced onto the first preamble sentence and the fence bodies were
 	// kept as body text.
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "local/spec-coordination/spec-planning-ux/codex.md", "x\n")
 
 	gen := func(_ context.Context, _ prompts.CommitData) (string, error) {
@@ -460,7 +460,7 @@ func TestCommitPlanningRound_SanitizesAgentFencedOutput(t *testing.T) {
 func TestCommitPlanningRound_AgentPreambleOnlyFallsBack(t *testing.T) {
 	// Agent returned prose with no scope-prefixed line anywhere — cannot be
 	// rescued, must fall back to the deterministic path.
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "local/auth/oauth.md", "x\n")
 
 	gen := func(_ context.Context, _ prompts.CommitData) (string, error) {
@@ -570,7 +570,7 @@ func TestWrapLine(t *testing.T) {
 // calls runner.Commit (and inside it maybeAutoPush) after moving a Waiting
 // task to Done.
 func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeSpec(t, ws, "local/foo.md", "# Foo\n")
 
 	mock := &runner.MockRunner{}
@@ -602,7 +602,7 @@ func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {
 // MaybeAutoPushWorkspace is NOT called when commitPlanningRound returns 0
 // (no specs/ changes pending — nothing to push).
 func TestPlanningCommit_AutoPushNotCalledWhenNoCommit(t *testing.T) {
-	ws := initPlanningTestRepo(t) // clean repo, no spec changes
+	ws := initGitTestRepo(t) // clean repo, no spec changes
 
 	mock := &runner.MockRunner{}
 
@@ -627,7 +627,7 @@ func TestPlanningCommit_AutoPushNotCalledWhenNoCommit(t *testing.T) {
 // the host's global identity on the resulting commit. Regression test for the
 // incident where planning commits landed authored as `Claude <claude@wallfacer.local>`.
 func TestCommitPlanningRound_IgnoresPollutedLocalIdentity(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 
 	// Stage 1: seed a polluted per-repo identity of the kind a sandbox agent
 	// might leave behind. Without the -c overrides, git would pick these up.
@@ -672,7 +672,7 @@ func TestCommitPlanningRound_IgnoresPollutedLocalIdentity(t *testing.T) {
 }
 
 func TestCommitPlanningRound_FansOutStale(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	// A is depended on by B (channel 1) and shares an affects dir with C
 	// (channel 2). D is unrelated.
 	writeFanoutSpec(t, ws, "a.md", "validated", "original", nil, []string{"internal/x/"})
@@ -716,7 +716,7 @@ func TestCommitPlanningRound_FansOutStale(t *testing.T) {
 }
 
 func TestCommitPlanningRound_UpdatedOnlyBumpNoFanout(t *testing.T) {
-	ws := initPlanningTestRepo(t)
+	ws := initGitTestRepo(t)
 	writeFanoutSpec(t, ws, "a.md", "validated", "body", nil, []string{"internal/x/"})
 	writeFanoutSpec(t, ws, "b.md", "validated", "b", []string{"specs/a.md"}, nil)
 	runGit(t, ws, "add", "specs/")
