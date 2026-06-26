@@ -13,8 +13,8 @@ import ChatComposer from './ChatComposer.vue';
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
 
-const planning = useAgentStore();
-const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(planning);
+const agentStore = useAgentStore();
+const { threads, threadOrder, archivedThreads, activeThreadId } = storeToRefs(agentStore);
 
 const chat = useChatSession();
 

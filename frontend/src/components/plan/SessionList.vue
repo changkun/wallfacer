@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // SessionList — the vertical session sub-sidebar for the dedicated Chat view.
-// Renders the workspace group's planning threads as the "sessions" of this
+// Renders the workspace group's agent sessions as the "sessions" of this
 // surface (the same threads the legacy panel showed as tabs), with active
 // highlight, unread dots, inline rename, archive, a running spinner, and an
 // archived overflow.
@@ -14,11 +14,11 @@ import type { ChatSession } from '../../composables/useChatSession';
 const props = defineProps<{ session: ChatSession }>();
 const s = props.session;
 
-const planning = useAgentStore();
+const agentStore = useAgentStore();
 const {
   threads, threadOrder, archivedThreads, activeThreadId,
   streaming, streamingThreadId, busyThreadId,
-} = storeToRefs(planning);
+} = storeToRefs(agentStore);
 
 // A session shows a spinner while an agent turn is in flight on it. busyThreadId
 // is the server's truth (so a session running in the background still spins
@@ -58,8 +58,8 @@ const sessionGroups = computed(() => {
 // reflected without disturbing the thread list or active selection.
 let busyTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
-  void planning.refreshBusy();
-  busyTimer = setInterval(() => void planning.refreshBusy(), 3000);
+  void agentStore.refreshBusy();
+  busyTimer = setInterval(() => void agentStore.refreshBusy(), 3000);
 });
 onUnmounted(() => {
   if (busyTimer !== null) clearInterval(busyTimer);

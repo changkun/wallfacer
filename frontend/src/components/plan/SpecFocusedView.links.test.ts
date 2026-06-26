@@ -50,12 +50,12 @@ describe('SpecFocusedView spec-link interception', () => {
   });
 
   it('intercepts a relative .md link rendered into the body after mount', async () => {
-    const planning = useAgentStore();
-    planning.focusedTaskId = 't1';
-    planning.focusedTaskTitle = 'Task';
+    const agentStore = useAgentStore();
+    agentStore.focusedTaskId = 't1';
+    agentStore.focusedTaskTitle = 'Task';
     // Empty at mount: the body (with ref="bodyRef") is absent, exactly when the
     // old onMounted listener would have had a null bodyRef and never attached.
-    planning.focusedTaskPrompt = '';
+    agentStore.focusedTaskPrompt = '';
 
     router.push('/');
     await router.isReady();
@@ -68,7 +68,7 @@ describe('SpecFocusedView spec-link interception', () => {
     await nextTick();
 
     // Now the content arrives, after mount — the body element appears here.
-    planning.focusedTaskPrompt = 'See [other spec](other.md) for details.';
+    agentStore.focusedTaskPrompt = 'See [other spec](other.md) for details.';
 
     await flushUntil(() => !!el.querySelector('a[href="other.md"]'));
     const link = el.querySelector('a[href="other.md"]') as HTMLAnchorElement;

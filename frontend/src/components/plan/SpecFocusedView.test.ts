@@ -64,10 +64,10 @@ describe('SpecFocusedView mermaid rendering', () => {
   it('enhances mermaid placeholders already rendered at mount', async () => {
     // Focused-task prompt populated before mount: renderedTaskPrompt is
     // non-empty at watcher registration and never changes afterward.
-    const planning = useAgentStore();
-    planning.focusedTaskId = 't1';
-    planning.focusedTaskTitle = 'Task';
-    planning.focusedTaskPrompt = PROMPT;
+    const agentStore = useAgentStore();
+    agentStore.focusedTaskId = 't1';
+    agentStore.focusedTaskTitle = 'Task';
+    agentStore.focusedTaskPrompt = PROMPT;
 
     router.push('/');
     await router.isReady();
