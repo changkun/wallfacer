@@ -1,9 +1,10 @@
 ---
 title: Intent-Driven Commit Tracking
-status: vague
+status: complete
 depends_on: []
 affects:
   - internal/handler/explorer.go
+  - internal/handler/explorer_git.go
   - internal/handler/planning_git.go
   - internal/handler/planning_undo.go
 effort: small
@@ -19,11 +20,11 @@ dispatched_task_id: null
 
 Treat code as a managed resource where every intent that produces a change (a task completion, a planning chat round, a manual file edit in the explorer) results in a git commit. This gives the platform a complete, fine-grained history of who (or what) changed what and why, enabling reliable undo/revert at any granularity.
 
-The thesis has largely shipped. Task completion has always committed via the board commit pipeline, and the planning path now commits each round with structured trailers and undoes via `git revert`. The one remaining gap is explorer file edits, which still land uncommitted in the working tree.
+The thesis has shipped. Task completion commits via the board commit pipeline, the planning path commits each round with structured trailers and undoes via `git revert`, and explorer file edits now auto-commit on save with an attribution trailer.
 
 ## Current State
 
-Three distinct paths produce file changes. Two of the three already commit with attribution; only the explorer path does not.
+Three distinct paths produce file changes. All three now commit with attribution.
 
 1. **Task execution** (`internal/runner/commit.go`) [DONE]: The commit pipeline runs after a task reaches `done`. `hostStageAndCommit()` stages uncommitted changes, generates a commit message via a lightweight executor harness, then `rebaseAndMerge()` rebases onto the default branch. Commits are deferred and batched (all changes from a multi-turn task become a single commit, or a small set if the agent committed inside its worktree). The merged commit hashes are recorded on `Task.CommitHashes` (`internal/store/models.go`), which `task-revert.md` consumes.
 
@@ -33,16 +34,16 @@ Three distinct paths produce file changes. Two of the three already commit with 
 
    Spec status transitions made by the agent during a round (frontmatter edits under `specs/`) are committed as part of the same round commit. Undo is implemented in `internal/handler/planning_undo.go`: `UndoPlanningRound()` creates a forward `git revert` commit for the thread's most recent planning commit (matched by the `Plan-Thread` trailer), so undo succeeds even when another thread committed afterwards. The revert commit itself carries `Plan-Thread` / `Plan-Round` trailers; conflicts respond `409` with the working tree left clean.
 
-3. **Explorer file editing** (`internal/handler/explorer.go:ExplorerWriteFile`) [GAP]: Atomic file writes (temp + rename) with workspace boundary validation. No commit. Changes remain uncommitted in the worktree indefinitely, so a manual spec edit via the explorer can be lost on a bad `git checkout` or overwritten by the next task's rebase.
+3. **Explorer file editing** (`internal/handler/explorer.go:ExplorerWriteFile`, `internal/handler/explorer_git.go`) [DONE]: Atomic file writes (temp + rename) with workspace boundary validation, followed by a best-effort `commitExplorerEdit`. The save stages the written file and runs a partial `git commit -- <path>` with a deterministic scope-prefixed subject (`<path>(edit): update <basename>`) and an `Edit-Source: explorer` trailer. The partial-commit pathspec isolates the save from any unrelated staged or working-tree changes (a concurrent task, a planning round), hooks are skipped with `--no-verify`, and a per-workspace mutex serializes commits so rapid saves queue on the git index instead of colliding on `index.lock`. Non-git workspaces and identical-content saves are no-ops; a commit failure never fails the save.
 
-The result is that completed tasks and planning rounds both have reliable, attributed git history. Only explorer edits are left uncommitted.
+The result is that completed tasks, planning rounds, and explorer edits all have reliable, attributed git history.
 
-## Problem
+## Resolved Problems
 
-The explorer path still lacks consistent commit tracking:
-- **Undo is ad hoc.** A planning round can be undone with a single `git revert` of a trailered commit. An explorer edit has no commit to revert; recovery depends on whatever was last committed.
-- **Attribution is lost.** There is no record of when a user manually edited a spec via the explorer. Git blame shows nothing for the uncommitted edit.
-- **Concurrent task isolation is fragile.** Tasks use worktrees for isolation, but explorer edits happen on the main working tree and can conflict with the next worktree merge.
+The explorer path previously lacked commit tracking; the explorer auto-commit closed each gap:
+- **Undo.** An explorer edit now carries an `Edit-Source: explorer` trailer, so it is revertible by the same `git log --grep` + `git revert` mechanism the planning path uses.
+- **Attribution.** Each manual edit produces a commit authored by the host identity, so git blame and history record when a spec was edited via the explorer.
+- **Concurrent task isolation.** The partial-commit pathspec records only the saved file, so an explorer edit no longer leaves uncommitted working-tree state for the next worktree merge to conflict with.
 
 ## Design Direction
 
@@ -54,37 +55,37 @@ The task and planning paths already realize this principle. Extend it to the exp
 |---------------|----------------|--------|
 | Task completion | Board commit pipeline | DONE |
 | Planning chat round | `commitPlanningRound()` after the agent response | DONE |
-| Explorer file edit | On save (debounced for rapid edits) | OPEN |
+| Explorer file edit | `commitExplorerEdit()` on save | DONE |
 
-### Remaining Scope: Explorer Edit Auto-Commit
+### Explorer Edit Auto-Commit (shipped)
 
-`ExplorerWriteFile` should commit after a successful save, mirroring the planning round path:
+`ExplorerWriteFile` commits after a successful save, mirroring the planning round path:
 
-- Stage the written file, then commit with a scope-prefixed subject (`<path>(edit): ...`).
-- Carry a trailer so the commit is attributable and queryable, consistent with the `Plan-Round` / `Plan-Thread` convention, for example `Edit-Source: explorer`.
-- Reuse the host-identity commit args helper already used by `commitPlanningRound` so the host user is the commit author.
-- Best-effort: an add/commit failure must not fail the save (the file is already written), matching the planning path's non-blocking behavior.
+- Stages the written file, then runs a partial `git commit -- <path>` with a scope-prefixed subject (`<path>(edit): update <basename>`).
+- Carries an `Edit-Source: explorer` trailer so the commit is attributable and queryable, consistent with the `Plan-Round` / `Plan-Thread` convention.
+- Reuses `gitutil.GlobalIdentityOverrides` (the host-identity commit args helper `commitPlanningRound` uses) so the host user authors the commit.
+- Best-effort: a non-git workspace, an identical-content save, or an add/commit failure all leave the written file intact and never fail the save, matching the planning path's non-blocking behavior.
 
-### Key Design Questions
+### Resolved Design Questions
 
-- **Commit granularity vs noise.** One commit per explorer save can produce many tiny commits. Should explorer edits be debounced (e.g., batch all saves within a few seconds into one commit)? Should there be an explicit "save point" instead of auto-commit?
-- **Message generation.** Planning commits use the commit-message agent with a deterministic fallback. Explorer commits likely want the deterministic, template-based message only (no LLM round-trip on every save) to keep saves fast.
-- **Performance.** Git commits are fast (~10-50ms) but add up. Measure the impact on the explorer editing experience.
-- **Non-git workspaces.** Some users may work in directories that aren't git repositories. The system needs a fallback (skip the commit; the atomic write still succeeds), matching how `commitPlanningRound` degrades when the workspace is not a git repo.
+- **Commit granularity vs noise.** One commit per save was adopted (no debounce): each explicit save is a discrete intent, and the partial-commit pathspec keeps each commit scoped to a single file. A per-workspace mutex serializes commits so rapid saves queue rather than collide on `index.lock`. Debounce / explicit save-point batching remains a future option if commit volume proves noisy in practice.
+- **Message generation.** Deterministic, template-based message only (no commit-message agent round-trip) to keep saves fast.
+- **Performance.** Synchronous before the response; hooks are skipped with `--no-verify` and the git op is bounded by a 10s timeout so a wedged process cannot block a save indefinitely.
+- **Non-git workspaces.** `commitExplorerEdit` returns early when the workspace is not a git repo (the atomic write still succeeds), matching how `commitPlanningRound` degrades.
 
 ## Components
 
 ### Explorer Commit Step
 
-A post-write commit in `ExplorerWriteFile` that stages the saved file, builds a deterministic scope-prefixed message, attaches an attribution trailer, and commits with host identity. Debouncing (if adopted) batches rapid sequential saves into one commit.
+`commitExplorerEdit` (`internal/handler/explorer_git.go`) runs as a post-write step in `ExplorerWriteFile`: it stages the saved file, builds the deterministic scope-prefixed message, attaches the `Edit-Source` trailer, and partial-commits with host identity. A per-workspace mutex serializes commits across rapid saves.
 
 ### Undo via Git History
 
-The planning path demonstrates the target: undo is a forward `git revert` of an attributed commit, queried by trailer. Explorer edits, once committed with an `Edit-Source` trailer, become revertible by the same mechanism.
+The planning path set the target: undo is a forward `git revert` of an attributed commit, queried by trailer. Explorer edits carry an `Edit-Source: explorer` trailer, so they are revertible by the same mechanism. No dedicated explorer-undo endpoint exists yet; the trailer is the durable contract that keeps the edit revertible.
 
-### Batch Commit Mode
+### Batch Commit Mode (future)
 
-For cases where auto-commit is too noisy (e.g., iterating on a spec via the explorer), an optional "draft mode" lets changes accumulate uncommitted, then commit explicitly with a summary message. This is the escape valve from the one-intent-one-commit principle.
+If per-save auto-commit proves too noisy (e.g., iterating on a spec via the explorer), an optional "draft mode" could let changes accumulate uncommitted, then commit explicitly with a summary message. Not implemented; the one-commit-per-save default ships first.
 
 ## Related Specs
 
@@ -93,7 +94,9 @@ For cases where auto-commit is too noisy (e.g., iterating on a spec via the expl
 
 ## Testing Strategy
 
-- Integration test for the explorer path: explorer write -> commit exists with the expected scope-prefixed subject and `Edit-Source` trailer.
-- Unit tests for debouncing logic if adopted (rapid writes produce one commit).
-- Integration test for undo: `git revert` an explorer commit by trailer query.
-- Edge cases: non-git workspace (write succeeds, no commit), empty change set (no-op commit), concurrent writes from multiple sources.
+Covered by `internal/handler/explorer_git_test.go`:
+- New-file save commits with the expected scope-prefixed subject and `Edit-Source` trailer.
+- The trailer is grep-queryable (`git log --grep="^Edit-Source: "`), the contract that keeps the edit revertible.
+- Isolation: a save commits only the saved file, leaving unrelated staged and dirty files uncommitted.
+- Edge cases: non-git workspace (write succeeds, no commit, no `.git`), identical-content save (no-op, no empty commit).
+- Deterministic message builder is unit-tested.

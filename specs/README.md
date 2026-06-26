@@ -260,7 +260,7 @@ Why no wallfacer-owned K8s control plane? Cella already owns sandbox runtime, li
 
 ## Git Workflow
 
-Git and GitHub workflow as a product surface: GitHub integration, revert, PR creation, and attribution over the commit graph. [github-integration](intent/github-integration.md) is the umbrella that makes GitHub a first-class surface via a real OAuth App (Codex-style, not host `gh`): connect, pick a repo, read PRs/issues + comments, create PRs and comment through the API, with cloud clone + remote-fix as a gated later phase on the Axis B Executor seam. PR creation folds into it (its `gh` mechanism is superseded by the API path); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds and spec transitions already commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec. GitHub *identity* (canonical `host/owner/repo`) is owned by the cloud coordination plane ([repo-identity](cloud/latere-integration/coordination-plane/repo-identity.md)); the PR feature consumes it rather than redefining it.
+Git and GitHub workflow as a product surface: GitHub integration, revert, PR creation, and attribution over the commit graph. [github-integration](intent/github-integration.md) is the umbrella that makes GitHub a first-class surface via a real OAuth App (Codex-style, not host `gh`): connect, pick a repo, read PRs/issues + comments, create PRs and comment through the API, with cloud clone + remote-fix as a gated later phase on the Axis B Executor seam. PR creation folds into it (its `gh` mechanism is superseded by the API path); revert and commit-attribution are local git. The original framing (intent-commits as a foundation the other two build on) was overtaken by reality: the commit/undo machinery shipped per-surface (planning rounds, spec transitions, and explorer edits all commit with trailers and undo via `git revert`), so revert and PR are independently shippable today, not gated on a foundation spec. GitHub *identity* (canonical `host/owner/repo`) is owned by the cloud coordination plane ([repo-identity](cloud/latere-integration/coordination-plane/repo-identity.md)); the PR feature consumes it rather than redefining it.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
@@ -271,7 +271,7 @@ Git and GitHub workflow as a product surface: GitHub integration, revert, PR cre
 | ↳ [pull-request.md](intent/github-integration/pull-request.md) | Drafted | Write surface: create PR via the GitHub API (supersedes `gh pr create`, reuses the sandbox title/body pipeline) + comment on PR/issue. Re-homed from `intent/pull-request.md`. |
 | ↳ [cloud-remote-fix.md](intent/github-integration/cloud-remote-fix.md) | Vague | Gated. Clone a repo + run agents in a cloud sandbox with no local checkout; blocked on the Axis B Executor seam (cella-runtime / topos). |
 | [task-revert.md](intent/task-revert.md) | Drafted | Agent-assisted revert of merged task changes with conflict resolution. Consumes the existing `task.CommitHashes` to know which commits belong to a task. Self-contained. |
-| [intent-commits.md](intent/intent-commits.md) | Vague | The thesis largely shipped (planning/spec commits with trailers, git-revert undo). Residual: explorer-edit auto-commit. Candidate to downgrade to a small leaf or archive. |
+| [intent-commits.md](intent/intent-commits.md) | Complete | Task, planning, and explorer paths all auto-commit with attribution trailers and undo via `git revert`. |
 
 ```mermaid
 graph LR
@@ -284,7 +284,7 @@ graph LR
   style EX stroke-dasharray: 5 5
 ```
 
-GitHub Integration is the OAuth umbrella; PR creation folds into it and cloud clone + remote-fix is gated on the Axis B Executor seam. Revert is independent and shippable; intent-commits is mostly realized with only the explorer-commit gap remaining.
+GitHub Integration is the OAuth umbrella; PR creation folds into it and cloud clone + remote-fix is gated on the Axis B Executor seam. Revert is independent and shippable; intent-commits is fully realized (task, planning, and explorer paths all auto-commit with attribution trailers).
 
 ---
 
