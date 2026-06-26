@@ -431,6 +431,163 @@
   color: #f2cc60;
 }
 
+/* --- Inline diff-review comments (waiting + signed in) --- */
+/* The gutter overlays the line's left padding lane; review mode widens that lane
+   so the affordance never sits on top of the code. */
+.diff-block-modal .diff-line { position: relative; }
+.diff-block--review .diff-line { padding-left: 28px; }
+
+.dc-gutter {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 1.5em;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 80ms ease;
+}
+.dc-line:hover .dc-gutter,
+.dc-gutter:focus-visible {
+  opacity: 1;
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+}
+.dc-gutter--has {
+  opacity: 1;
+  color: var(--accent);
+}
+.dc-gutter--has:hover { background: color-mix(in oklab, var(--accent) 16%, transparent); }
+
+/* Brief highlight when the panel scrolls to a line. */
+.dc-flash { animation: dcFlash 1.2s ease; }
+@keyframes dcFlash {
+  0%, 30% { background: color-mix(in oklab, var(--accent) 38%, transparent); }
+  100% { background: transparent; }
+}
+
+/* Inline editor block under a line; lives inside the font-size:0 <pre>, so it
+   restores its own font metrics and normal whitespace. */
+.dc-editor {
+  display: block;
+  font-size: 12px;
+  white-space: normal;
+  margin: 4px 10px 6px 28px;
+}
+.dc-editor-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dc-editor-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+.dc-editor-actions { display: flex; gap: 6px; margin-top: 6px; }
+.dc-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.dc-btn:hover:not(:disabled) { background: var(--bg-hover, var(--bg-input)); }
+.dc-btn:disabled { opacity: 0.5; cursor: default; }
+.dc-btn--primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.dc-btn--primary:hover:not(:disabled) { filter: brightness(0.96); }
+
+/* Review-comments panel below the diff. */
+.dc-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input);
+}
+.dc-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.dc-panel-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 16%, var(--bg-input));
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, var(--border));
+  color: var(--accent);
+  font-size: 11px;
+}
+.dc-panel-empty { font-size: 11px; color: var(--text-muted); margin: 0 0 8px; }
+.dc-group { margin-bottom: 10px; }
+.dc-group-file {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.dc-item {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card, var(--bg-input));
+  margin-bottom: 6px;
+}
+.dc-item-loc {
+  display: inline-block;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dc-item-loc:hover { text-decoration: underline; }
+.dc-item-body { font-size: 12px; color: var(--text-primary); margin: 2px 0; white-space: pre-wrap; word-break: break-word; }
+.dc-item-actions { display: flex; gap: 10px; }
+.dc-item-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dc-item-link:hover { color: var(--text-primary); text-decoration: underline; }
+.dc-general-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 6px 0 4px;
+}
+.dc-panel-foot { margin-top: 8px; }
+
 /* --- Workspace separators in multi-repo diffs --- */
 .diff-workspace-header {
   font-size: 11px;

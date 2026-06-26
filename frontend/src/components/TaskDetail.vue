@@ -10,6 +10,10 @@ import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import { useTaskStore } from '../stores/tasks';
+import { useAuthStore } from '../stores/auth';
+import { useDiffCommentsStore } from '../stores/diffComments';
+import { formatBatchFeedback } from '../lib/diffComments';
+import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import DependencyPicker from './DependencyPicker.vue';
@@ -346,9 +350,6 @@ watch(
   },
 );
 
-function lineClass(kind: string): string {
-  return kind === 'ctx' ? '' : 'diff-' + kind;
-}
 function showWorkspaceHeader(i: number): boolean {
   const f = diffFiles.value[i];
   if (!f.workspace) return false;
@@ -765,6 +766,96 @@ const isFailed = computed(() => status.value === 'failed');
 const isDone = computed(() => status.value === 'done');
 const isCancelled = computed(() => status.value === 'cancelled');
 const isArchived = computed(() => !!props.task.archived);
+
+// ── Inline diff review comments ─────────────────────────────────────
+// The gutter/editor/panel surface is login-gated like spec comments: the backend
+// 401s the feedback route without a browser principal (RequirePrincipalMiddleware),
+// and the SPA mirrors that with `canReview`. In local mode (auth disabled) it is
+// always on, so single-user runs keep the feature.
+const auth = useAuthStore();
+const diffComments = useDiffCommentsStore();
+const authEnabled = computed(() => taskStore.config?.auth_enabled === true);
+const canReview = computed(() => !authEnabled.value || !!auth.me);
+const reviewing = computed(() => isWaiting.value && canReview.value);
+
+function isCommentable(kind: string): boolean {
+  return kind === 'add' || kind === 'del' || kind === 'ctx';
+}
+
+const reviewComments = computed(() => diffComments.forTask(props.task.id));
+// Group the panel list by filename in first-seen order.
+const reviewGroups = computed(() => {
+  const order: string[] = [];
+  const byFile = new Map<string, typeof reviewComments.value>();
+  for (const c of reviewComments.value) {
+    let bucket = byFile.get(c.filename);
+    if (!bucket) { bucket = []; byFile.set(c.filename, bucket); order.push(c.filename); }
+    bucket.push(c);
+  }
+  return order.map((filename) => ({ filename, comments: byFile.get(filename)! }));
+});
+
+const reviewGeneral = ref('');
+const submittingReview = ref(false);
+const canSubmitReview = computed(
+  () => !submittingReview.value && (reviewComments.value.length > 0 || !!reviewGeneral.value.trim()),
+);
+
+// Inline panel editing of an existing comment body.
+const editingPanelId = ref<string | null>(null);
+const panelDraft = ref('');
+function startPanelEdit(id: string, body: string) {
+  editingPanelId.value = id;
+  panelDraft.value = body;
+}
+function savePanelEdit() {
+  const id = editingPanelId.value;
+  if (!id) return;
+  const body = panelDraft.value.trim();
+  if (body) diffComments.update(id, body);
+  editingPanelId.value = null;
+  panelDraft.value = '';
+}
+function cancelPanelEdit() {
+  editingPanelId.value = null;
+  panelDraft.value = '';
+}
+
+const changesEl = ref<HTMLElement | null>(null);
+function flashLine(filename: string, lineIndex: number) {
+  const root = changesEl.value;
+  if (!root) return;
+  const sel = `[data-dc-anchor="${CSS.escape(filename)}:${lineIndex}"]`;
+  const el = root.querySelector<HTMLElement>(sel);
+  if (!el) return;
+  // Open the enclosing <details> if it was collapsed, then scroll + flash.
+  el.closest('details')?.setAttribute('open', '');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('dc-flash');
+  setTimeout(() => el.classList.remove('dc-flash'), 1200);
+}
+
+function lineRef(c: { newLine: number | null; oldLine: number | null }): number | null {
+  return c.newLine ?? c.oldLine;
+}
+
+async function submitReview() {
+  if (!canSubmitReview.value) return;
+  const message = formatBatchFeedback(reviewComments.value, reviewGeneral.value);
+  if (!message.trim()) return;
+  submittingReview.value = true;
+  try {
+    await api('POST', `/api/tasks/${props.task.id}/feedback`, { message });
+    diffComments.clear(props.task.id);
+    reviewGeneral.value = '';
+    editingPanelId.value = null;
+  } catch (e) {
+    console.error('review submit:', e);
+    toast.push('Could not submit review comments.');
+  } finally {
+    submittingReview.value = false;
+  }
+}
 </script>
 
 <template>
@@ -1018,7 +1109,7 @@ const isArchived = computed(() => !!props.task.archived);
                 </div>
 
                 <!-- CHANGES (diff) tab -->
-                <div data-main-tab-section="changes">
+                <div ref="changesEl" data-main-tab-section="changes">
                   <div v-if="diffLoading" class="text-xs text-v-muted">Loading diff…</div>
                   <div v-else-if="diffError" class="text-xs text-v-muted">Could not load diff: {{ diffError }}</div>
                   <template v-else>
@@ -1036,12 +1127,51 @@ const isArchived = computed(() => !!props.task.archived);
                             <span v-if="f.dels" class="diff-del">&minus;{{ f.dels }}</span>
                           </span>
                         </summary>
-                        <pre v-if="diffHighlights[fi]" class="diff-block diff-block-modal"><template v-for="(ln, li) in diffHighlights[fi]!" :key="li"><span class="diff-line" :class="lineClass(ln.kind)"><template v-if="ln.kind === 'header' || ln.kind === 'hunk'">{{ f.lines[li].text }}</template><template v-else>{{ ln.prefix }}<span v-html="ln.html"></span></template></span>
-</template></pre>
-                        <pre v-else class="diff-block diff-block-modal"><template v-for="(ln, li) in f.lines" :key="li"><span class="diff-line" :class="lineClass(ln.kind)">{{ ln.text }}</span>
-</template></pre>
+                        <pre v-if="diffHighlights[fi]" class="diff-block diff-block-modal" :class="{ 'diff-block--review': reviewing }"><DiffLineRow v-for="(ln, li) in diffHighlights[fi]!" :key="li" :task-id="task.id" :filename="f.filename" :line-index="li" :line="f.lines[li]" :hl="ln" :commentable="reviewing && isCommentable(f.lines[li].kind)" /></pre>
+                        <pre v-else class="diff-block diff-block-modal" :class="{ 'diff-block--review': reviewing }"><DiffLineRow v-for="(ln, li) in f.lines" :key="li" :task-id="task.id" :filename="f.filename" :line-index="li" :line="ln" :hl="null" :commentable="reviewing && isCommentable(ln.kind)" /></pre>
                       </details>
                     </template>
+
+                    <!-- Review-comments panel: collected line comments + general
+                         feedback, batched into one message. Signed-in + waiting only. -->
+                    <div v-if="reviewing" class="dc-panel">
+                      <div class="dc-panel-head">
+                        Review comments
+                        <span v-if="reviewComments.length" class="dc-panel-count">{{ reviewComments.length }}</span>
+                      </div>
+                      <p v-if="!reviewComments.length" class="dc-panel-empty">
+                        Click the gutter on any changed line to comment. Comments batch into one feedback message.
+                      </p>
+                      <div v-for="g in reviewGroups" :key="g.filename" class="dc-group">
+                        <div class="dc-group-file">{{ g.filename }}</div>
+                        <div v-for="c in g.comments" :key="c.id" class="dc-item">
+                          <button type="button" class="dc-item-loc" @click="flashLine(c.filename, c.lineIndex)">
+                            Line {{ lineRef(c) }}
+                          </button>
+                          <template v-if="editingPanelId === c.id">
+                            <textarea v-model="panelDraft" class="dc-editor-input" rows="2" @keydown.meta.enter="savePanelEdit" @keydown.ctrl.enter="savePanelEdit" @keydown.esc="cancelPanelEdit" />
+                            <div class="dc-editor-actions">
+                              <button type="button" class="dc-btn dc-btn--primary" :disabled="!panelDraft.trim()" @click="savePanelEdit">Save</button>
+                              <button type="button" class="dc-btn" @click="cancelPanelEdit">Cancel</button>
+                            </div>
+                          </template>
+                          <template v-else>
+                            <div class="dc-item-body">{{ c.body }}</div>
+                            <div class="dc-item-actions">
+                              <button type="button" class="dc-item-link" @click="startPanelEdit(c.id, c.body)">Edit</button>
+                              <button type="button" class="dc-item-link" @click="diffComments.remove(c.id)">Delete</button>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <label class="dc-general-label" for="dc-general">General feedback</label>
+                      <textarea id="dc-general" v-model="reviewGeneral" class="dc-editor-input" rows="3" placeholder="Optional overall feedback…" />
+                      <div class="dc-panel-foot">
+                        <button type="button" class="btn btn-yellow" :disabled="!canSubmitReview" @click="submitReview">
+                          {{ submittingReview ? 'Sending…' : reviewComments.length ? `Submit ${reviewComments.length} comment${reviewComments.length === 1 ? '' : 's'}` : 'Submit feedback' }}
+                        </button>
+                      </div>
+                    </div>
                   </template>
                 </div>
 
