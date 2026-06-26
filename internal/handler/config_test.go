@@ -2040,7 +2040,7 @@ func TestGetConfig_IncludesTerminalEnabled(t *testing.T) {
 	}
 }
 
-func TestConfigResponse_IncludesPlanningWindowDays(t *testing.T) {
+func TestConfigResponse_IncludesAgentSessionWindowDays(t *testing.T) {
 	ws := t.TempDir()
 	configDir := t.TempDir()
 
@@ -2085,7 +2085,7 @@ func TestConfigResponse_IncludesPlanningWindowDays(t *testing.T) {
 	}
 }
 
-func TestConfigResponse_PlanningWindowDaysDefault(t *testing.T) {
+func TestConfigResponse_AgentSessionWindowDaysDefault(t *testing.T) {
 	// With no env file configured (h.envFile == ""), the handler must still
 	// return a sensible default so the UI always has a value to start with.
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, t.TempDir())
