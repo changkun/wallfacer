@@ -19,12 +19,84 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: large
 created: 2026-06-26
-updated: 2026-06-26
+updated: 2026-06-26  # rev: hybrid execution model
 author: changkun
 dispatched_task_id: null
 ---
 
 # Agon Adversarial Verification
+
+## Revision 2026-06-26: review outcome, hybrid execution model
+
+The first implementation shipped (commits `67d055fd`…`5958313e`) but a review
+found design defects. This revision records the corrected design. Where it
+conflicts with the original "## Design" section below, **this section wins**.
+
+### Defects found in the shipped v1
+
+1. **Runaway auto-runs.** `tryAutoAgon` fired a goroutine per waiting task every
+   tick. `AgonUnresolved` is only written when a run *finishes* (minutes), so the
+   task stayed a candidate and was re-launched every tick — unbounded duplicate
+   runs sharing one `.agon` dir; an erroring run that never marks retried forever
+   with no breaker and no concurrency cap.
+2. **`.agon` written inside the worktree.** `StateDir = cwd/.agon` is under the
+   tree that `git add -A` commits, so debate scratch leaks into the PR branch and
+   pollutes the next `generateWorktreeDiff`.
+3. **Critic is blind to the code.** `HarnessCritic` drops `CriticInput.Cwd` and
+   `RunCriticRound` runs in a base container with no worktree mount — the critic
+   sees only the diff *patch text*, can't read neighbouring files or run tests.
+4. **Critics aren't diverse.** The `NewCritic` factory ignores `forkIdx` and
+   returns the same Claude harness — two samples of one model, not perspectives.
+5. **Proposer runs unrestricted on the host.** agon's `ClaudeProposer` execs
+   `claude --resume --fork-session` on the host in the *live* worktree with no
+   tool restriction → it can edit the user's tree mid-debate; auto-submit commits
+   the edits.
+6. **Untracked cost, wrong-store writes, stubbed criteria, permanent sentinel,
+   dead `NoopVerifier`, non-persisted toggle** — see review notes.
+
+### Decided execution model (hybrid)
+
+`claude --resume` is **cwd-scoped** (agon spec 17: `ErrCwdMismatch` on cwd
+mismatch). The fork-session proposer therefore *must* run in the original task
+worktree; a fully-isolated tree would break it. The critic is stateless
+`claude -p` with no cwd constraint, so it can run anywhere. Hence:
+
+| Actor | Where | Tools | Why |
+|-------|-------|-------|-----|
+| Proposer (fork-session) | original worktree | **read-only** | cwd-scoping forces the original path; read-only removes mutation/commit risk |
+| Critics (stateless, diverse harnesses) | **throwaway `git worktree` at task HEAD** | read + build + test | no cwd constraint → isolated tree, can run tests, zero risk to the real tree |
+| `.agon` state | wallfacer data dir, keyed by task ID | — | never inside a committed tree |
+
+Quality is the priority: if agon runs at all, the critic gets real code access
+and the forks use diverse harnesses (e.g. fork 1 Claude, fork 2 Codex). Token
+cost is managed by *scope and budget* (`CostCapTokens`, `maxConcurrentAgon`,
+opt-in / diff-size gating), not by weakening the critic.
+
+### Work breakdown (this revision)
+
+- [x] **Dedup + concurrency cap.** `beginAgon`/`endAgon` in-flight set guarded by
+  `agonMu`, `maxConcurrentAgon=2`, reserved before goroutine spawn; manual
+  trigger shares the guard (409 when in flight). _(commit: dedup/cap)_
+- [x] **Circuit breaker + store-safe writes.** `"auto-agon"` breaker; capture the
+  owning `*store.Store` at scan time; persist only when the task is still
+  `waiting`. _(commit: harden auto-agon)_
+- [ ] **agon: read-only proposer option.** Add `claude.WithProposerReadOnly()`
+  (restrict `--allowedTools` to read-only) so importers can run a non-mutating
+  proposer. Update agon `specs/37` / add a sibling spec.
+- [ ] **`.agon` relocation.** `StateDir` → wallfacer data dir keyed by task ID;
+  update the manual-trigger response path.
+- [ ] **Critic worktree access + per-fork diversity.** `RunCriticRound` runs the
+  critic against a throwaway worktree; `HarnessCritic` threads `Cwd`; the
+  `criticFactory` picks a harness by `forkIdx`.
+- [ ] **Usage attribution.** `RunCriticRound` returns `TokenUsage`;
+  `HarnessCritic` populates `CriticResult.Usage`; `runAgon` accumulates onto the
+  task so agon cost is visible to budgets/dashboards.
+- [ ] **Reset `AgonUnresolved` on resume.** Mirror the test-result reset once the
+  resume → re-verify lifecycle is traced; currently deferred.
+- [ ] **Config knobs.** Expose `ForkCount`/`MaxRounds`/`CostCapTokens` in
+  `GET/PATCH /api/config`.
+- [ ] **Criteria threading (goal #7).** Blocked on `Task.Criteria`
+  ([[test-criteria]]); wire when it lands, do not ship a hardcoded `""`.
 
 ## Problem
 
