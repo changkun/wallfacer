@@ -20,7 +20,7 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// selectSpecSystemPrompt returns the planning-agent prompt prefix
+// selectSpecSystemPrompt returns the spec-mode prompt prefix
 // appropriate for the current workspace state: the "empty" variant when
 // no non-archived parseable specs exist across any mounted workspace,
 // the "nonempty" variant otherwise. Evaluated per-turn (not cached)
@@ -43,7 +43,7 @@ func selectSpecSystemPrompt(workspaces []string) string {
 			// empty-variant prompt would falsely signal "no specs" and
 			// invite the agent to scaffold against an unknown tree —
 			// safer to assume non-empty and surface the failure in logs.
-			slog.Warn("planning: spec tree read failed; defaulting to nonempty prompt",
+			slog.Warn("agentsession: spec tree read failed; defaulting to nonempty prompt",
 				"workspace", ws, "err", err)
 			return prompts.SpecSystemNonempty()
 		}
@@ -60,17 +60,17 @@ func selectSpecSystemPrompt(workspaces []string) string {
 	return prompts.SpecSystemEmpty()
 }
 
-// assemblePlanningPrompt layers the per-turn system prompts on top of
+// assembleAgentPrompt layers the per-turn system prompts on top of
 // the (already user-message-shaped) base. Final layout:
 //
-//	[planning_system][archivedSpecGuard][base]
+//	[spec_system][archivedSpecGuard][base]
 //
 // archivedSpecGuard sits closest to the base because its rail
 // ("don't write to this archived spec") is most relevant the moment
-// the model reads the user's request. The planning_system prompt wraps
+// the model reads the user's request. The spec_system prompt wraps
 // the whole turn from the outside. Empty layers are skipped, so an
-// unfocused or non-archived spec produces just [planning_system][base].
-func assemblePlanningPrompt(workspaces []string, focusedSpec, base string) string {
+// unfocused or non-archived spec produces just [spec_system][base].
+func assembleAgentPrompt(workspaces []string, focusedSpec, base string) string {
 	out := base
 	if guard := archivedSpecGuard(workspaces, focusedSpec); guard != "" {
 		out = guard + out
@@ -108,7 +108,7 @@ func archivedSpecGuard(workspaces []string, focusedSpec string) string {
 // and records a prompt_round event. It mirrors the logic in the explicit
 // /api/agent/tool/update_task_prompt HTTP bridge so both entry points
 // produce the same durable state, and is invoked automatically at the end
-// of a task-mode planning turn (the agent has no way to reach back and
+// of a task-mode agent turn (the agent has no way to reach back and
 // call the HTTP bridge itself). Returns the round number assigned, or 0
 // on failure — errors are logged, never bubbled up.
 func (h *Handler) applyTaskPromptRound(ctx context.Context, pinnedTaskID, threadID, newPrompt string) int {
@@ -176,7 +176,7 @@ func (h *Handler) buildTaskModeSystemPrompt(ctx context.Context, taskID string) 
 	return prompts.TaskPromptRefine(d)
 }
 
-// GetAgentSessionStatus reports whether the planning sandbox is running.
+// GetAgentSessionStatus reports whether the agent session is running.
 func (h *Handler) GetAgentSessionStatus(w http.ResponseWriter, _ *http.Request) {
 	running := false
 	if h.planner != nil {
@@ -187,14 +187,14 @@ func (h *Handler) GetAgentSessionStatus(w http.ResponseWriter, _ *http.Request) 
 	})
 }
 
-// StartAgentSession starts the planning sandbox container.
+// StartAgentSession starts the agent session container.
 // If already running, returns 200 with running=true (idempotent).
 func (h *Handler) StartAgentSession(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
 	}
 	if h.planner == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	if h.planner.IsRunning() {
@@ -208,7 +208,7 @@ func (h *Handler) StartAgentSession(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"running": true})
 }
 
-// StopAgentSession stops the planning sandbox container.
+// StopAgentSession stops the agent session container.
 func (h *Handler) StopAgentSession(w http.ResponseWriter, _ *http.Request) {
 	if h.planner != nil {
 		h.planner.Stop()
@@ -216,7 +216,7 @@ func (h *Handler) StopAgentSession(w http.ResponseWriter, _ *http.Request) {
 	httpjson.Write(w, http.StatusOK, map[string]any{"stopped": true})
 }
 
-// GetAgentMessages returns the planning conversation history as a JSON array.
+// GetAgentMessages returns the conversation history as a JSON array.
 // Supports optional ?before=<RFC3339> for pagination. The `?thread=<id>`
 // query parameter selects which thread's history is returned; when
 // omitted, the currently active thread is used.
@@ -260,7 +260,7 @@ func (h *Handler) GetAgentMessages(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, msgs)
 }
 
-// SendAgentMessage sends a user message to the planning agent.
+// SendAgentMessage sends a user message to the agent.
 // The agent exec runs in a background goroutine; returns 202 immediately.
 // Returns 409 if an exec is already in flight. The `?thread=<id>` query
 // parameter (or body field) selects which thread receives the message;
@@ -270,7 +270,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.planner == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	if h.planner.IsBusy() {
@@ -420,12 +420,12 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 
 	if pinnedTaskID != "" {
 		// Task-mode: inject the task-prompt refinement system prompt instead of
-		// the spec-planning system prompt.
+		// the spec system prompt.
 		if prefix := h.buildTaskModeSystemPrompt(r.Context(), pinnedTaskID); prefix != "" {
 			prompt = prefix + "\n\n" + prompt
 		}
 	} else {
-		prompt = assemblePlanningPrompt(h.currentWorkspaces(), req.FocusedSpec, prompt)
+		prompt = assembleAgentPrompt(h.currentWorkspaces(), req.FocusedSpec, prompt)
 	}
 
 	cmd := []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
@@ -441,10 +441,10 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		cmd = append(cmd, "--resume", sess.SessionID)
 	}
 
-	// Auto-start the planner if not already running.
+	// Auto-start the agent session if not already running.
 	if !h.planner.IsRunning() {
 		if err := h.planner.Start(r.Context()); err != nil {
-			http.Error(w, "failed to start planner: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to start agent session: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -463,13 +463,13 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			h.planner.SetBusy(false, "")
 			h.planner.CloseLiveLog()
 			if rec := recover(); rec != nil {
-				slog.Error("planning exec panic", "recover", rec)
+				slog.Error("agent exec panic", "recover", rec)
 			}
 		}()
 
 		handle, err := h.planner.Exec(context.Background(), cmd)
 		if err != nil {
-			slog.Error("planning exec failed", "error", err)
+			slog.Error("agent exec failed", "error", err)
 			return
 		}
 
@@ -501,7 +501,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		// If the error is a stale session, clear session (not history) and retry
 		// with conversation history prepended to give the agent prior context.
 		if agentsession.IsErrorResult(rawStdout) && agentsession.IsStaleSessionError(rawStdout) {
-			slog.Warn("planning: stale session, retrying with history context")
+			slog.Warn("agentsession: stale session, retrying with history context")
 			// Preserve mode pin while clearing the stale session ID.
 			pinned, _ := cs.LoadSession()
 			_ = cs.SaveSession(agentsession.ResumeInfo{
@@ -517,7 +517,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			retryCmd := []string{"-p", retryPrompt, "--verbose", "--output-format", "stream-json"}
 			retryHandle, retryErr := h.planner.Exec(context.Background(), retryCmd)
 			if retryErr != nil {
-				slog.Error("planning retry exec failed", "error", retryErr)
+				slog.Error("agent retry exec failed", "error", retryErr)
 				return
 			}
 			retryTee := io.TeeReader(retryHandle.Stdout(), ll2)
@@ -546,7 +546,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		// stats/usage dashboards reflect the round even if the commit
 		// pipeline below produces a warning. Best-effort: errors are logged
 		// and never fail the round.
-		h.persistPlanningRoundUsage(rawStdout)
+		h.persistAgentRoundUsage(rawStdout)
 
 		// Parse response text and append assistant message (skip errors).
 		if !agentsession.IsErrorResult(rawStdout) {
@@ -640,7 +640,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusAccepted, map[string]any{"status": "accepted"})
 }
 
-// maybeAutoTitleThread names an untitled ("Chat N") planning thread from its
+// maybeAutoTitleThread names an untitled ("Chat N") agent session from its
 // opening user message, using the lightweight title model. It is a no-op when
 // the thread already has a user/auto-assigned title, the runner is absent, or
 // the message is blank. Runs inline on the caller's (already detached) exec
@@ -656,18 +656,18 @@ func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, first
 	}
 	title, err := h.runner.GeneratePlanningThreadTitle(context.Background(), firstMessage)
 	if err != nil {
-		slog.Warn("planning thread auto-title failed", "thread", threadID, "err", err)
+		slog.Warn("agent session auto-title failed", "thread", threadID, "err", err)
 		return
 	}
 	if title == "" {
 		return
 	}
 	if err := tm.Rename(threadID, title); err != nil {
-		slog.Warn("planning thread rename failed", "thread", threadID, "err", err)
+		slog.Warn("agent session rename failed", "thread", threadID, "err", err)
 	}
 }
 
-// StreamAgentMessages streams the current planning exec's raw stdout.
+// StreamAgentMessages streams the current agent exec's raw stdout.
 // Uses the same plain-text streaming pattern as task log streaming
 // (streamLiveLog) so the frontend can reuse renderPrettyLogs().
 // Returns 204 No Content if no exec is in flight, or if the `?thread=<id>`
@@ -748,7 +748,7 @@ func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if h.planner == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	if threadID := strings.TrimSpace(r.URL.Query().Get("thread")); threadID != "" {
@@ -767,12 +767,12 @@ func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) 
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "interrupted"})
 }
 
-// persistPlanningRoundUsage parses token and cost usage from a round's
-// raw stdout and appends it to the planning-usage log for the current
+// persistAgentRoundUsage parses token and cost usage from a round's
+// raw stdout and appends it to the agent-session usage log for the current
 // workspace group. Failed rounds, missing usage, and missing workspace
 // configuration short-circuit silently. Append errors are logged so a
 // persistence failure never fails the user-facing round.
-func (h *Handler) persistPlanningRoundUsage(raw []byte) {
+func (h *Handler) persistAgentRoundUsage(raw []byte) {
 	if agentsession.IsErrorResult(raw) {
 		return
 	}
@@ -799,7 +799,7 @@ func (h *Handler) persistPlanningRoundUsage(raw []byte) {
 		SubAgent:             store.SandboxActivityAgentSession,
 	}
 	if err := store.AppendAgentSessionUsage(h.configDir, groupKey, rec); err != nil {
-		slog.Warn("planning: failed to append round usage", "error", err)
+		slog.Warn("agentsession: failed to append round usage", "error", err)
 	}
 }
 

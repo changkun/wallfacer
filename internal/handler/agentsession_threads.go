@@ -13,9 +13,9 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
-// isTaskLockedByPlanner reports whether any task-mode planning thread currently
+// isTaskLockedByAgent reports whether any task-mode agent session currently
 // has an in-flight turn pinned to taskID. Returns (true, threadID) when locked.
-func (h *Handler) isTaskLockedByPlanner(taskID string) (bool, string) {
+func (h *Handler) isTaskLockedByAgent(taskID string) (bool, string) {
 	if h.planner == nil {
 		return false, ""
 	}
@@ -51,7 +51,7 @@ func (h *Handler) cascadeUnarchiveThreadsForTask(taskID string) {
 	}
 }
 
-// threadsManager returns the planner's thread manager if both are
+// threadsManager returns the runtime's session manager if both are
 // configured, else nil.
 func (h *Handler) threadsManager() *agentsession.Manager {
 	if h.planner == nil {
@@ -145,7 +145,7 @@ func writeThreadErr(w http.ResponseWriter, err error) {
 	}
 }
 
-// ListAgentSessions returns the set of planning chat threads for the
+// ListAgentSessions returns the set of agent sessions for the
 // current workspace group. Pass ?includeArchived=true to include
 // archived threads in the result.
 func (h *Handler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +175,7 @@ func (h *Handler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CreateAgentSession creates a new planning chat thread. Body is
+// CreateAgentSession creates a new agent session. Body is
 // optional; when `name` is empty, a default "Chat N" name is used.
 // When `focused_task` is set, the thread is pinned to task-mode immediately.
 func (h *Handler) CreateAgentSession(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +184,7 @@ func (h *Handler) CreateAgentSession(w http.ResponseWriter, r *http.Request) {
 	}
 	tm := h.threadsManager()
 	if tm == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	req, ok := httpjson.DecodeOptionalBody[struct {
@@ -231,7 +231,7 @@ func (h *Handler) CreateAgentSession(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusCreated, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
-// PatchAgentSession mutates a single planning chat thread. The body
+// PatchAgentSession mutates a single agent session. The body
 // carries exactly one mutation:
 //
 //	{"name": "New name"}     — rename the thread
@@ -246,7 +246,7 @@ func (h *Handler) PatchAgentSession(w http.ResponseWriter, r *http.Request) {
 	}
 	tm := h.threadsManager()
 	if tm == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	req, ok := httpjson.DecodeBody[struct {
@@ -269,14 +269,14 @@ func (h *Handler) PatchAgentSession(w http.ResponseWriter, r *http.Request) {
 
 	switch req.State {
 	case "archived":
-		h.mutatePlanningThread(w, r,
+		h.mutateAgentSession(w, r,
 			"thread is busy; interrupt or wait before archiving",
 			(*agentsession.Manager).Archive,
 		)
 	case "visible":
-		h.mutatePlanningThread(w, r, "", (*agentsession.Manager).Unarchive)
+		h.mutateAgentSession(w, r, "", (*agentsession.Manager).Unarchive)
 	case "active":
-		h.mutatePlanningThread(w, r, "", (*agentsession.Manager).SetActiveID)
+		h.mutateAgentSession(w, r, "", (*agentsession.Manager).SetActiveID)
 	default:
 		http.Error(w, "body must set name or state (archived|visible|active)", http.StatusBadRequest)
 	}
@@ -291,7 +291,7 @@ func (h *Handler) DeleteAgentSession(w http.ResponseWriter, r *http.Request) {
 	}
 	tm := h.threadsManager()
 	if tm == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	id := r.PathValue("id")
@@ -318,19 +318,19 @@ func (h *Handler) writeThreadSummary(w http.ResponseWriter, tm *agentsession.Man
 	httpjson.Write(w, http.StatusOK, toThreadSummary(meta, tm.ActiveID(), mode, taskID))
 }
 
-// mutatePlanningThread is the shared scaffold for the single-verb
-// planning-thread state mutations (archive, unarchive, activate)
+// mutateAgentSession is the shared scaffold for the single-verb
+// agent-session state mutations (archive, unarchive, activate)
 // dispatched from PatchAgentSession. Each caller supplies its own
 // ThreadManager method; the require-configured, busy-check (archive
 // only), apply, and response shape stay identical across the trio.
-func (h *Handler) mutatePlanningThread(
+func (h *Handler) mutateAgentSession(
 	w http.ResponseWriter, r *http.Request,
 	busyConflict string,
 	apply func(*agentsession.Manager, string) error,
 ) {
 	tm := h.threadsManager()
 	if tm == nil {
-		http.Error(w, "planning not configured", http.StatusServiceUnavailable)
+		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
 	}
 	id := r.PathValue("id")

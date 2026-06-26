@@ -10,7 +10,7 @@ import (
 )
 
 // UpdateTaskPromptTool handles POST /api/agent/tool/update_task_prompt.
-// It is the HTTP bridge that lets the planning agent (in task-mode) write
+// It is the HTTP bridge that lets the agent (in task-mode) write
 // task.Prompt and append a prompt_round event.
 //
 // Request body: {task_id: string, prompt: string, thread_id: string}
