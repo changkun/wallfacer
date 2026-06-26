@@ -604,6 +604,25 @@ func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// RequirePrincipalMiddleware rejects requests with 401 when auth is configured
+// but the request carries no authenticated browser principal. It is the
+// data-layer gate for the spec-comment surface: a logged-out browser (no session
+// cookie) must neither read nor write comments, even though the instance still
+// holds a coordination token and could otherwise serve the connector's cached
+// threads. The gate must live here, not in the SPA, because the comment
+// endpoints serve the relay cache independent of the browser session. In local
+// mode (no auth configured) it is a no-op, preserving permissive single-user
+// behavior (there is no session concept to gate on, and coordination is off).
+func (h *Handler) RequirePrincipalMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.HasAuth() && principalFromRequest(r) == nil {
+			httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "sign in required"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // incAutopilotAction increments the autopilot action counter for the given
 // watcher and outcome. It is a no-op when no registry is configured.
 func (h *Handler) incAutopilotAction(watcher, outcome string) {
