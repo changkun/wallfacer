@@ -1131,6 +1131,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ResumeTask":     withID(h.ResumeTask),
 		"SyncTask":       withID(h.SyncTask),
 		"TestTask":       withID(h.TestTask),
+		"AgonTask":       withID(h.AgonTask),
 
 		"TaskDiff":     withID(h.TaskDiff),
 		"StreamLogs":   withID(h.StreamLogs),
@@ -1242,6 +1243,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
 		"TestTask":       handler.BodyLimitDefault,
+		"AgonTask":       handler.BodyLimitDefault,
 	}
 
 	// Register all routes from the contract. A missing handler entry panics at
