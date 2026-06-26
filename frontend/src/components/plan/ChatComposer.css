@@ -86,18 +86,16 @@
 }
 
 .pcp-composer-action {
-  font-size: 12px;
+  font-size: 13px;
   width: 24px;
   height: 24px;
   background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border: none;
   color: var(--ink-3);
   cursor: pointer;
 }
 
 .pcp-composer-action:hover {
-  background: var(--bg-hover);
   color: var(--ink);
 }
 
@@ -105,6 +103,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .pcp-send-hint {
