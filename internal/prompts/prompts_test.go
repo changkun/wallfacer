@@ -517,7 +517,7 @@ func TestPackageLevelSpecSystemPrompts(t *testing.T) {
 }
 
 // TestPromptRegistry_SpecOverridable exercises the full
-// write → render → delete → render cycle for both planning_system_*
+// write → render → delete → render cycle for both spec_system_*
 // templates. Required by agent-system-prompts.md so that users can
 // customize the agent's framing without forking the binary.
 func TestPromptRegistry_SpecOverridable(t *testing.T) {
