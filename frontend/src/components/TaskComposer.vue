@@ -55,7 +55,13 @@ function removeTag(i: number) { tags.value.splice(i, 1); }
 // A trailing comma typed/pasted into the draft auto-commits.
 watch(tagDraft, (v) => { if (v.includes(',')) { tagDraft.value = v.replace(/,/g, ''); commitTag(); } });
 
-const timeoutMin = ref<number | null>(null);
+const timeoutPreset = ref<'' | '15' | '30' | '60' | '120' | '300' | 'custom'>('');
+const timeoutCustomMin = ref<number | null>(null);
+const timeoutMin = computed<number | null>(() => {
+  if (!timeoutPreset.value) return null;
+  if (timeoutPreset.value === 'custom') return timeoutCustomMin.value;
+  return Number(timeoutPreset.value);
+});
 
 // Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
 const allowsEmptyPrompt = computed(() => flowAllowsEmptyPrompt(flow.value, flows.value));
@@ -176,7 +182,8 @@ function collapse() {
   expanded.value = false;
   prompt.value = '';
   tags.value = []; tagDraft.value = '';
-  timeoutMin.value = null;
+  timeoutPreset.value = '';
+  timeoutCustomMin.value = null;
   showMore.value = false;
   model.value = '';
   maxCostUsd.value = null;
@@ -256,7 +263,8 @@ async function submit() {
 
     prompt.value = '';
     tags.value = []; tagDraft.value = '';
-    timeoutMin.value = null;
+    timeoutPreset.value = '';
+    timeoutCustomMin.value = null;
     model.value = '';
     maxCostUsd.value = null;
     maxInputTokens.value = null;
@@ -354,13 +362,23 @@ function onInput(e: Event) {
       </label>
       <label class="composer__opt">
         <span class="composer__opt-label">Timeout</span>
+        <select v-model="timeoutPreset" class="composer__select" aria-label="Timeout preset">
+          <option value="">—</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60">1 hour</option>
+          <option value="120">2 hours</option>
+          <option value="300">5 hours</option>
+          <option value="custom">Custom…</option>
+        </select>
         <input
-          v-model.number="timeoutMin"
+          v-if="timeoutPreset === 'custom'"
+          v-model.number="timeoutCustomMin"
           class="composer__input composer__input--num"
           type="number"
           min="1"
           placeholder="min"
-          aria-label="Timeout in minutes"
+          aria-label="Custom timeout in minutes"
         />
       </label>
       <label v-if="templates.length" class="composer__opt">
