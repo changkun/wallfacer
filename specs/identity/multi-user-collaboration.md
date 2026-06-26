@@ -1,6 +1,6 @@
 ---
 title: Multi-User Collaboration (Org-Scoped Board)
-status: drafted
+status: stale
 depends_on:
   - specs/foundations/storage-backends.md
 affects:
