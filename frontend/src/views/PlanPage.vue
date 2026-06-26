@@ -14,9 +14,9 @@ import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 
 const route = useRoute();
 const router = useRouter();
-const planning = useAgentStore();
+const agentStore = useAgentStore();
 const tasks = useTaskStore();
-const { tree, treeIndex, treeLoading, focusedSpecPath } = storeToRefs(planning);
+const { tree, treeIndex, treeLoading, focusedSpecPath } = storeToRefs(agentStore);
 
 // ── Layout state machine ───────────────────────────────────────────
 //
@@ -43,7 +43,7 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
 // to forward Break Down sends. In chat-first mode the popup isn't mounted; the
 // full-width AgentChatPanel covers the empty-workspace case.
 //
-// Gates the three-pane planning chat: the floating popup, its focused-view
+// Gates the three-pane agent chat: the floating popup, its focused-view
 // toggle button, and the C shortcut. Set false to hide chat in Plan mode
 // (the dedicated /chat surface is unaffected); true shows the popup launcher
 // in the bottom-right. The chat-first empty-workspace onboarding is unaffected
@@ -116,12 +116,12 @@ watch(focusedSpecPath, (path) => {
 function focusSibling(path: string) {
   // Match against the loaded tree; if unknown, ignore (could be a docs link
   // we don't render in the tree).
-  if (planning.tree.find(n => n.path === path)) {
-    planning.focusSpec(path);
+  if (agentStore.tree.find(n => n.path === path)) {
+    agentStore.focusSpec(path);
   } else {
     // Fall back to focusing anyway; loadCurrent will surface the error
     // state if the path is invalid.
-    planning.focusSpec(path);
+    agentStore.focusSpec(path);
   }
 }
 
@@ -147,7 +147,7 @@ onMounted(async () => {
   // SpecTreePanel only mounts under the three-pane layout but the layout
   // itself is gated on tree.length > 0 || treeIndex. Without an
   // unconditional initial fetch the page would deadlock on chat-first.
-  void planning.fetchTree();
+  void agentStore.fetchTree();
 
   // Translate legacy hash deep-link.
   const hashPath = readHashPath();
@@ -156,12 +156,12 @@ onMounted(async () => {
     void router.replace({ path: '/plan', query: { spec: hashPath } });
   }
 
-  // Honour ?task=<id>: open task-mode planning pinned to that task.
+  // Honour ?task=<id>: open task-mode agent session pinned to that task.
   const focusTask = typeof route.query.task === 'string' ? route.query.task : '';
   if (focusTask) {
     if (tasks.tasks.length === 0) await tasks.fetchTasks().catch(() => {});
     const t = tasks.tasks.find(x => x.id === focusTask);
-    void planning.openPlanForTask(focusTask, t?.title ?? '', t?.prompt ?? '');
+    void agentStore.openPlanForTask(focusTask, t?.title ?? '', t?.prompt ?? '');
   }
 
   // Honour ?spec=<path> when the tree finishes loading.
@@ -170,7 +170,7 @@ onMounted(async () => {
     const stop = watch(tree, (v) => {
       if (v.length === 0) return;
       if (v.find(n => n.path === focus)) {
-        planning.focusSpec(focus);
+        agentStore.focusSpec(focus);
       }
       stop();
     }, { immediate: true });
@@ -187,7 +187,7 @@ useSse({
           index?: SpecIndexMeta | null;
           progress?: Record<string, SpecProgress>;
         };
-        planning.applyTree({
+        agentStore.applyTree({
           nodes: d.nodes ?? [],
           index: d.index ?? null,
           progress: d.progress ?? {},

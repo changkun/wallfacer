@@ -1,5 +1,5 @@
 // Regression: switching workspace groups under a mounted chat surface must
-// reload the planning thread list (threads are per-workspace-group on the
+// reload the agent-session thread list (threads are per-workspace-group on the
 // server). Without the watch in useChatSession the session list went stale
 // until a full page reload.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

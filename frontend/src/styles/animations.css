@@ -1,7 +1,7 @@
 /* Shared progress affordances for incrementally-appearing / streaming content.
    Reused across the task-detail activity stream, oversight phases, and other
    live surfaces so "work is happening" reads consistently instead of content
-   popping in suddenly. The planning chat keeps its own scoped copy. */
+   popping in suddenly. The agent-session chat keeps its own scoped copy. */
 
 /* Each newly-arrived item eases in rather than popping. */
 @keyframes wf-content-in {

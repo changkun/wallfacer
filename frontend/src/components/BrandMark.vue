@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// BrandMark — the wallfacer pixel logo, sized on demand. Used as the planning
-// agent's signature in chat turns and on the chat entry screen, so the brand
+// BrandMark — the wallfacer pixel logo, sized on demand. Used as the agent's
+// signature in chat turns and on the chat entry screen, so the brand
 // mark (not a generic avatar or another product's glyph) carries identity.
 withDefaults(defineProps<{ size?: number }>(), { size: 16 });
 </script>

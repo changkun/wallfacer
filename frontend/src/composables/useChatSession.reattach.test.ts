@@ -54,9 +54,9 @@ describe('useChatSession live-stream re-attach', () => {
 
   it('attaches when the active thread is the busy one', async () => {
     await mount();
-    const planning = useAgentStore();
-    planning.activeThreadId = 'thread-x';
-    planning.busyThreadId = 'thread-x';
+    const agentStore = useAgentStore();
+    agentStore.activeThreadId = 'thread-x';
+    agentStore.busyThreadId = 'thread-x';
     await nextTick();
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(0);
@@ -65,9 +65,9 @@ describe('useChatSession live-stream re-attach', () => {
 
   it('does not attach when a different thread is busy', async () => {
     await mount();
-    const planning = useAgentStore();
-    planning.activeThreadId = 'thread-x';
-    planning.busyThreadId = 'thread-y';
+    const agentStore = useAgentStore();
+    agentStore.activeThreadId = 'thread-x';
+    agentStore.busyThreadId = 'thread-y';
     await nextTick();
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(0);

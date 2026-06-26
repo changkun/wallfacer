@@ -61,10 +61,10 @@ interface Mounted {
 
 async function mountPage(): Promise<Mounted> {
   setActivePinia(createPinia());
-  // Give the planning store a tree so the layout resolves to three-pane
+  // Give the agent store a tree so the layout resolves to three-pane
   // (which is what renders the splitter and SpecTreePanel).
-  const planning = useAgentStore();
-  planning.applyTree({
+  const agentStore = useAgentStore();
+  agentStore.applyTree({
     nodes: [{ path: 'a', is_leaf: true, spec: { title: 'A', status: 'drafted' } } as never],
     index: null,
     progress: {},
