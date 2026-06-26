@@ -1,6 +1,6 @@
 ---
 title: Per-Task Host Path References
-status: drafted
+status: stale
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-03-25
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

@@ -1,12 +1,12 @@
 ---
 title: Tenant API
-status: drafted
+status: stale
 depends_on:
   - specs/cloud/latere-integration.md
 affects: [internal/handler/tenantapi/]
 effort: large
 created: 2026-03-28
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

@@ -1,6 +1,6 @@
 ---
 title: "Task Revert: Agent-Assisted Undo of Merged Task Changes"
-status: drafted
+status: stale
 depends_on: []
 affects:
   - internal/runner/revert.go
@@ -13,7 +13,7 @@ affects:
   - frontend/src/components/TaskCard.vue
 effort: medium
 created: 2026-04-01
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

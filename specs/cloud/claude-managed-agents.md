@@ -1,6 +1,6 @@
 ---
 title: Claude Managed Agents as a Remote Executor
-status: drafted
+status: stale
 depends_on:
   - specs/shared/harness-abstraction.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - docs/cloud/
 effort: large
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

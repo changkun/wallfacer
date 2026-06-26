@@ -1,6 +1,6 @@
 ---
 title: Task Prompt File and Image Attachments
-status: drafted
+status: stale
 depends_on: []
 affects:
   - internal/store/models.go
@@ -16,7 +16,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-26
 author: changkun
 dispatched_task_id: null
 ---

@@ -1,6 +1,6 @@
 ---
 title: Agent Token Exchange
-status: stale
+status: archived
 depends_on:
   - specs/identity/authentication.md
 affects:

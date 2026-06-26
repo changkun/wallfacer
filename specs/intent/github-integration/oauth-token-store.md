@@ -1,6 +1,6 @@
 ---
 title: "GitHub OAuth App and Token Store"
-status: drafted
+status: stale
 depends_on:
   - specs/identity/authentication.md
 affects:

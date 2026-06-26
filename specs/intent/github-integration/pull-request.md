@@ -1,6 +1,6 @@
 ---
 title: "Pull Request Creation and Commenting (Write Surface)"
-status: drafted
+status: stale
 depends_on:
   - specs/intent/github-integration/oauth-token-store.md
   - specs/intent/github-integration/repo-selection.md
