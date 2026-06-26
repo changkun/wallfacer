@@ -20,7 +20,7 @@ import (
 // agent-session launch via the "wallfacer.task.id" label, so the process
 // monitor and usage attribution can tell agent-session runs apart from task
 // runs.
-const agentSessionTaskID = "planning-sandbox"
+const agentSessionTaskID = "agent-session"
 
 // sessionsDirName is the per-config-dir directory holding agent-session state
 // (chat threads). Must match store.agentSessionsDirName; this package stays
@@ -28,17 +28,17 @@ const agentSessionTaskID = "planning-sandbox"
 // store.MigrateAgentSessionsDir handles the one-time rename from "planning".
 const sessionsDirName = "agent-sessions"
 
-// Config holds the configuration for a Planner.
+// Config holds the configuration for a Runtime.
 type Config struct {
 	Backend     executor.Backend // execution backend (host; cloud later)
 	Command     string           // legacy runtime binary path; unused on the host backend
 	Workspaces  []string         // workspace directory paths
 	EnvFile     string           // path to .env file for the agent process
-	Fingerprint string           // workspace fingerprint for keying the planning workspace
+	Fingerprint string           // workspace fingerprint for keying the agent-session workspace
 	ConfigDir   string           // base config directory (~/.wallfacer/) for conversation persistence
 }
 
-// Runtime manages the singleton planning agent process for a workspace.
+// Runtime manages the singleton agent process for a workspace.
 type Runtime struct {
 	mu          sync.Mutex
 	backend     executor.Backend
@@ -47,7 +47,7 @@ type Runtime struct {
 	envFile     string
 	fingerprint string
 
-	handle       executor.Handle // non-nil when a planning invocation is active
+	handle       executor.Handle // non-nil when a agent invocation is active
 	active       bool            // true after Start, false after Stop
 	busy         bool            // true while a chat exec is in flight
 	busyThreadID string          // thread ID of the in-flight exec (empty when !busy)
@@ -57,7 +57,7 @@ type Runtime struct {
 	configDir string // root config directory; kept so UpdateWorkspaces can open a new ThreadManager
 }
 
-// New creates a Planner from the given configuration. If ConfigDir and
+// New creates a Runtime from the given configuration. If ConfigDir and
 // Fingerprint are set, a [Manager] is created for multi-thread
 // chat persistence; on first load, any legacy single-thread layout is
 // migrated to "Chat 1".
@@ -104,7 +104,7 @@ func (p *Runtime) ActiveConversation() *ConversationStore {
 	return s
 }
 
-// Start marks the planner as active. The agent process is spawned lazily
+// Start marks the runtime as active. The agent process is spawned lazily
 // on the first Exec call.
 func (p *Runtime) Start(_ context.Context) error {
 	p.mu.Lock()
@@ -113,7 +113,7 @@ func (p *Runtime) Start(_ context.Context) error {
 	return nil
 }
 
-// Stop kills the planning agent process and marks the planner as inactive.
+// Stop kills the agent process and marks the runtime as inactive.
 func (p *Runtime) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -125,35 +125,35 @@ func (p *Runtime) Stop() {
 	p.active = false
 }
 
-// IsRunning reports whether the planner has been started and not stopped.
+// IsRunning reports whether the runtime has been started and not stopped.
 func (p *Runtime) IsRunning() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.active
 }
 
-// Exec launches a command as a planning agent process via the execution
+// Exec launches a command as a agent process via the execution
 // backend. Each call spawns a fresh process tagged with the stable
 // agentSessionTaskID for monitor and usage attribution.
 func (p *Runtime) Exec(ctx context.Context, cmd []string) (executor.Handle, error) {
 	p.mu.Lock()
 	if !p.active {
 		p.mu.Unlock()
-		return nil, fmt.Errorf("planner: not started")
+		return nil, fmt.Errorf("agentsession: not started")
 	}
 	if p.backend == nil {
 		p.mu.Unlock()
-		return nil, fmt.Errorf("planner: no backend configured")
+		return nil, fmt.Errorf("agentsession: no backend configured")
 	}
 	p.mu.Unlock()
 
-	name := "wallfacer-plan-" + truncFingerprint(p.fingerprint)
+	name := "wallfacer-agent-" + truncFingerprint(p.fingerprint)
 	spec := p.buildSpec(name, harness.Claude)
 	spec.Cmd = cmd
 
 	h, err := p.backend.Launch(ctx, spec)
 	if err != nil {
-		return nil, fmt.Errorf("planner exec: %w", err)
+		return nil, fmt.Errorf("agentsession exec: %w", err)
 	}
 
 	p.mu.Lock()
@@ -205,7 +205,7 @@ func (p *Runtime) BusyThreadID() string {
 	return p.busyThreadID
 }
 
-// SetBusy marks the planner as busy (exec in flight) and records the
+// SetBusy marks the runtime as busy (exec in flight) and records the
 // thread ID that owns the exec. Pass an empty threadID when clearing.
 func (p *Runtime) SetBusy(b bool, threadID string) {
 	p.mu.Lock()
@@ -273,7 +273,7 @@ func (p *Runtime) Interrupt() error {
 	p.mu.Lock()
 	if !p.busy {
 		p.mu.Unlock()
-		return fmt.Errorf("planner: not busy")
+		return fmt.Errorf("agentsession: not busy")
 	}
 	h := p.handle
 	l := p.liveLog
@@ -290,9 +290,9 @@ func (p *Runtime) Interrupt() error {
 	return nil
 }
 
-// UpdateWorkspaces stops the current planning agent process (if any),
+// UpdateWorkspaces stops the current agent process (if any),
 // stores new workspace configuration, and re-opens the thread manager
-// rooted at the new fingerprint's planning directory so thread CRUD,
+// rooted at the new fingerprint's agent-session directory so thread CRUD,
 // messages, and undo target the right workspace group after a switch.
 // A subsequent Start+Exec spawns a fresh process in the updated workspace.
 func (p *Runtime) UpdateWorkspaces(workspaces []string, fingerprint string) {

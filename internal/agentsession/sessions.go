@@ -16,7 +16,7 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
-// SessionMeta describes a single planning chat thread.
+// SessionMeta describes a single agent session.
 type SessionMeta struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`
@@ -31,7 +31,7 @@ type SessionMeta struct {
 
 // threadManifest is the on-disk shape of threads.json.
 type threadManifest struct {
-	Version int          `json:"version"`
+	Version int           `json:"version"`
 	Threads []SessionMeta `json:"threads"`
 }
 
@@ -47,7 +47,7 @@ const (
 	threadManifestV1    = 1
 )
 
-// Manager owns the set of planning chat threads for a single
+// Manager owns the set of agent sessions for a single
 // workspace-group fingerprint. Each thread has its own on-disk
 // [ConversationStore] under threads/<id>/. The manager persists the
 // ordered list of threads in threads.json and the UI's active-thread

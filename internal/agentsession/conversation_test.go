@@ -355,7 +355,7 @@ func TestConversationStore_ClearEmpty(t *testing.T) {
 	}
 }
 
-func TestPlannerConversation(t *testing.T) {
+func TestRuntimeConversation(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
 		Fingerprint: "test123",
@@ -366,7 +366,7 @@ func TestPlannerConversation(t *testing.T) {
 	}
 }
 
-func TestPlannerConversation_NoConfigDir(t *testing.T) {
+func TestRuntimeConversation_NoConfigDir(t *testing.T) {
 	p := New(Config{Command: "podman", Fingerprint: "test123"})
 	if p.ActiveConversation() != nil {
 		t.Error("ActiveConversation() should be nil when ConfigDir is empty")
@@ -421,10 +421,10 @@ func TestExtractResultText_Empty(t *testing.T) {
 	}
 }
 
-func TestPlannerIsBusy(t *testing.T) {
+func TestRuntimeIsBusy(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	if p.IsBusy() {
-		t.Error("new planner should not be busy")
+		t.Error("new runtime should not be busy")
 	}
 	p.SetBusy(true, "")
 	if !p.IsBusy() {

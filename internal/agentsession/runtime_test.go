@@ -14,7 +14,7 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 )
 
-func TestPlannerNew(t *testing.T) {
+func TestRuntimeNew(t *testing.T) {
 	cfg := Config{
 		Command:     "/usr/bin/podman",
 		Workspaces:  []string{"/home/user/repo"},
@@ -33,14 +33,14 @@ func TestPlannerNew(t *testing.T) {
 	}
 }
 
-func TestPlannerIsRunningWhenNotStarted(t *testing.T) {
+func TestRuntimeIsRunningWhenNotStarted(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	if p.IsRunning() {
-		t.Error("IsRunning() = true, want false for a new planner")
+		t.Error("IsRunning() = true, want false for a new runtime")
 	}
 }
 
-func TestPlannerStartStop(t *testing.T) {
+func TestRuntimeStartStop(t *testing.T) {
 	p := New(Config{Command: "podman"})
 
 	if err := p.Start(context.Background()); err != nil {
@@ -56,7 +56,7 @@ func TestPlannerStartStop(t *testing.T) {
 	}
 }
 
-func TestPlannerUpdateWorkspaces(t *testing.T) {
+func TestRuntimeUpdateWorkspaces(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
 		Workspaces:  []string{"/old/path"},
@@ -79,15 +79,15 @@ func TestPlannerUpdateWorkspaces(t *testing.T) {
 	}
 }
 
-func TestPlannerExecNotStarted(t *testing.T) {
+func TestRuntimeExecNotStarted(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	_, err := p.Exec(context.Background(), []string{"echo", "hello"})
 	if err == nil {
-		t.Error("Exec should fail when planner is not started")
+		t.Error("Exec should fail when runtime is not started")
 	}
 }
 
-func TestPlannerExecNoBackend(t *testing.T) {
+func TestRuntimeExecNoBackend(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	_ = p.Start(context.Background())
 	_, err := p.Exec(context.Background(), []string{"echo", "hello"})
@@ -96,10 +96,10 @@ func TestPlannerExecNoBackend(t *testing.T) {
 	}
 }
 
-// TestBuildContainerSpec_HostBackend verifies that when the planner is
+// TestBuildContainerSpec_HostBackend verifies that when the runtime is
 // configured with the sandbox HostBackend, its WorkDir is a real host
 // path rather than the container-only /workspace/<basename>. Without
-// this, planner execs fail with "host backend: WorkDir is a container
+// this, runtime execs fail with "host backend: WorkDir is a container
 // path; runner must translate to a host path" as the HostBackend
 // actively rejects container paths to prevent silent CWD drift.
 func TestBuildContainerSpec_HostBackend(t *testing.T) {
@@ -122,7 +122,7 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 		Command:    "/usr/bin/podman",
 		Workspaces: []string{tmpDir},
 	})
-	spec := p.buildSpec("wallfacer-plan-test", harness.Claude)
+	spec := p.buildSpec("wallfacer-agent-test", harness.Claude)
 
 	if spec.WorkDir != tmpDir {
 		t.Errorf("host mode WorkDir = %q, want host path %q", spec.WorkDir, tmpDir)
@@ -147,15 +147,15 @@ func TestBuildContainerSpec(t *testing.T) {
 		Fingerprint: "abc123",
 	})
 
-	spec := p.buildSpec("wallfacer-plan-test", harness.Claude)
+	spec := p.buildSpec("wallfacer-agent-test", harness.Claude)
 
 	// Basic fields.
-	if spec.Name != "wallfacer-plan-test" {
-		t.Errorf("Name = %q, want %q", spec.Name, "wallfacer-plan-test")
+	if spec.Name != "wallfacer-agent-test" {
+		t.Errorf("Name = %q, want %q", spec.Name, "wallfacer-agent-test")
 	}
 	// The host backend dispatches to the right CLI based on WALLFACER_AGENT.
-	// Without it, host-backend planner execs error out with "WALLFACER_AGENT
-	// is missing or unknown". Regression test for a bug where the planner spec
+	// Without it, host-backend runtime execs error out with "WALLFACER_AGENT
+	// is missing or unknown". Regression test for a bug where the runtime spec
 	// didn't thread the agent through.
 	if got := spec.Env["WALLFACER_AGENT"]; got != string(harness.Claude) {
 		t.Errorf("spec.Env[WALLFACER_AGENT] = %q, want %q", got, harness.Claude)
@@ -215,7 +215,7 @@ func (b *mockBackend) List(_ context.Context) ([]executor.ContainerInfo, error) 
 
 // --- StartLiveLog / CloseLiveLog / LogReader ---
 
-func TestPlannerStartLiveLog(t *testing.T) {
+func TestRuntimeStartLiveLog(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	l := p.StartLiveLog()
 	if l == nil {
@@ -236,11 +236,11 @@ func TestPlannerStartLiveLog(t *testing.T) {
 	}
 }
 
-// TestPlannerStartLiveLog_SealsPrevious verifies that starting a new live log
+// TestRuntimeStartLiveLog_SealsPrevious verifies that starting a new live log
 // seals the previous one so its readers receive io.EOF. The stale-session retry
 // path starts a second live log without closing the first; without sealing, a
 // reader of the first turn would hang until the client disconnects.
-func TestPlannerStartLiveLog_SealsPrevious(t *testing.T) {
+func TestRuntimeStartLiveLog_SealsPrevious(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	first := p.StartLiveLog()
 	_, _ = first.Write([]byte("turn one"))
@@ -263,14 +263,14 @@ func TestPlannerStartLiveLog_SealsPrevious(t *testing.T) {
 	p.CloseLiveLog()
 }
 
-func TestPlannerLogReader_NoLiveLog(t *testing.T) {
+func TestRuntimeLogReader_NoLiveLog(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	if p.LogReader("") != nil {
 		t.Error("LogReader should return nil when no live log")
 	}
 }
 
-func TestPlannerCloseLiveLog_NoOp(_ *testing.T) {
+func TestRuntimeCloseLiveLog_NoOp(_ *testing.T) {
 	p := New(Config{Command: "podman"})
 	// Should not panic.
 	p.CloseLiveLog()
@@ -278,15 +278,15 @@ func TestPlannerCloseLiveLog_NoOp(_ *testing.T) {
 
 // --- Interrupt ---
 
-func TestPlannerInterrupt_NotBusy(t *testing.T) {
+func TestRuntimeInterrupt_NotBusy(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	err := p.Interrupt()
 	if err == nil {
-		t.Error("expected error when interrupting non-busy planner")
+		t.Error("expected error when interrupting non-busy runtime")
 	}
 }
 
-func TestPlannerInterrupt_Busy(t *testing.T) {
+func TestRuntimeInterrupt_Busy(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	p.SetBusy(true, "")
 	p.handle = &mockHandle{}
@@ -307,7 +307,7 @@ func TestPlannerInterrupt_Busy(t *testing.T) {
 
 // --- Stop with handle ---
 
-func TestPlannerStop_WithHandle(t *testing.T) {
+func TestRuntimeStop_WithHandle(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	_ = p.Start(context.Background())
 	p.handle = &mockHandle{}
@@ -322,7 +322,7 @@ func TestPlannerStop_WithHandle(t *testing.T) {
 
 // --- Exec with mock backend ---
 
-func TestPlannerExec_Success(t *testing.T) {
+func TestRuntimeExec_Success(t *testing.T) {
 	mb := &mockBackend{}
 	p := New(Config{Command: "podman", Fingerprint: "abc123def456789"})
 	p.backend = mb
@@ -337,7 +337,7 @@ func TestPlannerExec_Success(t *testing.T) {
 	}
 }
 
-func TestPlannerExec_BackendError(t *testing.T) {
+func TestRuntimeExec_BackendError(t *testing.T) {
 	mb := &mockBackend{launchErr: fmt.Errorf("container failed")}
 	p := New(Config{Command: "podman", Fingerprint: "abc"})
 	p.backend = mb
@@ -352,7 +352,7 @@ func TestPlannerExec_BackendError(t *testing.T) {
 // --- buildSpec workspace selection, empty workspace, no env file ---
 
 // TestBuildContainerSpec_MultiWorkspaceUsesFirst documents that the host
-// planner runs in the first configured workspace; subsequent workspaces are
+// runtime runs in the first configured workspace; subsequent workspaces are
 // reachable as siblings but do not change the process CWD.
 func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
 	first := t.TempDir()
@@ -363,7 +363,7 @@ func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
 		Fingerprint: "multi",
 	})
 
-	spec := p.buildSpec("wallfacer-plan-multi", harness.Claude)
+	spec := p.buildSpec("wallfacer-agent-multi", harness.Claude)
 	if spec.WorkDir != first {
 		t.Errorf("WorkDir = %q, want first workspace %q", spec.WorkDir, first)
 	}
