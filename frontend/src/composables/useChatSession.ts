@@ -770,7 +770,7 @@ export function useChatSession(): ChatSession {
   // Re-attach to a thread's live stream when it's the one viewed and the server
   // reports it as running (busyThreadId). The in-flight turn isn't persisted, so
   // without this, returning to a session that's still working shows it empty.
-  // StreamPlanningMessages replays the in-flight turn from the start. Fires both
+  // StreamAgentMessages replays the in-flight turn from the start. Fires both
   // on thread switch and when the busy poll discovers the active thread is busy.
   watch([activeThreadId, busyThreadId], () => {
     if (
