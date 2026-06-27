@@ -14,6 +14,8 @@ const graphFixture: Graph = {
   nodes: [
     { id: 'spec:a', kind: 'spec', label: 'Spec A', status: 'validated', ref: 'specs/a.md', depth: 0, available_actions: ['dispatch'] },
     { id: 'task:b', kind: 'task', label: 'Task B', status: 'backlog', ref: 'b', depth: 0, available_actions: ['start'] },
+    { id: 'task:d', kind: 'task', label: 'Task Done', status: 'done', ref: 'd', depth: 0 },
+    { id: 'task:c', kind: 'task', label: 'Task Cancelled', status: 'cancelled', ref: 'c', depth: 0 },
   ],
   edges: [{ from: 'spec:a', to: 'task:b', kind: 'dispatch' }],
   critical_path: ['spec:a', 'task:b'],
@@ -75,6 +77,12 @@ beforeEach(() => {
     if (url.includes('/api/specs/transition')) {
       return new Response(JSON.stringify({ dispatched: [{ task_id: 'new-task' }] }), { status: 200 });
     }
+    if (url.includes('/api/explorer/file')) {
+      return new Response('# Spec A\n\nBody of the spec.', { status: 200 });
+    }
+    if (url.includes('/api/config')) {
+      return new Response(JSON.stringify({ workspaces: ['/ws'] }), { status: 200 });
+    }
     if (url.includes('/api/tasks')) return new Response('[]', { status: 200 });
     return new Response('{}', { status: 200 });
   }) as unknown as typeof globalThis.fetch;
@@ -100,6 +108,46 @@ describe('MapPage', () => {
     // previously offered no Board jump for task nodes).
     const { app, host } = await mountMapPage();
     expect(calls.some((c) => c.url.includes('/api/tasks') && c.method === 'GET')).toBe(true);
+    app.unmount();
+    host.remove();
+  });
+
+  it('hides done and cancelled nodes by default', async () => {
+    const { app, host } = await mountMapPage();
+    // 4 graph nodes, but done + cancelled are hidden → 2 rendered.
+    expect(host.querySelectorAll('.gc-node').length).toBe(2);
+    const labels = [...host.querySelectorAll('.gc-node__label')].map((e) => e.textContent).join(' ');
+    expect(labels).not.toContain('Done');
+    expect(labels).not.toContain('Cancelled');
+    app.unmount();
+    host.remove();
+  });
+
+  it('reveals a hidden state when re-enabled in the States menu', async () => {
+    const { app, host } = await mountMapPage();
+    const statesBtn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('States'))!;
+    statesBtn.dispatchEvent(new Event('click', { bubbles: true }));
+    await nextTick();
+    const doneItem = [...host.querySelectorAll('.map-statefilter__item')].find((li) =>
+      li.textContent?.toLowerCase().includes('done'),
+    )!;
+    const cb = doneItem.querySelector('input') as HTMLInputElement;
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    expect(host.querySelectorAll('.gc-node').length).toBe(3); // done now visible
+    app.unmount();
+    host.remove();
+  });
+
+  it('opens a spec popup on double-clicking a spec node', async () => {
+    const { app, host } = await mountMapPage();
+    const specNode = host.querySelector('.gc-node') as SVGGElement; // first = spec:a
+    specNode.dispatchEvent(new Event('dblclick', { bubbles: true }));
+    await nextTick();
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(host.querySelector('.map-popup')).not.toBeNull();
+    expect(calls.some((c) => c.url.includes('/api/explorer/file'))).toBe(true);
     app.unmount();
     host.remove();
   });
