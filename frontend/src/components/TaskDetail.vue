@@ -5,7 +5,7 @@ import { useTaskActivity } from '../composables/useTaskActivity';
 import { parseDiffFiles, type DiffFile } from '../lib/diff';
 import { highlightDiffFile, type HighlightedDiffLine } from '../lib/diffHighlight';
 import type { ActivityRow } from '../lib/prettyNdjson';
-import type { Task } from '../api/types';
+import type { Task, AgonTranscript } from '../api/types';
 import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
@@ -150,8 +150,45 @@ const resultsLoading = ref(false);
 const resultsError = ref('');
 const resultsFetched = ref(false);
 
+// Agon verification trajectory — the live proposer/critic debate, polled while
+// a run is in flight and rendered alongside the test-agent results.
+const agonTranscript = ref<AgonTranscript | null>(null);
+const agonError = ref('');
+let agonPollTimer: ReturnType<typeof setTimeout> | null = null;
+
+function stopAgonPoll() {
+  if (agonPollTimer !== null) {
+    clearTimeout(agonPollTimer);
+    agonPollTimer = null;
+  }
+}
+
+async function fetchAgonTranscript() {
+  if (!props.task || !props.task.session_id) {
+    agonTranscript.value = null;
+    return;
+  }
+  try {
+    agonTranscript.value = await api<AgonTranscript>(
+      'GET',
+      `/api/tasks/${props.task.id}/agon/transcript`,
+    );
+    agonError.value = '';
+  } catch {
+    // 404 (no run yet) is the common case — show the empty state, not an error.
+    agonTranscript.value = null;
+  }
+  // Keep polling while the run is in flight and the verification tab is open.
+  stopAgonPoll();
+  if (mainTab.value === 'verification' && agonTranscript.value?.running) {
+    agonPollTimer = setTimeout(fetchAgonTranscript, 2500);
+  }
+}
+
 async function fetchResults() {
   if (!props.task) return;
+  // Kick off the agon trajectory fetch alongside the test-agent results.
+  void fetchAgonTranscript();
   resultsLoading.value = true;
   resultsError.value = '';
   try {
@@ -323,6 +360,7 @@ const retryHistory = computed(() => props.task.retry_history ?? []);
 const promptHistory = computed(() => props.task.prompt_history ?? []);
 
 function fetchForTab(t: MainTab) {
+  if (t !== 'verification') stopAgonPoll();
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
   if (t === 'verification' && !resultsFetched.value) fetchResults();
@@ -341,6 +379,7 @@ watch(
   () => {
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
     resultsFetched.value = false; testResults.value = [];
+    stopAgonPoll(); agonTranscript.value = null;
     eventsFetched.value = false; events.value = [];
     diffFetched.value = false; diffFiles.value = []; behindCounts.value = {};
     if (mainTab.value === 'timeline') fetchSpans();
@@ -797,6 +836,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
   stopOversightPolling();
+  stopAgonPoll();
 });
 
 const status = computed(() => props.task.status);
@@ -1335,6 +1375,43 @@ async function submitReview() {
                      the latest result shows in Spec, so they're not repeated
                      here. -->
                 <div data-main-tab-section="verification">
+                  <!-- Agon adversarial trajectory (live fork/round debate) -->
+                  <div v-if="agonTranscript && agonTranscript.forks.length" class="agon-trajectory">
+                    <div class="agon-trajectory__head">
+                      <span class="result-type-badge result-type-plan">Agon</span>
+                      <span class="text-xs text-v-secondary">adversarial verification trajectory</span>
+                      <span v-if="agonTranscript.running" class="agon-trajectory__live">● live</span>
+                    </div>
+                    <details
+                      v-for="fork in agonTranscript.forks"
+                      :key="`agon-fork-${fork.index}`"
+                      class="result-entry"
+                      open
+                    >
+                      <summary class="result-entry-summary">
+                        <div class="result-entry-labels">
+                          <span class="result-turn-label">Fork {{ fork.index }}</span>
+                          <span class="text-xs text-v-muted">{{ fork.rounds.length }} round(s)</span>
+                        </div>
+                      </summary>
+                      <details
+                        v-for="(r, ri) in fork.rounds"
+                        :key="`agon-${fork.index}-${r.round}-${r.role}`"
+                        class="agon-round"
+                        :open="ri === fork.rounds.length - 1"
+                      >
+                        <summary class="agon-round__summary">
+                          <span class="result-type-badge" :class="r.role === 'critic' ? 'agon-role--critic' : 'agon-role--proposer'">
+                            {{ r.role === 'critic' ? 'Critic' : 'Proposer' }} R{{ r.round }}
+                          </span>
+                        </summary>
+                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                        <div class="result-entry-body prose-content" v-html="renderResultMarkdown(r.body)" />
+                      </details>
+                    </details>
+                  </div>
+                  <div v-else-if="agonTranscript && agonTranscript.running" class="text-xs text-v-secondary">Agon verification running… waiting for the first round.</div>
+
                   <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading verification…</div>
                   <div v-else-if="resultsError" class="text-xs" style="color: var(--err, #c0392b);">{{ resultsError }}</div>
                   <div v-else-if="!testResults.length" class="text-xs text-v-muted">No verification run for this task yet.</div>
@@ -1665,6 +1742,25 @@ async function submitReview() {
 </template>
 
 <style scoped>
+.agon-trajectory { margin-bottom: 1rem; }
+.agon-trajectory__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.agon-trajectory__live {
+  color: var(--accent, #d97757);
+  font-size: 0.7rem;
+  font-weight: 600;
+  animation: agon-pulse 1.4s ease-in-out infinite;
+}
+@keyframes agon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.agon-round { margin: 0.25rem 0 0.25rem 0.75rem; }
+.agon-round__summary { cursor: pointer; padding: 0.2rem 0; }
+.agon-role--critic { background: rgba(192, 57, 43, 0.12); color: #c0392b; }
+.agon-role--proposer { background: rgba(39, 119, 87, 0.12); color: #277757; }
+
 .modal-overlay {
   position: fixed;
   inset: 0;

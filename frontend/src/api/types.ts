@@ -97,6 +97,23 @@ export interface Task {
   agon_headline?: string;
 }
 
+// Agon verification trajectory (GET /api/tasks/{id}/agon/transcript).
+export interface AgonRound {
+  round: number;
+  role: 'critic' | 'proposer' | string;
+  body: string;
+  ts: string;
+}
+export interface AgonFork {
+  index: number;
+  rounds: AgonRound[];
+}
+export interface AgonTranscript {
+  session_id: string;
+  running: boolean;
+  forks: AgonFork[];
+}
+
 // Runtime environment captured at the start of a task run (reproducibility
 // provenance). Mirrors store.ExecutionEnvironment.
 export interface ExecutionEnvironment {
