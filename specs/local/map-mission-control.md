@@ -269,6 +269,28 @@ graph TD
 - **No change to the spec lifecycle or task execution engines.** Inline actions
   reuse existing transition/task APIs; no new states, no new runner path.
 
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Graph endpoint](map-mission-control/graph-endpoint.md) | — | medium | validated |
+| [Renderer rebuild](map-mission-control/renderer-rebuild.md) | graph-endpoint | large | validated |
+| [Map integration + removal](map-mission-control/map-integration.md) | graph-endpoint, renderer-rebuild | medium | validated |
+| [Inline actions + highlighting](map-mission-control/inline-actions.md) | map-integration | medium | validated |
+
+```mermaid
+graph LR
+  A[Graph endpoint] --> B[Renderer rebuild]
+  A --> C[Map integration + removal]
+  B --> C
+  C --> D[Inline actions + highlighting]
+```
+
+**Recommended order:** start the backend endpoint (A) first — it defines the
+wire contract. The renderer (B) can be built in parallel once A's type shape is
+fixed. Integration (C) merges both and deletes the vendored code. Inline actions
+(D) land last on the working new surface.
+
 ## Open Questions
 
 - Should `/api/graph` stream (SSE) like `/api/tasks/stream` and
