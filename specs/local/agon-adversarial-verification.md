@@ -102,9 +102,11 @@ opt-in / diff-size gating), not by weakening the critic.
   but never edit it. Shipped in agon; **wallfacer wiring pending** a go.mod bump
   to the agon release that contains it (the proposer is already effectively
   read-only meanwhile — its path passes no `--dangerously-skip-permissions`).
-- [ ] **Usage attribution.** `RunCriticRound` returns `TokenUsage`;
-  `HarnessCritic` populates `CriticResult.Usage`; `runAgon` accumulates onto the
-  task so agon cost is visible to budgets/dashboards.
+- [x] **Usage attribution (cost).** `runAgon` accumulates `VerifyResult.USD`
+  onto the task under `SandboxActivityAgon`, so agon spend shows in the usage
+  breakdown. _(commit: attribute agon run cost)_ Token-level attribution
+  (input/output/cache) still needs agon's `VerifyResult` to carry a token
+  breakdown — a follow-up tied to the next agon release.
 - [x] **Config knobs (env).** `WALLFACER_AGON_FORKS` / `_ROUNDS` / `_COST_CAP`
   override the defaults via `agonTuning`; documented in the configuration guide.
   _(commit: make fork count, rounds, and cost cap configurable)_. A `/api/config`
