@@ -528,6 +528,44 @@ Response fields are neutral by design (slug, title, description, capabilities, m
 
 ---
 
+## Map
+
+The **Map** entry in the sidebar opens a single graph of the whole
+autonomous-engineering pipeline: specs and tasks as nodes, connected by their
+dependencies. Where the Board executes tasks and Plan authors specs, the Map is
+the place to *see and drive the cross-cutting flow* neither single surface
+shows -- idea -> spec -> dispatched task -> done.
+
+**Nodes** are specs (colored by lifecycle) and tasks (colored by status).
+**Edges** carry four meanings:
+
+- **containment** -- a parent spec to its child specs (dashed; organizational);
+- **dispatch** -- a leaf spec to the task it materialized;
+- **spec dep** -- a prerequisite spec to one that `depends_on` it;
+- **task dep** -- a prerequisite task to one that depends on it.
+
+The graph is served whole by `GET /api/graph` (the `internal/graph` builder),
+which composes the spec tree and task list into one model: nodes, typed edges,
+the longest **critical path** along dependency edges, the **blocked** set, and
+the **actions available** on each node. `?archived=1` includes archived specs
+and tasks (the "Show archived" toggle).
+
+**Driving the pipeline.** A node the server marks actionable gets an accent ring
+and appears under **Ready to act** in the inspector. Select it to:
+
+- **Dispatch** a validated, undispatched leaf spec to the board
+  (`POST /api/specs/transition`, action `dispatch`) -- the same transition Plan
+  uses;
+- **Start** a ready (unblocked) backlog task (`PATCH /api/tasks/{id}`,
+  `status: in_progress`), which launches it exactly as dragging it on the Board
+  would;
+- **Open in Plan** / **Open in Board** to jump to the full surface for that node.
+
+After any action the Map refetches the graph, so the affordances re-sync to the
+server's view rather than guessing. Drag a node to reposition it; hold
+**Space** and drag to pan; **Ctrl**/**Cmd**+scroll to zoom; **Reset layout**
+clears the filter and re-lays-out.
+
 ## See Also
 
 - [Workspaces](workspaces.md) -- workspace management, git branches, and multi-repo setups

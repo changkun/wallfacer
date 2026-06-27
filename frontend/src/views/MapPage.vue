@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
+import { useToastStore } from '../stores/toast';
 import { api } from '../api/client';
 import GraphCanvas from '../components/map/GraphCanvas.vue';
 import TaskDetail from '../components/TaskDetail.vue';
@@ -13,6 +14,7 @@ import type { Graph, GraphNode, Task } from '../api/types';
 // hand-rolled GraphCanvas component.
 
 const store = useTaskStore();
+const toast = useToastStore();
 const router = useRouter();
 
 const graph = ref<Graph>({ nodes: [], edges: [], critical_path: [], blocked: [] });
@@ -70,6 +72,59 @@ function openInPlan(path: string) {
 function openInBoard(taskId: string) {
   if (store.tasks.some((t) => t.id === taskId)) detailTaskId.value = taskId;
 }
+
+// --- inline actions: drive the pipeline from the graph ---
+// The server's available_actions is the source of truth; after any action we
+// refetch the graph so the affordances re-sync (a failed action never leaves a
+// stale button claiming something is possible).
+const actionBusy = ref(false);
+
+function hasAction(node: GraphNode | null, action: string): boolean {
+  return !!node && (node.available_actions ?? []).includes(action as never);
+}
+
+async function dispatchSpec(node: GraphNode) {
+  if (actionBusy.value) return;
+  actionBusy.value = true;
+  try {
+    const resp = await api<{ dispatched?: { task_id: string }[] }>('POST', '/api/specs/transition', {
+      action: 'dispatch',
+      paths: [node.ref],
+      run: false,
+    });
+    const taskId = resp.dispatched?.[0]?.task_id;
+    if (taskId) {
+      toast.pushWithAction('Spec dispatched to the board', 'View on Board →', () => {
+        router.push({ path: '/', query: { task: taskId } });
+      }, { kind: 'success' });
+    } else {
+      toast.push('Spec dispatched', { kind: 'success' });
+    }
+  } catch (e) {
+    toast.push('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+  } finally {
+    actionBusy.value = false;
+    await loadGraph();
+  }
+}
+
+async function startTask(node: GraphNode) {
+  if (actionBusy.value) return;
+  actionBusy.value = true;
+  try {
+    await api('PATCH', `/api/tasks/${node.ref}`, { status: 'in_progress' });
+    toast.push('Task started', { kind: 'success' });
+  } catch (e) {
+    toast.push('Start failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+  } finally {
+    actionBusy.value = false;
+    await loadGraph();
+  }
+}
+
+// Nodes the operator can act on right now — surfaced as an inspector list so
+// "what's actionable" is legible without hunting the canvas.
+const readyNodes = computed(() => graph.value.nodes.filter((n) => (n.available_actions?.length ?? 0) > 0));
 function onResetClick() {
   mapSearch.value = '';
   canvas.value?.resetView();
@@ -140,6 +195,24 @@ watch(showArchived, () => void loadGraph());
               <p><strong>{{ selectedNode.label }}</strong></p>
               <p class="depgraph-inspector__muted">{{ selectedNode.kind }} · {{ selectedNode.status }}</p>
               <div class="depgraph-inspector__actions">
+                <button
+                  v-if="hasAction(selectedNode, 'dispatch')"
+                  type="button"
+                  class="depgraph-inspector__action--primary"
+                  :disabled="actionBusy"
+                  @click="dispatchSpec(selectedNode)"
+                >
+                  Dispatch
+                </button>
+                <button
+                  v-if="hasAction(selectedNode, 'start')"
+                  type="button"
+                  class="depgraph-inspector__action--primary"
+                  :disabled="actionBusy"
+                  @click="startTask(selectedNode)"
+                >
+                  Start
+                </button>
                 <button v-if="selectedNode.kind === 'spec'" type="button" @click="openInPlan(selectedNode.ref)">
                   Open in Plan
                 </button>
@@ -153,6 +226,17 @@ watch(showArchived, () => void loadGraph());
               </div>
             </div>
             <p v-else class="depgraph-inspector__muted">Click a node to inspect it.</p>
+          </section>
+          <section v-if="readyNodes.length" class="depgraph-inspector__section">
+            <h3 class="depgraph-inspector__heading">Ready to act</h3>
+            <ul class="depgraph-inspector__ready">
+              <li v-for="n in readyNodes" :key="n.id">
+                <button type="button" class="depgraph-inspector__ready-item" @click="onSelect(n.id)">
+                  {{ n.label }}
+                  <span class="depgraph-inspector__ready-tag">{{ (n.available_actions || []).join(', ') }}</span>
+                </button>
+              </li>
+            </ul>
           </section>
           <section class="depgraph-inspector__section">
             <h3 class="depgraph-inspector__heading">Critical path</h3>

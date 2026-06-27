@@ -31,6 +31,10 @@ const edges = computed(() => edgePaths(props.graph, posMap.value));
 const criticalSet = computed(() => new Set(props.graph.critical_path));
 const blockedSet = computed(() => new Set(props.graph.blocked));
 
+const readySet = computed(
+  () => new Set(props.graph.nodes.filter((n) => (n.available_actions?.length ?? 0) > 0).map((n) => n.id)),
+);
+
 function nodeClasses(id: string, kind: string, status: string) {
   return [
     'gc-node',
@@ -38,6 +42,7 @@ function nodeClasses(id: string, kind: string, status: string) {
     `gc-status--${status}`,
     { 'gc-node--critical': criticalSet.value.has(id) },
     { 'gc-node--blocked': blockedSet.value.has(id) },
+    { 'gc-node--ready': readySet.value.has(id) },
     { 'gc-node--selected': props.selectedId === id },
   ];
 }
@@ -223,6 +228,12 @@ defineExpose({ resetView });
 }
 .gc-node--blocked {
   opacity: 0.5;
+}
+/* "Actionable now": a node the backend marked with an available action gets a
+   solid accent ring so the operator can spot what's ready to dispatch/start. */
+.gc-node--ready .gc-node__box {
+  stroke: var(--accent, #6f9bd8);
+  stroke-width: 2;
 }
 
 .gc-edge {
