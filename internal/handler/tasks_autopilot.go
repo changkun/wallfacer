@@ -772,7 +772,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 						implResult = *t.Result
 					}
 					diff := generateWorktreeDiff(t.WorktreePaths)
-					testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
+					testPrompt := buildTestPrompt(t.Prompt, t.Criteria, implResult, diff)
 					candidates = append(candidates, autoTestCandidate{task: *t, store: s, testPrompt: testPrompt})
 				}
 			})
@@ -1280,7 +1280,7 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 
 	input := adversarial.VerifyInput{
 		TaskPrompt:    t.Prompt,
-		Criteria:      "", // populated from Task.Criteria when test-criteria spec lands
+		Criteria:      t.Criteria, // anchors critics to the same acceptance bar as the test agent
 		SessionID:     *t.SessionID,
 		DiffPatch:     diff,
 		Cwd:           cwd,

@@ -176,6 +176,7 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Prompt             string                               `json:"prompt"`
+		Criteria           string                               `json:"criteria"`
 		Timeout            int                                  `json:"timeout"`
 		MountWorktrees     bool                                 `json:"mount_worktrees"`
 		Sandbox            *harness.ID                          `json:"sandbox,omitempty"`
@@ -224,6 +225,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	opts := store.TaskCreateOptions{
 		Prompt:             req.Prompt,
+		Criteria:           req.Criteria,
 		Timeout:            req.Timeout,
 		Tags:               req.Tags,
 		MountWorktrees:     req.MountWorktrees,
@@ -265,6 +267,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 type batchTaskInput struct {
 	Ref               string                                `json:"ref"`
 	Prompt            string                                `json:"prompt"`
+	Criteria          string                                `json:"criteria"`
 	Timeout           int                                   `json:"timeout"`
 	Tags              []string                              `json:"tags"`
 	Sandbox           *harness.ID                           `json:"sandbox,omitempty"`
@@ -537,6 +540,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		batchOpts := store.TaskCreateOptions{
 			ID:             preAssignedIDs[idx],
 			Prompt:         t.Prompt,
+			Criteria:       t.Criteria,
 			Timeout:        t.Timeout,
 			Tags:           t.Tags,
 			MountWorktrees: t.MountWorktrees,
@@ -595,6 +599,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Status            *store.TaskStatus                     `json:"status"`
 		Position          *int                                  `json:"position"`
 		Prompt            *string                               `json:"prompt"`
+		Criteria          *string                               `json:"criteria"`
 		Timeout           *int                                  `json:"timeout"`
 		FreshStart        *bool                                 `json:"fresh_start"`
 		MountWorktrees    *bool                                 `json:"mount_worktrees"`
@@ -673,8 +678,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, model, budget, and custom patterns for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
+	// Allow editing prompt, criteria, timeout, fresh_start, mount_worktrees, sandbox, model, budget, and custom patterns for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -694,6 +699,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if req.Criteria != nil {
+			if err := s.UpdateTaskCriteria(r.Context(), id, *req.Criteria); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		if req.Sandbox != nil {
 			if err := s.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {
