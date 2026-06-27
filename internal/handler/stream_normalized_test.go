@@ -157,6 +157,28 @@ func TestNormalizingWriter_CursorAndPi(t *testing.T) {
 		t.Errorf("cursor: tool=%v result=%v; kinds=%v", sawCursorTool, sawCursorResult, kinds(cursor))
 	}
 
+	codex := runNormalized(t, harness.Codex, loadFixture(t, "codex/headless-run.ndjson"), false)
+	var sawCodexTool, sawCodexThinking, sawCodexAssistant, sawCodexToolErr bool
+	for _, e := range codex {
+		switch e.Kind {
+		case "tool_start", "tool_end":
+			sawCodexTool = true
+			if e.Tool != nil && e.Tool.Error != "" {
+				sawCodexToolErr = true
+			}
+		case "thinking":
+			sawCodexThinking = true
+		case "assistant":
+			if e.Text != "" {
+				sawCodexAssistant = true
+			}
+		}
+	}
+	if !sawCodexTool || !sawCodexThinking || !sawCodexAssistant || !sawCodexToolErr {
+		t.Errorf("codex: tool=%v thinking=%v assistant=%v toolErr=%v; kinds=%v",
+			sawCodexTool, sawCodexThinking, sawCodexAssistant, sawCodexToolErr, kinds(codex))
+	}
+
 	pi := runNormalized(t, harness.Pi, loadFixture(t, "pi/headless-run.ndjson"), false)
 	var sawPiTool, sawPiAssistant bool
 	for _, e := range pi {
