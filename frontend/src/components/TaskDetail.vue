@@ -621,6 +621,7 @@ async function syncTask() {
 // the legacy modal-core editable settings (timeout/tags/deps/budget).
 const editingBacklog = ref(false);
 const editPrompt = ref('');
+const editCriteria = ref('');
 const editPromptPreview = ref(false);
 const editTimeout = ref<number | null>(null);
 const editModel = ref('');
@@ -652,6 +653,7 @@ function toDatetimeLocal(iso: string | null | undefined): string {
 function openBacklogEdit() {
   const t = props.task;
   editPrompt.value = t.prompt ?? '';
+  editCriteria.value = t.criteria ?? '';
   editPromptPreview.value = false;
   editTimeout.value = t.timeout > 0 ? Math.round(t.timeout / 60) : null;
   editModel.value = t.model ?? '';
@@ -670,6 +672,7 @@ async function saveBacklogEdit() {
     const t = props.task;
     const patch: Record<string, unknown> = {};
     if (editPrompt.value.trim() !== (t.prompt ?? '').trim()) patch.prompt = editPrompt.value.trim();
+    if (editCriteria.value.trim() !== (t.criteria ?? '').trim()) patch.criteria = editCriteria.value.trim();
     if (editTimeout.value !== null && editTimeout.value > 0) patch.timeout = editTimeout.value * 60;
     if (editModel.value.trim() !== (t.model ?? '').trim()) patch.model = editModel.value.trim();
     if (editSandbox.value !== (t.sandbox ?? '')) patch.sandbox = editSandbox.value;
@@ -1407,6 +1410,10 @@ async function submitReview() {
                       <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
                       <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
                     </div>
+                    <label class="backlog-edit__field">
+                      <span>Test criteria</span>
+                      <textarea v-model="editCriteria" class="backlog-edit__prompt" rows="3" placeholder="What the test agent and agon critics should verify (optional)"></textarea>
+                    </label>
                     <label class="backlog-edit__field">
                       <span>Timeout (min)</span>
                       <input v-model.number="editTimeout" type="number" min="1" placeholder="15" />
