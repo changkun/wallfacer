@@ -4,9 +4,9 @@
 
 /* --- Dep graph mode (full-pane DAG visualization) ---
  *
- * Palette: node fills are tinted status colours with a saturated stroke.
- * These hues are defined once here and referenced from unified-graph.js via
- * getComputedStyle so the node renderer stays theme-aware.
+ * These classes style the Map page chrome (header, actions, inspector). The
+ * graph itself is drawn by components/map/GraphCanvas.vue, which carries its
+ * own scoped node/edge styles.
  */
 .depgraph-mode-container {
   display: flex;

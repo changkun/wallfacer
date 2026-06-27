@@ -16,36 +16,4 @@ interface WallfacerBootConfig {
 
 interface Window {
   __WALLFACER__?: WallfacerBootConfig;
-
-  // Shims the legacy depgraph / unified-graph renderers (vendored from ui/js/)
-  // expect, installed by MapPage.vue. Declared here (ambient) rather than via a
-  // `declare global` inside MapPage.vue so test files that touch these globals
-  // typecheck under vue-tsc without importing the SFC.
-  specModeState?: {
-    tree: Array<{
-      path: string;
-      spec: { status: string; dispatched_task_id: string | null };
-      children: string[];
-      is_leaf: boolean;
-      depth: number;
-    }>;
-    index: unknown;
-  };
-  depGraphEnabled?: boolean;
-  openTaskModal?: (id: string) => void;
-  focusSpec?: (path: string) => void;
-  switchMode?: (mode: string, opts?: { persist?: boolean }) => void;
-  scheduleRender?: () => void;
-  renderDependencyGraph?: (tasks: import('./api/types').Task[]) => void;
-  hideDependencyGraph?: () => void;
-  setMapShowArchived?: (v: boolean) => void;
-  setMapSearch?: (q: string) => void;
-  resetMapLayout?: () => void;
-  _resetMapCentering?: () => void;
 }
-
-// IIFE renderers vendored into frontend/src/vendor/depgraph/ (depgraph,
-// unified-graph) have no exports; Vite imports them for side effects so
-// they attach renderer functions to `window` (typed above).
-declare module '*/vendor/depgraph/depgraph.js';
-declare module '*/vendor/depgraph/unified-graph.js';

@@ -1,172 +1,106 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
+import GraphCanvas from '../components/map/GraphCanvas.vue';
 import TaskDetail from '../components/TaskDetail.vue';
-import type { Task } from '../api/types';
+import type { Graph, GraphNode, Task } from '../api/types';
 
-// MapPage hosts the depgraph + unified-graph renderers, vendored verbatim
-// into frontend/src/vendor/depgraph/. We render the same DOM the legacy
-// ui/partials/depgraph-mode.html provided, install a handful of `window`
-// shims the renderers expect, then call window.renderDependencyGraph()
-// reactively. The vendored copies are self-contained (no ui/ imports), so
-// frontend/ no longer depends on ui/ for the Map view.
-
-interface SpecMeta { status: string; dispatched_task_id: string | null }
-interface SpecNode { path: string; spec: SpecMeta; children: string[]; is_leaf: boolean; depth: number }
-interface SpecTreeResponse { nodes: SpecNode[] }
-
-// The window shims these legacy renderers expect are declared ambiently in
-// src/env.d.ts so test files can reference them without importing this SFC.
+// MapPage renders the unified spec+task graph served authoritatively by
+// GET /api/graph (internal/graph). The legacy vendored depgraph renderer and
+// its window-shim bridge are gone; the graph is fetched data, drawn by the
+// hand-rolled GraphCanvas component.
 
 const store = useTaskStore();
 const router = useRouter();
 
-// Track the open task by id, not by a held object reference, so a `task-updated`
-// SSE delta (stores/tasks.ts updateTask replaces the object) keeps the detail
-// panel live instead of pinning the stale status. See BoardPage for the same fix.
-const selectedTaskId = ref<string | null>(null);
-const selectedTask = computed<Task | null>(() =>
-  selectedTaskId.value ? store.tasks.find((t) => t.id === selectedTaskId.value) ?? null : null,
-);
-const specTree = ref<SpecNode[]>([]);
-const ready = ref(false);
+const graph = ref<Graph>({ nodes: [], edges: [], critical_path: [], blocked: [] });
+const loadError = ref(false);
+const showArchived = ref(false);
+const mapSearch = ref('');
+const selectedId = ref<string | null>(null);
+const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null);
 
-// Stable shared state object — the legacy renderer reads this once during
-// each call to renderDependencyGraph. We mutate `tree` in-place so the
-// reference held by depgraph.js stays current as the spec tree refreshes.
-const sharedSpecState = { tree: [] as SpecNode[], index: null as unknown };
-
-// Track the previous values of the window properties we replace so we can
-// restore them on unmount, avoiding leakage across route changes.
-const previous: Record<string, unknown> = {};
-function setShim<K extends keyof Window>(key: K, value: Window[K]) {
-  previous[key as string] = window[key];
-  (window as unknown as Record<string, unknown>)[key as string] = value as unknown;
-}
-function restoreShims() {
-  for (const k of Object.keys(previous)) {
-    (window as unknown as Record<string, unknown>)[k] = previous[k];
-  }
-}
-
-function currentTasks(): Task[] {
-  return store.tasks;
-}
-
-function rerender() {
-  if (!ready.value) return;
-  if (typeof window.renderDependencyGraph !== 'function') return;
-  window.renderDependencyGraph(currentTasks());
-}
-
-async function loadSpecTree() {
+async function loadGraph() {
   try {
-    const resp = await api<SpecTreeResponse>('GET', '/api/specs/tree');
-    specTree.value = resp.nodes ?? [];
-    sharedSpecState.tree.length = 0;
-    sharedSpecState.tree.push(...specTree.value);
+    const q = showArchived.value ? '?archived=1' : '';
+    graph.value = await api<Graph>('GET', '/api/graph' + q);
+    loadError.value = false;
   } catch (e) {
-    console.error('MapPage: spec tree load failed', e);
+    console.error('MapPage: graph load failed', e);
+    loadError.value = true;
   }
 }
 
-function onShowArchivedChange(e: Event) {
-  const target = e.target as HTMLInputElement;
-  window.setMapShowArchived?.(target.checked);
-}
+onMounted(loadGraph);
 
+// Filter by label substring; keep only edges whose endpoints both survive.
+const filteredGraph = computed<Graph>(() => {
+  const q = mapSearch.value.trim().toLowerCase();
+  if (!q) return graph.value;
+  const nodes = graph.value.nodes.filter((n) => n.label.toLowerCase().includes(q));
+  const keep = new Set(nodes.map((n) => n.id));
+  const edges = graph.value.edges.filter((e) => keep.has(e.from) && keep.has(e.to));
+  const critical_path = graph.value.critical_path.filter((id) => keep.has(id));
+  const blocked = graph.value.blocked.filter((id) => keep.has(id));
+  return { nodes, edges, critical_path, blocked };
+});
+
+const selectedNode = computed<GraphNode | null>(
+  () => graph.value.nodes.find((n) => n.id === selectedId.value) ?? null,
+);
+// A selected task node resolves to a live Task for the TaskDetail overlay.
+const selectedTask = computed<Task | null>(() => {
+  const n = selectedNode.value;
+  if (!n || n.kind !== 'task') return null;
+  return store.tasks.find((t) => t.id === n.ref) ?? null;
+});
+const detailTaskId = ref<string | null>(null);
+const detailTask = computed<Task | null>(() =>
+  detailTaskId.value ? store.tasks.find((t) => t.id === detailTaskId.value) ?? null : null,
+);
+
+function onSelect(id: string) {
+  selectedId.value = id;
+}
+function openInPlan(path: string) {
+  void router.push({ path: '/plan', query: { spec: path } });
+}
+function openInBoard(taskId: string) {
+  if (store.tasks.some((t) => t.id === taskId)) detailTaskId.value = taskId;
+}
 function onResetClick() {
   mapSearch.value = '';
-  window.resetMapLayout?.();
+  canvas.value?.resetView();
 }
 
-// Map-mode search: filters graph nodes by label substring via the depgraph
-// lib's setMapSearch hook. This is the spec/depgraph leg of the legacy
-// mode-aware filter routing.
-const mapSearch = ref('');
-function onMapSearchInput() {
-  window.setMapSearch?.(mapSearch.value);
-}
-
-onMounted(async () => {
-  // Install window shims BEFORE importing the legacy IIFE modules so that
-  // any free-identifier lookups (typeof specModeState, typeof scheduleRender)
-  // resolve through the global object to our shims.
-  setShim('specModeState', sharedSpecState);
-  setShim('depGraphEnabled', true);
-  setShim('openTaskModal', (id: string) => {
-    if (store.tasks.some(x => x.id === id)) selectedTaskId.value = id;
-  });
-  setShim('focusSpec', (path: string) => {
-    void router.push({ path: '/plan', query: { spec: path } });
-  });
-  setShim('switchMode', () => { /* no-op in Vue: routing handles this */ });
-  setShim('scheduleRender', () => {
-    // Defer to the next animation frame so coalesced state changes (search
-    // input, focus toggle, expand-spec) batch into a single render.
-    requestAnimationFrame(() => rerender());
-  });
-
-  // Ensure tasks and spec tree are loaded.
-  if (!store.tasks.length) await store.fetchTasks();
-  await loadSpecTree();
-
-  // Dynamic side-effect import; the IIFEs attach to window at execution.
-  await import('../vendor/depgraph/unified-graph.js');
-  await import('../vendor/depgraph/depgraph.js');
-
-  ready.value = true;
-  await nextTick();
-  rerender();
-});
-
-onBeforeUnmount(() => {
-  window.hideDependencyGraph?.();
-  window._resetMapCentering?.();
-  // restoreShims() sets depGraphEnabled back to its prior value
-  // (undefined in normal operation), which falsy-checks the same as
-  // false in the legacy pan/zoom guards.
-  restoreShims();
-});
-
-// Re-render whenever the drawn task graph changes. Watch a fingerprint of the
-// draw-relevant fields rather than the array reference: store.updateTask mutates
-// an element in place (tasks.value[idx] = updated) without reassigning the
-// array, so a deep:false watch on store.tasks itself never fires for the most
-// common SSE event (a status transition), leaving the map stale. The fingerprint
-// recomputes only on fields the graph draws, avoiding relayout thrash on
-// high-frequency usage-token updates during a run.
-watch(
-  () => store.tasks
-    .map((t) => `${t.id}:${t.status}:${t.archived ? 1 : 0}:${(t.depends_on || []).join('|')}`)
-    .join(','),
-  () => rerender(),
+const criticalNodes = computed(() =>
+  graph.value.critical_path
+    .map((id) => graph.value.nodes.find((n) => n.id === id))
+    .filter((n): n is GraphNode => !!n),
 );
-watch(specTree, () => rerender(), { deep: false });
 
-// Reload the spec tree when the active workspace changes. The workspace
-// switcher refreshes tasks (whose fingerprint watch re-renders), but the spec
-// tree is fetched once on mount; without this the map keeps the previous
-// workspace's specs until a full page reload.
+// Re-sync the graph when the drawn task set changes (SSE deltas mutate tasks in
+// place), when the workspace switches, or when the archived toggle flips.
 watch(
-  () => (store.config?.workspaces ?? []).join('\n'),
-  () => { void loadSpecTree(); },
+  () => store.tasks.map((t) => `${t.id}:${t.status}:${t.archived ? 1 : 0}:${(t.depends_on || []).join('|')}`).join(','),
+  () => void loadGraph(),
 );
+watch(() => (store.config?.workspaces ?? []).join('\n'), () => void loadGraph());
+watch(showArchived, () => void loadGraph());
 </script>
 
 <template>
-  <div id="depgraph-mode-container" class="depgraph-mode-container">
+  <div class="depgraph-mode-container">
     <div class="depgraph-mode__inner">
       <header class="depgraph-mode__header">
         <div class="depgraph-mode__titles">
           <h2 class="depgraph-mode__title">Map</h2>
           <p class="depgraph-mode__subtitle">
-            Specs and tasks by dependency. Click a node to focus;
-            <kbd>Shift</kbd>+click to open. Drag to pin, double-click to un-pin.
-            Hold <kbd>Space</kbd> and drag to pan;
-            <kbd>Ctrl</kbd>/<kbd>&#8984;</kbd>+scroll to zoom.
+            The whole pipeline — specs and tasks by dependency. Click a node to
+            inspect and act; drag to reposition. Hold <kbd>Space</kbd> and drag
+            to pan; <kbd>Ctrl</kbd>/<kbd>&#8984;</kbd>+scroll to zoom.
           </p>
         </div>
         <div class="depgraph-mode__actions">
@@ -176,88 +110,63 @@ watch(
             class="depgraph-mode__search"
             placeholder="Filter nodes…"
             aria-label="Filter graph nodes"
-            @input="onMapSearchInput"
           />
           <label class="depgraph-mode__option" title="Include archived specs and tasks">
-            <input type="checkbox" id="depgraph-show-archived" @change="onShowArchivedChange" />
+            <input type="checkbox" v-model="showArchived" />
             Show archived
           </label>
-          <button
-            type="button"
-            id="depgraph-reset-btn"
-            class="depgraph-mode__reset-btn"
-            title="Clear pinned positions, focus, zoom and search"
-            @click="onResetClick"
-          >
+          <button type="button" class="depgraph-mode__reset-btn" title="Clear filter and reset view" @click="onResetClick">
             Reset layout
           </button>
         </div>
       </header>
       <div class="depgraph-mode__body">
-        <div id="depgraph-mount" class="depgraph-mode__mount">
-          <div class="depgraph-mode__empty">
+        <div class="depgraph-mode__mount">
+          <div v-if="loadError" class="depgraph-mode__empty">
+            <p>Couldn't load the graph. <button type="button" @click="loadGraph">Retry</button></p>
+          </div>
+          <div v-else-if="!graph.nodes.length" class="depgraph-mode__empty">
             <p>
-              No dependency edges yet. Add depends-on links between tasks to see
-              the graph &mdash; drag a card from Backlog onto another, or set
-              dependencies via the task modal.
+              No specs or tasks yet. Create a spec in Plan or add a task on the
+              Board to see the pipeline graph.
             </p>
           </div>
+          <GraphCanvas v-else ref="canvas" :graph="filteredGraph" :selected-id="selectedId" @select="onSelect" />
         </div>
-        <aside id="depgraph-inspector" class="depgraph-inspector" aria-label="Graph inspector">
-          <section class="depgraph-inspector__section">
-            <h3 class="depgraph-inspector__heading">Legend</h3>
-            <div class="depgraph-inspector__legend">
-              <div class="depgraph-inspector__legend-group">
-                <div class="depgraph-inspector__legend-subheading">Task</div>
-                <ul>
-                  <li><span class="depgraph-inspector__swatch" data-task-status="in_progress"></span>In progress</li>
-                  <li><span class="depgraph-inspector__swatch" data-task-status="waiting"></span>Waiting</li>
-                  <li><span class="depgraph-inspector__swatch" data-task-status="done"></span>Done</li>
-                  <li><span class="depgraph-inspector__swatch" data-task-status="backlog"></span>Backlog</li>
-                  <li><span class="depgraph-inspector__swatch" data-task-status="failed"></span>Failed</li>
-                </ul>
-              </div>
-              <div class="depgraph-inspector__legend-group">
-                <div class="depgraph-inspector__legend-subheading">Spec</div>
-                <ul>
-                  <li><span class="depgraph-inspector__swatch depgraph-inspector__swatch--spec" data-spec-status="drafted"></span>Drafted</li>
-                  <li><span class="depgraph-inspector__swatch depgraph-inspector__swatch--spec" data-spec-status="validated"></span>Validated</li>
-                  <li><span class="depgraph-inspector__swatch depgraph-inspector__swatch--spec" data-spec-status="complete"></span>Complete</li>
-                  <li><span class="depgraph-inspector__swatch depgraph-inspector__swatch--spec" data-spec-status="stale"></span>Stale</li>
-                </ul>
-              </div>
-              <div class="depgraph-inspector__legend-group">
-                <div class="depgraph-inspector__legend-subheading">Edges</div>
-                <ul>
-                  <li><span class="depgraph-inspector__edge depgraph-inspector__edge--containment"></span>Contains</li>
-                  <li><span class="depgraph-inspector__edge depgraph-inspector__edge--dispatch"></span>Dispatch</li>
-                  <li><span class="depgraph-inspector__edge depgraph-inspector__edge--spec-dep"></span>Spec dep</li>
-                  <li><span class="depgraph-inspector__edge depgraph-inspector__edge--task-dep"></span>Task dep</li>
-                </ul>
-              </div>
-            </div>
-          </section>
+        <aside class="depgraph-inspector" aria-label="Graph inspector">
           <section class="depgraph-inspector__section">
             <h3 class="depgraph-inspector__heading">Selection</h3>
-            <div id="depgraph-inspector-selection" class="depgraph-inspector__selection">
-              <p class="depgraph-inspector__muted">
-                Click a node to focus its neighbourhood. Shift+click opens the
-                task or spec.
-              </p>
+            <div v-if="selectedNode" class="depgraph-inspector__selection">
+              <p><strong>{{ selectedNode.label }}</strong></p>
+              <p class="depgraph-inspector__muted">{{ selectedNode.kind }} · {{ selectedNode.status }}</p>
+              <div class="depgraph-inspector__actions">
+                <button v-if="selectedNode.kind === 'spec'" type="button" @click="openInPlan(selectedNode.ref)">
+                  Open in Plan
+                </button>
+                <button
+                  v-if="selectedNode.kind === 'task' && selectedTask"
+                  type="button"
+                  @click="openInBoard(selectedNode.ref)"
+                >
+                  Open in Board
+                </button>
+              </div>
             </div>
+            <p v-else class="depgraph-inspector__muted">Click a node to inspect it.</p>
           </section>
           <section class="depgraph-inspector__section">
             <h3 class="depgraph-inspector__heading">Critical path</h3>
-            <div id="depgraph-inspector-critical" class="depgraph-inspector__critical">
-              <p class="depgraph-inspector__muted">
-                Longest dependency chain appears here once the graph has edges.
-              </p>
-            </div>
+            <ol v-if="criticalNodes.length" class="depgraph-inspector__critical">
+              <li v-for="n in criticalNodes" :key="n.id">{{ n.label }}</li>
+            </ol>
+            <p v-else class="depgraph-inspector__muted">
+              No dependency chain yet — add depends-on links between specs or tasks.
+            </p>
           </section>
         </aside>
       </div>
     </div>
 
-    <TaskDetail v-if="selectedTask" :task="selectedTask" @close="selectedTaskId = null" />
+    <TaskDetail v-if="detailTask" :task="detailTask" @close="detailTaskId = null" />
   </div>
 </template>
