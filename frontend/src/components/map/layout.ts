@@ -1,12 +1,16 @@
 // Layered (left-to-right) layout for the unified spec+task graph.
 //
-// This is the hierarchy/overlap fix (bug #1): instead of arbitrary positions
-// with straight edges crossing each other, nodes are assigned to dependency
-// layers (column = longest path from a root) and spread vertically within a
-// layer, so the flow of work reads left→right and nodes never share a slot.
+// Hierarchy/overlap fix (bug #1): nodes are assigned to dependency layers
+// (column = longest path from a root) so the flow of work reads left→right.
 //
-// Pure and deterministic: same graph in → same coordinates out, which is what
-// makes it unit-testable without a DOM.
+// Crucially, a layer is *grid-wrapped*: on the real repo the spec tree has
+// layers of 90+ independent nodes, and stacking those in one column produces an
+// 8000px-tall wall — exactly the "still a mess" the rebuild is meant to kill. A
+// layer wider than `maxRows` is packed into multiple sub-columns, bounding
+// column height to `maxRows * rowHeight`, and each layer's horizontal span is
+// accumulated so neighbouring layers never overlap.
+//
+// Pure and deterministic: same graph in → same coordinates out.
 
 import type { Graph } from '../../api/types';
 
@@ -16,15 +20,19 @@ export interface Point {
 }
 
 export interface LayoutOptions {
-  colWidth?: number; // horizontal gap between layers
-  rowHeight?: number; // vertical gap between nodes in a layer
+  colWidth?: number; // horizontal step between sub-columns
+  rowHeight?: number; // vertical step between nodes in a sub-column
+  layerGap?: number; // extra horizontal gap between dependency layers
+  maxRows?: number; // max nodes stacked in one sub-column before wrapping
   originX?: number;
   originY?: number;
 }
 
 const DEFAULTS: Required<LayoutOptions> = {
-  colWidth: 220,
+  colWidth: 210,
   rowHeight: 90,
+  layerGap: 70,
+  maxRows: 16,
   originX: 60,
   originY: 50,
 };
@@ -65,7 +73,7 @@ export function computeLayout(graph: Graph, opts: LayoutOptions = {}): Map<strin
   };
   for (const id of ids) layerOf(id);
 
-  // Group by layer in stable node order, then assign rows within each column.
+  // Group by layer in stable node order.
   const byLayer = new Map<number, string[]>();
   for (const id of ids) {
     const l = layer.get(id)!;
@@ -73,21 +81,23 @@ export function computeLayout(graph: Graph, opts: LayoutOptions = {}): Map<strin
     byLayer.get(l)!.push(id);
   }
 
+  // Walk layers left→right, grid-wrapping each into sub-columns and advancing a
+  // running x cursor so a wide layer pushes later layers further right rather
+  // than overlapping them.
   const pos = new Map<string, Point>();
-  for (const [l, members] of byLayer) {
-    members.forEach((id, row) => {
+  let xCursor = o.originX;
+  for (const l of [...byLayer.keys()].sort((a, b) => a - b)) {
+    const members = byLayer.get(l)!;
+    const subCols = Math.max(1, Math.ceil(members.length / o.maxRows));
+    members.forEach((id, i) => {
+      const subCol = Math.floor(i / o.maxRows);
+      const row = i % o.maxRows;
       pos.set(id, {
-        x: o.originX + l * o.colWidth,
+        x: xCursor + subCol * o.colWidth,
         y: o.originY + row * o.rowHeight,
       });
     });
+    xCursor += subCols * o.colWidth + o.layerGap;
   }
   return pos;
-}
-
-// layerCount is the number of distinct columns, useful for sizing the canvas.
-export function layerCount(pos: Map<string, Point>, colWidth = DEFAULTS.colWidth, originX = DEFAULTS.originX): number {
-  let max = 0;
-  for (const p of pos.values()) max = Math.max(max, Math.round((p.x - originX) / colWidth));
-  return pos.size === 0 ? 0 : max + 1;
 }
