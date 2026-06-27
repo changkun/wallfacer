@@ -1,6 +1,6 @@
 ---
 title: Unified Transcript Rendering (Raw ↔ Rendered, all harnesses)
-status: draft
+status: complete
 depends_on:
   - harness-abstraction
   - agon-trajectory-streaming
@@ -162,6 +162,44 @@ normalized server-side to `AgonTranscript` JSON). **Do not** refactor it into
 Verification tab where Raw shows the underlying `transcript.jsonl` (+ round
 bodies) and Rendered is the existing accordion. (Optional / lowest priority; can
 land last or be split out.)
+
+## Outcome (2026-06-27)
+
+Phases 1–3 implemented directly (not dispatched) and verified end-to-end in the
+running app; phase 4 (agon raw toggle) deferred (see Non-Goals).
+
+Backend: added `?format=normalized` to `StreamLogs` via a `normalizingWriter`
+that rewrites the raw harness-native NDJSON into a stable `normalizedEvent` DTO
+through the task's harness `ParseEvent` — installed before the live/stored/phase
+branching so every serve path inherits it (no live-streaming regression). Added
+an additive `KindThinking` (opencode `reasoning` and codex reasoning items emit
+it) and guarded the runner's last-text fallback to `KindAssistantText` so
+reasoning never becomes the answer. Enriched `codex.go`'s `item.*` to the real
+exec-json schema (agent_message→text, reasoning→thinking, command_execution→tool
+with command/output/error, file_change/mcp/web_search→generic tool) and added
+the missing codex testdata fixture. The normalized tool DTO carries an `id` so
+the renderer pairs `tool_start`/`tool_end` into one row.
+
+Frontend: `createNormalizedParser` (events → `ActivityRow` + answer, generic v1
+tool summaries) and `createTurnParser` (incremental Claude timeline that also
+yields the answer prose). `useTaskActivity` is harness+mode aware — Claude parses
+raw client-side; other harnesses render from `?format=normalized`; the raw view
+shows the native stream. The Activity tab gained a `Raw ↔ Rendered` toggle
+(default Rendered) that renders trajectory **and** answer prose and auto-falls
+back to raw when nothing parses. The Oversight Summary box is untouched.
+
+Verification: per-harness Go + TS unit tests over the real testdata fixtures,
+plus a live-app pass (booted wallfacer + vite, seeded one done task per harness
+with its fixture as the saved turn output): the Claude greeting renders prose
+(was the raw-JSON dump), codex/cursor/opencode/pi render trajectories + answer,
+and the Raw toggle shows the native stream — no console errors.
+
+Deviations: (1) thinking fidelity is opencode + codex only — claude/pi pack
+reasoning inside a message line and `ParseEvent` is one-line-one-event, so their
+thinking stays embedded (Claude still shows it via its own parser). (2) tool
+summaries are generic v1 (name + expandable raw input); per-harness rich
+summarisers are a later pass. (3) agon keeps its existing rendered accordion; its
+raw toggle (phase 4) is deferred.
 
 ## Non-Goals
 
