@@ -609,7 +609,18 @@ async function testTask() {
   await api('POST', `/api/tasks/${props.task.id}/test`, body);
 }
 async function agonTask() {
-  await api('POST', `/api/tasks/${props.task.id}/agon`);
+  // The run is asynchronous and takes minutes; acknowledge the trigger so the
+  // click isn't silent, and surface failures (shared runAction only logs them).
+  // Progress and the verdict appear in the task timeline.
+  try {
+    await api('POST', `/api/tasks/${props.task.id}/agon`);
+    toast.push('Agon verification started — this runs in the background (minutes).', {
+      kind: 'success',
+      timeout: 4000,
+    });
+  } catch (e) {
+    toast.push(`Agon failed to start: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
 }
 async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
