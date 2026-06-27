@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 122,
+  "route_count": 123,
   "routes": [
     {
       "method": "GET",
@@ -860,6 +860,15 @@
       "pattern": "/api/tasks/{id}/agon",
       "name": "AgonTask",
       "description": "Trigger adversarial agon verification for a task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/agon/transcript",
+      "name": "AgonTranscript",
+      "description": "Read the agon verification trajectory (per-fork, per-round transcripts).",
       "tags": [
         "tasks"
       ]
