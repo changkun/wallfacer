@@ -333,3 +333,47 @@ export function createActivityParser(): ActivityParser {
     },
   };
 }
+
+// TurnParser incrementally parses a Claude NDJSON stream into the full turn
+// timeline (steps + interleaved narration) AND the trailing answer, mirroring
+// the one-shot parseTurn but parsing each line once. Used by the task Activity
+// tab's rendered view so a Claude transcript shows both its trajectory and the
+// answer prose (the older createActivityParser dropped the answer entirely).
+export interface TurnParser {
+  push(chunk: string): void;
+  finalize(): void;
+  rows(): ActivityRow[];
+  answer(): string;
+}
+
+export function createTurnParser(): TurnParser {
+  const acc: TurnAccumulator = { rows: [], pending: '' };
+  let buf = '';
+  const consume = (line: string) => {
+    const frame = parseFrameLine(line);
+    if (frame) accumulateFrame(frame, acc);
+  };
+  return {
+    push(chunk: string) {
+      buf += chunk;
+      let nl = buf.indexOf('\n');
+      while (nl !== -1) {
+        consume(buf.slice(0, nl));
+        buf = buf.slice(nl + 1);
+        nl = buf.indexOf('\n');
+      }
+    },
+    finalize() {
+      if (buf) {
+        consume(buf);
+        buf = '';
+      }
+    },
+    rows() {
+      return acc.rows;
+    },
+    answer() {
+      return acc.pending.trim();
+    },
+  };
+}
