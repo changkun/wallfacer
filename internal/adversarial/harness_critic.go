@@ -43,9 +43,23 @@ func (c *HarnessCritic) Round(ctx context.Context, in adversarial.CriticInput) (
 	if cwd == "" {
 		cwd = in.Cwd
 	}
-	text, err := c.runner.RunCriticRound(ctx, prompt, c.sb, cwd, deadline)
+	res, err := c.runner.RunCriticRound(ctx, prompt, c.sb, cwd, deadline)
 	if err != nil {
 		return nil, err
 	}
-	return &adversarial.CriticResult{Markdown: text}, nil
+	// Report the critic's token usage and cost back to agon so its session
+	// accounting (end.json, summary USD) includes the critic instead of
+	// undercounting it. wallfacer runs the critics, so this is the only place
+	// the spend is visible.
+	return &adversarial.CriticResult{
+		Markdown: res.Text,
+		Tokens:   res.InputTokens + res.OutputTokens,
+		Usage: adversarial.TokenUsage{
+			Input:       res.InputTokens,
+			Output:      res.OutputTokens,
+			CacheRead:   res.CacheReadTokens,
+			CacheCreate: res.CacheCreateTokens,
+		},
+		USD: res.CostUSD,
+	}, nil
 }
