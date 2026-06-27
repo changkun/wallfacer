@@ -458,6 +458,13 @@ async function resolveTriage(t: SpecCommentThread) {
   await submit({ op: 'resolve', spec: t.spec_path, thread_id: t.id });
 }
 
+// Mark outdated files an orphaned thread away as no-longer-relevant (terminal).
+// It leaves the triage list and every spec highlight but is retained, not
+// deleted. The practical "dismiss" for a thread whose anchor is gone for good.
+async function outdateTriage(t: SpecCommentThread) {
+  await submit({ op: 'outdated', spec: t.spec_path, thread_id: t.id });
+}
+
 // ── Lifecycle ──────────────────────────────────────────────────────
 
 onMounted(() => {
@@ -696,7 +703,12 @@ defineExpose({ openCount, showResolved, available });
                 class="sc-btn sc-btn--sm"
                 @click="resolveTriage(t)"
               >Resolve</button>
-              <button type="button" class="sc-btn sc-btn--sm" disabled title="coming soon">Mark outdated</button>
+              <button
+                type="button"
+                class="sc-btn sc-btn--sm"
+                title="File this thread away as no longer relevant"
+                @click="outdateTriage(t)"
+              >Mark outdated</button>
               <button type="button" class="sc-btn sc-btn--sm" disabled title="coming soon">Re-place</button>
             </div>
           </div>
