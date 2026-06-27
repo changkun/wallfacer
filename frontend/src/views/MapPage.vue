@@ -35,7 +35,13 @@ async function loadGraph() {
   }
 }
 
-onMounted(loadGraph);
+onMounted(async () => {
+  // Ensure the task store is populated even when /map is the first route hit:
+  // openInBoard / selectedTask / detailTask all read store.tasks, so a cold
+  // load would otherwise offer no Board deep-jump for task nodes.
+  if (!store.tasks.length) await store.fetchTasks();
+  await loadGraph();
+});
 
 // Filter by label substring; keep only edges whose endpoints both survive.
 const filteredGraph = computed<Graph>(() => {
