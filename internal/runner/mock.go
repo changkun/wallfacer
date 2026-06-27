@@ -58,7 +58,7 @@ type MockRunner struct {
 
 	// RunCriticRoundFn lets tests stub agon critic invocations and assert the
 	// working directory the critic is run in.
-	RunCriticRoundFn func(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error)
+	RunCriticRoundFn func(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 
 	// GenerateAgentSessionTitleFn lets tests stub the task-free agent-session
 	// thread title generation. When nil, the method returns ("", nil).
@@ -245,12 +245,12 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 }
 
 // RunCriticRound delegates to RunCriticRoundFn when set; otherwise it returns
-// ("", nil) so callers that do not exercise the critic path are unaffected.
-func (m *MockRunner) RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error) {
+// a zero result so callers that do not exercise the critic path are unaffected.
+func (m *MockRunner) RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error) {
 	if m.RunCriticRoundFn != nil {
 		return m.RunCriticRoundFn(ctx, prompt, sb, cwd, deadline)
 	}
-	return "", nil
+	return CriticRoundResult{}, nil
 }
 
 // GenerateAgentSessionTitle delegates to GenerateAgentSessionTitleFn when

@@ -65,9 +65,10 @@ type Interface interface {
 	// RunCriticRound runs a one-shot stateless agent invocation for an agon
 	// critic turn in the given working directory (cwd), so the critic can read
 	// the full codebase rather than only the diff patch. cwd may be empty for a
-	// patch-only critic. Returns raw markdown text. Token usage is not
-	// attributed to any task (agon aggregates it separately).
-	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (string, error)
+	// patch-only critic. Returns the markdown text plus the agent's reported
+	// token usage and cost, so the caller can report it back to agon and
+	// attribute the spend to the task.
+	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 
 	// Agent-session title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.

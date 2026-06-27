@@ -21,9 +21,12 @@ func TestHarnessCritic_RunsInThrowawayCwd(t *testing.T) {
 	var gotCwd string
 	var gotSb harness.ID
 	mock := &runner.MockRunner{
-		RunCriticRoundFn: func(_ context.Context, _ string, sb harness.ID, cwd string, _ time.Duration) (string, error) {
+		RunCriticRoundFn: func(_ context.Context, _ string, sb harness.ID, cwd string, _ time.Duration) (runner.CriticRoundResult, error) {
 			gotCwd, gotSb = cwd, sb
-			return "## attack\nfound a bug", nil
+			return runner.CriticRoundResult{
+				Text:        "## attack\nfound a bug",
+				InputTokens: 100, OutputTokens: 20, CostUSD: 0.03,
+			}, nil
 		},
 	}
 	c := NewHarnessCritic(mock, harness.Codex, "/wt/task/.agon-critic-abcd1234")
@@ -43,6 +46,10 @@ func TestHarnessCritic_RunsInThrowawayCwd(t *testing.T) {
 	if res == nil || res.Markdown == "" {
 		t.Error("expected critic markdown in the result")
 	}
+	// Usage must be reported back to agon, not dropped.
+	if res.Usage.Input != 100 || res.Usage.Output != 20 || res.USD != 0.03 {
+		t.Errorf("critic usage not reported: usage=%+v usd=%v", res.Usage, res.USD)
+	}
 }
 
 // TestHarnessCritic_FallsBackToInputCwd proves an empty override cwd falls back
@@ -50,9 +57,9 @@ func TestHarnessCritic_RunsInThrowawayCwd(t *testing.T) {
 func TestHarnessCritic_FallsBackToInputCwd(t *testing.T) {
 	var gotCwd string
 	mock := &runner.MockRunner{
-		RunCriticRoundFn: func(_ context.Context, _ string, _ harness.ID, cwd string, _ time.Duration) (string, error) {
+		RunCriticRoundFn: func(_ context.Context, _ string, _ harness.ID, cwd string, _ time.Duration) (runner.CriticRoundResult, error) {
 			gotCwd = cwd
-			return "ok", nil
+			return runner.CriticRoundResult{Text: "ok"}, nil
 		},
 	}
 	c := NewHarnessCritic(mock, harness.Claude, "")
