@@ -315,11 +315,17 @@ task; all four leaves are complete.
   spec tree and task list already use. Readiness is computed over the full task
   set so an archived-done prerequisite doesn't read as blocked; the critical
   path excludes organizational containment hops.
-- **Renderer rebuild** (`cfd9b43a`): hand-rolled SVG renderer with no new
-  dependency — `layout.ts` (layered placement, fixes overlap/hierarchy),
+- **Renderer rebuild** (`cfd9b43a`, scaling fix `80d7ce5a`): hand-rolled SVG
+  renderer with no new dependency — `layout.ts` (layered placement),
   `edges.ts` (curved cubic-Bézier, recomputed from live positions), and a
   RAF-batched `dragController.ts` (one path rewrite per frame, edges stay
-  attached). Both bug fixes are covered by unit tests.
+  attached). Verifying against a live `/api/graph` capture of the **real** repo
+  (352 nodes) exposed a pathology the small unit fixtures missed — a naive
+  one-column-per-layer layout stacked a 93-node layer into an ~8,280px wall, so
+  `computeLayout` now grid-wraps wide layers into sub-columns. Re-measured on
+  the same 352-node graph: ≤16 nodes per sub-column, height bounded to 1,350px,
+  zero overlaps, all 558 edges resolve. Both bug fixes plus the wide-layer cap
+  are covered by unit tests.
 - **Integration + removal** (`0e482920`): `MapPage` rewired onto `/api/graph` +
   `GraphCanvas`; the ~4,583-line vendored depgraph and all `window` shims
   deleted; no remaining `vendor/depgraph` or `ui/` reference.
@@ -327,8 +333,13 @@ task; all four leaves are complete.
   ready backlog task directly from a node, plus a "Ready to act" list and
   accent-ring highlighting; docs updated.
 
+The layout/edge geometry was validated against the real spec tree (the
+352-node `/api/graph` capture above); a final pixel-level pass with the
+`frontend/scripts/ui-shots` harness — which needs Playwright installed — is
+left for the author to run in-app, since the subjective "feel" of the drag and
+the look are best judged on screen.
+
 Deferred (not blocking): undispatch/retract from the graph, `/api/graph` SSE
-streaming (refetch-on-action + the existing task SSE delta cover v1), and node
-pinning. Visual verification via the ui-shots harness is left for the author to
-run in-app, since the "not laggy / curved / clear hierarchy" bar is visual; the
-logic that produces it is unit-tested.
+streaming (refetch-on-action + the existing task SSE delta cover v1), node
+pinning, and per-layer crossing minimization (the grid-wrap bounds size; it
+does not minimize edge crossings the way the old Sugiyama pass did).
