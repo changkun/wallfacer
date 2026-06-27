@@ -1,6 +1,6 @@
 ---
 title: Task Test Criteria for Post-Run Verification
-status: stale
+status: complete
 depends_on: []
 affects:
   - internal/store/models.go
@@ -115,6 +115,29 @@ Phase 1 - model and store. Add `Task.Criteria`, thread through `TaskCreateOption
 Phase 2 - handlers and resolution. Wire create / batch / PATCH request fields; apply the resolution order in `TestTask`; pass `t.Criteria` in `tryAutoTest`. Tests: `req.Criteria` wins over `task.Criteria`; empty body falls back to `task.Criteria`; both empty yields no criteria section; `tryAutoTest` builds a prompt containing the persisted criteria.
 
 Phase 3 - frontend. Composer input, store payloads, detail edit/read surfaces, `types.ts` field. Acceptance: a task created with criteria in the composer shows them in detail; editing in backlog persists via PATCH; an auto-test run on that task renders the Acceptance Criteria block.
+
+## Outcome (2026-06-27)
+
+Implemented across three commits, all phases done.
+
+- **Phase 1 (model + store):** `Task.Criteria` added (omitempty, no migration);
+  threaded through `TaskCreateOptions` / `CreateTaskWithOptions`.
+- **Phase 2 (handlers + resolution):** create / batch / PATCH carry the field;
+  `TestTask` resolves `req.Criteria > task.Criteria > ""`; `tryAutoTest` passes
+  `t.Criteria`; **`runAgon` passes `t.Criteria`** — this unblocked
+  [[agon-adversarial-verification]] goal #7 (the primary motivation for landing
+  this now).
+- **Phase 3 (frontend):** `types.ts` field; composer "Test criteria" input;
+  `TaskDetail` backlog-edit field; `vue-tsc` clean.
+
+**Deviation from the spec:** rather than extend `UpdateTaskBacklog`'s positional
+signature with a `criteria *string` parameter (which would have churned ~15 test
+call sites), a dedicated `UpdateTaskCriteria` setter was added and called from
+the same backlog-only PATCH gate. Same constraint, smaller blast radius.
+
+**Not done (matches Non-Goals / deferred):** read-only criteria display for
+non-backlog tasks (criteria is currently visible only via the backlog edit
+form); search indexing of the field.
 
 ## Non-Goals
 
