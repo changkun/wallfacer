@@ -108,11 +108,58 @@ func TestCodex_ParseEvent_ThreadStarted(t *testing.T) {
 	}
 }
 
-func TestCodex_ParseEvent_Item(t *testing.T) {
-	raw := []byte(`{"type":"item.agent_message","content":"hello"}`)
+func TestCodex_ParseEvent_ItemAgentMessage(t *testing.T) {
+	raw := []byte(`{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"hello there"}}`)
 	evt, _ := codexHarness{}.ParseEvent(raw)
 	if evt.Kind != KindAssistantText {
-		t.Errorf("Kind = %v, want KindAssistantText for item.* events", evt.Kind)
+		t.Errorf("Kind = %v, want KindAssistantText", evt.Kind)
+	}
+	if evt.Text != "hello there" {
+		t.Errorf("Text = %q, want 'hello there'", evt.Text)
+	}
+}
+
+func TestCodex_ParseEvent_ItemReasoning(t *testing.T) {
+	raw := []byte(`{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"thinking it through"}}`)
+	evt, _ := codexHarness{}.ParseEvent(raw)
+	if evt.Kind != KindThinking {
+		t.Errorf("Kind = %v, want KindThinking", evt.Kind)
+	}
+	if evt.Text != "thinking it through" {
+		t.Errorf("Text = %q", evt.Text)
+	}
+}
+
+func TestCodex_ParseEvent_ItemCommandExecution(t *testing.T) {
+	ok := []byte(`{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"ls -la","aggregated_output":"a.txt\n","exit_code":0,"status":"completed"}}`)
+	evt, _ := codexHarness{}.ParseEvent(ok)
+	if evt.Kind != KindToolCallEnd {
+		t.Fatalf("Kind = %v, want KindToolCallEnd", evt.Kind)
+	}
+	if evt.Tool == nil || evt.Tool.ID != "i1" {
+		t.Fatalf("Tool = %+v, want id i1", evt.Tool)
+	}
+	if !strings.Contains(string(evt.Tool.Input), "ls -la") {
+		t.Errorf("Tool.Input should carry the command, got %s", evt.Tool.Input)
+	}
+	if evt.Tool.Error != "" {
+		t.Errorf("successful command should have no error, got %q", evt.Tool.Error)
+	}
+
+	bad := []byte(`{"type":"item.completed","item":{"id":"i2","type":"command_execution","command":"cat nope","aggregated_output":"cat: nope: No such file or directory\n","exit_code":1,"status":"failed"}}`)
+	evt2, _ := codexHarness{}.ParseEvent(bad)
+	if evt2.Tool == nil || !strings.Contains(evt2.Tool.Error, "No such file") {
+		t.Errorf("failed command should surface error, got %+v", evt2.Tool)
+	}
+}
+
+func TestCodex_ParseEvent_ItemStartedIsInert(t *testing.T) {
+	// item.started / item.updated are intermediate; only item.completed yields
+	// a renderable event, so each item produces exactly one row.
+	raw := []byte(`{"type":"item.started","item":{"id":"item_3","type":"agent_message","text":""}}`)
+	evt, _ := codexHarness{}.ParseEvent(raw)
+	if evt.Kind != KindUnknown {
+		t.Errorf("item.started Kind = %v, want KindUnknown", evt.Kind)
 	}
 }
 

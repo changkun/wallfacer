@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"0199a1b2-c3d4-7e8f-9012-3456789abcde"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"I should list the directory, then read the missing file to confirm."}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"ls -la /private/tmp/codex-fixture","aggregated_output":"total 8\ndrwxr-xr-x  3 changkun  wheel   96 Jun 14 21:40 .\n-rw-r--r--  1 changkun  wheel    6 Jun 14 21:40 a.txt\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"cat nope","aggregated_output":"cat: nope: No such file or directory\n","exit_code":1,"status":"failed"}}
+{"type":"item.started","item":{"id":"item_3","type":"agent_message","text":""}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"There is one file: `a.txt` (6 bytes). The second file does not exist."}}
+{"type":"turn.completed","usage":{"input_tokens":1240,"output_tokens":72,"cached_input_tokens":300,"cache_creation_input_tokens":40}}
+{"result":"There is one file: `a.txt` (6 bytes). The second file does not exist.","stop_reason":"end_turn","session_id":"0199a1b2-c3d4-7e8f-9012-3456789abcde","usage":{"input_tokens":1240,"output_tokens":72,"cached_input_tokens":300}}

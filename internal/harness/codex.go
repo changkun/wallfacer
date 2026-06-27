@@ -74,6 +74,23 @@ type codexEventLine struct {
 	Result       string          `json:"result,omitempty"`
 	IsError      bool            `json:"is_error,omitempty"`
 	Subtype      string          `json:"subtype,omitempty"`
+	Item         json.RawMessage `json:"item,omitempty"`
+}
+
+// codexItem is the nested object on an item.* event. Codex's exec --json
+// stream wraps every thread item as {"type":"item.completed","item":{...}};
+// the item's own "type" field discriminates the kind (agent_message,
+// reasoning, command_execution, file_change, mcp_tool_call, web_search,
+// todo_list, error). See takopi.dev's exec-json cheatsheet and
+// openai/codex codex-rs.
+type codexItem struct {
+	ID               string `json:"id"`
+	Type             string `json:"type"`
+	Text             string `json:"text"`
+	Command          string `json:"command"`
+	AggregatedOutput string `json:"aggregated_output"`
+	ExitCode         *int   `json:"exit_code"`
+	Status           string `json:"status"`
 }
 
 // ParseEvent maps one NDJSON line of codex output to a canonical Event.
@@ -135,11 +152,13 @@ func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 			evt.Kind = KindError
 		}
 	case strings.HasPrefix(line.Type, "item."):
-		// Items cover assistant messages, tool calls, file changes, etc.
-		// v1 maps the family to KindAssistantText; downstream consumers
-		// inspect Raw for the specific subtype until a richer mapping
-		// is justified.
-		evt.Kind = KindAssistantText
+		// Items cover assistant messages, reasoning, command executions, file
+		// changes, etc. Key on item.completed so each item yields exactly one
+		// event (item.started / item.updated are intermediate and left
+		// KindUnknown). codexParseItem fills evt from the nested item.
+		if line.Type == "item.completed" {
+			codexParseItem(&evt, line.Item)
+		}
 	case line.Type == "turn.failed" || line.Type == "error":
 		evt.Kind = KindError
 	case line.Type == "result" || (line.Type == "" &&
@@ -158,6 +177,63 @@ func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 		}
 	}
 	return evt, nil
+}
+
+// codexParseItem fills evt from the nested item of an item.completed event.
+// One item → one canonical Event:
+//   - agent_message → KindAssistantText (item.text)
+//   - reasoning     → KindThinking (item.text)
+//   - command_execution → KindToolCallEnd (command as input, aggregated_output
+//     as output, an error when status=="failed")
+//   - file_change / mcp_tool_call / web_search → KindToolCallEnd with the raw
+//     item as the call detail (generic v1 — no per-subtype summary)
+//   - error → KindError
+//
+// An unrecognised item with text degrades to assistant text; otherwise it is
+// left KindUnknown (dropped from the normalized view, preserved in Raw).
+func codexParseItem(evt *Event, rawItem json.RawMessage) {
+	var it codexItem
+	if err := json.Unmarshal(rawItem, &it); err != nil {
+		return
+	}
+	switch it.Type {
+	case "agent_message":
+		evt.Kind = KindAssistantText
+		evt.Text = it.Text
+	case "reasoning":
+		evt.Kind = KindThinking
+		evt.Text = it.Text
+	case "command_execution":
+		evt.Kind = KindToolCallEnd
+		tc := &ToolCall{ID: it.ID, Name: "shell"}
+		if input, err := json.Marshal(map[string]string{"command": it.Command}); err == nil {
+			tc.Input = input
+		}
+		if it.AggregatedOutput != "" {
+			if out, err := json.Marshal(it.AggregatedOutput); err == nil {
+				tc.Output = out
+			}
+		}
+		if it.Status == "failed" {
+			if it.AggregatedOutput != "" {
+				tc.Error = it.AggregatedOutput
+			} else {
+				tc.Error = "command failed"
+			}
+		}
+		evt.Tool = tc
+	case "file_change", "mcp_tool_call", "web_search":
+		evt.Kind = KindToolCallEnd
+		evt.Tool = &ToolCall{ID: it.ID, Name: it.Type, Input: rawItem}
+	case "error":
+		evt.Kind = KindError
+		evt.Text = it.Text
+	default:
+		if it.Text != "" {
+			evt.Kind = KindAssistantText
+			evt.Text = it.Text
+		}
+	}
 }
 
 // AuthEnv populates the env vars codex reads at startup. OPENAI_API_KEY

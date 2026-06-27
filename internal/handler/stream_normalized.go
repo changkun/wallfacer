@@ -24,6 +24,9 @@ type normalizedEvent struct {
 }
 
 type normalizedTool struct {
+	// ID pairs a tool_start with its tool_end so the renderer collapses them
+	// into one row (harnesses that emit only one of the two still render).
+	ID     string          `json:"id,omitempty"`
 	Name   string          `json:"name,omitempty"`
 	Input  json.RawMessage `json:"input,omitempty"`
 	Output json.RawMessage `json:"output,omitempty"`
@@ -49,6 +52,7 @@ func toNormalized(evt harness.Event) normalizedEvent {
 	}
 	if evt.Tool != nil {
 		out.Tool = &normalizedTool{
+			ID:     evt.Tool.ID,
 			Name:   evt.Tool.Name,
 			Input:  evt.Tool.Input,
 			Output: evt.Tool.Output,
