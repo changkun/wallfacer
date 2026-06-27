@@ -119,6 +119,7 @@ export const useTaskStore = defineStore('tasks', () => {
     prompt: string,
     opts?: {
       flow?: string;
+      criteria?: string;
       timeout?: number;
       tags?: string[];
       model?: string;
@@ -127,6 +128,7 @@ export const useTaskStore = defineStore('tasks', () => {
     },
   ) {
     const body: Record<string, unknown> = { prompt };
+    if (opts?.criteria?.trim()) body.criteria = opts.criteria.trim();
     if (opts?.timeout !== undefined) body.timeout = opts.timeout;
     if (opts?.flow) body.flow = opts.flow;
     if (opts?.tags?.length) body.tags = opts.tags;
@@ -144,6 +146,7 @@ export const useTaskStore = defineStore('tasks', () => {
     prompts: string[],
     opts?: {
       flow?: string;
+      criteria?: string;
       timeout?: number;
       tags?: string[];
       model?: string;
@@ -153,6 +156,7 @@ export const useTaskStore = defineStore('tasks', () => {
   ) {
     const tasks = prompts.map((prompt) => {
       const t: Record<string, unknown> = { prompt };
+      if (opts?.criteria?.trim()) t.criteria = opts.criteria.trim();
       if (opts?.timeout !== undefined) t.timeout = opts.timeout;
       if (opts?.flow) t.flow = opts.flow;
       if (opts?.tags?.length) t.tags = opts.tags;

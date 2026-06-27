@@ -76,6 +76,7 @@ const promptPlaceholder = computed(() => {
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
 const model = ref('');
+const criteria = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
@@ -186,6 +187,7 @@ function collapse() {
   timeoutCustomMin.value = null;
   showMore.value = false;
   model.value = '';
+  criteria.value = '';
   maxCostUsd.value = null;
   maxInputTokens.value = null;
   dependsOn.value = [];
@@ -226,6 +228,7 @@ async function submit() {
     }
     const sharedOpts = {
       flow: flow.value || undefined,
+      criteria: criteria.value.trim() || undefined,
       tags: tags.value.slice(),
       timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
       model: model.value.trim() || undefined,
@@ -393,6 +396,10 @@ function onInput(e: Event) {
       </button>
     </div>
     <div v-if="showMore" class="composer__opts">
+      <label class="composer__opt composer__opt--grow">
+        <span class="composer__opt-label">Test criteria</span>
+        <input v-model="criteria" class="composer__input" type="text" placeholder="what the test agent should verify (optional)" aria-label="Test criteria" />
+      </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Model</span>
         <input v-model="model" class="composer__input" type="text" placeholder="override model" aria-label="Model override" />

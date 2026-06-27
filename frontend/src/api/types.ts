@@ -20,6 +20,7 @@ export interface Task {
   id: string;
   title: string;
   prompt: string;
+  criteria?: string;
   status: TaskStatus;
   archived: boolean;
   result: string | null;
