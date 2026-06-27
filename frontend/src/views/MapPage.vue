@@ -189,11 +189,12 @@ watch(showArchived, () => void loadGraph());
     <div class="depgraph-mode__inner">
       <header class="depgraph-mode__header">
         <div class="depgraph-mode__titles">
-          <h2 class="depgraph-mode__title">Map</h2>
+          <h2 class="depgraph-mode__title">Mission Control</h2>
           <p class="depgraph-mode__subtitle">
-            The whole pipeline — specs and tasks by dependency. Click a node to
-            inspect and act; drag to reposition. Hold <kbd>Space</kbd> and drag
-            to pan; <kbd>Ctrl</kbd>/<kbd>&#8984;</kbd>+scroll to zoom.
+            Watch and command the whole pipeline — specs and tasks by
+            dependency. Click a node to inspect and act; double-click a spec to
+            open it; drag to reposition. Hold <kbd>Space</kbd> and drag to pan;
+            <kbd>Ctrl</kbd>/<kbd>&#8984;</kbd>+scroll to zoom.
           </p>
         </div>
         <div class="depgraph-mode__actions">

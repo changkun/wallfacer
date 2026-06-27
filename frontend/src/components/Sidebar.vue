@@ -155,7 +155,7 @@ const navModel = computed<ConsoleNavModel>(() => ({
       { id: 'agents', label: 'Agents', to: '/agents', icon: 'agents' },
       { id: 'flows', label: 'Workflows', to: '/workflows', icon: 'flows' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
-      { id: 'map', label: 'Map', to: '/map', icon: 'map' },
+      { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },
     ] },
     { label: 'Inspect', items: [
       { id: 'terminal', label: 'Terminal', action: true, icon: 'terminal' },
