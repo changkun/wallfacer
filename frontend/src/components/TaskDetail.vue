@@ -153,6 +153,11 @@ const resultsFetched = ref(false);
 // Agon verification trajectory — the live proposer/critic debate, polled while
 // a run is in flight and rendered alongside the test-agent results.
 const agonTranscript = ref<AgonTranscript | null>(null);
+// Agon transcript view: the rendered fork/round debate (default) ↔ the raw
+// transcript payload (the fork/round records + bodies the server assembled).
+const agonView = ref<'rendered' | 'raw'>('rendered');
+const agonRawText = computed(() =>
+  agonTranscript.value ? JSON.stringify(agonTranscript.value, null, 2) : '');
 const agonError = ref('');
 let agonPollTimer: ReturnType<typeof setTimeout> | null = null;
 // After triggering a run, keep polling until this time even before the session
@@ -1430,9 +1435,17 @@ async function submitReview() {
                       <span class="result-type-badge result-type-plan">Agon</span>
                       <span class="text-xs text-v-secondary">adversarial verification trajectory</span>
                       <span v-if="agonTranscript.running" class="agon-trajectory__live">● live</span>
+                      <button
+                        type="button"
+                        class="btn-icon"
+                        style="margin-left: auto;"
+                        @click="agonView = agonView === 'raw' ? 'rendered' : 'raw'"
+                      >{{ agonView === 'raw' ? 'Rendered' : 'Raw' }}</button>
                     </div>
+                    <pre v-if="agonView === 'raw'" class="logs-block">{{ agonRawText }}</pre>
                     <details
                       v-for="fork in agonTranscript.forks"
+                      v-else
                       :key="`agon-fork-${fork.index}`"
                       class="result-entry"
                       open

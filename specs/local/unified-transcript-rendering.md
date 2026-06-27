@@ -165,8 +165,8 @@ land last or be split out.)
 
 ## Outcome (2026-06-27)
 
-Phases 1–3 implemented directly (not dispatched) and verified end-to-end in the
-running app; phase 4 (agon raw toggle) deferred (see Non-Goals).
+Phases 1–4 implemented directly (not dispatched) and verified end-to-end in the
+running app.
 
 Backend: added `?format=normalized` to `StreamLogs` via a `normalizingWriter`
 that rewrites the raw harness-native NDJSON into a stable `normalizedEvent` DTO
@@ -194,12 +194,17 @@ with its fixture as the saved turn output): the Claude greeting renders prose
 (was the raw-JSON dump), codex/cursor/opencode/pi render trajectories + answer,
 and the Raw toggle shows the native stream — no console errors.
 
+Phase 4: agon kept its existing rendered fork/round accordion and gained a
+`Raw ↔ Rendered` toggle in the Verification tab; raw shows the assembled
+transcript payload (fork/round records + bodies) pretty-printed — no agon
+refactor, no backend change (the payload is already normalized server-side and
+is more complete than the raw `transcript.jsonl`, which only carries pointers).
+
 Deviations: (1) thinking fidelity is opencode + codex only — claude/pi pack
 reasoning inside a message line and `ParseEvent` is one-line-one-event, so their
 thinking stays embedded (Claude still shows it via its own parser). (2) tool
 summaries are generic v1 (name + expandable raw input); per-harness rich
-summarisers are a later pass. (3) agon keeps its existing rendered accordion; its
-raw toggle (phase 4) is deferred.
+summarisers are a later pass.
 
 ## Non-Goals
 
