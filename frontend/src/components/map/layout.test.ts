@@ -40,6 +40,33 @@ describe('computeLayout', () => {
     expect(x('b')).toBe(x('c'));
   });
 
+  it('grid-wraps a wide layer instead of stacking one tall column', () => {
+    // One root with 40 children: without wrapping this is a 40-node column
+    // (~3500px). Wrapping must cap any single column at maxRows nodes.
+    const root = node('root');
+    const children = Array.from({ length: 40 }, (_, i) => node(`c${i}`));
+    const g: Graph = {
+      nodes: [root, ...children],
+      edges: children.map((c) => ({ from: 'root', to: c.id, kind: 'spec_dep' as const })),
+      critical_path: [],
+      blocked: [],
+    };
+    const pos = computeLayout(g, { maxRows: 16, rowHeight: 90, originY: 50 });
+
+    // Count how many nodes share each x (i.e. each sub-column).
+    const perColumn = new Map<number, number>();
+    let maxY = -Infinity;
+    for (const p of pos.values()) {
+      perColumn.set(p.x, (perColumn.get(p.x) ?? 0) + 1);
+      maxY = Math.max(maxY, p.y);
+    }
+    expect(Math.max(...perColumn.values())).toBeLessThanOrEqual(16);
+    expect(maxY).toBeLessThanOrEqual(50 + 15 * 90); // bounded height
+    // 40 children → ceil(40/16) = 3 sub-columns within the layer.
+    const childXs = new Set(children.map((c) => pos.get(c.id)!.x));
+    expect(childXs.size).toBe(3);
+  });
+
   it('terminates on a cycle instead of recursing forever', () => {
     const g: Graph = {
       nodes: ['x', 'y'].map(node),
