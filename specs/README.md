@@ -34,6 +34,7 @@ Local Product - 11 shipped, rest pending
   ○ Free-Form Specs
   ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
   ○ Dockable Panel Workspace       ○ Workflows Graph UX
+  ○ Map Mission Control
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback, Spatial Canvas
 
@@ -126,6 +127,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. |
 | [inline-file-panel.md](local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
 | [inline-diff-feedback.md](local/inline-diff-feedback.md) | **Complete** | Code-review-style inline comments anchored to Changes-tab diff lines, batched into the existing feedback channel, with the inline surface login-gated server-side like spec comments. Implemented directly (not dispatched); also fixed the `submitFeedback` `feedback`/`message` key bug. |
+| [map-mission-control.md](local/map-mission-control.md) | Drafted | Rebuild the orphaned read-only Map into an actionable mission-control surface: a server-side unified spec+task graph (`GET /api/graph`), a clean hand-rolled-SVG renderer (no new dep; RAF-batched drag, curved edges) replacing the ~4,583-line vendored depgraph, and inline node actions (dispatch spec, start/retract task, jump to Board/Plan). |
 | [dockable-panel-workspace.md](local/dockable-panel-workspace.md) | Drafted | VS Code-style dockable panel workspace: terminal (later explorer/file panel) docks to any edge, maximizes to fullscreen, and splits via drag-and-drop, persisted to localStorage. Editor-center model wrapping the RouterView in `AppLayout`; custom split-tree (no docking library). |
 | [test-criteria.md](local/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task (`Task.Criteria`) so the auto-tester checks them, threaded into the existing `buildTestPrompt` / `tryAutoTest` path. Closes a live hole: autopilot test runs currently pass empty criteria. Supersedes the archived validation-barrier. |
 | [agon-adversarial-verification.md](local/agon-adversarial-verification.md) | Drafted | Post-run adversarial multi-agent verification via agon (`latere.ai/x/agon`). `HarnessCritic` adapts all five wallfacer harnesses as critics; `SessionProposer` uses `Task.SessionID` for the fork-session path; `tryAutoAdon` in the autopilot loop gated by a toggleable `agonEnabled` flag (off by default). Requires agon `specs/37-pkg-public-api.md` first. |
