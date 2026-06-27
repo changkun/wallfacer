@@ -238,6 +238,35 @@ func TestRunAgon_PersistsWhenWaiting(t *testing.T) {
 	}
 }
 
+// TestRunAgon_AttributesCost proves the agon run's USD is added to the task's
+// usage total and recorded under the "agon" sub-agent breakdown.
+func TestRunAgon_AttributesCost(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0, USD: 0.42}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Usage.CostUSD != 0.42 {
+		t.Errorf("task total CostUSD = %v, want 0.42", got.Usage.CostUSD)
+	}
+	if bd := got.UsageBreakdown[store.SandboxActivityAgon]; bd.CostUSD != 0.42 {
+		t.Errorf("agon breakdown CostUSD = %v, want 0.42", bd.CostUSD)
+	}
+}
+
 // TestRunAgon_SkipsPersistWhenNotWaiting proves a run that finishes after the
 // task already left waiting (resumed, submitted, failed) does not stamp a stale
 // result onto it.
