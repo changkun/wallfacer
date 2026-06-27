@@ -267,6 +267,11 @@ type Task struct {
 	ID                uuid.UUID                      `json:"id"`
 	Title             string                         `json:"title,omitempty"`
 	Prompt            string                         `json:"prompt"`
+	// Criteria is user-defined free-form acceptance criteria for the test
+	// verification agent (and agon critics). When non-empty it renders into the
+	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
+	// a hard gate. omitempty keeps existing task.json files deserializing clean.
+	Criteria          string                         `json:"criteria,omitempty"`
 	PromptHistory     []string                       `json:"prompt_history,omitempty"`
 	RetryHistory      []RetryRecord                  `json:"retry_history,omitempty"`
 	RefineSessions    []RefinementSession            `json:"refine_sessions,omitempty"`
