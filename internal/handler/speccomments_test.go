@@ -189,6 +189,51 @@ func TestSubmitSpecComment_FreeFormSpec(t *testing.T) {
 	}
 }
 
+// TestSubmitSpecComment_OutdatedOp verifies the handler accepts op:"outdated"
+// and forwards it with the thread id, rather than rejecting it as an unsupported
+// op (the in-process half of wiring Mark outdated; the coordinator applies it).
+func TestSubmitSpecComment_OutdatedOp(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	specsDir := filepath.Join(root, "specs")
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specsDir, "00-overview.md"), []byte("# Overview\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init"}, {"remote", "add", "origin", "https://github.com/acme/widgets.git"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+
+	var captured speccomment.Event
+	relay := NewCommentRelay()
+	relay.SetSendUp(func(ev speccomment.Event) error { captured = ev; return nil })
+	h := &Handler{workspaces: []string{root}}
+	h.SetCommentRelay(relay)
+
+	body := `{"op":"outdated","spec":"specs/00-overview.md","thread_id":"t_123"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/spec-comments", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.SubmitSpecComment(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d (%s), want 202; outdated must be an accepted op",
+			w.Code, strings.TrimSpace(w.Body.String()))
+	}
+	if captured.Op != speccomment.OpOutdated || captured.Thread == nil || captured.Thread.ID != "t_123" {
+		t.Fatalf("forwarded event = %+v, want op=outdated thread_id=t_123", captured)
+	}
+}
+
 // TestGitObjectSHAs verifies the advisory anchor metadata: a committed spec
 // yields a non-empty commit and blob, and the blob changes after an edit (the
 // signal the outdated/out-of-sync banner is built on).
