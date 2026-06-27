@@ -409,7 +409,15 @@ const logContainer = ref<HTMLElement | null>(null);
 // Stream output for every task (the endpoint replays saved turn outputs for
 // finished tasks and live output for running ones).
 const streamTaskId = computed(() => props.task.id || null);
-const { raw: rawOutput, activity, streaming, truncated: serverTruncated } = useTaskActivity(streamTaskId);
+// Transcript view: rendered trajectory (default) ↔ raw harness-native JSON.
+const transcriptView = ref<'rendered' | 'raw'>('rendered');
+const taskHarness = computed(() => props.task.sandbox);
+const { raw: rawOutput, activity, answer: transcriptAnswer, streaming, truncated: serverTruncated } =
+  useTaskActivity(streamTaskId, { harness: taskHarness, mode: transcriptView });
+// The assistant's answer prose, rendered as sanitised markdown for the
+// rendered transcript view.
+const transcriptAnswerHtml = computed(() =>
+  transcriptAnswer.value ? renderResultMarkdown(transcriptAnswer.value) : '');
 
 // Activity search + truncation. Mirrors ui/js/modal-logs.js (line 142
 // search filter + line 117 MAX_LOG_LINES cap). Filter is case-insensitive
@@ -1142,61 +1150,92 @@ async function submitReview() {
                       </div>
                       <div v-else-if="oversightStatus === 'failed'" class="text-xs" style="color: var(--err, #c0392b);">Oversight generation failed{{ oversightError ? `: ${oversightError}` : '' }}</div>
 
-                      <!-- Pretty activity rows (thinking / tool calls / results / text). -->
-                      <div v-if="activity.length">
-                        <h3 class="section-title" style="margin-top: 18px;">Transcript</h3>
-                        <div class="ta-activity-search">
-                          <input
-                            v-model="activitySearch"
-                            type="search"
-                            class="ta-activity-search__input"
-                            placeholder="Filter activity…"
-                            aria-label="Filter activity rows"
-                          />
-                          <span v-if="activitySearch" class="ta-activity-search__count">
-                            {{ visibleActivity.length }} / {{ activity.length }}
-                          </span>
-                        </div>
-                        <div v-if="serverTruncated" class="ta-activity-truncated ta-activity-truncated--warn">
-                          ⚠ Turn output was truncated at the server (8&nbsp;MB limit). Some tool calls may be missing.
-                          <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
-                        </div>
-                        <div
-                          v-if="activityTruncated"
-                          class="ta-activity-truncated"
-                          :title="`Showing the last ${ACTIVITY_MAX_ROWS} rows; load the full log via /api/tasks/{id}/logs for the complete trace.`"
-                        >
-                          Showing last {{ ACTIVITY_MAX_ROWS.toLocaleString() }} rows.
-                          <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
-                        </div>
-                        <div class="ta-activity-log" :class="{ 'ta-activity-log--streaming': streaming }">
-                          <div
-                            v-for="(row, i) in visibleActivity"
-                            :key="i"
-                            class="ta-activity-row"
-                            :class="'ta-activity-row--' + row.kind"
-                          >
-                            <span class="ta-activity-icon" aria-hidden="true">{{ activityIcon(row.kind) }}</span>
-                            <span class="ta-activity-label">{{ row.label }}</span>
-                            <span v-if="row.summary" class="ta-activity-summary">{{ row.summary }}</span>
-                            <span v-if="row.preview" class="ta-activity-preview">{{ row.preview }}</span>
-                            <details v-if="row.detail" class="ta-activity-detail" :open="row.defaultOpen">
-                              <summary>{{ row.detailLabel || 'details' }}</summary>
-                              <pre>{{ row.detail }}</pre>
-                            </details>
-                          </div>
-                        </div>
+                      <!-- Transcript: a rendered trajectory + answer (default),
+                           toggleable to the raw harness-native JSON stream. The
+                           rendered view works across every harness — Claude is
+                           parsed client-side, the rest via the backend's
+                           normalized event stream (?format=normalized). -->
+                      <div class="md-section-head" style="margin-top: 18px;">
+                        <h3 class="section-title">Transcript</h3>
+                        <span class="md-section-actions">
+                          <button
+                            type="button"
+                            class="btn-icon"
+                            @click="transcriptView = transcriptView === 'raw' ? 'rendered' : 'raw'"
+                          >{{ transcriptView === 'raw' ? 'Rendered' : 'Raw' }}</button>
+                        </span>
                       </div>
 
-                      <!-- Fallback: raw output when nothing parsed into activity.
-                           Carriage returns are collapsed and ANSI escapes are
-                           coloured via lib/ansi so spinners + warning lines
-                           render the way they do in a terminal. -->
-                      <div v-else class="activity-oversight-box" id="modal-logs-section">
+                      <!-- RAW view: the harness-native stream. Carriage returns
+                           are collapsed and ANSI escapes are coloured via
+                           lib/ansi so spinners + warning lines read like a
+                           terminal. -->
+                      <div v-if="transcriptView === 'raw'" class="activity-oversight-box" id="modal-logs-section">
                         <pre v-if="!rawOutput" ref="logContainer" class="logs-block"><span class="cc-result-empty">{{ streaming ? 'Connecting…' : 'No output' }}</span></pre>
                         <!-- eslint-disable-next-line vue/no-v-html — ansiToHtml escapes its input -->
                         <pre v-else ref="logContainer" class="logs-block" v-html="ansiToHtml(rawOutput)"></pre>
                       </div>
+
+                      <!-- RENDERED view: trajectory rows + the answer prose. -->
+                      <template v-else>
+                        <div v-if="activity.length || transcriptAnswerHtml">
+                          <div v-if="activity.length" class="ta-activity-search">
+                            <input
+                              v-model="activitySearch"
+                              type="search"
+                              class="ta-activity-search__input"
+                              placeholder="Filter activity…"
+                              aria-label="Filter activity rows"
+                            />
+                            <span v-if="activitySearch" class="ta-activity-search__count">
+                              {{ visibleActivity.length }} / {{ activity.length }}
+                            </span>
+                          </div>
+                          <div v-if="serverTruncated" class="ta-activity-truncated ta-activity-truncated--warn">
+                            ⚠ Turn output was truncated at the server (8&nbsp;MB limit). Some tool calls may be missing.
+                            <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
+                          </div>
+                          <div
+                            v-if="activityTruncated"
+                            class="ta-activity-truncated"
+                            :title="`Showing the last ${ACTIVITY_MAX_ROWS} rows; load the full log via /api/tasks/{id}/logs for the complete trace.`"
+                          >
+                            Showing last {{ ACTIVITY_MAX_ROWS.toLocaleString() }} rows.
+                            <a :href="logDownloadUrl" target="_blank" rel="noopener">Download full log</a>
+                          </div>
+                          <div v-if="activity.length" class="ta-activity-log" :class="{ 'ta-activity-log--streaming': streaming }">
+                            <div
+                              v-for="(row, i) in visibleActivity"
+                              :key="i"
+                              class="ta-activity-row"
+                              :class="'ta-activity-row--' + row.kind"
+                            >
+                              <span class="ta-activity-icon" aria-hidden="true">{{ activityIcon(row.kind) }}</span>
+                              <span class="ta-activity-label">{{ row.label }}</span>
+                              <span v-if="row.summary" class="ta-activity-summary">{{ row.summary }}</span>
+                              <span v-if="row.preview" class="ta-activity-preview">{{ row.preview }}</span>
+                              <details v-if="row.detail" class="ta-activity-detail" :open="row.defaultOpen">
+                                <summary>{{ row.detailLabel || 'details' }}</summary>
+                                <pre>{{ row.detail }}</pre>
+                              </details>
+                            </div>
+                          </div>
+                          <!-- The assistant's answer prose, rendered as markdown
+                               (the prose-only greeting case used to fall through
+                               to the raw JSON dump). -->
+                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                          <div v-if="transcriptAnswerHtml" class="ta-transcript-answer prose-content" v-html="transcriptAnswerHtml"></div>
+                        </div>
+
+                        <!-- Auto-fallback to raw when nothing parsed into the
+                             rendered view (no normalizer for this harness, or
+                             empty output). Never an empty pane. -->
+                        <div v-else class="activity-oversight-box" id="modal-logs-section">
+                          <pre v-if="!rawOutput" ref="logContainer" class="logs-block"><span class="cc-result-empty">{{ streaming ? 'Connecting…' : 'No output' }}</span></pre>
+                          <!-- eslint-disable-next-line vue/no-v-html — ansiToHtml escapes its input -->
+                          <pre v-else ref="logContainer" class="logs-block" v-html="ansiToHtml(rawOutput)"></pre>
+                        </div>
+                      </template>
                     </div>
                   </section>
                 </div>
@@ -2275,6 +2314,13 @@ async function submitReview() {
   font-size: 12px;
   max-height: 60vh;
   overflow-y: auto;
+}
+/* The assistant answer prose under the rendered trajectory, separated from the
+   steps above it. */
+.ta-transcript-answer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
 }
 .ta-activity-row {
   display: grid;
