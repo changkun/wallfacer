@@ -191,6 +191,12 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	if err := s.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
 		return err
 	}
+	// Clear the agon verdict: it was computed against the pre-resume diff and is
+	// stale once this resumed run lands new commits, so the task should be
+	// re-verified after it returns to waiting.
+	if err := s.ClearAgonResult(ctx, task.ID); err != nil {
+		return err
+	}
 	// Reset the consecutive test failure counter so the auto-resume cycle
 	// can start fresh after manual intervention.
 	if err := s.ResetTestFailCount(ctx, task.ID); err != nil {
@@ -601,6 +607,12 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 	promoteMu.Unlock()
+
+	// Clear any stale agon verdict so the resumed task is re-verified once it
+	// returns to waiting (no-op for a failed task, which never had one set).
+	if err := s.ClearAgonResult(r.Context(), id); err != nil {
+		logger.Handler.Warn("resume: clear agon result", "task", id, "error", err)
+	}
 
 	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 		store.NewStateChangeData(prevStatus, store.TaskStatusInProgress, store.TriggerUser, nil))

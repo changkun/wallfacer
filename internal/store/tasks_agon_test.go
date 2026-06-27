@@ -74,6 +74,45 @@ func TestListWaitingTasksWithSession_ExcludesAlreadyRun(t *testing.T) {
 	}
 }
 
+func TestClearAgonResult_MakesTaskReeligible(t *testing.T) {
+	s := newTestStore(t)
+	ctx := bg()
+
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "resumed", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	if err := s.UpdateTaskResult(ctx, task.ID, "done", "session-xyz", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult: %v", err)
+	}
+	// Agon ran: task is excluded from the eligible set.
+	if err := s.UpdateTaskAgon(ctx, task.ID, 2, "boom", "/sessions/1"); err != nil {
+		t.Fatalf("UpdateTaskAgon: %v", err)
+	}
+	if got := s.ListWaitingTasksWithSession(ctx); len(got) != 0 {
+		t.Fatalf("expected 0 eligible while verdict set, got %d", len(got))
+	}
+
+	// On resume the verdict is cleared, making the task eligible again.
+	if err := s.ClearAgonResult(ctx, task.ID); err != nil {
+		t.Fatalf("ClearAgonResult: %v", err)
+	}
+	fresh, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if fresh.AgonUnresolved != nil || fresh.AgonHeadline != "" || fresh.AgonSessionDir != "" {
+		t.Errorf("agon fields not cleared: unresolved=%v headline=%q dir=%q",
+			fresh.AgonUnresolved, fresh.AgonHeadline, fresh.AgonSessionDir)
+	}
+	if got := s.ListWaitingTasksWithSession(ctx); len(got) != 1 {
+		t.Errorf("expected task re-eligible after clear, got %d", len(got))
+	}
+}
+
 func TestUpdateTaskAgon_PersistsAllFields(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
