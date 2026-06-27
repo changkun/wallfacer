@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
@@ -183,6 +184,19 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
+	}
+
+	// ?format=normalized rewrites the raw harness-native stream into
+	// normalized-event NDJSON via the task's harness ParseEvent, so the client
+	// renders one trajectory shape across every harness. Installed before the
+	// phase/live/stored branching so all serve paths inherit it. If the task's
+	// harness is unregistered, fall through serving the raw stream unchanged.
+	if r.URL.Query().Get("format") == "normalized" {
+		if hImpl, ok := harness.Lookup(task.Sandbox); ok {
+			nw := &normalizingWriter{w: w, h: hImpl}
+			defer nw.finish()
+			w = nw
+		}
 	}
 
 	// Implementation-phase logs: serve only the turns that belong to the

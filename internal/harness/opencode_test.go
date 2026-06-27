@@ -158,6 +158,23 @@ func TestOpenCode_ParseEvent_ToolCalls(t *testing.T) {
 	}
 }
 
+func TestOpenCode_ParseEvent_Reasoning(t *testing.T) {
+	evts := parseOpenCodeFixture(t, "tool-calls.jsonl")
+
+	var thinking *Event
+	for i := range evts {
+		if evts[i].Kind == KindThinking {
+			thinking = &evts[i]
+		}
+	}
+	if thinking == nil {
+		t.Fatal("no KindThinking event parsed from reasoning line")
+	}
+	if thinking.Text != "thinking about the directory listing" {
+		t.Errorf("thinking Text = %q, want the reasoning prose", thinking.Text)
+	}
+}
+
 func TestOpenCode_ParseEvent_Error(t *testing.T) {
 	raw := []byte(`{"type":"error","sessionID":"ses_x","error":{"name":"ProviderAuthError","data":{"providerID":"anthropic"}}}`)
 	evt, err := openCodeHarness{}.ParseEvent(raw)
