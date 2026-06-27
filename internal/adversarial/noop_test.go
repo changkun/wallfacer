@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/agon/pkg/adversarial"
+	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 )
 
 func TestNoopVerifier(t *testing.T) {
