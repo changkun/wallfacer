@@ -218,6 +218,19 @@ func (s *Store) UpdateTaskAgon(_ context.Context, id uuid.UUID, unresolved int, 
 	})
 }
 
+// ClearAgonResult clears a task's agon verdict (AgonUnresolved back to nil),
+// so the task is eligible for re-verification. Called when a task is resumed
+// for more work: the prior verdict was computed against an earlier diff and is
+// stale once new commits land. A no-op when nothing was set.
+func (s *Store) ClearAgonResult(_ context.Context, id uuid.UUID) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.AgonUnresolved = nil
+		t.AgonHeadline = ""
+		t.AgonSessionDir = ""
+		return nil
+	})
+}
+
 // AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
 // and records the contribution under the named sub-agent in UsageBreakdown.
 // agent should be one of the SandboxActivity constants.
