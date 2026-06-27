@@ -66,6 +66,21 @@ const SIDEBAR_MAX = 520;
 
 const sidebarWidth = ref<number>(parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '280', 10));
 
+// Collapse the spec tree to a thin rail, mirroring the Board's file explorer:
+// when folded, a 28px left-edge strip advertises that the tree can be reopened.
+// Persisted so the choice survives reloads.
+const SIDEBAR_COLLAPSED_KEY = 'wallfacer-spec-tree-collapsed';
+const sidebarCollapsed = ref<boolean>(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
+
+function collapseSidebar() {
+  sidebarCollapsed.value = true;
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '1');
+}
+function expandSidebar() {
+  sidebarCollapsed.value = false;
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0');
+}
+
 function startSidebarResize(ev: MouseEvent) {
   ev.preventDefault();
   const startX = ev.clientX;
@@ -227,17 +242,63 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 <template>
   <div class="plan-page" :data-layout="layout">
-    <SpecTreePanel
-      v-if="layout === 'three-pane'"
-      :style="{ '--stp-width': sidebarWidth + 'px' }"
-    />
-    <div
-      v-if="layout === 'three-pane'"
-      class="plan-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      @mousedown="startSidebarResize"
-    />
+    <template v-if="layout === 'three-pane'">
+      <template v-if="!sidebarCollapsed">
+        <SpecTreePanel
+          :style="{ '--stp-width': sidebarWidth + 'px' }"
+          @collapse="collapseSidebar"
+        />
+        <div
+          class="plan-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          @mousedown="startSidebarResize"
+        />
+      </template>
+      <!-- Collapsed rail: a persistent left-edge affordance to reopen the spec
+           tree, occupying the same slot the panel would. Mirrors the Board's
+           explorer rail. -->
+      <button
+        v-else
+        type="button"
+        class="spec-tree-rail"
+        title="Show spec tree"
+        aria-label="Show spec tree"
+        @click="expandSidebar"
+      >
+        <svg
+          class="spec-tree-rail__icon"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        <svg
+          class="spec-tree-rail__chevron"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </template>
     <SpecFocusedView
       v-if="layout === 'three-pane'"
       ref="focusedViewRef"
@@ -290,5 +351,31 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 .plan-resize-handle:hover {
   background: var(--rule);
+}
+
+/* Collapsed rail: persistent left-edge strip that reopens the spec tree,
+   matching the Board explorer's collapsed rail. */
+.spec-tree-rail {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 0;
+  border: none;
+  border-right: 1px solid var(--rule);
+  background: var(--bg-card);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.spec-tree-rail:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.spec-tree-rail__chevron {
+  opacity: 0.55;
 }
 </style>
