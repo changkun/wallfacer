@@ -155,6 +155,9 @@ const resultsFetched = ref(false);
 const agonTranscript = ref<AgonTranscript | null>(null);
 const agonError = ref('');
 let agonPollTimer: ReturnType<typeof setTimeout> | null = null;
+// After triggering a run, keep polling until this time even before the session
+// appears, so a just-started run's first rounds show up live.
+let agonWatchUntil = 0;
 
 function stopAgonPoll() {
   if (agonPollTimer !== null) {
@@ -178,9 +181,11 @@ async function fetchAgonTranscript() {
     // 404 (no run yet) is the common case — show the empty state, not an error.
     agonTranscript.value = null;
   }
-  // Keep polling while the run is in flight and the verification tab is open.
+  // Keep polling while the run is in flight (or within the post-trigger watch
+  // window, to catch a just-started run's session appearing) and the tab is open.
   stopAgonPoll();
-  if (mainTab.value === 'verification' && agonTranscript.value?.running) {
+  const keepPolling = agonTranscript.value?.running || Date.now() < agonWatchUntil;
+  if (mainTab.value === 'verification' && keepPolling) {
     agonPollTimer = setTimeout(fetchAgonTranscript, 2500);
   }
 }
@@ -657,6 +662,11 @@ async function agonTask() {
       kind: 'success',
       timeout: 4000,
     });
+    // Surface the live trajectory: jump to the verification tab and watch for
+    // the session to appear (it is created a moment after the trigger).
+    agonWatchUntil = Date.now() + 90_000;
+    mainTab.value = 'verification';
+    void fetchAgonTranscript();
   } catch (e) {
     toast.push(`Agon failed to start: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
   }
