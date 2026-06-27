@@ -210,6 +210,17 @@ describe('SpecChatPopup geometry', () => {
     expect(win.style.left).toBe(`${48 - 380}px`);
   });
 
+  it('places the new-chat button beside the title, not in the close actions', async () => {
+    const { host } = await mount();
+    // The "+" new-chat button lives in the left-hand session/title cluster…
+    expect(host.querySelector('.scp-session .scp-iconbtn--new')).not.toBeNull();
+    // …and not in the right-hand actions cluster next to the close button.
+    expect(host.querySelector('.scp-header-actions .scp-iconbtn--new')).toBeNull();
+    // The close button is the only thing left in the actions cluster.
+    const actions = host.querySelectorAll('.scp-header-actions .scp-iconbtn');
+    expect(actions.length).toBe(1);
+  });
+
   it('restores persisted geometry and open state on reopen', async () => {
     memStore.set(KEY, JSON.stringify({ x: 100, y: 120, w: 420, h: 480, open: true }));
     const { host } = await mount();

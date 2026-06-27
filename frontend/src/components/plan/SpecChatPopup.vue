@@ -271,6 +271,7 @@ defineExpose({
             <span class="scp-session-name">{{ activeName }}</span>
             <span class="scp-session-caret">▾</span>
           </button>
+          <button type="button" class="scp-iconbtn scp-iconbtn--new" title="New chat" @click="newSession">+</button>
           <div v-if="switcherOpen" class="scp-session-menu" role="menu">
             <button
               v-for="id in threadOrder"
@@ -291,7 +292,6 @@ defineExpose({
           </div>
         </div>
         <div class="scp-header-actions">
-          <button type="button" class="scp-iconbtn scp-iconbtn--new" title="New chat" @click="newSession">+</button>
           <button type="button" class="scp-iconbtn" title="Hide chat (C)" @click="toggle">✕</button>
         </div>
       </header>
@@ -376,6 +376,9 @@ defineExpose({
 
 .scp-session {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex: 1;
   min-width: 0;
 }
@@ -384,6 +387,7 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   max-width: 100%;
   padding: 3px 8px;
   background: transparent;
@@ -473,6 +477,10 @@ defineExpose({
   cursor: pointer;
 }
 .scp-iconbtn:hover { background: var(--bg-hover); color: var(--ink); }
+
+/* The new-chat button sits in the title cluster, beside the session switcher;
+   keep it from shrinking when a long session name fills the row. */
+.scp-iconbtn--new { flex-shrink: 0; }
 
 /* Resize handles line the edges and corners. Kept inside the frame so the
    window's `overflow: hidden` (for the rounded corners) doesn't clip them. */
