@@ -31,6 +31,7 @@ type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
 	ID             uuid.UUID
 	Prompt         string
+	Criteria       string
 	Timeout        int
 	MountWorktrees bool
 	Kind           TaskKind
@@ -83,6 +84,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		SchemaVersion:  constants.CurrentTaskSchemaVersion,
 		ID:             id,
 		Prompt:         opts.Prompt,
+		Criteria:       opts.Criteria,
 		Status:         TaskStatusBacklog,
 		Turns:          0,
 		Timeout:        clampTimeout(opts.Timeout),

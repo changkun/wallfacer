@@ -127,7 +127,7 @@ defineExpose({
       </div>
     </div>
     <div class="pcp-composer-bar">
-      <div v-if="inputText.trim()" class="pcp-composer-actions">
+      <div class="pcp-composer-actions">
         <button
           type="button"
           class="pcp-composer-action"
