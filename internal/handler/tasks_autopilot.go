@@ -3,6 +3,7 @@ package handler
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1204,6 +1205,50 @@ func primaryWorktree(worktreePaths map[string]string) string {
 	return paths[0]
 }
 
+// agonEndFile is the minimal subset of agon's session end.json that carries
+// the aggregate token usage (over proposer + critics). Mirrors agon's
+// state.EndFile.Stats schema; only the fields we attribute are decoded.
+type agonEndFile struct {
+	Stats struct {
+		TokenUsage *struct {
+			Input       int `json:"input_tokens"`
+			Output      int `json:"output_tokens"`
+			CacheRead   int `json:"cache_read_input_tokens"`
+			CacheCreate int `json:"cache_creation_input_tokens"`
+		} `json:"token_usage"`
+	} `json:"stats"`
+}
+
+// readAgonUsage reads the token breakdown from <sessionDir>/end.json, the
+// artifact agon writes at the end of a run. Returns a zero TaskUsage (no tokens)
+// when the file is missing or unparseable — cost is attributed separately by
+// the caller, so a missing end.json degrades to cost-only attribution.
+func readAgonUsage(sessionDir string) store.TaskUsage {
+	if sessionDir == "" {
+		return store.TaskUsage{}
+	}
+	b, err := os.ReadFile(filepath.Join(sessionDir, "end.json"))
+	if err != nil {
+		return store.TaskUsage{}
+	}
+	var ef agonEndFile
+	if err := json.Unmarshal(b, &ef); err != nil || ef.Stats.TokenUsage == nil {
+		return store.TaskUsage{}
+	}
+	return store.TaskUsage{
+		InputTokens:          ef.Stats.TokenUsage.Input,
+		OutputTokens:         ef.Stats.TokenUsage.Output,
+		CacheReadInputTokens: ef.Stats.TokenUsage.CacheRead,
+		CacheCreationTokens:  ef.Stats.TokenUsage.CacheCreate,
+	}
+}
+
+// agonUsageNonZero reports whether a TaskUsage carries any spend worth recording.
+func agonUsageNonZero(u store.TaskUsage) bool {
+	return u.InputTokens > 0 || u.OutputTokens > 0 || u.CacheReadInputTokens > 0 ||
+		u.CacheCreationTokens > 0 || u.CostUSD > 0
+}
+
 // agonStateDir returns the .agon state directory for a run. It lives beside the
 // worktree in the shared per-task dir (<worktreesDir>/<taskID>/.agon), not
 // inside it, so debate scratch is never staged by `git add -A`, never appears
@@ -1256,12 +1301,15 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		return nil
 	}
 
-	// Attribute the run's cost to the task so agon spend shows up in the usage
-	// breakdown instead of being untracked. The tokens were spent regardless of
-	// whether the result is persisted below, so this runs before the
-	// still-waiting guard.
-	if result.USD > 0 {
-		if uErr := s.AccumulateSubAgentUsage(ctx, t.ID, store.SandboxActivityAgon, store.TaskUsage{CostUSD: result.USD}); uErr != nil {
+	// Attribute the run's complete usage to the task so agon spend shows in the
+	// usage breakdown instead of being untracked. Tokens come from agon's
+	// session end.json (the aggregate over proposer + critics); cost is the USD
+	// agon reports. This runs before the still-waiting guard because the spend
+	// happened regardless of whether the result is persisted below.
+	usage := readAgonUsage(result.SessionDir)
+	usage.CostUSD = result.USD
+	if agonUsageNonZero(usage) {
+		if uErr := s.AccumulateSubAgentUsage(ctx, t.ID, store.SandboxActivityAgon, usage); uErr != nil {
 			logger.Handler.Warn("agon: accumulate usage", "task", t.ID, "error", uErr)
 		}
 	}

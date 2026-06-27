@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -264,6 +266,43 @@ func TestRunAgon_AttributesCost(t *testing.T) {
 	}
 	if bd := got.UsageBreakdown[store.SandboxActivityAgon]; bd.CostUSD != 0.42 {
 		t.Errorf("agon breakdown CostUSD = %v, want 0.42", bd.CostUSD)
+	}
+}
+
+// TestRunAgon_AttributesTokensFromEndJson proves the complete token breakdown
+// is read from agon's session end.json and attributed to the task, alongside
+// the USD cost.
+func TestRunAgon_AttributesTokensFromEndJson(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	sessionDir := t.TempDir()
+	endJSON := `{"stats":{"token_usage":{"input_tokens":1500,"output_tokens":300,"cache_read_input_tokens":900,"cache_creation_input_tokens":40}}}`
+	if err := os.WriteFile(filepath.Join(sessionDir, "end.json"), []byte(endJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0, USD: 0.91, SessionDir: sessionDir}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	bd := got.UsageBreakdown[store.SandboxActivityAgon]
+	if bd.InputTokens != 1500 || bd.OutputTokens != 300 || bd.CacheReadInputTokens != 900 || bd.CacheCreationTokens != 40 {
+		t.Errorf("agon token breakdown = %+v, want input=1500 output=300 cacheRead=900 cacheCreate=40", bd)
+	}
+	if bd.CostUSD != 0.91 {
+		t.Errorf("agon CostUSD = %v, want 0.91", bd.CostUSD)
 	}
 }
 
