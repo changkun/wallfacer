@@ -5,6 +5,8 @@ import { useTaskStore } from '../stores/tasks';
 import { useToastStore } from '../stores/toast';
 import { api } from '../api/client';
 import GraphCanvas from '../components/map/GraphCanvas.vue';
+import MapNodePopup from '../components/map/MapNodePopup.vue';
+import { stateColor } from '../components/map/nodeColors';
 import TaskDetail from '../components/TaskDetail.vue';
 import type { Graph, GraphNode, Task } from '../api/types';
 
@@ -24,6 +26,24 @@ const mapSearch = ref('');
 const selectedId = ref<string | null>(null);
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null);
 
+// Status filter (top-right). done + cancelled are noise on a pipeline overview,
+// so they are hidden by default; the dropdown lets the user toggle any state.
+const hiddenStatuses = ref<Set<string>>(new Set(['done', 'cancelled']));
+const statusMenuOpen = ref(false);
+// All statuses present in the current graph, for the filter menu.
+const allStatuses = computed(() =>
+  [...new Set(graph.value.nodes.map((n) => n.status))].sort(),
+);
+function toggleStatus(s: string) {
+  const next = new Set(hiddenStatuses.value);
+  if (next.has(s)) next.delete(s);
+  else next.add(s);
+  hiddenStatuses.value = next;
+}
+
+// Spec popup opened by double-clicking a spec node.
+const popup = ref<{ path: string; title: string } | null>(null);
+
 async function loadGraph() {
   try {
     const q = showArchived.value ? '?archived=1' : '';
@@ -40,14 +60,20 @@ onMounted(async () => {
   // openInBoard / selectedTask / detailTask all read store.tasks, so a cold
   // load would otherwise offer no Board deep-jump for task nodes.
   if (!store.tasks.length) await store.fetchTasks();
+  if (!store.config) await store.fetchConfig(); // workspaces, for the spec popup
   await loadGraph();
 });
 
-// Filter by label substring; keep only edges whose endpoints both survive.
+// Apply label-substring search and the status filter; keep only edges whose
+// endpoints both survive. Pruning critical_path/blocked to surviving nodes
+// keeps the inspector consistent with what's drawn.
 const filteredGraph = computed<Graph>(() => {
   const q = mapSearch.value.trim().toLowerCase();
-  if (!q) return graph.value;
-  const nodes = graph.value.nodes.filter((n) => n.label.toLowerCase().includes(q));
+  const hidden = hiddenStatuses.value;
+  const nodes = graph.value.nodes.filter(
+    (n) => !hidden.has(n.status) && (!q || n.label.toLowerCase().includes(q)),
+  );
+  if (nodes.length === graph.value.nodes.length) return graph.value;
   const keep = new Set(nodes.map((n) => n.id));
   const edges = graph.value.edges.filter((e) => keep.has(e.from) && keep.has(e.to));
   const critical_path = graph.value.critical_path.filter((id) => keep.has(id));
@@ -71,6 +97,13 @@ const detailTask = computed<Task | null>(() =>
 
 function onSelect(id: string) {
   selectedId.value = id;
+}
+// Double-click: open the spec in a popup (task nodes open their Board detail).
+function onOpen(id: string) {
+  const n = graph.value.nodes.find((x) => x.id === id);
+  if (!n) return;
+  if (n.kind === 'spec') popup.value = { path: n.ref, title: n.label };
+  else openInBoard(n.ref);
 }
 function openInPlan(path: string) {
   void router.push({ path: '/plan', query: { spec: path } });
@@ -172,6 +205,23 @@ watch(showArchived, () => void loadGraph());
             placeholder="Filter nodes…"
             aria-label="Filter graph nodes"
           />
+          <div class="map-statefilter" @pointerleave="statusMenuOpen = false">
+            <button
+              type="button"
+              class="depgraph-mode__reset-btn"
+              :aria-expanded="statusMenuOpen"
+              title="Show or hide nodes by state"
+              @click="statusMenuOpen = !statusMenuOpen"
+            >
+              States{{ hiddenStatuses.size ? ` (${hiddenStatuses.size} hidden)` : '' }} ▾
+            </button>
+            <div v-if="statusMenuOpen" class="map-statefilter__menu">
+              <label v-for="s in allStatuses" :key="s" class="map-statefilter__item">
+                <input type="checkbox" :checked="!hiddenStatuses.has(s)" @change="toggleStatus(s)" />
+                <span class="map-statefilter__label">{{ s }}</span>
+              </label>
+            </div>
+          </div>
           <label class="depgraph-mode__option" title="Include archived specs and tasks">
             <input type="checkbox" v-model="showArchived" />
             Show archived
@@ -192,7 +242,14 @@ watch(showArchived, () => void loadGraph());
               Board to see the pipeline graph.
             </p>
           </div>
-          <GraphCanvas v-else ref="canvas" :graph="filteredGraph" :selected-id="selectedId" @select="onSelect" />
+          <GraphCanvas
+            v-else
+            ref="canvas"
+            :graph="filteredGraph"
+            :selected-id="selectedId"
+            @select="onSelect"
+            @open="onOpen"
+          />
         </div>
         <aside class="depgraph-inspector" aria-label="Graph inspector">
           <section class="depgraph-inspector__section">
@@ -253,10 +310,88 @@ watch(showArchived, () => void loadGraph());
               No dependency chain yet — add depends-on links between specs or tasks.
             </p>
           </section>
+          <section v-if="allStatuses.length" class="depgraph-inspector__section">
+            <h3 class="depgraph-inspector__heading">Legend</h3>
+            <ul class="map-legend">
+              <li v-for="s in allStatuses" :key="s" class="map-legend__item">
+                <span class="map-legend__dot" :style="{ background: stateColor(s) }"></span>
+                <span class="map-legend__label">{{ s }}</span>
+              </li>
+            </ul>
+          </section>
         </aside>
       </div>
     </div>
 
     <TaskDetail v-if="detailTask" :task="detailTask" @close="detailTaskId = null" />
+    <MapNodePopup
+      v-if="popup"
+      :path="popup.path"
+      :title="popup.title"
+      :workspaces="store.config?.workspaces ?? []"
+      @close="popup = null"
+    />
   </div>
 </template>
+
+<style scoped>
+.map-statefilter {
+  position: relative;
+}
+.map-statefilter__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 160px;
+  padding: 6px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--rule-2, #c7c0af);
+  border-radius: var(--r-md, 6px);
+  box-shadow: var(--sh-3, 0 8px 24px rgba(0, 0, 0, 0.16));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.map-statefilter__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--r-sm, 4px);
+  font-size: var(--fs-md, 13px);
+  color: var(--ink-2, #4c4842);
+  cursor: pointer;
+}
+.map-statefilter__item:hover {
+  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
+}
+.map-statefilter__label {
+  text-transform: capitalize;
+}
+
+.map-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}
+.map-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-10, 11px);
+  color: var(--ink-2, #4c4842);
+}
+.map-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.map-legend__label {
+  text-transform: capitalize;
+}
+</style>
