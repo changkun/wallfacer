@@ -101,11 +101,14 @@ opt-in / diff-size gating), not by weakening the critic.
   the fork-session proposer (which shares the real worktree) can argue/concede
   but never edit it. Wired into `NewSessionProposer` and live (go.mod bumped to
   agon v0.1.1). _(commit: restrict the fork-session proposer to read-only tools)_
-- [x] **Usage attribution (cost).** `runAgon` accumulates `VerifyResult.USD`
-  onto the task under `SandboxActivityAgon`, so agon spend shows in the usage
-  breakdown. _(commit: attribute agon run cost)_ Token-level attribution
-  (input/output/cache) still needs agon's `VerifyResult` to carry a token
-  breakdown — a follow-up tied to the next agon release.
+- [x] **Usage attribution (complete: cost + tokens).** `runAgon` attributes the
+  full agon spend to the task under `SandboxActivityAgon`: cost from
+  `VerifyResult.USD`, and the input/output/cache token breakdown read from
+  agon's session `end.json` (`VerifyResult.SessionDir`), which agon already
+  writes with the fork-session proposer + critics combined. Two parts: critics
+  now report their usage back to agon (else its totals were proposer-only), and
+  wallfacer reads the artifact. **No agon release needed.** _(commits: report
+  critic token usage; attribute complete agon token usage)_
 - [x] **Config knobs (env).** `WALLFACER_AGON_FORKS` / `_ROUNDS` / `_COST_CAP`
   override the defaults via `agonTuning`; documented in the configuration guide.
   _(commit: make fork count, rounds, and cost cap configurable)_. A `/api/config`
