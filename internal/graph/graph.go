@@ -37,11 +37,18 @@ const (
 // Action names the inline operations the Map may offer on a node. Each one only
 // *reports* what the existing transition / task APIs already allow — the graph
 // never introduces a new lifecycle transition.
+// Action names mirror the verbs the spec-transition API (POST
+// /api/specs/transition) and the task routes already accept, so the client can
+// fire a node action without translating. The graph only *reports* which are
+// legal for a node's current state; the server still enforces them.
 const (
-	// ActionDispatch is offered on a validated, undispatched leaf spec.
-	ActionDispatch = "dispatch"
-	// ActionStart is offered on a ready (unblocked) backlog task.
-	ActionStart = "start"
+	ActionDispatch      = "dispatch"       // validated, undispatched leaf spec → board
+	ActionUndispatch    = "undispatch"     // dispatched spec → cancel its task + clear link
+	ActionValidate      = "validate"       // drafted spec → validated
+	ActionUnstale       = "unstale"        // stale spec → drafted/validated
+	ActionForceComplete = "force-complete" // testing spec → complete (skip the drift gate)
+	ActionUnarchive     = "unarchive"      // archived spec → drafted
+	ActionStart         = "start"          // ready (unblocked) backlog task → in_progress
 )
 
 // Node is one vertex of the unified graph.
@@ -138,11 +145,7 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 			Ref:    n.Path,
 			Depth:  n.Depth,
 		}
-		// Dispatch action: a validated, undispatched leaf spec can be dispatched
-		// (mirrors the gate in internal/handler/specs_dispatch.go).
-		if s.Status == spec.StatusValidated && n.IsLeaf && s.DispatchedTaskID == nil {
-			node.AvailableActions = append(node.AvailableActions, ActionDispatch)
-		}
+		node.AvailableActions = specActions(s, n.IsLeaf)
 		g.Nodes = append(g.Nodes, node)
 
 		// containment: parent → each child spec present in the set.
@@ -201,6 +204,53 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 
 	g.CriticalPath = criticalPath(g.Nodes, g.Edges)
 	return g
+}
+
+// specActions returns the coordination-flow verbs legal for a spec in its
+// current state: the forward path (validate → dispatch → run → complete) plus
+// its reversals (undispatch, unstale, unarchive). Each verb that maps to a
+// lifecycle edge is checked against the canonical spec.StatusMachine so the
+// graph never drifts from the lifecycle; dispatch/undispatch (which create or
+// cancel a task without changing the spec's own status) are gated on the
+// leaf/dispatched flags, mirroring internal/handler/specs_dispatch.go.
+//
+// Maintenance verbs (mark-stale, archive) are intentionally omitted from the
+// inline menu — they stay available via Plan and the transition API — to keep
+// the node menu focused on the pipeline flow.
+func specActions(s *spec.Spec, isLeaf bool) []string {
+	if s == nil {
+		return nil
+	}
+	can := func(to spec.Status) bool { return spec.StatusMachine.CanTransition(s.Status, to) }
+	dispatched := s.DispatchedTaskID != nil
+
+	var a []string
+	switch s.Status {
+	case spec.StatusDrafted:
+		if can(spec.StatusValidated) {
+			a = append(a, ActionValidate)
+		}
+	case spec.StatusValidated:
+		switch {
+		case dispatched:
+			a = append(a, ActionUndispatch)
+		case isLeaf:
+			a = append(a, ActionDispatch)
+		}
+	case spec.StatusTesting:
+		if can(spec.StatusComplete) {
+			a = append(a, ActionForceComplete)
+		}
+	case spec.StatusStale:
+		if can(spec.StatusValidated) || can(spec.StatusDrafted) {
+			a = append(a, ActionUnstale)
+		}
+	case spec.StatusArchived:
+		if can(spec.StatusDrafted) {
+			a = append(a, ActionUnarchive)
+		}
+	}
+	return a
 }
 
 // specLabel prefers the spec title, falling back to the path so a titleless

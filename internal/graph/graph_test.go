@@ -110,11 +110,11 @@ func TestBuild_AvailableActions(t *testing.T) {
 	g := Build(specs, tasks, false)
 
 	cases := map[string][]string{
-		SpecID("specs/x/parent.md"):        nil,              // non-leaf: no dispatch
-		SpecID("specs/x/parent/childA.md"): {ActionDispatch}, // validated leaf, undispatched
-		SpecID("specs/x/parent/childB.md"): nil,              // already dispatched
-		TaskID(t2.String()):                nil,              // backlog but blocked
-		TaskID(t3.String()):                {ActionStart},    // backlog, ready
+		SpecID("specs/x/parent.md"):        nil,                // validated non-leaf: nothing in the flow
+		SpecID("specs/x/parent/childA.md"): {ActionDispatch},   // validated leaf, undispatched
+		SpecID("specs/x/parent/childB.md"): {ActionUndispatch}, // validated, already dispatched
+		TaskID(t2.String()):                nil,                // backlog but blocked
+		TaskID(t3.String()):                {ActionStart},      // backlog, ready
 	}
 	for id, want := range cases {
 		n, ok := nodeByID(g, id)
@@ -123,6 +123,64 @@ func TestBuild_AvailableActions(t *testing.T) {
 		}
 		if !reflect.DeepEqual(n.AvailableActions, want) {
 			t.Errorf("%s actions = %v, want %v", id, n.AvailableActions, want)
+		}
+	}
+}
+
+func TestSpecActions_PerState(t *testing.T) {
+	leaf := func(st spec.Status, dispatched bool) *spec.Spec {
+		s := &spec.Spec{Status: st}
+		if dispatched {
+			s.DispatchedTaskID = strptr(t1.String())
+		}
+		return s
+	}
+	cases := []struct {
+		name     string
+		s        *spec.Spec
+		isLeaf   bool
+		expected []string
+	}{
+		{"drafted", leaf(spec.StatusDrafted, false), true, []string{ActionValidate}},
+		{"validated-leaf", leaf(spec.StatusValidated, false), true, []string{ActionDispatch}},
+		{"validated-nonleaf", leaf(spec.StatusValidated, false), false, nil},
+		{"validated-dispatched", leaf(spec.StatusValidated, true), true, []string{ActionUndispatch}},
+		{"testing", leaf(spec.StatusTesting, false), true, []string{ActionForceComplete}},
+		{"stale", leaf(spec.StatusStale, false), true, []string{ActionUnstale}},
+		{"archived", leaf(spec.StatusArchived, false), true, []string{ActionUnarchive}},
+		{"complete", leaf(spec.StatusComplete, false), true, nil}, // terminal in the flow
+		{"vague", leaf(spec.StatusVague, false), true, nil},       // advances via the agent, not a server transition
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := specActions(c.s, c.isLeaf)
+			if !reflect.DeepEqual(got, c.expected) {
+				t.Errorf("specActions(%s) = %v, want %v", c.name, got, c.expected)
+			}
+		})
+	}
+}
+
+// TestSpecActions_RespectLifecycleMachine guards against drift: every
+// state-changing action the builder offers must correspond to a legal edge in
+// the canonical spec.StatusMachine.
+func TestSpecActions_RespectLifecycleMachine(t *testing.T) {
+	// action → the lifecycle target it drives (dispatch/undispatch change no
+	// spec status, so they are exempt).
+	target := map[string]spec.Status{
+		ActionValidate:      spec.StatusValidated,
+		ActionForceComplete: spec.StatusComplete,
+		ActionUnarchive:     spec.StatusDrafted,
+	}
+	for _, st := range spec.ValidStatuses() {
+		for _, act := range specActions(&spec.Spec{Status: st}, true) {
+			to, ok := target[act]
+			if !ok {
+				continue // dispatch/undispatch/unstale: not a single fixed edge
+			}
+			if !spec.StatusMachine.CanTransition(st, to) {
+				t.Errorf("action %q offered in state %q but %q→%q is not a legal edge", act, st, st, to)
+			}
 		}
 	}
 }
