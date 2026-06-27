@@ -47,8 +47,8 @@ func runNormalized(t *testing.T, id harness.ID, raw []byte, byteByByte bool) []n
 	if !ok {
 		t.Fatalf("harness %s not registered", id)
 	}
-	cap := &captureRW{}
-	nw := &normalizingWriter{w: cap, h: h}
+	capRW := &captureRW{}
+	nw := &normalizingWriter{w: capRW, h: h}
 	if byteByByte {
 		for i := range raw {
 			_, _ = nw.Write(raw[i : i+1])
@@ -59,7 +59,7 @@ func runNormalized(t *testing.T, id harness.ID, raw []byte, byteByByte bool) []n
 	nw.finish()
 
 	var out []normalizedEvent
-	for _, line := range strings.Split(strings.TrimSpace(cap.body.String()), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(capRW.body.String()), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

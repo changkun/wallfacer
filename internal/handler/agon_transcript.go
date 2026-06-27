@@ -118,7 +118,7 @@ func readAgonTranscript(sessionDir string) []agonFork {
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	byFork := map[int]*agonFork{}
 	var order []int
