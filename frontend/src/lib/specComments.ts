@@ -58,12 +58,31 @@ export interface SpecCommentThread extends Thread {
   outdated?: boolean;
 }
 
-// outOfSyncCount counts threads whose anchor was lost (orphaned) or whose spec
-// text changed since the comment was made (outdated), across all specs in the
-// repo. A non-zero count means this clone differs from where teammates
-// commented: the signal for the out-of-sync banner.
+// anchorLost reports that a thread's anchor could not be resolved against the
+// current spec body: the server-set `orphaned` flag, or a stored orphaned
+// status. These threads have no inline home and collect in the triage list.
+function anchorLost(t: SpecCommentThread): boolean {
+  return t.orphaned || t.status === 'orphaned';
+}
+
+// isCleared reports that a human has filed the thread away — addressed it
+// (resolved) or marked it no-longer-relevant (outdated). A cleared thread is
+// terminal: it leaves both the triage list and the out-of-sync banner even when
+// its anchor is still lost. This is what makes "Resolve" / "Mark outdated"
+// actually dismiss an orphaned thread, instead of it lingering in triage.
+function isCleared(t: SpecCommentThread): boolean {
+  return t.resolved || t.status === 'resolved' || t.status === 'outdated';
+}
+
+// outOfSyncCount counts threads that signal this clone has drifted from where
+// teammates commented: the anchor was lost (orphaned) or the spec file's text
+// changed since the comment was made (outdated), excluding threads a human has
+// already cleared. Drives the out-of-sync banner. It is a SUPERSET of
+// triageThreads — it also counts file-drifted threads whose anchor still
+// resolves (they render inline fine, but the underlying text moved), so the
+// banner count is >= the triage count; the difference is the drift-only set.
 export function outOfSyncCount(threads: SpecCommentThread[]): number {
-  return threads.filter((t) => t.orphaned || t.status === 'orphaned' || t.outdated).length;
+  return threads.filter((t) => (anchorLost(t) || t.outdated === true) && !isCleared(t)).length;
 }
 
 // The SSE event shape from GET /api/spec-comments/stream (event: spec-comment).
@@ -158,13 +177,13 @@ export function activeCount(threads: SpecCommentThread[], specPath: string): num
   ).length;
 }
 
-// triageThreads selects orphaned (and outdated) threads for a repo's triage
-// panel, across all specs. These are threads whose anchor was lost or that a
-// human filed away; they never render inline.
+// triageThreads selects the threads that need a human's attention in the triage
+// panel, across all specs: their anchor was lost (orphaned) and no one has
+// cleared them yet. Resolved and outdated threads are terminal — they never
+// appear here (nor inline), even though their anchor may still be unresolvable.
+// This is the fix for resolved-but-orphaned threads lingering in triage.
 export function triageThreads(threads: SpecCommentThread[]): SpecCommentThread[] {
-  return threads.filter(
-    (t) => t.orphaned || t.status === 'orphaned' || t.status === 'outdated',
-  );
+  return threads.filter((t) => anchorLost(t) && !isCleared(t));
 }
 
 // applyEvent folds one SSE event into a repo-keyed thread map. `sync` replaces
