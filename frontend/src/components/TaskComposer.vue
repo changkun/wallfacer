@@ -361,24 +361,26 @@ function onInput(e: Event) {
       </label>
       <label class="composer__opt">
         <span class="composer__opt-label">Timeout</span>
-        <select v-model="timeoutPreset" class="composer__select" aria-label="Timeout preset">
-          <option value="">—</option>
-          <option value="15">15 min</option>
-          <option value="30">30 min</option>
-          <option value="60">1 hour</option>
-          <option value="120">2 hours</option>
-          <option value="300">5 hours</option>
-          <option value="custom">Custom…</option>
-        </select>
-        <input
-          v-if="timeoutPreset === 'custom'"
-          v-model.number="timeoutCustomMin"
-          class="composer__input composer__input--num"
-          type="number"
-          min="1"
-          placeholder="min"
-          aria-label="Custom timeout in minutes"
-        />
+        <div class="composer__opt-controls">
+          <select v-model="timeoutPreset" class="composer__select" aria-label="Timeout preset">
+            <option value="">—</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="300">5 hours</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <input
+            v-if="timeoutPreset === 'custom'"
+            v-model.number="timeoutCustomMin"
+            class="composer__input composer__input--num"
+            type="number"
+            min="1"
+            placeholder="min"
+            aria-label="Custom timeout in minutes"
+          />
+        </div>
       </label>
       <label v-if="templates.length" class="composer__opt">
         <span class="composer__opt-label">Template</span>
@@ -447,33 +449,35 @@ function onInput(e: Event) {
         />
       </label>
       <span class="composer__spacer" />
-      <button
-        type="button"
-        class="composer__btn composer__btn--ghost"
-        @click="collapse"
-      >
-        Cancel
-      </button>
-      <button
-        type="submit"
-        class="composer__btn composer__btn--primary"
-        :disabled="
-          !prompt.trim() ||
-          submitting ||
-          (batchMode && batchCount === 0) ||
-          (scheduled && (!intervalMinutes || intervalMinutes <= 0))
-        "
-      >
-        {{
-          submitting
-            ? 'Saving…'
-            : scheduled
-              ? 'Schedule'
-              : batchMode
-                ? `Save ${batchCount}`
-                : 'Save'
-        }}
-      </button>
+      <div class="composer__btn-group">
+        <button
+          type="button"
+          class="composer__btn composer__btn--ghost"
+          @click="collapse"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="composer__btn composer__btn--primary"
+          :disabled="
+            !prompt.trim() ||
+            submitting ||
+            (batchMode && batchCount === 0) ||
+            (scheduled && (!intervalMinutes || intervalMinutes <= 0))
+          "
+        >
+          {{
+            submitting
+              ? 'Saving…'
+              : scheduled
+                ? 'Schedule'
+                : batchMode
+                  ? `Save ${batchCount}`
+                  : 'Save'
+          }}
+        </button>
+      </div>
     </div>
   </form>
 </template>
@@ -521,6 +525,10 @@ function onInput(e: Event) {
   gap: 2px;
 }
 .composer__opt--grow { flex: 1 1 auto; min-width: 120px; }
+/* Keep the timeout preset select and its "Custom…" minutes input on one row
+   beneath the label, rather than letting the input drop to a new line (the
+   parent .composer__opt is a vertical column). */
+.composer__opt-controls { display: flex; align-items: center; gap: 4px; }
 .composer__opt-label {
   font-size: 10px;
   color: var(--text-muted);
@@ -589,4 +597,8 @@ function onInput(e: Event) {
 .composer__toggle input { margin: 0; accent-color: var(--accent); }
 .composer__toggle-hint { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
 .composer__spacer { flex: 1 1 auto; }
+/* Cancel + Save move as a unit so a wrap of the actions row never strands
+   one button on a different line from the other; they stay right-aligned
+   and adjacent (Cancel left of Save). */
+.composer__btn-group { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
 </style>
