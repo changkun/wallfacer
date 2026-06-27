@@ -306,6 +306,36 @@ func TestRunAgon_AttributesTokensFromEndJson(t *testing.T) {
 	}
 }
 
+// TestRunAgon_ThreadsCriteria proves the task's persisted Criteria reaches the
+// verifier input, so agon critics are anchored to the same acceptance bar as
+// the test agent (the previously-blocked goal #7).
+func TestRunAgon_ThreadsCriteria(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+	if err := s.UpdateTaskCriteria(ctx, task.ID, "the /health endpoint returns 200"); err != nil {
+		t.Fatalf("UpdateTaskCriteria: %v", err)
+	}
+	fresh, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+
+	if err := h.runAgon(ctx, s, *fresh); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	if v.lastIn.Criteria != "the /health endpoint returns 200" {
+		t.Errorf("verifier received Criteria %q, want the task's criteria", v.lastIn.Criteria)
+	}
+}
+
 // TestRunAgon_SkipsPersistWhenNotWaiting proves a run that finishes after the
 // task already left waiting (resumed, submitted, failed) does not stamp a stale
 // result onto it.

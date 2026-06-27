@@ -734,7 +734,13 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	// directly on the changed files instead of exploring from scratch.
 	diff := generateWorktreeDiff(task.WorktreePaths)
 
-	testPrompt := buildTestPrompt(task.Prompt, req.Criteria, implResult, diff)
+	// Resolve criteria: an explicit per-run override wins; otherwise fall back
+	// to the criteria persisted on the task (the unattended path's source).
+	criteria := strings.TrimSpace(req.Criteria)
+	if criteria == "" {
+		criteria = task.Criteria
+	}
+	testPrompt := buildTestPrompt(task.Prompt, criteria, implResult, diff)
 
 	h.closeFeedbackWaitingSpan(r.Context(), id)
 

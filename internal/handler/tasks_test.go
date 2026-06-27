@@ -237,6 +237,55 @@ func TestCreateTask_RejectsEmptyPrompt(t *testing.T) {
 	}
 }
 
+// TestCreateTask_PersistsCriteria verifies the create request's criteria field
+// is persisted on the task.
+func TestCreateTask_PersistsCriteria(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"prompt": "build a thing", "criteria": "run make test; /health returns 200", "timeout": 30}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var task store.Task
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if task.Criteria != "run make test; /health returns 200" {
+		t.Errorf("criteria not persisted on create: %q", task.Criteria)
+	}
+}
+
+// TestUpdateTask_PersistsCriteriaForBacklog verifies a PATCH sets criteria on a
+// backlog task.
+func TestUpdateTask_PersistsCriteriaForBacklog(t *testing.T) {
+	h := newTestHandler(t)
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "p", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	body := `{"criteria": "verify the migration is reversible"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Criteria != "verify the migration is reversible" {
+		t.Errorf("criteria not persisted via PATCH: %q", got.Criteria)
+	}
+}
+
 // TestCreateTask_RejectsInvalidJSON verifies that bad JSON returns 400.
 func TestCreateTask_RejectsInvalidJSON(t *testing.T) {
 	h := newTestHandler(t)
