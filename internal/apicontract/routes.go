@@ -249,6 +249,12 @@ var Routes = []Route{
 		Tags:        []string{"specs", "sse"},
 	},
 	{
+		Method: http.MethodGet, Pattern: "/api/graph", Name: "GetGraph",
+		JSName:      "graph",
+		Description: "Get the unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for the Map.",
+		Tags:        []string{"specs", "tasks"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/specs/stale-candidates", Name: "StaleCandidates",
 		Description: "Advisory scan: complete specs whose affects files changed since the spec's updated date. No mutation; returns {candidates:[{path,files,reason}]}.",
 		Tags:        []string{"specs"},
