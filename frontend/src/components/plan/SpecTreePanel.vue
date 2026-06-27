@@ -10,6 +10,10 @@ import { useUiStore } from '../../stores/ui';
 import { useDialogStore } from '../../stores/dialog';
 import AppSelect from '../AppSelect.vue';
 
+// Folding the tree to a rail is owned by the parent (PlanPage) which controls
+// the layout slot; we just ask to be collapsed.
+const emit = defineEmits<{ collapse: [] }>();
+
 const agentStore = useAgentStore();
 const taskStore = useTaskStore();
 const ui = useUiStore();
@@ -440,12 +444,25 @@ onUnmounted(() => {
 <template>
   <aside class="spec-tree-panel">
     <div class="stp-toolbar">
-      <input
-        v-model="textFilter"
-        class="stp-search"
-        type="search"
-        placeholder="Filter specs…"
-      />
+      <div class="stp-head">
+        <input
+          v-model="textFilter"
+          class="stp-search"
+          type="search"
+          placeholder="Filter specs…"
+        />
+        <button
+          type="button"
+          class="stp-collapse"
+          title="Collapse spec tree"
+          aria-label="Collapse spec tree"
+          @click="emit('collapse')"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+      </div>
       <AppSelect
         :model-value="statusFilter"
         :options="statusFilterOptions"
@@ -640,6 +657,37 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 6px;
   border-bottom: 1px solid var(--rule);
+}
+
+.stp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stp-head .stp-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.stp-collapse {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.stp-collapse:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .stp-search,
