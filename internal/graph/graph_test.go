@@ -110,11 +110,11 @@ func TestBuild_AvailableActions(t *testing.T) {
 	g := Build(specs, tasks, false)
 
 	cases := map[string][]string{
-		SpecID("specs/x/parent.md"):          nil,               // non-leaf: no dispatch
-		SpecID("specs/x/parent/childA.md"):   {ActionDispatch},  // validated leaf, undispatched
-		SpecID("specs/x/parent/childB.md"):   nil,               // already dispatched
-		TaskID(t2.String()):                  nil,               // backlog but blocked
-		TaskID(t3.String()):                  {ActionStart},     // backlog, ready
+		SpecID("specs/x/parent.md"):        nil,              // non-leaf: no dispatch
+		SpecID("specs/x/parent/childA.md"): {ActionDispatch}, // validated leaf, undispatched
+		SpecID("specs/x/parent/childB.md"): nil,              // already dispatched
+		TaskID(t2.String()):                nil,              // backlog but blocked
+		TaskID(t3.String()):                {ActionStart},    // backlog, ready
 	}
 	for id, want := range cases {
 		n, ok := nodeByID(g, id)
