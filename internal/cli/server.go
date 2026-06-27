@@ -1133,6 +1133,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SyncTask":       withID(h.SyncTask),
 		"TestTask":       withID(h.TestTask),
 		"AgonTask":       withID(h.AgonTask),
+		"AgonTranscript": withID(h.AgonTranscript),
 
 		"TaskDiff":     withID(h.TaskDiff),
 		"StreamLogs":   withID(h.StreamLogs),
