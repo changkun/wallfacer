@@ -117,9 +117,11 @@ opt-in / diff-size gating), not by weakening the critic.
   both resume paths (feedback/auto-resume and manual `ResumeTask`), alongside the
   feedback path's existing test-verdict reset, so a resumed task is re-verified
   once it returns to waiting. _(commit: clear the agon verdict on resume)_
-- [ ] **Criteria threading (goal #7).** Blocked: `Task.Criteria` does not exist
-  yet (test-criteria spec unlanded). `runAgon` passes `Criteria: ""`; wire it
-  when the field lands. Do not ship a fabricated criteria source.
+- [x] **Criteria threading (goal #7).** Unblocked and wired: landed
+  `Task.Criteria` ([[test-criteria]] Phases 1–2) and `runAgon` now passes
+  `t.Criteria` into `VerifyInput`, anchoring critics to the same acceptance bar
+  as the test agent. _(commits: persist Task.Criteria; wire criteria through
+  handlers and into test + agon paths)_
 
 ## Problem
 
