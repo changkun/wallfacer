@@ -86,20 +86,27 @@ func TaskID(id string) string { return "task:" + id }
 func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) Graph {
 	g := Graph{Nodes: []Node{}, Edges: []Edge{}, CriticalPath: []string{}, Blocked: []string{}}
 
-	// --- task index + readiness, needed before spec dispatch edges ---
-	taskByID := make(map[string]store.Task, len(tasks))
+	// Readiness is computed over the FULL task set, independent of which nodes
+	// are displayed: a prerequisite that is done-and-archived must still count
+	// as satisfied even when archived nodes are hidden, or a ready backlog task
+	// would wrongly read as blocked in the default view.
+	taskDone := func(id string) bool {
+		for _, t := range tasks {
+			if t.ID.String() == id {
+				return t.Status == store.TaskStatusDone
+			}
+		}
+		return false // unknown / absent prerequisite is unmet
+	}
+
+	// Display set: which tasks render (and therefore which task-incident edges
+	// are kept). Edges to a hidden task are dropped as dangling.
+	shown := make(map[string]bool, len(tasks))
 	for _, t := range tasks {
 		if t.Archived && !includeArchived {
 			continue
 		}
-		taskByID[t.ID.String()] = t
-	}
-
-	// A task is blocked when it is still in backlog and any prerequisite task
-	// has not reached done. Done-ness is read from the same filtered set.
-	taskDone := func(id string) bool {
-		t, ok := taskByID[id]
-		return ok && t.Status == store.TaskStatusDone
+		shown[t.ID.String()] = true
 	}
 
 	// --- spec nodes + spec edges ---
@@ -150,11 +157,9 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 				g.Edges = append(g.Edges, Edge{From: SpecID(dep), To: id, Kind: EdgeSpecDep})
 			}
 		}
-		// dispatch: leaf spec → its materialized task, when present.
-		if s.DispatchedTaskID != nil {
-			if _, ok := taskByID[*s.DispatchedTaskID]; ok {
-				g.Edges = append(g.Edges, Edge{From: id, To: TaskID(*s.DispatchedTaskID), Kind: EdgeDispatch})
-			}
+		// dispatch: leaf spec → its materialized task, when displayed.
+		if s.DispatchedTaskID != nil && shown[*s.DispatchedTaskID] {
+			g.Edges = append(g.Edges, Edge{From: id, To: TaskID(*s.DispatchedTaskID), Kind: EdgeDispatch})
 		}
 	}
 
@@ -172,7 +177,7 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 			if !taskDone(dep) {
 				blocked = true
 			}
-			if _, ok := taskByID[dep]; ok {
+			if shown[dep] {
 				g.Edges = append(g.Edges, Edge{From: TaskID(dep), To: id, Kind: EdgeTaskDep})
 			}
 		}
@@ -220,10 +225,12 @@ func taskLabel(t store.Task) string {
 }
 
 // criticalPath returns the longest directed chain (as a node-ID sequence)
-// across the combined spec+task DAG. Edges referencing absent nodes are
-// ignored; cycles (which should not occur in a well-formed tree) are guarded so
-// the walk always terminates. A path of fewer than two nodes is reported as
-// empty, since a single node is not a chain.
+// along *dependency* edges across the combined spec+task DAG. Containment is
+// organizational, not work-ordering, so it is excluded — otherwise a spec with
+// many independent children would report a spurious chain through them. Edges
+// referencing absent nodes are ignored; cycles (which should not occur in a
+// well-formed tree) are guarded so the walk always terminates. A path of fewer
+// than two nodes is reported as empty, since a single node is not a chain.
 func criticalPath(nodes []Node, edges []Edge) []string {
 	present := make(map[string]bool, len(nodes))
 	for _, n := range nodes {
@@ -231,6 +238,9 @@ func criticalPath(nodes []Node, edges []Edge) []string {
 	}
 	adj := make(map[string][]string)
 	for _, e := range edges {
+		if e.Kind == EdgeContainment {
+			continue // organizational, not a work-ordering hop
+		}
 		if present[e.From] && present[e.To] {
 			adj[e.From] = append(adj[e.From], e.To)
 		}

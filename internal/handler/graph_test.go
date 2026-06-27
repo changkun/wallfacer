@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -74,6 +75,36 @@ func TestGetGraph_Shape(t *testing.T) {
 				t.Errorf("task actions = %v, want [start]", n.AvailableActions)
 			}
 		}
+	}
+}
+
+// TestGetGraph_SpecDepEdgeFromRealTree proves spec_dep edges resolve against
+// the real BuildTree path format — i.e. the NodeResponse.Path that the builder
+// keys on equals the frontmatter depends_on string a user writes. A format
+// mismatch here would silently drop every spec_dep edge in production while
+// the unit fixtures (which pick the path format themselves) stay green.
+func TestGetGraph_SpecDepEdgeFromRealTree(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	writeTestSpec(t, ws, "specs/local/base.md", testSpecValidated)
+	dependent := strings.Replace(testSpecValidated, "depends_on: []",
+		"depends_on:\n  - specs/local/base.md", 1)
+	writeTestSpec(t, ws, "specs/local/dependent.md", dependent)
+
+	g := getGraph(t, h, httptest.NewRequest(http.MethodGet, "/api/graph", nil))
+
+	want := graph.Edge{
+		From: graph.SpecID("specs/local/base.md"),
+		To:   graph.SpecID("specs/local/dependent.md"),
+		Kind: graph.EdgeSpecDep,
+	}
+	found := false
+	for _, e := range g.Edges {
+		if e == want {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("spec_dep edge missing; edges=%+v", g.Edges)
 	}
 }
 
