@@ -1256,6 +1256,16 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		return nil
 	}
 
+	// Attribute the run's cost to the task so agon spend shows up in the usage
+	// breakdown instead of being untracked. The tokens were spent regardless of
+	// whether the result is persisted below, so this runs before the
+	// still-waiting guard.
+	if result.USD > 0 {
+		if uErr := s.AccumulateSubAgentUsage(ctx, t.ID, store.SandboxActivityAgon, store.TaskUsage{CostUSD: result.USD}); uErr != nil {
+			logger.Handler.Warn("agon: accumulate usage", "task", t.ID, "error", uErr)
+		}
+	}
+
 	// Only persist if the task is still waiting: a run that completes after the
 	// task was resumed, submitted, or failed would otherwise stamp a stale
 	// result onto a task whose worktree has already moved on.

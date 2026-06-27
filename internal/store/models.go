@@ -163,6 +163,10 @@ const (
 	SandboxActivityTest SandboxActivity = "test"
 	// SandboxActivityOversightTest is a usage-attribution-only activity for test oversight generation.
 	SandboxActivityOversightTest SandboxActivity = "oversight-test"
+	// SandboxActivityAgon is a usage-attribution-only activity for agon
+	// adversarial verification (proposer + critics), so its cost is visible in
+	// the task's usage breakdown rather than untracked.
+	SandboxActivityAgon SandboxActivity = "agon"
 )
 
 // SandboxActivities lists activities that support per-activity sandbox routing.
@@ -428,9 +432,9 @@ type Task struct {
 	// nil AgonUnresolved means agon has not run for this task.
 	// 0 means it ran and found no unresolved attacks (clean).
 	// >0 means open disputes remain; AgonHeadline holds the claim text.
-	AgonUnresolved  *int   `json:"agon_unresolved,omitempty"`
-	AgonHeadline    string `json:"agon_headline,omitempty"`
-	AgonSessionDir  string `json:"agon_session_dir,omitempty"`
+	AgonUnresolved *int   `json:"agon_unresolved,omitempty"`
+	AgonHeadline   string `json:"agon_headline,omitempty"`
+	AgonSessionDir string `json:"agon_session_dir,omitempty"`
 }
 
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry
