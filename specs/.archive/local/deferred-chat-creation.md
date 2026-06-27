@@ -1,6 +1,6 @@
 ---
 title: Deferred Chat Creation
-status: complete
+status: archived
 depends_on: []
 affects:
   - frontend/src/composables/useChatSession.ts
@@ -8,7 +8,7 @@ affects:
   - frontend/src/components/plan/SpecChatPopup.vue
 effort: small
 created: 2026-06-25
-updated: 2026-06-26
+updated: 2026-06-27
 author: changkun
 dispatched_task_id: null
 ---
