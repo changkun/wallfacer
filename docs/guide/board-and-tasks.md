@@ -528,16 +528,19 @@ Response fields are neutral by design (slug, title, description, capabilities, m
 
 ---
 
-## Map
+## Mission Control
 
-The **Map** entry in the sidebar opens a single graph of the whole
-autonomous-engineering pipeline: specs and tasks as nodes, connected by their
-dependencies. Where the Board executes tasks and Plan authors specs, the Map is
-the place to *see and drive the cross-cutting flow* neither single surface
-shows -- idea -> spec -> dispatched task -> done.
+The **Mission Control** entry in the sidebar (`/mission`; `/map` redirects here)
+opens a single graph of the whole autonomous-engineering pipeline: specs and
+tasks as nodes, connected by their dependencies. Where the Board executes tasks
+and Plan authors specs, Mission Control is the place to *see and drive the
+cross-cutting flow* neither single surface shows: idea, spec, dispatched task,
+done.
 
-**Nodes** are specs (colored by lifecycle) and tasks (colored by status).
-**Edges** carry four meanings:
+**Nodes** are network-style discs, each colored by state (the inspector legend
+maps every color, and clicking a legend row shows or hides that state; done and
+cancelled start hidden). Double-click a spec node to open its full text in a
+draggable, resizable popup. **Edges** carry four meanings:
 
 - **containment** -- a parent spec to its child specs (dashed; organizational);
 - **dispatch** -- a leaf spec to the task it materialized;
@@ -561,8 +564,8 @@ and appears under **Ready to act** in the inspector. Select it to:
   would;
 - **Open in Plan** / **Open in Board** to jump to the full surface for that node.
 
-After any action the Map refetches the graph, so the affordances re-sync to the
-server's view rather than guessing. Drag a node to reposition it; hold
+After any action Mission Control refetches the graph, so the affordances re-sync
+to the server's view rather than guessing. Drag a node to reposition it; hold
 **Space** and drag to pan; **Ctrl**/**Cmd**+scroll to zoom; **Reset layout**
 clears the filter and re-lays-out.
 

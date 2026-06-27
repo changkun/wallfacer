@@ -13,7 +13,7 @@ function metaFor(path: string): boolean {
 
 describe('localRoutes workspace gating', () => {
   it('marks every workspace-scoped view as needsWorkspace', () => {
-    for (const path of ['/', '/agents', '/flows', '/routines', '/analytics', '/chat', '/plan', '/map']) {
+    for (const path of ['/', '/agents', '/flows', '/routines', '/analytics', '/chat', '/plan', '/mission', '/map']) {
       expect(metaFor(path), `${path} should require a workspace`).toBe(true);
     }
   });
