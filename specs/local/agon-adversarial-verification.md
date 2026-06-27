@@ -113,10 +113,13 @@ opt-in / diff-size gating), not by weakening the critic.
   override the defaults via `agonTuning`; documented in the configuration guide.
   _(commit: make fork count, rounds, and cost cap configurable)_. A `/api/config`
   + frontend surface is a later nicety.
-- [ ] **Reset `AgonUnresolved` on resume.** Mirror the test-result reset once the
-  resume → re-verify lifecycle is traced; currently deferred.
-- [ ] **Criteria threading (goal #7).** Blocked on `Task.Criteria`
-  ([[test-criteria]]); wire when it lands, do not ship a hardcoded `""`.
+- [x] **Reset `AgonUnresolved` on resume.** `ClearAgonResult` is called from
+  both resume paths (feedback/auto-resume and manual `ResumeTask`), alongside the
+  feedback path's existing test-verdict reset, so a resumed task is re-verified
+  once it returns to waiting. _(commit: clear the agon verdict on resume)_
+- [ ] **Criteria threading (goal #7).** Blocked: `Task.Criteria` does not exist
+  yet (test-criteria spec unlanded). `runAgon` passes `Criteria: ""`; wire it
+  when the field lands. Do not ship a fabricated criteria source.
 
 ## Problem
 
