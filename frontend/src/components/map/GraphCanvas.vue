@@ -4,6 +4,7 @@ import type { Graph } from '../../api/types';
 import { computeLayout, type Point } from './layout';
 import { edgePaths } from './edges';
 import { DragBatcher } from './dragController';
+import { stateColor } from './nodeColors';
 
 const props = defineProps<{
   graph: Graph;
@@ -11,6 +12,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   (e: 'select', id: string): void;
+  (e: 'open', id: string): void;
 }>();
 
 // Live node positions, seeded from the layered layout and then mutated in place
@@ -46,10 +48,47 @@ function nodeClasses(id: string, kind: string, status: string) {
     { 'gc-node--selected': props.selectedId === id },
   ];
 }
-// SVG <text> doesn't ellipsis; truncate so a long spec/task title can't spill
-// out of the node box and overlap its neighbours.
-function short(label: string, max = 22): string {
-  return label.length > max ? label.slice(0, max - 1).trimEnd() + '…' : label;
+// SVG <text> neither wraps nor ellipsises, so a title is greedily wrapped into
+// up to maxLines lines (so most titles show in full) and only the final line is
+// truncated when even that overflows. Memoized per label since the template
+// reads it a few times per node across hundreds of nodes.
+const LABEL_MAX_CHARS = 20;
+const LABEL_MAX_LINES = 2;
+const lineCache = new Map<string, string[]>();
+function labelLines(label: string): string[] {
+  const hit = lineCache.get(label);
+  if (hit) return hit;
+  const words = label.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = '';
+  for (let w of words) {
+    while (w.length > LABEL_MAX_CHARS) {
+      // hard-break an over-long single token
+      if (cur) { lines.push(cur); cur = ''; }
+      if (lines.length >= LABEL_MAX_LINES) break;
+      lines.push(w.slice(0, LABEL_MAX_CHARS));
+      w = w.slice(LABEL_MAX_CHARS);
+    }
+    if (lines.length >= LABEL_MAX_LINES && !cur) break;
+    const cand = cur ? cur + ' ' + w : w;
+    if (cand.length <= LABEL_MAX_CHARS) {
+      cur = cand;
+    } else {
+      lines.push(cur);
+      cur = w;
+      if (lines.length >= LABEL_MAX_LINES) break;
+    }
+  }
+  if (cur && lines.length < LABEL_MAX_LINES) lines.push(cur);
+  const out = lines.slice(0, LABEL_MAX_LINES);
+  // Ellipsise the last line if any content was dropped.
+  const shown = out.join(' ');
+  if (shown.length < label.replace(/\s+/g, ' ').length && out.length) {
+    const i = out.length - 1;
+    out[i] = out[i].slice(0, LABEL_MAX_CHARS - 1).trimEnd() + '…';
+  }
+  lineCache.set(label, out);
+  return out;
 }
 
 function edgeClasses(kind: string, from: string, to: string) {
@@ -172,11 +211,13 @@ defineExpose({ resetView });
           :class="nodeClasses(n.id, n.kind, n.status)"
           @pointerdown="onNodePointerDown($event, n.id)"
           @click.stop="emit('select', n.id)"
+          @dblclick.stop="emit('open', n.id)"
         >
-          <rect class="gc-node__box" x="-80" y="-22" width="160" height="44" rx="8" />
-          <text class="gc-node__label" x="0" y="-2" text-anchor="middle">{{ short(n.label) }}</text>
-          <title>{{ n.label }}</title>
-          <text class="gc-node__status" x="0" y="13" text-anchor="middle">{{ n.status }}</text>
+          <title>{{ n.label }} · {{ n.status }}</title>
+          <circle class="gc-dot" :fill="stateColor(n.status)" :r="n.kind === 'task' ? 9 : 11" />
+          <text class="gc-node__label" text-anchor="middle">
+            <tspan v-for="(ln, i) in labelLines(n.label)" :key="i" x="0" :y="24 + i * 13">{{ ln }}</tspan>
+          </text>
         </g>
       </g>
     </svg>
@@ -190,6 +231,8 @@ defineExpose({ resetView });
   height: 100%;
   overflow: hidden;
   outline: none;
+  user-select: none;
+  -webkit-user-select: none;
   background:
     radial-gradient(circle, var(--rule, #d9d3c5) 1px, transparent 1px) 0 0 / 24px 24px;
   background-color: var(--bg, #f4f1ea);
@@ -203,44 +246,36 @@ defineExpose({ resetView });
 .gc-node {
   cursor: pointer;
 }
-.gc-node__box {
-  fill: var(--bg-card, #ffffff);
-  stroke: var(--col-backlog, #8e8a80);
-  stroke-width: 1.5;
+/* Network-style node: a state-colored disc with the title below it. */
+.gc-dot {
+  stroke: var(--bg, #f4f1ea);
+  stroke-width: 2;
+  transition: r 80ms ease;
 }
 .gc-node__label {
-  fill: var(--ink, #1b1916);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  fill: var(--ink, #1b1916);
+  /* Halo so the label stays legible over edges and the dot grid. */
+  paint-order: stroke;
+  stroke: var(--bg, #f4f1ea);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
-.gc-node__status {
-  fill: var(--ink-3, #6b6760);
-  font-size: 10px;
-  text-transform: capitalize;
-}
-/* Task status accents (reuse board tokens). */
-.gc-status--in_progress .gc-node__box { stroke: var(--col-progress, #3a6db3); }
-.gc-status--waiting .gc-node__box { stroke: var(--col-waiting, #a56a12); }
-.gc-status--done .gc-node__box { stroke: var(--col-done, #3f7a4a); }
-.gc-status--failed .gc-node__box { stroke: var(--col-failed, #b3433a); }
-/* Spec lifecycle accents. */
-.gc-status--validated .gc-node__box { stroke: var(--col-progress, #3a6db3); }
-.gc-status--complete .gc-node__box { stroke: var(--col-done, #3f7a4a); }
-.gc-status--stale .gc-node__box { stroke: var(--col-waiting, #a56a12); }
 
-.gc-node--selected .gc-node__box {
+.gc-node--selected .gc-dot {
   stroke: var(--accent, #c45a33);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 4px var(--accent-soft, #f3dccf));
+  stroke-width: 3;
+  filter: drop-shadow(0 0 5px var(--accent-soft, #f3dccf));
 }
 .gc-node--blocked {
-  opacity: 0.5;
+  opacity: 0.45;
 }
-/* "Actionable now": a node the backend marked with an available action gets a
-   solid accent ring so the operator can spot what's ready to dispatch/start. */
-.gc-node--ready .gc-node__box {
+/* "Actionable now": a node the backend marked with an available action gets an
+   accent ring so the operator can spot what's ready to dispatch/start. */
+.gc-node--ready .gc-dot {
   stroke: var(--accent, #c45a33);
-  stroke-width: 2;
+  stroke-width: 3;
 }
 
 .gc-edge {
