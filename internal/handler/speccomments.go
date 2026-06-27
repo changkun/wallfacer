@@ -180,7 +180,7 @@ type submitSpecCommentReq struct {
 }
 
 // SubmitSpecComment forwards a browser-initiated op (create/reply/resolve/
-// reopen) up the coordination connection. The coordinator is authoritative: it
+// reopen/outdated) up the coordination connection. The coordinator is authoritative: it
 // mints ids, stamps the principal, and echoes the result back down, which the
 // relay applies and streams to browsers. This handler builds the wire op only.
 func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +234,7 @@ func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
 		}
 	case speccomment.OpReply:
 		ev.Comment = &speccomment.Comment{ThreadID: req.ThreadID, ParentID: req.ParentID, Body: req.Body}
-	case speccomment.OpResolve, speccomment.OpReopen:
+	case speccomment.OpResolve, speccomment.OpReopen, speccomment.OpOutdated:
 		ev.Thread = &speccomment.Thread{ID: req.ThreadID}
 	default:
 		http.Error(w, "unsupported op", http.StatusBadRequest)
