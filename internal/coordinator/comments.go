@@ -49,6 +49,8 @@ func (s *CommentService) Apply(ctx context.Context, p Principal, ev speccomment.
 		return s.setResolved(ctx, p, ev, true)
 	case speccomment.OpReopen:
 		return s.setResolved(ctx, p, ev, false)
+	case speccomment.OpOutdated:
+		return s.setOutdated(ctx, p, ev)
 	default:
 		return fmt.Errorf("%w: unsupported op %q", errInvalid, ev.Op)
 	}
@@ -149,6 +151,36 @@ func (s *CommentService) setResolved(ctx context.Context, p Principal, ev specco
 		return err
 	}
 	s.fanout(tenantKey(p), t.WorkspaceID, op, t)
+	return nil
+}
+
+// setOutdated files a thread away as no-longer-relevant: a terminal verdict,
+// distinct from resolve (which is reversible by reopen). The thread leaves the
+// triage list and every spec highlight — repositionThread short-circuits a
+// StatusOutdated thread to a non-orphaned, non-inline result — but it is
+// retained, not hard-deleted. Reachable from the triage list. Gated by the same
+// tenant boundary as resolve.
+func (s *CommentService) setOutdated(ctx context.Context, p Principal, ev speccomment.Event) error {
+	if ev.Thread == nil || ev.Thread.ID == "" {
+		return fmt.Errorf("%w: outdated needs a thread id", errInvalid)
+	}
+	t, ok, err := s.store.GetThread(ctx, tenantKey(p), ev.Thread.ID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("%w: unknown thread", errInvalid)
+	}
+	if !canResolve(p, t) {
+		return fmt.Errorf("not permitted to outdate thread")
+	}
+	t.Status = speccomment.StatusOutdated
+	// Persist before fanning out, matching setResolved: a failed store write
+	// must not leave peers ahead of the store.
+	if err := s.store.PutThread(ctx, t); err != nil {
+		return err
+	}
+	s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpOutdated, t)
 	return nil
 }
 

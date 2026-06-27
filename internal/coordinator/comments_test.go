@@ -172,6 +172,37 @@ func TestCommentReplyAndResolve(t *testing.T) {
 	}
 }
 
+// TestCommentMarkOutdated verifies that OpOutdated files a thread away as the
+// terminal "outdated" status and fans the authoritative thread out. Before
+// OpOutdated was wired through Apply, this op returned "unsupported op".
+func TestCommentMarkOutdated(t *testing.T) {
+	reg := NewRegistry()
+	store := NewMemCommentStore()
+	svc := NewCommentService(store, reg)
+	author := joinInst(reg, "inst_a", "u_alice", "org_1")
+	p := Principal{Sub: "u_alice", OrgID: "org_1"}
+
+	if err := svc.Apply(context.Background(), p, createEvent("specs/x.md", "root", "")); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	threadID := author.opsFor(speccomment.OpCreate)[0].Thread.ID
+
+	outdated := speccomment.Event{Op: speccomment.OpOutdated, Repo: testRepo, Thread: &speccomment.Thread{ID: threadID}}
+	if err := svc.Apply(context.Background(), p, outdated); err != nil {
+		t.Fatalf("outdated: %v", err)
+	}
+	oEv := author.opsFor(speccomment.OpOutdated)
+	if len(oEv) != 1 || oEv[0].Thread.Status != speccomment.StatusOutdated {
+		t.Fatalf("outdated did not file thread away: %+v", oEv)
+	}
+
+	// A member of another tenant must not be able to outdate the thread.
+	mallory := Principal{Sub: "u_mallory", OrgID: "org_2"}
+	if err := svc.Apply(context.Background(), mallory, outdated); err == nil {
+		t.Fatal("expected cross-tenant outdate to be refused")
+	}
+}
+
 // TestCommentResolveDoesNotFanOutOnStoreFailure verifies that setResolved
 // persists before fanning out (like create/reply). If the store write fails,
 // peers must NOT have been pushed the authoritative thread, otherwise
