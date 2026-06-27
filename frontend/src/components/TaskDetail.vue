@@ -747,6 +747,7 @@ async function archiveTask() {
   toast.pushWithAction('Task archived', 'Undo', () => {
     api('PATCH', `/api/tasks/${id}`, { archived: false }).catch((e) => console.error('unarchive:', e));
   }, { kind: 'success' });
+  emit('close');
 }
 async function unarchiveTask() {
   await api('PATCH', `/api/tasks/${props.task.id}`, { archived: false });
