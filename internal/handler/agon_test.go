@@ -306,6 +306,49 @@ func TestRunAgon_AttributesTokensFromEndJson(t *testing.T) {
 	}
 }
 
+// TestRunAgon_EmitsTimelineEvents proves a run surfaces start + completion
+// events on the task timeline, so a manual or auto trigger is visible rather
+// than silently running in the background.
+func TestRunAgon_EmitsTimelineEvents(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref in foo"}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	var started, finished bool
+	for _, e := range events {
+		if e.EventType != store.EventTypeSystem {
+			continue
+		}
+		d := string(e.Data)
+		if strings.Contains(d, "verification started") {
+			started = true
+		}
+		if strings.Contains(d, "2 unresolved") {
+			finished = true
+		}
+	}
+	if !started {
+		t.Error("expected an 'Agon: ... started' timeline event")
+	}
+	if !finished {
+		t.Error("expected an 'Agon: 2 unresolved' completion event")
+	}
+}
+
 // TestRunAgon_ThreadsCriteria proves the task's persisted Criteria reaches the
 // verifier input, so agon critics are anchored to the same acceptance bar as
 // the test agent (the previously-blocked goal #7).

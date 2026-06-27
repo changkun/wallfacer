@@ -1290,9 +1290,19 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		CostCapTokens: costCap,
 	}
 
+	// Surface the run on the task timeline so a manual or auto trigger gives
+	// immediate, visible feedback (the run itself takes minutes in the
+	// background; without this the UI looks inert until it finishes).
+	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+		"result": fmt.Sprintf("Agon: adversarial verification started (%d critics, up to %d rounds).", forks, rounds),
+	})
+
 	result, err := h.verifier.Verify(ctx, input)
 	if err != nil {
 		h.breakers["auto-agon"].recordFailure(&t.ID, err.Error())
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": "Agon: verification failed: " + err.Error(),
+		})
 		return err
 	}
 	h.breakers["auto-agon"].recordSuccess()
@@ -1321,5 +1331,16 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting {
 		return nil
 	}
-	return s.UpdateTaskAgon(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir)
+	if err := s.UpdateTaskAgon(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir); err != nil {
+		return err
+	}
+	summary := "Agon: verification clean — no unresolved attacks."
+	if result.Unresolved > 0 {
+		summary = fmt.Sprintf("Agon: %d unresolved attack(s).", result.Unresolved)
+		if result.Headline != "" {
+			summary += " " + result.Headline
+		}
+	}
+	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{"result": summary})
+	return nil
 }
