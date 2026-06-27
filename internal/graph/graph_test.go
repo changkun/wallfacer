@@ -146,11 +146,37 @@ func TestBuild_Blocked(t *testing.T) {
 	}
 }
 
+func TestBuild_ArchivedDonePrereqDoesNotBlock(t *testing.T) {
+	// A backlog task whose only prerequisite is done-and-archived must read as
+	// ready in the default (archived-hidden) view: readiness is computed over
+	// the full task set, not the displayed subset.
+	tasks := []store.Task{
+		{ID: t1, Status: store.TaskStatusDone, Archived: true},
+		{ID: t2, Status: store.TaskStatusBacklog, DependsOn: []string{t1.String()}},
+	}
+	g := Build(nil, tasks, false)
+
+	if _, shown := nodeByID(g, TaskID(t1.String())); shown {
+		t.Error("archived prerequisite should be hidden in default view")
+	}
+	if len(g.Blocked) != 0 {
+		t.Errorf("blocked = %v, want empty (prereq is done, just archived)", g.Blocked)
+	}
+	n, ok := nodeByID(g, TaskID(t2.String()))
+	if !ok {
+		t.Fatal("t2 node missing")
+	}
+	if !reflect.DeepEqual(n.AvailableActions, []string{ActionStart}) {
+		t.Errorf("t2 actions = %v, want [start]", n.AvailableActions)
+	}
+}
+
 func TestBuild_CriticalPath(t *testing.T) {
 	specs, tasks := fixture()
 	g := Build(specs, tasks, false)
+	// Containment (parent → child) is organizational and excluded; the chain
+	// follows only dependency edges: spec_dep, dispatch, task_dep.
 	want := []string{
-		SpecID("specs/x/parent.md"),
 		SpecID("specs/x/parent/childA.md"),
 		SpecID("specs/x/parent/childB.md"),
 		TaskID(t1.String()),
@@ -158,6 +184,21 @@ func TestBuild_CriticalPath(t *testing.T) {
 	}
 	if !reflect.DeepEqual(g.CriticalPath, want) {
 		t.Errorf("critical path = %v, want %v", g.CriticalPath, want)
+	}
+}
+
+func TestBuild_CriticalPathIgnoresContainmentStar(t *testing.T) {
+	// A parent with many dependency-less children has no real dependency chain;
+	// containment hops must not fabricate one.
+	specs := []spec.NodeResponse{
+		{Path: "p.md", Children: []string{"a.md", "b.md", "c.md"}, Spec: &spec.Spec{Status: spec.StatusDrafted}},
+		{Path: "a.md", IsLeaf: true, Spec: &spec.Spec{Status: spec.StatusDrafted}},
+		{Path: "b.md", IsLeaf: true, Spec: &spec.Spec{Status: spec.StatusDrafted}},
+		{Path: "c.md", IsLeaf: true, Spec: &spec.Spec{Status: spec.StatusDrafted}},
+	}
+	g := Build(specs, nil, false)
+	if len(g.CriticalPath) != 0 {
+		t.Errorf("critical path = %v, want empty (containment is not a chain)", g.CriticalPath)
 	}
 }
 
