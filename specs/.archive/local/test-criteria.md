@@ -1,6 +1,6 @@
 ---
 title: Task Test Criteria for Post-Run Verification
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/store/models.go
@@ -15,7 +15,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-06-14
-updated: 2026-06-26
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---
