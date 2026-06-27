@@ -38,9 +38,3 @@ export function edgePaths(graph: Graph, pos: Map<string, Point>): RenderedEdge[]
   }
   return out;
 }
-
-// incidentEdges returns the edges touching a node — the set that must be
-// re-pathed while that node is dragged.
-export function incidentEdges(graph: Graph, nodeId: string): GraphEdge[] {
-  return graph.edges.filter((e) => e.from === nodeId || e.to === nodeId);
-}

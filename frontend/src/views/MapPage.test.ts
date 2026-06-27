@@ -94,6 +94,16 @@ describe('MapPage', () => {
     host.remove();
   });
 
+  it('fetches the task store on a cold mount so Board deep-jump works', async () => {
+    // Landing on /map first leaves store.tasks empty; openInBoard/selectedTask
+    // read it, so the page must populate it on mount (regression: a cold load
+    // previously offered no Board jump for task nodes).
+    const { app, host } = await mountMapPage();
+    expect(calls.some((c) => c.url.includes('/api/tasks') && c.method === 'GET')).toBe(true);
+    app.unmount();
+    host.remove();
+  });
+
   it('installs none of the legacy window shims', async () => {
     const { app, host } = await mountMapPage();
     const w = window as unknown as Record<string, unknown>;
