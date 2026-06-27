@@ -1,6 +1,6 @@
 ---
 title: Hand-Rolled SVG Graph Renderer (RAF Drag + Curved Edges)
-status: validated
+status: complete
 depends_on:
   - specs/local/map-mission-control/graph-endpoint.md
 affects:

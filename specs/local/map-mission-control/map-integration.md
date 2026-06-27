@@ -1,6 +1,6 @@
 ---
 title: Rewire MapPage onto /api/graph + GraphCanvas; Remove Vendored Depgraph
-status: validated
+status: complete
 depends_on:
   - specs/local/map-mission-control/graph-endpoint.md
   - specs/local/map-mission-control/renderer-rebuild.md

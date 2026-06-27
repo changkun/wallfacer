@@ -1,6 +1,6 @@
 ---
 title: Inline Node Actions + Operational Critical-Path Highlighting
-status: validated
+status: complete
 depends_on:
   - specs/local/map-mission-control/map-integration.md
 affects:
