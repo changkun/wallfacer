@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 120,
+  "route_count": 122,
   "routes": [
     {
       "method": "GET",
@@ -281,6 +281,16 @@
       "tags": [
         "specs",
         "sse"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/graph",
+      "name": "GetGraph",
+      "description": "Get the unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for the Map.",
+      "tags": [
+        "specs",
+        "tasks"
       ]
     },
     {
@@ -841,6 +851,15 @@
       "pattern": "/api/tasks/{id}/test",
       "name": "TestTask",
       "description": "Trigger the test agent for a task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/agon",
+      "name": "AgonTask",
+      "description": "Trigger adversarial agon verification for a task.",
       "tags": [
         "tasks"
       ]

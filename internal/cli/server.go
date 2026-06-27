@@ -1018,6 +1018,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Spec tree.
 		"GetSpecTree":               h.GetSpecTree,
 		"SpecTreeStream":            h.SpecTreeStream,
+		"GetGraph":                  h.GetGraph,
 		"SpecTransition":            h.SpecTransition,
 		"StaleCandidates":           h.StaleCandidates,
 		"DismissAllStaleCandidates": h.DismissAllStaleCandidates,
