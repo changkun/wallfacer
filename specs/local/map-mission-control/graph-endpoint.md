@@ -1,6 +1,6 @@
 ---
 title: Server-Side Unified Graph Model + GET /api/graph
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/graph/

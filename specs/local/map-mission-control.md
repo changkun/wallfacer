@@ -1,6 +1,6 @@
 ---
 title: Map as Mission Control
-status: drafted
+status: complete
 depends_on: []
 affects:
   - frontend/src/views/MapPage.vue
@@ -273,10 +273,10 @@ graph TD
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Graph endpoint](map-mission-control/graph-endpoint.md) | — | medium | validated |
-| [Renderer rebuild](map-mission-control/renderer-rebuild.md) | graph-endpoint | large | validated |
-| [Map integration + removal](map-mission-control/map-integration.md) | graph-endpoint, renderer-rebuild | medium | validated |
-| [Inline actions + highlighting](map-mission-control/inline-actions.md) | map-integration | medium | validated |
+| [Graph endpoint](map-mission-control/graph-endpoint.md) | — | medium | complete |
+| [Renderer rebuild](map-mission-control/renderer-rebuild.md) | graph-endpoint | large | complete |
+| [Map integration + removal](map-mission-control/map-integration.md) | graph-endpoint, renderer-rebuild | medium | complete |
+| [Inline actions + highlighting](map-mission-control/inline-actions.md) | map-integration | medium | complete |
 
 ```mermaid
 graph LR
@@ -301,3 +301,34 @@ fixed. Integration (C) merges both and deletes the vendored code. Inline actions
   double-click to un-pin / reset layout" affordance, or drop pinning in favor
   of a stable deterministic layout? (Lean: keep reset; revisit pinning during
   breakdown.)
+
+## Outcome (2026-06-27)
+
+Implemented directly (not dispatched) across four commits, one per breakdown
+task; all four leaves are complete.
+
+- **Backend graph model** (`743d4ab7`, hardened in `c2dd5143`): new pure
+  `internal/graph` builder + `GET /api/graph` compose the spec tree and task
+  list into one authoritative model — typed nodes/edges, a dependency-only
+  critical path, the blocked set, and per-node available actions — reusing the
+  same principal-scoped sources (`collectSpecTree`, `TasksForPrincipal`) the
+  spec tree and task list already use. Readiness is computed over the full task
+  set so an archived-done prerequisite doesn't read as blocked; the critical
+  path excludes organizational containment hops.
+- **Renderer rebuild** (`cfd9b43a`): hand-rolled SVG renderer with no new
+  dependency — `layout.ts` (layered placement, fixes overlap/hierarchy),
+  `edges.ts` (curved cubic-Bézier, recomputed from live positions), and a
+  RAF-batched `dragController.ts` (one path rewrite per frame, edges stay
+  attached). Both bug fixes are covered by unit tests.
+- **Integration + removal** (`0e482920`): `MapPage` rewired onto `/api/graph` +
+  `GraphCanvas`; the ~4,583-line vendored depgraph and all `window` shims
+  deleted; no remaining `vendor/depgraph` or `ui/` reference.
+- **Inline actions** (`80f41f61`): dispatch a validated leaf spec / start a
+  ready backlog task directly from a node, plus a "Ready to act" list and
+  accent-ring highlighting; docs updated.
+
+Deferred (not blocking): undispatch/retract from the graph, `/api/graph` SSE
+streaming (refetch-on-action + the existing task SSE delta cover v1), and node
+pinning. Visual verification via the ui-shots harness is left for the author to
+run in-app, since the "not laggy / curved / clear hierarchy" bar is visual; the
+logic that produces it is unit-tested.
