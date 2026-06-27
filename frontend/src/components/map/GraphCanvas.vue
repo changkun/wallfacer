@@ -46,6 +46,12 @@ function nodeClasses(id: string, kind: string, status: string) {
     { 'gc-node--selected': props.selectedId === id },
   ];
 }
+// SVG <text> doesn't ellipsis; truncate so a long spec/task title can't spill
+// out of the node box and overlap its neighbours.
+function short(label: string, max = 22): string {
+  return label.length > max ? label.slice(0, max - 1).trimEnd() + '…' : label;
+}
+
 function edgeClasses(kind: string, from: string, to: string) {
   const onPath = criticalSet.value.has(from) && criticalSet.value.has(to);
   return ['gc-edge', `gc-edge--${kind}`, { 'gc-edge--critical': onPath }];
@@ -168,7 +174,8 @@ defineExpose({ resetView });
           @click.stop="emit('select', n.id)"
         >
           <rect class="gc-node__box" x="-80" y="-22" width="160" height="44" rx="8" />
-          <text class="gc-node__label" x="0" y="-2" text-anchor="middle">{{ n.label }}</text>
+          <text class="gc-node__label" x="0" y="-2" text-anchor="middle">{{ short(n.label) }}</text>
+          <title>{{ n.label }}</title>
           <text class="gc-node__status" x="0" y="13" text-anchor="middle">{{ n.status }}</text>
         </g>
       </g>
@@ -184,7 +191,8 @@ defineExpose({ resetView });
   overflow: hidden;
   outline: none;
   background:
-    radial-gradient(circle, var(--border, #2a2a2a) 1px, transparent 1px) 0 0 / 24px 24px;
+    radial-gradient(circle, var(--rule, #d9d3c5) 1px, transparent 1px) 0 0 / 24px 24px;
+  background-color: var(--bg, #f4f1ea);
 }
 .gc-canvas--panning {
   cursor: grab;
@@ -196,18 +204,19 @@ defineExpose({ resetView });
   cursor: pointer;
 }
 .gc-node__box {
-  fill: var(--surface-2, #1c1c1c);
+  fill: var(--bg-card, #ffffff);
   stroke: var(--col-backlog, #8e8a80);
   stroke-width: 1.5;
 }
 .gc-node__label {
-  fill: var(--text, #e8e8e8);
+  fill: var(--ink, #1b1916);
   font-size: 12px;
   font-weight: 600;
 }
 .gc-node__status {
-  fill: var(--text-muted, #9a9a9a);
+  fill: var(--ink-3, #6b6760);
   font-size: 10px;
+  text-transform: capitalize;
 }
 /* Task status accents (reuse board tokens). */
 .gc-status--in_progress .gc-node__box { stroke: var(--col-progress, #3a6db3); }
@@ -220,11 +229,9 @@ defineExpose({ resetView });
 .gc-status--stale .gc-node__box { stroke: var(--col-waiting, #a56a12); }
 
 .gc-node--selected .gc-node__box {
+  stroke: var(--accent, #c45a33);
   stroke-width: 2.5;
-  filter: drop-shadow(0 0 4px var(--accent, #6f9bd8));
-}
-.gc-node--critical .gc-node__box {
-  stroke-dasharray: none;
+  filter: drop-shadow(0 0 4px var(--accent-soft, #f3dccf));
 }
 .gc-node--blocked {
   opacity: 0.5;
@@ -232,22 +239,22 @@ defineExpose({ resetView });
 /* "Actionable now": a node the backend marked with an available action gets a
    solid accent ring so the operator can spot what's ready to dispatch/start. */
 .gc-node--ready .gc-node__box {
-  stroke: var(--accent, #6f9bd8);
+  stroke: var(--accent, #c45a33);
   stroke-width: 2;
 }
 
 .gc-edge {
-  stroke: var(--border-strong, #555);
+  stroke: var(--border-strong, #c7c0af);
   stroke-width: 1.5;
 }
-.gc-edge--containment { stroke-dasharray: 2 3; opacity: 0.6; }
+.gc-edge--containment { stroke-dasharray: 2 3; opacity: 0.55; }
 .gc-edge--dispatch { stroke: var(--col-progress, #3a6db3); }
 .gc-edge--spec_dep { stroke: var(--col-backlog, #8e8a80); }
-.gc-edge--task_dep { stroke: var(--text-muted, #9a9a9a); }
+.gc-edge--task_dep { stroke: var(--ink-4, #97928a); }
 .gc-edge--critical {
   stroke-width: 2.5;
-  stroke: var(--accent, #6f9bd8);
+  stroke: var(--accent, #c45a33);
 }
-.gc-arrowhead { fill: var(--border-strong, #555); }
+.gc-arrowhead { fill: var(--border-strong, #c7c0af); }
 .gc-arrowhead--dispatch { fill: var(--col-progress, #3a6db3); }
 </style>
