@@ -31,6 +31,18 @@
   --tag-text-11: var(--tint-neutral-ink);
 }
 
+/* --- Focus rings ---
+ * Suppress the browser's default focus outline when focus did NOT arrive from
+ * the keyboard — i.e. mouse clicks and programmatic focus. Keyboard navigation
+ * still shows a ring via :focus-visible (components style it with the accent),
+ * so this only removes the stray UA blue outline that appeared on task cards
+ * and other tabindex elements after a click. Defined early in base.css at the
+ * same specificity components use, so an intentional component :focus ring,
+ * declared later, still wins. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 ::selection {
   background: rgba(80, 130, 190, 0.3);
   color: inherit;
