@@ -58,7 +58,10 @@ func parseHarnessOutput(h harness.Harness, raw string) (*agentOutput, error) {
 		if evt.SessionID != "" {
 			sessionID = evt.SessionID
 		}
-		if evt.Text != "" {
+		// Only assistant prose is a candidate for the final-answer fallback.
+		// Thinking blocks (KindThinking) also carry Text but are reasoning, not
+		// the conclusion, so they must never be picked as the result.
+		if evt.Kind == harness.KindAssistantText && evt.Text != "" {
 			lastText = evt.Text
 		}
 		if evt.Kind == harness.KindResult || evt.Kind == harness.KindError {

@@ -84,7 +84,40 @@ const (
 	KindUserResult
 	KindResult
 	KindError
+	// KindThinking carries a reasoning / thinking block emitted on its own
+	// output line (e.g. opencode "reasoning", codex reasoning items). Its
+	// content rides in Event.Text, but consumers that accumulate the final
+	// answer MUST ignore it (it is not the conclusion) — see the runner's
+	// parseHarnessOutput, which keys the last-text fallback on
+	// KindAssistantText only.
+	KindThinking
 )
+
+// String returns the stable wire token for an EventKind, used by the
+// normalized transcript stream (?format=normalized). Distinct from the int
+// iota value so the wire shape never depends on enum ordering.
+func (k EventKind) String() string {
+	switch k {
+	case KindSystemInit:
+		return "system_init"
+	case KindAssistantText:
+		return "assistant"
+	case KindThinking:
+		return "thinking"
+	case KindToolCallStart:
+		return "tool_start"
+	case KindToolCallEnd:
+		return "tool_end"
+	case KindUserResult:
+		return "user_result"
+	case KindResult:
+		return "result"
+	case KindError:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
 
 // ToolCall carries the payload of KindToolCall{Start,End} events.
 type ToolCall struct {

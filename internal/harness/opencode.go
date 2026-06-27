@@ -118,8 +118,8 @@ type openCodeLine struct {
 }
 
 // ParseEvent maps one NDJSON line of opencode output to a canonical Event.
-// Recognised top-level types: text / reasoning → KindAssistantText,
-// tool_use → KindToolCall{Start,End}, step_start → KindSystemInit, error →
+// Recognised top-level types: text → KindAssistantText, reasoning →
+// KindThinking, tool_use → KindToolCall{Start,End}, step_start → KindSystemInit, error →
 // KindError, and the synthesized result → KindResult. Everything else
 // (step_finish, future event types) yields KindUnknown with Raw preserved,
 // matching the spec's tolerance for opencode's less-standardised schema.
@@ -139,10 +139,14 @@ func (openCodeHarness) ParseEvent(raw []byte) (Event, error) {
 			evt.Text = line.Part.Text
 		}
 	case "reasoning":
-		// Thinking output. Surface as an assistant event but leave Text empty
-		// so the runner's result fallback never picks a reasoning block over
-		// the final answer.
-		evt.Kind = KindAssistantText
+		// Thinking output, emitted on its own line. Surface it as KindThinking
+		// carrying the reasoning text: the runner's last-text fallback keys on
+		// KindAssistantText, so this never gets picked as the final answer, but
+		// the transcript renderer can now show a reasoning row.
+		evt.Kind = KindThinking
+		if line.Part != nil {
+			evt.Text = line.Part.Text
+		}
 	case "tool_use":
 		tc := &ToolCall{}
 		status := ""
