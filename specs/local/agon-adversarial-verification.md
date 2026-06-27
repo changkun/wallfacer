@@ -96,12 +96,11 @@ opt-in / diff-size gating), not by weakening the critic.
   there; they can build/run tests with zero risk to the task branch. The
   proposer keeps the real worktree (fork-session is cwd-scoped). _(commit: run
   critics in a throwaway worktree)_
-- [x] **agon: read-only proposer option** (agon repo, spec 38).
+- [x] **agon: read-only proposer option** (agon repo, spec 38, released v0.1.1).
   `claude.WithProposerReadOnly()` bars Write/Edit/MultiEdit/NotebookEdit/Bash so
   the fork-session proposer (which shares the real worktree) can argue/concede
-  but never edit it. Shipped in agon; **wallfacer wiring pending** a go.mod bump
-  to the agon release that contains it (the proposer is already effectively
-  read-only meanwhile — its path passes no `--dangerously-skip-permissions`).
+  but never edit it. Wired into `NewSessionProposer` and live (go.mod bumped to
+  agon v0.1.1). _(commit: restrict the fork-session proposer to read-only tools)_
 - [x] **Usage attribution (cost).** `runAgon` accumulates `VerifyResult.USD`
   onto the task under `SandboxActivityAgon`, so agon spend shows in the usage
   breakdown. _(commit: attribute agon run cost)_ Token-level attribution
