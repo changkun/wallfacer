@@ -1,6 +1,6 @@
 ---
 title: Agon Verification Trajectory Streaming
-status: drafted
+status: complete
 depends_on:
   - agon-adversarial-verification
 affects:
@@ -92,6 +92,20 @@ test-agent `testResults`): add an **Agon trajectory** block above/below it.
 - Empty/!running/no-session → a muted "No agon run yet" line; never error loudly.
 
 `types.ts`: add `AgonTranscript` / `AgonFork` / `AgonRound` interfaces.
+
+## Outcome (2026-06-27)
+
+Both phases implemented. Backend: `AgonTranscript` reads the newest session under
+the task's `.agon`, parses `transcript.jsonl`, reads each round markdown (with
+`..`/absolute-path guards), returns forks→rounds + a `running` flag from
+`end.json` presence. Frontend: the verification tab renders the fork/round debate
+(latest round auto-open, pulsing "live" badge) and polls every 2.5s while
+running; clicking Agon jumps to the tab and opens a 90s watch window so a
+just-started run streams in. No agon change was needed — it persists the
+trajectory incrementally during the run.
+
+Deviation: polling (2.5s) rather than SSE tailing — adequate for per-round
+(~30s–2min) updates; SSE remains a future optimization (Non-Goals).
 
 ## Non-Goals
 
