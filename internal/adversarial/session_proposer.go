@@ -10,14 +10,14 @@ import (
 // Returns nil if sessionID is empty — callers must check.
 //
 // The proposer runs in the task's real worktree (fork-session is cwd-scoped, so
-// it cannot run elsewhere). It is effectively read-only today because this path
-// does not pass --dangerously-skip-permissions, so claude default-denies write
-// tools in headless mode. agon spec 38 adds an explicit guarantee via
-// agonClaude.WithProposerReadOnly(); wire it here once wallfacer's go.mod is
-// bumped to the agon release that contains it.
+// it cannot run elsewhere) and is restricted to read-only tools
+// (agonClaude.WithProposerReadOnly, agon spec 38): it can read the code to
+// rebut and concede but cannot edit the tree wallfacer's commit pipeline would
+// then stage. This is an explicit guarantee on top of claude's headless
+// default-deny.
 func NewSessionProposer(sessionID, cwd string) adversarial.Proposer {
 	if sessionID == "" {
 		return nil
 	}
-	return agonClaude.NewProposer(sessionID, cwd)
+	return agonClaude.NewProposer(sessionID, cwd, agonClaude.WithProposerReadOnly())
 }
