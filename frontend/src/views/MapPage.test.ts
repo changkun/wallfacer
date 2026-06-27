@@ -123,19 +123,27 @@ describe('MapPage', () => {
     host.remove();
   });
 
-  it('reveals a hidden state when re-enabled in the States menu', async () => {
+  it('toggles a state by clicking its legend row', async () => {
     const { app, host } = await mountMapPage();
-    const statesBtn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('States'))!;
-    statesBtn.dispatchEvent(new Event('click', { bubbles: true }));
-    await nextTick();
-    const doneItem = [...host.querySelectorAll('.map-statefilter__item')].find((li) =>
-      li.textContent?.toLowerCase().includes('done'),
-    )!;
-    const cb = doneItem.querySelector('input') as HTMLInputElement;
-    cb.checked = true;
-    cb.dispatchEvent(new Event('change', { bubbles: true }));
+    // The 'done' legend row starts in the off (filtered) state; clicking it
+    // reveals the done node.
+    const doneRow = [...host.querySelectorAll('.map-legend__item')].find((b) =>
+      b.textContent?.toLowerCase().includes('done'),
+    ) as HTMLButtonElement;
+    expect(doneRow.classList.contains('map-legend__item--off')).toBe(true);
+    doneRow.dispatchEvent(new Event('click', { bubbles: true }));
     await nextTick();
     expect(host.querySelectorAll('.gc-node').length).toBe(3); // done now visible
+    expect(doneRow.classList.contains('map-legend__item--off')).toBe(false);
+    // Clicking a visible state hides it.
+    const backlogRow = [...host.querySelectorAll('.map-legend__item')].find((b) =>
+      b.textContent?.toLowerCase().includes('backlog'),
+    ) as HTMLButtonElement | undefined;
+    if (backlogRow) {
+      backlogRow.dispatchEvent(new Event('click', { bubbles: true }));
+      await nextTick();
+      expect(backlogRow.classList.contains('map-legend__item--off')).toBe(true);
+    }
     app.unmount();
     host.remove();
   });

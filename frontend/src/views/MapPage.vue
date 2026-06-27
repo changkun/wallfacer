@@ -26,11 +26,10 @@ const mapSearch = ref('');
 const selectedId = ref<string | null>(null);
 const canvas = ref<InstanceType<typeof GraphCanvas> | null>(null);
 
-// Status filter (top-right). done + cancelled are noise on a pipeline overview,
-// so they are hidden by default; the dropdown lets the user toggle any state.
+// State filter. done + cancelled are noise on a pipeline overview, so they are
+// hidden by default; the legend rows (right panel) act as the toggles.
 const hiddenStatuses = ref<Set<string>>(new Set(['done', 'cancelled']));
-const statusMenuOpen = ref(false);
-// All statuses present in the current graph, for the filter menu.
+// All statuses present in the current graph, for the legend/filter.
 const allStatuses = computed(() =>
   [...new Set(graph.value.nodes.map((n) => n.status))].sort(),
 );
@@ -205,23 +204,6 @@ watch(showArchived, () => void loadGraph());
             placeholder="Filter nodes…"
             aria-label="Filter graph nodes"
           />
-          <div class="map-statefilter" @pointerleave="statusMenuOpen = false">
-            <button
-              type="button"
-              class="depgraph-mode__reset-btn"
-              :aria-expanded="statusMenuOpen"
-              title="Show or hide nodes by state"
-              @click="statusMenuOpen = !statusMenuOpen"
-            >
-              States{{ hiddenStatuses.size ? ` (${hiddenStatuses.size} hidden)` : '' }} ▾
-            </button>
-            <div v-if="statusMenuOpen" class="map-statefilter__menu">
-              <label v-for="s in allStatuses" :key="s" class="map-statefilter__item">
-                <input type="checkbox" :checked="!hiddenStatuses.has(s)" @change="toggleStatus(s)" />
-                <span class="map-statefilter__label">{{ s }}</span>
-              </label>
-            </div>
-          </div>
           <label class="depgraph-mode__option" title="Include archived specs and tasks">
             <input type="checkbox" v-model="showArchived" />
             Show archived
@@ -312,10 +294,19 @@ watch(showArchived, () => void loadGraph());
           </section>
           <section v-if="allStatuses.length" class="depgraph-inspector__section">
             <h3 class="depgraph-inspector__heading">Legend</h3>
+            <p class="depgraph-inspector__muted map-legend__hint">Click a state to show/hide it.</p>
             <ul class="map-legend">
-              <li v-for="s in allStatuses" :key="s" class="map-legend__item">
-                <span class="map-legend__dot" :style="{ background: stateColor(s) }"></span>
-                <span class="map-legend__label">{{ s }}</span>
+              <li v-for="s in allStatuses" :key="s">
+                <button
+                  type="button"
+                  class="map-legend__item"
+                  :class="{ 'map-legend__item--off': hiddenStatuses.has(s) }"
+                  :aria-pressed="!hiddenStatuses.has(s)"
+                  @click="toggleStatus(s)"
+                >
+                  <span class="map-legend__dot" :style="{ background: stateColor(s) }"></span>
+                  <span class="map-legend__label">{{ s }}</span>
+                </button>
               </li>
             </ul>
           </section>
@@ -335,61 +326,51 @@ watch(showArchived, () => void loadGraph());
 </template>
 
 <style scoped>
-.map-statefilter {
-  position: relative;
+.map-legend__hint {
+  margin: 0 0 6px;
+  font-size: var(--fs-10, 11px);
 }
-.map-statefilter__menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 20;
-  min-width: 160px;
-  padding: 6px;
-  background: var(--bg-card, #fff);
-  border: 1px solid var(--rule-2, #c7c0af);
-  border-radius: var(--r-md, 6px);
-  box-shadow: var(--sh-3, 0 8px 24px rgba(0, 0, 0, 0.16));
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.map-statefilter__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: var(--r-sm, 4px);
-  font-size: var(--fs-md, 13px);
-  color: var(--ink-2, #4c4842);
-  cursor: pointer;
-}
-.map-statefilter__item:hover {
-  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
-}
-.map-statefilter__label {
-  text-transform: capitalize;
-}
-
 .map-legend {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px 10px;
+  gap: 2px 6px;
 }
 .map-legend__item {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  background: none;
+  border-radius: var(--r-sm, 4px);
   font-size: var(--fs-10, 11px);
   color: var(--ink-2, #4c4842);
+  cursor: pointer;
+  text-align: left;
+}
+.map-legend__item:hover {
+  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
+}
+/* A filtered-out state reads as muted + struck through. */
+.map-legend__item--off {
+  opacity: 0.45;
+}
+.map-legend__item--off .map-legend__label {
+  text-decoration: line-through;
 }
 .map-legend__dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   flex: 0 0 auto;
+}
+.map-legend__item--off .map-legend__dot {
+  outline: 1px solid var(--rule-2, #c7c0af);
+  background: transparent !important;
 }
 .map-legend__label {
   text-transform: capitalize;
