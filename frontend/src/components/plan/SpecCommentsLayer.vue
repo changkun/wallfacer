@@ -678,7 +678,10 @@ defineExpose({ openCount, showResolved, available });
         <div class="sc-triage-list">
           <div v-for="t in triage" :key="t.id" class="sc-triage-item">
             <div class="sc-triage-meta">
-              <span class="sc-triage-status" :class="'sc-triage-status--' + t.status">{{ t.status }}</span>
+              <!-- Every triage item is here because its anchor was lost; the badge
+                   names that reason, not the thread's lifecycle status (which is
+                   typically still "active"). -->
+              <span class="sc-triage-status sc-triage-status--orphaned">anchor lost</span>
               <span class="sc-triage-spec">{{ t.spec_path }}</span>
             </div>
             <blockquote v-if="t.anchor.exact_text" class="sc-quote">{{ t.anchor.exact_text }}</blockquote>

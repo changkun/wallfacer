@@ -120,13 +120,17 @@ describe('activeCount', () => {
 });
 
 describe('triageThreads', () => {
-  it('selects orphaned and outdated across specs', () => {
+  it('lists anchor-lost threads that no one has cleared, across specs', () => {
     const all = [
-      thread({ id: 'act', status: 'active' }),
-      thread({ id: 'orph', status: 'orphaned', orphaned: true, spec_path: 'x.md' }),
-      thread({ id: 'out', status: 'outdated', spec_path: 'y.md' }),
+      thread({ id: 'act', status: 'active' }), // anchored, fine
+      thread({ id: 'orph', status: 'active', orphaned: true, spec_path: 'x.md' }), // lost → triage
+      // A resolved thread whose anchor is also lost must NOT appear: resolving
+      // it is how a human dismisses it from triage (the reported bug).
+      thread({ id: 'resolved-orph', status: 'resolved', resolved: true, orphaned: true, spec_path: 'y.md' }),
+      // Outdated is terminal/archived — filed away, never in triage.
+      thread({ id: 'out', status: 'outdated', orphaned: true, spec_path: 'z.md' }),
     ];
-    expect(triageThreads(all).map((t) => t.id).sort()).toEqual(['orph', 'out']);
+    expect(triageThreads(all).map((t) => t.id).sort()).toEqual(['orph']);
   });
 });
 
@@ -177,6 +181,27 @@ describe('outOfSyncCount', () => {
 
   it('is zero when every thread is in sync', () => {
     expect(outOfSyncCount([thread({ id: '1' }), thread({ id: '2' })])).toBe(0);
+  });
+
+  it('excludes cleared threads even when their anchor is lost', () => {
+    const all = [
+      thread({ id: 'lost', status: 'active', orphaned: true }),
+      thread({ id: 'resolved-lost', status: 'resolved', resolved: true, orphaned: true }),
+      thread({ id: 'outdated-lost', status: 'outdated', orphaned: true }),
+    ];
+    expect(outOfSyncCount(all)).toBe(1);
+  });
+
+  it('counts file-drifted threads in the banner but not in triage', () => {
+    // A thread whose file changed but whose anchor still resolves renders inline
+    // fine; it warns the clone has drifted (banner) but is not actionable in
+    // triage. This locks the intended banner >= triage split (the "4 vs 2").
+    const all = [
+      thread({ id: 'lost', status: 'active', orphaned: true }), // both
+      thread({ id: 'drift', status: 'active', orphaned: false, outdated: true }), // banner only
+    ];
+    expect(triageThreads(all).map((t) => t.id)).toEqual(['lost']);
+    expect(outOfSyncCount(all)).toBe(2);
   });
 });
 
