@@ -218,6 +218,16 @@ func (s *Store) UpdateTaskAgon(_ context.Context, id uuid.UUID, unresolved int, 
 	})
 }
 
+// UpdateTaskCriteria sets a task's free-form acceptance Criteria. Callers gate
+// this to backlog status (same constraint as editing the prompt); the store
+// records it unconditionally.
+func (s *Store) UpdateTaskCriteria(_ context.Context, id uuid.UUID, criteria string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.Criteria = criteria
+		return nil
+	})
+}
+
 // ClearAgonResult clears a task's agon verdict (AgonUnresolved back to nil),
 // so the task is eligible for re-verification. Called when a task is resumed
 // for more work: the prior verdict was computed against an earlier diff and is

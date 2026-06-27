@@ -263,10 +263,10 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion     int                            `json:"schema_version"`
-	ID                uuid.UUID                      `json:"id"`
-	Title             string                         `json:"title,omitempty"`
-	Prompt            string                         `json:"prompt"`
+	SchemaVersion int       `json:"schema_version"`
+	ID            uuid.UUID `json:"id"`
+	Title         string    `json:"title,omitempty"`
+	Prompt        string    `json:"prompt"`
 	// Criteria is user-defined free-form acceptance criteria for the test
 	// verification agent (and agon critics). When non-empty it renders into the
 	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
