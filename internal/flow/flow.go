@@ -34,6 +34,15 @@ type Flow struct {
 	// User-authored flows (future) set this to false so the UI
 	// can mark them differently.
 	Builtin bool
+
+	// Agentic marks a flow that executes through the in-process topos
+	// agent-graph runtime (internal/agentgraph) instead of the legacy
+	// flow engine. The runner dispatch builds a topos.Region from the
+	// flow's steps + the agents registry, runs it, and persists the
+	// resulting lineage on the task. Default false keeps every existing
+	// flow on its current execution path. See
+	// specs/local/topos-runtime-integration.md (M2).
+	Agentic bool
 }
 
 // Step is a single node in a Flow. AgentSlug references a role in

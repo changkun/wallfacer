@@ -271,16 +271,22 @@ type Task struct {
 	// verification agent (and agon critics). When non-empty it renders into the
 	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
 	// a hard gate. omitempty keeps existing task.json files deserializing clean.
-	Criteria          string                         `json:"criteria,omitempty"`
-	PromptHistory     []string                       `json:"prompt_history,omitempty"`
-	RetryHistory      []RetryRecord                  `json:"retry_history,omitempty"`
-	RefineSessions    []RefinementSession            `json:"refine_sessions,omitempty"`
-	CurrentRefinement *RefinementJob                 `json:"current_refinement,omitempty"`
-	Status            TaskStatus                     `json:"status"`
-	Archived          bool                           `json:"archived,omitempty"`
-	SessionID         *string                        `json:"session_id"`
-	FreshStart        bool                           `json:"fresh_start,omitempty"`
-	Result            *string                        `json:"result"`
+	Criteria          string              `json:"criteria,omitempty"`
+	PromptHistory     []string            `json:"prompt_history,omitempty"`
+	RetryHistory      []RetryRecord       `json:"retry_history,omitempty"`
+	RefineSessions    []RefinementSession `json:"refine_sessions,omitempty"`
+	CurrentRefinement *RefinementJob      `json:"current_refinement,omitempty"`
+	Status            TaskStatus          `json:"status"`
+	Archived          bool                `json:"archived,omitempty"`
+	SessionID         *string             `json:"session_id"`
+	FreshStart        bool                `json:"fresh_start,omitempty"`
+	Result            *string             `json:"result"`
+	// Lineage holds the JSON-marshalled topos.Lineage (nodes + edges)
+	// produced by an agentic-flow run through internal/agentgraph. Nil
+	// for every non-agentic task. Persisted as an opaque string so the
+	// store does not depend on the topos package; the graph endpoint
+	// (M5) unmarshals it. See specs/local/topos-runtime-integration.md.
+	Lineage           *string                        `json:"lineage,omitempty"`
 	StopReason        *string                        `json:"stop_reason"`
 	Turns             int                            `json:"turns"`
 	Timeout           int                            `json:"timeout"`
