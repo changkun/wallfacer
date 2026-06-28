@@ -88,6 +88,38 @@ const agents = computed<Agent[]>(() =>
   })),
 );
 
+// deterministicStages groups steps into ordered stages by the transitive closure
+// of run_in_parallel_with: agents that run together (no ordering between them)
+// land in one stage. This is the grouping the flow engine executes, so the
+// drawing matches the run -- the parallel trio renders as one stage, not a line.
+function deterministicStages(): Agent[][] {
+  const steps = props.flow?.steps ?? [];
+  const idx = new Map(steps.map((s, i) => [s.agent_slug, i]));
+  const assigned = steps.map(() => -1);
+  const stages: Agent[][] = [];
+  steps.forEach((_, i) => {
+    if (assigned[i] !== -1) return;
+    const gid = stages.length;
+    const queue = [i];
+    assigned[i] = gid;
+    const members = [i];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const p of steps[cur].run_in_parallel_with ?? []) {
+        const j = idx.get(p);
+        if (j !== undefined && assigned[j] === -1) {
+          assigned[j] = gid;
+          members.push(j);
+          queue.push(j);
+        }
+      }
+    }
+    members.sort((a, b) => a - b);
+    stages.push(members.map((m) => ({ slug: steps[m].agent_slug, name: steps[m].agent_name || steps[m].agent_slug, lead: false })));
+  });
+  return stages;
+}
+
 type NodeKind = 'task' | 'agent' | 'outcome';
 interface LNode {
   key: string;
@@ -130,22 +162,45 @@ const layout = computed<Layout>(() => {
   const edges: LEdge[] = [];
   if (ags.length === 0) return { nodes, edges, vx: 0, vy: 0, width: 0, height: 0 };
 
-  // Fixed sequence: Task -> a0 -> a1 -> ... -> Outcome, one row, no free-form
-  // (the sequence IS the left-to-right order).
+  // Deterministic ("fixed sequence"): Task -> stages -> Outcome, where a stage is
+  // a set of agents that run together. Agents with no ordering between them (the
+  // implement commit-msg / title / oversight trio) share a stage and render as a
+  // parallel fan -- NOT a false linear chain. Edges mean "then / feeds".
   if (mode.value === 'sequence') {
-    const cols = ags.length + 2; // task + agents + outcome
+    const stages = deterministicStages();
+    const maxRows = Math.max(1, ...stages.map((s) => s.length));
+    const height = PAD * 2 + maxRows * ROW - (ROW - NODE_H);
+    const cols = stages.length + 2; // task + stages + outcome
     const width = PAD * 2 + cols * NODE_W + (cols - 1) * (COL - NODE_W);
-    const height = PAD * 2 + NODE_H;
-    const y = PAD;
-    nodes.push({ key: 'task', kind: 'task', slug: '', name: 'Task', lead: false, member: false, x: colX(0), y });
-    ags.forEach((a, i) =>
-      nodes.push({ key: `a:${a.slug}`, kind: 'agent', slug: a.slug, name: a.name, lead: a.lead, member: !a.lead, x: colX(i + 1), y }),
+    const rowY = (count: number, row: number): number => {
+      const block = count * ROW - (ROW - NODE_H);
+      return (height - block) / 2 + row * ROW;
+    };
+    const midY = (height - NODE_H) / 2;
+
+    const taskN: LNode = { key: 'task', kind: 'task', slug: '', name: 'Task', lead: false, member: false, x: colX(0), y: midY };
+    const stageNodes: LNode[][] = stages.map((stage, ci) =>
+      stage.map((a, ri) => ({
+        key: `a:${a.slug}`, kind: 'agent' as NodeKind, slug: a.slug, name: a.name,
+        lead: false, member: false, x: colX(ci + 1), y: rowY(stage.length, ri),
+      })),
     );
-    nodes.push({ key: 'outcome', kind: 'outcome', slug: '', name: 'Outcome', lead: false, member: false, x: colX(cols - 1), y });
-    for (let i = 0; i < nodes.length - 1; i++) {
-      const a = nodes[i];
-      const b = nodes[i + 1];
-      edges.push({ key: `e:${i}`, d: bezier(a.x + NODE_W, a.y + NODE_H / 2, b.x, b.y + NODE_H / 2), delegate: false, mesh: false });
+    const outN: LNode = { key: 'outcome', kind: 'outcome', slug: '', name: 'Outcome', lead: false, member: false, x: colX(cols - 1), y: midY };
+    nodes.push(taskN, ...stageNodes.flat(), outN);
+
+    // Task -> first stage; consecutive stages fully connected; last stage -> Outcome.
+    for (const n of stageNodes[0] ?? []) {
+      edges.push({ key: `e:task:${n.key}`, d: bezier(taskN.x + NODE_W, taskN.y + NODE_H / 2, n.x, n.y + NODE_H / 2), delegate: false, mesh: false });
+    }
+    for (let i = 0; i < stageNodes.length - 1; i++) {
+      for (const a of stageNodes[i]) {
+        for (const b of stageNodes[i + 1]) {
+          edges.push({ key: `e:${a.key}:${b.key}`, d: bezier(a.x + NODE_W, a.y + NODE_H / 2, b.x, b.y + NODE_H / 2), delegate: false, mesh: false });
+        }
+      }
+    }
+    for (const n of stageNodes[stageNodes.length - 1] ?? []) {
+      edges.push({ key: `e:out:${n.key}`, d: bezier(n.x + NODE_W, n.y + NODE_H / 2, outN.x, outN.y + NODE_H / 2), delegate: false, mesh: false });
     }
     return { nodes, edges, vx: 0, vy: 0, width, height };
   }
