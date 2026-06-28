@@ -273,7 +273,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 			h.SetAutopilot(false)
 		}
 	})
-	r.SetAutosubmitFunc(h.AutosubmitEnabled)
 
 	// Create and wire the agent-session runtime.
 	p := agentsession.New(agentsession.Config{
