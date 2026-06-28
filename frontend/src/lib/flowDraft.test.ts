@@ -6,6 +6,8 @@ import {
   setParallel,
   clearParallel,
   parallelGroupSlugs,
+  stagesOf,
+  moveStage,
   draftToFlow,
   draftToPayload,
   suggestCloneSlug,
@@ -139,6 +141,47 @@ describe('flowDraft', () => {
     expect(d.steps[1].run_in_parallel_with).toEqual([]);
     // Ungrouping a non-parallel step is a no-op.
     expect(clearParallel(d, 'a')).toBe(false);
+  });
+
+  it('reorders whole stages, keeping parallel groups intact', () => {
+    const f: Flow = {
+      slug: 'f',
+      name: 'F',
+      builtin: false,
+      steps: [
+        { agent_slug: 'a' },
+        { agent_slug: 'b', run_in_parallel_with: ['c'] },
+        { agent_slug: 'c', run_in_parallel_with: ['b'] },
+        { agent_slug: 'd' },
+      ],
+    };
+    const d = buildDraftFromFlow(f, { clone: false });
+    // Stages: [a] [b,c] [d]. Move the b/c stage (via 'b') to the front (gap 0).
+    expect(moveStage(d, 'b', 0)).toBe(true);
+    expect(stagesOf(d).map((g) => g.map((s) => s.agent_slug))).toEqual([
+      ['b', 'c'],
+      ['a'],
+      ['d'],
+    ]);
+    // The parallel pair stays mutual after the move.
+    expect(d.steps[0].run_in_parallel_with).toEqual(['c']);
+    expect(d.steps[1].run_in_parallel_with).toEqual(['b']);
+
+    // Dropping a stage adjacent to its own position is a no-op.
+    expect(moveStage(d, 'a', 1)).toBe(false); // 'a' is stage 1; gaps 1 and 2 are no-ops
+    expect(moveStage(d, 'a', 2)).toBe(false);
+  });
+
+  it('moves a stage to the end', () => {
+    const f: Flow = {
+      slug: 'f',
+      name: 'F',
+      builtin: false,
+      steps: [{ agent_slug: 'a' }, { agent_slug: 'b' }, { agent_slug: 'c' }],
+    };
+    const d = buildDraftFromFlow(f, { clone: false });
+    expect(moveStage(d, 'a', 3)).toBe(true); // gap 3 = after the last stage
+    expect(d.steps.map((s) => s.agent_slug)).toEqual(['b', 'c', 'a']);
   });
 
   it('projects a draft into the Flow shape the canvas renders', () => {
