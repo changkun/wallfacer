@@ -1,6 +1,6 @@
 ---
 title: Unified Agent-Graph UI (merge Agents and Flows)
-status: stale
+status: drafted
 depends_on:
   - local/topos-runtime-integration.md
 affects:
@@ -68,10 +68,14 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
 
 ## Milestones (built additively, reviewed visually each step)
 
-- **M6.1: read-only scaffold.** A new route + view: palette (agent list) + canvas that
-  renders a selected flow as an agent-graph (nodes = steps' agents, edges = order),
-  read-only. Reuses existing agents/flows GETs. Proves the layout and rendering. No
-  edits, old pages untouched.
+- **M6.1: read-only scaffold. DONE** (`4528f636`, `b0032915`). New `/agent-graph`
+  route + `AgentGraphPage`: searchable agent palette + flow picker + `AgentGraphCanvas`
+  (a focused read-only SVG renderer, forked rather than reusing `GraphCanvas` which is
+  bound to the spec/task model). Renders nodes per step, order edges, parallel
+  siblings, a topology indicator. Additive (new nav entry; AgentsPage/FlowsPage/
+  GraphCanvas byte-identical). Also fixed `GET /api/flows` to serialize the M3 agentic
+  fields so the topology indicator reflects real flows. **Needs the author's visual
+  review before M6.2.**
 - **M6.2: graph editing.** Drag-from-palette to add a step, connect/reorder, mark
   parallel/optional, set agentic + topology + depth; persist to the flow YAML via the
   existing flow CRUD. Edit an agent node -> the agent editor (existing).
