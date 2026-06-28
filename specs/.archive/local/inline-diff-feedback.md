@@ -1,6 +1,6 @@
 ---
 title: Inline Diff Feedback
-status: complete
+status: archived
 depends_on: []
 affects:
   - frontend/src/lib/diff.ts
