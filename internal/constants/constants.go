@@ -103,6 +103,11 @@ const MaxRebaseRetries = 3
 // the auto-resume cycle is halted.
 const MaxTestFailRetries = 3
 
+// MaxAgonRetries is the maximum number of consecutive agon-feedback auto-resumes
+// before the cycle is halted. Lower than MaxTestFailRetries because each agon
+// cycle (proposer + multiple critic forks) is considerably more expensive.
+const MaxAgonRetries = 2
+
 // DefaultMaxConcurrentTasks is the default parallel task limit.
 const DefaultMaxConcurrentTasks = 5
 
