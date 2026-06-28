@@ -52,9 +52,6 @@ const DefaultWorktreeHealthInterval = 2 * time.Minute
 // DefaultWorktreeGCInterval is the interval between worktree garbage collection runs.
 const DefaultWorktreeGCInterval = 24 * time.Hour
 
-// DefaultIdeationInterval is the default interval between ideation brainstorm runs.
-const DefaultIdeationInterval = 60 * time.Minute
-
 // SSEKeepaliveInterval controls how often SSE streams send keepalive comments
 // to prevent proxy and OS-level TCP idle timeouts from silently closing the
 // connection. Tests can lower this for faster verification.
@@ -67,10 +64,6 @@ var WatcherSettleDelay = 1500 * time.Millisecond
 // RefinementRecentCompleteWindow is the grace window for clearing a refinement
 // job that has just finished, allowing async startup/failure races to settle.
 const RefinementRecentCompleteWindow = 500 * time.Millisecond
-
-// WorkspaceIdeationCommandTTL is the timeout for workspace-scanning shell
-// commands during ideation.
-const WorkspaceIdeationCommandTTL = 2 * time.Second
 
 // ---------------------------------------------------------------------------
 // Cache TTLs
@@ -176,28 +169,6 @@ const DefaultArchivedTasksPerPage = 20
 // DefaultTombstoneRetentionDays is the default number of days before
 // pruning soft-deleted tasks.
 const DefaultTombstoneRetentionDays = 7
-
-// ---------------------------------------------------------------------------
-// Ideation parameters
-// ---------------------------------------------------------------------------
-
-// MaxIdeationIdeas is the maximum number of ideas generated per ideation run.
-const MaxIdeationIdeas = 3
-
-// DefaultIdeationImpactScore is the default impact score threshold for ideation.
-const DefaultIdeationImpactScore = 60
-
-// MaxIdeationChurnSignals is the maximum number of churn signals collected.
-const MaxIdeationChurnSignals = 6
-
-// MaxIdeationTodoSignals is the maximum number of TODO signals collected.
-const MaxIdeationTodoSignals = 6
-
-// ChurnLookbackDays only includes commits newer than this many days.
-const ChurnLookbackDays = 90
-
-// MaxChurnCommits is the hard cap so very active repos don't scan unboundedly.
-const MaxChurnCommits = 200
 
 // ---------------------------------------------------------------------------
 // Task schema / pruning limits

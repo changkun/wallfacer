@@ -315,11 +315,11 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		Autopilot            *bool             `json:"autopilot"`
-		Autotest             *bool             `json:"autotest"`
-		Autosubmit           *bool             `json:"autosubmit"`
-		Autosync             *bool             `json:"autosync"`
-		Autopush             *bool             `json:"autopush"`
+		Autopilot        *bool             `json:"autopilot"`
+		Autotest         *bool             `json:"autotest"`
+		Autosubmit       *bool             `json:"autosubmit"`
+		Autosync         *bool             `json:"autosync"`
+		Autopush         *bool             `json:"autopush"`
 		Agon             *bool             `json:"agon"`
 		Ideation         *bool             `json:"ideation"`          // retired; accepted for old clients but ignored
 		IdeationInterval *int              `json:"ideation_interval"` // retired; accepted for old clients but ignored

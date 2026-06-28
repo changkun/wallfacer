@@ -64,15 +64,6 @@ var agentBindings = map[string]agentBinding{
 		SingleTurn:  true,
 		ParseResult: parseCommitMessageResult,
 	},
-	agents.IdeaAgent.Slug: {
-		Activity: store.SandboxActivityIdeaAgent,
-		// Ideation caller wraps the call in its own deadline derived
-		// from the task's Timeout field; no role-level timeout.
-		Timeout:     nil,
-		MountMode:   mountReadOnly,
-		SingleTurn:  true,
-		ParseResult: rawResultParse,
-	},
 	agents.Implementation.Slug: {
 		Activity: store.SandboxActivityImplementation,
 		Timeout: func(t *store.Task) time.Duration {
@@ -108,10 +99,6 @@ func bindingFor(slug string) (agentBinding, bool) {
 	b, ok := agentBindings[slug]
 	return b, ok
 }
-
-// rawResultParse hands the raw result string back unchanged. Used by
-// roles whose downstream caller does the role-specific parsing (ideation).
-func rawResultParse(o *agentOutput) (any, error) { return o.Result, nil }
 
 // passthroughParse hands the raw *agentOutput back to the caller.
 // Heavyweight roles use this because the turn loop consumes every

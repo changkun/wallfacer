@@ -48,7 +48,6 @@ const (
 	activityTitle          = store.SandboxActivityTitle
 	activityOversight      = store.SandboxActivityOversight
 	activityCommitMessage  = store.SandboxActivityCommitMessage
-	activityIdeaAgent      = store.SandboxActivityIdeaAgent
 )
 
 // buildContainerArgs constructs the full argument list for the container run command.
@@ -295,10 +294,6 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) harne
 	case activityCommitMessage:
 		if cfg.CommitMessageSandbox != "" {
 			return cfg.CommitMessageSandbox
-		}
-	case activityIdeaAgent:
-		if cfg.IdeaAgentSandbox != "" {
-			return cfg.IdeaAgentSandbox
 		}
 	}
 	return cfg.DefaultSandbox

@@ -174,17 +174,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 		t.Error("GenerateBoardManifest returned nil manifest")
 	}
 
-	if got := m.BuildIdeationPrompt(nil); got != "" {
-		t.Errorf("BuildIdeationPrompt = %q, want empty", got)
-	}
-
-	if got := m.IdeationCategories(); got != nil {
-		t.Errorf("IdeationCategories = %v, want nil", got)
-	}
-	if got := m.IdeationIgnorePatterns(); got != nil {
-		t.Errorf("IdeationIgnorePatterns = %v, want nil", got)
-	}
-
 	ok, msg := m.HostCodexAuthStatus(time.Now())
 	if ok {
 		t.Errorf("HostCodexAuthStatus ok = true, want false")

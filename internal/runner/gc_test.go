@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/store"
 )
 
 // ---------------------------------------------------------------------------
@@ -118,42 +117,4 @@ func TestPruneOrphanedWorktrees_MultipleOrphans(t *testing.T) {
 			t.Errorf("expected %s to be removed", dir)
 		}
 	}
-}
-
-// ---------------------------------------------------------------------------
-// BuildIdeationPrompt tests
-// ---------------------------------------------------------------------------
-
-// TestBuildIdeationPrompt_NoWorkspaces verifies BuildIdeationPrompt does not
-// panic with no workspaces configured and returns a string (possibly empty).
-func TestBuildIdeationPrompt_NoWorkspaces(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// Should not panic with no workspaces.
-	result := r.BuildIdeationPrompt(nil)
-	// Result can be empty or non-empty — just verify no panic.
-	_ = result
-}
-
-// TestBuildIdeationPrompt_WithTasks verifies that BuildIdeationPrompt runs
-// without panicking when existing tasks are provided.
-func TestBuildIdeationPrompt_WithTasks(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-
-	tasks := []store.Task{
-		{Prompt: "fix login bug"},
-		{Prompt: "add dark mode"},
-	}
-	result := r.BuildIdeationPrompt(tasks)
-	// Just verify it runs without panic.
-	_ = result
-}
-
-// TestBuildIdeationPrompt_WithWorkspace verifies that BuildIdeationPrompt
-// handles a configured workspace (even without git history) without panicking.
-func TestBuildIdeationPrompt_WithWorkspace(t *testing.T) {
-	repo := setupTestRepo(t)
-	_, r := setupTestRunner(t, []string{repo})
-
-	result := r.BuildIdeationPrompt(nil)
-	_ = result
 }

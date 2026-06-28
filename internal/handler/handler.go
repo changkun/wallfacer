@@ -239,17 +239,17 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		wsMgr = workspace.NewStatic(s, workspaces)
 	}
 	h := &Handler{
-		store:                s,
-		workspace:            wsMgr,
-		runner:               r,
-		configDir:            configDir,
-		workspaces:           workspaces,
-		envFile:              r.EnvFile(),
-		diffCache:            newDiffCache(),
-		commitsBehindCache:   newCommitsBehindCache(constants.CommitsBehindCacheTTL),
-		fileIndex:            newFileIndex(),
-		startTime:            time.Now(),
-		reg:                  reg,
+		store:              s,
+		workspace:          wsMgr,
+		runner:             r,
+		configDir:          configDir,
+		workspaces:         workspaces,
+		envFile:            r.EnvFile(),
+		diffCache:          newDiffCache(),
+		commitsBehindCache: newCommitsBehindCache(constants.CommitsBehindCacheTTL),
+		fileIndex:          newFileIndex(),
+		startTime:          time.Now(),
+		reg:                reg,
 		sandboxTestPassed: map[harness.ID]bool{
 			harness.Claude: false,
 			harness.Codex:  false,
@@ -762,4 +762,3 @@ func (h *Handler) openWatcherBreaker(watcherName string, taskID *uuid.UUID, reas
 func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
 	return h.openWatcherBreaker(watcher, taskID, reason)
 }
-

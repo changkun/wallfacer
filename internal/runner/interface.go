@@ -78,12 +78,6 @@ type Interface interface {
 	// that do not have a task ID in scope, e.g. the plan commit pipeline.
 	MaybeAutoPushWorkspace(ctx context.Context, ws string)
 
-	// Ideation.
-	BuildIdeationPrompt(existingTasks []store.Task) string
-	CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error
-	IdeationCategories() []string
-	IdeationIgnorePatterns() []string
-
 	// Host Codex auth.
 	HostCodexAuthStatus(now time.Time) (bool, string)
 	CodexAuthPath() string

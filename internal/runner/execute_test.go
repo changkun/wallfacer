@@ -1660,8 +1660,8 @@ func TestSyncWorktrees_PreservesTestVerdictAfterCleanSync(t *testing.T) {
 // setupRunnerWithMockBackend creates a Store and Runner whose container calls
 // are routed through the provided MockSandboxBackend instead of a real
 // container runtime. The runner still needs a real git workspace for worktree
-// setup; pass a repo returned by setupTestRepo(t) (or nil for idea-agent-only
-// tasks that skip worktree setup).
+// setup; pass a repo returned by setupTestRepo(t) (or nil for tasks that skip
+// worktree setup).
 func setupRunnerWithMockBackend(t testing.TB, workspaces []string, mock *MockSandboxBackend) (*store.Store, *Runner) {
 	t.Helper()
 	s, r := setupRunnerWithCmd(t, workspaces, "true") // "true" for rm/kill calls, not used
@@ -1752,56 +1752,6 @@ func TestMockPauseTurnAutoContinue(t *testing.T) {
 	calls := filterTaskCalls(mock.RunArgsCalls())
 	if len(calls) != 2 {
 		t.Fatalf("expected exactly 2 task RunArgs calls, got %d", len(calls))
-	}
-}
-
-// TestMockIdeaAgentJSONParsing verifies that a valid JSON idea array returned
-// by the mock causes the idea-agent task to create child backlog tasks and
-// transition to waiting.
-func TestMockIdeaAgentJSONParsing(t *testing.T) {
-	ideas := []IdeateResult{
-		{Title: "Improve search", Prompt: "Add full-text search indexing to the tasks store."},
-		{Title: "Add metrics", Prompt: "Expose Prometheus metrics for task state transitions."},
-		{Title: "Refactor UI", Prompt: "Replace the inline styles with a Tailwind component library."},
-	}
-	ideasJSON := ideaOutput(ideas)
-
-	mock := &MockSandboxBackend{
-		responses: []ContainerResponse{
-			{Stdout: []byte(ideasJSON)},
-		},
-	}
-	s, r := setupRunnerWithMockBackend(t, nil, mock)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm via mock", Timeout: 5, Kind: store.TaskKindIdeaAgent})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-	r.Run(task.ID, "", "", false)
-
-	updated, _ := s.GetTask(ctx, task.ID)
-	// Idea-agent tasks now transition through waiting→committing→done
-	// immediately since brainstorm tasks produce no code changes.
-	if updated.Status != store.TaskStatusDone {
-		t.Fatalf("expected status=done after idea-agent run, got %q", updated.Status)
-	}
-
-	allTasks, _ := s.ListTasks(ctx, true)
-	var childTasks []store.Task
-	for _, tsk := range allTasks {
-		if tsk.ID == task.ID {
-			continue
-		}
-		if tsk.HasTag("idea-agent") {
-			childTasks = append(childTasks, tsk)
-		}
-	}
-	if len(childTasks) != len(ideas) {
-		t.Fatalf("expected %d child tasks, got %d", len(ideas), len(childTasks))
 	}
 }
 
