@@ -6,7 +6,7 @@ export const ACTION_LABELS: Record<GraphAction, string> = {
   undispatch: 'Undispatch',
   validate: 'Validate',
   'force-complete': 'Force complete',
-  unstale: 'Un-stale',
+  unstale: 'Reopen as Draft',
   unarchive: 'Unarchive',
   start: 'Start',
 };
