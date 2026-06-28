@@ -1,6 +1,6 @@
 ---
 title: Agent Resource Governance (Priority + Global Budget + Tunable Verification Depth)
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/executor/host.go
@@ -198,6 +198,35 @@ admission integration. Test: with budget N, at most N agent processes run
 concurrently across mixed task/test/agon load; release on exit re-opens a slot;
 `0` = unlimited; no nested-launch deadlock.
 
+## Outcome (2026-06-28)
+
+All four phases shipped (directly implemented, not dispatched).
+
+- **Phase 1** — agon defaults dropped to the floor (1 fork / 3 rounds);
+  `TestAgonTuning_MinimalDefaultsAndOverride` guards the floor + the dial.
+- **Phase 2** (load-bearing) — `HostBackend` launches every agent in its own
+  process group (`Setpgid`) and throttles it: macOS `PRIO_DARWIN_BG` (CPU+I/O,
+  inherited by tool children), Linux `PRIO_PGRP` nice, no-op elsewhere; teardown
+  and ctx-cancel kill the group, not just the leader. Split across
+  `host_proc_{unix,windows}.go` and `host_priority_{darwin,linux,other}.go`.
+  Throttle on by default (nice 10). Test proves group-kill reaps children and
+  the nice lands on the leader.
+- **Phase 4** — global budget: a counting semaphore in `HostBackend`
+  (`WALLFACER_MAX_AGENTS`), acquired in `Launch` outside any handler lock, freed
+  on `Wait`. Default 0 = unlimited (OQ-1 resolved: opt-in, no silent throughput
+  cap). Test covers cap / release / double-release / unlimited.
+- **Phase 3** — all knobs (agon forks/rounds/cost-cap, `agent_nice`,
+  `max_agents`) surfaced through GET/PUT `/api/env` and the Execution settings
+  tab. Agon dials apply live (`agonTuning` re-reads); `agent_nice` / `max_agents`
+  apply on restart (read at backend construction), labelled as such in the UI.
+  Backend round-trip test + frontend `vue-tsc` green.
+
+`go build ./...`, the executor/handler/envconfig suites, and golangci-lint
+(darwin/linux/windows variants) pass. **OQ-3 is the one open empirical check**:
+whether `PRIO_DARWIN_BG` on a child pid is permitted on `Darwin 25.x` or hits
+`EPERM` (auto-falls back to nice). Confirm on the reporter's machine; if it
+`EPERM`s, add a self-backgrounding harness flag.
+
 ## Non-Goals
 
 - Hard CPU/memory *caps* per agent. macOS has no cgroup-style per-process CPU cap;
@@ -213,9 +242,11 @@ concurrently across mixed task/test/agon load; release on exit re-opens a slot;
 
 ## Open Questions
 
-- **OQ-1 — global budget default.** Fixed small constant vs CPU-derived
-  (`max(2, NumCPU/2)`)? CPU-derived adapts to the machine but is less
-  predictable. Lean CPU-derived; confirm before Phase 4.
+- **OQ-1 — global budget default. RESOLVED: unlimited (opt-in).** Shipped with
+  default 0 = unlimited rather than a CPU-derived cap, so behavior is unchanged
+  until a user sets a budget. The Phase 2 throttle already addresses the
+  responsiveness symptom; a default cap would silently change throughput. Users
+  dial a budget in settings when they want a hard ceiling.
 - **OQ-2 — agon rounds floor. RESOLVED: 3.** Agon alternates by round parity
   (odd = critic, even = proposer rebuttal), so 3 rounds is the minimum full cycle
   (attack → rebut → re-assess). 2 would never let the critic see the rebuttal, so
