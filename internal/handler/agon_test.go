@@ -349,6 +349,58 @@ func TestRunAgon_EmitsTimelineEvents(t *testing.T) {
 	}
 }
 
+func TestAgonSupersedesTest_Gate(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	sid := "sess-1"
+	withSession := &store.Task{SessionID: &sid}
+	noSession := &store.Task{}
+
+	// Agon off: never supersedes.
+	if h.agonSupersedesTest(withSession) {
+		t.Error("agon off should not supersede the test agent")
+	}
+	// Agon on + session: supersedes.
+	h.SetAgon(true)
+	if !h.agonSupersedesTest(withSession) {
+		t.Error("agon on + session should supersede the test agent")
+	}
+	// Agon on, no session: falls back to the test agent.
+	if h.agonSupersedesTest(noSession) {
+		t.Error("a non-session task should fall back to the test agent")
+	}
+}
+
+// TestTryAutoPromote_ResumesOnAgonFeedback proves the autopilot picks up a
+// waiting task with pending agon feedback and resumes it (the feedback loop's
+// auto-mode driver), clearing the feedback on resume.
+func TestTryAutoPromote_ResumesOnAgonFeedback(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.SetAutopilot(true)
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+	if err := s.SetAgonFeedback(ctx, task.ID, "fix: nil deref in foo()"); err != nil {
+		t.Fatalf("SetAgonFeedback: %v", err)
+	}
+
+	h.tryAutoPromote(ctx)
+
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusInProgress {
+		t.Errorf("status = %s, want in_progress (resumed)", got.Status)
+	}
+	if got.PendingAgonFeedback != "" {
+		t.Errorf("pending agon feedback should be cleared on resume, got %q", got.PendingAgonFeedback)
+	}
+}
+
 // TestRunAgon_FeedbackLoop proves unresolved attacks become pending feedback
 // (capped), and a clean verdict resets the cycle.
 func TestRunAgon_FeedbackLoop(t *testing.T) {
