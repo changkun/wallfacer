@@ -1,17 +1,17 @@
 ---
 title: Excalidraw Whiteboard
-status: stale
+status: drafted
 depends_on: []
 affects:
   - frontend/src/views/
   - frontend/src/router.ts
   - frontend/src/components/Sidebar.vue
+  - frontend/package.json
   - internal/handler/
   - internal/apicontract/routes.go
-  - internal/workspace/
 effort: medium
 created: 2026-04-03
-updated: 2026-06-26
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---
@@ -47,19 +47,20 @@ earlier "is the React dependency worth it" question.
 ## Current State
 
 The frontend is a single Vue 3 SPA under `frontend/src/`, built with Vite and
-embedded into the binary via `go:embed` (`internal/webserver/spa/embed.go`,
-`//go:embed all:dist`). The vanilla `ui/` tree (HTML partials, `ui/js/`,
-`ui/css/`) has been deleted; there is no `spec-mode.js` mode registry and no
-`localStorage["wallfacer-mode"]` toggle anymore.
+embedded into the binary via `go:embed` (`main.go`, `//go:embed
+all:frontend/dist`). There is no separate `internal/webserver/spa/` package and
+no legacy `ui/` mode registry.
 
 Top-level views are vue-router routes registered in `frontend/src/router.ts`.
-In local mode the peer views are board (`/`), plan (`/plan`), agents
-(`/agents`), flows (`/flows`), routines (`/routines`), map (`/map`),
-analytics (`/analytics`), docs (`/docs`), and settings (`/settings`). Each page
-is a lazy-imported SFC under `frontend/src/views/` (for example
-`MapPage.vue`, `PlanPage.vue`). The left rail in
+In local mode the peer views are board (`/`), chat (`/chat`), plan (`/plan`),
+agents (`/agents`), workflows (`/workflows`, with `/flows` as a redirect),
+routines (`/routines`), mission control (`/mission`, with `/map` as a
+redirect), analytics (`/analytics`), docs (`/docs`), and settings
+(`/settings`). Each page is a lazy-imported SFC under `frontend/src/views/`
+(for example `MapPage.vue`, `PlanPage.vue`). The left rail in
 `frontend/src/components/Sidebar.vue` drives navigation through `to:` items
-grouped under "Workspace" and "Inspect", each with an inline SVG icon.
+grouped under "Workspace", "Inspect", and a bottom group (docs, settings),
+each with an inline SVG icon.
 
 Theme lives in the `prefs` store (`frontend/src/stores/prefs.ts`), which writes
 `data-theme="light|dark"` on `<html>` and persists to
@@ -76,9 +77,11 @@ group exposes this directory directly: `workspace.Snapshot.ScopedDataDir`
 (`internal/workspace/manager.go`) is exactly
 `~/.wallfacer/data/<workspace-key>/`. Task data is stored per-task via the
 filesystem store backend (`internal/store/backend_fs.go`), but there is no
-existing pattern for workspace-level (non-task) blob storage; workspace-scoped
-files such as the merged `AGENTS.md` are read and written directly through
-handler helpers (see `internal/handler/instructions.go`).
+existing pattern for workspace-level (non-task) blob storage, and no handler
+currently reads `ScopedDataDir`; the merged `AGENTS.md` instructions are
+surfaced through `internal/handler/config.go` (which keys workspace state via
+`prompts.InstructionsKey()`), and config/template blobs are written under
+`h.configDir` rather than the workspace-scoped data dir.
 
 ## Architecture
 
@@ -151,9 +154,10 @@ root is torn down in `onBeforeUnmount` so leaving the route releases it.
 - `internal/handler/whiteboard.go` - HTTP handlers for whiteboard load/save.
 
 **Modifications:**
-- `internal/apicontract/routes.go` - register the whiteboard routes (the
-  `Name` field maps to the `Handler` method of the same name; see the
-  `/api/instructions` block for the pattern).
+- `internal/apicontract/routes.go` - register the whiteboard routes. Each entry
+  is `{ Method, Pattern, Name }`, where `Name` maps to the `Handler` method of
+  the same name; mirror the `/api/config` (`GetConfig`/`UpdateConfig`) or
+  `/api/env` (`GetEnvConfig`/`UpdateEnvConfig`) GET/PUT block.
 
 The whiteboard scene is stored as a single JSON file per workspace. This is
 workspace-level data (not task-level), so it lives directly in the active
@@ -161,11 +165,14 @@ group's scoped data directory rather than under a task UUID subdirectory.
 
 **Storage path:** `<workspace.Snapshot.ScopedDataDir>/whiteboard.json`, i.e.
 `~/.wallfacer/data/<workspace-key>/whiteboard.json`. The handler resolves the
-directory through the workspace snapshot, the same way
-`currentInstructionsPath()` resolves the AGENTS.md path; add a small
-`currentWhiteboardPath()` helper alongside it in
-`internal/handler/handler.go` that joins `ScopedDataDir` with
-`whiteboard.json` (returning `""` when no workspace is configured).
+directory through the active workspace snapshot, which is mirrored onto the
+handler by `applySnapshot` (`internal/handler/handler.go`). No existing handler
+reads `ScopedDataDir` yet, so this introduces that usage: add a small
+`currentWhiteboardPath()` helper in `internal/handler/handler.go` that joins the
+snapshot's `ScopedDataDir` with `whiteboard.json` (returning `""` when no
+workspace is configured, i.e. an empty `ScopedDataDir`). For the read/write
+mechanics, the closest analog is `templates.go`'s private `templatesPath()`
+helper plus its `atomicfile` write.
 
 The file contains the raw Excalidraw scene JSON (elements array, app state,
 files for embedded images). Excalidraw scenes are typically 10KB-1MB depending
@@ -183,8 +190,8 @@ Excalidraw and its React dependencies are added to `frontend/package.json` and
 installed with bun, then bundled by Vite into a lazily-loaded route chunk. No
 runtime CDN, no hand-maintained `ui/vendor/` UMD copies: the build step Vite
 already runs handles tree-shaking and chunk splitting, and the resulting
-`dist/` is embedded via `go:embed all:dist`
-(`internal/webserver/spa/embed.go`). Keep the Excalidraw import dynamic so the
+`frontend/dist/` is embedded via `//go:embed all:frontend/dist` (`main.go`).
+Keep the Excalidraw import dynamic so the
 React + Excalidraw chunk (~1.5MB gzipped) is fetched only when the whiteboard
 route is opened.
 
@@ -194,14 +201,14 @@ route is opened.
 
 - `GET /api/whiteboard` - load the current workspace's whiteboard scene JSON.
   Returns `200` with the scene, or `200` with an empty body / `204` when no
-  whiteboard exists yet (mirror the empty-content convention
-  `GetInstructions` uses for a missing file).
+  whiteboard file exists yet.
 - `PUT /api/whiteboard` - save the whiteboard scene JSON. The request body is
   the raw Excalidraw scene. Returns `200` (`{"status":"ok"}`) on success.
 
 Both routes are scoped to the active workspace via the workspace manager
-snapshot, following the same pattern as `GET/PUT /api/instructions`. When no
-workspace is configured, return `503` as the instructions handlers do.
+snapshot, following the same shape as the `GET/PUT /api/config` and
+`GET/PUT /api/env` handlers. When no workspace is configured, return `503`
+(`http.StatusServiceUnavailable`) as `config.go` and the agents handlers do.
 
 ## Data Flow
 
@@ -222,9 +229,9 @@ workspace is configured, return `503` as the instructions handlers do.
 - Unit test `handler/whiteboard.go`: GET returns the empty convention when no
   file exists, PUT saves and a subsequent GET retrieves the same bytes, no
   workspace configured returns `503`, two distinct workspace keys stay
-  isolated. Follow the pattern in `handler/instructions_test.go` (the closest
-  workspace-scoped file analog) and `handler/explorer_test.go` (which already
-  exercises `atomicfile`-backed writes through a temp-dir handler).
+  isolated. Follow `handler/explorer_test.go` and `handler/templates_test.go`
+  (which exercise `atomicfile`-backed writes through a temp-dir handler) and
+  `handler/config_test.go` for the no-workspace `503` case.
 
 **Frontend:**
 - Vitest unit test for `WhiteboardPage.vue`: verify the GET-on-mount call, the
