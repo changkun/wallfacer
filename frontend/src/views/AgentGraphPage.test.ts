@@ -22,7 +22,13 @@ beforeEach(() => {
     const url = typeof input === 'string' ? input : input.toString();
     let body: unknown = null;
     if (url.includes('/api/agents')) body = agents;
-    else if (url.includes('/api/flows')) body = flows;
+    else {
+      // GET /api/flows/<slug> returns a single flow (the detail route the editor
+      // fetches before cloning); GET /api/flows returns the list.
+      const m = url.match(/\/api\/flows\/([^/?]+)/);
+      if (m) body = flows.find((f) => f.slug === decodeURIComponent(m[1])) ?? null;
+      else if (url.includes('/api/flows')) body = flows;
+    }
     return new Response(JSON.stringify(body ?? []), { status: 200 });
   }) as unknown as typeof globalThis.fetch;
 });
@@ -79,6 +85,40 @@ describe('AgentGraphPage', () => {
 
     // Topology indicator reflects the agentic + dynamic + mesh flow.
     expect(text.toLowerCase()).toContain('mesh');
+
+    app.unmount();
+    host.remove();
+  });
+
+  it('clones a built-in into an editable draft and offers a save action', async () => {
+    agents = [
+      { slug: 'impl', title: 'Implementation', builtin: true },
+      { slug: 'test', title: 'Testing', builtin: true },
+    ];
+    flows = [
+      {
+        slug: 'implement',
+        name: 'Implement',
+        builtin: true,
+        steps: [{ agent_slug: 'impl', agent_name: 'Implementation' }],
+      },
+    ];
+
+    const { app, host } = await mount();
+    // Built-in is read-only: the action reads "Clone & edit".
+    const editBtn = host.querySelector('.ag-detail__edit') as HTMLButtonElement;
+    expect(editBtn).toBeTruthy();
+    expect(editBtn.textContent).toContain('Clone & edit');
+
+    editBtn.click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // The editor toolbar appears with a save action and a clone-of hint.
+    expect(host.querySelector('.ag-edit')).toBeTruthy();
+    expect(host.querySelector('.ag-edit__btn--save')).toBeTruthy();
+    expect((host.textContent ?? '').toLowerCase()).toContain('clone of implement');
+    // Palette cards become draggable in edit mode.
+    expect((host.querySelector('.ag-card') as HTMLElement).getAttribute('draggable')).toBe('true');
 
     app.unmount();
     host.remove();
