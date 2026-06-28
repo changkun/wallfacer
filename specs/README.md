@@ -20,23 +20,34 @@ Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Planning UX                   ✅ Chat-First Mode
   ✅ Planning Chat Threads         ✅ Spec State Control Plane
 
-Local Product - 11 shipped, rest pending
+Local Product - 21 shipped, rest pending (※ = stale, needs refresh)
   ⊘ Desktop App (code removed)     ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ✅ Routine Tasks
   ✅ Agents & Flows                ✅ Refinement Into Plan
   ✅ Vue Frontend Migration        ✅ Rebrand Module Path
-  ✅ Backend Redundancy Cleanup
-  ○ Task Prompt Attachments        ✅ Editor Tabs
-  ○ Diff Review Comments           ○ Test Criteria
-  ○ Visual Verification            ○ Scoped Command Registry
-  ○ Host Path References           ○ Live Serve
-  ○ Free-Form Specs
-  ○ Terminal UI (TUI mode)         ✅ Excalidraw Whiteboard
-  ○ Dockable Panel Workspace       ○ Workflows Graph UX
-  ✅ Map Mission Control
+  ✅ Backend Redundancy Cleanup    ✅ Editor Tabs
+  ✅ Diff Review Comments          ✅ Excalidraw Whiteboard
+  ✅ Map Mission Control           ✅ Mission Control
+  ✅ Free-Form Specs               ✅ Archive Active Task Guard
+  ✅ Unified Transcript Render     ✅ Agent Resource Governance
+  ✅ Remove Idea-Agent Subsystem
+
+  Agent-graph convergence (the hot area; gated on a design decision)
+    ✅ Topos Runtime Integration M1-M5  ✅ Topos Live Agent Trace
+    ○ Agent Graph E2E Design (decision anchor — accept first)
+    ○ Unified Agent Graph UI (reframed by the decision)
+    ○ Workflows Graph UX (at risk — may be absorbed/retired)
+    ○ First-Run Onboarding (deferred behind the engine)
+
+  Remaining polish
+    ○ Test Criteria                ○ Visual Verification
+    ○ Dockable Panel Workspace     ※ Task Prompt Attachments
+    ※ Scoped Command Registry      ※ Host Path References
+    ※ Live Serve                   ※ Terminal UI (TUI mode)
+
   ⊘ superseded by the Vue/host rewrite: File Attachments,
-    File Panel Viewer, Inline Diff Feedback, Spatial Canvas
+    File Panel Viewer, Inline Diff Feedback (old), Spatial Canvas
 
 Shared Design - 4 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
@@ -60,10 +71,16 @@ Git Workflow - GitHub integration umbrella + two shippable features
   ○ Pull Request Creation (→ umbrella)  ○ Intent-Driven Commits (mostly shipped)
 ```
 
-The hot area is **Local Product** polish (the file/diff/attachment trio). Spec
-Coordination is complete (the state control plane shipped). Identity / platform
-convergence (auth-by-default and the latere-ui console shell) has shipped and is
-archived. Cloud Platform is drafted and demand-gated; Git Workflow is two
+The hot area is the **agent-graph convergence** in Local Product: the topos
+runtime is embedded (M1-M5 shipped, live agent traces shipped, the idea-agent
+subsystem removed), and the open question is the [agent-graph-e2e-design](local/agent-graph-e2e-design.md)
+decision that gates the unified UI and the workflows-graph redraw. The
+file/diff/attachment trio largely shipped (editor tabs, inline diff feedback,
+transcript rendering); task-prompt-attachments and four other leaves went stale
+in the June review and need a refresh before dispatch. Spec Coordination is
+complete (the state control plane shipped). Identity / platform convergence
+(auth-by-default and the latere-ui console shell) has shipped and is archived.
+Cloud Platform is drafted and demand-gated; Git Workflow is two
 independently-shippable features.
 
 ---
@@ -124,7 +141,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. |
+| [task-prompt-attachments.md](local/task-prompt-attachments.md) | Stale | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. Marked stale in the June review; needs a refresh pass against the Vue + host-executor surface before dispatch. |
 | [inline-file-panel.md](local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
 | [inline-diff-feedback.md](local/inline-diff-feedback.md) | **Complete** | Code-review-style inline comments anchored to Changes-tab diff lines, batched into the existing feedback channel, with the inline surface login-gated server-side like spec comments. Implemented directly (not dispatched); also fixed the `submitFeedback` `feedback`/`message` key bug. |
 | [map-mission-control.md](local/map-mission-control.md) | **Complete** | Rebuilt the orphaned read-only Map into an actionable mission-control surface: a server-side unified spec+task graph (`GET /api/graph` + pure `internal/graph` builder), a clean hand-rolled-SVG renderer (no new dep; RAF-batched drag, curved edges) replacing the ~4,583-line vendored depgraph, and inline node actions (dispatch a validated spec, start a ready task, jump to Board/Plan) with operational "ready to act" highlighting. |
@@ -134,11 +151,11 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [agon-adversarial-verification.md](local/agon-adversarial-verification.md) | Drafted | Post-run adversarial multi-agent verification via agon (`latere.ai/x/agon`). `HarnessCritic` adapts all five wallfacer harnesses as critics; `SessionProposer` uses `Task.SessionID` for the fork-session path; `tryAutoAdon` in the autopilot loop gated by a toggleable `agonEnabled` flag (off by default). Requires agon `specs/37-pkg-public-api.md` first. |
 | [visual-verification.md](local/visual-verification.md) | Drafted | Post-execution visual regression check for UI changes, built on the existing `frontend/scripts/ui-shots` screenshot harness. Test/CI tooling, not a hard gate. |
 | [unified-transcript-rendering.md](local/unified-transcript-rendering.md) | **Complete** | Activity tab gets a `Raw ↔ Rendered` transcript toggle (default Rendered) that works for all five harnesses. Hybrid normalization: Claude keeps the rich FE `prettyNdjson` parser; cursor/opencode/pi render from the backend canonical `harness.Event` via a new `?format=normalized` on the logs stream; codex's `item.*` gets enriched; additive `KindThinking`. Fixes the prose-only raw-JSON dump and renders the answer prose. Agon gets only a raw toggle (no refactor). |
-| [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the flat planning-only slash registry (`internal/planner/commands.go`, no scope field today) to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting) so the board and other Vue surfaces get their own `/` commands. |
-| [host-mounts.md](local/host-mounts.md) | Drafted | Per-task host path references surfaced to the agent prompt (reframed off container `-v` mounts for the host-worktree model; read-only is advisory, no isolation boundary). |
-| [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer; needs a raw-command launch seam on the executor backend. |
+| [scoped-command-registry.md](local/scoped-command-registry.md) | Stale | Promote the flat planning-only slash registry (`internal/planner/commands.go`, no scope field today) to a surface-agnostic mechanism with per-scope catalogs (planning, task_create, task_waiting) so the board and other Vue surfaces get their own `/` commands. |
+| [host-mounts.md](local/host-mounts.md) | Stale | Per-task host path references surfaced to the agent prompt (reframed off container `-v` mounts for the host-worktree model; read-only is advisory, no isolation boundary). |
+| [live-serve.md](local/live-serve.md) | Stale | Build and run developed software from within Wallfacer; needs a raw-command launch seam on the executor backend. |
 | [agent-resource-governance.md](local/agent-resource-governance.md) | **Complete** | Stop Test/Agon from pegging the machine: host agents run in their own process group throttled to background priority (macOS `PRIO_DARWIN_BG`, Linux nice), a global `WALLFACER_MAX_AGENTS` budget (opt-in), agon defaulted to its floor (1 fork / 3 rounds), and forks/rounds/cost-cap/nice/budget surfaced in the Execution settings tab via `/api/env`. OQ-3 (darwin child-backgrounding permission) pending empirical confirmation. |
-| [terminal-ui.md](local/terminal-ui.md) | Drafted | Full TUI mode over the same backend: interactive terminal board, log streaming, task lifecycle via Bubble Tea (`internal/tui/`). |
+| [terminal-ui.md](local/terminal-ui.md) | Stale | Full TUI mode over the same backend: interactive terminal board, log streaming, task lifecycle via Bubble Tea (`internal/tui/`). |
 | [archive-active-task-guard.md](local/archive-active-task-guard.md) | **Complete** | Spec archive guard blocks only when a dispatched task is still active; terminal (done/failed/cancelled) or stale links no longer 409. Fixes a complete tree refusing to archive. |
 | [excalidraw-whiteboard.md](local/excalidraw-whiteboard.md) | **Complete** | Whiteboard drawing/brainstorm canvas as a peer Vue view, backed by a per-workspace scene file (`GET`/`PUT /api/whiteboard`). Excalidraw runs in a lazily-loaded React island; the app entry chunk stays React-free. Cloud sync for signed-in users is future work. |
 | [free-form-specs.md](local/free-form-specs.md) | **Complete** | Render frontmatter-less markdown specs read-only in spec mode (previously they silently collapsed the tree to empty), plus a non-blocking, dismissible suggestion to migrate them into wallfacer lifecycle-managed specs via opt-in frontmatter scaffolding. Shipped: `ErrMissingFrontmatter` sentinel + `BuildTree` doc nodes, `InjectFrontmatter`, `migrate` transition action, explorer doc-node rendering + adopt banner. |
@@ -149,7 +166,10 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [agents-and-flows.md](local/agents-and-flows.md) | **Complete** | Agent role + pipeline as first-class user primitives. Sidebar Agents and Flows tabs; the composer simplifies to "pick a Flow, write a prompt". Seeded built-in flows replace the old TaskKind + Agent-overrides surface. |
 | [topos-runtime-integration.md](local/topos-runtime-integration.md) | Drafted | Embed the public `latere.ai/x/topos` runtime SDK as a new in-process execution path (`agentic` flow kind) and surface its deterministic lineage as a live agent graph in the Map. Foundation for unifying the Agents and Flows surfaces; wiring (go.work + import guard) is M1. M1-M5 shipped. |
 | [topos-live-agent-trace.md](local/topos-live-agent-trace.md) | **Complete** | Live agent traces for topos runs. topos gained a root `Options.Observer` seam + `EventAssistantMessage` (per-turn text) + the entry session-id↔node-id join fix (topos `d8e51f8`); wallfacer's agentgraph seam forwards the run's events (assistant text, delegations, tool use) onto the task timeline via the existing `/api/tasks/stream` live path — the multi-agent transcript now appears as the run proceeds, no new endpoint or UI. Bespoke SSE + lineage-node animation deferred as optional polish. Shipped: topos v0.0.5 tagged + pushed, go.mod bumped, verified building GOWORK=off. |
-| [unified-agent-graph-ui.md](local/unified-agent-graph-ui.md) | Drafted | The founding goal: merge the Agents and Flows pages into one agent-graph surface (palette + canvas; agents are nodes, a flow is a graph, a run overlays live lineage). Full unified surface, built additively then the old pages retire. Builds on the topos integration. |
+| [unified-agent-graph-ui.md](local/unified-agent-graph-ui.md) | Drafted | The founding goal: merge the Agents and Flows pages into one agent-graph surface (palette + canvas; agents are nodes, a flow is a graph, a run overlays live lineage). Full unified surface, built additively then the old pages retire. Builds on the topos integration. Likely reframed by the e2e-design decision below. |
+| [agent-graph-e2e-design.md](local/agent-graph-e2e-design.md) | Drafted | **Decision anchor.** Re-evaluates the whole agent-graph surface against the code as it actually is (three execution engines, split Agents/Flows/Graph vocabulary, board not wired to fleets), defines one coherent end-to-end target and editing model, and plans the teardown of the legacy flow mechanism. Default path: ship the coherent authoring surface + board wiring + terminology cleanup while the proven `implement` loop runs untouched; engine convergence gated. No code until accepted — its acceptance gates `unified-agent-graph-ui` and `workflows-graph-ux`. |
+| [workflows-graph-ux.md](local/workflows-graph-ux.md) | Drafted (at risk) | Rename Flows→Workflows and redraw the `FlowsPage` step editor as a connected pipeline graph. Overlaps the agent-graph surface; **pending the e2e-design decision**, which may reframe or absorb it (the e2e target removes "flow" from the UI and retires `FlowsPage`). Do not dispatch until that decision lands. |
+| [remove-idea-agent-subsystem.md](local/remove-idea-agent-subsystem.md) | **Complete** | Full teardown of the idea-agent (brainstorm) auto-ideation engine and the test-only flow: removed across runner/handler/flow/agents/store/envconfig/constants/apicontract/frontend/docs. Accepted feature loss; clears vestigial flow paths ahead of the agent-graph convergence. |
 | [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | The founding "fresh user has no clue how to start" concern + discoverability of the merged agent graph (Agents + Flows unified). Depends on the embeddable SDK foundation in `../agents`. Deliberately deferred behind the engine; tracked here so it is not lost. |
 | [agents-and-flows/refinements.md](local/agents-and-flows/refinements.md) | **Archived** | Post-ship follow-ups: split-pane UI redesign, token-based CSS restyle, `Role.PromptTmpl` runtime wiring, a dedicated [`docs/guide/agents-and-flows.md`](../docs/guide/agents-and-flows.md) guide, and a cross-reference repair across 12 docs. |
 
@@ -306,7 +326,8 @@ GitHub Integration is the OAuth umbrella; PR creation folds into it and cloud cl
 
 **Within local product:**
 - Spec coordination is complete (document model, planning UX, archival, chat-first mode, planning threads, and the state control plane / drift detection all shipped; the drift pipeline's agent-backed tester is wired but gated behind `WALLFACER_DRIFT_TESTER`, off by default).
-- Editor tabs (inline-file-panel) shipped. The remaining file/diff/attachment work (task-prompt-attachments, inline-diff-feedback) plus test-criteria are clean and ready to dispatch.
+- Editor tabs (inline-file-panel) and inline-diff-feedback shipped. test-criteria is clean and ready to dispatch. task-prompt-attachments was marked stale in the June review and needs a refresh pass before dispatch.
+- The agent-graph cluster (topos integration shipped M1-M5; unified-agent-graph-ui, workflows-graph-ux drafted) is gated on the [agent-graph-e2e-design.md](local/agent-graph-e2e-design.md) decision. Getting that design accepted is the real next action — it determines whether the two UI specs proceed as-is, get reframed, or retire. Its low-risk default path (coherent authoring surface + board wiring + terminology cleanup) leaves the proven `implement` execution loop untouched.
 
 **Within cloud platform:**
 - [latere-integration.md](cloud/latere-integration.md) is the umbrella; read it first. The executor sub-cluster (cella-runtime, topos, antigravity, managed-agents) is blocked on the `Executor` seam from harness-abstraction.
