@@ -1,6 +1,6 @@
 ---
 title: "Terminal UI - Full TUI Mode for Wallfacer"
-status: drafted
+status: stale
 depends_on: []
 affects:
   - internal/tui/
@@ -10,7 +10,7 @@ affects:
   - internal/cli/server.go
 effort: xlarge
 created: 2026-03-30
-updated: 2026-06-14
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---

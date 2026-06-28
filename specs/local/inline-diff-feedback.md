@@ -1,6 +1,6 @@
 ---
 title: Inline Diff Feedback
-status: validated
+status: complete
 depends_on: []
 affects:
   - frontend/src/lib/diff.ts
