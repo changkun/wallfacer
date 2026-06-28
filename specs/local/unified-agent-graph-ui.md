@@ -93,8 +93,13 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     emits `remove` (keyed by agent_slug); a hover × on each step node deletes
     it, pruning any `run_in_parallel_with` references so the flow stays valid
     (`removeStep` in `lib/flowDraft.ts`, unit-tested; wiring component-tested).
-  - **Remaining:** node-level drag to reorder / mark parallel, the agentic +
-    topology + depth controls in the toolbar (backend ready via M6.2a), and
+  - **M6.2d DONE.** Topology toolbar: Agentic / Dynamic toggles, an
+    orchestrator-worker|mesh select, and a handoff-depth input, bound to the
+    draft and serialized by `draftToPayload` onto the M6.2a flow fields. The
+    canvas topology indicator updates live from the draft (component-tested).
+    Validated same-origin end-to-end: clone -> agentic + dynamic + mesh + depth
+    -> save -> the flow round-trips as `agentic:true, topology:mesh, depth:4`.
+  - **Remaining:** node-level drag to reorder / mark parallel, and
     edit-an-agent-node -> the agent editor.
 - **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
   canvas (status colors, handoff edges), polling/streaming the M5 endpoint.

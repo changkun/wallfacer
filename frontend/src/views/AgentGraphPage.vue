@@ -249,7 +249,8 @@ onMounted(async () => {
             </div>
 
             <!-- Editing toolbar: name + slug (slug locked when editing in place,
-                 editable when naming a clone) and the save/cancel actions. -->
+                 editable when naming a clone), the topology controls, and the
+                 save/cancel actions. -->
             <div v-else class="ag-edit">
               <div class="ag-edit__fields">
                 <input
@@ -267,6 +268,41 @@ onMounted(async () => {
                 />
                 <span v-if="draft.isClone" class="ag-edit__hint">clone of {{ draft.sourceSlug }}</span>
               </div>
+
+              <!-- Topology: a pinned chain runs the steps deterministically; an
+                   agentic flow runs through the topos runtime, and a dynamic one
+                   lets the model delegate (orchestrator-worker or mesh, bounded
+                   by the handoff depth). Maps onto the M6.2a flow fields. -->
+              <div class="ag-edit__topo">
+                <label class="ag-edit__toggle">
+                  <input type="checkbox" v-model="draft.agentic" aria-label="Agentic" />
+                  <span>Agentic</span>
+                </label>
+                <label v-if="draft.agentic" class="ag-edit__toggle">
+                  <input type="checkbox" v-model="draft.dynamic" aria-label="Dynamic" />
+                  <span>Dynamic</span>
+                </label>
+                <select
+                  v-if="draft.agentic && draft.dynamic"
+                  v-model="draft.topology"
+                  class="ag-edit__topo-select"
+                  aria-label="Topology"
+                >
+                  <option value="orchestrator-worker">orchestrator-worker</option>
+                  <option value="mesh">mesh</option>
+                </select>
+                <label v-if="draft.agentic && draft.dynamic" class="ag-edit__depth">
+                  <span>depth</span>
+                  <input
+                    type="number"
+                    min="0"
+                    v-model.number="draft.max_handoff_depth"
+                    class="ag-edit__depth-input"
+                    aria-label="Max handoff depth"
+                  />
+                </label>
+              </div>
+
               <div class="ag-edit__actions">
                 <button type="button" class="ag-edit__btn" @click="cancelEdit" :disabled="saving">Cancel</button>
                 <button type="button" class="ag-edit__btn ag-edit__btn--save" @click="saveDraft" :disabled="saving">
@@ -529,6 +565,44 @@ onMounted(async () => {
 .ag-edit__hint {
   font-size: 0.7rem;
   color: var(--text-muted);
+}
+.ag-edit__topo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.ag-edit__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+.ag-edit__topo-select {
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
+}
+.ag-edit__depth {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.ag-edit__depth-input {
+  width: 3.2rem;
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
 }
 .ag-edit__actions {
   display: flex;
