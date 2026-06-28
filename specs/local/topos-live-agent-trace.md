@@ -145,13 +145,17 @@ real run is triggerable (create an agentic flow, run a task; `ModelFake` without
 creds, Lux with). `go.work` points at local `../topos`, so cross-repo builds
 resolve during co-development.
 
-**Phase 1 — topos event seam (SDK).** `Options.Observer`, root `topos.Event`,
-root-re-exported event-name constants, `EventAssistantMessage`, and a `recover()`
-guard around the observer. Tests (fake model): an observer receives SessionStart →
-UserPromptSubmit → AssistantMessage → Stop → SessionEnd in order for a single
-agent, and SubagentStart/Stop for a delegated peer; a panicking observer does not
-fail the run; and run output is identical with and without an observer
-(determinism). **Release:** tag topos `v0.0.5` and bump wallfacer `go.mod` (the
+**Phase 1 — topos event seam (SDK). DONE** (topos `d8e51f8`, branch
+`feat/cella-provider`). `Options.Observer func(Event)`, root `topos.Event`
+{Name, SessionID, AgentID, At, PayloadJSON}, re-exported event-name constants,
+`EventAssistantMessage` (the loop now emits per-turn assistant text), and a
+`recover()` guard around the observer. Bonus fix: the dynamic entry's loop
+SessionID now equals its lineage node id (`entryID`), consistent with peers and
+pinned steps, so an event's SessionID is a reliable join key to its lineage node.
+Tests (fake model) cover the ordered stream incl. assistant text + delegation,
+the SessionID→node join, determinism (output identical with/without observer),
+and observer-panic recovery; full topos suite + golangci-lint green.
+*Remaining for ship:* tag topos `v0.0.5` and bump wallfacer `go.mod` (the
 `go.work` masks this during dev; CI/`go.mod` builds need the published version).
 
 **Phase 2 — wallfacer forward + persist + SSE.** agentgraph forwards events to a
