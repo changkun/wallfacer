@@ -1,6 +1,6 @@
 ---
 title: Agon Verification Trajectory Streaming
-status: complete
+status: archived
 depends_on:
   - agon-adversarial-verification
 affects:
@@ -12,7 +12,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---
