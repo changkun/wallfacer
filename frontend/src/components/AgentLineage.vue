@@ -1,35 +1,82 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { api } from '../api/client';
+import { renderMarkdown } from '../lib/markdown';
 import type { TaskLineage, LineageNode } from '../api/types';
 
-// AgentLineage renders the agent-graph lineage of an agentic-flow run: each
-// agent as a labeled box with a status colour, and each handoff as a labeled
-// edge (delegate / deliver / next). It fetches its own data so it stays
-// self-contained and can be dropped beside a task result without the parent
-// wiring a request. Rendering is plain interpolation (no markdown, no v-html).
-const props = defineProps<{ taskId: string }>();
+// AgentLineage renders an agentic-flow run's agent graph plus a live, per-agent
+// transcript. The graph nodes (with status colour) and handoff edges come from
+// the persisted lineage; the transcript is built from the run's trace events
+// (forwarded onto the task timeline as the run proceeds), so it appears live
+// while the run is in flight, not just after it completes. refreshKey (the task's
+// updated_at) re-pulls both whenever the task changes, riding the existing live
+// task-update path — no dedicated stream needed.
+const props = defineProps<{ taskId: string; refreshKey?: string }>();
+
+interface TraceRow {
+  id: number;
+  agent: string;
+  kind: string; // "assistant" | "delegate" | "tool"
+  text: string;
+  result: string;
+}
 
 const lineage = ref<TaskLineage | null>(null);
-const loading = ref(true);
+const trace = ref<TraceRow[]>([]);
 const error = ref('');
 
-onMounted(async () => {
+interface RawEvent {
+  id: number;
+  event_type: string;
+  data?: Record<string, unknown>;
+}
+
+async function fetchAll() {
+  // Lineage: 404 (not persisted yet, mid-run) is the normal live case.
   try {
     lineage.value = await api<TaskLineage>('GET', `/api/tasks/${props.taskId}/lineage`);
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'failed to load lineage';
-  } finally {
-    loading.value = false;
+  } catch {
+    lineage.value = null;
   }
-});
+  try {
+    const data = await api<RawEvent[] | { events?: RawEvent[] }>(
+      'GET',
+      `/api/tasks/${props.taskId}/events`,
+    );
+    const raw = Array.isArray(data) ? data : (data?.events ?? []);
+    trace.value = raw
+      .filter((e) => e.data?.source === 'agentgraph')
+      .map((e) => ({
+        id: e.id,
+        agent: String(e.data?.agent ?? ''),
+        kind: String(e.data?.kind ?? ''),
+        text: String(e.data?.text ?? ''),
+        result: String(e.data?.result ?? ''),
+      }));
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'failed to load trace';
+  }
+}
 
-const nodes = computed(() => lineage.value?.nodes ?? []);
+watch(() => [props.taskId, props.refreshKey], fetchAll, { immediate: true });
+
+// Persisted nodes when the run has finished; otherwise synthesize provisional
+// "running" nodes from the agents seen in the trace so the graph shows live.
+const nodes = computed<LineageNode[]>(() => {
+  if (lineage.value?.nodes?.length) return lineage.value.nodes;
+  const seen = new Map<string, LineageNode>();
+  for (const r of trace.value) {
+    if (r.agent && !seen.has(r.agent)) {
+      seen.set(r.agent, { id: r.agent, name: r.agent, role: '', status: 'running', grants: [], sandbox: '' });
+    }
+  }
+  return [...seen.values()];
+});
 const edges = computed(() => lineage.value?.edges ?? []);
 const hasGraph = computed(() => nodes.value.length > 0);
+const hasTrace = computed(() => trace.value.length > 0);
+const visible = computed(() => hasGraph.value || hasTrace.value);
 
-// nameById resolves an edge endpoint id to the agent's display name, falling
-// back to the raw id when a referenced node is missing from the node set.
 const nameById = computed(() => {
   const map = new Map<string, string>();
   for (const n of nodes.value) map.set(n.id, n.name || n.id);
@@ -39,8 +86,6 @@ function endpointName(id: string): string {
   return nameById.value.get(id) ?? id;
 }
 
-// statusKind normalises a node status into one of the styled buckets; an
-// unknown status renders with the neutral fallback.
 function statusKind(node: LineageNode): 'running' | 'done' | 'failed' | 'other' {
   switch (node.status) {
     case 'running':
@@ -51,41 +96,70 @@ function statusKind(node: LineageNode): 'running' | 'done' | 'failed' | 'other' 
       return 'other';
   }
 }
+
+// Memoize markdown by content: the transcript re-renders whenever the task
+// updates, and re-parsing every assistant turn on each tick is what pegged the
+// browser in the agon verification view. Cache so each turn parses once.
+const mdCache = new Map<string, string>();
+function renderTurn(text: string): string {
+  let html = mdCache.get(text);
+  if (html === undefined) {
+    if (mdCache.size > 500) mdCache.clear();
+    html = renderMarkdown(text);
+    mdCache.set(text, html);
+  }
+  return html;
+}
 </script>
 
 <template>
-  <section class="lineage">
+  <section v-if="visible" class="lineage">
     <header class="lineage__header">
       <span class="lineage__icon" aria-hidden="true">&#9783;</span>
       <span>Agent Graph</span>
     </header>
 
-    <p v-if="loading" class="lineage__note">Loading lineage.</p>
-    <p v-else-if="error" class="lineage__note lineage__note--error">Lineage unavailable: {{ error }}</p>
-    <p v-else-if="!hasGraph" class="lineage__note">No lineage recorded for this run.</p>
+    <p v-if="error" class="lineage__note lineage__note--error">Trace unavailable: {{ error }}</p>
 
-    <template v-else>
-      <ul class="lineage__nodes">
-        <li
-          v-for="node in nodes"
-          :key="node.id"
-          class="lineage__node"
-          :class="`lineage__node--${statusKind(node)}`"
-        >
-          <span class="lineage__node-name">{{ node.name || node.id }}</span>
-          <span v-if="node.role" class="lineage__node-role">{{ node.role }}</span>
-          <span class="lineage__node-status">{{ node.status }}</span>
-        </li>
-      </ul>
+    <ul v-if="hasGraph" class="lineage__nodes">
+      <li
+        v-for="node in nodes"
+        :key="node.id"
+        class="lineage__node"
+        :class="`lineage__node--${statusKind(node)}`"
+      >
+        <span class="lineage__node-name">{{ node.name || node.id }}</span>
+        <span v-if="node.role" class="lineage__node-role">{{ node.role }}</span>
+        <span class="lineage__node-status">{{ node.status }}</span>
+      </li>
+    </ul>
 
-      <ul v-if="edges.length" class="lineage__edges">
-        <li v-for="(edge, i) in edges" :key="i" class="lineage__edge">
-          <span class="lineage__edge-end">{{ endpointName(edge.from) }}</span>
-          <span class="lineage__edge-kind" :class="`lineage__edge-kind--${edge.kind}`">{{ edge.kind }}</span>
-          <span class="lineage__edge-end">{{ endpointName(edge.to) }}</span>
-        </li>
-      </ul>
-    </template>
+    <ul v-if="edges.length" class="lineage__edges">
+      <li v-for="(edge, i) in edges" :key="i" class="lineage__edge">
+        <span class="lineage__edge-end">{{ endpointName(edge.from) }}</span>
+        <span class="lineage__edge-kind" :class="`lineage__edge-kind--${edge.kind}`">{{ edge.kind }}</span>
+        <span class="lineage__edge-end">{{ endpointName(edge.to) }}</span>
+      </li>
+    </ul>
+
+    <!-- Live per-agent transcript, in run order. -->
+    <ol v-if="hasTrace" class="lineage__trace">
+      <li
+        v-for="row in trace"
+        :key="row.id"
+        class="lineage__turn"
+        :class="`lineage__turn--${row.kind}`"
+      >
+        <span class="lineage__turn-agent">{{ row.agent }}</span>
+        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+        <div
+          v-if="row.kind === 'assistant' && row.text"
+          class="lineage__turn-body prose-content"
+          v-html="renderTurn(row.text)"
+        />
+        <span v-else class="lineage__turn-meta">{{ row.result }}</span>
+      </li>
+    </ol>
   </section>
 </template>
 
@@ -196,5 +270,39 @@ function statusKind(node: LineageNode): 'running' | 'done' | 'failed' | 'other' 
 .lineage__edge-kind--deliver {
   color: var(--ok);
   background: color-mix(in srgb, var(--ok) 16%, transparent);
+}
+
+.lineage__trace {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.lineage__turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.lineage__turn-agent {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.lineage__turn-body {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.lineage__turn-meta {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+.lineage__turn--delegate .lineage__turn-agent {
+  color: var(--ok);
+}
+.lineage__turn--tool .lineage__turn-agent {
+  color: var(--text-muted);
 }
 </style>

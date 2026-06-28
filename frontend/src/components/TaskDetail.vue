@@ -1078,7 +1078,11 @@ async function submitReview() {
                     <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
                   </template>
 
-                  <AgentLineage v-if="task.lineage" :task-id="task.id" />
+                  <AgentLineage
+                    v-if="task.lineage || task.status === 'in_progress'"
+                    :task-id="task.id"
+                    :refresh-key="task.updated_at"
+                  />
 
                   <div v-if="isWaiting" class="mb-4">
                     <h3 class="section-title">Provide Feedback</h3>
