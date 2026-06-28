@@ -83,6 +83,9 @@ event types must be reachable from root.
 - The observer is called synchronously in dispatch order; document that a slow
   observer backpressures the run (wallfacer's consumer must be non-blocking —
   it pushes to a buffered channel and returns).
+- **The runner must `recover()` around the observer call.** A buggy embedder
+  observer must not panic the run; a recovered panic is logged and the run
+  continues. An SDK that lets a consumer crash the run is wrong.
 
 ### B. topos SDK — emit assistant text (the "transcription")
 
@@ -116,6 +119,12 @@ event so the trace reads as a transcript:
     polling + unmemoized render was the CPU sink found in the resource-governance
     work — SSE avoids it).
   - completed run → replay the persisted JSONL then close.
+- **Live→replay handoff must not drop or duplicate.** Tag every event with a
+  monotonic per-run sequence number. A connecting client subscribes to the live
+  fan-out *before* the handler reads the persisted JSONL, then replays only
+  events with a sequence below the first live one (dedupe on the boundary). A
+  reconnect passes its last-seen sequence as a cursor so the server resumes
+  exactly after it.
 
 ### E. frontend — render the live trace
 
@@ -129,12 +138,21 @@ event so the trace reads as a transcript:
 
 ## Phasing / Acceptance Criteria
 
+**Phase 0 — gates (done).** Confirmed the topos path is production-wired: a flow
+carries `Agentic` (`handler/flows.go`), `runner/execute.go:277` routes such a task
+to `runAgenticFlow` → `agentgraph.RunFlowWithModel` (`runner/agentic.go:80`). So a
+real run is triggerable (create an agentic flow, run a task; `ModelFake` without
+creds, Lux with). `go.work` points at local `../topos`, so cross-repo builds
+resolve during co-development.
+
 **Phase 1 — topos event seam (SDK).** `Options.Observer`, root `topos.Event`,
-root-re-exported event-name constants, and `EventAssistantMessage`. Tests (fake
-model): an observer receives SessionStart → UserPromptSubmit → AssistantMessage →
-Stop → SessionEnd in order for a single agent, and SubagentStart/Stop for a
-delegated peer. Observation does not change run output (lineage/final text equal
-with and without an observer).
+root-re-exported event-name constants, `EventAssistantMessage`, and a `recover()`
+guard around the observer. Tests (fake model): an observer receives SessionStart →
+UserPromptSubmit → AssistantMessage → Stop → SessionEnd in order for a single
+agent, and SubagentStart/Stop for a delegated peer; a panicking observer does not
+fail the run; and run output is identical with and without an observer
+(determinism). **Release:** tag topos `v0.0.5` and bump wallfacer `go.mod` (the
+`go.work` masks this during dev; CI/`go.mod` builds need the published version).
 
 **Phase 2 — wallfacer forward + persist + SSE.** agentgraph forwards events to a
 per-task sink; events persist to JSONL; `GET …/agentgraph/trace` streams live
