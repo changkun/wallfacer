@@ -403,9 +403,9 @@ async function onUnstale() {
   try {
     await api('POST', '/api/specs/transition', { action: 'unstale', path: focusedSpecPath.value });
     await loadCurrent();
-    toast.push('Spec re-activated as drafted', { kind: 'success' });
+    toast.push('Spec reopened as draft', { kind: 'success' });
   } catch (e) {
-    toast.push('Unstale failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+    toast.push('Reopen failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
   } finally {
     actionBusy.value = false;
   }
@@ -523,9 +523,9 @@ defineExpose({ dispatchFocused, breakdownFocused });
           type="button"
           class="sf-action"
           :disabled="actionBusy"
-          title="Re-activate this spec as drafted"
+          title="Move this spec back to drafted"
           @click="onUnstale"
-        >Re-activate</button>
+        >Reopen as Draft</button>
         <button
           v-if="canArchive"
           type="button"
