@@ -95,7 +95,10 @@ editing the graph edits the underlying agents/flows YAML registries.
   -> `ModelLux`; bare key -> `ModelDirect`; none -> `ModelFake`), mapped inside the
   agentgraph seam. *Deferred:* OAuth/bearer credentials (a per-call `BearerSource`)
   and the `executor.Backend -> topos.Sandbox` adapter (OQ-1: local sandbox for now).
-- **M5: live lineage in the Map.** Persist + serve + render the lineage sub-graph.
+- **M5: serve + render the lineage. DONE** (`c832fa8e`). `GET /api/tasks/{id}/lineage`
+  serves the parsed lineage; a self-contained `AgentLineage.vue` renders nodes (by
+  status) and edges (by kind) in the task detail. *Deferred:* rendering it as a
+  sub-graph inside the Map's `GraphCanvas` (coordinate with the in-progress map work).
 - **M6: unified Agents/Flows graph UI.** Merge the two pages into the agent-graph
   editor over the same YAML registries. (Pairs with the onboarding spec
   [first-run-onboarding.md](first-run-onboarding.md).)
