@@ -401,15 +401,14 @@ func TestTryAutoPromote_ResumesOnAgonFeedback(t *testing.T) {
 	}
 }
 
-// TestRunAgon_FeedbackLoop proves unresolved attacks become pending feedback
-// (capped), and a clean verdict resets the cycle.
-func TestRunAgon_FeedbackLoop(t *testing.T) {
+// TestRunAgon_BlocksOnUnresolved proves an unresolved verdict is a hard barrier:
+// the verdict is persisted, the task stays parked in waiting, autopilot does not
+// auto-resume it, and a clean verdict clears the barrier. This is the
+// block-on-first-failure behavior that replaced the old auto-feedback loop.
+func TestRunAgon_BlocksOnUnresolved(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	sessionDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(sessionDir, "summary.md"), []byte("## Unresolved\n- c1-1 nil deref in foo()"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref", SessionDir: sessionDir}}
+	h.SetAutopilot(true)
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref"}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -419,44 +418,34 @@ func TestRunAgon_FeedbackLoop(t *testing.T) {
 	}
 	task := waitingTaskWithSession(t, s)
 
-	// Cycle 1: under cap → feedback set, count 1, drawn from summary.md.
+	// Unresolved attacks: verdict persisted, task stays waiting (the barrier).
 	if err := h.runAgon(ctx, s, task); err != nil {
 		t.Fatalf("runAgon: %v", err)
 	}
 	got, _ := s.GetTask(ctx, task.ID)
-	if got.AgonRetryCount != 1 || got.PendingAgonFeedback == "" {
-		t.Fatalf("cycle1: count=%d feedback=%q", got.AgonRetryCount, got.PendingAgonFeedback)
+	if got.AgonUnresolved == nil || *got.AgonUnresolved != 2 {
+		t.Fatalf("AgonUnresolved = %v, want 2", got.AgonUnresolved)
 	}
-	if !strings.Contains(got.PendingAgonFeedback, "nil deref in foo()") {
-		t.Errorf("feedback should include the summary.md attack list: %q", got.PendingAgonFeedback)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("status = %s, want waiting (task halted for review)", got.Status)
 	}
 
-	// Cycle 2: still under cap (MaxAgonRetries=2) → count 2.
-	if err := h.runAgon(ctx, s, task); err != nil {
-		t.Fatalf("runAgon: %v", err)
-	}
+	// Autopilot must not auto-resume a task halted by unresolved attacks: it stays
+	// waiting until a human confirms or resumes it with steering.
+	h.tryAutoPromote(ctx)
 	got, _ = s.GetTask(ctx, task.ID)
-	if got.AgonRetryCount != 2 {
-		t.Fatalf("cycle2: count=%d, want 2", got.AgonRetryCount)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("status = %s, want waiting (no auto-resume on unresolved attacks)", got.Status)
 	}
 
-	// Cycle 3: at cap → no further increment (auto-resume halts).
-	if err := h.runAgon(ctx, s, task); err != nil {
-		t.Fatalf("runAgon: %v", err)
-	}
-	got, _ = s.GetTask(ctx, task.ID)
-	if got.AgonRetryCount != 2 {
-		t.Errorf("cycle3: count=%d, want 2 (capped)", got.AgonRetryCount)
-	}
-
-	// Clean verdict → reset.
+	// A clean verdict clears the barrier.
 	v.result = &adversarial.VerifyResult{Unresolved: 0}
 	if err := h.runAgon(ctx, s, task); err != nil {
 		t.Fatalf("runAgon clean: %v", err)
 	}
 	got, _ = s.GetTask(ctx, task.ID)
-	if got.AgonRetryCount != 0 || got.PendingAgonFeedback != "" {
-		t.Errorf("after clean: count=%d feedback=%q, want 0 + empty", got.AgonRetryCount, got.PendingAgonFeedback)
+	if got.AgonUnresolved == nil || *got.AgonUnresolved != 0 {
+		t.Errorf("after clean: AgonUnresolved = %v, want 0", got.AgonUnresolved)
 	}
 }
 
