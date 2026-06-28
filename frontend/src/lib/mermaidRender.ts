@@ -109,6 +109,21 @@ export async function enhanceMermaid(container: HTMLElement | null): Promise<voi
     const code = block.getAttribute('data-mermaid');
     if (!code) continue;
     const id = 'mermaid-diagram-' + Date.now() + '-' + ++renderSeq;
+    // Validate before rendering. mermaid.render() injects a "Syntax error"
+    // bomb SVG into the document and throws on bad input, and that orphaned
+    // bomb is what leaked into the page. parse({ suppressErrors }) returns
+    // false instead of touching the DOM, so an invalid diagram never reaches
+    // render() and the source <pre> fallback stays put.
+    let parsed = false;
+    try {
+      parsed = (await mermaid.parse(code, { suppressErrors: true })) !== false;
+    } catch {
+      parsed = false;
+    }
+    if (!parsed) {
+      block.classList.add('mermaid-error');
+      continue; // Leave the .mermaid-src <pre> visible.
+    }
     try {
       const { svg } = await mermaid.render(id, code);
       const div = document.createElement('div');
@@ -122,6 +137,11 @@ export async function enhanceMermaid(container: HTMLElement | null): Promise<voi
       fixNodeContrast(div);
     } catch (err) {
       console.error('mermaid render error:', err);
+      block.classList.add('mermaid-error');
+      // Drop any temporary element render() appended to the body before it
+      // threw, so a half-rendered bomb never lingers.
+      document.getElementById(id)?.remove();
+      document.getElementById('d' + id)?.remove();
       // Leave the source code visible (the .mermaid-src <pre> already inside).
     }
   }

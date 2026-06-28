@@ -41,6 +41,17 @@
   text-align: left;
 }
 
+/* Invalid-diagram fallback: a diagram that fails to parse keeps its source
+   <pre> instead of mermaid's "Syntax error" bomb. A muted card frames it as a
+   deliberate fallback rather than broken output. */
+.mermaid-error .mermaid-src {
+  background: var(--bg-sunk);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
 /* --- Full-screen diagram overlay (click-to-expand) --- */
 
 .diagram-overlay {
