@@ -172,14 +172,22 @@ honouring the synchronous-observer contract) and maps the meaningful ones to
 timeline lines. Tests: the observer receives the ordered stream with Node→lineage
 join; `agenticTraceEvent` maps/filters correctly. Import guard intact; lint green.
 
-**Phase 3 — bespoke SSE + live lineage animation. OPTIONAL (deferred).** The
-original D/E design (per-task trace hub, JSONL persistence, `GET …/agentgraph/trace`
-SSE with the seq-cursored live→replay handoff, and `AgentLineage.vue` node
-animation + per-agent transcript panel with memoized markdown) is now *polish*,
-not the core deliverable — Phase 2 already shows the trace live on the timeline.
-Build this only if the richer experience (typewriter streaming, the graph lighting
-up node-by-node, a dedicated transcript panel) is wanted. The memoized-markdown
-requirement and the seq-cursor handoff still apply if it is built.
+**Phase 3 — live per-agent transcript in AgentLineage. DONE** (`167b8313`,
+`cb02a2c5`). A leaner cut than the original D/E plan: instead of a bespoke trace
+hub + JSONL + dedicated SSE endpoint, `AgentLineage.vue` builds the live trace
+from the run's agentgraph-tagged timeline events (3a enriched them with
+`source`/`kind`/`node`/`agent`/`text`), refetched on `task.updated_at` via the
+existing live task-update path. It renders a per-agent transcript (assistant text
+as **memoized markdown** — the agon CPU lesson), shows during the run (provisional
+running nodes synthesized from the trace before the lineage persists), and renders
+nothing for non-agentgraph tasks. Mounted for `in_progress` agentic tasks. Tests
+cover graph, transcript (markdown rendered, non-agentgraph filtered, provisional
+nodes), and the empty case; `vue-tsc` + the SSG build pass.
+
+*Still deferred (optional polish):* token-level typewriter streaming and a
+bespoke SSE endpoint with the seq-cursored live→replay handoff. Only needed if the
+`task.updated_at`-driven refetch granularity proves too coarse; the timeline +
+this refetch already show the trace live.
 
 ## Non-Goals
 
