@@ -16,6 +16,25 @@ import '../styles/whiteboard.css';
 // The scene persists per workspace via GET/PUT /api/whiteboard as opaque JSON.
 
 const SAVE_DEBOUNCE_MS = 1500;
+// Excalidraw libraries (reusable shape sets) are global to the user, not per
+// workspace, and are persisted in localStorage. The embedded component does not
+// persist them itself, so without this the "Add to Excalidraw" library import —
+// which round-trips back through a fresh tab and the addLibrary URL hash — would
+// never reach the working session.
+const LIBRARY_KEY = 'wallfacer-whiteboard-library';
+
+// Use window.localStorage (the DOM Storage) explicitly rather than the bare
+// global, which on Node 22 resolves to an unrelated experimental webstorage stub
+// in tests.
+function loadLibrary(): unknown[] | null {
+  try {
+    const raw = window.localStorage.getItem(LIBRARY_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function saveLibrary(items: unknown): void {
+  try { window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(items ?? [])); } catch { /* quota / disabled */ }
+}
 
 const rootEl = ref<HTMLDivElement | null>(null);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
@@ -30,6 +49,11 @@ let themeObserver: MutationObserver | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingScene: unknown = null;
 let disposed = false;
+// Excalidraw imperative API (captured via the excalidrawAPI prop), used to push
+// cross-tab library updates into the live instance.
+let excalApi: { updateLibrary: (opts: { libraryItems: unknown; merge?: boolean }) => void } | null = null;
+let onWindowStorage: ((e: StorageEvent) => void) | null = null;
+let onDocEscape: ((e: KeyboardEvent) => void) | null = null;
 
 // resolvedTheme reads the app's resolved theme from <html data-theme>, which the
 // prefs store keeps current (including OS 'auto' resolution). Excalidraw's theme
@@ -71,6 +95,16 @@ onMounted(async () => {
     return;
   }
   if (disposed || !rootEl.value) return;
+
+  // Merge the persisted (global) library into the initial data so saved /
+  // imported shape sets are available. The library is separate from the scene
+  // blob stored per workspace.
+  const library = loadLibrary();
+  if (library) {
+    initialData = (initialData && typeof initialData === 'object')
+      ? { ...(initialData as object), libraryItems: library }
+      : { libraryItems: library };
+  }
 
   // Dynamic, client-only imports: React island + Excalidraw + its stylesheet.
   let createRoot: typeof import('react-dom/client')['createRoot'];
@@ -131,6 +165,10 @@ onMounted(async () => {
       theme: resolvedTheme(),
       onChange: (elements: unknown, appState: unknown, files: unknown) =>
         scheduleSave(elements, appState, files),
+      // Persist library changes (incl. the "Add to Excalidraw" import) so they
+      // survive reloads and reach other tabs.
+      onLibraryChange: (items: unknown) => saveLibrary(items),
+      excalidrawAPI: (apiObj: unknown) => { excalApi = apiObj as typeof excalApi; },
       // Theme is driven by the app (<html data-theme>), so hide Excalidraw's
       // own theme toggle to avoid a second, conflicting control.
       UIOptions: { canvasActions: { toggleTheme: false } },
@@ -155,6 +193,29 @@ onMounted(async () => {
     attributes: true,
     attributeFilter: ['data-theme'],
   });
+
+  // Cross-tab library sync: the "Add to Excalidraw" flow imports into a separate
+  // tab and writes localStorage; reflect that into this live instance.
+  onWindowStorage = (e) => {
+    if (e.key !== LIBRARY_KEY || !excalApi || !e.newValue) return;
+    try { excalApi.updateLibrary({ libraryItems: JSON.parse(e.newValue), merge: false }); }
+    catch { /* malformed payload — ignore */ }
+  };
+  window.addEventListener('storage', onWindowStorage);
+
+  // Excalidraw binds its dialog Escape handler to the (portaled) modal element,
+  // which can miss focus in this embed, so Escape sometimes fails to close a
+  // dialog (e.g. Help). As a fallback, close any open Excalidraw dialog on
+  // Escape. When none is open this is a no-op, leaving Excalidraw's own Escape
+  // (deselect, exit tool) untouched.
+  onDocEscape = (e) => {
+    if (e.key !== 'Escape') return;
+    const closeBtn = document.querySelector<HTMLElement>(
+      '.excalidraw-modal-container .Dialog__close',
+    );
+    if (closeBtn) { e.preventDefault(); e.stopPropagation(); closeBtn.click(); }
+  };
+  document.addEventListener('keydown', onDocEscape, true);
 });
 
 onBeforeUnmount(() => {
@@ -163,6 +224,8 @@ onBeforeUnmount(() => {
   // Best-effort flush of any pending edits before the React root is torn down.
   void flushSave();
   if (themeObserver) themeObserver.disconnect();
+  if (onWindowStorage) window.removeEventListener('storage', onWindowStorage);
+  if (onDocEscape) document.removeEventListener('keydown', onDocEscape, true);
   if (reactRoot) reactRoot.unmount();
 });
 </script>
