@@ -19,37 +19,59 @@ const emit = defineEmits<{
   (e: 'remove', agentSlug: string): void;
   (e: 'parallel', payload: { from: string; to: string }): void;
   (e: 'ungroup', agentSlug: string): void;
+  (e: 'reorder', payload: { slug: string; toStage: number }): void;
 }>();
 
 // Node dragging uses pointer events rather than HTML5 drag: SVG elements do not
 // fire dragstart reliably across browsers, and a pointer model also generalises
-// to reordering later. Dragging one node onto another emits `parallel` (group
-// them into one stage). Hit-testing is by elementFromPoint on the data-node-slug
-// attribute, so the geometry stays the single source of truth.
+// to reordering. Dropping a node ON another emits `parallel` (group them into
+// one stage); dropping it in a gap between stages emits `reorder` (move its
+// stage). Hit-testing is by elementFromPoint on the data attributes, so the
+// rendered geometry stays the single source of truth. Nodes are drawn above the
+// gaps, so a node wins when the pointer is over one.
 const draggingSlug = ref<string | null>(null);
 const dropTargetSlug = ref<string | null>(null);
+const dropGapIndex = ref<number | null>(null);
 
 function onNodePointerDown(slug: string) {
   if (!props.editable || !slug) return;
   draggingSlug.value = slug;
   dropTargetSlug.value = null;
+  dropGapIndex.value = null;
 }
-function slugAtPoint(x: number, y: number): string | null {
+type Hit = { kind: 'node'; slug: string } | { kind: 'gap'; index: number } | null;
+function hitAtPoint(x: number, y: number): Hit {
   const el = document.elementFromPoint(x, y);
   const node = el?.closest('[data-node-slug]');
-  return node?.getAttribute('data-node-slug') || null;
+  const slug = node?.getAttribute('data-node-slug');
+  if (slug) return { kind: 'node', slug };
+  const gap = el?.closest('[data-gap-index]');
+  if (gap) return { kind: 'gap', index: Number(gap.getAttribute('data-gap-index')) };
+  return null;
 }
 function onCanvasPointerMove(e: PointerEvent) {
   if (!draggingSlug.value) return;
-  const s = slugAtPoint(e.clientX, e.clientY);
-  dropTargetSlug.value = s && s !== draggingSlug.value ? s : null;
+  const hit = hitAtPoint(e.clientX, e.clientY);
+  if (hit?.kind === 'node' && hit.slug !== draggingSlug.value) {
+    dropTargetSlug.value = hit.slug;
+    dropGapIndex.value = null;
+  } else if (hit?.kind === 'gap') {
+    dropGapIndex.value = hit.index;
+    dropTargetSlug.value = null;
+  } else {
+    dropTargetSlug.value = null;
+    dropGapIndex.value = null;
+  }
 }
 function onCanvasPointerUp() {
-  if (draggingSlug.value && dropTargetSlug.value && dropTargetSlug.value !== draggingSlug.value) {
+  if (draggingSlug.value && dropTargetSlug.value) {
     emit('parallel', { from: draggingSlug.value, to: dropTargetSlug.value });
+  } else if (draggingSlug.value && dropGapIndex.value !== null) {
+    emit('reorder', { slug: draggingSlug.value, toStage: dropGapIndex.value });
   }
   draggingSlug.value = null;
   dropTargetSlug.value = null;
+  dropGapIndex.value = null;
 }
 
 // Geometry. A stage is a column; parallel steps stack as rows within it.
@@ -85,11 +107,21 @@ interface StageBadge {
   x: number;
   y: number;
 }
+// A reorder drop zone occupying the gap before a stage. `index` is the stage
+// insertion position (0..stageCount). Only rendered while a node is dragging.
+interface GapZone {
+  index: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 interface Layout {
   nodes: LayoutNode[];
   entry: LayoutNode | null;
   edges: LayoutEdge[];
   badges: StageBadge[];
+  gaps: GapZone[];
   width: number;
   height: number;
 }
@@ -156,12 +188,15 @@ function edgePath(a: LayoutNode, b: LayoutNode): string {
 const layout = computed<Layout>(() => {
   const gs = groups.value;
   if (gs.length === 0) {
-    return { nodes: [], entry: null, edges: [], badges: [], width: 0, height: 0 };
+    return { nodes: [], entry: null, edges: [], badges: [], gaps: [], width: 0, height: 0 };
   }
   const maxRows = Math.max(1, ...gs.map((g) => g.length));
   const height = PAD * 2 + maxRows * ROW_PITCH - (ROW_PITCH - NODE_H);
   const columns = gs.length + 1; // +1 for the Task entry column
-  const width = PAD * 2 + columns * NODE_W + (columns - 1) * (COL_PITCH - NODE_W);
+  const baseWidth = PAD * 2 + columns * NODE_W + (columns - 1) * (COL_PITCH - NODE_W);
+  // In edit mode reserve a trailing slot so a stage can be dropped after the
+  // last one; read-only width is unchanged.
+  const width = props.editable ? baseWidth + (COL_PITCH - NODE_W) : baseWidth;
 
   function columnX(col: number): number {
     return PAD + col * COL_PITCH;
@@ -221,7 +256,22 @@ const layout = computed<Layout>(() => {
     badges.push({ key: `b:${ci}`, x: columnX(ci + 1) + NODE_W / 2, y: topY - 10 });
   });
 
-  return { nodes: stageNodes.flat(), entry, edges, badges, width, height };
+  // Reorder gaps (edit mode only): one before each stage plus one after the
+  // last. Gap k sits between canvas column k and k+1 (column 0 is the entry).
+  const gaps: GapZone[] = [];
+  if (props.editable) {
+    for (let k = 0; k <= gs.length; k++) {
+      gaps.push({
+        index: k,
+        x: columnX(k) + NODE_W,
+        y: PAD / 2,
+        w: COL_PITCH - NODE_W,
+        h: height - PAD,
+      });
+    }
+  }
+
+  return { nodes: stageNodes.flat(), entry, edges, badges, gaps, width, height };
 });
 
 // Topology indicator. Only an agentic + dynamic flow carries a topology;
@@ -269,6 +319,23 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
             class="agc-edge"
             :d="edge.d"
             fill="none"
+          />
+        </g>
+
+        <!-- Reorder drop zones, visible only during a node drag. Rendered
+             before the nodes so a node wins the elementFromPoint hit-test. -->
+        <g v-if="draggingSlug" class="agc__gaps">
+          <rect
+            v-for="gap in layout.gaps"
+            :key="`gap:${gap.index}`"
+            class="agc-gap"
+            :class="{ 'agc-gap--active': dropGapIndex === gap.index }"
+            :data-gap-index="gap.index"
+            :x="gap.x"
+            :y="gap.y"
+            :width="gap.w"
+            :height="gap.h"
+            rx="6"
           />
         </g>
 
@@ -481,6 +548,16 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.agc-gap {
+  fill: var(--accent);
+  opacity: 0.06;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.agc-gap--active {
+  opacity: 0.22;
 }
 .agc-node--editable {
   cursor: grab;

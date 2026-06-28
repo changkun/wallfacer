@@ -9,6 +9,7 @@ import {
   removeStep,
   setParallel,
   clearParallel,
+  moveStage,
   draftToFlow,
   draftToPayload,
   type EditableFlow,
@@ -116,6 +117,12 @@ function onParallel(p: { from: string; to: string }) {
 function onUngroup(agentSlug: string) {
   if (!draft.value) return;
   clearParallel(draft.value, agentSlug);
+  saveError.value = '';
+}
+
+function onReorder(p: { slug: string; toStage: number }) {
+  if (!draft.value) return;
+  moveStage(draft.value, p.slug, p.toStage);
   saveError.value = '';
 }
 
@@ -331,7 +338,7 @@ onMounted(async () => {
             </p>
             <p v-else-if="draft" class="ag-edit__tip">
               Drag an agent from the palette to add a step; drag one step onto
-              another to run them in parallel.
+              another to run them in parallel, or into a gap to reorder.
             </p>
 
             <div
@@ -347,6 +354,7 @@ onMounted(async () => {
                 @remove="onRemoveStep"
                 @parallel="onParallel"
                 @ungroup="onUngroup"
+                @reorder="onReorder"
               />
             </div>
           </template>

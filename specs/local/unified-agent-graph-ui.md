@@ -107,8 +107,13 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     (`clearParallel`, dissolving a singleton remainder). Pure ops unit-tested,
     ungroup wiring component-tested, the drag validated in a real browser:
     drag -> group -> save round-trips `run_in_parallel_with`.
-  - **Remaining:** node drag to reorder the sequence, and edit-an-agent-node ->
-    the agent editor.
+  - **M6.2f DONE.** Reorder by node drag: while a node drags, gap drop-zones
+    appear between stages; dropping a node in a gap moves its whole parallel
+    stage to that position (`moveStage` over `stagesOf`, keeping groups intact),
+    while dropping on a node still groups (nodes win the hit-test). Pure ops
+    unit-tested; the drag + reserved trailing gap validated in a real browser:
+    drag -> reorder -> save round-trips the new step order.
+  - **Remaining:** edit-an-agent-node -> the agent editor.
 - **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
   canvas (status colors, handoff edges), polling/streaming the M5 endpoint.
 - **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;

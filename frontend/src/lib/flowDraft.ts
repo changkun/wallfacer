@@ -195,6 +195,55 @@ export function clearParallel(draft: EditableFlow, slug: string): boolean {
   return true;
 }
 
+// stagesOf groups the draft's steps into ordered parallel stages by the
+// transitive closure of run_in_parallel_with -- the same grouping the canvas
+// renders and the flow engine executes. Stage order follows first appearance in
+// the steps array.
+export function stagesOf(draft: EditableFlow): EditStep[][] {
+  const idxBySlug = new Map(draft.steps.map((s, i) => [s.agent_slug, i]));
+  const assigned = draft.steps.map(() => -1);
+  const stages: EditStep[][] = [];
+  draft.steps.forEach((_, i) => {
+    if (assigned[i] !== -1) return;
+    const gid = stages.length;
+    const queue = [i];
+    assigned[i] = gid;
+    const members = [i];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const p of draft.steps[cur].run_in_parallel_with) {
+        const j = idxBySlug.get(p);
+        if (j !== undefined && assigned[j] === -1) {
+          assigned[j] = gid;
+          members.push(j);
+          queue.push(j);
+        }
+      }
+    }
+    members.sort((a, b) => a - b);
+    stages.push(members.map((m) => draft.steps[m]));
+  });
+  return stages;
+}
+
+// moveStage reorders the whole parallel stage a step belongs to, to insertion
+// position toStage (0..stageCount, the gap indices the canvas exposes). Members
+// of a stage move together, preserving their grouping. Returns false when the
+// move is a no-op (dropping a stage adjacent to its own position).
+export function moveStage(draft: EditableFlow, slug: string, toStage: number): boolean {
+  const stages = stagesOf(draft);
+  const src = stages.findIndex((g) => g.some((s) => s.agent_slug === slug));
+  if (src === -1) return false;
+  const clamped = Math.max(0, Math.min(toStage, stages.length));
+  // Account for the source stage being removed before re-insertion.
+  const adj = clamped > src ? clamped - 1 : clamped;
+  if (adj === src) return false;
+  const without = stages.filter((_, i) => i !== src);
+  without.splice(adj, 0, stages[src]);
+  draft.steps = without.flat();
+  return true;
+}
+
 // draftToFlow projects a draft into the Flow shape the read-only canvas renders,
 // so the editor reuses one renderer for both the saved flow and the live draft.
 export function draftToFlow(draft: EditableFlow): Flow {
