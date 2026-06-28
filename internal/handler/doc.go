@@ -5,7 +5,7 @@
 // to the task store, runner, workspace manager, prompt manager, metrics registry,
 // and automation state (autopilot, autotest, autosubmit, etc.). Each concern is
 // implemented in a separate file: tasks, configuration, git operations, streaming,
-// refinement, ideation, oversight, and more. The package uses stdlib net/http
+// refinement, oversight, and more. The package uses stdlib net/http
 // (Go 1.22+ pattern routing) with no framework. Background automation watchers
 // (auto-promote, auto-test, auto-submit, auto-sync, auto-push) run as goroutines
 // managed by this package.

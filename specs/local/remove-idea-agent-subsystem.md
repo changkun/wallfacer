@@ -1,6 +1,6 @@
 ---
 title: Remove the idea-agent (brainstorm) subsystem and the test-only flow
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/runner/
@@ -80,6 +80,15 @@ agent-graph work: fewer, clearer built-ins. It is a removal, not a rewrite.
 - Config: `ideation_exploit_ratio`, `ideation_categories`.
 - UI: composer empty-prompt allowance, idea-agent task badges/categories, the
   brainstorm default in the routine creator.
+
+## Status: complete
+
+All milestones shipped. Commits: R1 `ba8fe252` (spec); R2 `7684dde5` (frontend);
+R3 `08bc4611` (HTTP/config); R4 `9165e5f1` (runner engine); R5 `261011c2` +
+`7a3a4327` (catalog/kind/routines + dead-callback sweep); R6 docs + example
+prompt (this commit). Final gate green: `go build ./...`, `go test ./...`
+(0 fail), golangci-lint 0 issues; slug-fallback safety verified so legacy
+`brainstorm`/`test-only` tasks and routines resolve to `implement`.
 
 ## Milestones (each commit keeps `go build` + `go test` + vitest green)
 

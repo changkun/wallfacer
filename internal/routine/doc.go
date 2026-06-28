@@ -1,6 +1,6 @@
 // Package routine schedules periodic fire-and-forget callbacks keyed by
 // UUID. It generalizes the singleton cronjob-style loop that used to drive
-// the ideation agent: each routine owns one [time.AfterFunc] timer, arms it
+// periodic background work: each routine owns one [time.AfterFunc] timer, arms it
 // according to a [Schedule], and invokes a caller-supplied [FireFunc] when
 // the timer elapses.
 //

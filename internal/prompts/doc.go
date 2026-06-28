@@ -2,8 +2,8 @@
 // with optional per-user overrides, and manages workspace-level AGENTS.md
 // instruction files that are mounted into every task container.
 //
-// Eight built-in prompt templates (title, commit, refinement, oversight, test,
-// ideation, conflict resolution, instructions) are embedded in the binary. The
+// Seven built-in prompt templates (title, commit, refinement, oversight, test,
+// conflict resolution, instructions) are embedded in the binary. The
 // [Manager] checks for user overrides in ~/.wallfacer/prompts/ before falling
 // back to the embedded defaults. Templates use Go text/template syntax with
 // custom arithmetic and ratio functions. This allows users to customize agent

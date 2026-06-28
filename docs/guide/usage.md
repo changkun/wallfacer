@@ -21,7 +21,7 @@ Start here for the full reading order.
 - [Designing Specs](designing-specs.md). Plan mode layout, spec lifecycle (six states), dispatch workflow, archive/unarchive, dependency minimap.
 - [Agents & Flows](agents-and-flows.md). The four primitives (agent, flow, task, routine), how they compose, how to clone and customize built-ins, harness pinning, recipes.
 - [Board & Tasks](board-and-tasks.md). Task board, lifecycle, dependencies, batch creation, search.
-- [Refinement & Ideation](refinement-and-ideation.md). Prompt refinement in the Plan task-mode chat and the brainstorm flow.
+- [Prompt Refinement](refinement-and-ideation.md). Prompt refinement in the Plan task-mode chat.
 
 ### Operate
 
@@ -46,8 +46,8 @@ Start here for the full reading order.
 
 Customise what Wallfacer runs on your behalf. Built-ins are read-only, so clone first:
 
-1. Clone a built-in agent (impl, test, commit-msg, title, oversight, ideate) and pin a harness (claude or codex) or tighten its system prompt.
-2. Clone a built-in flow (implement, brainstorm, test-only) and reorder or swap its steps, for example add a security-review pass.
+1. Clone a built-in agent (impl, test, commit-msg, title, oversight) and pin a harness (claude or codex) or tighten its system prompt.
+2. Clone the built-in flow (implement) and reorder or swap its steps, for example add a security-review pass.
 3. Author custom YAML under `~/.wallfacer/agents/` and `~/.wallfacer/flows/`. The clone is available immediately.
 
 See [Agents & Flows](agents-and-flows.md) for the full recipes and runtime-scope caveats.

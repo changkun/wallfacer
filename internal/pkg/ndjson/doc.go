@@ -10,7 +10,7 @@
 // # Connected packages
 //
 // No internal dependencies (stdlib only). Consumed by [store] for reading and
-// writing task event traces, turn usage records, and ideation history. Changes
+// writing task event traces and turn usage records. Changes
 // to the file format or error handling affect all event sourcing persistence.
 //
 // # Usage

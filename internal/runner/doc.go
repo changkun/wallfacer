@@ -3,7 +3,7 @@
 //
 // It manages the complete task lifecycle: worktree setup, container launching via
 // os/exec (podman or docker), agent communication, commit pipelines, title and
-// oversight generation, prompt refinement, brainstorm ideation, and error recovery
+// oversight generation, prompt refinement, and error recovery
 // with failure classification. The [Runner] struct implements the [Interface] which
 // exposes a minimal surface for test mocking. Background operations (title gen,
 // oversight, sync) are tracked via a labeled WaitGroup for clean shutdown.

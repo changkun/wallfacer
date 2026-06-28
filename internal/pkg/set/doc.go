@@ -8,7 +8,7 @@
 // # Connected packages
 //
 // No dependencies (not even stdlib). Consumed by [runner] (tracking board items,
-// parsing ideation output, deduplicating workspace entries) and [workspace]
+// deduplicating workspace entries) and [workspace]
 // (normalizing workspace groups). A simple utility with no ripple effects.
 //
 // # Usage
