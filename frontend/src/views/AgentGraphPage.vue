@@ -264,9 +264,10 @@ onMounted(async () => {
           <div>
             <h2 class="ag-mode__title">Agent Graph</h2>
             <p class="ag-mode__subtitle">
-              An agent fleet works a task to an outcome. The palette lists the
-              agent registry; the canvas shows the selected fleet as a graph,
-              with the lead receiving the task and delegating to its members.
+              An agent graph works a task to an outcome. The palette lists the
+              agent registry; the canvas shows the selected graph, with the lead
+              agent receiving the task. A graph either runs its agents in a fixed
+              order or lets the lead delegate to members (its coordination).
               <template v-if="draft">Drag agents in, set the lead, pick how they coordinate, then save.</template>
               <template v-else>Clone or edit a fleet to compose it; double-click an agent or node to edit the agent.</template>
             </p>

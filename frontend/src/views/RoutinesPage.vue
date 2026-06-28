@@ -147,8 +147,8 @@ onMounted(() => { loadRoutines(); loadFlows(); });
               <AppSelect v-model="intervalMin" :options="intervalOptions" class="routine-create__select" aria-label="Interval" />
             </label>
             <label class="routine-create__opt">
-              <span>Flow</span>
-              <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Flow" />
+              <span>Agent graph</span>
+              <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Agent graph" />
             </label>
             <button type="submit" class="btn btn-accent routine-create__btn" :disabled="!prompt.trim() || creating">
               {{ creating ? 'Creating…' : 'Create routine' }}
@@ -190,8 +190,8 @@ onMounted(() => { loadRoutines(); loadFlows(); });
             <AppSelect v-model="intervalMin" :options="intervalOptions" class="routine-create__select" aria-label="Interval" />
           </label>
           <label class="routine-create__opt">
-            <span>Flow</span>
-            <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Flow" />
+            <span>Agent graph</span>
+            <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Agent graph" />
           </label>
           <button type="submit" class="btn btn-accent routine-create__btn" :disabled="!prompt.trim() || creating">
             {{ creating ? 'Creating…' : 'Create routine' }}
