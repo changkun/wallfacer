@@ -70,9 +70,10 @@ onMounted(async () => {
   if (disposed || !rootEl.value) return;
 
   // Dynamic, client-only imports: React island + Excalidraw + its stylesheet.
-  let createElement: typeof import('react')['createElement'];
   let createRoot: typeof import('react-dom/client')['createRoot'];
-  let Excalidraw: typeof import('@excalidraw/excalidraw')['Excalidraw'];
+  // buildScene constructs the Excalidraw React tree (with the trimmed menu and
+  // welcome screen) using the current theme; it is rebuilt on each render.
+  let buildScene: (() => unknown) | null = null;
   try {
     const [react, reactDom, excalidraw] = await Promise.all([
       import('react'),
@@ -80,30 +81,67 @@ onMounted(async () => {
       import('@excalidraw/excalidraw'),
       import('@excalidraw/excalidraw/index.css'),
     ]);
-    createElement = react.createElement;
     createRoot = reactDom.createRoot;
-    Excalidraw = excalidraw.Excalidraw;
     serialize = excalidraw.serializeAsJSON as typeof serialize;
-  } catch {
-    status.value = 'error';
-    return;
-  }
-  if (disposed || !rootEl.value) return;
 
-  const root = createRoot(rootEl.value);
-  reactRoot = root;
+    const { Excalidraw, MainMenu, WelcomeScreen } = excalidraw;
+    // Permissive createElement wrapper. Composing Excalidraw's React children
+    // against React's JSX types under vue-tsc adds only noise; this island never
+    // type-checks as JSX, so element construction is kept untyped here.
+    const h = react.createElement as unknown as
+      (type: unknown, props?: unknown, ...children: unknown[]) => unknown;
 
-  // Re-render the React element with the current theme. initialData keeps a
-  // stable reference so Excalidraw consumes it once (at mount) and theme changes
-  // do not reset the canvas.
-  const render = () => {
-    root.render(createElement(Excalidraw as never, {
+    // Trimmed main menu: local scene / export / canvas actions only. Excalidraw's
+    // default menu items that are external to wallfacer — the Excalidraw+ promo,
+    // GitHub and social links, live collaboration, and sign-up — are dropped by
+    // supplying our own MainMenu, which replaces the default entirely.
+    const menu = () => h(MainMenu, null,
+      h(MainMenu.DefaultItems.SearchMenu),
+      h(MainMenu.DefaultItems.CommandPalette),
+      h(MainMenu.Separator),
+      h(MainMenu.DefaultItems.LoadScene),
+      h(MainMenu.DefaultItems.SaveAsImage),
+      h(MainMenu.DefaultItems.Export),
+      h(MainMenu.Separator),
+      h(MainMenu.DefaultItems.ChangeCanvasBackground),
+      h(MainMenu.Separator),
+      h(MainMenu.DefaultItems.ClearCanvas),
+      h(MainMenu.DefaultItems.Help),
+    );
+    // Branding-free welcome screen: keep the onboarding hints, drop the
+    // Excalidraw logo and the sign-up / Excalidraw+ center menu.
+    const welcome = () => h(WelcomeScreen, null,
+      h(WelcomeScreen.Hints.MenuHint),
+      h(WelcomeScreen.Hints.ToolbarHint),
+      h(WelcomeScreen.Hints.HelpHint),
+      h(WelcomeScreen.Center, null,
+        h(WelcomeScreen.Center.Heading, null,
+          'Sketch, diagram, and brainstorm on an infinite canvas.'),
+      ),
+    );
+
+    // initialData keeps a stable reference so Excalidraw consumes it once (at
+    // mount); theme changes re-render with a new theme prop without resetting
+    // the canvas.
+    buildScene = () => h(Excalidraw, {
       initialData,
       theme: resolvedTheme(),
       onChange: (elements: unknown, appState: unknown, files: unknown) =>
         scheduleSave(elements, appState, files),
-    } as never));
-  };
+      // Theme is driven by the app (<html data-theme>), so hide Excalidraw's
+      // own theme toggle to avoid a second, conflicting control.
+      UIOptions: { canvasActions: { toggleTheme: false } },
+    }, menu(), welcome());
+  } catch {
+    status.value = 'error';
+    return;
+  }
+  if (disposed || !rootEl.value || !buildScene) return;
+
+  const root = createRoot(rootEl.value);
+  reactRoot = root;
+
+  const render = () => { root.render(buildScene!() as never); };
   render();
   status.value = 'ready';
 

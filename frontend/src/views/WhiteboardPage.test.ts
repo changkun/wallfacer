@@ -21,18 +21,41 @@ const serializeMock = vi.fn(
 
 vi.mock('react', () => ({ createElement: (...a: unknown[]) => createElementSpy(...a) }));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: renderSpy, unmount: unmountSpy }) }));
-vi.mock('@excalidraw/excalidraw', () => ({
-  Excalidraw: { name: 'Excalidraw' },
-  serializeAsJSON: (...a: unknown[]) => serializeMock(...a),
-}));
+vi.mock('@excalidraw/excalidraw', () => {
+  const c = () => null; // component stub
+  const MainMenu = Object.assign(c, {
+    Separator: c,
+    DefaultItems: {
+      SearchMenu: c, CommandPalette: c, LoadScene: c, SaveAsImage: c,
+      Export: c, ChangeCanvasBackground: c, ClearCanvas: c, Help: c,
+    },
+  });
+  const WelcomeScreen = Object.assign(c, {
+    Hints: { MenuHint: c, ToolbarHint: c, HelpHint: c },
+    Center: Object.assign(c, { Heading: c }),
+  });
+  return {
+    Excalidraw: { name: 'Excalidraw' },
+    MainMenu,
+    WelcomeScreen,
+    serializeAsJSON: (...a: unknown[]) => serializeMock(...a),
+  };
+});
 vi.mock('@excalidraw/excalidraw/index.css', () => ({}));
 
 import WhiteboardPage from './WhiteboardPage.vue';
 
+// The Excalidraw element is the only createElement call carrying an onChange
+// prop (the trimmed menu/welcome children are props-less), so find it by that
+// rather than by call order.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function lastExcalidrawProps(): any {
   const calls = createElementSpy.mock.calls;
-  return calls.length ? calls[calls.length - 1][1] : null;
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const props = calls[i][1] as Record<string, unknown> | undefined;
+    if (props && typeof props === 'object' && 'onChange' in props) return props;
+  }
+  return null;
 }
 
 // flush drains the macrotask + microtask queues under REAL timers, letting the
