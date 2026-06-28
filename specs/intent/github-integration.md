@@ -10,7 +10,11 @@ affects:
   - internal/handler/config.go
   - internal/store/models.go
   - internal/apicontract/routes.go
-  - frontend/src/components/GithubPanel.vue
+  - frontend/src/views/GithubPage.vue
+  - frontend/src/components/settings/SettingsTabGithub.vue
+  - frontend/src/components/github/
+  - frontend/src/components/Sidebar.vue
+  - frontend/src/router.ts
   - frontend/src/stores/github.ts
 effort: xlarge
 created: 2026-06-26
@@ -99,7 +103,7 @@ children, not here.
 
 ```mermaid
 graph TD
-  UI[GithubPanel.vue + github.ts store] -->|/api/github/*| H[handler/github.go]
+  UI[GithubPage.vue + SettingsTabGithub.vue + github.ts store] -->|/api/github/*| H[handler/github.go]
   H --> GC[internal/github client]
   H --> TS[GitHub token store]
   GC -->|REST/GraphQL| GH[(api.github.com)]
@@ -119,15 +123,19 @@ pull-request.md) and the gated cloud-clone phase (reaches the Executor seam).
 
 #### 1. GitHub OAuth App + token store
 
-The auth foundation every other component needs. A GitHub OAuth App (or GitHub
-App, decided in the child) with an OAuth flow initiated from the UI, requesting
-the minimum scopes (`repo`, `read:org`; `read:user` for identity). Tokens are
-stored server-side, scoped to the principal (user/org from
+The auth foundation every other component needs. A **GitHub App** (decided; see
+the child) installed per org, with a user-to-server OAuth flow initiated from the
+UI and an install step that grants per-repo permissions
+(`contents`, `pull_requests`, `issues`, `metadata`). Tokens are stored
+server-side, scoped to the principal (user/org from
 [authentication.md](../identity/authentication.md)), and refreshed on expiry.
-`/api/config` gains GitHub auth status (connected, scopes, login) so the UI can
-gate the rest of the surface. Reuse the `authkit` token-store patterns
-(`internal/handler/device_auth.go`) where they fit; GitHub tokens are a distinct
-credential from the latere.ai OIDC token and must not be conflated.
+`/api/config` gains GitHub auth status (connected, login, installation/granted
+scopes) so the UI can gate the rest of the surface. Reuse the `authkit`
+token-store patterns (`internal/handler/device_auth.go`) where they fit; GitHub
+tokens are a distinct credential from the latere.ai OIDC token and must not be
+conflated. The install model means the connect flow has an explicit install +
+grant step (component 1 UI) and repo selection lists installation repos
+(component 2).
 
 This is the lead child: nothing else dispatches until tokens exist.
 
@@ -174,6 +182,78 @@ local checkout. This depends on the **Cloud Axis B Executor seam**
 which is demand-gated and not yet built. Specced as a dependent later phase so
 the local/headless OAuth + read/write surface (components 1-4) ships
 independently of remote execution.
+
+### UI Architecture
+
+The umbrella owns the cross-cutting UI so the children specify only their slice
+and do not each re-invent the shell. The naming in the original `affects` lists
+(a single `GithubPanel.vue`) predates this IA and is reconciled here.
+
+#### Surface split (follows the app idiom)
+
+Wallfacer's frontend is route-per-surface (a Sidebar nav item maps to a page
+view under `frontend/src/views/`) with account/prerequisite settings living in
+tabbed sub-components under `frontend/src/components/settings/`. The GitHub
+surface splits along that same seam:
+
+- **Connect / disconnect (component 1)** is account-level and connect-once, so
+  it lives in a **Settings tab** (`SettingsTabGithub.vue`), mirroring
+  `AccountControl.vue` and the existing prerequisite tabs. Reachable from
+  Settings; not workspace-scoped.
+- **Repo selection + PR/issue browse (components 2-3)** is workspace-level and
+  is the day-to-day surface, so it is a **`/github` page**
+  (`views/GithubPage.vue`) with a Sidebar entry under the **Workspace** group
+  (`meta: { needsWorkspace: true }`, so the standard `WorkspaceRequired` prompt
+  applies when no workspace is visible).
+
+The old `GithubPanel.vue` name is dropped. The page composes child components
+under `frontend/src/components/github/` (e.g. a repo picker, PR/issue lists, a
+thread view); the exact decomposition is each child's call. A shared
+`stores/github.ts` holds auth status, the selected repo, and list/detail state.
+
+#### `/github` page information architecture
+
+```
++--------------------------------------------------------------+
+| [ repo selector v ]  owner/repo      rate: 4980/5000  [↻]    |  <- header
++--------------------------------------------------------------+
+|  ( Pull Requests )  ( Issues )                               |  <- tab switch
++----------------------+---------------------------------------+
+|  open  closed  all   |   #42  Add task revert ...            |
+|  [ search ]          |   opened by @x · 3 days ago · 2 ✓     |
+|----------------------|   ------------------------------------|
+| #42 Add task revert  |   <body markdown>                     |
+| #41 Fix flaky test   |   ------------------------------------|
+| #39 Bump deps        |   <conversation + review comments>    |
+|  ... (paginated)     |   [ comment box ] (write surface, #4) |
++----------------------+---------------------------------------+
+       list pane                 detail pane (master-detail)
+```
+
+The repo selector and header are shared chrome; the PRs/Issues tabs and the
+master-detail list/detail are component 3 (read); the comment box and a "Create
+PR" affordance are component 4 (write). The list pane is a master list; the
+detail pane lazy-loads the selected item.
+
+#### Shared UI state matrix
+
+Every GitHub surface resolves to one of these states. Children reference this
+matrix rather than redefining states; each child names which states it owns and
+what it renders.
+
+| State | Trigger | Surface behavior |
+|-------|---------|------------------|
+| Disconnected | no GitHub token for principal | `/github` page shows a connect call-to-action linking to the Settings tab; Settings tab shows `[ Connect GitHub ]`. Sidebar entry visible but page gated. |
+| Connecting | OAuth/install flow in flight | Settings tab shows an in-progress state through the install + grant round trip; disable re-trigger. |
+| Connected | valid token, login + scopes known | Settings tab shows login, granted scopes/installation, `[ Disconnect ]`. Page enabled. |
+| No repo selected | connected, no repo chosen | Page shows the repo picker (component 2) front and center; lists are empty/hidden. |
+| Loading | list or detail fetch in flight | Skeleton rows in the active pane; the rest of the chrome stays interactive. |
+| Empty | fetch succeeded, zero items | "No open pull requests" / "No open issues" with the active filter echoed. |
+| Error | non-auth fetch failure | Inline error in the affected pane with a retry; never a blank page. |
+| Token expired / 401 | API returns 401 | Silent refresh attempt; on failure, drop to Disconnected and re-prompt (see Error Handling). |
+| Rate-limited | remaining budget low / secondary-limit 403 | Header shows remaining/reset; refresh disabled with a "resets in N min" hint; reads served from cache where possible. |
+| Org-boundary blocked | repo outside the signed-in org | 403 surfaced as "outside your organization", not a 500; the repo never appears in the picker. |
+| No local clone | selected repo has no local workspace match (local mode) | Read/write surfaces work; a banner notes "no local checkout" and points at the gated remote-fix phase rather than erroring. |
 
 ### API Surface
 
@@ -271,6 +351,13 @@ graph LR
   style C fill:#eee,stroke:#999
   style EX stroke-dasharray: 5 5
 ```
+
+**Resolved cross-cutting decisions:** the app type is **GitHub App** (per-org
+install, per-repo permissions) -- this fixes the connect flow (install + grant
+step) and the repo-list source (installation repos) for #1 and #2. The UI shell
+is settled in [UI Architecture](#ui-architecture): a Settings tab for connect,
+a `/github` Workspace page for browse, and the shared state matrix all children
+draw from.
 
 **Recommended iteration order:** #1 leads and blocks everything (no GitHub call
 works without a token). Once it settles, #2, #3, and #4 iterate largely in
