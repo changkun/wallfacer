@@ -1,6 +1,6 @@
 ---
 title: Mission Control — Graph-Driven Coordination & Live Execution
-status: complete
+status: archived
 depends_on:
   - specs/local/map-mission-control.md
 affects:
