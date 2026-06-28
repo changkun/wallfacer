@@ -7,7 +7,10 @@ affects:
   - internal/github/read.go
   - internal/github/client.go
   - internal/handler/github.go
-  - frontend/src/components/GithubPanel.vue
+  - frontend/src/views/GithubPage.vue
+  - frontend/src/components/github/
+  - frontend/src/components/Sidebar.vue
+  - frontend/src/router.ts
   - frontend/src/stores/github.ts
 effort: large
 created: 2026-06-26
@@ -77,8 +80,66 @@ decide per view.
 5. What is the canonical internal model for a PR/issue/comment that both the
    read views and the write surface (reply/comment) share?
 
+## UI
+
+Owns the **`/github` page shell** (the umbrella's
+[UI Architecture](../github-integration.md#ui-architecture)): the new
+`views/GithubPage.vue`, its route in `router.ts` (`localRoutes`, with
+`meta: { needsWorkspace: true }`), and a Sidebar entry under the **Workspace**
+group in `Sidebar.vue` (`{ id: 'github', label: 'GitHub', to: '/github',
+icon: 'github' }` plus the inline SVG). The page hosts the repo selector
+(component 2), the PRs/Issues tabs, and the master-detail list/detail; the write
+affordances (comment box, Create PR) are component 4 slotted in.
+
+States this child owns from the shared matrix: **Loading**, **Empty**,
+**Error**, **Rate-limited**, plus the page-level **Disconnected** call-to-action
+that links into component 1's Settings tab.
+
+```
+/github  (page = header + tabs + master-detail)
++--------------------------------------------------------------+
+| [ latere/wallfacer ▾ ]            rate: 4980/5000   [ ↻ ]    |
++--------------------------------------------------------------+
+|  ( Pull Requests )  ( Issues )                               |
++----------------------+---------------------------------------+
+| open  closed  all    |  #42  Add task revert ...             |
+| [ filter labels ]    |  @author · opened 3d ago · ✓ 2 / ✗ 0 |
+| [ search ]           |  -------------------------------------|
+|----------------------|  Summary / body (markdown)           |
+| ▸ #42 Add task ...   |  -------------------------------------|
+| ▸ #41 Fix flaky test |  ▸ review comment (file:line)         |
+| ▸ #39 Bump deps      |  ▸ conversation comment               |
+| · loading more...    |  ▸ ...                                |
++----------------------+---------------------------------------+
+     list pane (master)          detail pane (lazy-loaded)
+```
+
+- **Tabs**: Pull Requests / Issues switch the list pane; each has open/closed/all
+  state filters (issues also label filter). Switching tabs preserves the
+  selected repo and the per-tab filter.
+- **List pane** (master): paginated rows; selecting a row loads the detail pane.
+  Pagination UX follows open question 4 -- default to incremental "load more" /
+  infinite scroll with a capped window and an "open on GitHub ↗" escape for the
+  long tail.
+- **Detail pane**: lazy-loads on selection (PR or issue) with its merged comment
+  thread (review comments line-anchored, conversation comments inline); built
+  from the REST-vs-GraphQL decision in open question 1.
+- **Loading**: skeleton rows in the list pane, a skeleton block in the detail
+  pane; chrome (repo selector, tabs, refresh) stays interactive.
+- **Empty**: "No open pull requests" / "No open issues" echoing the active
+  filter; not a blank pane.
+- **Error**: inline error with a retry in the affected pane; the rest of the
+  page keeps working.
+- **Rate-limited**: the header shows remaining/reset (open question 3); on a
+  secondary-limit 403 the manual refresh is disabled with a "resets in N min"
+  hint and lists fall back to cache. The header rate readout is shared chrome
+  other components read.
+- **Refresh** (`↻`) bypasses the short-TTL cache for the active view; normal
+  navigation is served from cache (open question 2).
+
 ## Affects
 
 Establishes `internal/github/client.go` (shared transport) and `read.go`, adds
 the `GET /api/github/pulls`, `/pulls/{number}`, `/issues`, `/issues/{number}`
-routes, and the list/detail UI in the GitHub panel.
+routes, and the `/github` page + list/detail UI (see UI above), including the
+route and Sidebar entry that make the page reachable.
