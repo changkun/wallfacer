@@ -32,6 +32,39 @@ This is the **full unified surface** (the chosen merge depth). It is built addit
 first (a new view alongside the existing pages) so the working product is never
 broken mid-build, then the old pages are retired once it proves out.
 
+## Reframe (2026-06-28): the primitive is an agent FLEET, not a pipeline
+
+Author review of M6.1-M6.2 surfaced that "flow as an ordered pipeline of steps"
+is the wrong mental model and is confusing. The chosen primitive is an **agent
+fleet (delegation graph)**, matching the founding goal: define agents, define how
+they talk, let them discover and delegate to peers, spawn subagent graphs. The
+backend already runs exactly this (`agentgraph.FromFlow`: `steps[0]` is the fleet
+**lead/entry**, the rest are **peers**; `dynamic` + topology gates who may
+delegate to whom). The reframe is in the UI's concepts and rendering, not the
+data model or runtime.
+
+- A node is an agent; an **edge means "can delegate to / hand off to"**, NOT
+  "runs after". A task enters at the lead and the fleet works it to an outcome by
+  delegating.
+- **Coordination** (one control, replacing the agentic/dynamic/topology toggles
+  as the user-facing concept): **Lead delegates** (orchestrator-worker: only the
+  lead hands off to workers) | **Open mesh** (any agent delegates to any peer,
+  bounded by handoff depth) | **Fixed sequence** (the legacy pinned chain: runs
+  the agents in order; the simple deterministic special case). These map onto
+  `dynamic=false` (Fixed sequence) and `dynamic=true` + `topology` (the two
+  delegation modes).
+- The first agent is the **lead**; the rest are members. Lead delegates / mesh
+  render delegation edges from the coordination mode; Fixed sequence keeps the
+  ordered-chain rendering for the simple case.
+- Pipeline-only gestures (mark-parallel, reorder by stage gaps) apply only to
+  Fixed sequence; a delegating fleet has no inherent order, so members are just
+  positioned (free-form, the author's arrangement).
+- Language throughout speaks fleet terms (lead, members, delegates to, "a task
+  enters the fleet and is worked to an outcome"), not flow/step/pipeline.
+
+Storage is unchanged: a fleet persists as a flow (lead = step 0, members =
+the rest, coordination = dynamic + topology) through the existing CRUD.
+
 ## The surface
 
 A single view (provisional route `/agents`, eventually replacing both
