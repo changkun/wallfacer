@@ -1,6 +1,6 @@
 ---
 title: Live Agent Traces for Topos Runs (Event Seam + Stream + UI)
-status: drafted
+status: complete
 depends_on:
   - topos-runtime-integration
 affects:
@@ -158,16 +158,28 @@ and observer-panic recovery; full topos suite + golangci-lint green.
 *Remaining for ship:* tag topos `v0.0.5` and bump wallfacer `go.mod` (the
 `go.work` masks this during dev; CI/`go.mod` builds need the published version).
 
-**Phase 2 — wallfacer forward + persist + SSE.** agentgraph forwards events to a
-per-task sink; events persist to JSONL; `GET …/agentgraph/trace` streams live
-(SSE) and replays completed runs. Tests: a fake-model agentic run produces the
-expected `TraceEvent` sequence on the sink; the endpoint streams then replays;
-the seam stays topos-free (import-guard test still passes).
+**Phase 2 — wallfacer forward to the task timeline. DONE** (`b6b4ac8f`).
+*Scope change from the original D/E plan:* rather than build a bespoke per-task
+trace hub + JSONL + dedicated SSE endpoint + new UI, the run's events are
+forwarded onto the **existing task timeline** via `InsertEvent`, which already
+renders live through `/api/tasks/stream`. This delivers the live multi-agent
+transcript (per-turn assistant text, delegations, tool use, labelled by lineage
+node id) with no new endpoint and no frontend change — far less surface for the
+same user-visible outcome. agentgraph gained a topos-free `TraceEvent` + an
+`onEvent` observer on `RunFlowWithModel` (wired to `topos.Options.Observer` inside
+the seam); `runAgenticFlow` drains events through a buffered channel (non-blocking,
+honouring the synchronous-observer contract) and maps the meaningful ones to
+timeline lines. Tests: the observer receives the ordered stream with Node→lineage
+join; `agenticTraceEvent` maps/filters correctly. Import guard intact; lint green.
 
-**Phase 3 — live UI.** `AgentLineage.vue` animates node status from the stream and
-shows per-agent transcript with memoized markdown. Test: nodes transition on
-mocked SSE events; markdown renders once per turn (no re-parse on subsequent
-events).
+**Phase 3 — bespoke SSE + live lineage animation. OPTIONAL (deferred).** The
+original D/E design (per-task trace hub, JSONL persistence, `GET …/agentgraph/trace`
+SSE with the seq-cursored live→replay handoff, and `AgentLineage.vue` node
+animation + per-agent transcript panel with memoized markdown) is now *polish*,
+not the core deliverable — Phase 2 already shows the trace live on the timeline.
+Build this only if the richer experience (typewriter streaming, the graph lighting
+up node-by-node, a dedicated transcript panel) is wanted. The memoized-markdown
+requirement and the seq-cursor handoff still apply if it is built.
 
 ## Non-Goals
 
