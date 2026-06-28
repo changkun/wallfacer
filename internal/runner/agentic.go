@@ -69,6 +69,19 @@ func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]st
 	if label == "" {
 		label = ev.Node
 	}
+	// trace builds the timeline data: a human "result" line (so the events tab
+	// reads naturally) plus structured fields the Agent Graph view groups on
+	// (source marks it as an agent-graph trace; node is the lineage join key).
+	trace := func(kind, result, text string) (store.EventType, map[string]string, bool) {
+		return store.EventTypeSystem, map[string]string{
+			"result": result,
+			"source": "agentgraph",
+			"kind":   kind,
+			"node":   ev.Node,
+			"agent":  label,
+			"text":   text,
+		}, true
+	}
 	switch ev.Name {
 	case "AssistantMessage":
 		var p struct {
@@ -78,9 +91,9 @@ func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]st
 		if p.Text == "" {
 			return "", nil, false
 		}
-		return store.EventTypeSystem, map[string]string{"result": label + ": " + p.Text}, true
+		return trace("assistant", label+": "+p.Text, p.Text)
 	case "SubagentStart":
-		return store.EventTypeSystem, map[string]string{"result": "↳ delegated to " + label}, true
+		return trace("delegate", "↳ delegated to "+label, "")
 	case "PostToolUse":
 		var p struct {
 			ToolCall struct {
@@ -91,7 +104,7 @@ func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]st
 		if p.ToolCall.Name == "" {
 			return "", nil, false
 		}
-		return store.EventTypeSystem, map[string]string{"result": label + " used " + p.ToolCall.Name}, true
+		return trace("tool", label+" used "+p.ToolCall.Name, p.ToolCall.Name)
 	default:
 		return "", nil, false
 	}

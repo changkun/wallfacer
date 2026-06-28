@@ -18,13 +18,15 @@ func TestAgenticTraceEvent(t *testing.T) {
 		wantOK    bool
 		wantType  store.EventType
 		wantParts []string // substrings the result line must contain
+		wantKind  string   // expected data["kind"] (empty = skip)
 	}{
 		{
 			name:      "assistant text",
-			ev:        agentgraph.TraceEvent{Name: "AssistantMessage", AgentID: "planner", PayloadJSON: []byte(`{"text":"here is the plan"}`)},
+			ev:        agentgraph.TraceEvent{Name: "AssistantMessage", Node: "run-x/planner", AgentID: "planner", PayloadJSON: []byte(`{"text":"here is the plan"}`)},
 			wantOK:    true,
 			wantType:  store.EventTypeSystem,
 			wantParts: []string{"planner", "here is the plan"},
+			wantKind:  "assistant",
 		},
 		{
 			name:   "assistant empty text filtered",
@@ -75,6 +77,13 @@ func TestAgenticTraceEvent(t *testing.T) {
 				if !strings.Contains(data["result"], part) {
 					t.Errorf("result %q missing %q", data["result"], part)
 				}
+			}
+			// Structured fields the Agent Graph view groups on.
+			if data["source"] != "agentgraph" {
+				t.Errorf("source = %q, want agentgraph", data["source"])
+			}
+			if tc.wantKind != "" && data["kind"] != tc.wantKind {
+				t.Errorf("kind = %q, want %q", data["kind"], tc.wantKind)
 			}
 		})
 	}
