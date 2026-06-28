@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { api, ApiError } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
@@ -300,9 +301,17 @@ function openSandboxSettings() {
   window.location.href = '/settings#sandbox';
 }
 
+const route = useRoute();
+
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
   await loadAgents();
+  // Deep link from the agent-graph: ?agent=<slug> opens that agent's editor.
+  const want = typeof route.query.agent === 'string' ? route.query.agent : '';
+  if (want) {
+    const a = agents.value.find((x) => x.slug === want);
+    if (a) await selectAgent(a);
+  }
 });
 </script>
 

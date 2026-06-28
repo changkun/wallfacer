@@ -113,7 +113,14 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     while dropping on a node still groups (nodes win the hit-test). Pure ops
     unit-tested; the drag + reserved trailing gap validated in a real browser:
     drag -> reorder -> save round-trips the new step order.
-  - **Remaining:** edit-an-agent-node -> the agent editor.
+  - **M6.2g DONE.** Edit-an-agent-node -> the agent editor: double-clicking a
+    step node or a palette agent (in the read-only graph, so an in-progress flow
+    draft is never lost to navigation) routes to `/agents?agent=<slug>`, and
+    AgentsPage reads that query to open the agent. Validated in a real browser.
+  - **M6.2 COMPLETE.** The agent-graph canvas is a full flow editor: clone/edit,
+    drag-to-add, remove, mark-parallel, ungroup, reorder, the agentic/topology
+    controls, and a jump to the agent editor -- all persisting through the flow
+    and agents CRUD.
 - **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
   canvas (status colors, handoff edges), polling/streaming the M5 endpoint.
 - **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;

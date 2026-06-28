@@ -20,6 +20,7 @@ const emit = defineEmits<{
   (e: 'parallel', payload: { from: string; to: string }): void;
   (e: 'ungroup', agentSlug: string): void;
   (e: 'reorder', payload: { slug: string; toStage: number }): void;
+  (e: 'editAgent', agentSlug: string): void;
 }>();
 
 // Node dragging uses pointer events rather than HTML5 drag: SVG elements do not
@@ -382,6 +383,7 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
             }"
             :data-node-slug="node.slug || null"
             @pointerdown="editable && onNodePointerDown(node.slug)"
+            @dblclick="node.slug && emit('editAgent', node.slug)"
           >
             <rect
               class="agc-node-box"

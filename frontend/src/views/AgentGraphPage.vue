@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { Agent, Flow } from '../api/types';
 import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
@@ -23,6 +24,8 @@ import {
 // palette onto the canvas to add steps, and the draft is saved through the flow
 // CRUD. When `draft` is null the page is read-only, which keeps the original
 // render path (and its component test) intact.
+
+const router = useRouter();
 
 const agents = ref<Agent[]>([]);
 const flows = ref<Flow[]>([]);
@@ -126,6 +129,14 @@ function onReorder(p: { slug: string; toStage: number }) {
   saveError.value = '';
 }
 
+// editAgent jumps to the existing Agents editor for an agent (deep link read by
+// AgentsPage). Suppressed while editing a flow so an unsaved draft is not lost
+// to the navigation; the affordance is for the read-only graph.
+function editAgent(slug: string) {
+  if (draft.value || !slug) return;
+  void router.push({ path: '/agents', query: { agent: slug } });
+}
+
 async function saveDraft() {
   if (!draft.value) return;
   if (draft.value.steps.length === 0) {
@@ -195,7 +206,7 @@ onMounted(async () => {
               agent registry; the canvas renders a flow as an agent-graph, with a
               node per step and edges for order.
               <template v-if="draft">Drag agents onto the canvas to add steps, then save.</template>
-              <template v-else>Clone or edit a flow to compose it.</template>
+              <template v-else>Clone or edit a flow to compose it; double-click an agent or node to edit the agent.</template>
             </p>
           </div>
           <div class="ag-mode__header-actions">
@@ -233,9 +244,11 @@ onMounted(async () => {
                 v-for="a in filteredAgents"
                 :key="a.slug"
                 class="ag-card"
-                :class="{ 'ag-card--draggable': !!draft }"
+                :class="{ 'ag-card--draggable': !!draft, 'ag-card--linkable': !draft }"
                 :draggable="!!draft"
+                :title="!draft ? 'Double-click to edit this agent' : ''"
                 @dragstart="onAgentDragStart($event, a)"
+                @dblclick="editAgent(a.slug)"
               >
                 <div class="ag-card__head">
                   <span class="ag-card__name">{{ a.title || a.slug }}</span>
@@ -355,6 +368,7 @@ onMounted(async () => {
                 @parallel="onParallel"
                 @ungroup="onUngroup"
                 @reorder="onReorder"
+                @edit-agent="editAgent"
               />
             </div>
           </template>
@@ -458,6 +472,9 @@ onMounted(async () => {
   border-radius: 9px;
   background: var(--bg-sunk);
   padding: 0.55rem 0.65rem;
+}
+.ag-card--linkable {
+  cursor: pointer;
 }
 .ag-card--draggable {
   cursor: grab;
