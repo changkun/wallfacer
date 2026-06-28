@@ -62,82 +62,41 @@ func (r *Registry) List() []Flow {
 	return out
 }
 
-// ResolveLegacyKind maps the legacy store.TaskKind values onto their
-// equivalent flow slugs so callers can migrate incrementally. The
-// mapping is:
-//
-//   - "" (default)   → "implement"
-//
-// Other kinds (including "planning", "routine") return ok=false —
-// those tasks continue to use their existing dispatch paths until
-// their own migration tasks land. The retired "idea-agent" kind no
-// longer maps to a flow; such records fall through to the default
-// ("implement") via resolveByExplicitOrLegacy. Returning the Flow by
-// value keeps callers isolated from mutation, same as Get.
-func (r *Registry) ResolveLegacyKind(kind store.TaskKind) (Flow, bool) {
-	switch kind {
-	case "":
-		return r.Get("implement")
-	default:
-		return Flow{}, false
-	}
-}
-
-// resolveByExplicitOrLegacy is the shared body of ResolveForTask and
-// ResolveRoutineFlow: prefer the explicit slug field; fall back to the
-// legacy-kind mapping; default to "implement". explicitFlow and
-// legacyKind are extractor functions because the two callers read
-// different store.Task fields (FlowID vs RoutineSpawnFlow, Kind vs
-// RoutineSpawnKind).
-func (r *Registry) resolveByExplicitOrLegacy(
-	t *store.Task,
-	explicitFlow func(*store.Task) string,
-	legacyKind func(*store.Task) store.TaskKind,
-) string {
+// resolveExplicit is the shared body of ResolveForTask and
+// ResolveRoutineFlow: prefer the explicit slug field, but only when it still
+// names a registered flow; otherwise default to "implement". The old
+// legacy-Kind mapping is gone -- every removed kind (idea-agent, the retired
+// brainstorm / test-only flows) already resolved to "implement", so the kind
+// extractor and ResolveLegacyKind were dead. explicitFlow differs per caller
+// (FlowID vs RoutineSpawnFlow).
+func (r *Registry) resolveExplicit(t *store.Task, explicitFlow func(*store.Task) string) string {
 	if t == nil {
 		return "implement"
 	}
-	// An explicit slug wins, but only when it still names a registered
-	// flow. A task or routine pinned to a since-removed slug (e.g. the
-	// retired "brainstorm" / "test-only" built-ins) must keep dispatching
-	// rather than resolve to a slug that no longer exists, which would
-	// fail or silently drop the run. Fall back to the default flow.
-	// User-authored flows are registered, so they resolve to themselves.
+	// A task or routine pinned to a since-removed slug must keep dispatching
+	// rather than resolve to a slug that no longer exists; fall back to the
+	// default flow. User-authored flows are registered, so they resolve to
+	// themselves.
 	if s := explicitFlow(t); s != "" {
 		if _, ok := r.byKey[s]; ok {
 			return s
 		}
-		return "implement"
-	}
-	if f, ok := r.ResolveLegacyKind(legacyKind(t)); ok {
-		return f.Slug
 	}
 	return "implement"
 }
 
-// ResolveForTask returns the slug of the flow a task should run
-// against. Precedence: the task's explicit FlowID wins; otherwise
-// fall back to ResolveLegacyKind so pre-migration records dispatch
-// correctly; otherwise "implement" as a last resort. This helper
-// lives on the flow Registry (rather than as a *Task method) because
+// ResolveForTask returns the slug of the flow a task should run against: the
+// task's explicit FlowID when it names a registered flow, otherwise "implement".
+// This helper lives on the flow Registry (rather than as a *Task method) because
 // the store package cannot import flow without creating a cycle.
 func (r *Registry) ResolveForTask(t *store.Task) string {
-	return r.resolveByExplicitOrLegacy(t,
-		func(t *store.Task) string { return t.FlowID },
-		func(t *store.Task) store.TaskKind { return t.Kind },
-	)
+	return r.resolveExplicit(t, func(t *store.Task) string { return t.FlowID })
 }
 
-// ResolveRoutineFlow returns the slug of the flow a routine should
-// spawn instance tasks against. Precedence: RoutineSpawnFlow wins;
-// otherwise the legacy RoutineSpawnKind is mapped via the legacy
-// resolver; otherwise "implement". Shares the same cycle-breaking
-// rationale as ResolveForTask.
+// ResolveRoutineFlow returns the slug of the flow a routine spawns instance
+// tasks against: RoutineSpawnFlow when registered, otherwise "implement".
 func (r *Registry) ResolveRoutineFlow(t *store.Task) string {
-	return r.resolveByExplicitOrLegacy(t,
-		func(t *store.Task) string { return t.RoutineSpawnFlow },
-		func(t *store.Task) store.TaskKind { return t.RoutineSpawnKind },
-	)
+	return r.resolveExplicit(t, func(t *store.Task) string { return t.RoutineSpawnFlow })
 }
 
 // cloneFlow produces a defensive deep copy of a Flow. Used by Get and

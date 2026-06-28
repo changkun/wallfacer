@@ -30,7 +30,6 @@ import './styles/explorer.css';
 import './styles/spec-mode.css';
 import './styles/docs.css';
 import './styles/agents.css';
-import './styles/flows.css';
 import './styles/syntax.css';
 import './styles/utilities.css';
 import './styles/app.css';

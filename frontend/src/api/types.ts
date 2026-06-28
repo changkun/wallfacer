@@ -34,7 +34,6 @@ export interface Flow {
   description?: string;
   builtin: boolean;
   steps?: FlowStep[];
-  spawn_kind?: string;
   // M3 agentic fields, serialized by GET /api/flows (see
   // internal/handler/flows.go FlowResponse / describeFlow) and accepted on
   // POST/PUT. They are omitted for ordinary flows, so they arrive undefined for
