@@ -1,10 +1,10 @@
 # Agents & Flows
 
-Wallfacer's execution model builds on four primitives: **agents**, **flows**, **tasks**, and **routines**. Understanding how they compose is the single biggest lever for customising what Wallfacer does on your behalf: picking a different coding harness per step, tightening an agent's system prompt, adding a security-review pass to every implementation, or scheduling a nightly brainstorm.
+Wallfacer's execution model builds on four primitives: **agents**, **flows**, **tasks**, and **routines**. Understanding how they compose is the single biggest lever for customising what Wallfacer does on your behalf: picking a different coding harness per step, tightening an agent's system prompt, adding a security-review pass to every implementation, or scheduling a nightly routine that scans the repository for new tasks.
 
 This guide explains each primitive, how they plug into each other, and works through common recipes.
 
-> Prompt refinement is not an agent or a flow. It happens in the Plan task-mode chat through the `update_task_prompt` tool. See [Refinement & Ideation](refinement-and-ideation.md) for where and how to refine a task before you run it.
+> Prompt refinement is not an agent or a flow. It happens in the Plan task-mode chat through the `update_task_prompt` tool. See [Prompt Refinement](refinement-and-ideation.md) for where and how to refine a task before it runs.
 
 ---
 
@@ -13,7 +13,7 @@ This guide explains each primitive, how they plug into each other, and works thr
 ```mermaid
 flowchart TD
     Task["Task<br/>prompt, metadata, and a flow slug"]
-    Flow["Flow<br/>implement, brainstorm, test-only, or custom<br/>an ordered chain of agent slugs"]
+    Flow["Flow<br/>implement or custom<br/>an ordered chain of agent slugs"]
     Agent["Agent<br/>impl, test, title, oversight, and more<br/>title, system prompt, harness, capabilities"]
     Harness["Harness<br/>Claude or Codex<br/>the selected CLI, run as a host process in the task worktree"]
     Task --> Flow --> Agent --> Harness
@@ -50,7 +50,7 @@ An agent is a descriptor, not a running process. It tells the runner how a parti
 
 ### The built-in catalog
 
-Six agents ship with Wallfacer, each mapped to a specific sub-agent role the runner knows how to dispatch:
+Five agents ship with Wallfacer, each mapped to a specific sub-agent role the runner knows how to dispatch:
 
 | Slug | Purpose |
 |------|---------|
@@ -59,13 +59,12 @@ Six agents ship with Wallfacer, each mapped to a specific sub-agent role the run
 | `title` | Generates a 2-5 word title for a task card. |
 | `oversight` | Produces a high-level summary of what the task did. |
 | `commit-msg` | Drafts a commit message from the worktree diff. |
-| `ideate` | Scans the workspace and proposes task ideas. |
 
 Browse them in the sidebar **Agents** tab. Clicking a row shows its full descriptor, including the rendered prompt template.
 
 ![Agents tab listing built-in agents with the selected agent's descriptor in the detail pane](images/agents.png)
 
-> Looking for a "refine" agent? There isn't one. Prompt refinement lives in the Plan task-mode chat, not in the agent catalog. See [Refinement & Ideation](refinement-and-ideation.md).
+> Looking for a "refine" agent? There isn't one. Prompt refinement lives in the Plan task-mode chat, not in the agent catalog. See [Prompt Refinement](refinement-and-ideation.md).
 
 ### Cloning a built-in
 
@@ -147,8 +146,8 @@ A flow is an ordered list of steps, where each step references an agent by slug.
 | Slug | Chain | What it's for |
 |------|-------|---------------|
 | `implement` | impl → test → (commit-msg ‖ title ‖ oversight) | The standard task pipeline. The three terminal steps run in parallel. |
-| `brainstorm` | ideate | Workspace scan that proposes new tasks. Used by the ideation routine. |
-| `test-only` | test | Run the test agent against the current worktree state. |
+
+`implement` is the only built-in flow. Clone it or author a new flow under `~/.wallfacer/flows/` for anything else, such as a test-only chain or a workspace scan that proposes new tasks.
 
 ### Reading a flow row
 
@@ -226,7 +225,6 @@ Step `impl` runs with the text `test` produced. If `input_from` is omitted, the 
 The runner's `Run` method resolves the task's flow slug, then:
 
 - **`implement`** → the turn loop in `execute.go`. This path is kept because the implement pipeline has multi-turn / session-recovery semantics the linear engine does not express.
-- **`brainstorm`** (or legacy `Kind=idea-agent`) → the ideation fast path (`runIdeationTask`), which knows how to parse idea-agent output and create backlog tasks.
 - **anything else** → the flow engine in `internal/flow/engine.go`. The engine walks steps, fans out parallel groups through an errgroup, and drives each step via `Runner.RunAgent(slug, task, prompt)`.
 
 ### On-disk format
@@ -252,11 +250,9 @@ Watched the same way as agents. Override the directory with `WALLFACER_FLOWS_DIR
 
 The **+ New Task** form in the Backlog column has a **Flow** dropdown populated from `/api/flows`. Default is `implement`. Switch to any built-in or user-authored flow to run the task against that chain. The same form exposes a Templates button, the task description field, and per-task Agent and Timeout controls.
 
-When the flow is `brainstorm`, the prompt field becomes optional (the ideate agent derives the topic from the workspace itself).
-
 ### What the task record stores
 
-Every task carries a `flow_id` field. Legacy records written before the flow-data-model task (or via back-compat code paths) may instead carry `kind: "idea-agent"`, which resolves to `brainstorm` via the legacy-kind mapper. You don't need to migrate anything, the runner reads either.
+Every task carries a `flow_id` field. Legacy records written before the flow-data-model task (or via back-compat code paths) may instead carry `kind: "idea-agent"`. With the idea-agent subsystem removed, such records resolve to the default flow (`implement`) and render as ordinary cards. Nothing needs migrating; the runner reads either.
 
 ### Switching a task's flow
 
@@ -266,11 +262,11 @@ Via the UI today you pick the flow at creation and cannot change it after. Via t
 
 ## Routines spawn tasks against a flow
 
-A **routine** is a board card (`Kind=routine`) with a schedule. When its timer fires, the routine spawns a fresh task against the flow you picked. A routine card shows its cadence, its target flow, and its next fire time (for example, "nightly idea scan, every 24h, flow: brainstorm, next fire tomorrow 09:00").
+A **routine** is a board card (`Kind=routine`) with a schedule. When its timer fires, the routine spawns a fresh task against the flow you picked. A routine card shows its cadence, its target flow, and its next fire time (for example, "nightly idea scan, every 24h, flow: implement, next fire tomorrow 09:00").
 
 The `spawn_flow` field replaces the legacy `spawn_kind`. Create one via the composer's "Repeat on a schedule" toggle or directly via `POST /api/routines`.
 
-The runner uses the routine's flow on every fire, so changing the routine's `spawn_flow` affects all future instances. The ideation routine is the canonical example: it's a routine card tagged `system:ideation` with `spawn_flow: brainstorm`.
+The runner uses the routine's flow on every fire, so changing the routine's `spawn_flow` affects all future instances. Recurring idea generation is a routine like any other: schedule a card on the [Routines](board-and-tasks.md#routine-tasks) page with a prompt such as "Review the repository for the three highest-impact improvements and create a task for each." The routine creator offers that example with one click.
 
 See [Routine Tasks](board-and-tasks.md#routine-tasks) for the routine lifecycle and API surface.
 
@@ -367,7 +363,7 @@ For contributors:
 - `internal/agents/`, `Role` descriptor, built-in catalog (`builtins.go`), YAML store + watcher.
 - `internal/flow/`, `Flow` / `Step` data model, built-in catalog, YAML store + watcher, `Engine` sequencer.
 - `internal/runner/agent.go`, `runAgent` dispatch, `RunAgent` flow-engine adapter.
-- `internal/runner/execute.go`, `Run` selects the dispatch path (implement turn loop vs brainstorm fast path vs flow engine).
+- `internal/runner/execute.go`, `Run` selects the dispatch path (implement turn loop vs flow engine).
 - `internal/handler/agents.go` + `flows.go`, HTTP API surface.
 - `frontend/src/views/AgentsPage.vue` + `FlowsPage.vue`, the management tabs.
 

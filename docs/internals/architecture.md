@@ -52,9 +52,9 @@ graph TB
 
 **Worktree isolation, not container isolation.** Every agent turn is a host process whose CWD is the task's git worktree. Tasks isolate from each other through separate worktrees and `task/<id>` branches, not through a sandboxed runtime. Tasks work in parallel without merge conflicts during execution; rebase and merge happen at commit time.
 
-**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg, ideate) can route to different harnesses (`claude`, `codex`, `cursor`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
+**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
 
-**Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds). Scheduled work (including ideation) runs through the routine engine.
+**Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds). Scheduled work runs through the routine engine.
 
 ### Recent migrations
 
@@ -123,7 +123,7 @@ flowchart TD
 
 ## Background Automation
 
-Six long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go:252-259`). Ideation is not a watcher; it is a routine fired by the routine engine.
+Six long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go:252-259`). Scheduled work, including recurring idea generation, is not a watcher; it is a routine fired by the routine engine.
 
 ```mermaid
 flowchart LR
@@ -134,24 +134,23 @@ flowchart LR
     PubSub --> Submitter["Auto-submitter<br/>waiting to done<br/>when test passed<br/>+ conflict-free"]
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
-    PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(ideation + user-defined)<br/>spawn tasks against a flow"]
+    PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn tasks against a flow"]
 ```
 
-The six entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`. There is no auto-refiner and no standalone ideation watcher.
+The six entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`. There is no auto-refiner.
 
 ### Agents, flows, and the dispatch layer
 
 At task execution time the runner consults two registries before it execs any CLI:
 
-- `internal/agents/` holds the **Role** descriptors. Six built-ins ship (`title`, `oversight`, `commit-msg`, `ideate`, `impl`, `test`; `internal/agents/builtins.go`), plus any user-authored clones loaded from `~/.wallfacer/agents/`. A role pins a harness (`claude`, `codex`, or `cursor`), declares capabilities, and optionally carries a system-prompt preamble.
-- `internal/flow/` holds **Flow** definitions: ordered step chains that reference roles by slug. Three built-ins ship (`implement`, `brainstorm`, `test-only`; `internal/flow/builtins.go`); user flows live under `~/.wallfacer/flows/`. The `implement` flow runs `impl -> test -> parallel(commit-msg, title, oversight)`.
+- `internal/agents/` holds the **Role** descriptors. Five built-ins ship (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`), plus any user-authored clones loaded from `~/.wallfacer/agents/`. A role pins a harness (`claude`, `codex`, or `cursor`), declares capabilities, and optionally carries a system-prompt preamble.
+- `internal/flow/` holds **Flow** definitions: ordered step chains that reference roles by slug. One built-in ships (`implement`; `internal/flow/builtins.go`); user flows live under `~/.wallfacer/flows/`. The `implement` flow runs `impl -> test -> parallel(commit-msg, title, oversight)`.
 
 Both directories are fsnotify-watched; edits reload the merged registry without restarting the server.
 
-Task execution picks one of three dispatch paths:
+Task execution picks one of two dispatch paths:
 
 - `flow == "implement"` -> the turn-loop path in `execute.go` (impl -> test -> commit pipeline with full session-recovery semantics).
-- `flow == "brainstorm"` (or legacy `Kind = idea-agent`) -> `runIdeationTask`, which parses ideate output and creates backlog tasks.
 - any other flow slug -> the flow engine in `internal/flow/engine.go`. It walks steps linearly, fans parallel-sibling groups through an `errgroup`, and launches each role via `Runner.RunAgent`.
 
 See [Agents & Flows](../guide/agents-and-flows.md) for the full user-facing model.
@@ -382,14 +381,14 @@ Every `internal/` package and its role in the system:
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `StartFlow()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
-| `routine` | Routine scheduler engine that fires routine-kind tasks (ideation, user-defined) on their configured cadence | `Engine`, `Start()`, `Trigger()` |
+| `routine` | Routine scheduler engine that fires routine-kind tasks (user-defined) on their configured cadence | `Engine`, `Start()`, `Trigger()` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; six-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
 
 Top-level packages:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `prompts` | System prompt templates (title, commit, oversight, test, ideation, conflict) and the workspace key helper used to scope the per-workspace data directory | `Manager`, `NewManager()`, `InstructionsKey()` |
+| `prompts` | System prompt templates (title, commit, oversight, test, conflict) and the workspace key helper used to scope the per-workspace data directory | `Manager`, `NewManager()`, `InstructionsKey()` |
 
 Shared utility packages under `internal/pkg/`:
 
@@ -437,7 +436,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `agents.go` | User-authored agent catalog CRUD backed by `~/.wallfacer/agents/` | `GET/POST /api/agents`, `PUT/DELETE /api/agents/{slug}` |
 | `flows.go` | User-authored flow catalog CRUD backed by `~/.wallfacer/flows/` | `GET/POST /api/flows`, `PUT/DELETE /api/flows/{slug}` |
 | `routines.go` | Routine card CRUD (list, create, update schedule, trigger) | `GET/POST /api/routines`, `PATCH /api/routines/{id}/schedule`, `POST /api/routines/{id}/trigger` |
-| `routines_engine.go` | Scheduler loop that fires routine tasks (ideation + user-defined) on their cadence | `StartRoutineEngine()` (internal loop) |
+| `routines_engine.go` | Scheduler loop that fires routine tasks (user-defined) on their cadence | `StartRoutineEngine()` (internal loop) |
 | `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/me`, `GET /api/auth/orgs`, `PATCH /api/auth/me` |
 | `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
@@ -448,7 +447,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `env.go` | Environment configuration (API tokens, model settings, harness routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |
 | `git.go` | Git workspace operations (status, push, sync, rebase, branches, checkout) | `GET /api/git/status`, `POST /api/git/push`, `POST /api/git/sync`, etc. |
 | `execute.go` | Task execution trigger (delegates to runner) |, (internal, called by task status transitions) |
-| `ideate.go` | Brainstorm/ideation agent lifecycle | `GET /api/ideate`, `POST /api/ideate`, `DELETE /api/ideate` |
 | `oversight.go` | Task oversight summary retrieval | `GET /api/tasks/{id}/oversight` (impl + test phases via `?phase=`) |
 | `spans.go` | Span timing statistics (per-task and aggregate) | `GET /api/debug/spans`, `GET /api/tasks/{id}/spans` |
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |

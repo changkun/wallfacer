@@ -32,7 +32,6 @@ or directly at `/settings?tab=execution`. The toggles are:
 
 | Toggle | Label in menu | What it controls |
 |--------|---------------|------------------|
-| Ideate | **Ideate** | Recurring brainstorm agent (see [Refinement & Ideation](refinement-and-ideation.md#ideation--brainstorm-agent)) |
 | Autopilot | **Implement** | Automatic promotion of backlog tasks to In Progress |
 | Catch Up | **Catch Up** | Automatic rebase of waiting tasks onto latest branch |
 | Auto-test | **Test** | Automatic test verification of waiting tasks |

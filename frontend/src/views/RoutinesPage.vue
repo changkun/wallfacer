@@ -20,6 +20,15 @@ const intervalMin = ref(60);
 const spawnFlow = ref('implement');
 const creating = ref(false);
 
+// Example prompt that turns a routine into a recurring idea generator,
+// the replacement for the retired brainstorm flow.
+const BRAINSTORM_EXAMPLE =
+  'Review the repository for the three highest-impact improvements and create a task for each.';
+
+function fillExample() {
+  prompt.value = BRAINSTORM_EXAMPLE;
+}
+
 const INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
 const intervalOptions = INTERVAL_OPTIONS.map((m) => ({ value: m, label: `${m} min` }));
 const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
@@ -124,6 +133,14 @@ onMounted(() => { loadRoutines(); loadFlows(); });
             placeholder="What should this routine do each time it fires?"
             @input="autogrow"
           />
+          <button
+            type="button"
+            class="routine-create__example"
+            aria-label="Use an example brainstorm prompt"
+            @click="fillExample"
+          >
+            Try an example
+          </button>
           <div class="routine-create__row">
             <label class="routine-create__opt">
               <span>Every</span>
@@ -159,6 +176,14 @@ onMounted(() => { loadRoutines(); loadFlows(); });
           placeholder="What should this routine do each time it fires?"
           @input="autogrow"
         />
+        <button
+          type="button"
+          class="routine-create__example"
+          aria-label="Use an example brainstorm prompt"
+          @click="fillExample"
+        >
+          Try an example
+        </button>
         <div class="routine-create__row">
           <label class="routine-create__opt">
             <span>Every</span>

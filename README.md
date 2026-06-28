@@ -99,12 +99,12 @@ Read more: [The Autonomy Spectrum](docs/guide/autonomy-spectrum.md), [Designing 
 
 Wallfacer runs every task through a small, composable set of primitives:
 
-- **Agents** are sub-roles (impl, test, commit-msg, title, oversight, ideate), each with a harness pin (Claude, Codex, Cursor, OpenCode, or Pi), capabilities, and an optional system prompt.
-- **Flows** compose agents into an ordered pipeline. Built-ins are `implement`, `brainstorm`, and `test-only`.
+- **Agents** are sub-roles (impl, test, commit-msg, title, oversight), each with a harness pin (Claude, Codex, Cursor, OpenCode, or Pi), capabilities, and an optional system prompt.
+- **Flows** compose agents into an ordered pipeline. The built-in is `implement`.
 - **Tasks** pick a flow; the runner walks the flow's step chain.
-- **Routines** spawn tasks against a flow on a schedule.
+- **Routines** spawn tasks against a flow on a schedule. A scheduled routine running an ordinary prompt covers recurring idea generation.
 
-User-authored agents and flows live as YAML under `~/.wallfacer/{agents,flows}/` and are edited through the sidebar **Agents** and **Flows** tabs. Clone a built-in to pin it to a harness, override its system prompt, or insert a review step, without restarting the server. Prompt refinement happens in the Plan task-mode chat (see [Refinement & Ideation](docs/guide/refinement-and-ideation.md)).
+User-authored agents and flows live as YAML under `~/.wallfacer/{agents,flows}/` and are edited through the sidebar **Agents** and **Flows** tabs. Clone a built-in to pin it to a harness, override its system prompt, or insert a review step, without restarting the server. Prompt refinement happens in the Plan task-mode chat (see [Prompt Refinement](docs/guide/refinement-and-ideation.md)).
 
 Read more: [Agents & Flows](docs/guide/agents-and-flows.md).
 
@@ -132,12 +132,12 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 
 ## Capability Stack
 
-- **Chat.** Planning chat with slash commands and file-explorer context, the brainstorm and ideation agents, conversational drift away from or back into specs.
+- **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
 - **Spec.** Six-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
 - **Task.** Host-process execution, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
-Six composable sub-agent roles (each pinned to any installed harness) arrange into flows (`implement`, `brainstorm`, `test-only`, plus user-authored clones) that you can inspect or rewrite from the sidebar.
+Five composable sub-agent roles (each pinned to any installed harness) arrange into flows (`implement`, plus user-authored clones) that can be inspected or rewritten from the sidebar.
 
 ## Roadmap
 
@@ -170,7 +170,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Designing Specs](docs/guide/designing-specs.md) | Spec mode, focused view, dependency minimap |
 | [Agents & Flows](docs/guide/agents-and-flows.md) | Agents, flows, cloning, harness pinning, recipes |
 | [Board & Tasks](docs/guide/board-and-tasks.md) | Task board, lifecycle, dependencies, search |
-| [Refinement & Ideation](docs/guide/refinement-and-ideation.md) | Prompt refinement, brainstorm agent |
+| [Prompt Refinement](docs/guide/refinement-and-ideation.md) | Prompt refinement in the Plan task-mode chat |
 
 **Operate**
 
@@ -191,7 +191,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
-| [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, ideation |
+| [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, routines |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 

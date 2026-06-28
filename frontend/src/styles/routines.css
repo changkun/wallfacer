@@ -91,6 +91,20 @@
 .routine-create__prompt:focus {
   border-color: var(--accent);
 }
+.routine-create__example {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.routine-create__example:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 .routine-create__row {
   display: flex;
   align-items: flex-end;

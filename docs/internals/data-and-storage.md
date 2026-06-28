@@ -45,9 +45,9 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
 | `Title` | `string` | `title` | Display title (auto-generated or user-set) |
-| `Kind` | `TaskKind` | `kind` | Legacy execution mode. `""` for a standard task, `"idea-agent"` for pre-flow ideation records, `"routine"` for routine cards, `"planning"` for the planning task mode. Resolves to a flow slug via the legacy mapper when `FlowID` is empty. |
-| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. New tasks always set this; legacy records fall through to the `Kind` mapper. Built-in slugs: `implement`, `brainstorm`, `test-only`. See [Agents & Flows](../guide/agents-and-flows.md). |
-| `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"idea-agent"`) |
+| `Kind` | `TaskKind` | `kind` | Legacy execution mode. `""` for a standard task, `"routine"` for routine cards, `"planning"` for the planning task mode. A historical `"idea-agent"` value may persist on old rows; with the idea-agent subsystem removed it resolves to the default flow. Resolves to a flow slug via the legacy mapper when `FlowID` is empty. |
+| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. New tasks always set this; legacy records fall through to the `Kind` mapper. Built-in slug: `implement`. See [Agents & Flows](../guide/agents-and-flows.md). |
+| `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"priority:1"`) |
 
 ### State and Lifecycle
 
@@ -341,7 +341,6 @@ Identifies which phase of a task a host-process run belongs to. Primary use toda
 | `SandboxActivityTitle` | `"title"` | Title generation (routing + attribution) |
 | `SandboxActivityOversight` | `"oversight"` | Oversight generation (routing + attribution) |
 | `SandboxActivityCommitMessage` | `"commit_message"` | Commit message generation (routing + attribution) |
-| `SandboxActivityIdeaAgent` | `"idea_agent"` | Brainstorm/ideation (routing + attribution) |
 | `SandboxActivityTest` | `"test"` | Attribution-only (not used for harness routing) |
 | `SandboxActivityOversightTest` | `"oversight-test"` | Attribution-only (not used for harness routing) |
 
