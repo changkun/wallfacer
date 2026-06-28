@@ -12,7 +12,7 @@ const props = defineProps<{
   title: string;
   workspaces: string[];
 }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; discuss: [] }>();
 
 const content = ref('');
 const loading = ref(true);
@@ -78,9 +78,14 @@ function onDragUp() {
   <div class="map-popup" :style="{ left: geom.x + 'px', top: geom.y + 'px' }" role="dialog">
     <header class="map-popup__header" @pointerdown="onDragDown">
       <span class="map-popup__title">{{ title }}</span>
-      <button type="button" class="map-popup__close" aria-label="Close" @pointerdown.stop @click="emit('close')">
-        ✕
-      </button>
+      <span class="map-popup__actions">
+        <button type="button" class="map-popup__btn" @pointerdown.stop @click="emit('discuss')">
+          Refine / discuss
+        </button>
+        <button type="button" class="map-popup__close" aria-label="Close" @pointerdown.stop @click="emit('close')">
+          ✕
+        </button>
+      </span>
     </header>
     <div class="map-popup__body">
       <p v-if="loading" class="map-popup__muted">Loading…</p>
@@ -128,6 +133,24 @@ function onDragUp() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.map-popup__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.map-popup__btn {
+  border: 1px solid var(--rule, #d9d3c5);
+  background: var(--bg-card, #fff);
+  color: var(--ink-2, #4c4842);
+  cursor: pointer;
+  font-size: var(--fs-10, 11px);
+  padding: 3px 8px;
+  border-radius: var(--r-sm, 4px);
+}
+.map-popup__btn:hover {
+  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
 }
 .map-popup__close {
   border: none;

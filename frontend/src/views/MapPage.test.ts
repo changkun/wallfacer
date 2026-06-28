@@ -7,6 +7,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, nextTick, type App } from 'vue';
 import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
+// Stub the shared planning chat popup: its setup initializes chat sessions and
+// threads, which is out of scope for these graph-wiring tests (and unmounted
+// without a real backend). The Map only sets focus + calls .open() on it.
+vi.mock('../components/plan/SpecChatPopup.vue', () => ({
+  default: { name: 'SpecChatPopup', setup: () => ({ open() {} }), render: () => null },
+}));
+
 import MapPage from './MapPage.vue';
 import type { Graph } from '../api/types';
 
@@ -144,6 +151,21 @@ describe('MapPage', () => {
       await nextTick();
       expect(backlogRow.classList.contains('map-legend__item--off')).toBe(true);
     }
+    app.unmount();
+    host.remove();
+  });
+
+  it('focuses the spec when "Refine / discuss" is clicked', async () => {
+    const { useAgentStore } = await import('../stores/agentSession');
+    const { app, host } = await mountMapPage();
+    const agent = useAgentStore();
+    const spy = vi.spyOn(agent, 'focusSpec');
+    await selectNode(host, 0); // spec:a
+    const btn = buttonByText(host, 'Refine / discuss');
+    expect(btn).not.toBeNull();
+    btn!.dispatchEvent(new Event('click', { bubbles: true }));
+    await nextTick();
+    expect(spy).toHaveBeenCalledWith('specs/a.md');
     app.unmount();
     host.remove();
   });

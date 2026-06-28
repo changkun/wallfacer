@@ -3,10 +3,12 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';
 import { useToastStore } from '../stores/toast';
+import { useAgentStore } from '../stores/agentSession';
 import { api } from '../api/client';
 import GraphCanvas from '../components/map/GraphCanvas.vue';
 import MapNodePopup from '../components/map/MapNodePopup.vue';
 import { stateColor } from '../components/map/nodeColors';
+import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import type { Graph, GraphNode, GraphAction, Task } from '../api/types';
 
@@ -17,7 +19,12 @@ import type { Graph, GraphNode, GraphAction, Task } from '../api/types';
 
 const store = useTaskStore();
 const toast = useToastStore();
+const agentStore = useAgentStore();
 const router = useRouter();
+// The shared planning chat, mounted here so generative spec ops (refine,
+// break-down, …) run from the graph without rebuilding chat. We just set the
+// focused spec and open the same popup Plan uses.
+const chatPopupRef = ref<InstanceType<typeof SpecChatPopup> | null>(null);
 
 const graph = ref<Graph>({ nodes: [], edges: [], critical_path: [], blocked: [] });
 const loadError = ref(false);
@@ -106,6 +113,12 @@ function onOpen(id: string) {
 }
 function openInPlan(path: string) {
   void router.push({ path: '/plan', query: { spec: path } });
+}
+// Generative ops (refine, break-down, validate-by-agent, …) reuse the planning
+// chat: focus its spec and open the shared popup, scoped to this node.
+function discussSpec(specPath: string) {
+  agentStore.focusSpec(specPath);
+  chatPopupRef.value?.open();
 }
 function openInBoard(taskId: string) {
   if (store.tasks.some((t) => t.id === taskId)) detailTaskId.value = taskId;
@@ -253,6 +266,9 @@ watch(showArchived, () => void loadGraph());
                 >
                   {{ ACTION_LABELS[act] }}
                 </button>
+                <button v-if="selectedNode.kind === 'spec'" type="button" @click="discussSpec(selectedNode.ref)">
+                  Refine / discuss
+                </button>
                 <button v-if="selectedNode.kind === 'spec'" type="button" @click="openInPlan(selectedNode.ref)">
                   Open in Plan
                 </button>
@@ -315,8 +331,10 @@ watch(showArchived, () => void loadGraph());
       :path="popup.path"
       :title="popup.title"
       :workspaces="store.config?.workspaces ?? []"
+      @discuss="popup && discussSpec(popup.path)"
       @close="popup = null"
     />
+    <SpecChatPopup ref="chatPopupRef" />
   </div>
 </template>
 
