@@ -154,7 +154,6 @@ const navModel = computed<ConsoleNavModel>(() => ({
       { id: 'whiteboard', label: 'Whiteboard', to: '/whiteboard', icon: 'whiteboard' },
       { id: 'board', label: 'Board', to: '/', icon: 'board', dot: boardUnread.value && route.path !== '/' },
       { id: 'agents', label: 'Agents', to: '/agents', icon: 'agents' },
-      { id: 'flows', label: 'Workflows', to: '/workflows', icon: 'flows' },
       { id: 'agent-graph', label: 'Agent Graph', to: '/agent-graph', icon: 'agent-graph' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
       { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },

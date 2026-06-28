@@ -67,7 +67,7 @@ const timeoutMin = computed<number | null>(() => {
 const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
 const promptPlaceholder = computed(() => {
   const f = flow.value || 'implement';
-  return `Describe the task… (flow: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
+  return `Describe the task… (graph: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
 });
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
@@ -333,8 +333,8 @@ function onInput(e: Event) {
     </div>
     <div class="composer__opts">
       <label class="composer__opt">
-        <span class="composer__opt-label">Flow</span>
-        <AppSelect v-model="flow" :options="flowOptions" aria-label="Flow" block />
+        <span class="composer__opt-label">Agent graph</span>
+        <AppSelect v-model="flow" :options="flowOptions" aria-label="Agent graph" block />
       </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Tags</span>
