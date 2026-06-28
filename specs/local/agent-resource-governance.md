@@ -68,6 +68,12 @@ Govern agent execution along three axes, and surface the knobs in settings with 
 
 ### A. Process priority and grouping (`internal/executor/host.go`)
 
+The CPU sink is not the agent CLI itself — it is the **build/test/vite/ripgrep
+subprocesses the agent spawns**. (Hitting *Test*, which is roughly one agent, pegs
+the machine; so count is not the driver — the tool subtree is.) The fix must
+therefore throttle the whole descendant tree, not just the leader. This is the
+load-bearing workstream; C and B do not touch the tool children.
+
 In the host launch path (`launchPlainHostAgent` / `launchClaude`), before
 `cmd.Start()`:
 
@@ -75,27 +81,39 @@ In the host launch path (`launchPlainHostAgent` / `launchClaude`), before
 cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // own process group
 ```
 
-After a successful `Start()`, lower the group's priority:
+After a successful `Start()`, call best-effort `applyAgentPriority(pid)`, split
+**darwin / linux / windows** (not unix / windows — macOS needs its own lever):
 
-```go
-applyAgentPriority(cmd.Process.Pid, nice) // PRIO_PGRP, best-effort
-```
+- `host_priority_darwin.go`: macOS `nice` is a weak signal. Use the XNU
+  background-task policy instead:
+  `unix.Setpriority(PRIO_DARWIN_PROCESS, pid, PRIO_DARWIN_BG)` — the syscall
+  behind `taskpolicy -b`. It throttles CPU **and** I/O and steers the process to
+  efficiency cores, and the background state is **inherited by descendants**
+  spawned afterward (so the agent's build/test children are throttled too).
+  `golang.org/x/sys/unix` v0.43.0 does **not** export these constants, so define
+  them locally: `PRIO_DARWIN_PROCESS = 4`, `PRIO_DARWIN_BG = 0x1000`. Verify a
+  parent can set BG on a child pid on the target macOS (some XNU versions only
+  allow self-backgrounding — OQ-3); on `EPERM`, fall back to plain
+  `Setpriority(PRIO_PGRP, pgid, nice)`.
+- `host_priority_linux.go`: `unix.Setpriority(unix.PRIO_PGRP, pgid, nice)` —
+  niceness on the group covers the leader and its forked tool children.
+- `host_priority_windows.go`: no-op (host mode is `!windows` in tests today).
 
-`applyAgentPriority` is platform-split to keep `host.go` portable:
+Promote `golang.org/x/sys` to a direct dependency. A `Setpriority` failure logs
+at debug and never fails the launch.
 
-- `host_priority_unix.go` (`//go:build !windows`): wraps
-  `golang.org/x/sys/unix.Setpriority(unix.PRIO_PGRP, pgid, nice)` (already an
-  indirect dependency; promote to direct). Best-effort: a `Setpriority` failure
-  logs at debug and does not fail the launch.
-- `host_priority_windows.go` (`//go:build windows`): no-op (host mode is
-  `!windows` in tests today; keep the build green everywhere).
-
-`Setpgid` is independently useful: it lets a future change signal the whole agent
-tool subtree as a group. Niceness set on the leader is inherited by tool children
-forked afterward; using `PRIO_PGRP` also covers any already-spawned members.
+**Teardown must kill the group, not the leader.** Adding `Setpgid` changes kill
+semantics: today `signalAndEscalate` signals only `cmd.Process` (the leader), so
+once the agent is its own group leader the build/test children would orphan
+instead of being reaped. Update teardown to signal the process group
+(`syscall.Kill(-pgid, SIGTERM)` then `-pgid, SIGKILL`) on `!windows`; this is
+strictly better cleanup. This coupling is mandatory in the same phase as
+`Setpgid`, not a follow-up.
 
 Config: `WALLFACER_AGENT_NICE`, default `10`, clamped to `[0, 19]` (0 = no
-change). Read live per launch (cheap) or via a small cache; no restart required.
+change); used by the linux path and the darwin fallback. (The darwin BG policy is
+a boolean, not a level — the nice value tunes only the non-darwin path.) Read live
+per launch (cheap); no restart required.
 
 ### B. Global agent budget (`internal/executor` + autopilot gates)
 
@@ -115,10 +133,12 @@ self-deadlock.
   `max(2, NumCPU/2)` — finalize in OQ-1). `0` = unlimited (matches the group
   `0`-means-unlimited sentinel convention).
 
-Deadlock note: because no held slot ever launches another agent (agon critic
-one-shots are launched by the agon run goroutine, which does not itself hold an
-executor slot), the semaphore cannot self-starve. Tests must assert this
-invariant (a task turn holding a slot never triggers a nested executor Launch).
+Lock-ordering note: self-nesting is safe (no held slot launches another agent —
+agon critic one-shots are launched by the agon run goroutine, which holds no
+executor slot). The real hazard is **stalling the autopilot**: a blocking
+semaphore acquire must never happen under `promoteMu`, a store lock, or inside a
+synchronous watcher `Action`. Phase 4 acquires *outside* any lock and launches in
+a goroutine, so a full budget delays a launch without serializing the gates.
 
 ### C. Minimal agon default (`tasks_autopilot.go`, `constants.go`)
 
@@ -193,7 +213,16 @@ concurrently across mixed task/test/agon load; release on exit re-opens a slot;
   predictable. Lean CPU-derived; confirm before Phase 4.
 - **OQ-2 — agon rounds floor.** Does `agonMaxRounds = 2` still yield a meaningful
   adversarial verdict, or is 3 the practical floor? Validate against agon's round
-  semantics before flipping the default in Phase 1.
-- **OQ-3 — nice scope.** Apply the lowered priority to *all* host agents
-  (simplest; the server is the only foreground) or only to verification (test/
-  agon) processes? Default to all; revisit if interactive task runs feel starved.
+  semantics before flipping the default in Phase 1. Note the interaction with the
+  just-shipped hard barrier ([[agon-supersede-test]]): a shallower default debate
+  surfaces fewer resolutions, so more runs end with unresolved attacks — which now
+  *parks the task for human review* rather than auto-retrying. Reducing depth makes
+  the barrier bite more often; weigh depth-vs-friction, not just depth-vs-cost.
+- **OQ-3 — darwin child backgrounding.** Can the parent set `PRIO_DARWIN_BG` on a
+  child pid on the target macOS, or only on itself? If only self, the darwin path
+  must have the child background itself at startup (a harness flag/env) rather than
+  the parent doing it post-`Start`. Verify on `Darwin 25.x` before Phase 2; the
+  `EPERM` → nice fallback keeps it safe meanwhile.
+- **OQ-4 — priority scope.** Apply the throttle to *all* host agents (simplest;
+  the server is the only foreground) or only to verification (test/agon)
+  processes? Default to all; revisit if interactive task runs feel starved.
