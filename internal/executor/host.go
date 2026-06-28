@@ -60,6 +60,11 @@ type HostBackendConfig struct {
 	// their tool subprocesses yield CPU to the foreground. 0 ⇒ defaultAgentNice;
 	// a negative value disables throttling. See applyAgentPriority.
 	AgentNice int
+	// MaxAgents caps the number of agent processes that may run concurrently
+	// across all callers (regular tasks, test runs, agon). 0 ⇒ unlimited. This is
+	// the hard ceiling beneath the per-kind admission gates: Launch blocks until a
+	// slot frees (honoring the caller's context).
+	MaxAgents int
 }
 
 // defaultAgentNice is the niceness used when HostBackendConfig.AgentNice is unset
@@ -89,7 +94,8 @@ type HostBackend struct {
 	openCodeBinary string
 	piBinary       string
 
-	agentNice int // resolved niceness passed to applyAgentPriority (0 ⇒ disabled)
+	agentNice int           // resolved niceness passed to applyAgentPriority (0 ⇒ disabled)
+	agentSem  chan struct{} // global concurrency budget; nil ⇒ unlimited
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
@@ -136,6 +142,10 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	case nice < 0:
 		nice = 0
 	}
+	var sem chan struct{}
+	if cfg.MaxAgents > 0 {
+		sem = make(chan struct{}, cfg.MaxAgents)
+	}
 	return &HostBackend{
 		claudeBinary:   claude,
 		codexBinary:    codex,
@@ -143,8 +153,25 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 		openCodeBinary: opencode,
 		piBinary:       pi,
 		agentNice:      nice,
+		agentSem:       sem,
 		procs:          make(map[string]*hostHandle),
 	}, nil
+}
+
+// acquireSlot reserves a global agent-budget slot, blocking until one frees or
+// ctx is cancelled. The returned release frees the slot exactly once; when the
+// budget is unlimited (agentSem nil) it reserves nothing and release is a no-op.
+func (b *HostBackend) acquireSlot(ctx context.Context) (func(), error) {
+	if b.agentSem == nil {
+		return func() {}, nil
+	}
+	select {
+	case b.agentSem <- struct{}{}:
+		var once sync.Once
+		return func() { once.Do(func() { <-b.agentSem }) }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // RequireClaude verifies the claude binary can be resolved, returning the
@@ -228,20 +255,38 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 		return nil, fmt.Errorf("host backend: WorkDir %q is a container path; runner must translate to a host path", spec.WorkDir)
 	}
 
+	// Reserve a global budget slot before spawning. Held for the process
+	// lifetime and freed when the handle's Wait reaps it.
+	release, err := b.acquireSlot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var h Handle
 	switch agent {
 	case harness.Claude:
-		return b.launchClaude(ctx, spec)
+		h, err = b.launchClaude(ctx, spec)
 	case harness.Codex:
-		return b.launchCodex(ctx, spec)
+		h, err = b.launchCodex(ctx, spec)
 	case harness.Cursor:
-		return b.launchCursor(ctx, spec)
+		h, err = b.launchCursor(ctx, spec)
 	case harness.OpenCode:
-		return b.launchOpenCode(ctx, spec)
+		h, err = b.launchOpenCode(ctx, spec)
 	case harness.Pi:
-		return b.launchPi(ctx, spec)
+		h, err = b.launchPi(ctx, spec)
 	default:
-		return nil, fmt.Errorf("host backend: unsupported agent %q", agent)
+		err = fmt.Errorf("host backend: unsupported agent %q", agent)
 	}
+	if err != nil {
+		release()
+		return nil, err
+	}
+	if hh, ok := h.(*hostHandle); ok {
+		hh.release = release
+	} else {
+		release() // unknown handle type cannot free the slot on exit
+	}
+	return h, nil
 }
 
 // launchClaude execs the claude CLI. The argv is assembled by
@@ -399,6 +444,7 @@ type hostHandle struct {
 
 	killOnce sync.Once     // ensures SIGTERM→SIGKILL escalation runs at most once
 	done     chan struct{} // closed after cmd.Wait() returns
+	release  func()        // frees the global budget slot; set by Launch, nil ⇒ no-op
 }
 
 // newHostHandle constructs a hostHandle with state initialised to Creating.
@@ -429,6 +475,9 @@ func (h *hostHandle) Wait() (int, error) {
 	err := h.cmd.Wait()
 	close(h.done)
 	defer h.removeFromBackend()
+	if h.release != nil {
+		defer h.release()
+	}
 
 	terminal := func() bool {
 		s := BackendState(h.state.Load())

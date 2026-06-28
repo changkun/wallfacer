@@ -25,6 +25,8 @@ type Config struct {
 	TitleModel             string // CLAUDE_TITLE_MODEL
 	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
 	MaxTestParallelTasks   int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
+	MaxAgents              int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
+	AgentNice              int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
 	OversightInterval      int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
 	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
@@ -91,6 +93,8 @@ var knownKeys = []string{
 	"OPENCODE_SERVER_PASSWORD",
 	"WALLFACER_MAX_PARALLEL",
 	"WALLFACER_MAX_TEST_PARALLEL",
+	"WALLFACER_MAX_AGENTS",
+	"WALLFACER_AGENT_NICE",
 	"WALLFACER_OVERSIGHT_INTERVAL",
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
@@ -162,6 +166,16 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_MAX_TEST_PARALLEL":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxTestParallelTasks = n
+			}
+		case "WALLFACER_MAX_AGENTS":
+			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+				cfg.MaxAgents = n
+			}
+		case "WALLFACER_AGENT_NICE":
+			// Any int is valid: 0 keeps the backend default, negative disables
+			// throttling, positive sets the niceness.
+			if n, err := strconv.Atoi(v); err == nil {
+				cfg.AgentNice = n
 			}
 		case "WALLFACER_OVERSIGHT_INTERVAL":
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -432,6 +446,11 @@ type Updates struct {
 	CodexTitleModel      *string
 	MaxParallel          *string
 	MaxTestParallel      *string
+	MaxAgents            *string
+	AgentNice            *string
+	AgonForks            *string
+	AgonRounds           *string
+	AgonCostCap          *string
 	OversightInterval    *string
 	ArchivedTasksPerPage *string
 	AutoPush             *string
@@ -458,6 +477,11 @@ func Update(path string, u Updates) error {
 		"CODEX_TITLE_MODEL":                 u.CodexTitleModel,
 		"WALLFACER_MAX_PARALLEL":            u.MaxParallel,
 		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
+		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
+		"WALLFACER_AGENT_NICE":              u.AgentNice,
+		"WALLFACER_AGON_FORKS":              u.AgonForks,
+		"WALLFACER_AGON_ROUNDS":             u.AgonRounds,
+		"WALLFACER_AGON_COST_CAP":           u.AgonCostCap,
 		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,
