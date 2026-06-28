@@ -92,6 +92,8 @@ type RunnerConfig struct {
 	HostCursorBinary   string           // optional override for the `cursor-agent` binary path
 	HostOpenCodeBinary string           // optional override for the `opencode` binary path
 	HostPiBinary       string           // optional override for the `pi` binary path
+	AgentNice          int              // niceness for agent processes (0 ⇒ default, negative disables)
+	MaxAgents          int              // global concurrent agent-process budget (0 ⇒ unlimited)
 	TmpDir             string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	Prompts            *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager   *workspace.Manager
@@ -499,6 +501,8 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		CursorBinary:   cfg.HostCursorBinary,
 		OpenCodeBinary: cfg.HostOpenCodeBinary,
 		PiBinary:       cfg.HostPiBinary,
+		AgentNice:      cfg.AgentNice,
+		MaxAgents:      cfg.MaxAgents,
 	})
 	r.backend = hb
 	r.reg = cfg.Reg
