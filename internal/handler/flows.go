@@ -61,6 +61,12 @@ type FlowResponse struct {
 	SpawnKind   string         `json:"spawn_kind,omitempty"`
 	Builtin     bool           `json:"builtin"`
 	Steps       []StepResponse `json:"steps"`
+	// Agentic execution fields (run the flow through the topos runtime). Omitted
+	// for ordinary flows so their responses are byte-identical.
+	Agentic         bool   `json:"agentic,omitempty"`
+	Dynamic         bool   `json:"dynamic,omitempty"`
+	Topology        string `json:"topology,omitempty"`
+	MaxHandoffDepth int    `json:"max_handoff_depth,omitempty"`
 }
 
 func agentNameForSlug(slug string) string {
@@ -87,9 +93,13 @@ func describeFlow(f flow.Flow) FlowResponse {
 		Slug:        f.Slug,
 		Name:        f.Name,
 		Description: f.Description,
-		SpawnKind:   string(f.SpawnKind),
-		Builtin:     f.Builtin,
-		Steps:       steps,
+		SpawnKind:       string(f.SpawnKind),
+		Builtin:         f.Builtin,
+		Steps:           steps,
+		Agentic:         f.Agentic,
+		Dynamic:         f.Dynamic,
+		Topology:        string(f.Topology),
+		MaxHandoffDepth: f.MaxHandoffDepth,
 	}
 }
 
