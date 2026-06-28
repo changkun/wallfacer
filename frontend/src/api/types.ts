@@ -102,6 +102,32 @@ export interface Task {
   // Agon adversarial-verification results. Absent = not yet run.
   agon_unresolved?: number;
   agon_headline?: string;
+  // Present (non-empty string) only for tasks run via the agentic flow kind;
+  // the opaque JSON of the run's agent-graph lineage. The thin parsed shape is
+  // served by GET /api/tasks/{id}/lineage (see AgentLineage).
+  lineage?: string | null;
+}
+
+// Agent-graph lineage of an agentic-flow run (GET /api/tasks/{id}/lineage).
+// status is the node lifecycle; kind is the handoff type between agents.
+export type LineageNodeStatus = 'running' | 'done' | 'failed' | string;
+export type LineageEdgeKind = 'delegate' | 'deliver' | 'next' | string;
+export interface LineageNode {
+  id: string;
+  name: string;
+  role: string;
+  status: LineageNodeStatus;
+  grants?: string[];
+  sandbox?: string;
+}
+export interface LineageEdge {
+  from: string;
+  to: string;
+  kind: LineageEdgeKind;
+}
+export interface TaskLineage {
+  nodes: LineageNode[];
+  edges: LineageEdge[];
 }
 
 // Agon verification trajectory (GET /api/tasks/{id}/agon/transcript).

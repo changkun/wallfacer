@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 123,
+  "route_count": 126,
   "routes": [
     {
       "method": "GET",
@@ -593,6 +593,24 @@
     },
     {
       "method": "GET",
+      "pattern": "/api/whiteboard",
+      "name": "GetWhiteboard",
+      "description": "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
+      "tags": [
+        "whiteboard"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/whiteboard",
+      "name": "PutWhiteboard",
+      "description": "Save the active workspace's whiteboard scene JSON.",
+      "tags": [
+        "whiteboard"
+      ]
+    },
+    {
+      "method": "GET",
       "pattern": "/api/git/status",
       "name": "GitStatus",
       "description": "Git status for all mounted workspaces.",
@@ -869,6 +887,15 @@
       "pattern": "/api/tasks/{id}/agon/transcript",
       "name": "AgonTranscript",
       "description": "Read the agon verification trajectory (per-fork, per-round transcripts).",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/lineage",
+      "name": "TaskLineage",
+      "description": "Read the agent-graph lineage (nodes + edges) of an agentic-flow run.",
       "tags": [
         "tasks"
       ]

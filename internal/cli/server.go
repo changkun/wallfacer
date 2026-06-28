@@ -1088,6 +1088,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CreateTemplate": h.CreateTemplate,
 		"DeleteTemplate": h.DeleteTemplate,
 
+		// Whiteboard.
+		"GetWhiteboard": http.HandlerFunc(h.GetWhiteboard),
+		"PutWhiteboard": http.HandlerFunc(h.PutWhiteboard),
+
 		// File explorer.
 		"ExplorerTree":        h.ExplorerTree,
 		"ExplorerStream":      h.ExplorerStream,
@@ -1134,6 +1138,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TestTask":       withID(h.TestTask),
 		"AgonTask":       withID(h.AgonTask),
 		"AgonTranscript": withID(h.AgonTranscript),
+		"TaskLineage":    withID(h.TaskLineage),
 
 		"TaskDiff":     withID(h.TaskDiff),
 		"StreamLogs":   withID(h.StreamLogs),
@@ -1218,6 +1223,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Prompt templates.
 		"CreateTemplate": handler.BodyLimitDefault,
+
+		// Whiteboard scene (allows embedded images, so larger than default).
+		"PutWhiteboard": handler.BodyLimitWhiteboard,
 
 		// Workspace browser.
 		"MkdirWorkspace":  handler.BodyLimitDefault,

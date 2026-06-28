@@ -17,6 +17,7 @@ import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import AgonVerification from './AgonVerification.vue';
+import AgentLineage from './AgentLineage.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
@@ -1076,6 +1077,8 @@ async function submitReview() {
                     <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
                     <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
                   </template>
+
+                  <AgentLineage v-if="task.lineage" :task-id="task.id" />
 
                   <div v-if="isWaiting" class="mb-4">
                     <h3 class="section-title">Provide Feedback</h3>
