@@ -113,52 +113,6 @@ func TestClearAgonResult_MakesTaskReeligible(t *testing.T) {
 	}
 }
 
-func TestAgonFeedback_SetClearReset(t *testing.T) {
-	s := newTestStore(t)
-	ctx := bg()
-
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "fb", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	// First unresolved verdict: set feedback, count -> 1.
-	if err := s.SetAgonFeedback(ctx, task.ID, "attack: nil deref"); err != nil {
-		t.Fatalf("SetAgonFeedback: %v", err)
-	}
-	got, _ := s.GetTask(ctx, task.ID)
-	if got.PendingAgonFeedback != "attack: nil deref" || got.AgonRetryCount != 1 {
-		t.Fatalf("after set: feedback=%q count=%d", got.PendingAgonFeedback, got.AgonRetryCount)
-	}
-
-	// Second unresolved verdict: count -> 2, feedback replaced.
-	if err := s.SetAgonFeedback(ctx, task.ID, "attack: race"); err != nil {
-		t.Fatalf("SetAgonFeedback: %v", err)
-	}
-	got, _ = s.GetTask(ctx, task.ID)
-	if got.AgonRetryCount != 2 {
-		t.Errorf("count = %d, want 2", got.AgonRetryCount)
-	}
-
-	// Resume consumes the feedback but preserves the retry count.
-	if err := s.ClearAgonResult(ctx, task.ID); err != nil {
-		t.Fatalf("ClearAgonResult: %v", err)
-	}
-	got, _ = s.GetTask(ctx, task.ID)
-	if got.PendingAgonFeedback != "" || got.AgonRetryCount != 2 {
-		t.Errorf("after resume: feedback=%q count=%d, want empty + 2", got.PendingAgonFeedback, got.AgonRetryCount)
-	}
-
-	// A clean verdict resets the cycle.
-	if err := s.ResetAgonRetry(ctx, task.ID); err != nil {
-		t.Fatalf("ResetAgonRetry: %v", err)
-	}
-	got, _ = s.GetTask(ctx, task.ID)
-	if got.PendingAgonFeedback != "" || got.AgonRetryCount != 0 {
-		t.Errorf("after reset: feedback=%q count=%d, want empty + 0", got.PendingAgonFeedback, got.AgonRetryCount)
-	}
-}
-
 func TestUpdateTaskAgon_PersistsAllFields(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()

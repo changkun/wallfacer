@@ -446,12 +446,6 @@ type Task struct {
 	AgonUnresolved *int   `json:"agon_unresolved,omitempty"`
 	AgonHeadline   string `json:"agon_headline,omitempty"`
 	AgonSessionDir string `json:"agon_session_dir,omitempty"`
-	// PendingAgonFeedback holds the unresolved-attacks summary awaiting
-	// auto-resume as feedback (the agon analogue of PendingTestFeedback).
-	// AgonRetryCount tracks consecutive agon-feedback resumes, capped by
-	// constants.MaxAgonRetries.
-	PendingAgonFeedback string `json:"pending_agon_feedback,omitempty"`
-	AgonRetryCount      int    `json:"agon_retry_count,omitempty"`
 }
 
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry
