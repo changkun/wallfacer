@@ -1,6 +1,6 @@
 ---
 title: Agon Adversarial Verification
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/adversarial/agon.go
@@ -19,7 +19,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: large
 created: 2026-06-26
-updated: 2026-06-26  # rev: hybrid execution model
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---
