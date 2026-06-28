@@ -288,10 +288,11 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
     <template v-else>
       <div class="agc__meta">
         <span class="agc__mode" :class="`agc__mode--${mode}`">{{ modeLabel }}</span>
+        <span v-if="mode !== 'sequence'" class="agc__experimental-tag">experimental</span>
         <span class="agc__hint">
           {{ mode === 'sequence'
             ? 'Agents run in order, left to right.'
-            : 'A task enters at the lead; the fleet delegates to reach an outcome.' }}
+            : 'A task enters at the lead; the lead delegates to members. Does not make durable commits yet.' }}
         </span>
       </div>
 
@@ -449,6 +450,16 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
 .agc__mode--mesh {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.agc__experimental-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  color: var(--warning, #c98a00);
+  background: color-mix(in srgb, var(--warning, #c98a00) 14%, transparent);
 }
 .agc__hint {
   font-size: 0.74rem;
