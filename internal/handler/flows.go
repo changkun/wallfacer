@@ -10,7 +10,6 @@ import (
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/slugutil"
-	"latere.ai/x/wallfacer/internal/store"
 )
 
 // flowRegistry returns the merged built-in + user-authored flow
@@ -51,14 +50,11 @@ type StepResponse struct {
 	RunInParallelWith []string `json:"run_in_parallel_with,omitempty"`
 }
 
-// FlowResponse is the wire shape for a Flow surfaced on the Flows tab.
-// SpawnKind is serialised as a string so the zero value collapses to
-// omitempty for normal flows.
+// FlowResponse is the wire shape for a Flow surfaced on the agent-graph surface.
 type FlowResponse struct {
 	Slug        string         `json:"slug"`
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
-	SpawnKind   string         `json:"spawn_kind,omitempty"`
 	Builtin     bool           `json:"builtin"`
 	Steps       []StepResponse `json:"steps"`
 	// Agentic execution fields (run the flow through the topos runtime). Omitted
@@ -93,7 +89,6 @@ func describeFlow(f flow.Flow) FlowResponse {
 		Slug:            f.Slug,
 		Name:            f.Name,
 		Description:     f.Description,
-		SpawnKind:       string(f.SpawnKind),
 		Builtin:         f.Builtin,
 		Steps:           steps,
 		Agentic:         f.Agentic,
@@ -131,7 +126,6 @@ type flowWriteRequest struct {
 	Slug        string               `json:"slug"`
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
-	SpawnKind   string               `json:"spawn_kind"`
 	Steps       []flowStepWriteInput `json:"steps"`
 	// Agentic execution fields (mirror FlowResponse). They round-trip the
 	// topos runtime knobs through the flow editor; omitting them keeps a
@@ -163,7 +157,6 @@ func (req flowWriteRequest) toFlow() flow.Flow {
 		Slug:            req.Slug,
 		Name:            req.Name,
 		Description:     req.Description,
-		SpawnKind:       store.TaskKind(req.SpawnKind),
 		Steps:           steps,
 		Agentic:         req.Agentic,
 		Dynamic:         req.Dynamic,

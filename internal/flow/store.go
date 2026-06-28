@@ -11,7 +11,6 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/registry"
 	"latere.ai/x/wallfacer/internal/pkg/slugutil"
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
-	"latere.ai/x/wallfacer/internal/store"
 )
 
 // diskFlow is the on-disk YAML shape for a user-authored flow. It
@@ -21,7 +20,6 @@ type diskFlow struct {
 	Slug            string     `yaml:"slug"`
 	Name            string     `yaml:"name"`
 	Description     string     `yaml:"description,omitempty"`
-	SpawnKind       string     `yaml:"spawn_kind,omitempty"`
 	Agentic         bool       `yaml:"agentic,omitempty"`
 	Dynamic         bool       `yaml:"dynamic,omitempty"`
 	Topology        string     `yaml:"topology,omitempty"`
@@ -96,7 +94,6 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 			Slug:            f.Slug,
 			Name:            f.Name,
 			Description:     f.Description,
-			SpawnKind:       store.TaskKind(f.SpawnKind),
 			Agentic:         f.Agentic,
 			Dynamic:         f.Dynamic,
 			Topology:        Topology(f.Topology),
@@ -130,7 +127,6 @@ func WriteUserFlow(dir string, f Flow) error {
 		Slug:            f.Slug,
 		Name:            f.Name,
 		Description:     f.Description,
-		SpawnKind:       string(f.SpawnKind),
 		Agentic:         f.Agentic,
 		Dynamic:         f.Dynamic,
 		Topology:        string(f.Topology),
