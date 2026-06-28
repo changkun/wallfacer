@@ -395,16 +395,18 @@ onMounted(async () => {
                 <span v-if="draft.isClone" class="ag-edit__hint">clone of {{ draft.sourceSlug }}</span>
               </div>
 
-              <!-- Coordination: how the fleet works a task. Lead delegates
-                   (orchestrator-worker) and Open mesh run through the topos
-                   delegation runtime; Fixed sequence is the simple deterministic
-                   chain. Maps onto the flow's agentic/dynamic/topology fields. -->
+              <!-- Coordination: how the graph works a task. Fixed sequence is
+                   the production path (runs the agents through the engine with
+                   real worktrees/commits). The delegating modes (Lead delegates,
+                   Open mesh) run through the topos runtime, which does not yet
+                   produce durable commits (spike S NO-GO) -- so they are marked
+                   experimental until the worktree-sandbox adapter lands. -->
               <div class="ag-edit__topo">
                 <label class="ag-edit__field-label">Coordination</label>
                 <select v-model="coordination" class="ag-edit__topo-select" aria-label="Coordination">
-                  <option value="lead">Lead delegates</option>
-                  <option value="mesh">Open mesh</option>
                   <option value="sequence">Fixed sequence</option>
+                  <option value="lead">Lead delegates (experimental)</option>
+                  <option value="mesh">Open mesh (experimental)</option>
                 </select>
                 <label v-if="coordination === 'mesh'" class="ag-edit__depth">
                   <span>handoff depth</span>
@@ -417,6 +419,11 @@ onMounted(async () => {
                   />
                 </label>
               </div>
+              <p v-if="coordination !== 'sequence'" class="ag-edit__experimental">
+                Experimental: delegating graphs run through the topos runtime,
+                which does not yet make durable commits or run verification. Use
+                Fixed sequence for real task runs.
+              </p>
 
               <div class="ag-edit__actions">
                 <button type="button" class="ag-edit__btn" @click="cancelEdit" :disabled="saving">Cancel</button>
@@ -739,6 +746,12 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-muted);
+}
+.ag-edit__experimental {
+  flex-basis: 100%;
+  margin: 0.3rem 0 0;
+  font-size: 0.74rem;
+  color: var(--warning, #c98a00);
 }
 .ag-edit__topo-select {
   font: inherit;
