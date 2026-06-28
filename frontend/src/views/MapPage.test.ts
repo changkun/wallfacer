@@ -236,10 +236,14 @@ describe('MapPage', () => {
     host.remove();
   });
 
-  it('lists actionable nodes under "Ready to act"', async () => {
+  it('lists actionable nodes under "Ready to act" with action chips', async () => {
     const { app, host } = await mountMapPage();
-    const ready = host.querySelectorAll('.depgraph-inspector__ready-item');
-    expect(ready.length).toBe(2); // both fixture nodes carry an action
+    // The ready section is the .mc-list that is not the critical-path list.
+    const readyList = [...host.querySelectorAll('.mc-list')].find((l) => !l.classList.contains('mc-crit'))!;
+    const rows = readyList.querySelectorAll('.mc-row');
+    expect(rows.length).toBe(2); // both fixture nodes carry a forward action
+    // Each row shows its action as a chip (Dispatch / Start), not raw text.
+    expect(readyList.querySelectorAll('.mc-chip').length).toBe(2);
     app.unmount();
     host.remove();
   });

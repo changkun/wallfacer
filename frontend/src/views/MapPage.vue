@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import GraphCanvas from '../components/map/GraphCanvas.vue';
 import MapNodePopup from '../components/map/MapNodePopup.vue';
 import { stateColor } from '../components/map/nodeColors';
-import { ACTION_LABELS, hasPrimaryAction } from '../components/map/actions';
+import { ACTION_LABELS, hasPrimaryAction, primaryActions } from '../components/map/actions';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import type { Graph, GraphNode, GraphAction, Task } from '../api/types';
@@ -243,28 +243,32 @@ watch(showArchived, () => void loadGraph());
           <section class="depgraph-inspector__section">
             <h3 class="depgraph-inspector__heading">Selection</h3>
             <div v-if="selectedNode" class="depgraph-inspector__selection">
-              <p><strong>{{ selectedNode.label }}</strong></p>
-              <p class="depgraph-inspector__muted">{{ selectedNode.kind }} · {{ selectedNode.status }}</p>
-              <div class="depgraph-inspector__actions">
+              <p class="mc-sel__title">
+                <span class="mc-dot" :style="{ background: stateColor(selectedNode.status) }"></span>
+                <strong>{{ selectedNode.label }}</strong>
+              </p>
+              <p class="mc-sel__meta">{{ selectedNode.kind }} · {{ selectedNode.status }}</p>
+              <div class="mc-actions">
                 <button
                   v-for="act in (selectedNode.available_actions || [])"
                   :key="act"
                   type="button"
-                  class="depgraph-inspector__action--primary"
+                  class="mc-btn mc-btn--primary"
                   :disabled="actionBusy"
                   @click="runAction(selectedNode, act)"
                 >
                   {{ ACTION_LABELS[act] }}
                 </button>
-                <button v-if="selectedNode.kind === 'spec'" type="button" @click="discussSpec(selectedNode.ref)">
+                <button v-if="selectedNode.kind === 'spec'" type="button" class="mc-btn" @click="discussSpec(selectedNode.ref)">
                   Refine / discuss
                 </button>
-                <button v-if="selectedNode.kind === 'spec'" type="button" @click="openInPlan(selectedNode.ref)">
+                <button v-if="selectedNode.kind === 'spec'" type="button" class="mc-btn" @click="openInPlan(selectedNode.ref)">
                   Open in Plan
                 </button>
                 <button
                   v-if="selectedNode.kind === 'task' && selectedTask"
                   type="button"
+                  class="mc-btn"
                   @click="openInBoard(selectedNode.ref)"
                 >
                   Open in Board
@@ -274,20 +278,28 @@ watch(showArchived, () => void loadGraph());
             <p v-else class="depgraph-inspector__muted">Click a node to inspect it.</p>
           </section>
           <section v-if="readyNodes.length" class="depgraph-inspector__section">
-            <h3 class="depgraph-inspector__heading">Ready to act</h3>
-            <ul class="depgraph-inspector__ready">
+            <h3 class="depgraph-inspector__heading">Ready to act <span class="mc-count">{{ readyNodes.length }}</span></h3>
+            <ul class="mc-list">
               <li v-for="n in readyNodes" :key="n.id">
-                <button type="button" class="depgraph-inspector__ready-item" @click="onSelect(n.id)">
-                  {{ n.label }}
-                  <span class="depgraph-inspector__ready-tag">{{ (n.available_actions || []).join(', ') }}</span>
+                <button type="button" class="mc-row" @click="onSelect(n.id)">
+                  <span class="mc-dot" :style="{ background: stateColor(n.status) }"></span>
+                  <span class="mc-row__label">{{ n.label }}</span>
+                  <span class="mc-row__verbs">
+                    <span v-for="a in primaryActions(n.available_actions)" :key="a" class="mc-chip">{{ ACTION_LABELS[a] }}</span>
+                  </span>
                 </button>
               </li>
             </ul>
           </section>
           <section class="depgraph-inspector__section">
             <h3 class="depgraph-inspector__heading">Critical path</h3>
-            <ol v-if="criticalNodes.length" class="depgraph-inspector__critical">
-              <li v-for="n in criticalNodes" :key="n.id">{{ n.label }}</li>
+            <ol v-if="criticalNodes.length" class="mc-list mc-crit">
+              <li v-for="n in criticalNodes" :key="n.id">
+                <button type="button" class="mc-row" @click="onSelect(n.id)">
+                  <span class="mc-dot" :style="{ background: stateColor(n.status) }"></span>
+                  <span class="mc-row__label">{{ n.label }}</span>
+                </button>
+              </li>
             </ol>
             <p v-else class="depgraph-inspector__muted">
               No dependency chain yet — add depends-on links between specs or tasks.
@@ -377,5 +389,141 @@ watch(showArchived, () => void loadGraph());
 }
 .map-legend__label {
   text-transform: capitalize;
+}
+
+/* --- inspector readability: real buttons, dots, chips, grouping --- */
+/* Divider lines group the sections so the panel reads as blocks, not a wall. */
+.depgraph-inspector__section + .depgraph-inspector__section {
+  border-top: 1px solid var(--rule, #d9d3c5);
+  padding-top: 16px;
+}
+.depgraph-inspector__heading {
+  display: flex;
+  align-items: center;
+  color: var(--ink-3, #6b6760);
+}
+.mc-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+.mc-sel__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 3px;
+  font-size: var(--fs-md, 13px);
+  color: var(--ink, #1b1916);
+  line-height: 1.3;
+}
+.mc-sel__meta {
+  margin: 0 0 10px;
+  text-transform: capitalize;
+  color: var(--ink-3, #6b6760);
+  font-size: var(--fs-10, 11px);
+}
+.mc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mc-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--rule-2, #c7c0af);
+  border-radius: var(--r-sm, 4px);
+  background: var(--bg-card, #fff);
+  color: var(--ink-2, #4c4842);
+  font-size: var(--fs-10, 11px);
+  font-weight: 500;
+  cursor: pointer;
+}
+.mc-btn:hover {
+  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
+  border-color: var(--ink-4, #97928a);
+}
+.mc-btn--primary {
+  background: var(--accent, #c45a33);
+  border-color: var(--accent, #c45a33);
+  color: #fff;
+}
+.mc-btn--primary:hover {
+  background: var(--accent-2, #a84e2e);
+  border-color: var(--accent-2, #a84e2e);
+}
+.mc-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mc-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3, #6b6760);
+  background: var(--bg-sunk, #ebe7de);
+  border-radius: 999px;
+  padding: 0 6px;
+  margin-left: 4px;
+}
+
+.mc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mc-crit {
+  counter-reset: mc-crit;
+}
+.mc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 7px;
+  border: none;
+  background: none;
+  border-radius: var(--r-sm, 4px);
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink-2, #4c4842);
+  font-size: var(--fs-10, 11px);
+}
+.mc-row:hover {
+  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
+}
+.mc-crit .mc-row::before {
+  counter-increment: mc-crit;
+  content: counter(mc-crit);
+  flex: 0 0 auto;
+  width: 13px;
+  color: var(--ink-4, #97928a);
+  font-variant-numeric: tabular-nums;
+}
+.mc-row__label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-row__verbs {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.mc-chip {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft, #f3dccf);
+  color: var(--accent-2, #a84e2e);
 }
 </style>
