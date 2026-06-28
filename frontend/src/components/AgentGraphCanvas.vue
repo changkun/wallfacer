@@ -478,6 +478,10 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
   height: 100%;
   overflow: auto;
   padding: 0.5rem;
+  /* Node labels are diagram content, not selectable text; selection also fights
+     pointer dragging (a drag would highlight labels instead of moving nodes). */
+  user-select: none;
+  -webkit-user-select: none;
 }
 .agc__empty {
   display: flex;
