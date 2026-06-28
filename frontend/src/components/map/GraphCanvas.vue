@@ -25,7 +25,15 @@ function relayout() {
   for (const k of Object.keys(pos)) delete pos[k];
   for (const [id, p] of next) pos[id] = { x: p.x, y: p.y };
 }
-watch(() => props.graph, relayout, { immediate: true });
+// Relayout only when the node/edge *structure* changes — not when a task's
+// status flips. A live run streams status updates constantly; relaying out on
+// each would discard drag positions and prevent any animation. Status-only
+// changes flow through reactively (node fill/classes) with positions intact.
+function structuralKey(): string {
+  const g = props.graph;
+  return g.nodes.map((n) => n.id).join(',') + '|' + g.edges.map((e) => `${e.from}>${e.to}`).join(',');
+}
+watch(structuralKey, relayout, { immediate: true });
 
 const posMap = computed(() => new Map(Object.entries(pos)));
 const edges = computed(() => edgePaths(props.graph, posMap.value));
@@ -37,6 +45,14 @@ const readySet = computed(
   () => new Set(props.graph.nodes.filter((n) => (n.available_actions?.length ?? 0) > 0).map((n) => n.id)),
 );
 
+// Live execution states drive the animation layer.
+function isRunning(status: string) {
+  return status === 'in_progress' || status === 'committing';
+}
+function isWaiting(status: string) {
+  return status === 'waiting';
+}
+
 function nodeClasses(id: string, kind: string, status: string) {
   return [
     'gc-node',
@@ -46,6 +62,11 @@ function nodeClasses(id: string, kind: string, status: string) {
     { 'gc-node--blocked': blockedSet.value.has(id) },
     { 'gc-node--ready': readySet.value.has(id) },
     { 'gc-node--selected': props.selectedId === id },
+    { 'gc-node--running': isRunning(status) },
+    { 'gc-node--waiting-live': isWaiting(status) },
+    // "You are here": a running node that sits on the critical path is where the
+    // pipeline currently is.
+    { 'gc-node--here': isRunning(status) && criticalSet.value.has(id) },
   ];
 }
 // SVG <text> neither wraps nor ellipsises, so a title is greedily wrapped into
@@ -214,6 +235,14 @@ defineExpose({ resetView });
           @dblclick.stop="emit('open', n.id)"
         >
           <title>{{ n.label }} · {{ n.status }}</title>
+          <circle
+            v-if="isRunning(n.status) || isWaiting(n.status)"
+            class="gc-pulse"
+            :class="isWaiting(n.status) ? 'gc-pulse--waiting' : 'gc-pulse--running'"
+            :stroke="stateColor(n.status)"
+            :r="n.kind === 'task' ? 9 : 11"
+            fill="none"
+          />
           <circle class="gc-dot" :fill="stateColor(n.status)" :r="n.kind === 'task' ? 9 : 11" />
           <text class="gc-node__label" text-anchor="middle">
             <tspan v-for="(ln, i) in labelLines(n.label)" :key="i" x="0" :y="24 + i * 13">{{ ln }}</tspan>
@@ -276,6 +305,58 @@ defineExpose({ resetView });
 .gc-node--ready .gc-dot {
   stroke: var(--accent, #c45a33);
   stroke-width: 3;
+}
+
+/* --- live execution animation --- */
+/* An expanding ring radiates from a running/waiting node so a glance shows what
+   is currently executing. */
+.gc-pulse {
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+}
+.gc-pulse--running {
+  animation: gc-pulse 1.6s ease-out infinite;
+}
+.gc-pulse--waiting {
+  animation: gc-pulse 2.4s ease-out infinite;
+  opacity: 0.7;
+}
+@keyframes gc-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+/* The running disc itself breathes; a waiting one holds a steady amber ring. */
+.gc-node--running .gc-dot {
+  animation: gc-breathe 1.6s ease-in-out infinite;
+}
+@keyframes gc-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+.gc-node--running .gc-dot,
+.gc-node--waiting-live .gc-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* "You are here": the running node on the critical path gets a bold accent ring
+   plus the breathing disc, so the eye lands on where the pipeline is now. */
+.gc-node--here .gc-dot {
+  stroke: var(--accent, #c45a33);
+  stroke-width: 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc-pulse,
+  .gc-node--running .gc-dot {
+    animation: none;
+  }
+  /* Keep a static ring so running nodes still read as active. */
+  .gc-pulse--running,
+  .gc-pulse--waiting {
+    opacity: 0.5;
+  }
 }
 
 .gc-edge {

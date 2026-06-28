@@ -54,4 +54,30 @@ describe('GraphCanvas', () => {
     expect(selected).toContain('spec:a');
     app.unmount();
   });
+
+  it('animates a running node and marks "you are here" on the critical path', () => {
+    const live: Graph = {
+      nodes: [
+        { id: 'task:run', kind: 'task', label: 'Running', status: 'in_progress', ref: 'r', depth: 0 },
+        { id: 'task:wait', kind: 'task', label: 'Waiting', status: 'waiting', ref: 'w', depth: 0 },
+        { id: 'task:idle', kind: 'task', label: 'Idle', status: 'backlog', ref: 'i', depth: 0 },
+      ],
+      edges: [],
+      critical_path: ['task:run'],
+      blocked: [],
+    };
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const app = createApp({ render: () => h(GraphCanvas, { graph: live }) });
+    app.mount(host);
+
+    // Running + waiting nodes emit a pulse ring; an idle one does not.
+    expect(host.querySelectorAll('.gc-pulse').length).toBe(2);
+    expect(host.querySelector('.gc-node--running')).not.toBeNull();
+    expect(host.querySelector('.gc-node--waiting-live')).not.toBeNull();
+    // The running node sits on the critical path → "you are here".
+    expect(host.querySelector('.gc-node--here')).not.toBeNull();
+    app.unmount();
+    host.remove();
+  });
 });
