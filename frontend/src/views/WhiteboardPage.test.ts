@@ -14,9 +14,9 @@ vi.mock('../api/client', () => ({ api: (...args: unknown[]) => apiMock(...args) 
 
 const renderSpy = vi.fn();
 const unmountSpy = vi.fn();
-const createElementSpy = vi.fn((type: unknown, props: unknown) => ({ type, props }));
+const createElementSpy = vi.fn((...args: unknown[]) => ({ type: args[0], props: args[1] }));
 const serializeMock = vi.fn(
-  () => '{"type":"excalidraw","version":2,"elements":[{"id":"x"}],"appState":{}}',
+  (..._args: unknown[]) => '{"type":"excalidraw","version":2,"elements":[{"id":"x"}],"appState":{}}',
 );
 
 vi.mock('react', () => ({ createElement: (...a: unknown[]) => createElementSpy(...a) }));
