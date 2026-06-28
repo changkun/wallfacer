@@ -6,6 +6,7 @@ import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
 import {
   buildDraftFromFlow,
   appendStep,
+  removeStep,
   draftToFlow,
   draftToPayload,
   type EditableFlow,
@@ -96,6 +97,12 @@ function onAgentDragStart(e: DragEvent, a: Agent) {
   if (!draft.value) return;
   e.dataTransfer?.setData('text/agent-slug', a.slug);
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+}
+
+function onRemoveStep(agentSlug: string) {
+  if (!draft.value) return;
+  removeStep(draft.value, agentSlug);
+  saveError.value = '';
 }
 
 async function saveDraft() {
@@ -283,7 +290,7 @@ onMounted(async () => {
               @dragleave="dragOver = false"
               @drop.prevent="onDropAgent"
             >
-              <AgentGraphCanvas :flow="canvasFlow" />
+              <AgentGraphCanvas :flow="canvasFlow" :editable="!!draft" @remove="onRemoveStep" />
             </div>
           </template>
         </section>

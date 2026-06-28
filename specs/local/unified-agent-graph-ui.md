@@ -89,9 +89,13 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     name/slug + Save/Cancel toolbar persists via the flow CRUD. Validated
     same-origin end-to-end (clone/edit -> drag-add -> save -> persisted YAML).
     The read-only render path (and its M6.1 test) is unchanged.
-  - **Remaining:** node-level drag to reorder / mark parallel, per-node remove,
-    the agentic + topology + depth controls in the toolbar (backend ready via
-    M6.2a), and edit-an-agent-node -> the agent editor.
+  - **M6.2c DONE.** Per-node remove: the canvas takes an `editable` prop and
+    emits `remove` (keyed by agent_slug); a hover × on each step node deletes
+    it, pruning any `run_in_parallel_with` references so the flow stays valid
+    (`removeStep` in `lib/flowDraft.ts`, unit-tested; wiring component-tested).
+  - **Remaining:** node-level drag to reorder / mark parallel, the agentic +
+    topology + depth controls in the toolbar (backend ready via M6.2a), and
+    edit-an-agent-node -> the agent editor.
 - **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
   canvas (status colors, handoff edges), polling/streaming the M5 endpoint.
 - **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;
