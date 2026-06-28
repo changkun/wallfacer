@@ -22,3 +22,8 @@ const PRIMARY_ACTIONS = new Set<GraphAction>(['validate', 'dispatch', 'start']);
 export function hasPrimaryAction(actions?: GraphAction[]): boolean {
   return (actions ?? []).some((a) => PRIMARY_ACTIONS.has(a));
 }
+
+// primaryActions keeps only the forward verbs, for the Ready-to-act chips.
+export function primaryActions(actions?: GraphAction[]): GraphAction[] {
+  return (actions ?? []).filter((a) => PRIMARY_ACTIONS.has(a));
+}
