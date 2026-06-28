@@ -1,6 +1,6 @@
 ---
 title: Unified Transcript Rendering (Raw ↔ Rendered, all harnesses)
-status: complete
+status: archived
 depends_on:
   - harness-abstraction
   - agon-trajectory-streaming
@@ -16,7 +16,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: large
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---
