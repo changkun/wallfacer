@@ -39,6 +39,10 @@
   --color-surface-primary-container: var(--accent-tint) !important;
   --color-on-primary-container: var(--accent) !important;
 
+  /* Range sliders (opacity, font size, …) */
+  --color-slider-track: var(--accent-tint) !important;
+  --color-slider-thumb: var(--accent) !important;
+
   /* Surfaces — islands/toolbar/dialogs read as elevated cards; recessed
      surfaces use the sunk token. */
   --island-bg-color: var(--bg-card) !important;
