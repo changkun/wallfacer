@@ -17,7 +17,7 @@ const loading = ref(true);
 // Create form.
 const prompt = ref('');
 const intervalMin = ref(60);
-const spawnFlow = ref('brainstorm');
+const spawnFlow = ref('implement');
 const creating = ref(false);
 
 const INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];

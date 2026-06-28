@@ -221,13 +221,8 @@ const testBadge = computed<{ label: string; cls: string; title: string } | null>
   }
 });
 
-// Brainstorm categories are backend-authoritative (config ideation_categories);
-// tags matching them render as category badges. See lib/tagBadge.
-const brainstormCategories = computed(
-  () => new Set(taskStore.config?.ideation_categories ?? []),
-);
 function renderedTag(rawTag: string): RenderedTag {
-  return classifyTag(rawTag, brainstormCategories.value);
+  return classifyTag(rawTag);
 }
 
 function showSpinner(task: Task): boolean {

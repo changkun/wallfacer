@@ -2,7 +2,7 @@
 import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { api } from '../api/client';
-import { splitBatch, flowAllowsEmptyPrompt } from '../lib/composer';
+import { splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
 import TemplatePicker from './TemplatePicker.vue';
@@ -64,13 +64,9 @@ const timeoutMin = computed<number | null>(() => {
 });
 
 // Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
-const allowsEmptyPrompt = computed(() => flowAllowsEmptyPrompt(flow.value, flows.value));
 const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
 const promptPlaceholder = computed(() => {
   const f = flow.value || 'implement';
-  if (allowsEmptyPrompt.value) {
-    return `Optional: focus the ${f} (leave blank to let the agent pick from workspace signals)`;
-  }
   return `Describe the task… (flow: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
 });
 // Optional overrides (behind a "More" toggle).
@@ -211,9 +207,8 @@ async function submitRoutine(text: string): Promise<void> {
 
 async function submit() {
   const text = prompt.value.trim();
-  // Brainstorm / idea-agent flows accept an empty prompt (the agent builds its
-  // own from workspace signals); every other flow requires one.
-  if ((!text && !allowsEmptyPrompt.value) || submitting.value) return;
+  // A prompt is always required; bail on empty input or an in-flight submit.
+  if (!text || submitting.value) return;
   submitting.value = true;
   // Drop the persisted draft up front: when the empty-state composer creates
   // the first task, the board re-renders and mounts the in-backlog composer,
