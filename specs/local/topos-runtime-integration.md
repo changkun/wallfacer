@@ -86,10 +86,13 @@ editing the graph edits the underlying agents/flows YAML registries.
   existing `in_progress -> waiting -> committing -> done` state machine with zero
   container launches. The runner consumes a topos-free `Result` mirror, so only
   `internal/agentgraph` names a topos type. Existing flows unchanged; tested.
-- **M3: flow/agents adapter (depth).** M2 landed the pinned `FromFlow` mapping
-  (`Role -> AgentSpec`, entry + peers chain). Remaining: the **dynamic/mesh** path
-  (a flow opts into `Autonomy: Dynamic` + `Topology`, peers as a directory) and a
-  richer `Role -> AgentSpec` mapping (Harness/Capabilities -> tools/scopes).
+- **M3: flow/agents adapter (depth). DONE** (`6b4ce135`). The pinned `FromFlow`
+  mapping landed in M2; M3 adds the **dynamic/mesh** path: `flow.Flow` gains
+  `Dynamic`, a typed `Topology` (orchestrator-worker default | mesh), and
+  `MaxHandoffDepth` (YAML, omitempty, unknown topology rejected on load). `FromFlow`
+  maps a dynamic flow to a `topos.Dynamic` region with peers as the directory;
+  `MaxHandoffDepth` threads into `topos.Options`. *Minor remaining:* a richer
+  `Role -> AgentSpec` tool mapping (Harness/Capabilities -> tools).
 - **M4: model + sandbox. DONE** (`2eafc03b`). An agentic flow uses a real model via
   Lux when wallfacer's `.env` configures one (`ANTHROPIC_API_KEY` + `ANTHROPIC_BASE_URL`
   -> `ModelLux`; bare key -> `ModelDirect`; none -> `ModelFake`), mapped inside the
