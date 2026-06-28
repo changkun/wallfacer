@@ -34,7 +34,7 @@
     "@xterm/xterm": "^6.0.0",
     "codemirror": "^6.0.1",
     "highlight.js": "^11.11.1",
-    "latere-ui": "github:latere-ai/latere-ui#v1.9.13",
+    "latere-ui": "github:latere-ai/latere-ui#v1.9.14",
     "markdown-it": "^14.1.0",
     "markdown-it-anchor": "^9.2.0",
     "mermaid": "^11.14.0",
