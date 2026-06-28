@@ -88,6 +88,47 @@ compatibility but unused. Legacy `Kind`-> flow mapping survives only to keep old
 records dispatching. `TaskKindPlanning`/`TaskKindRoutine` are not mapped by the
 resolver (fall through to `implement`).
 
+## Spike S outcome (2026-06-29): NO-GO on engine convergence
+
+The feasibility spike ran. **Topos cannot replace the `implement` loop without a
+redesign, not a port.** The agentic/topos path (`runAgenticFlow` ->
+`agentgraph` -> topos):
+
+- creates **no git worktrees** (the worktree<->topos-sandbox adapter is explicitly
+  deferred, `agentgraph/model.go`), so code changes never reach the host repo;
+- runs **no commit pipeline**, **no test verification**, **no oversight**, **no
+  agon** -- and persists an **empty SessionID** (`runner/agentic.go`) that
+  structurally breaks the handler's agon / auto-submit / commit machinery;
+- **races to `done`** via hollow state writes, bypassing the handler verification
+  the legacy path relies on.
+
+Worktrees, the commit pipeline, oversight, and agon are all wallfacer-specific
+runner/handler code (`runner/worktree.go`, `runner/commit.go`,
+`runner/oversight.go`, `handler/tasks_autopilot.go`), orthogonal to topos's
+generic multi-agent-graph orchestration. Moving them in is foundational work
+(an `executor.Backend` topos-sandbox adapter, git abstraction, session
+persistence across topos runs, output capture) -- a redesign.
+
+**Consequences (settle the open questions):**
+
+1. **A4 is ruled out** for now. The legacy flow engine and the `implement`
+   multi-turn loop are **not removable** -- they are the working execution
+   substrate. The end state is the staged plan's fallback: **two clean
+   coordination semantics under one surface** (deterministic DAG = the real
+   production path; delegating = a distinct mode), one dispatch, no engine
+   teardown.
+2. **The delegating/agentic coordination is EXPERIMENTAL** until the
+   worktree-sandbox adapter exists. Today it produces a transcript + lineage but
+   **no durable commits and no verification** -- so the agent-graph UI must not
+   present a delegating graph as a production-ready way to run a real task. This
+   is the genuine "suboptimal design" left to address: either gate/label the
+   delegating mode as experimental, or build the adapter (a separate, large
+   feature -- not part of this cleanup).
+3. **Deterministic graphs are the production path.** `implement` (legacy loop)
+   and any multi-step non-agentic flow (flow engine -> containers/worktrees) run
+   real, committable work. The agent-graph surface should center these and treat
+   delegation as opt-in/experimental.
+
 ## The core decision: what is the primitive, and how many execution engines
 
 The founding goal (define agents; define how they talk; let them discover and
@@ -291,14 +332,16 @@ Each teardown step ships with a regression test proving the capability survives
   API alias).
 - **A3: board wiring.** Composer + routines pick an agent graph (showing
   coordination); task shows + links its run on the graph; default `implement`.
-- **S: execution feasibility spike (gates A4).** Can topos run the `implement`
-  job (worktree, commit pipeline, agon, oversight, multi-turn coding) end to end?
-  Time-boxed; output is a go/no-go. Run after A1-A3 are shipping, since A4 is not
-  required for the product to be coherent.
-- **A4 (optional, gated by S = yes): execution convergence.** Converge on topos;
-  tear out the flow engine and the special implement loop; `implement` becomes a
-  graph. If S = no, skip A4 and keep two clean coordination semantics — a fine
-  end state.
+- **S: execution feasibility spike (gates A4). DONE -> NO-GO** (2026-06-29).
+  Topos cannot carry the `implement` job without a redesign (no worktrees, no
+  commit pipeline, no agon/oversight; races to done). See "Spike S outcome".
+- **A4: RULED OUT.** The flow engine and the `implement` loop stay (the working
+  substrate). End state = two clean coordination semantics under one surface.
+- **A4': delegating-mode honesty (replaces A4).** The delegating/agentic path
+  produces no durable commits today, so the surface must mark it EXPERIMENTAL and
+  center deterministic graphs as the production path; do not present a delegating
+  graph as a ready way to run a real task. Building the worktree-sandbox adapter
+  to make delegation real is a separate large feature, out of scope here.
 - **A5: final cleanup.** Data-model + records migration, API alias drop,
   vestigial UI removal (localStorage positions, raw agentic toggles), dead-code
   sweep.
