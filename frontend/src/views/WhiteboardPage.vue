@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue';
 import { api } from '../api/client';
+// Wallfacer-native theming for the Excalidraw island (maps Excalidraw's CSS
+// variables onto wallfacer tokens; hides Excalidraw's external Help links).
+import '../styles/whiteboard.css';
 
 // WhiteboardPage hosts an Excalidraw drawing canvas as a peer view. Excalidraw
 // is a React component with no Vue port, so a single React root is mounted into

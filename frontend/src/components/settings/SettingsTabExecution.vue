@@ -34,19 +34,11 @@ const archivedPerPage = ref(20);
 const oversightInterval = ref(0);
 const autoPushEnabled = ref(false);
 const autoPushThreshold = ref(1);
-const maxAgents = ref(0);
-const agentNice = ref(10);
-const agonForks = ref(1);
-const agonRounds = ref(3);
-const agonCostCap = ref(50000);
 
 const maxParallelStatus = ref('');
 const archivedStatus = ref('');
 const oversightStatus = ref('');
 const autoPushStatus = ref('');
-const maxAgentsStatus = ref('');
-const agentNiceStatus = ref('');
-const agonStatus = ref('');
 
 const titlesLimit = ref('10');
 const titlesStatus = ref('');
@@ -87,21 +79,6 @@ function syncFromEnv() {
   if (typeof env.value.auto_push_threshold === 'number' && env.value.auto_push_threshold > 0) {
     autoPushThreshold.value = env.value.auto_push_threshold;
   }
-  if (typeof env.value.max_agents === 'number') {
-    maxAgents.value = env.value.max_agents;
-  }
-  if (typeof env.value.agent_nice === 'number') {
-    agentNice.value = env.value.agent_nice;
-  }
-  if (typeof env.value.agon_forks === 'number' && env.value.agon_forks > 0) {
-    agonForks.value = env.value.agon_forks;
-  }
-  if (typeof env.value.agon_rounds === 'number' && env.value.agon_rounds > 0) {
-    agonRounds.value = env.value.agon_rounds;
-  }
-  if (typeof env.value.agon_cost_cap === 'number' && env.value.agon_cost_cap > 0) {
-    agonCostCap.value = env.value.agon_cost_cap;
-  }
 }
 
 watch(env, syncFromEnv);
@@ -121,52 +98,6 @@ async function saveMaxParallel() {
     flashSaved(maxParallelStatus);
   } catch (e) {
     maxParallelStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
-  }
-}
-
-async function saveMaxAgents() {
-  const value = clamp(parseInt(String(maxAgents.value), 10), 0, 64);
-  maxAgents.value = value;
-  maxAgentsStatus.value = 'Saving…';
-  try {
-    await updateEnv({ max_agents: value });
-    maxAgentsStatus.value = 'Saved — applies on restart.';
-    setTimeout(() => {
-      if (maxAgentsStatus.value.startsWith('Saved')) maxAgentsStatus.value = '';
-    }, 3000);
-  } catch (e) {
-    maxAgentsStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
-  }
-}
-
-async function saveAgentNice() {
-  const value = clamp(parseInt(String(agentNice.value), 10), -1, 19);
-  agentNice.value = value;
-  agentNiceStatus.value = 'Saving…';
-  try {
-    await updateEnv({ agent_nice: value });
-    agentNiceStatus.value = 'Saved — applies on restart.';
-    setTimeout(() => {
-      if (agentNiceStatus.value.startsWith('Saved')) agentNiceStatus.value = '';
-    }, 3000);
-  } catch (e) {
-    agentNiceStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
-  }
-}
-
-async function saveAgon() {
-  const forks = clamp(parseInt(String(agonForks.value), 10), 1, 8);
-  const rounds = clamp(parseInt(String(agonRounds.value), 10), 1, 12);
-  const costCap = clamp(parseInt(String(agonCostCap.value), 10), 1000, 1000000);
-  agonForks.value = forks;
-  agonRounds.value = rounds;
-  agonCostCap.value = costCap;
-  agonStatus.value = 'Saving…';
-  try {
-    await updateEnv({ agon_forks: forks, agon_rounds: rounds, agon_cost_cap: costCap });
-    flashSaved(agonStatus);
-  } catch (e) {
-    agonStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -313,116 +244,6 @@ async function generateMissingOversight() {
       style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
     >
       Max tasks running concurrently in the In Progress column.
-    </div>
-
-    <div class="settings-section">
-      <div
-        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-      >
-        Verification &amp; Resources
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
-        <label style="font-size: 12px; color: var(--text-muted)" for="agon-forks-input"
-          >Agon forks</label
-        >
-        <input
-          id="agon-forks-input"
-          v-model.number="agonForks"
-          type="number"
-          min="1"
-          max="8"
-          class="field"
-          style="width: 56px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveAgon"
-        />
-        <label style="font-size: 12px; color: var(--text-muted)" for="agon-rounds-input"
-          >rounds</label
-        >
-        <input
-          id="agon-rounds-input"
-          v-model.number="agonRounds"
-          type="number"
-          min="1"
-          max="12"
-          class="field"
-          style="width: 56px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveAgon"
-        />
-        <label style="font-size: 12px; color: var(--text-muted)" for="agon-cap-input"
-          >token cap</label
-        >
-        <input
-          id="agon-cap-input"
-          v-model.number="agonCostCap"
-          type="number"
-          min="1000"
-          max="1000000"
-          step="1000"
-          class="field"
-          style="width: 90px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveAgon"
-        />
-        <span style="font-size: 11px; color: var(--text-muted)">{{ agonStatus }}</span>
-      </div>
-      <div
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-      >
-        Adversarial verification depth. The minimum (1 fork, 3 rounds) is the
-        cheapest meaningful debate; raise for more scrutiny at higher cost.
-        Applies to the next run.
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px">
-        <label style="font-size: 12px; color: var(--text-muted)" for="agent-nice-input"
-          >Agent niceness</label
-        >
-        <input
-          id="agent-nice-input"
-          v-model.number="agentNice"
-          type="number"
-          min="-1"
-          max="19"
-          class="field"
-          style="width: 56px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveAgentNice"
-        />
-        <span style="font-size: 11px; color: var(--text-muted)">{{ agentNiceStatus }}</span>
-      </div>
-      <div
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-      >
-        OS priority for agent processes so they yield CPU to the foreground.
-        Higher = nicer (lower priority); -1 disables throttling.
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px">
-        <label style="font-size: 12px; color: var(--text-muted)" for="max-agents-input"
-          >Max concurrent agents</label
-        >
-        <input
-          id="max-agents-input"
-          v-model.number="maxAgents"
-          type="number"
-          min="0"
-          max="64"
-          class="field"
-          style="width: 56px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveMaxAgents"
-        />
-        <span style="font-size: 11px; color: var(--text-muted)">{{ maxAgentsStatus }}</span>
-      </div>
-      <div
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-      >
-        Hard ceiling on agent processes running at once across tasks, tests, and
-        verification. 0 = unlimited.
-      </div>
     </div>
 
     <div class="settings-section">
