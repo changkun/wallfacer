@@ -1,5 +1,5 @@
 ---
-title: Excalidraw Whiteboard
+title: Whiteboard
 status: drafted
 depends_on: []
 affects:
@@ -16,33 +16,44 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# Excalidraw Whiteboard
+# Whiteboard
 
 ## Overview
 
-Add an Excalidraw-based whiteboard as a peer view alongside the board, plan,
-and map views. Users can draft architecture diagrams, brainstorm ideas, and
-sketch designs on an infinite canvas that persists per workspace. This is a
-focused integration, embedding Excalidraw as a drawing tool, not a full
-spatial-canvas rethinking of the UI (see `spatial-canvas.md` for that).
+Add a whiteboard as a peer view alongside the board, plan, and map views. Users
+can draft architecture diagrams, brainstorm ideas, and sketch designs on an
+infinite canvas that persists per workspace, drawing freely the way they would
+in Excalidraw. The goal is the drawing capability, not a specific vendor; the
+engine below is the chosen vehicle, not the requirement. This is a focused
+integration of a drawing tool, not a full spatial-canvas rethinking of the UI
+(see `spatial-canvas.md` for that).
 
-## Approach: keep Excalidraw, isolate React (decided)
+## Engine: Excalidraw, React isolated (current choice, revisable)
 
-Excalidraw is a React component with no Vue port, and the closest alternative
-(tldraw) is also React. The options were: (1) keep Excalidraw and isolate React
-behind a lazy code-split boundary, (2) iframe-isolate a self-hosted Excalidraw,
-or (3) rebuild the whiteboard Vue-natively on a canvas library like vue-konva.
+The goal — an infinite drawing canvas — does not mandate any particular library.
+The options were: (1) embed Excalidraw and isolate React behind a lazy
+code-split boundary, (2) iframe-isolate a self-hosted Excalidraw, or (3) build
+the whiteboard Vue-natively on a canvas library like vue-konva. Excalidraw and
+the closest alternative (tldraw) are both React components with no Vue port.
 Option 3 reimplements a mature tool at much lower fidelity and far higher cost;
 option 2 adds a separate build plus a postMessage bridge for theme, sizing, and
 data.
 
-Decision: option 1. Mount a single React root inside one Vue view via a dynamic
-`import()`, code-split so the React + Excalidraw chunk (~1.5MB gzipped) loads
-only when the whiteboard route is first opened. The initial Vue SPA bundle stays
-React-free in practice; React is confined to this one lazily-loaded island and
-torn down on route leave. The `react`/`react-dom` cost is therefore an on-demand
-chunk for an opt-in view, not a tax on every page load, which resolves the
-earlier "is the React dependency worth it" question.
+Current choice: option 1. Mount a single React root inside one Vue view via a
+dynamic `import()`, code-split so the React + Excalidraw chunk (~1.5MB gzipped)
+loads only when the whiteboard route is first opened. The initial Vue SPA bundle
+stays React-free in practice; React is confined to this one lazily-loaded island
+and torn down on route leave. The `react`/`react-dom` cost is therefore an
+on-demand chunk for an opt-in view, not a tax on every page load.
+
+Revisit trigger: the one real cost is that Excalidraw drags React into an
+otherwise React-free Vue SPA. If that proves unacceptable (bundle size,
+maintenance, build friction), the engine can be swapped — for tldraw, a
+Vue-native vue-konva build, or another library — without changing the goal, the
+per-workspace storage design, or the API surface. The whiteboard is persisted as
+opaque scene JSON via `GET/PUT /api/whiteboard` (see below), which is
+engine-agnostic; only the frontend view and the scene serialization format are
+engine-specific.
 
 ## Current State
 
