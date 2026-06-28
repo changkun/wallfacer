@@ -22,3 +22,7 @@ frontend/dist/
 frontend/test-results/
 release-evidence/
 deploy/prebuilt/wallfacer
+
+# Local dev workspace
+go.work
+go.work.sum
