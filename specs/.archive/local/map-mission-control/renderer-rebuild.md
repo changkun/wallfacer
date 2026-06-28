@@ -1,6 +1,6 @@
 ---
 title: Hand-Rolled SVG Graph Renderer (RAF Drag + Curved Edges)
-status: complete
+status: archived
 depends_on:
   - specs/local/map-mission-control/graph-endpoint.md
 affects:
@@ -11,7 +11,7 @@ affects:
   - frontend/src/components/map/layout.test.ts
   - frontend/src/api/types.ts
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 effort: large

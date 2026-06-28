@@ -1,6 +1,6 @@
 ---
 title: Map as Mission Control
-status: complete
+status: archived
 depends_on: []
 affects:
   - frontend/src/views/MapPage.vue
@@ -16,7 +16,7 @@ affects:
   - docs/guide/
 effort: large
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---

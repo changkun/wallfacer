@@ -1,6 +1,6 @@
 ---
 title: Inline Node Actions + Operational Critical-Path Highlighting
-status: complete
+status: archived
 depends_on:
   - specs/local/map-mission-control/map-integration.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - frontend/src/views/MapPage.test.ts
   - docs/guide/
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 effort: medium
