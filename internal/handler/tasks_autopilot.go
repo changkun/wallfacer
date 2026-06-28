@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -1363,13 +1364,43 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	if err := s.UpdateTaskAgon(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir); err != nil {
 		return err
 	}
-	summary := "Agon: verification clean — no unresolved attacks."
-	if result.Unresolved > 0 {
-		summary = fmt.Sprintf("Agon: %d unresolved attack(s).", result.Unresolved)
-		if result.Headline != "" {
-			summary += " " + result.Headline
+
+	// Feedback loop (acted on by tryAutoPromote under autopilot): a clean verdict
+	// ends the cycle; unresolved attacks under the retry cap are fed back to the
+	// implementation agent as feedback so it fixes them, then re-verify.
+	switch {
+	case result.Unresolved == 0:
+		if err := s.ResetAgonRetry(ctx, t.ID); err != nil {
+			logger.Handler.Warn("agon: reset retry", "task", t.ID, "error", err)
 		}
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": "Agon: verification clean — no unresolved attacks.",
+		})
+	case ft.AgonRetryCount < constants.MaxAgonRetries:
+		if err := s.SetAgonFeedback(ctx, t.ID, buildAgonFeedback(result)); err != nil {
+			logger.Handler.Warn("agon: set feedback", "task", t.ID, "error", err)
+		}
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf("Agon: %d unresolved attack(s); resuming the task with them as feedback.", result.Unresolved),
+		})
+	default:
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf("Agon: %d unresolved attack(s) after %d feedback cycle(s); auto-resume halted, manual review needed.", result.Unresolved, ft.AgonRetryCount),
+		})
 	}
-	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{"result": summary})
 	return nil
+}
+
+// buildAgonFeedback constructs the implementation-agent feedback for unresolved
+// attacks. It prefers the run's rendered summary.md (the full attack ledger,
+// written by agon since v0.1.2); falls back to the headline claim.
+func buildAgonFeedback(result *adversarial.VerifyResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Adversarial verification (agon) found %d unresolved attack(s). Address them:\n\n", result.Unresolved)
+	if sum, err := os.ReadFile(filepath.Join(result.SessionDir, "summary.md")); err == nil && len(sum) > 0 {
+		b.Write(sum)
+	} else if result.Headline != "" {
+		b.WriteString(result.Headline)
+	}
+	return b.String()
 }

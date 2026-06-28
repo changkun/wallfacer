@@ -349,6 +349,65 @@ func TestRunAgon_EmitsTimelineEvents(t *testing.T) {
 	}
 }
 
+// TestRunAgon_FeedbackLoop proves unresolved attacks become pending feedback
+// (capped), and a clean verdict resets the cycle.
+func TestRunAgon_FeedbackLoop(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	sessionDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(sessionDir, "summary.md"), []byte("## Unresolved\n- c1-1 nil deref in foo()"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref", SessionDir: sessionDir}}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskWithSession(t, s)
+
+	// Cycle 1: under cap → feedback set, count 1, drawn from summary.md.
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	got, _ := s.GetTask(ctx, task.ID)
+	if got.AgonRetryCount != 1 || got.PendingAgonFeedback == "" {
+		t.Fatalf("cycle1: count=%d feedback=%q", got.AgonRetryCount, got.PendingAgonFeedback)
+	}
+	if !strings.Contains(got.PendingAgonFeedback, "nil deref in foo()") {
+		t.Errorf("feedback should include the summary.md attack list: %q", got.PendingAgonFeedback)
+	}
+
+	// Cycle 2: still under cap (MaxAgonRetries=2) → count 2.
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	got, _ = s.GetTask(ctx, task.ID)
+	if got.AgonRetryCount != 2 {
+		t.Fatalf("cycle2: count=%d, want 2", got.AgonRetryCount)
+	}
+
+	// Cycle 3: at cap → no further increment (auto-resume halts).
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon: %v", err)
+	}
+	got, _ = s.GetTask(ctx, task.ID)
+	if got.AgonRetryCount != 2 {
+		t.Errorf("cycle3: count=%d, want 2 (capped)", got.AgonRetryCount)
+	}
+
+	// Clean verdict → reset.
+	v.result = &adversarial.VerifyResult{Unresolved: 0}
+	if err := h.runAgon(ctx, s, task); err != nil {
+		t.Fatalf("runAgon clean: %v", err)
+	}
+	got, _ = s.GetTask(ctx, task.ID)
+	if got.AgonRetryCount != 0 || got.PendingAgonFeedback != "" {
+		t.Errorf("after clean: count=%d feedback=%q, want 0 + empty", got.AgonRetryCount, got.PendingAgonFeedback)
+	}
+}
+
 // TestRunAgon_ThreadsCriteria proves the task's persisted Criteria reaches the
 // verifier input, so agon critics are anchored to the same acceptance bar as
 // the test agent (the previously-blocked goal #7).
