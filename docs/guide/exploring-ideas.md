@@ -2,7 +2,7 @@
 
 Plan mode is where you explore ideas conversationally with an AI agent before committing to structured specs or tasks.
 
-The agent chat lives inside Plan mode. It is backed by an agent that can read your codebase, create files, and run commands. The same agent also powers task-mode prompt refinement (see [Refinement & Ideation](refinement-and-ideation.md)).
+The agent chat lives inside Plan mode. It is backed by an agent that can read your codebase, create files, and run commands. The same agent also powers task-mode prompt refinement (see [Prompt Refinement](refinement-and-ideation.md)).
 
 ```mermaid
 flowchart LR
@@ -143,7 +143,7 @@ When a spec is selected in the explorer (left pane), the agent automatically rec
 
 - [The Autonomy Spectrum](autonomy-spectrum.md) -- where the agent chat fits in the overall workflow
 - [Designing Specs](designing-specs.md) -- structured design with specs
-- [Refinement & Ideation](refinement-and-ideation.md) -- AI-assisted prompt improvement for tasks
+- [Prompt Refinement](refinement-and-ideation.md) -- AI-assisted prompt improvement for tasks
 - [Plan Mode Internals](../internals/plan-mode.md) -- packages, SSE protocol, and undo plumbing
 </content>
 </invoke>

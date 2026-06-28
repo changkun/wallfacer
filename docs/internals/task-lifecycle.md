@@ -231,10 +231,6 @@ When a task process is found still running after a restart, a background gorouti
 
 See [Automation](automation.md).
 
-## Ideation / Brainstorm Agent
-
-See [Automation](automation.md).
-
 ## Output Truncation
 
 Server-side output truncation is controlled by `WALLFACER_MAX_TURN_OUTPUT_BYTES` (default 8 MB). When a turn's stdout or stderr exceeds this limit, the output is truncated and a sentinel is appended. Truncated turn numbers are recorded in `Task.TruncatedTurns` so the UI can surface warnings.
@@ -271,7 +267,7 @@ Tasks can declare dependencies on other tasks via `DependsOn []string` (a list o
 
 1. **Ref uniqueness**: Each task in the batch can have a symbolic `ref` string. Duplicate refs are rejected.
 
-2. **Prompt validation**: Every task must have a non-empty prompt unless its flow resolves to `brainstorm` (the legacy `idea-agent` kind also qualifies), in which case the agent derives the topic from the workspace itself.
+2. **Prompt validation**: Every task must have a non-empty prompt.
 
 3. **Flow validation**: Each task's `flow` field is optional on input but normalises to `implement` when omitted; unknown flow slugs are rejected at dispatch time by the runner. The deprecated `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400; see the [Agents & Flows](../guide/agents-and-flows.md) guide for the migration path.
 
@@ -424,6 +420,6 @@ See [Data & Storage](data-and-storage.md).
 - [Internals Index](internals.md), Overview and reading order for all internals docs
 - [Architecture](architecture.md), System design, component overview, and design decisions
 - [Data & Storage](data-and-storage.md), Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
-- [Automation](automation.md), Autopilot, oversight generation, ideation agent
+- [Automation](automation.md), Autopilot, oversight generation, scheduled routines
 - [Git Worktrees](git-worktrees.md), Worktree lifecycle, branch naming, cleanup
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

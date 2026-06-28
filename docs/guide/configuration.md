@@ -148,8 +148,6 @@ Board and plan-mode shortcuts are suppressed when focus is in a text input or wh
 
 **Auto Push** -- Enable automatic `git push` after a task's commit pipeline completes. When enabled, an additional threshold field appears: push only triggers when the workspace is at least N commits ahead of upstream. Corresponds to `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD`.
 
-**Brainstorm** -- Enable the brainstorm (ideation) agent and set its recurrence interval. Options range from "immediately" to "every 24h". The brainstorm agent analyses repositories and proposes tasks tagged `idea-agent`. A "Run now" button triggers an immediate brainstorm.
-
 **Task Titles** -- Select a batch limit (5, 10, 25, 50, or All) and click "Generate Missing" to auto-generate titles for untitled tasks using a lightweight model call.
 
 **Trace Oversight** -- Select a batch limit and click "Generate Missing" to generate oversight summaries for tasks that lack them.
@@ -205,11 +203,10 @@ The six configurable activities are:
 3. **Title generation** -- automatic task title generation
 4. **Oversight summary** -- trace oversight analysis
 5. **Commit message** -- commit message generation
-6. **Idea agent** -- brainstorm/ideation agent
 
 When an activity-specific override is not set, it falls back to `WALLFACER_DEFAULT_SANDBOX`. When that is also unset, the agent is determined by the task's own field or the server default (Claude).
 
-Prompt refinement is not an agent activity. It happens in the Plan task-mode chat via the `update_task_prompt` tool. See [Refinement & Ideation](refinement-and-ideation.md).
+Prompt refinement is not an agent activity. It happens in the Plan task-mode chat via the `update_task_prompt` tool. See [Prompt Refinement](refinement-and-ideation.md).
 
 Route specific activities to different agents (`claude` or `codex`):
 
@@ -221,7 +218,6 @@ Route specific activities to different agents (`claude` or `codex`):
 | `WALLFACER_SANDBOX_TITLE` | Override for title generation |
 | `WALLFACER_SANDBOX_OVERSIGHT` | Override for oversight generation |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Override for commit message generation |
-| `WALLFACER_SANDBOX_IDEA_AGENT` | Override for the ideation agent |
 
 The `WALLFACER_SANDBOX_*` names are retained for backward compatibility; they select the agent, not a container.
 
@@ -369,7 +365,6 @@ Wallfacer ships built-in Go template files that instruct its agent activities. T
 | `commit.tmpl` | Commit message generation |
 | `test.tmpl` | Test-verification agent |
 | `oversight.tmpl` | Oversight summary generation |
-| `ideation.tmpl` | Brainstorm/ideation agent |
 | `conflict.tmpl` | Merge conflict resolution |
 | `task_prompt_refine.tmpl` | Plan task-mode prompt refinement (`update_task_prompt`) |
 
@@ -581,5 +576,5 @@ Access via **Settings > Workspace**.
 - [Getting Started](getting-started.md) -- initial setup and first task
 - [Usage Guide](usage.md) -- task creation, feedback, autopilot, and results
 - [Circuit Breakers](circuit-breakers.md) -- agent launch failure protection
-- [Refinement & Ideation](refinement-and-ideation.md) -- prompt refinement and brainstorm agents
+- [Prompt Refinement](refinement-and-ideation.md) -- shaping a task's prompt in the Plan task-mode chat
 - [Architecture](../internals/architecture.md) -- system design for contributors
