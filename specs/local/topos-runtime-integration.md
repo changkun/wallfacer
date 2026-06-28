@@ -1,6 +1,6 @@
 ---
 title: Topos Runtime Integration (Embed the Agent-Graph Runtime)
-status: stale
+status: drafted
 depends_on:
   - ../../agents/specs/architecture/agent-sdk-mesh-foundation.md
 affects:
@@ -32,7 +32,7 @@ produces a lineage graph, and the Map renders it live.
 
 ## Why now
 
-The runtime is extracted, public, and stable (`latere.ai/x/topos` v0.0.3: pure SDK,
+The runtime is extracted, public, and stable (`latere.ai/x/topos` v0.0.4: pure SDK,
 linted, covered). wallfacer already consumes sibling latere modules (`agon`, `pkg`),
 so the dependency pattern exists. The current Agents and Flows pages are two disjoint
 surfaces; topos gives one model (agents, regions, topology, delegation, lineage) that
@@ -77,13 +77,19 @@ editing the graph edits the underlying agents/flows YAML registries.
 
 ## Milestones
 
-- **M1: wiring + guard.** go.work + `require topos v0.0.3` + import-guard test;
-  wallfacer compiles against topos. Smallest, de-risks the dependency.
-- **M2: execution seam (headless).** The `agentic` flow kind runs a fixed two-agent
-  region via topos and writes the final result + lineage to the task. Tested with the
-  topos fake model (no network), asserting the lineage shape.
-- **M3: flow/agents adapter.** Real mapping from a wallfacer flow + agents registry to
-  a `topos.Region`, pinned and dynamic.
+- **M1: wiring + guard. DONE** (`84be42bf`). `internal/agentgraph` is the single seam
+  importing the root topos package; `go.mod` requires `topos v0.0.4`; a `go.work`
+  (gitignored) uses local `../topos`; the import-guard test enforces the boundary.
+- **M2: execution seam (headless). DONE** (`a8abfa3b`). A flow flagged
+  `flow.Flow.Agentic` runs in-process via `agentgraph.RunFlow` and the topos fake
+  model, persists the lineage to a typed `Task.Lineage` JSON field, and drives the
+  existing `in_progress -> waiting -> committing -> done` state machine with zero
+  container launches. The runner consumes a topos-free `Result` mirror, so only
+  `internal/agentgraph` names a topos type. Existing flows unchanged; tested.
+- **M3: flow/agents adapter (depth).** M2 landed the pinned `FromFlow` mapping
+  (`Role -> AgentSpec`, entry + peers chain). Remaining: the **dynamic/mesh** path
+  (a flow opts into `Autonomy: Dynamic` + `Topology`, peers as a directory) and a
+  richer `Role -> AgentSpec` mapping (Harness/Capabilities -> tools/scopes).
 - **M4: model + sandbox.** Lux model wiring; sandbox via `Options.Sandbox`.
 - **M5: live lineage in the Map.** Persist + serve + render the lineage sub-graph.
 - **M6: unified Agents/Flows graph UI.** Merge the two pages into the agent-graph
@@ -110,8 +116,9 @@ editing the graph edits the underlying agents/flows YAML registries.
 - **OQ-1**: sandbox strategy. Use the topos local sandbox, or adapt
   `executor.Backend` to `topos.Sandbox`? Local is simplest for M2-M4; the adapter
   lets a topos run share wallfacer's container/host execution. Decide at M4.
-- **OQ-2**: lineage persistence shape. A typed `Task.Lineage` field vs embedding in
-  `Task.Result`. Affects the graph endpoint and storage migration.
+- **OQ-2 RESOLVED** (M2): lineage is a typed `Task.Lineage *string` JSON field (an
+  opaque string so the store never imports topos), keeping `Task.Result` for the
+  agent's final text. `omitempty` means non-agentic tasks serialize byte-identically.
 - **OQ-3**: how a dynamic flow declares topology (orchestrator-worker vs mesh) and the
   handoff-depth bound in the flow YAML schema.
 
