@@ -16,6 +16,7 @@ import { formatBatchFeedback } from '../lib/diffComments';
 import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
+import AgonVerification from './AgonVerification.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
@@ -155,10 +156,6 @@ const resultsFetched = ref(false);
 const agonTranscript = ref<AgonTranscript | null>(null);
 // Agon transcript view: the rendered fork/round debate (default) ↔ the raw
 // transcript payload (the fork/round records + bodies the server assembled).
-const agonView = ref<'rendered' | 'raw'>('rendered');
-const agonRawText = computed(() =>
-  agonTranscript.value ? JSON.stringify(agonTranscript.value, null, 2) : '');
-const agonError = ref('');
 let agonPollTimer: ReturnType<typeof setTimeout> | null = null;
 // After triggering a run, keep polling until this time even before the session
 // appears, so a just-started run's first rounds show up live.
@@ -181,7 +178,6 @@ async function fetchAgonTranscript() {
       'GET',
       `/api/tasks/${props.task.id}/agon/transcript`,
     );
-    agonError.value = '';
   } catch {
     // 404 (no run yet) is the common case — show the empty state, not an error.
     agonTranscript.value = null;
@@ -1429,76 +1425,38 @@ async function submitReview() {
                      the latest result shows in Spec, so they're not repeated
                      here. -->
                 <div data-main-tab-section="verification">
-                  <!-- Agon adversarial trajectory (live fork/round debate) -->
-                  <div v-if="agonTranscript && agonTranscript.forks.length" class="agon-trajectory">
-                    <div class="agon-trajectory__head">
-                      <span class="result-type-badge result-type-plan">Agon</span>
-                      <span class="text-xs text-v-secondary">adversarial verification trajectory</span>
-                      <span v-if="agonTranscript.running" class="agon-trajectory__live">● live</span>
-                      <button
-                        type="button"
-                        class="btn-icon"
-                        style="margin-left: auto;"
-                        @click="agonView = agonView === 'raw' ? 'rendered' : 'raw'"
-                      >{{ agonView === 'raw' ? 'Rendered' : 'Raw' }}</button>
-                    </div>
-                    <pre v-if="agonView === 'raw'" class="logs-block">{{ agonRawText }}</pre>
-                    <details
-                      v-for="fork in agonTranscript.forks"
-                      v-else
-                      :key="`agon-fork-${fork.index}`"
-                      class="result-entry"
-                      open
-                    >
-                      <summary class="result-entry-summary">
-                        <div class="result-entry-labels">
-                          <span class="result-turn-label">Fork {{ fork.index }}</span>
-                          <span class="text-xs text-v-muted">{{ fork.rounds.length }} round(s)</span>
-                        </div>
-                      </summary>
-                      <details
-                        v-for="(r, ri) in fork.rounds"
-                        :key="`agon-${fork.index}-${r.round}-${r.role}`"
-                        class="agon-round"
-                        :open="ri === fork.rounds.length - 1"
-                      >
-                        <summary class="agon-round__summary">
-                          <span class="result-type-badge" :class="r.role === 'critic' ? 'agon-role--critic' : 'agon-role--proposer'">
-                            {{ r.role === 'critic' ? 'Critic' : 'Proposer' }} R{{ r.round }}
-                          </span>
-                        </summary>
-                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                        <div class="result-entry-body prose-content" v-html="renderResultMarkdown(r.body)" />
-                      </details>
-                    </details>
-                  </div>
-                  <div v-else-if="agonTranscript && agonTranscript.running" class="text-xs text-v-secondary">Agon verification running… waiting for the first round.</div>
+                  <!-- Adversarial verification (agon): config, outcome, live trajectory -->
+                  <AgonVerification :task="task" :transcript="agonTranscript" />
 
-                  <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading verification…</div>
-                  <div v-else-if="resultsError" class="text-xs" style="color: var(--err, #c0392b);">{{ resultsError }}</div>
-                  <div v-else-if="!testResults.length" class="text-xs text-v-muted">No verification run for this task yet.</div>
-                  <template v-else>
-                    <details
-                      v-for="(entry, idx) in testResults"
-                      :key="`test-${entry.turn}`"
-                      class="result-entry"
-                      :open="idx === 0"
-                    >
-                      <summary class="result-entry-summary">
-                        <div class="result-entry-labels">
-                          <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
-                          <span class="result-turn-label">Turn {{ entry.turn }}</span>
+                  <!-- Test-agent verification (separate phase, its own empty state) -->
+                  <section class="ta-verify-sec">
+                    <h3 class="ta-events__h">Test agent</h3>
+                    <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading…</div>
+                    <div v-else-if="resultsError" class="text-xs" style="color: var(--err, #c0392b);">{{ resultsError }}</div>
+                    <div v-else-if="!testResults.length" class="text-xs text-v-muted">No test-agent run for this task yet.</div>
+                    <template v-else>
+                      <details
+                        v-for="(entry, idx) in testResults"
+                        :key="`test-${entry.turn}`"
+                        class="result-entry"
+                        :open="idx === 0"
+                      >
+                        <summary class="result-entry-summary">
+                          <div class="result-entry-labels">
+                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
+                            <span class="result-turn-label">Turn {{ entry.turn }}</span>
+                          </div>
+                        </summary>
+                        <div class="result-entry-actions flex items-center gap-1.5">
+                          <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
+                          <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
                         </div>
-                      </summary>
-                      <div class="result-entry-actions flex items-center gap-1.5">
-                        <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                        <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                      </div>
-                      <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                      <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                    </details>
-                  </template>
+                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
+                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
+                      </details>
+                    </template>
+                  </section>
                 </div>
 
                 <!-- TIMELINE tab (span flamegraph) -->
@@ -1804,24 +1762,8 @@ async function submitReview() {
 </template>
 
 <style scoped>
-.agon-trajectory { margin-bottom: 1rem; }
-.agon-trajectory__head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-.agon-trajectory__live {
-  color: var(--accent, #d97757);
-  font-size: 0.7rem;
-  font-weight: 600;
-  animation: agon-pulse 1.4s ease-in-out infinite;
-}
-@keyframes agon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-.agon-round { margin: 0.25rem 0 0.25rem 0.75rem; }
-.agon-round__summary { cursor: pointer; padding: 0.2rem 0; }
-.agon-role--critic { background: rgba(192, 57, 43, 0.12); color: #c0392b; }
-.agon-role--proposer { background: rgba(39, 119, 87, 0.12); color: #277757; }
+.ta-verify-sec { margin-top: 0.25rem; }
+.ta-verify-sec .ta-events__h { margin-bottom: 0.5rem; }
 
 .modal-overlay {
   position: fixed;

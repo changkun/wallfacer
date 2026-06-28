@@ -115,9 +115,25 @@ export interface AgonFork {
   index: number;
   rounds: AgonRound[];
 }
+export interface AgonRunConfig {
+  forks: number;
+  max_rounds: number;
+  cost_cap: number;
+  proposer_model: string;
+  critic_models: string[];
+}
+export interface AgonOutcome {
+  termination: string;
+  total_attacks: number;
+  by_status: Record<string, number>;
+  wall_seconds: number;
+  tokens: number;
+}
 export interface AgonTranscript {
   session_id: string;
   running: boolean;
+  config?: AgonRunConfig;
+  outcome?: AgonOutcome;
   forks: AgonFork[];
 }
 
