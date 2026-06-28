@@ -1,6 +1,6 @@
 ---
 title: Topos Runtime Integration (Embed the Agent-Graph Runtime)
-status: drafted
+status: stale
 depends_on:
   - ../../agents/specs/architecture/agent-sdk-mesh-foundation.md
 affects:
