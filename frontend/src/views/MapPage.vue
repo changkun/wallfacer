@@ -8,7 +8,7 @@ import GraphCanvas from '../components/map/GraphCanvas.vue';
 import MapNodePopup from '../components/map/MapNodePopup.vue';
 import { stateColor } from '../components/map/nodeColors';
 import TaskDetail from '../components/TaskDetail.vue';
-import type { Graph, GraphNode, Task } from '../api/types';
+import type { Graph, GraphNode, GraphAction, Task } from '../api/types';
 
 // MapPage renders the unified spec+task graph served authoritatively by
 // GET /api/graph (internal/graph). The legacy vendored depgraph renderer and
@@ -117,43 +117,45 @@ function openInBoard(taskId: string) {
 // stale button claiming something is possible).
 const actionBusy = ref(false);
 
-function hasAction(node: GraphNode | null, action: string): boolean {
-  return !!node && (node.available_actions ?? []).includes(action as never);
-}
+// User-facing labels for the transition verbs the backend marks available.
+const ACTION_LABELS: Record<GraphAction, string> = {
+  dispatch: 'Dispatch',
+  undispatch: 'Undispatch',
+  validate: 'Validate',
+  'force-complete': 'Force complete',
+  unstale: 'Un-stale',
+  unarchive: 'Unarchive',
+  start: 'Start',
+};
 
-async function dispatchSpec(node: GraphNode) {
+// runAction fires one node action against the real API and re-syncs the graph.
+// 'start' promotes a task; every other verb is a spec transition. The server's
+// available_actions stays the source of truth — a failure re-fetches so a stale
+// button can't linger.
+async function runAction(node: GraphNode, action: GraphAction) {
   if (actionBusy.value) return;
   actionBusy.value = true;
   try {
-    const resp = await api<{ dispatched?: { task_id: string }[] }>('POST', '/api/specs/transition', {
-      action: 'dispatch',
-      paths: [node.ref],
-      run: false,
-    });
-    const taskId = resp.dispatched?.[0]?.task_id;
-    if (taskId) {
-      toast.pushWithAction('Spec dispatched to the board', 'View on Board →', () => {
-        router.push({ path: '/', query: { task: taskId } });
-      }, { kind: 'success' });
+    if (action === 'start') {
+      await api('PATCH', `/api/tasks/${node.ref}`, { status: 'in_progress' });
+      toast.push('Task started', { kind: 'success' });
     } else {
-      toast.push('Spec dispatched', { kind: 'success' });
+      const resp = await api<{ dispatched?: { task_id: string }[] }>('POST', '/api/specs/transition', {
+        action,
+        paths: [node.ref],
+        run: false,
+      });
+      const taskId = action === 'dispatch' ? resp.dispatched?.[0]?.task_id : undefined;
+      if (taskId) {
+        toast.pushWithAction('Spec dispatched to the board', 'View on Board →', () => {
+          router.push({ path: '/', query: { task: taskId } });
+        }, { kind: 'success' });
+      } else {
+        toast.push(`${ACTION_LABELS[action]} done`, { kind: 'success' });
+      }
     }
   } catch (e) {
-    toast.push('Dispatch failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
-  } finally {
-    actionBusy.value = false;
-    await loadGraph();
-  }
-}
-
-async function startTask(node: GraphNode) {
-  if (actionBusy.value) return;
-  actionBusy.value = true;
-  try {
-    await api('PATCH', `/api/tasks/${node.ref}`, { status: 'in_progress' });
-    toast.push('Task started', { kind: 'success' });
-  } catch (e) {
-    toast.push('Start failed: ' + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
+    toast.push(`${ACTION_LABELS[action]} failed: ` + (e instanceof Error ? e.message : String(e)), { kind: 'error' });
   } finally {
     actionBusy.value = false;
     await loadGraph();
@@ -242,22 +244,14 @@ watch(showArchived, () => void loadGraph());
               <p class="depgraph-inspector__muted">{{ selectedNode.kind }} · {{ selectedNode.status }}</p>
               <div class="depgraph-inspector__actions">
                 <button
-                  v-if="hasAction(selectedNode, 'dispatch')"
+                  v-for="act in (selectedNode.available_actions || [])"
+                  :key="act"
                   type="button"
                   class="depgraph-inspector__action--primary"
                   :disabled="actionBusy"
-                  @click="dispatchSpec(selectedNode)"
+                  @click="runAction(selectedNode, act)"
                 >
-                  Dispatch
-                </button>
-                <button
-                  v-if="hasAction(selectedNode, 'start')"
-                  type="button"
-                  class="depgraph-inspector__action--primary"
-                  :disabled="actionBusy"
-                  @click="startTask(selectedNode)"
-                >
-                  Start
+                  {{ ACTION_LABELS[act] }}
                 </button>
                 <button v-if="selectedNode.kind === 'spec'" type="button" @click="openInPlan(selectedNode.ref)">
                   Open in Plan
