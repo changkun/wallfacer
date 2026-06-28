@@ -5,18 +5,11 @@ export interface RenderedTag {
   styled: boolean;
 }
 
-// Mirrors ui/js/render.js's renderTaskTagBadge taxonomy. Brainstorm category
-// tags (sourced from /api/config ideation_categories) and idea-agent get
-// dedicated badge classes; priority:* / impact:* / spawned-by:* keep their
-// own; everything else falls back to the hue-coloured generic chip.
-export function classifyTag(rawTag: string, categories?: Set<string>): RenderedTag {
+// Mirrors ui/js/render.js's renderTaskTagBadge taxonomy. priority:* / impact:* /
+// spawned-by:* get dedicated badge classes; everything else falls back to the
+// hue-coloured generic chip.
+export function classifyTag(rawTag: string): RenderedTag {
   const lower = rawTag.toLowerCase();
-  if (categories && categories.has(rawTag)) {
-    return { rawTag, label: rawTag, cls: 'badge badge-category', styled: false };
-  }
-  if (lower === 'idea-agent') {
-    return { rawTag, label: rawTag, cls: 'badge badge-idea-agent', styled: false };
-  }
   if (lower.startsWith('priority:')) {
     return { rawTag, label: rawTag.slice('priority:'.length).trim() || 'priority', cls: 'badge badge-priority', styled: false };
   }
