@@ -32,7 +32,7 @@ Local Product - 11 shipped, rest pending
   ○ Visual Verification            ○ Scoped Command Registry
   ○ Host Path References           ○ Live Serve
   ○ Free-Form Specs
-  ○ Terminal UI (TUI mode)         ○ Excalidraw Whiteboard
+  ○ Terminal UI (TUI mode)         ✅ Excalidraw Whiteboard
   ○ Dockable Panel Workspace       ○ Workflows Graph UX
   ✅ Map Mission Control
   ⊘ superseded by the Vue/host rewrite: File Attachments,
@@ -140,7 +140,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [agent-resource-governance.md](local/agent-resource-governance.md) | Drafted | Stop Test/Agon from pegging the machine: lower host agent OS priority (nice + own process group), add a global ceiling on concurrent agent processes, default agon to its floor (1 fork / 1 critic), and surface forks/rounds/cost-cap/nice/budget in the Execution settings tab via the existing `/api/env` path. |
 | [terminal-ui.md](local/terminal-ui.md) | Drafted | Full TUI mode over the same backend: interactive terminal board, log streaming, task lifecycle via Bubble Tea (`internal/tui/`). |
 | [archive-active-task-guard.md](local/archive-active-task-guard.md) | **Complete** | Spec archive guard blocks only when a dispatched task is still active; terminal (done/failed/cancelled) or stale links no longer 409. Fixes a complete tree refusing to archive. |
-| [excalidraw-whiteboard.md](local/excalidraw-whiteboard.md) | Drafted | Whiteboard drawing/brainstorm canvas as a peer Vue view; Excalidraw is the current engine choice (note: adds React to the otherwise React-free SPA, a revisable cost worth sign-off before dispatch). |
+| [excalidraw-whiteboard.md](local/excalidraw-whiteboard.md) | **Complete** | Whiteboard drawing/brainstorm canvas as a peer Vue view, backed by a per-workspace scene file (`GET`/`PUT /api/whiteboard`). Excalidraw runs in a lazily-loaded React island; the app entry chunk stays React-free. Cloud sync for signed-in users is future work. |
 | [free-form-specs.md](local/free-form-specs.md) | **Complete** | Render frontmatter-less markdown specs read-only in spec mode (previously they silently collapsed the tree to empty), plus a non-blocking, dismissible suggestion to migrate them into wallfacer lifecycle-managed specs via opt-in frontmatter scaffolding. Shipped: `ErrMissingFrontmatter` sentinel + `BuildTree` doc nodes, `InjectFrontmatter`, `migrate` transition action, explorer doc-node rendering + adopt banner. |
 | [refinement-into-plan.md](local/refinement-into-plan.md) | **Complete** | Retired the bespoke refine pipeline. Plan mode edits task prompts directly via a Task Prompts explorer section and a task-aware `update_task_prompt` tool. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
 | [backend-redundancy-cleanup.md](local/backend-redundancy-cleanup.md) | **Complete** | Umbrella for follow-ups to the June 2026 pass-1 cleanup. All children landed or retired: the 6 API-surface leaves collapsed verb-specific routes into PATCH/parameterised endpoints (123 → 113 routes). `ideate` archived; `transitionTask` helper deferred. |

@@ -1,6 +1,6 @@
 ---
 title: Whiteboard
-status: drafted
+status: complete
 depends_on: []
 affects:
   - frontend/src/views/
@@ -252,3 +252,36 @@ snapshot, following the same shape as the `GET/PUT /api/config` and
   `MapPage.test.ts` for its vendored renderer).
 - Manual test: draw shapes, reload the page, verify persistence; switch
   workspace groups, verify isolation; toggle theme, verify Excalidraw follows.
+
+## Outcome
+
+Shipped as designed (option 1: Excalidraw in an isolated, lazily-loaded React
+island).
+
+Backend (`internal/handler/whiteboard.go`): `GET`/`PUT /api/whiteboard` store the
+scene as an opaque JSON blob at `<ScopedDataDir>/whiteboard.json`, one file per
+workspace. The server never parses the scene; `PUT` writes atomically via
+`atomicfile.Write`, rejects an empty body so a malformed save cannot clobber an
+existing scene, and is capped at `BodyLimitWhiteboard` (32 MiB) to allow embedded
+images. `currentWhiteboardPath()` resolves the path from the active snapshot's
+`ScopedDataDir` (newly mirrored onto the handler via `applySnapshot`); an empty
+workspace set returns `503`. Covered by `whiteboard_test.go` (round-trip,
+missing-file empty `200`, empty-body `400`, no-workspace `503`, isolation).
+
+Frontend (`frontend/src/views/WhiteboardPage.vue`): React, `react-dom`, and
+`@excalidraw/excalidraw@0.18.1` (+ its CSS) are imported dynamically inside
+`onMounted` only. The vite-ssg build confirms the design's central claim — the
+app entry chunk is React-free and Excalidraw lands in its own lazily-loaded
+chunks fetched only on `/whiteboard`; SSG prerender never touches React. The
+scene loads on mount, saves debounced (1.5s) via `PUT`, follows the app theme by
+observing `<html data-theme>`, and the React root is torn down on unmount.
+`WhiteboardPage.test.ts` mocks the dynamic imports to verify the lifecycle.
+
+### Future work: cloud sync
+
+This is a local-first feature; the scene is a per-workspace file on the host.
+For users signed in via latere.ai, a future iteration can sync the whiteboard
+through the cloud coordination plane (see `cloud/`), making it available across
+machines and, eventually, collaborative. The current `GET`/`PUT` API and opaque
+scene-blob storage are deliberately engine- and transport-agnostic, so cloud
+sync can be layered on without changing the storage shape or the frontend view.
