@@ -1,3 +1,51 @@
+// --- Agent registry (GET /api/agents) ---
+// The merged built-in + user-authored agent catalog. Mirrors the handler's
+// agent response shape; the agent-graph palette renders these as nodes.
+export interface Agent {
+  slug: string;
+  title: string;
+  description?: string;
+  capabilities?: string[];
+  multiturn?: boolean;
+  harness?: string;
+  builtin: boolean;
+}
+
+// --- Flow registry (GET /api/flows) ---
+// A flow is an ordered composition of agent steps. FlowStep mirrors the
+// handler's StepResponse; agent_name is resolved server-side so the UI needs
+// no second round-trip per step.
+export interface FlowStep {
+  agent_slug: string;
+  agent_name?: string;
+  optional?: boolean;
+  input_from?: string;
+  run_in_parallel_with?: string[];
+}
+
+// FlowTopology mirrors flow.Topology: whom an agent in a dynamic agentic flow
+// may delegate to. orchestrator-worker pins delegation to the entry agent;
+// mesh lets any agent delegate recursively.
+export type FlowTopology = 'orchestrator-worker' | 'mesh';
+
+export interface Flow {
+  slug: string;
+  name: string;
+  description?: string;
+  builtin: boolean;
+  steps?: FlowStep[];
+  spawn_kind?: string;
+  // M3 agentic fields. These live on flow.Flow but GET /api/flows does not yet
+  // serialize them (see internal/handler/flows.go FlowResponse / describeFlow),
+  // so they arrive undefined from the live server today. The agent-graph
+  // topology indicator reads them defensively and stays dormant until the
+  // backend exposes the fields.
+  agentic?: boolean;
+  dynamic?: boolean;
+  topology?: FlowTopology;
+  max_handoff_depth?: number;
+}
+
 export interface Me {
   sub: string;
   email: string;
@@ -227,6 +275,11 @@ export interface EnvConfig {
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks: number;
   max_test_parallel_tasks: number;
+  max_agents: number;
+  agent_nice: number;
+  agon_forks: number;
+  agon_rounds: number;
+  agon_cost_cap: number;
   oversight_interval: number;
   archived_tasks_per_page: number;
   auto_push_enabled: boolean;
@@ -248,6 +301,11 @@ export interface EnvUpdatePayload {
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks?: number;
   max_test_parallel_tasks?: number;
+  max_agents?: number;
+  agent_nice?: number;
+  agon_forks?: number;
+  agon_rounds?: number;
+  agon_cost_cap?: number;
   oversight_interval?: number;
   archived_tasks_per_page?: number;
   auto_push_enabled?: boolean;

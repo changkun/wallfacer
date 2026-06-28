@@ -155,6 +155,7 @@ const navModel = computed<ConsoleNavModel>(() => ({
       { id: 'board', label: 'Board', to: '/', icon: 'board', dot: boardUnread.value && route.path !== '/' },
       { id: 'agents', label: 'Agents', to: '/agents', icon: 'agents' },
       { id: 'flows', label: 'Workflows', to: '/workflows', icon: 'flows' },
+      { id: 'agent-graph', label: 'Agent Graph', to: '/agent-graph', icon: 'agent-graph' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
       { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },
     ] },
@@ -329,6 +330,7 @@ onUnmounted(removeWsOutsideHandler);
       <svg v-else-if="item.icon === 'plan'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
       <svg v-else-if="item.icon === 'agents'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-7 8-7s8 3 8 7"></path></svg>
       <svg v-else-if="item.icon === 'flows'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"></circle><circle cx="5" cy="18" r="2"></circle><circle cx="19" cy="12" r="2"></circle><path d="M7 6h6a4 4 0 0 1 4 4v2"></path><path d="M7 18h6a4 4 0 0 0 4-4v-2"></path></svg>
+      <svg v-else-if="item.icon === 'agent-graph'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="12" r="2.5"></circle><line x1="8.2" y1="7" x2="15.8" y2="11"></line><line x1="8.2" y1="17" x2="15.8" y2="13"></line></svg>
       <svg v-else-if="item.icon === 'routines'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
       <svg v-else-if="item.icon === 'map'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="6" r="2"></circle><circle cx="12" cy="18" r="2"></circle><line x1="5" y1="8" x2="12" y2="16"></line><line x1="19" y1="8" x2="12" y2="16"></line></svg>
       <svg v-else-if="item.icon === 'terminal'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
