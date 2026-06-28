@@ -18,6 +18,7 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 	"latere.ai/x/wallfacer/internal/pkg/watcher"
@@ -1115,6 +1116,16 @@ func (h *Handler) endAgon(id uuid.UUID) {
 	h.agonMu.Unlock()
 }
 
+// isAgonRunning reports whether an agon verification run is currently executing
+// for the task. This is the authoritative "running" signal (the real-time
+// in-flight set), independent of on-disk artifacts.
+func (h *Handler) isAgonRunning(id uuid.UUID) bool {
+	h.agonMu.Lock()
+	defer h.agonMu.Unlock()
+	_, ok := h.agonInFlight[id]
+	return ok
+}
+
 // agonCandidate pairs a waiting task with the store that owns it, captured at
 // scan time. The owning store is threaded through to the completion write so a
 // workspace-group switch during the multi-minute run cannot redirect the
@@ -1168,6 +1179,24 @@ const (
 	agonMaxRounds = 4
 	agonCostCap   = 50000
 )
+
+// agonProposerHarness and agonCriticHarnessIDs are the single source of truth
+// for which harnesses drive agon's roles. NewHandler builds the verifier from
+// them and the transcript endpoint reports them as the run config, so the two
+// never drift. The proposer is always Claude (fork-session is Claude-native);
+// critics rotate the listed harnesses by fork index for perspective diversity.
+const agonProposerHarness = harness.Claude
+
+var agonCriticHarnessIDs = []harness.ID{harness.Claude, harness.Codex}
+
+// agonCriticHarnessNames returns the critic rotation as display strings.
+func agonCriticHarnessNames() []string {
+	out := make([]string, len(agonCriticHarnessIDs))
+	for i, id := range agonCriticHarnessIDs {
+		out[i] = string(id)
+	}
+	return out
+}
 
 // agonTuning returns the fork count, max rounds, and token cost cap for an agon
 // run, applying env overrides over the conservative defaults. A missing or

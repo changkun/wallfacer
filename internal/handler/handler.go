@@ -298,8 +298,8 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		return cfg.MaxTestParallelTasks
 	})
 	// Initialize the agon verifier once; AgonEnabled() is the runtime gate.
-	// Critics rotate Claude/Codex per fork for perspective diversity.
-	h.verifier = wadversarial.NewAgonVerifier(r, harness.Claude, harness.Codex)
+	// Critics rotate the configured harnesses per fork for perspective diversity.
+	h.verifier = wadversarial.NewAgonVerifier(r, agonCriticHarnessIDs...)
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)

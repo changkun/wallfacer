@@ -35,7 +35,8 @@ func writeAgonSession(t *testing.T, worktree, sessionID string, withEnd bool) {
 		t.Fatal(err)
 	}
 	if withEnd {
-		if err := os.WriteFile(filepath.Join(sessionDir, "end.json"), []byte(`{"stats":{}}`), 0o644); err != nil {
+		end := `{"termination":{"reason":"steady_state"},"stats":{"total_attacks":3,"by_status":{"conceded":2,"open":1},"tokens_used":4200,"wall_seconds":92}}`
+		if err := os.WriteFile(filepath.Join(sessionDir, "end.json"), []byte(end), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -56,7 +57,12 @@ func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{filepath.Dir(worktree): worktree}, "branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
-	writeAgonSession(t, worktree, "sess-01", false /* still running */)
+	writeAgonSession(t, worktree, "sess-01", false /* no end.json yet */)
+
+	// While the run is in flight (reserved slot), running=true.
+	if !h.beginAgon(task.ID) {
+		t.Fatal("beginAgon should reserve the slot")
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/agon/transcript", nil)
 	w := httptest.NewRecorder()
@@ -69,7 +75,13 @@ func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if !resp.Running {
-		t.Error("expected running=true when end.json absent")
+		t.Error("expected running=true while the in-flight slot is held")
+	}
+	if resp.Config == nil || resp.Config.Forks != agonForkCount || resp.Config.MaxRounds != agonMaxRounds {
+		t.Errorf("config = %+v, want forks=%d rounds=%d", resp.Config, agonForkCount, agonMaxRounds)
+	}
+	if len(resp.Config.CriticModels) == 0 || resp.Config.ProposerModel == "" {
+		t.Errorf("config models missing: %+v", resp.Config)
 	}
 	if len(resp.Forks) != 1 || len(resp.Forks[0].Rounds) != 2 {
 		t.Fatalf("forks/rounds = %+v, want 1 fork with 2 rounds", resp.Forks)
@@ -82,14 +94,23 @@ func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
 		t.Errorf("round2 = %+v, want proposer R2 with body", r2)
 	}
 
-	// Once end.json lands, running flips to false.
+	// Run finishes: release the slot and write end.json → running=false + outcome.
+	h.endAgon(task.ID)
 	writeAgonSession(t, worktree, "sess-01", true)
 	w2 := httptest.NewRecorder()
 	h.AgonTranscript(w2, httptest.NewRequest(http.MethodGet, "/x", nil), task.ID)
 	var resp2 agonTranscriptResp
-	_ = json.NewDecoder(w2.Body).Decode(&resp2)
+	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
+		t.Fatalf("decode 2: %v", err)
+	}
 	if resp2.Running {
-		t.Error("expected running=false after end.json written")
+		t.Error("expected running=false after the slot is released")
+	}
+	if resp2.Outcome == nil || resp2.Outcome.Termination != "steady_state" || resp2.Outcome.TotalAttacks != 3 {
+		t.Errorf("outcome = %+v, want steady_state with 3 attacks", resp2.Outcome)
+	}
+	if resp2.Outcome.WallSeconds != 92 || resp2.Outcome.ByStatus["conceded"] != 2 {
+		t.Errorf("outcome stats = %+v", resp2.Outcome)
 	}
 }
 
