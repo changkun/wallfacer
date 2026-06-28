@@ -1,6 +1,6 @@
 ---
-title: Agon Supersedes the Test Step (Verification Gate + Feedback Loop)
-status: stale
+title: Agon Supersedes the Test Step (Verification Gate)
+status: complete
 depends_on:
   - agon-adversarial-verification
 affects:
@@ -36,10 +36,11 @@ When **agon is enabled** and a task is **agon-eligible** (has a Claude
 1. **Suppress auto-test** for agon-eligible tasks (no double verification).
    Non-session tasks still use the test agent even when agon is on (agon can't
    run without a fork-session).
-2. **Feedback loop** (auto mode only): when agon finds unresolved attacks,
-   auto-resume the task with the attacks as feedback — reusing the test-fail
-   resume machinery — so the agent fixes them; then re-verify. Capped by
-   `MaxAgonRetries`, mirroring `MaxTestFailRetries`.
+2. **Unresolved verdict is a hard barrier**: when agon finds unresolved attacks,
+   the task is parked in `waiting` and autopilot does not advance it. Clearing
+   the barrier is an explicit human act — confirm the work, or resume with
+   steering (which calls `ClearAgonResult` and triggers fresh re-verification).
+   Autopilot does not auto-resume the task on its own.
 3. **Auto-submit gates on agon**: an agon-eligible task auto-submits only when
    its agon verdict is clean (`AgonUnresolved == 0`), replacing the test "pass"
    requirement.
@@ -50,34 +51,30 @@ Agon **off** → the test agent path is exactly as today. Nothing is deleted.
 
 ### Task model (`store/models.go`)
 
-```go
-PendingAgonFeedback string `json:"pending_agon_feedback,omitempty"` // unresolved attacks awaiting auto-resume
-AgonRetryCount      int    `json:"agon_retry_count,omitempty"`      // consecutive agon-feedback resumes
-```
-
-`MaxAgonRetries` in constants (e.g. 2 — agon cycles are expensive; lower than the
-test cap of 3).
+No new fields. The existing agon verdict fields (`AgonUnresolved`,
+`AgonHeadline`, `AgonSessionDir`) carry the barrier state: a non-nil
+`AgonUnresolved > 0` is the parked-for-review signal. `ClearAgonResult` wipes the
+verdict on resume so the re-worked diff is re-verified.
 
 ### runAgon (`tasks_autopilot.go`)
 
 After persisting the verdict:
-- `AgonUnresolved == 0` (clean): reset `AgonRetryCount` to 0, clear
-  `PendingAgonFeedback`.
-- `AgonUnresolved > 0` and `AgonRetryCount < MaxAgonRetries`: build feedback from
-  the run's `summary.md` (agon writes the rendered attack ledger there as of
-  v0.1.2) — `"Adversarial verification found N unresolved attack(s):\n\n<summary>\n\nPlease address them."` — store it in `PendingAgonFeedback` and increment
-  `AgonRetryCount`. At the cap, stop (leave a system event; manual intervention).
+- `AgonUnresolved == 0` (clean): emit a "verification clean" timeline event; the
+  task is eligible for auto-submit.
+- `AgonUnresolved > 0` (unresolved): emit a "task halted for review — confirm or
+  resume with steering to re-verify" timeline event. The task stays in `waiting`;
+  autopilot does not auto-resume it. The verdict (and `AgonHeadline`) drives the
+  UI badge/panel so the unresolved attacks are visible.
 
-A new `UpdateTaskAgonFeedback` store method sets the verdict + feedback +
-incremented count atomically (or compose existing setters).
+### Human steering (`resumeWaitingTaskWithFeedbackLocked` / manual resume)
 
-### Auto-resume branch (`tryAutoPromote`)
-
-Parallel to the existing test-fail branch (`tasks_autopilot.go` Phase 1/2): a
-waiting task with `PendingAgonFeedback != "" && session && AgonRetryCount <
-MaxAgonRetries` is auto-resumed via `resumeWaitingTaskWithFeedbackLocked(...,
-PendingAgonFeedback, TriggerFeedback, ...)`. The resume path already calls
-`ClearAgonResult`; also clear `PendingAgonFeedback` there so the loop advances.
+There is no autopilot auto-resume branch for agon. A human clears the barrier by
+resuming the task (optionally with steering feedback); the resume path calls
+`ClearAgonResult`, dropping the stale verdict so the next run re-verifies the new
+work. Re-failure re-blocks. (An earlier design auto-resumed with the attacks as
+feedback up to `MaxAgonRetries`; that loop was dropped in favor of explicit human
+confirmation, so the verdict is a deterministic barrier rather than a cost-capped
+retry cycle.)
 
 ### Suppress auto-test (`tryAutoTest`)
 
@@ -103,31 +100,36 @@ agon-eligible task that agon hasn't cleared.
 
 ## Outcome (2026-06-28)
 
-All three phases shipped. `agonSupersedesTest(t)` (agon enabled + session) is the
-single gate: `tryAutoTest` skips such tasks, `tryAutoSubmit` requires a clean
-agon verdict for them, and `tryAutoPromote` gained an agon-feedback resume branch
-that mirrors the failed-test one. `runAgon` drives the cycle (feedback from
-summary.md under `MaxAgonRetries=2`, reset on clean). Agon off → the test path is
-unchanged. Tests cover the gate, the feedback cycle (set/cap/reset), and the
-auto-resume; full handler+store suites and golangci-lint pass.
+`agonSupersedesTest(t)` (agon enabled + session) is the single gate: `tryAutoTest`
+skips such tasks and `tryAutoSubmit` requires a clean agon verdict for them. An
+unresolved verdict is a hard barrier — `runAgon` parks the task in `waiting` with
+a "halted for review" timeline event and autopilot does not advance it; a human
+confirms or resumes with steering (`ClearAgonResult` re-arms verification). Agon
+off → the test path is unchanged.
+
+The design initially shipped with an auto-resume feedback loop (attacks fed back
+to the implementation agent, capped at `MaxAgonRetries=2`). That loop was removed
+in a follow-up: the `PendingAgonFeedback` / `AgonRetryCount` fields,
+`MaxAgonRetries`, the `SetAgonFeedback` / `ResetAgonRetry` setters, and the
+`tryAutoPromote` agon-resume branch are gone. The verdict is now a deterministic
+human-gated barrier rather than a cost-capped retry cycle. `TestRunAgon_BlocksOnUnresolved`
+covers it (verdict persists, task stays waiting, no auto-resume, clean clears the
+barrier); full handler+store suites and golangci-lint pass.
 
 ## Non-Goals
 
 - Removing the test agent entirely (it's the path when agon is off).
 - Blocking *manual* submit on agon (this gates the autopilot path only).
-- Gating non-autopilot flows; the feedback loop is auto-mode only by virtue of
-  living in tryAutoPromote.
+- Auto-resuming an agon-halted task; clearing the barrier is a human act.
 
 ## Phasing / Acceptance Criteria
 
-Phase 1 — model + store + constants. Fields, setters, `MaxAgonRetries`, clear on
-resume. Tests: setting feedback + count persists; clear resets.
+Phase 1 — suppress auto-test for agon-eligible tasks. Test: agon-eligible task
+skipped by `tryAutoTest` when agon on; non-session tasks fall through.
 
-Phase 2 — runAgon feedback. Build feedback from summary.md under the cap; reset
-on clean. Tests: unresolved under cap sets PendingAgonFeedback + increments;
-clean resets; at cap does not set feedback.
+Phase 2 — auto-submit gates on agon. Test: agon-clean task auto-submits while an
+agon-unresolved task does not; agon-off behavior unchanged.
 
-Phase 3 — autopilot wiring. Auto-resume branch; suppress auto-test for
-agon-eligible; auto-submit gates on agon. Tests: agon-eligible task skipped by
-tryAutoTest when agon on; pending agon feedback auto-resumes; agon-clean task
-auto-submits while agon-unresolved does not; agon-off behavior unchanged.
+Phase 3 — unresolved verdict barrier. `runAgon` parks the task and emits the
+review event; no autopilot auto-resume. Test: unresolved verdict persists, task
+stays waiting, autopilot does not resume it, a clean verdict clears the barrier.
