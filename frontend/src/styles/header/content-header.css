@@ -413,7 +413,10 @@
 .col-bg {
   background: var(--bg-sunk);
   border-radius: var(--r-xl);
-  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  /* Uniform gutter so a card's corners (--r-md = 6) stay concentric with the
+     tray (--r-xl = 14) on all four sides: 14 − 8 = 6. A larger top inset
+     would leave the top corners non-concentric with the sides. */
+  padding: var(--sp-3);
   gap: var(--sp-2);
   /* Recessed well: cards sit visibly above the tray floor. */
   box-shadow: var(--sh-inset);
