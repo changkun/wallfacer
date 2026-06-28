@@ -119,7 +119,12 @@ type Handler struct {
 	runner     runner.Interface
 	configDir  string
 	workspaces []string
-	envFile    string
+	// scopedDataDir mirrors the active workspace snapshot's per-workspace-key
+	// data directory (~/.wallfacer/data/<key>/). Empty when no workspace is
+	// configured. Used by workspace-level (non-task) blob storage such as the
+	// whiteboard scene.
+	scopedDataDir string
+	envFile       string
 	startTime  time.Time
 	reg        *metrics.Registry
 
@@ -383,6 +388,7 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	h.snapshotMu.Lock()
 	h.store = snap.Store
 	h.workspaces = snap.Workspaces
+	h.scopedDataDir = snap.ScopedDataDir
 	h.snapshotMu.Unlock()
 
 	// Update the agent session's workspaces when the workspace group changes.

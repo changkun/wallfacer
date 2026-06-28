@@ -14,8 +14,9 @@ import (
 // These re-export constants used by MaxBytesMiddleware to enforce per-route
 // request body size limits.
 const (
-	BodyLimitDefault  = constants.BodyLimitDefault
-	BodyLimitFeedback = constants.BodyLimitFeedback
+	BodyLimitDefault    = constants.BodyLimitDefault
+	BodyLimitFeedback   = constants.BodyLimitFeedback
+	BodyLimitWhiteboard = constants.BodyLimitWhiteboard
 )
 
 // MaxBytesMiddleware limits the size of the request body for downstream handlers.
