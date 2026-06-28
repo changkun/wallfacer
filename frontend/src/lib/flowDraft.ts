@@ -127,6 +127,74 @@ export function removeStep(draft: EditableFlow, agentSlug: string): boolean {
   return true;
 }
 
+// parallelGroupSlugs returns the agent_slugs sharing a parallel stage with the
+// given step (itself included), via the transitive closure of
+// run_in_parallel_with -- the same grouping the canvas and the flow engine use.
+export function parallelGroupSlugs(draft: EditableFlow, slug: string): string[] {
+  const bySlug = new Map(draft.steps.map((s) => [s.agent_slug, s]));
+  if (!bySlug.has(slug)) return [];
+  const seen = new Set([slug]);
+  const queue = [slug];
+  while (queue.length) {
+    const cur = bySlug.get(queue.shift()!);
+    for (const p of cur?.run_in_parallel_with ?? []) {
+      if (bySlug.has(p) && !seen.has(p)) {
+        seen.add(p);
+        queue.push(p);
+      }
+    }
+  }
+  return [...seen];
+}
+
+// setParallel merges the parallel groups of two steps into one. The union is
+// made fully mutual (every member lists every other), which the flow engine and
+// the backend's sibling validation expect, and the members are pulled together
+// so the stage renders as one column. Returns true when the flow changed.
+export function setParallel(draft: EditableFlow, a: string, b: string): boolean {
+  if (a === b) return false;
+  const haveA = draft.steps.some((s) => s.agent_slug === a);
+  const haveB = draft.steps.some((s) => s.agent_slug === b);
+  if (!haveA || !haveB) return false;
+
+  const members = new Set([...parallelGroupSlugs(draft, a), ...parallelGroupSlugs(draft, b)]);
+  if (members.size < 2) return false;
+
+  for (const slug of members) {
+    const st = draft.steps.find((s) => s.agent_slug === slug)!;
+    st.run_in_parallel_with = [...members].filter((m) => m !== slug);
+  }
+
+  // Pull the members together at the position of the earliest one so the stage
+  // reads as a contiguous parallel column.
+  const firstIdx = draft.steps.findIndex((s) => members.has(s.agent_slug));
+  const memberSteps = draft.steps.filter((s) => members.has(s.agent_slug));
+  const rest = draft.steps.filter((s) => !members.has(s.agent_slug));
+  rest.splice(firstIdx, 0, ...memberSteps);
+  draft.steps = rest;
+  return true;
+}
+
+// clearParallel pulls a step out of its parallel group: it drops its own
+// siblings and removes itself from theirs. A group left with a single member is
+// no longer parallel, so that member's siblings are cleared too. Returns true
+// when the step was in a group.
+export function clearParallel(draft: EditableFlow, slug: string): boolean {
+  const st = draft.steps.find((s) => s.agent_slug === slug);
+  if (!st || st.run_in_parallel_with.length === 0) return false;
+  const others = parallelGroupSlugs(draft, slug).filter((s) => s !== slug);
+  st.run_in_parallel_with = [];
+  for (const other of others) {
+    const os = draft.steps.find((s) => s.agent_slug === other);
+    if (os) os.run_in_parallel_with = os.run_in_parallel_with.filter((p) => p !== slug);
+  }
+  if (others.length === 1) {
+    const lone = draft.steps.find((s) => s.agent_slug === others[0]);
+    if (lone) lone.run_in_parallel_with = [];
+  }
+  return true;
+}
+
 // draftToFlow projects a draft into the Flow shape the read-only canvas renders,
 // so the editor reuses one renderer for both the saved flow and the live draft.
 export function draftToFlow(draft: EditableFlow): Flow {

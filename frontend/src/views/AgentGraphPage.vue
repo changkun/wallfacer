@@ -7,6 +7,8 @@ import {
   buildDraftFromFlow,
   appendStep,
   removeStep,
+  setParallel,
+  clearParallel,
   draftToFlow,
   draftToPayload,
   type EditableFlow,
@@ -102,6 +104,18 @@ function onAgentDragStart(e: DragEvent, a: Agent) {
 function onRemoveStep(agentSlug: string) {
   if (!draft.value) return;
   removeStep(draft.value, agentSlug);
+  saveError.value = '';
+}
+
+function onParallel(p: { from: string; to: string }) {
+  if (!draft.value) return;
+  setParallel(draft.value, p.from, p.to);
+  saveError.value = '';
+}
+
+function onUngroup(agentSlug: string) {
+  if (!draft.value) return;
+  clearParallel(draft.value, agentSlug);
   saveError.value = '';
 }
 
@@ -316,7 +330,8 @@ onMounted(async () => {
               {{ selectedFlow.description }}
             </p>
             <p v-else-if="draft" class="ag-edit__tip">
-              Drag an agent from the palette onto the canvas to add a step.
+              Drag an agent from the palette to add a step; drag one step onto
+              another to run them in parallel.
             </p>
 
             <div
@@ -326,7 +341,13 @@ onMounted(async () => {
               @dragleave="dragOver = false"
               @drop.prevent="onDropAgent"
             >
-              <AgentGraphCanvas :flow="canvasFlow" :editable="!!draft" @remove="onRemoveStep" />
+              <AgentGraphCanvas
+                :flow="canvasFlow"
+                :editable="!!draft"
+                @remove="onRemoveStep"
+                @parallel="onParallel"
+                @ungroup="onUngroup"
+              />
             </div>
           </template>
         </section>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Flow, FlowStep, FlowTopology } from '../api/types';
 
 // AgentGraphCanvas renders a flow as a read-only agent-graph: one node per
@@ -15,7 +15,42 @@ import type { Flow, FlowStep, FlowTopology } from '../api/types';
 const props = withDefaults(defineProps<{ flow: Flow | null; editable?: boolean }>(), {
   editable: false,
 });
-const emit = defineEmits<{ (e: 'remove', agentSlug: string): void }>();
+const emit = defineEmits<{
+  (e: 'remove', agentSlug: string): void;
+  (e: 'parallel', payload: { from: string; to: string }): void;
+  (e: 'ungroup', agentSlug: string): void;
+}>();
+
+// Node dragging uses pointer events rather than HTML5 drag: SVG elements do not
+// fire dragstart reliably across browsers, and a pointer model also generalises
+// to reordering later. Dragging one node onto another emits `parallel` (group
+// them into one stage). Hit-testing is by elementFromPoint on the data-node-slug
+// attribute, so the geometry stays the single source of truth.
+const draggingSlug = ref<string | null>(null);
+const dropTargetSlug = ref<string | null>(null);
+
+function onNodePointerDown(slug: string) {
+  if (!props.editable || !slug) return;
+  draggingSlug.value = slug;
+  dropTargetSlug.value = null;
+}
+function slugAtPoint(x: number, y: number): string | null {
+  const el = document.elementFromPoint(x, y);
+  const node = el?.closest('[data-node-slug]');
+  return node?.getAttribute('data-node-slug') || null;
+}
+function onCanvasPointerMove(e: PointerEvent) {
+  if (!draggingSlug.value) return;
+  const s = slugAtPoint(e.clientX, e.clientY);
+  dropTargetSlug.value = s && s !== draggingSlug.value ? s : null;
+}
+function onCanvasPointerUp() {
+  if (draggingSlug.value && dropTargetSlug.value && dropTargetSlug.value !== draggingSlug.value) {
+    emit('parallel', { from: draggingSlug.value, to: dropTargetSlug.value });
+  }
+  draggingSlug.value = null;
+  dropTargetSlug.value = null;
+}
 
 // Geometry. A stage is a column; parallel steps stack as rows within it.
 const NODE_W = 156;
@@ -29,6 +64,9 @@ interface LayoutNode {
   // agent_slug of the step this node renders; empty for the synthetic entry
   // ("Task") node, which is not a step and so is not removable.
   slug: string;
+  // parallel is true when this step shares its stage with at least one sibling,
+  // which is when the ungroup affordance applies.
+  parallel: boolean;
   label: string;
   optional: boolean;
   x: number;
@@ -138,6 +176,7 @@ const layout = computed<Layout>(() => {
   const entry: LayoutNode = {
     key: 'entry',
     slug: '',
+    parallel: false,
     label: 'Task',
     optional: false,
     x: columnX(0),
@@ -150,6 +189,7 @@ const layout = computed<Layout>(() => {
     group.map((step, ri) => ({
       key: `${ci}:${ri}:${step.agent_slug}`,
       slug: step.agent_slug,
+      parallel: group.length > 1,
       label: stepLabel(step),
       optional: !!step.optional,
       x: columnX(ci + 1),
@@ -212,11 +252,15 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
       </div>
       <svg
         class="agc__svg"
+        :class="{ 'agc__svg--dragging': !!draggingSlug }"
         :viewBox="`0 0 ${layout.width} ${layout.height}`"
         :width="layout.width"
         :height="layout.height"
         role="img"
         aria-label="Flow agent-graph"
+        @pointermove="onCanvasPointerMove"
+        @pointerup="onCanvasPointerUp"
+        @pointerleave="onCanvasPointerUp"
       >
         <g class="agc__edges">
           <path
@@ -263,7 +307,14 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
             v-for="node in layout.nodes"
             :key="node.key"
             class="agc-node"
-            :class="{ 'agc-node--optional': node.optional }"
+            :class="{
+              'agc-node--optional': node.optional,
+              'agc-node--editable': editable,
+              'agc-node--dragging': draggingSlug === node.slug,
+              'agc-node--drop-target': dropTargetSlug === node.slug,
+            }"
+            :data-node-slug="node.slug || null"
+            @pointerdown="editable && onNodePointerDown(node.slug)"
           >
             <rect
               class="agc-node-box"
@@ -290,16 +341,19 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
             >optional</text>
 
             <!-- Remove control, edit mode only. Sits on the node's top-right
-                 corner; emits the step's agent_slug for the page to splice. -->
+                 corner; emits the step's agent_slug for the page to splice.
+                 pointerdown is stopped so grabbing it does not start a drag. -->
             <g
               v-if="editable && node.slug"
               class="agc-node-remove"
               role="button"
               :aria-label="`Remove ${node.label}`"
               tabindex="0"
+              @pointerdown.stop
               @click="emit('remove', node.slug)"
               @keydown.enter="emit('remove', node.slug)"
             >
+              <title>Remove step</title>
               <circle
                 class="agc-node-remove-bg"
                 :cx="node.x + node.w - 9"
@@ -313,6 +367,34 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
                 text-anchor="middle"
                 dominant-baseline="central"
               >&#215;</text>
+            </g>
+
+            <!-- Ungroup control, edit mode + parallel nodes only. Top-left
+                 corner; pulls the step out of its parallel stage. -->
+            <g
+              v-if="editable && node.slug && node.parallel"
+              class="agc-node-ungroup"
+              role="button"
+              :aria-label="`Make ${node.label} sequential`"
+              tabindex="0"
+              @pointerdown.stop
+              @click="emit('ungroup', node.slug)"
+              @keydown.enter="emit('ungroup', node.slug)"
+            >
+              <title>Make sequential (remove from parallel group)</title>
+              <circle
+                class="agc-node-ungroup-bg"
+                :cx="node.x + 9"
+                :cy="node.y + 9"
+                r="9"
+              />
+              <text
+                class="agc-node-ungroup-icon"
+                :x="node.x + 9"
+                :y="node.y + 9"
+                text-anchor="middle"
+                dominant-baseline="central"
+              >&#8676;</text>
             </g>
           </g>
         </g>
@@ -400,14 +482,48 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.agc-node-remove {
+.agc-node--editable {
+  cursor: grab;
+}
+.agc__svg--dragging .agc-node--editable {
+  cursor: grabbing;
+}
+.agc-node--dragging .agc-node-box {
+  opacity: 0.5;
+}
+.agc-node--drop-target .agc-node-box {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+}
+.agc-node-remove,
+.agc-node-ungroup {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.1s ease;
 }
 .agc-node:hover .agc-node-remove,
-.agc-node-remove:focus-visible {
+.agc-node:hover .agc-node-ungroup,
+.agc-node-remove:focus-visible,
+.agc-node-ungroup:focus-visible {
   opacity: 1;
+}
+.agc-node-ungroup-bg {
+  fill: var(--bg-elevated);
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+.agc-node-ungroup:hover .agc-node-ungroup-bg {
+  fill: var(--accent);
+}
+.agc-node-ungroup-icon {
+  fill: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.agc-node-ungroup:hover .agc-node-ungroup-icon {
+  fill: #fff;
 }
 .agc-node-remove-bg {
   fill: var(--bg-elevated);
