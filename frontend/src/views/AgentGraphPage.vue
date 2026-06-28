@@ -3,19 +3,35 @@ import { ref, computed, onMounted } from 'vue';
 import { api } from '../api/client';
 import type { Agent, Flow } from '../api/types';
 import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
+import {
+  buildDraftFromFlow,
+  appendStep,
+  draftToFlow,
+  draftToPayload,
+  type EditableFlow,
+} from '../lib/flowDraft';
 
-// AgentGraphPage is the read-only scaffold of the unified agent-graph surface
-// (spec: unified-agent-graph-ui.md, M6.1). Left is the agent palette (the
-// merged registry, searchable); centre renders a selected flow as an
-// agent-graph. It is deliberately store-free and router-free: cards do not
-// navigate and nothing is persisted, which keeps the surface self-contained
-// and the component test trivial. Editing arrives in M6.2.
+// AgentGraphPage is the unified agent-graph surface (spec:
+// unified-agent-graph-ui.md). Left is the agent palette (the merged registry,
+// searchable); centre renders a selected flow as an agent-graph. M6.1 was the
+// read-only scaffold; M6.2 adds editing: a flow is cloned (built-ins are
+// read-only) or edited in place into a draft, agents are dragged from the
+// palette onto the canvas to add steps, and the draft is saved through the flow
+// CRUD. When `draft` is null the page is read-only, which keeps the original
+// render path (and its component test) intact.
 
 const agents = ref<Agent[]>([]);
 const flows = ref<Flow[]>([]);
 const loading = ref(true);
 const search = ref('');
 const selectedSlug = ref<string | null>(null);
+
+// Editing state. `draft` is the flow under edit (null = read-only). `saving`
+// and `saveError` mirror the FlowsPage editor so the surfaces behave alike.
+const draft = ref<EditableFlow | null>(null);
+const saving = ref(false);
+const saveError = ref('');
+const dragOver = ref(false);
 
 const filteredAgents = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -34,6 +50,79 @@ const selectedFlow = computed<Flow | null>(() => {
 });
 
 const flowOptions = computed(() => flows.value);
+
+// The canvas renders the live draft while editing, otherwise the selected flow.
+const canvasFlow = computed<Flow | null>(() =>
+  draft.value ? draftToFlow(draft.value) : selectedFlow.value,
+);
+
+// startEdit opens the selected flow for editing. A built-in is read-only, so it
+// is cloned into a new user flow (saving POSTs); a user flow is edited in place
+// (saving PUTs). The full step list is fetched first so a list-view summary
+// (which may omit steps) doesn't seed an empty draft.
+async function startEdit() {
+  const f = selectedFlow.value;
+  if (!f) return;
+  saveError.value = '';
+  let full = f;
+  try {
+    full = await api<Flow>('GET', `/api/flows/${encodeURIComponent(f.slug)}`);
+  } catch (e) {
+    console.warn('flow detail:', e);
+  }
+  draft.value = buildDraftFromFlow(full, { clone: !!full.builtin });
+}
+
+function cancelEdit() {
+  draft.value = null;
+  saveError.value = '';
+}
+
+// onDropAgent adds the dragged palette agent as a new step. Duplicate agents are
+// rejected by appendStep (the backend forbids two steps on one agent), surfaced
+// as a transient hint rather than a hard error.
+function onDropAgent(e: DragEvent) {
+  dragOver.value = false;
+  if (!draft.value) return;
+  const slug = e.dataTransfer?.getData('text/agent-slug') || '';
+  if (!slug) return;
+  const agent = agents.value.find((a) => a.slug === slug);
+  const added = appendStep(draft.value, slug, agent?.title || '');
+  if (!added) saveError.value = `"${agent?.title || slug}" is already a step in this flow.`;
+  else saveError.value = '';
+}
+
+function onAgentDragStart(e: DragEvent, a: Agent) {
+  if (!draft.value) return;
+  e.dataTransfer?.setData('text/agent-slug', a.slug);
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+}
+
+async function saveDraft() {
+  if (!draft.value) return;
+  if (draft.value.steps.length === 0) {
+    saveError.value = 'Add at least one step before saving.';
+    return;
+  }
+  saving.value = true;
+  saveError.value = '';
+  try {
+    const payload = draftToPayload(draft.value);
+    const method = draft.value.isClone ? 'POST' : 'PUT';
+    const url = draft.value.isClone
+      ? '/api/flows'
+      : `/api/flows/${encodeURIComponent(draft.value.slug)}`;
+    const saved = await api<Flow>(method, url, payload);
+    const slug = saved.slug || payload.slug;
+    draft.value = null;
+    await loadFlows();
+    selectedSlug.value = slug;
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    saving.value = false;
+  }
+}
 
 async function loadAgents() {
   try {
@@ -76,7 +165,9 @@ onMounted(async () => {
             <p class="ag-mode__subtitle">
               One surface for agents and flows. The palette on the left lists the
               agent registry; the canvas renders a flow as an agent-graph, with a
-              node per step and edges for order. This view is read-only.
+              node per step and edges for order.
+              <template v-if="draft">Drag agents onto the canvas to add steps, then save.</template>
+              <template v-else>Clone or edit a flow to compose it.</template>
             </p>
           </div>
           <div class="ag-mode__header-actions">
@@ -114,6 +205,9 @@ onMounted(async () => {
                 v-for="a in filteredAgents"
                 :key="a.slug"
                 class="ag-card"
+                :class="{ 'ag-card--draggable': !!draft }"
+                :draggable="!!draft"
+                @dragstart="onAgentDragStart($event, a)"
               >
                 <div class="ag-card__head">
                   <span class="ag-card__name">{{ a.title || a.slug }}</span>
@@ -135,19 +229,61 @@ onMounted(async () => {
             <p>Pick a flow above to render its agent-graph.</p>
           </div>
           <template v-else>
-            <div class="ag-detail__head">
+            <div v-if="!draft" class="ag-detail__head">
               <h3 class="ag-detail__title">{{ selectedFlow.name || selectedFlow.slug }}</h3>
               <span
                 class="ag-detail__badge"
                 :class="{ 'ag-detail__badge--user': !selectedFlow.builtin }"
               >{{ selectedFlow.builtin ? 'built-in' : 'user' }}</span>
               <code class="ag-detail__slug">{{ selectedFlow.slug }}</code>
+              <button type="button" class="ag-detail__edit" @click="startEdit">
+                {{ selectedFlow.builtin ? 'Clone & edit' : 'Edit' }}
+              </button>
             </div>
-            <p v-if="selectedFlow.description" class="ag-detail__desc">
+
+            <!-- Editing toolbar: name + slug (slug locked when editing in place,
+                 editable when naming a clone) and the save/cancel actions. -->
+            <div v-else class="ag-edit">
+              <div class="ag-edit__fields">
+                <input
+                  v-model="draft.name"
+                  class="ag-edit__name"
+                  placeholder="Flow name"
+                  aria-label="Flow name"
+                />
+                <input
+                  v-model="draft.slug"
+                  class="ag-edit__slug"
+                  :readonly="!draft.isClone"
+                  placeholder="flow-slug"
+                  aria-label="Flow slug"
+                />
+                <span v-if="draft.isClone" class="ag-edit__hint">clone of {{ draft.sourceSlug }}</span>
+              </div>
+              <div class="ag-edit__actions">
+                <button type="button" class="ag-edit__btn" @click="cancelEdit" :disabled="saving">Cancel</button>
+                <button type="button" class="ag-edit__btn ag-edit__btn--save" @click="saveDraft" :disabled="saving">
+                  {{ saving ? 'Saving...' : 'Save' }}
+                </button>
+              </div>
+            </div>
+
+            <p v-if="draft && saveError" class="ag-edit__error">{{ saveError }}</p>
+            <p v-else-if="!draft && selectedFlow.description" class="ag-detail__desc">
               {{ selectedFlow.description }}
             </p>
-            <div class="ag-detail__canvas">
-              <AgentGraphCanvas :flow="selectedFlow" />
+            <p v-else-if="draft" class="ag-edit__tip">
+              Drag an agent from the palette onto the canvas to add a step.
+            </p>
+
+            <div
+              class="ag-detail__canvas"
+              :class="{ 'ag-detail__canvas--drop': dragOver, 'ag-detail__canvas--editing': !!draft }"
+              @dragover.prevent="draft && (dragOver = true)"
+              @dragleave="dragOver = false"
+              @drop.prevent="onDropAgent"
+            >
+              <AgentGraphCanvas :flow="canvasFlow" />
             </div>
           </template>
         </section>
@@ -251,6 +387,13 @@ onMounted(async () => {
   background: var(--bg-sunk);
   padding: 0.55rem 0.65rem;
 }
+.ag-card--draggable {
+  cursor: grab;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.ag-card--draggable:active {
+  cursor: grabbing;
+}
 .ag-card__head {
   display: flex;
   align-items: baseline;
@@ -322,9 +465,96 @@ onMounted(async () => {
   font-size: 0.72rem;
   color: var(--text-muted);
 }
+.ag-detail__edit {
+  margin-left: auto;
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
+  cursor: pointer;
+}
+.ag-detail__edit:hover {
+  border-color: var(--accent);
+}
 .ag-detail__desc {
   margin: 0.45rem 0 0;
   font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.ag-edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.ag-edit__fields {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.ag-edit__name,
+.ag-edit__slug {
+  font: inherit;
+  padding: 0.32rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
+}
+.ag-edit__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.ag-edit__slug {
+  font-size: 0.78rem;
+  font-family: var(--font-mono, monospace);
+  max-width: 13rem;
+}
+.ag-edit__slug[readonly] {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+.ag-edit__hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.ag-edit__actions {
+  display: flex;
+  gap: 0.45rem;
+}
+.ag-edit__btn {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.32rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
+  cursor: pointer;
+}
+.ag-edit__btn--save {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.ag-edit__btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ag-edit__error {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: var(--danger, #d2453f);
+}
+.ag-edit__tip {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
   color: var(--text-secondary);
 }
 .ag-detail__canvas {
@@ -335,5 +565,13 @@ onMounted(async () => {
   border-radius: 10px;
   background: var(--bg-sunk);
   overflow: auto;
+}
+.ag-detail__canvas--editing {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.ag-detail__canvas--drop {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-sunk));
 }
 </style>

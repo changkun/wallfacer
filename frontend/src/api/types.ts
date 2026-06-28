@@ -35,11 +35,11 @@ export interface Flow {
   builtin: boolean;
   steps?: FlowStep[];
   spawn_kind?: string;
-  // M3 agentic fields. These live on flow.Flow but GET /api/flows does not yet
-  // serialize them (see internal/handler/flows.go FlowResponse / describeFlow),
-  // so they arrive undefined from the live server today. The agent-graph
-  // topology indicator reads them defensively and stays dormant until the
-  // backend exposes the fields.
+  // M3 agentic fields, serialized by GET /api/flows (see
+  // internal/handler/flows.go FlowResponse / describeFlow) and accepted on
+  // POST/PUT. They are omitted for ordinary flows, so they arrive undefined for
+  // a non-agentic flow; the agent-graph topology indicator reads them
+  // defensively.
   agentic?: boolean;
   dynamic?: boolean;
   topology?: FlowTopology;

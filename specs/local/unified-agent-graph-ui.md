@@ -79,6 +79,19 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
 - **M6.2: graph editing.** Drag-from-palette to add a step, connect/reorder, mark
   parallel/optional, set agentic + topology + depth; persist to the flow YAML via the
   existing flow CRUD. Edit an agent node -> the agent editor (existing).
+  - **M6.2a DONE** (`4a67b18e`). Backend: `POST/PUT /api/flows` accept the agentic
+    fields (agentic/dynamic/topology/max_handoff_depth), validated against the
+    topology enum + a non-negative depth, so the editor can persist topology.
+  - **M6.2b DONE.** Frontend editable scaffold: a flow is cloned (built-ins are
+    read-only -> POST a new user flow) or edited in place (-> PUT) into a draft
+    (`lib/flowDraft.ts`, pure + unit-tested); palette cards become draggable;
+    dropping an agent on the canvas appends a step (duplicate-agent guarded); a
+    name/slug + Save/Cancel toolbar persists via the flow CRUD. Validated
+    same-origin end-to-end (clone/edit -> drag-add -> save -> persisted YAML).
+    The read-only render path (and its M6.1 test) is unchanged.
+  - **Remaining:** node-level drag to reorder / mark parallel, per-node remove,
+    the agentic + topology + depth controls in the toolbar (backend ready via
+    M6.2a), and edit-an-agent-node -> the agent editor.
 - **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
   canvas (status colors, handoff edges), polling/streaming the M5 endpoint.
 - **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;
