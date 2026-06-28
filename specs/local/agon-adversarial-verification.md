@@ -1,6 +1,6 @@
 ---
 title: Agon Adversarial Verification
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/adversarial/agon.go
