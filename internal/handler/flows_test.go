@@ -4,8 +4,33 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"latere.ai/x/wallfacer/internal/flow"
 )
+
+// TestDescribeFlow_AgenticFields asserts describeFlow serializes the agentic
+// execution fields (agentic/dynamic/topology/max_handoff_depth), and that an
+// ordinary flow omits them so its response stays byte-identical.
+func TestDescribeFlow_AgenticFields(t *testing.T) {
+	resp := describeFlow(flow.Flow{
+		Slug: "mesh", Name: "Mesh", Agentic: true, Dynamic: true,
+		Topology: flow.TopologyMesh, MaxHandoffDepth: 4,
+		Steps: []flow.Step{{AgentSlug: "lead"}},
+	})
+	if !resp.Agentic || !resp.Dynamic || resp.Topology != "mesh" || resp.MaxHandoffDepth != 4 {
+		t.Errorf("agentic fields not serialized: %+v", resp)
+	}
+	plain, _ := json.Marshal(describeFlow(flow.Flow{
+		Slug: "impl", Name: "Implement", Steps: []flow.Step{{AgentSlug: "impl"}},
+	}))
+	for _, k := range []string{"agentic", "dynamic", "topology", "max_handoff_depth"} {
+		if strings.Contains(string(plain), k) {
+			t.Errorf("ordinary flow leaked %q: %s", k, plain)
+		}
+	}
+}
 
 // TestListFlows_ReturnsBuiltins asserts every built-in flow shows up
 // with a non-empty slug/name, declares builtin=true, and that the
