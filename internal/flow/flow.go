@@ -43,7 +43,42 @@ type Flow struct {
 	// flow on its current execution path. See
 	// specs/local/topos-runtime-integration.md (M2).
 	Agentic bool
+
+	// Dynamic, on an agentic flow, opts the region into model-driven
+	// delegation (topos Autonomy: Dynamic) instead of the deterministic
+	// pinned chain: the entry agent gets a delegate tool over the peers
+	// directory and the model decides whom to hand off to. Default false
+	// keeps the pinned chain (Autonomy: Pinned). Ignored for non-agentic
+	// flows. See specs/local/topos-runtime-integration.md (M3).
+	Dynamic bool
+
+	// Topology, on a dynamic flow, decides whom an agent may delegate to:
+	// orchestrator-worker (the default) lets only the entry agent delegate;
+	// mesh lets any agent delegate recursively (bounded by MaxHandoffDepth).
+	// Empty maps to orchestrator-worker. Ignored when Dynamic is false.
+	Topology Topology
+
+	// MaxHandoffDepth, on a mesh flow, bounds the recursive delegation
+	// depth. Zero leaves the topos default (3). Ignored outside a mesh
+	// region.
+	MaxHandoffDepth int
 }
+
+// Topology selects whom an agent in a dynamic agentic flow may delegate
+// to. It is wallfacer's own enum; the agentgraph seam maps it onto the
+// topos topology constants so only that package names a topos type.
+type Topology string
+
+const (
+	// TopologyOrchestratorWorker (the zero value) lets only the entry
+	// agent delegate to peers; a delegated peer runs without a delegate
+	// tool. The safe default.
+	TopologyOrchestratorWorker Topology = "orchestrator-worker"
+
+	// TopologyMesh lets any agent delegate to a peer recursively, bounded
+	// by Flow.MaxHandoffDepth. Opt-in.
+	TopologyMesh Topology = "mesh"
+)
 
 // Step is a single node in a Flow. AgentSlug references a role in
 // internal/agents by slug; resolution happens at engine execute time

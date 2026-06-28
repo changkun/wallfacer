@@ -80,6 +80,78 @@ func TestLoadUserFlows_RejectsStepWithoutAgentSlug(t *testing.T) {
 	}
 }
 
+func TestLoadUserFlows_ReadsAgenticDynamicFields(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `slug: mesh-flow
+name: Mesh Flow
+agentic: true
+dynamic: true
+topology: mesh
+max_handoff_depth: 4
+steps:
+  - agent_slug: planner
+  - agent_slug: builder
+`
+	if err := os.WriteFile(filepath.Join(dir, "mesh.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	flows, err := LoadUserFlows(dir)
+	if err != nil {
+		t.Fatalf("LoadUserFlows: %v", err)
+	}
+	if len(flows) != 1 {
+		t.Fatalf("flows = %d, want 1", len(flows))
+	}
+	f := flows[0]
+	if !f.Agentic || !f.Dynamic {
+		t.Errorf("agentic=%v dynamic=%v, want both true", f.Agentic, f.Dynamic)
+	}
+	if f.Topology != TopologyMesh {
+		t.Errorf("topology = %q, want mesh", f.Topology)
+	}
+	if f.MaxHandoffDepth != 4 {
+		t.Errorf("max_handoff_depth = %d, want 4", f.MaxHandoffDepth)
+	}
+}
+
+func TestLoadUserFlows_RejectsUnknownTopology(t *testing.T) {
+	dir := t.TempDir()
+	body := "slug: bad-topo\nname: Bad\ntopology: clique\nsteps:\n  - agent_slug: impl\n"
+	if err := os.WriteFile(filepath.Join(dir, "bad.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := LoadUserFlows(dir); err == nil {
+		t.Fatal("expected error for an unknown topology value")
+	}
+}
+
+func TestWriteAndLoadUserFlow_AgenticRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	f := Flow{
+		Slug:            "mesh-flow",
+		Name:            "Mesh Flow",
+		Agentic:         true,
+		Dynamic:         true,
+		Topology:        TopologyMesh,
+		MaxHandoffDepth: 3,
+		Steps:           []Step{{AgentSlug: "planner"}, {AgentSlug: "builder"}},
+	}
+	if err := WriteUserFlow(dir, f); err != nil {
+		t.Fatalf("WriteUserFlow: %v", err)
+	}
+	flows, err := LoadUserFlows(dir)
+	if err != nil {
+		t.Fatalf("LoadUserFlows: %v", err)
+	}
+	if len(flows) != 1 {
+		t.Fatalf("flows = %d, want 1", len(flows))
+	}
+	got := flows[0]
+	if !got.Agentic || !got.Dynamic || got.Topology != TopologyMesh || got.MaxHandoffDepth != 3 {
+		t.Errorf("round-trip mismatch: %+v", got)
+	}
+}
+
 func TestNewMergedRegistry_IncludesBuiltinAndUser(t *testing.T) {
 	dir := t.TempDir()
 	body := "slug: custom-flow\nname: Custom\nsteps:\n  - agent_slug: impl\n"

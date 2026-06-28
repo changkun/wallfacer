@@ -18,11 +18,15 @@ import (
 // mirrors Flow with store-friendly types and a steps array that
 // carries every field flow.Step exposes.
 type diskFlow struct {
-	Slug        string     `yaml:"slug"`
-	Name        string     `yaml:"name"`
-	Description string     `yaml:"description,omitempty"`
-	SpawnKind   string     `yaml:"spawn_kind,omitempty"`
-	Steps       []diskStep `yaml:"steps"`
+	Slug            string     `yaml:"slug"`
+	Name            string     `yaml:"name"`
+	Description     string     `yaml:"description,omitempty"`
+	SpawnKind       string     `yaml:"spawn_kind,omitempty"`
+	Agentic         bool       `yaml:"agentic,omitempty"`
+	Dynamic         bool       `yaml:"dynamic,omitempty"`
+	Topology        string     `yaml:"topology,omitempty"`
+	MaxHandoffDepth int        `yaml:"max_handoff_depth,omitempty"`
+	Steps           []diskStep `yaml:"steps"`
 }
 
 type diskStep struct {
@@ -60,6 +64,14 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 		if len(f.Steps) == 0 {
 			return nil, fmt.Errorf("parse %s: at least one step is required", path)
 		}
+		// A topology typo would silently default to orchestrator-worker in
+		// the agentgraph seam; reject it at load so it doesn't vanish.
+		switch Topology(f.Topology) {
+		case "", TopologyOrchestratorWorker, TopologyMesh:
+		default:
+			return nil, fmt.Errorf("parse %s: topology %q is not one of %q, %q",
+				path, f.Topology, TopologyOrchestratorWorker, TopologyMesh)
+		}
 		steps := make([]Step, 0, len(f.Steps))
 		seenSlugs := make(map[string]bool, len(f.Steps))
 		for i, s := range f.Steps {
@@ -81,11 +93,15 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 			})
 		}
 		flows = append(flows, Flow{
-			Slug:        f.Slug,
-			Name:        f.Name,
-			Description: f.Description,
-			SpawnKind:   store.TaskKind(f.SpawnKind),
-			Steps:       steps,
+			Slug:            f.Slug,
+			Name:            f.Name,
+			Description:     f.Description,
+			SpawnKind:       store.TaskKind(f.SpawnKind),
+			Agentic:         f.Agentic,
+			Dynamic:         f.Dynamic,
+			Topology:        Topology(f.Topology),
+			MaxHandoffDepth: f.MaxHandoffDepth,
+			Steps:           steps,
 		})
 	}
 	return flows, nil
@@ -111,11 +127,15 @@ func WriteUserFlow(dir string, f Flow) error {
 		}
 	}
 	body, err := yaml.Marshal(diskFlow{
-		Slug:        f.Slug,
-		Name:        f.Name,
-		Description: f.Description,
-		SpawnKind:   string(f.SpawnKind),
-		Steps:       steps,
+		Slug:            f.Slug,
+		Name:            f.Name,
+		Description:     f.Description,
+		SpawnKind:       string(f.SpawnKind),
+		Agentic:         f.Agentic,
+		Dynamic:         f.Dynamic,
+		Topology:        string(f.Topology),
+		MaxHandoffDepth: f.MaxHandoffDepth,
+		Steps:           steps,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
