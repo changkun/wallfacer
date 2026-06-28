@@ -180,19 +180,23 @@ func TestFireRoutine_CreatesAndRunsInstanceTask(t *testing.T) {
 	}
 }
 
-func TestFireRoutine_IdeaAgentSpawnKind_SpawnsIdeaAgentInstance(t *testing.T) {
+// TestFireRoutine_SpawnsOrdinaryInstance verifies that firing a routine
+// spawns a normal instance task (Kind=task), promotes it to in_progress,
+// and hands it to the runner. This is the routines regression guard for
+// the idea-agent removal: routines fire against ordinary flows with no
+// idea-agent special-casing.
+func TestFireRoutine_SpawnsOrdinaryInstance(t *testing.T) {
 	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)
 	installRoutineEngine(h, nil, h.fireRoutine)
 
 	ctx := context.Background()
 	routineTask, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt:                 "Ideation routine",
+		Prompt:                 "Scan the workspace and propose improvements",
 		Timeout:                60,
 		Kind:                   store.TaskKindRoutine,
 		RoutineIntervalSeconds: 3600,
 		RoutineEnabled:         true,
-		RoutineSpawnKind:       store.TaskKindIdeaAgent,
 	})
 
 	h.fireRoutine(ctx, routineTask.ID)
@@ -200,21 +204,24 @@ func TestFireRoutine_IdeaAgentSpawnKind_SpawnsIdeaAgentInstance(t *testing.T) {
 	tasks, _ := s.ListTasks(ctx, false)
 	var instance *store.Task
 	for i := range tasks {
-		if tasks[i].Kind == store.TaskKindIdeaAgent {
+		if !tasks[i].IsRoutine() {
 			instance = &tasks[i]
 		}
 	}
 	if instance == nil {
-		t.Fatalf("expected spawned idea-agent task")
+		t.Fatalf("expected a spawned instance task")
+	}
+	if instance.Kind != store.TaskKindTask {
+		t.Fatalf("instance Kind = %q, want ordinary task", instance.Kind)
 	}
 	if instance.Status != store.TaskStatusInProgress {
-		t.Fatalf("idea-agent instance status = %q, want in_progress", instance.Status)
+		t.Fatalf("instance status = %q, want in_progress", instance.Status)
 	}
 
-	// RunBackground was invoked with the idea-agent instance.
+	// RunBackground was invoked with the spawned instance.
 	calls := mock.RunCalls()
 	if len(calls) != 1 || calls[0] != instance.ID {
-		t.Fatalf("expected 1 RunBackground call for idea-agent instance, got %+v", calls)
+		t.Fatalf("expected 1 RunBackground call for the instance, got %+v", calls)
 	}
 }
 

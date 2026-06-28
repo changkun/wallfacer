@@ -14,13 +14,11 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// allowedRoutineSpawnKinds bounds what a user (or the system-ideation
-// bootstrap) may set as a routine's spawn_kind at the API boundary. It
-// prevents routines from spawning, say, agent-session tasks that would
-// confuse the lifecycle machinery.
+// allowedRoutineSpawnKinds bounds what a user may set as a routine's
+// spawn_kind at the API boundary. It prevents routines from spawning,
+// say, agent-session tasks that would confuse the lifecycle machinery.
 var allowedRoutineSpawnKinds = []store.TaskKind{
 	store.TaskKindTask,
-	store.TaskKindIdeaAgent,
 }
 
 // minRoutineIntervalMinutes guards against "fire every second" misuse.
@@ -47,7 +45,7 @@ type RoutineResponse struct {
 	// RoutineSpawnFlow is the flow slug the routine spawns. When a
 	// record has no explicit RoutineSpawnFlow the response populates it
 	// via the legacy-Kind resolver so UIs can render "flow: implement"
-	// / "flow: brainstorm" uniformly.
+	// uniformly.
 	RoutineSpawnFlow string    `json:"routine_spawn_flow,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`

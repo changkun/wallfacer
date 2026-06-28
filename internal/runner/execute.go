@@ -260,9 +260,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 			return
 		}
-		// Follow the same in_progress → waiting → committing → done path
-		// the ideation branch uses (the state machine does not allow a
-		// direct in_progress → done transition).
+		// Follow the in_progress → waiting → committing → done path
+		// (the state machine does not allow a direct in_progress → done
+		// transition).
 		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))

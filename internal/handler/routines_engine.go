@@ -178,9 +178,9 @@ func (h *Handler) unregisterRoutine(id uuid.UUID) {
 }
 
 // fireRoutine is the engine's FireFunc. It runs in a dedicated goroutine
-// with no locks held. The flow mirrors createIdeaAgentTask: build the
-// instance task via CreateTaskWithOptions, promote to in_progress, emit
-// the state-change event, then hand off to the runner.
+// with no locks held. It builds the instance task via
+// CreateTaskWithOptions, promotes it to in_progress, emits the
+// state-change event, then hands off to the runner.
 //
 // Every early-return path that detects a card the engine should not keep
 // tracking (card missing, no longer a routine, in a stopped lane, or

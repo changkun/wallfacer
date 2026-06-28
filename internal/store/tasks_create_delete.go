@@ -36,8 +36,7 @@ type TaskCreateOptions struct {
 	MountWorktrees bool
 	Kind           TaskKind
 	// FlowID is the slug of the flow this task runs against. Empty means
-	// the runner's legacy Kind→Flow resolver picks the default
-	// ("implement" for normal tasks, "brainstorm" for idea-agent).
+	// the runner's legacy Kind→Flow resolver picks the default ("implement").
 	FlowID             string
 	Tags               []string
 	Sandbox            harness.ID

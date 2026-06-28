@@ -303,10 +303,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					for i := range backlogTasks {
 						t := &backlogTasks[i]
 						// Skip task-kinds that the auto-promoter must not touch:
-						// idea-agent runs are scheduled by their own watcher, and
 						// routine cards are schedule templates driven by the
 						// routine engine rather than the board lifecycle.
-						if t.IsIdeaAgent() || t.IsRoutine() {
+						if t.IsRoutine() {
 							continue
 						}
 						if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {

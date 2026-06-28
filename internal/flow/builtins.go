@@ -1,7 +1,5 @@
 package flow
 
-import "latere.ai/x/wallfacer/internal/store"
-
 // builtins is the embedded catalog seeded on first boot. Each Flow
 // references agents by Role.Slug from internal/agents — the flow
 // engine resolves those slugs at execute time.
@@ -21,18 +19,5 @@ var builtins = []Flow{
 			{AgentSlug: "title", RunInParallelWith: []string{"commit-msg", "oversight"}},
 			{AgentSlug: "oversight", RunInParallelWith: []string{"commit-msg", "title"}},
 		},
-	},
-	{
-		Slug:        "brainstorm",
-		Name:        "Brainstorm",
-		Description: "Scan the workspace and propose up to three high-impact task ideas.",
-		SpawnKind:   store.TaskKindIdeaAgent,
-		Steps:       []Step{{AgentSlug: "ideate"}},
-	},
-	{
-		Slug:        "test-only",
-		Name:        "Test only",
-		Description: "Run the test-verification agent against the current worktree state.",
-		Steps:       []Step{{AgentSlug: "test"}},
 	},
 }

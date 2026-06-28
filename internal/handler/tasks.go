@@ -206,11 +206,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			http.StatusBadRequest)
 		return
 	}
-	// Brainstorm tasks (legacy Kind="idea-agent" or new Flow="brainstorm")
-	// are the one case where an empty prompt is allowed: the agent
-	// derives the topic from the workspace itself.
-	isBrainstorm := req.Flow == "brainstorm" || req.Kind == store.TaskKindIdeaAgent
-	if strings.TrimSpace(req.Prompt) == "" && !isBrainstorm {
+	if strings.TrimSpace(req.Prompt) == "" {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
@@ -251,9 +247,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
 
-	if task.Kind != store.TaskKindIdeaAgent {
-		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
-	}
+	h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 
 	httpjson.Write(w, http.StatusCreated, task)
 }
@@ -342,7 +336,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Validate prompts.
 	for _, t := range req.Tasks {
-		if strings.TrimSpace(t.Prompt) == "" && t.Kind != store.TaskKindIdeaAgent {
+		if strings.TrimSpace(t.Prompt) == "" {
 			ref := t.Ref
 			if ref == "" {
 				ref = "<unnamed>"
@@ -562,9 +556,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
 			store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
 
-		if t.Kind != store.TaskKindIdeaAgent {
-			h.runner.GenerateTitleBackground(task.ID, task.Prompt)
-		}
+		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 
 		if t.Ref != "" {
 			refToID[t.Ref] = task.ID

@@ -122,20 +122,17 @@ type RefinementJob struct {
 
 // TaskKind identifies the execution mode for a task.
 // The zero value ("") and "task" both mean a standard implementation task.
-// "idea-agent" is a special task that runs the brainstorm agent: it analyses
-// the workspaces, proposes ideas, and creates backlog tasks from the results.
 type TaskKind string
 
 // TaskKind constants.
 const (
-	TaskKindTask      TaskKind = ""           // default; regular implementation task
-	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
-	TaskKindPlanning  TaskKind = "planning"   // spec planning session task
-	TaskKindRoutine   TaskKind = "routine"    // scheduler template; spawns instance tasks on its interval
+	TaskKindTask     TaskKind = ""         // default; regular implementation task
+	TaskKindPlanning TaskKind = "planning" // spec planning session task
+	TaskKindRoutine  TaskKind = "routine"  // scheduler template; spawns instance tasks on its interval
 )
 
 // SandboxActivity identifies which phase of a task a container run belongs to.
-// The routing constants (Implementation through IdeaAgent) are used for
+// The routing constants (Implementation through AgentSession) are used for
 // sandbox-per-activity configuration. Test and OversightTest are
 // usage-attribution-only values that appear in UsageBreakdown and turn logs.
 type SandboxActivity string
@@ -154,8 +151,6 @@ const (
 	SandboxActivityOversight SandboxActivity = "oversight"
 	// SandboxActivityCommitMessage is the commit-message generation phase.
 	SandboxActivityCommitMessage SandboxActivity = "commit_message"
-	// SandboxActivityIdeaAgent is the brainstorm/ideation phase.
-	SandboxActivityIdeaAgent SandboxActivity = "idea_agent"
 	// SandboxActivityAgentSession is the interactive agent-session (chat) phase.
 	SandboxActivityAgentSession SandboxActivity = "agent-session"
 
@@ -177,7 +172,6 @@ var SandboxActivities = []SandboxActivity{
 	SandboxActivityTitle,
 	SandboxActivityOversight,
 	SandboxActivityCommitMessage,
-	SandboxActivityIdeaAgent,
 	SandboxActivityAgentSession,
 }
 
@@ -340,7 +334,7 @@ type Task struct {
 	// CustomFailPatterns are checked first; a match returns "fail" immediately.
 	CustomFailPatterns []string `json:"custom_fail_patterns,omitempty"`
 
-	// Kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
+	// Kind identifies the execution mode (e.g. TaskKindTask, TaskKindRoutine).
 	// Empty string and "task" are equivalent: a standard implementation task.
 	Kind TaskKind `json:"kind,omitempty"`
 
@@ -351,8 +345,8 @@ type Task struct {
 	// (*Task).ResolvedFlowID.
 	FlowID string `json:"flow_id,omitempty"`
 
-	// Tags are labels attached to a task for categorisation (e.g. "idea-agent" for
-	// tasks auto-created by the brainstorm agent).
+	// Tags are labels attached to a task for categorisation (e.g.
+	// "spawned-by:<routine-id>" for tasks created by a routine).
 	Tags []string `json:"tags,omitempty"`
 
 	// SpecSourcePath is the relative path of the spec file this task was
@@ -468,12 +462,6 @@ func (t *Task) HasTag(tag string) bool {
 // forever and are filtered out of autopilot, archiving, and dep-graph walks.
 func (t *Task) IsRoutine() bool {
 	return t.Kind == TaskKindRoutine
-}
-
-// IsIdeaAgent reports whether the task is a brainstorm/ideation task.
-// Provided as a counterpart to IsRoutine so autopilot checks stay readable.
-func (t *Task) IsIdeaAgent() bool {
-	return t.Kind == TaskKindIdeaAgent
 }
 
 // cloneRefinementSessionSlice deep-copies a []RefinementSession, duplicating

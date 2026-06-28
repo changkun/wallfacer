@@ -145,23 +145,6 @@ func TestBuildBaseContainerSpecClaudeVsCodexAgentEnv(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// buildIdeationContainerArgs — table-driven parity tests
-// ---------------------------------------------------------------------------
-
-// TestBuildIdeationContainerArgsSingleWorkspaceReadOnly verifies that the
-// single workspace mount uses ":z,ro" (read-only) and the workdir points into
-// that workspace.
-
-// TestBuildIdeationContainerArgsSingleWorkspaceInstructionsInsideRepo verifies
-// that for a single workspace, the instructions file (CLAUDE.md / AGENTS.md)
-// is mounted inside the repo directory rather than at /workspace/ root, so the
-// agent stays anchored to the repo.
-
-// TestBuildIdeationContainerArgsClaudeVsCodex verifies that running ideation
-// with claude vs codex sandboxes produces the correct sandbox image while
-// keeping all other flags identical.
-
-// ---------------------------------------------------------------------------
 // buildAgentCmd — unit tests
 // ---------------------------------------------------------------------------
 

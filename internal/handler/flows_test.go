@@ -102,9 +102,14 @@ func TestListFlows_ReturnsBuiltins(t *testing.T) {
 		}
 		bySlug[f.Slug] = f
 	}
-	for _, slug := range []string{"implement", "brainstorm", "test-only"} {
+	for _, slug := range []string{"implement"} {
 		if _, ok := bySlug[slug]; !ok {
 			t.Errorf("missing expected flow %q", slug)
+		}
+	}
+	for _, slug := range []string{"brainstorm", "test-only"} {
+		if _, ok := bySlug[slug]; ok {
+			t.Errorf("retired flow %q should no longer be a built-in", slug)
 		}
 	}
 	impl, ok := bySlug["implement"]

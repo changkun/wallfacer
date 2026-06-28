@@ -67,18 +67,17 @@ func (r *Registry) List() []Flow {
 // mapping is:
 //
 //   - "" (default)   → "implement"
-//   - "idea-agent"   → "brainstorm"
 //
 // Other kinds (including "planning", "routine") return ok=false —
 // those tasks continue to use their existing dispatch paths until
-// their own migration tasks land. Returning the Flow by value keeps
-// callers isolated from mutation, same as Get.
+// their own migration tasks land. The retired "idea-agent" kind no
+// longer maps to a flow; such records fall through to the default
+// ("implement") via resolveByExplicitOrLegacy. Returning the Flow by
+// value keeps callers isolated from mutation, same as Get.
 func (r *Registry) ResolveLegacyKind(kind store.TaskKind) (Flow, bool) {
 	switch kind {
 	case "":
 		return r.Get("implement")
-	case store.TaskKindIdeaAgent:
-		return r.Get("brainstorm")
 	default:
 		return Flow{}, false
 	}
@@ -98,8 +97,17 @@ func (r *Registry) resolveByExplicitOrLegacy(
 	if t == nil {
 		return "implement"
 	}
+	// An explicit slug wins, but only when it still names a registered
+	// flow. A task or routine pinned to a since-removed slug (e.g. the
+	// retired "brainstorm" / "test-only" built-ins) must keep dispatching
+	// rather than resolve to a slug that no longer exists, which would
+	// fail or silently drop the run. Fall back to the default flow.
+	// User-authored flows are registered, so they resolve to themselves.
 	if s := explicitFlow(t); s != "" {
-		return s
+		if _, ok := r.byKey[s]; ok {
+			return s
+		}
+		return "implement"
 	}
 	if f, ok := r.ResolveLegacyKind(legacyKind(t)); ok {
 		return f.Slug
