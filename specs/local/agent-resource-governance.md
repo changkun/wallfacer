@@ -145,8 +145,13 @@ a goroutine, so a full budget delays a launch without serializing the gates.
 - `agonForkCount` default `2 → 1`. One fork = one actor/critic pair, Claude-only
   (fork 2, the Codex critic, is opt-in). This halves run count and drops the
   second agent family from the default path.
-- `agonMaxRounds` default `4 → 2` (one proposer→critic exchange; deeper debate is
-  opt-in). (Confirm the floor that still produces a meaningful verdict — OQ-2.)
+- `agonMaxRounds` default `4 → 3` — the meaningful floor (OQ-2, resolved). Agon
+  alternates roles by round parity: odd = critic, even = proposer. So 3 rounds is
+  one full cycle — critic attacks (R1, declares topic), proposer rebuts (R2),
+  critic re-assesses and can resolve/withdraw (R3). With only 2 rounds the critic
+  never sees the rebuttal, so a valid fix still ends "unresolved" and the hard
+  barrier ([[agon-supersede-test]]) would block spuriously. 3 is the floor;
+  deeper debate is opt-in.
 - `agonCostCap` unchanged.
 
 These are already env-tunable; this changes the compile-time floor and makes it
@@ -211,13 +216,12 @@ concurrently across mixed task/test/agon load; release on exit re-opens a slot;
 - **OQ-1 — global budget default.** Fixed small constant vs CPU-derived
   (`max(2, NumCPU/2)`)? CPU-derived adapts to the machine but is less
   predictable. Lean CPU-derived; confirm before Phase 4.
-- **OQ-2 — agon rounds floor.** Does `agonMaxRounds = 2` still yield a meaningful
-  adversarial verdict, or is 3 the practical floor? Validate against agon's round
-  semantics before flipping the default in Phase 1. Note the interaction with the
-  just-shipped hard barrier ([[agon-supersede-test]]): a shallower default debate
-  surfaces fewer resolutions, so more runs end with unresolved attacks — which now
-  *parks the task for human review* rather than auto-retrying. Reducing depth makes
-  the barrier bite more often; weigh depth-vs-friction, not just depth-vs-cost.
+- **OQ-2 — agon rounds floor. RESOLVED: 3.** Agon alternates by round parity
+  (odd = critic, even = proposer rebuttal), so 3 rounds is the minimum full cycle
+  (attack → rebut → re-assess). 2 would never let the critic see the rebuttal, so
+  a fixed attack still ends "unresolved" and the hard barrier
+  ([[agon-supersede-test]]) — which now *parks the task for human review* rather
+  than auto-retrying — would block spuriously. Phase 1 uses `rounds = 3`.
 - **OQ-3 — darwin child backgrounding.** Can the parent set `PRIO_DARWIN_BG` on a
   child pid on the target macOS, or only on itself? If only self, the darwin path
   must have the child background itself at startup (a harness flag/env) rather than

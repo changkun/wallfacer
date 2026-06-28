@@ -558,3 +558,29 @@ func TestTryAutoAgon_DedupesConcurrentTicks(t *testing.T) {
 		t.Errorf("verifier called %d times, want 1", got)
 	}
 }
+
+// TestAgonTuning_MinimalDefaultsAndOverride proves the default agon depth is the
+// minimum floor (1 fork, 3 rounds — one full attack/rebuttal/re-assess cycle) and
+// that env overrides expand it. Guards the cost-minimizing default and the dial.
+func TestAgonTuning_MinimalDefaultsAndOverride(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+
+	// No env override: the conservative floor.
+	forks, rounds, costCap := h.agonTuning()
+	if forks != 1 || rounds != 3 {
+		t.Errorf("default tuning = forks %d, rounds %d; want 1 fork, 3 rounds", forks, rounds)
+	}
+	if costCap != 50000 {
+		t.Errorf("default cost cap = %d, want 50000", costCap)
+	}
+
+	// Env overrides expand verification depth.
+	envBody := "WALLFACER_AGON_FORKS=2\nWALLFACER_AGON_ROUNDS=6\nWALLFACER_AGON_COST_CAP=120000\n"
+	if err := os.WriteFile(envPath, []byte(envBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	forks, rounds, costCap = h.agonTuning()
+	if forks != 2 || rounds != 6 || costCap != 120000 {
+		t.Errorf("override tuning = forks %d, rounds %d, cap %d; want 2, 6, 120000", forks, rounds, costCap)
+	}
+}

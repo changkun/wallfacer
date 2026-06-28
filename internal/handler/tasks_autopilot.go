@@ -1193,12 +1193,17 @@ func (h *Handler) tryAutoAgon(ctx context.Context) {
 
 // agonForkCount is the number of independent critic forks per run.
 // agonMaxRounds is the per-fork round cap. agonCostCap is the soft token budget.
-// All are deliberately conservative defaults for initial rollout; each can be
-// overridden via env (WALLFACER_AGON_FORKS / _ROUNDS / _COST_CAP) — the token
-// dial for trading verification depth against cost.
+// These are the minimum-cost floor, not a recommended depth: one fork (a single
+// actor/critic pair, Claude-only — the second {Claude, Codex} fork is opt-in) and
+// the shortest meaningful debate. Agon alternates roles by round parity (odd =
+// critic, even = proposer), so 3 rounds is one full cycle: attack, rebuttal,
+// re-assessment. Fewer would never let the critic see the rebuttal, leaving a
+// fixed attack spuriously "unresolved" — which the supersede-test barrier then
+// parks for human review. Users expand depth via env (WALLFACER_AGON_FORKS /
+// _ROUNDS / _COST_CAP) or the Execution settings tab.
 const (
-	agonForkCount = 2
-	agonMaxRounds = 4
+	agonForkCount = 1
+	agonMaxRounds = 3
 	agonCostCap   = 50000
 )
 
@@ -1404,4 +1409,3 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	}
 	return nil
 }
-
