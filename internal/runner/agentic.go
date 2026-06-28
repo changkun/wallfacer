@@ -8,10 +8,45 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
+
+// agenticModelConfig derives the model selection for an agentic run from
+// wallfacer's global credential settings (the .env file), the same source the
+// container harnesses read. It mirrors the guard the other env-reading runner
+// helpers use: a missing or unparseable env file, or an absent
+// ANTHROPIC_API_KEY, yields the zero ModelConfig, which the agentgraph seam maps
+// to the deterministic fake model (so tests and no-credential dev keep working).
+// A configured ANTHROPIC_BASE_URL routes through Lux (the gateway); a bare key
+// talks to the provider directly. Only the static x-api-key credential is wired
+// for now; Bearer-style tokens (ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN)
+// are deferred (they need a per-call BearerSource).
+func (r *Runner) agenticModelConfig() agentgraph.ModelConfig {
+	if r.envFile == "" {
+		return agentgraph.ModelConfig{}
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil {
+		return agentgraph.ModelConfig{}
+	}
+	if cfg.APIKey == "" {
+		return agentgraph.ModelConfig{}
+	}
+	mode := agentgraph.ModelModeDirect
+	if cfg.BaseURL != "" {
+		mode = agentgraph.ModelModeLux
+	}
+	return agentgraph.ModelConfig{
+		Mode:     mode,
+		Provider: "anthropic",
+		Model:    cfg.DefaultModel,
+		BaseURL:  cfg.BaseURL,
+		APIKey:   cfg.APIKey,
+	}
+}
 
 // flowBySlug looks up a flow by slug, guarding against a nil flow registry
 // (hand-constructed Runners in tests may leave it unset). Returning ok=false for
@@ -26,9 +61,11 @@ func (r *Runner) flowBySlug(slug string) (flow.Flow, bool) {
 
 // runAgenticFlow executes an agentic flow through the in-process topos
 // agent-graph runtime (internal/agentgraph) and maps the result back onto the
-// task. It compiles the flow into a topos.Region, runs it with the deterministic
-// fake model (real Lux model + sandbox wiring is M4), persists the final text
-// and the JSON-marshalled lineage graph, then drives the task through the same
+// task. It compiles the flow into a topos.Region, runs it with the model
+// wallfacer is configured for (a real provider through Lux when a credential is
+// set, else the deterministic fake model; see agenticModelConfig), persists the
+// final text and the JSON-marshalled lineage graph, then drives the task through
+// the same
 // in_progress -> waiting -> committing -> done state machine the flow-engine and
 // ideation branches use (the state machine forbids a direct in_progress -> done
 // transition). The caller sets statusSet=true before invoking this.
@@ -40,7 +77,7 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
 
-	res, err := agentgraph.RunFlowFake(ctx, task.ID.String(), f, r.agentsReg, prompt)
+	res, err := agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt)
 	if err != nil {
 		if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 			return

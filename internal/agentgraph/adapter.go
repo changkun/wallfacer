@@ -97,18 +97,10 @@ type Edge struct {
 
 // RunFlowFake runs a flow through the agent-graph runtime with the deterministic,
 // network-free fake model, returning a topos-free Result. sessionID seeds the
-// run id so lineage node ids (<session>/<agent>) are stable. This is the M2
-// headless entrypoint the runner uses; real model/sandbox wiring is M4.
+// run id so lineage node ids (<session>/<agent>) are stable. It is the explicit
+// fake entrypoint, equivalent to RunFlowWithModel with an unconfigured config.
 func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents.Registry, prompt string) (Result, error) {
-	opts := topos.Options{
-		SessionID: sessionID,
-		Model:     topos.ModelOptions{Kind: topos.ModelFake},
-	}
-	res, err := RunFlow(ctx, opts, f, reg, prompt)
-	if err != nil {
-		return Result{}, err
-	}
-	return toResult(res), nil
+	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt)
 }
 
 // toResult converts a topos.RunResult into the topos-free host Result.
