@@ -18,11 +18,14 @@ import (
 // labels, PromptTmpl becomes the system prompt, and Capabilities become the
 // permission scopes.
 //
-// M2 scope is a deterministic chain, so the region is Pinned and a step's
-// Optional / RunInParallelWith hints are ignored (the dynamic/mesh mapping is a
-// later milestone). Built-in roles leave PromptTmpl empty (they render through
-// the prompts package); FromFlow tolerates that — an empty system prompt is
-// legal for the fake model and the M2 headless path.
+// A pinned flow (the default) compiles to a deterministic chain (Autonomy:
+// Pinned), where Optional / RunInParallelWith hints are ignored. A flow marked
+// flow.Dynamic compiles to Autonomy: Dynamic, exposing the peers as a
+// discoverable directory whose reachability the Topology gates; flow.Topology
+// maps onto the topos topology constants here, the only place that names them.
+// Built-in roles leave PromptTmpl empty (they render through the prompts
+// package); FromFlow tolerates that — an empty system prompt is legal for the
+// fake model and the headless path.
 func FromFlow(f flow.Flow, reg *agents.Registry) (topos.Region, error) {
 	if len(f.Steps) == 0 {
 		return topos.Region{}, fmt.Errorf("agentgraph: flow %q has no steps", f.Slug)
@@ -41,11 +44,28 @@ func FromFlow(f flow.Flow, reg *agents.Registry) (topos.Region, error) {
 			Scopes:       role.Capabilities,
 		})
 	}
-	return topos.Region{
-		Autonomy: topos.Pinned,
-		Entry:    specs[0],
-		Peers:    specs[1:],
-	}, nil
+	region := topos.Region{
+		Entry: specs[0],
+		Peers: specs[1:],
+	}
+	if f.Dynamic {
+		region.Autonomy = topos.Dynamic
+		region.Topology = toTopology(f.Topology)
+	} else {
+		region.Autonomy = topos.Pinned
+	}
+	return region, nil
+}
+
+// toTopology maps a wallfacer flow topology onto the topos topology constant.
+// It materializes the orchestrator-worker default for the empty (and any
+// unknown) value so a caller reading the built region sees the resolved
+// topology rather than relying on the topos runner's internal default.
+func toTopology(t flow.Topology) topos.Topology {
+	if t == flow.TopologyMesh {
+		return topos.Mesh
+	}
+	return topos.OrchestratorWorker
 }
 
 // RunFlow builds a topos runner from opts and runs the region compiled from the
