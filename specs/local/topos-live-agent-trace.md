@@ -155,8 +155,9 @@ pinned steps, so an event's SessionID is a reliable join key to its lineage node
 Tests (fake model) cover the ordered stream incl. assistant text + delegation,
 the SessionID→node join, determinism (output identical with/without observer),
 and observer-panic recovery; full topos suite + golangci-lint green.
-*Remaining for ship:* tag topos `v0.0.5` and bump wallfacer `go.mod` (the
-`go.work` masks this during dev; CI/`go.mod` builds need the published version).
+*Shipped:* topos `v0.0.5` tagged + pushed to origin (`a010836..d8e51f8`); wallfacer
+`go.mod` bumped to v0.0.5 (`41c78d57`) and verified building `GOWORK=off`
+(CI-equivalent), so the feature no longer depends on the local `go.work`.
 
 **Phase 2 — wallfacer forward to the task timeline. DONE** (`b6b4ac8f`).
 *Scope change from the original D/E plan:* rather than build a bespoke per-task
