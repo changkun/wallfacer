@@ -1,6 +1,6 @@
 ---
 title: Server-Side Unified Graph Model + GET /api/graph
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/graph/
@@ -8,7 +8,7 @@ affects:
   - internal/handler/graph_test.go
   - internal/apicontract/routes.go
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 effort: medium
