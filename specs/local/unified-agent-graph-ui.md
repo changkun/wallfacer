@@ -99,8 +99,16 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     canvas topology indicator updates live from the draft (component-tested).
     Validated same-origin end-to-end: clone -> agentic + dynamic + mesh + depth
     -> save -> the flow round-trips as `agentic:true, topology:mesh, depth:4`.
-  - **Remaining:** node-level drag to reorder / mark parallel, and
-    edit-an-agent-node -> the agent editor.
+  - **M6.2e DONE.** Mark parallel via node drag: step nodes are pointer-draggable
+    (SVG does not fire HTML5 dragstart reliably, and a pointer model generalises
+    to reordering), and dropping one node on another groups them into a parallel
+    stage (`setParallel` merges the transitive groups into a fully-mutual,
+    contiguous column). A per-node ungroup control pulls a step back out
+    (`clearParallel`, dissolving a singleton remainder). Pure ops unit-tested,
+    ungroup wiring component-tested, the drag validated in a real browser:
+    drag -> group -> save round-trips `run_in_parallel_with`.
+  - **Remaining:** node drag to reorder the sequence, and edit-an-agent-node ->
+    the agent editor.
 - **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
   canvas (status colors, handoff edges), polling/streaming the M5 endpoint.
 - **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;

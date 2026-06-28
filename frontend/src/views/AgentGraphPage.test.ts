@@ -200,6 +200,47 @@ describe('AgentGraphPage', () => {
     host.remove();
   });
 
+  it('ungroups a parallel stage when a node ungroup control is activated', async () => {
+    agents = [
+      { slug: 'a', title: 'A', builtin: true },
+      { slug: 'b', title: 'B', builtin: true },
+      { slug: 'c', title: 'C', builtin: true },
+    ];
+    flows = [
+      {
+        slug: 'fan',
+        name: 'Fan',
+        builtin: false,
+        steps: [
+          { agent_slug: 'a', agent_name: 'A', run_in_parallel_with: ['b'] },
+          { agent_slug: 'b', agent_name: 'B', run_in_parallel_with: ['a'] },
+          { agent_slug: 'c', agent_name: 'C' },
+        ],
+      },
+    ];
+
+    const { app, host } = await mount();
+    // One parallel stage to start (a || b), so one "parallel" badge.
+    expect(host.querySelectorAll('.agc-badge').length).toBe(1);
+
+    (host.querySelector('.ag-detail__edit') as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // The two parallel nodes expose an ungroup control; the sequential one does not.
+    const ungroupers = host.querySelectorAll('.agc-node-ungroup');
+    expect(ungroupers.length).toBe(2);
+
+    (ungroupers[0] as SVGGElement).dispatchEvent(new Event('click', { bubbles: true }));
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // Group dissolved: no parallel badge, no ungroup controls remain.
+    expect(host.querySelectorAll('.agc-badge').length).toBe(0);
+    expect(host.querySelectorAll('.agc-node-ungroup').length).toBe(0);
+
+    app.unmount();
+    host.remove();
+  });
+
   it('draws parallel steps as siblings in one stage', async () => {
     agents = [
       { slug: 'a', title: 'Agent A', builtin: true },

@@ -3,6 +3,9 @@ import {
   buildDraftFromFlow,
   appendStep,
   removeStep,
+  setParallel,
+  clearParallel,
+  parallelGroupSlugs,
   draftToFlow,
   draftToPayload,
   suggestCloneSlug,
@@ -75,6 +78,67 @@ describe('flowDraft', () => {
     // Removing an absent agent is a no-op.
     expect(removeStep(d, 'zzz')).toBe(false);
     expect(d.steps).toHaveLength(2);
+  });
+
+  it('groups two steps into a fully-mutual, contiguous parallel stage', () => {
+    const seq: Flow = {
+      slug: 'seq',
+      name: 'Seq',
+      builtin: false,
+      steps: [
+        { agent_slug: 'a' },
+        { agent_slug: 'b' },
+        { agent_slug: 'c' },
+      ],
+    };
+    const d = buildDraftFromFlow(seq, { clone: false });
+    expect(setParallel(d, 'a', 'c')).toBe(true);
+    // a and c now reference each other; the group is contiguous at a's slot.
+    expect(d.steps.map((s) => s.agent_slug)).toEqual(['a', 'c', 'b']);
+    expect(parallelGroupSlugs(d, 'a').sort()).toEqual(['a', 'c']);
+    expect(d.steps[0].run_in_parallel_with).toEqual(['c']);
+    expect(d.steps[1].run_in_parallel_with).toEqual(['a']);
+    // b stays sequential.
+    expect(d.steps[2].run_in_parallel_with).toEqual([]);
+  });
+
+  it('merges an existing group when a third step joins, keeping it mutual', () => {
+    const f: Flow = {
+      slug: 'f',
+      name: 'F',
+      builtin: false,
+      steps: [
+        { agent_slug: 'a', run_in_parallel_with: ['b'] },
+        { agent_slug: 'b', run_in_parallel_with: ['a'] },
+        { agent_slug: 'c' },
+      ],
+    };
+    const d = buildDraftFromFlow(f, { clone: false });
+    expect(setParallel(d, 'c', 'a')).toBe(true);
+    expect(parallelGroupSlugs(d, 'c').sort()).toEqual(['a', 'b', 'c']);
+    // Every member lists the other two.
+    for (const s of d.steps) {
+      expect([...s.run_in_parallel_with].sort()).toEqual(['a', 'b', 'c'].filter((x) => x !== s.agent_slug));
+    }
+  });
+
+  it('ungroups a step and dissolves a singleton remainder', () => {
+    const f: Flow = {
+      slug: 'f',
+      name: 'F',
+      builtin: false,
+      steps: [
+        { agent_slug: 'a', run_in_parallel_with: ['b'] },
+        { agent_slug: 'b', run_in_parallel_with: ['a'] },
+      ],
+    };
+    const d = buildDraftFromFlow(f, { clone: false });
+    expect(clearParallel(d, 'a')).toBe(true);
+    // a left the group; b was the lone remainder, so it is no longer parallel.
+    expect(d.steps[0].run_in_parallel_with).toEqual([]);
+    expect(d.steps[1].run_in_parallel_with).toEqual([]);
+    // Ungrouping a non-parallel step is a no-op.
+    expect(clearParallel(d, 'a')).toBe(false);
   });
 
   it('projects a draft into the Flow shape the canvas renders', () => {
