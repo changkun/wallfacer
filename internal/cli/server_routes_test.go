@@ -77,6 +77,57 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 	}
 }
 
+// TestIdeateRoutesRemoved guards against reintroduction of the retired
+// idea-agent / brainstorm HTTP surface. The /api/ideate status, trigger, and
+// cancel endpoints were removed with the idea-agent subsystem; any of them
+// returning anything other than 404/405 means a handler was wired back in.
+//
+// See specs/local/remove-idea-agent-subsystem.md for the rationale —
+// brainstorming is now an ordinary scheduled routine.
+func TestIdeateRoutesRemoved(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer s.Close()
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+
+	retiredRoutes := []struct {
+		method string
+		path   string
+	}{
+		{"GET", "/api/ideate"},
+		{"POST", "/api/ideate"},
+		{"DELETE", "/api/ideate"},
+	}
+	for _, rt := range retiredRoutes {
+		rt := rt
+		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
+			req := httptest.NewRequest(rt.method, rt.path, nil)
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			if w.Code != http.StatusNotFound && w.Code != http.StatusMethodNotAllowed {
+				t.Errorf("%s %s returned %d, want 404 or 405 (route should be retired; Allow=%q)",
+					rt.method, rt.path, w.Code, w.Header().Get("Allow"))
+			}
+		})
+	}
+}
+
 // TestRefineRoutesRemoved is the guard against accidental reintroduction of
 // the retired refinement subsystem's HTTP endpoints. Any of the five routes
 // returning anything other than 404 means a handler has been wired back in.

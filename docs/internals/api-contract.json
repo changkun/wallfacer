@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 126,
+  "route_count": 123,
   "routes": [
     {
       "method": "GET",
@@ -109,33 +109,6 @@
       "description": "Replace the active workspace set and switch the scoped task board.",
       "tags": [
         "workspaces"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/ideate",
-      "name": "GetIdeationStatus",
-      "description": "Get brainstorm/ideation agent status.",
-      "tags": [
-        "ideate"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/ideate",
-      "name": "TriggerIdeation",
-      "description": "Trigger the ideation agent to generate new task ideas.",
-      "tags": [
-        "ideate"
-      ]
-    },
-    {
-      "method": "DELETE",
-      "pattern": "/api/ideate",
-      "name": "CancelIdeation",
-      "description": "Cancel an in-progress ideation run.",
-      "tags": [
-        "ideate"
       ]
     },
     {

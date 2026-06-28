@@ -12,9 +12,6 @@ import "time"
 // DefaultTaskTimeout is the default timeout for task execution.
 const DefaultTaskTimeout = 60 * time.Minute
 
-// IdeaAgentDefaultTimeout is the default timeout (minutes) for idea-agent task cards.
-const IdeaAgentDefaultTimeout = 60
-
 // TitleAgentTimeout bounds the background title-generation agent. Short
 // because the agent is headless and only needs to emit a 2–5 word summary.
 const TitleAgentTimeout = 60 * time.Second
@@ -179,9 +176,6 @@ const DefaultArchivedTasksPerPage = 20
 // DefaultTombstoneRetentionDays is the default number of days before
 // pruning soft-deleted tasks.
 const DefaultTombstoneRetentionDays = 7
-
-// DefaultIdeationExploitRatio is the default exploit/explore balance for ideation.
-const DefaultIdeationExploitRatio = 0.8
 
 // ---------------------------------------------------------------------------
 // Ideation parameters

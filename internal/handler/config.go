@@ -259,9 +259,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"autosync":                  h.AutosyncEnabled(),
 		"autopush":                  h.AutopushEnabled(),
 		"agon":                      h.AgonEnabled(),
-		"ideation_exploit_ratio":    h.IdeationExploitRatio(),
-		"ideation_categories":       h.runner.IdeationCategories(),
-		"ideation_ignore_patterns":  h.runner.IdeationIgnorePatterns(),
 		"default_model":             "",
 		"payload_limits":            payloadLimits,
 		"watcher_health":            watcherHealth,
@@ -323,11 +320,10 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Autosubmit           *bool             `json:"autosubmit"`
 		Autosync             *bool             `json:"autosync"`
 		Autopush             *bool             `json:"autopush"`
-		Agon                 *bool             `json:"agon"`
-		Ideation             *bool             `json:"ideation"`               // retired; accepted for old clients but ignored
-		IdeationInterval     *int              `json:"ideation_interval"`      // retired; accepted for old clients but ignored
-		IdeationExploitRatio *float64          `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
-		WorkspaceGroups      []workspace.Group `json:"workspace_groups"`
+		Agon             *bool             `json:"agon"`
+		Ideation         *bool             `json:"ideation"`          // retired; accepted for old clients but ignored
+		IdeationInterval *int              `json:"ideation_interval"` // retired; accepted for old clients but ignored
+		WorkspaceGroups  []workspace.Group `json:"workspace_groups"`
 	}](w, r)
 	if !ok {
 		return
@@ -369,18 +365,13 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if req.IdeationExploitRatio != nil {
-		h.SetIdeationExploitRatio(*req.IdeationExploitRatio)
-	}
 	resp := map[string]any{
-		"autopilot":              h.AutopilotEnabled(),
-		"autotest":               h.AutotestEnabled(),
-		"autosubmit":             h.AutosubmitEnabled(),
-		"autosync":               h.AutosyncEnabled(),
-		"autopush":               h.AutopushEnabled(),
-		"agon":                   h.AgonEnabled(),
-		"ideation_exploit_ratio": h.IdeationExploitRatio(),
-		"ideation_categories":    h.runner.IdeationCategories(),
+		"autopilot":  h.AutopilotEnabled(),
+		"autotest":   h.AutotestEnabled(),
+		"autosubmit": h.AutosubmitEnabled(),
+		"autosync":   h.AutosyncEnabled(),
+		"autopush":   h.AutopushEnabled(),
+		"agon":       h.AgonEnabled(),
 	}
 	httpjson.Write(w, http.StatusOK, resp)
 }
