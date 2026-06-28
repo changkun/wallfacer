@@ -210,10 +210,11 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 // is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
 // Populated by Phase 1 and consumed by Phase 2 of the two-phase protocol.
 type autoPromoteCandidate struct {
-	task     store.Task
-	store    *store.Store // the store that owns this task
-	isResume bool
-	feedback string
+	task       store.Task
+	store      *store.Store // the store that owns this task
+	isResume   bool
+	agonResume bool // resume driven by unresolved agon attacks (vs failed test)
+	feedback   string
 }
 
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
@@ -276,6 +277,27 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 						store:    s,
 						isResume: true,
 						feedback: t.PendingTestFeedback,
+					})
+				}
+
+				// Agon-feedback resume: waiting tasks whose agon verdict left
+				// unresolved attacks queued as feedback (the agon analogue of the
+				// failed-test resume above). PendingAgonFeedback is only set under
+				// the retry cap, so its presence is the gate.
+				for i := range waitingTasks {
+					t := &waitingTasks[i]
+					if t.IsTestRun || t.PendingAgonFeedback == "" {
+						continue
+					}
+					if t.SessionID == nil || *t.SessionID == "" {
+						continue
+					}
+					candidates = append(candidates, autoPromoteCandidate{
+						task:       *t,
+						store:      s,
+						isResume:   true,
+						agonResume: true,
+						feedback:   t.PendingAgonFeedback,
 					})
 				}
 			})
@@ -383,6 +405,30 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			promoted := false
 
 			for _, c := range candidates {
+				if c.isResume && c.agonResume {
+					// Agon-feedback resume: re-verify with fresh state.
+					freshTask, err := c.store.GetTask(ctx, c.task.ID)
+					if err != nil || freshTask == nil {
+						continue
+					}
+					if freshTask.Status != store.TaskStatusWaiting || freshTask.IsTestRun || freshTask.PendingAgonFeedback == "" {
+						continue
+					}
+					if freshTask.SessionID == nil || *freshTask.SessionID == "" {
+						continue
+					}
+					logger.Handler.Info("auto-promote: resuming waiting task from agon feedback",
+						"task", freshTask.ID, "agon_retry_count", freshTask.AgonRetryCount)
+					if err := h.resumeWaitingTaskWithFeedbackLocked(ctx, freshTask, freshTask.PendingAgonFeedback, store.TriggerFeedback, "Autopilot: resuming task with unresolved agon attacks as feedback."); err != nil {
+						logger.Handler.Error("auto-promote resume agon feedback", "task", freshTask.ID, "error", err)
+						h.breakers["auto-promote"].recordFailure(&freshTask.ID, err.Error())
+						continue
+					}
+					h.incAutopilotAction("auto_promoter", "resumed_agon")
+					h.breakers["auto-promote"].recordSuccess()
+					promoted = true
+					continue
+				}
 				if c.isResume {
 					// Auto-resume: re-verify eligibility with fresh state.
 					freshTask, err := c.store.GetTask(ctx, c.task.ID)
@@ -741,6 +787,11 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 					if t.LastTestResult != "" || t.IsTestRun {
 						continue
 					}
+					// When agon supersedes the test agent for this task, skip it
+					// here so the two don't both verify.
+					if h.agonSupersedesTest(t) {
+						continue
+					}
 					if len(t.WorktreePaths) == 0 {
 						continue
 					}
@@ -929,13 +980,22 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				if t.Status != store.TaskStatusWaiting {
 					continue
 				}
-				// Determine eligibility:
-				// (a) Passed verification ("pass").
-				// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
-				//     but only when auto-test is off — otherwise let auto-test run first.
-				// Tasks that failed testing are never auto-submitted.
-				tested := t.LastTestResult == "pass"
-				naturallyComplete := t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
+				// Determine eligibility. When agon supersedes the test agent
+				// (agon enabled + the task has a session), the gate is a clean
+				// agon verdict; the test-pass and natural-complete shortcuts do
+				// not apply — agon must clear the task first.
+				agonGate := h.agonSupersedesTest(t)
+				var tested, naturallyComplete bool
+				if agonGate {
+					tested = t.AgonUnresolved != nil && *t.AgonUnresolved == 0
+				} else {
+					// (a) Passed verification ("pass").
+					// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
+					//     but only when auto-test is off — otherwise let auto-test run first.
+					// Tasks that failed testing are never auto-submitted.
+					tested = t.LastTestResult == "pass"
+					naturallyComplete = t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
+				}
 				if !tested && !naturallyComplete {
 					continue
 				}
@@ -1115,6 +1175,14 @@ func (h *Handler) endAgon(id uuid.UUID) {
 	h.agonMu.Lock()
 	delete(h.agonInFlight, id)
 	h.agonMu.Unlock()
+}
+
+// agonSupersedesTest reports whether agon replaces the test agent for this task:
+// agon is enabled and the task has a session agon can fork from. Used to skip
+// auto-test for the task and to gate auto-submit on the agon verdict instead of
+// the test verdict. Non-session tasks fall back to the test agent.
+func (h *Handler) agonSupersedesTest(t *store.Task) bool {
+	return h.AgonEnabled() && t.SessionID != nil && *t.SessionID != ""
 }
 
 // isAgonRunning reports whether an agon verification run is currently executing
