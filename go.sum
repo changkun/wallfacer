@@ -155,3 +155,5 @@ latere.ai/x/agon v0.1.2 h1:3W/c/mnqwW/OU2sktpJ4JvS6lXOAzUIZwJrvlV521Tw=
 latere.ai/x/agon v0.1.2/go.mod h1:lOAk/m2o0cFMKUW9SpWTSCSKfLRbbajzTfSfo2qiU20=
 latere.ai/x/pkg v0.22.0 h1:OTd1PRICn4X7rv/5RKJe/XkEYqCjNcW3GRbcvBKzRek=
 latere.ai/x/pkg v0.22.0/go.mod h1:e2hUAJKxCMtoJi1gD7FupeBYxk65XF5UHMZfE67GFHs=
+latere.ai/x/topos v0.0.4 h1:LW63vJrwvQkBXXgWgdb9p4IZn3JBMZsDFh9gHbUM/7U=
+latere.ai/x/topos v0.0.4/go.mod h1:e1d7tVV96+Gse4JwHGkZ8MC2XDswnImwB/H7CqCGjWs=
