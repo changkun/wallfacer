@@ -1024,7 +1024,7 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 		Prompt:             "full opts",
 		Timeout:            30,
 		MountWorktrees:     true,
-		Kind:               TaskKindIdeaAgent,
+		Kind:               TaskKindPlanning,
 		Tags:               []string{"tag1", "tag2"},
 		Sandbox:            harness.Claude,
 		SandboxByActivity:  map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
@@ -1039,8 +1039,8 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
-	if task.Kind != TaskKindIdeaAgent {
-		t.Errorf("Kind = %q, want idea_agent", task.Kind)
+	if task.Kind != TaskKindPlanning {
+		t.Errorf("Kind = %q, want planning", task.Kind)
 	}
 	if task.ModelOverride == nil || *task.ModelOverride != "claude-opus-4-5" {
 		t.Errorf("ModelOverride = %v, want claude-opus-4-5", task.ModelOverride)

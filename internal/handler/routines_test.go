@@ -77,45 +77,28 @@ func TestCreateRoutine_Valid(t *testing.T) {
 	}
 }
 
-func TestCreateRoutine_AcceptsIdeaAgentSpawnKind(t *testing.T) {
-	h := newTestHandler(t)
-	rec := postRoutine(t, h, map[string]any{
-		"prompt":           "brainstorm routine",
-		"interval_minutes": 30,
-		"spawn_kind":       string(store.TaskKindIdeaAgent),
-	})
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
-	}
-	var resp RoutineResponse
-	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
-	if resp.RoutineSpawnKind != store.TaskKindIdeaAgent {
-		t.Fatalf("spawn kind = %q, want idea-agent", resp.RoutineSpawnKind)
-	}
-}
-
 func TestCreateRoutine_AcceptsSpawnFlow(t *testing.T) {
 	h := newTestHandler(t)
 	rec := postRoutine(t, h, map[string]any{
-		"prompt":           "brainstorm routine",
+		"prompt":           "implement routine",
 		"interval_minutes": 30,
-		"spawn_flow":       "brainstorm",
+		"spawn_flow":       "implement",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
 	}
 	var resp RoutineResponse
 	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
-	if resp.RoutineSpawnFlow != "brainstorm" {
-		t.Fatalf("spawn flow = %q, want brainstorm", resp.RoutineSpawnFlow)
+	if resp.RoutineSpawnFlow != "implement" {
+		t.Fatalf("spawn flow = %q, want implement", resp.RoutineSpawnFlow)
 	}
 	// Persisted task carries the flow slug.
 	got, err := h.store.GetTask(context.Background(), resp.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.RoutineSpawnFlow != "brainstorm" {
-		t.Fatalf("stored RoutineSpawnFlow = %q, want brainstorm", got.RoutineSpawnFlow)
+	if got.RoutineSpawnFlow != "implement" {
+		t.Fatalf("stored RoutineSpawnFlow = %q, want implement", got.RoutineSpawnFlow)
 	}
 }
 

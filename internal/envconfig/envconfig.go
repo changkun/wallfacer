@@ -56,7 +56,6 @@ type Config struct {
 	TitleSandbox          harness.ID // WALLFACER_SANDBOX_TITLE
 	OversightSandbox      harness.ID // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  harness.ID // WALLFACER_SANDBOX_COMMIT_MESSAGE
-	IdeaAgentSandbox      harness.ID // WALLFACER_SANDBOX_IDEA_AGENT
 
 	HostClaudeBinary   string // WALLFACER_HOST_CLAUDE_BINARY, optional override of $PATH lookup
 	HostCodexBinary    string // WALLFACER_HOST_CODEX_BINARY, optional override of $PATH lookup
@@ -110,7 +109,6 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_TITLE",
 	"WALLFACER_SANDBOX_OVERSIGHT",
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
-	"WALLFACER_SANDBOX_IDEA_AGENT",
 	"WALLFACER_HOST_CLAUDE_BINARY",
 	"WALLFACER_HOST_CODEX_BINARY",
 	"WALLFACER_HOST_CURSOR_BINARY",
@@ -234,8 +232,6 @@ func Parse(path string) (Config, error) {
 			cfg.OversightSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_COMMIT_MESSAGE":
 			cfg.CommitMessageSandbox = harness.NormalizeID(v)
-		case "WALLFACER_SANDBOX_IDEA_AGENT":
-			cfg.IdeaAgentSandbox = harness.NormalizeID(v)
 		case "WALLFACER_HOST_CLAUDE_BINARY":
 			cfg.HostClaudeBinary = v
 		case "WALLFACER_HOST_CODEX_BINARY":
@@ -351,9 +347,6 @@ func (c Config) SandboxByActivity() map[store.SandboxActivity]harness.ID {
 	}
 	if c.CommitMessageSandbox != "" {
 		out[store.SandboxActivityCommitMessage] = c.CommitMessageSandbox
-	}
-	if c.IdeaAgentSandbox != "" {
-		out[store.SandboxActivityIdeaAgent] = c.IdeaAgentSandbox
 	}
 	if len(out) == 0 {
 		return nil
@@ -503,9 +496,9 @@ func UpdateWorkspaces(path string, workspaces []string) error {
 // UpdateSandboxSettings merges global sandbox-routing settings into the env file.
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
 // sandboxByActivity supports keys: implementation, testing, title,
-// oversight, commit_message, idea_agent.
+// oversight, commit_message.
 func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByActivity map[store.SandboxActivity]harness.ID) error {
-	var impl, test, title, oversight, commit, idea *string
+	var impl, test, title, oversight, commit *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
 		// Two-phase approach: start with all activity pointers set to empty strings,
@@ -514,9 +507,9 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		// This ensures that omitted activities are actively removed rather than
 		// silently left stale.
 		emptyImpl, emptyTest := "", ""
-		emptyTitle, emptyOversight, emptyCommit, emptyIdea := "", "", "", ""
+		emptyTitle, emptyOversight, emptyCommit := "", "", ""
 		impl, test = &emptyImpl, &emptyTest
-		title, oversight, commit, idea = &emptyTitle, &emptyOversight, &emptyCommit, &emptyIdea
+		title, oversight, commit = &emptyTitle, &emptyOversight, &emptyCommit
 
 		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
 			s := string(harness.NormalizeID(string(v)))
@@ -537,10 +530,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		if v, ok := sandboxByActivity[store.SandboxActivityCommitMessage]; ok {
 			s := string(harness.NormalizeID(string(v)))
 			commit = &s
-		}
-		if v, ok := sandboxByActivity[store.SandboxActivityIdeaAgent]; ok {
-			s := string(harness.NormalizeID(string(v)))
-			idea = &s
 		}
 	}
 
@@ -563,7 +552,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		"WALLFACER_SANDBOX_TITLE":          title,
 		"WALLFACER_SANDBOX_OVERSIGHT":      oversight,
 		"WALLFACER_SANDBOX_COMMIT_MESSAGE": commit,
-		"WALLFACER_SANDBOX_IDEA_AGENT":     idea,
 	}
 	return updateRawWithUpdates(path, raw, updates)
 }

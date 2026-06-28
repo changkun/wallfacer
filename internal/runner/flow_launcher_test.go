@@ -10,9 +10,10 @@ import (
 )
 
 // TestRunner_FlowRegistryResolvesTasks verifies the flow registry
-// attached to a Runner maps tasks to the right slug: explicit FlowID
-// wins, legacy Kind falls back to its seeded flow, and everything
-// else defaults to "implement".
+// attached to a Runner maps tasks to the right slug: a registered
+// explicit FlowID wins, an unregistered slug (e.g. the retired
+// "brainstorm") falls back to "implement" rather than a slug that no
+// longer exists, and everything else defaults to "implement".
 func TestRunner_FlowRegistryResolvesTasks(t *testing.T) {
 	_, _, _ = newAgentTestRunner(t) // ensure package init works
 	r := &Runner{flows: flow.NewBuiltinRegistry()}
@@ -24,9 +25,9 @@ func TestRunner_FlowRegistryResolvesTasks(t *testing.T) {
 	}{
 		{"nil task", nil, "implement"},
 		{"empty task", &store.Task{}, "implement"},
-		{"legacy idea-agent kind", &store.Task{Kind: store.TaskKindIdeaAgent}, "brainstorm"},
-		{"explicit FlowID wins over kind", &store.Task{FlowID: "refine-only", Kind: store.TaskKindIdeaAgent}, "refine-only"},
-		{"unknown FlowID passes through", &store.Task{FlowID: "custom-flow"}, "custom-flow"},
+		{"registered FlowID wins", &store.Task{FlowID: "implement"}, "implement"},
+		{"retired brainstorm slug falls back", &store.Task{FlowID: "brainstorm"}, "implement"},
+		{"unknown FlowID falls back to implement", &store.Task{FlowID: "custom-flow"}, "implement"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -23,11 +23,11 @@ type Flow struct {
 	// v1 built-ins always have at least one step.
 	Steps []Step
 
-	// SpawnKind preserves the legacy TaskKind that tasks of this
-	// flow run as. "" for normal tasks, "idea-agent" for
-	// brainstorm. The field lives on the flow rather than the
-	// agent because a flow's first step drives the task's
-	// execution mode, not the individual agent.
+	// SpawnKind preserves the legacy TaskKind that tasks of this flow
+	// run as. Always "" now that the only flow that set it (the retired
+	// brainstorm flow) is gone; the generic field is retained on the
+	// wire to avoid rippling into the flow write API and is a candidate
+	// for a later dead-field sweep.
 	SpawnKind store.TaskKind
 
 	// Builtin is true for flows shipped in the embedded catalog.

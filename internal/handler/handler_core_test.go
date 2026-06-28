@@ -329,32 +329,6 @@ func TestTryAutoPromote_PromotesWhenCapacityAvailable(t *testing.T) {
 	// (The test in env_test.go already covers this pattern; we check the state machine here.)
 }
 
-// TestTryAutoPromote_SkipsIdeaAgentKindTasks verifies that autopilot does not
-// promote tasks with Kind=TaskKindIdeaAgent (the brainstorm runner task itself).
-func TestTryAutoPromote_SkipsIdeaAgentKindTasks(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutopilot(true)
-	ctx := context.Background()
-
-	// Create a brainstorm runner task (Kind=TaskKindIdeaAgent).
-	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm runner", Timeout: 30, Kind: store.TaskKindIdeaAgent})
-	if err != nil {
-		t.Fatalf("CreateTask (idea-agent kind): %v", err)
-	}
-
-	h.tryAutoPromote(ctx)
-
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		t.Fatalf("ListTasks: %v", err)
-	}
-	for _, task := range tasks {
-		if task.Status == store.TaskStatusInProgress {
-			t.Errorf("expected idea-agent kind task to stay in backlog, but it was promoted to in_progress")
-		}
-	}
-}
-
 // TestTryAutoPromote_PromotesIdeaAgentTaggedTasks verifies that tasks tagged
 // "idea-agent" (created by the brainstorm agent) ARE auto-promoted like normal tasks.
 func TestTryAutoPromote_PromotesIdeaAgentTaggedTasks(t *testing.T) {
@@ -383,49 +357,6 @@ func TestTryAutoPromote_PromotesIdeaAgentTaggedTasks(t *testing.T) {
 	// The idea-agent tagged task should have been promoted out of backlog.
 	if got := taskMap[ideaTask.ID.String()]; got == store.TaskStatusBacklog {
 		t.Errorf("idea-agent tagged task: expected promotion out of backlog, still in backlog")
-	}
-}
-
-// TestTryAutoPromote_PromotesManualTaskButNotIdeaAgentKind verifies that when both
-// a manual task and a brainstorm runner task (Kind=TaskKindIdeaAgent) are in backlog,
-// only the manual one is promoted.
-func TestTryAutoPromote_PromotesManualTaskButNotIdeaAgentKind(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutopilot(true)
-	ctx := context.Background()
-
-	// Create a manual backlog task first (lower position).
-	manual, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "manual task", Timeout: 30, Kind: store.TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask (manual): %v", err)
-	}
-
-	// Create a brainstorm runner task (Kind=TaskKindIdeaAgent).
-	ideaTask, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm runner", Timeout: 30, Kind: store.TaskKindIdeaAgent})
-	if err != nil {
-		t.Fatalf("CreateTask (idea-agent kind): %v", err)
-	}
-
-	h.tryAutoPromote(ctx)
-
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		t.Fatalf("ListTasks: %v", err)
-	}
-
-	taskMap := make(map[string]store.TaskStatus)
-	for _, task := range tasks {
-		taskMap[task.ID.String()] = task.Status
-	}
-
-	// The brainstorm runner task must remain in backlog.
-	if got := taskMap[ideaTask.ID.String()]; got != store.TaskStatusBacklog {
-		t.Errorf("idea-agent kind task: expected backlog, got %s", got)
-	}
-
-	// The manual task should have been promoted (in_progress or beyond).
-	if got := taskMap[manual.ID.String()]; got == store.TaskStatusBacklog {
-		t.Errorf("manual task: expected promotion out of backlog, still in backlog")
 	}
 }
 

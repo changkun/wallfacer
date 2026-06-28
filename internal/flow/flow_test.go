@@ -7,15 +7,15 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// TestBuiltinRegistry_HasExpectedFlows locks in the v1 catalog: every
-// built-in must be present and no extras. Keeping this strict so a
-// typo in flows adding or removing an entry surfaces loudly.
+// TestBuiltinRegistry_HasExpectedFlows locks in the v1 catalog: the
+// only built-in is "implement" after the brainstorm and test-only
+// flows were retired (see specs/local/remove-idea-agent-subsystem.md).
+// Keeping this strict so a typo in flows adding or removing an entry
+// surfaces loudly.
 func TestBuiltinRegistry_HasExpectedFlows(t *testing.T) {
 	reg := NewBuiltinRegistry()
 	want := map[string]bool{
-		"implement":  true,
-		"brainstorm": true,
-		"test-only":  true,
+		"implement": true,
 	}
 	got := reg.List()
 	if len(got) != len(want) {
@@ -65,17 +65,18 @@ func TestRegistry_ResolveLegacyKind_MapsEmptyToImplement(t *testing.T) {
 	}
 }
 
-// TestRegistry_ResolveLegacyKind_MapsIdeaAgentToBrainstorm covers the
-// idea-agent legacy task-kind.
-func TestRegistry_ResolveLegacyKind_MapsIdeaAgentToBrainstorm(t *testing.T) {
-	reg := NewBuiltinRegistry()
-	f, ok := reg.ResolveLegacyKind(store.TaskKindIdeaAgent)
+// registryWithUserFlow returns a registry containing the "implement"
+// built-in plus one user-authored flow, mirroring the merged catalog
+// the dispatcher resolves against in production. Used by resolution
+// tests that need a second, distinct, registered flow.
+func registryWithUserFlow(t *testing.T) (*Registry, string) {
+	t.Helper()
+	impl, ok := NewBuiltinRegistry().Get("implement")
 	if !ok {
-		t.Fatal("ResolveLegacyKind(idea-agent) returned ok=false")
+		t.Fatal("built-in registry missing implement")
 	}
-	if f.Slug != "brainstorm" {
-		t.Errorf("slug = %q, want brainstorm", f.Slug)
-	}
+	user := Flow{Slug: "custom-flow", Name: "Custom", Steps: []Step{{AgentSlug: "impl"}}}
+	return NewRegistry(impl, user), user.Slug
 }
 
 // TestRegistry_ResolveLegacyKind_UnknownReturnsFalse guards the
@@ -92,16 +93,14 @@ func TestRegistry_ResolveLegacyKind_UnknownReturnsFalse(t *testing.T) {
 	}
 }
 
-// TestResolveForTask_ExplicitFlowIDWins confirms the task's explicit
-// FlowID takes precedence over its legacy Kind.
+// TestResolveForTask_ExplicitFlowIDWins confirms a task's explicit,
+// registered FlowID resolves to itself (a user flow is not rewritten to
+// the default).
 func TestResolveForTask_ExplicitFlowIDWins(t *testing.T) {
-	reg := NewBuiltinRegistry()
-	got := reg.ResolveForTask(&store.Task{
-		Kind:   store.TaskKindIdeaAgent, // would legacy-resolve to brainstorm
-		FlowID: "test-only",
-	})
-	if got != "test-only" {
-		t.Errorf("ResolveForTask = %q, want test-only", got)
+	reg, userFlow := registryWithUserFlow(t)
+	got := reg.ResolveForTask(&store.Task{FlowID: userFlow})
+	if got != userFlow {
+		t.Errorf("ResolveForTask = %q, want %q", got, userFlow)
 	}
 }
 
@@ -115,13 +114,17 @@ func TestResolveForTask_EmptyFallsBackToImplement(t *testing.T) {
 	}
 }
 
-// TestResolveForTask_IdeaAgentKindResolvesToBrainstorm covers pre-
-// migration idea-agent records.
-func TestResolveForTask_IdeaAgentKindResolvesToBrainstorm(t *testing.T) {
+// TestResolveForTask_RemovedSlugFallsBackToImplement is the regression
+// guard for the fallback safety: a task pinned to a since-removed flow
+// slug (the retired "brainstorm") must keep dispatching against the
+// default flow rather than resolving to a slug that no longer exists.
+func TestResolveForTask_RemovedSlugFallsBackToImplement(t *testing.T) {
 	reg := NewBuiltinRegistry()
-	got := reg.ResolveForTask(&store.Task{Kind: store.TaskKindIdeaAgent})
-	if got != "brainstorm" {
-		t.Errorf("ResolveForTask = %q, want brainstorm", got)
+	if got := reg.ResolveForTask(&store.Task{FlowID: "brainstorm"}); got != "implement" {
+		t.Errorf("ResolveForTask(FlowID=brainstorm) = %q, want implement", got)
+	}
+	if got := reg.ResolveForTask(&store.Task{FlowID: "test-only"}); got != "implement" {
+		t.Errorf("ResolveForTask(FlowID=test-only) = %q, want implement", got)
 	}
 }
 
@@ -135,25 +138,22 @@ func TestResolveForTask_NilTaskReturnsDefault(t *testing.T) {
 }
 
 // TestResolveRoutineFlow_PrefersSpawnFlow confirms a routine with an
-// explicit RoutineSpawnFlow overrides any legacy RoutineSpawnKind.
+// explicit, registered RoutineSpawnFlow resolves to that flow.
 func TestResolveRoutineFlow_PrefersSpawnFlow(t *testing.T) {
-	reg := NewBuiltinRegistry()
-	got := reg.ResolveRoutineFlow(&store.Task{
-		RoutineSpawnKind: store.TaskKindIdeaAgent, // would legacy-resolve to brainstorm
-		RoutineSpawnFlow: "test-only",
-	})
-	if got != "test-only" {
-		t.Errorf("ResolveRoutineFlow = %q, want test-only", got)
+	reg, userFlow := registryWithUserFlow(t)
+	got := reg.ResolveRoutineFlow(&store.Task{RoutineSpawnFlow: userFlow})
+	if got != userFlow {
+		t.Errorf("ResolveRoutineFlow = %q, want %q", got, userFlow)
 	}
 }
 
-// TestResolveRoutineFlow_LegacyIdeaAgentMapsToBrainstorm covers
-// pre-migration routine records whose SpawnKind was idea-agent.
-func TestResolveRoutineFlow_LegacyIdeaAgentMapsToBrainstorm(t *testing.T) {
+// TestResolveRoutineFlow_RemovedSlugFallsBackToImplement is the routine
+// half of the fallback-safety guard: a routine pinned to the retired
+// "brainstorm" slug must keep firing against the default flow.
+func TestResolveRoutineFlow_RemovedSlugFallsBackToImplement(t *testing.T) {
 	reg := NewBuiltinRegistry()
-	got := reg.ResolveRoutineFlow(&store.Task{RoutineSpawnKind: store.TaskKindIdeaAgent})
-	if got != "brainstorm" {
-		t.Errorf("ResolveRoutineFlow = %q, want brainstorm", got)
+	if got := reg.ResolveRoutineFlow(&store.Task{RoutineSpawnFlow: "brainstorm"}); got != "implement" {
+		t.Errorf("ResolveRoutineFlow(RoutineSpawnFlow=brainstorm) = %q, want implement", got)
 	}
 }
 

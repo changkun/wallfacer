@@ -13,6 +13,18 @@ func TestBuiltinAgents_AllHaveRequiredDescriptorFields(t *testing.T) {
 	}
 }
 
+// TestBuiltinAgents_NoIdeateAgent guards against reintroduction of the
+// retired brainstorm/ideate built-in agent (see
+// specs/local/remove-idea-agent-subsystem.md). The ideate role was
+// removed with the idea-agent subsystem.
+func TestBuiltinAgents_NoIdeateAgent(t *testing.T) {
+	for _, role := range BuiltinAgents {
+		if role.Slug == "ideate" {
+			t.Errorf("retired %q agent must not be a built-in", role.Slug)
+		}
+	}
+}
+
 func TestBuiltinAgents_SlugsAreUnique(t *testing.T) {
 	seen := make(map[string]bool, len(BuiltinAgents))
 	for _, role := range BuiltinAgents {

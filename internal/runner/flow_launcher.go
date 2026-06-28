@@ -8,9 +8,8 @@ import (
 )
 
 // RunAgent is the flow.AgentLauncher adapter around the unexported
-// runAgent. The flow engine drives non-implement / non-brainstorm
-// flows by walking the step chain and calling this method once per
-// step.
+// runAgent. The flow engine drives non-implement flows by walking the
+// step chain and calling this method once per step.
 //
 // Keeping the public shape narrow (slug string + task + prompt)
 // keeps the flow package free of runner internals — opts, circuit

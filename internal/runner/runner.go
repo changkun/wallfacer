@@ -189,9 +189,8 @@ type Runner struct {
 	// agentsReg is the read-only catalog used by RunAgent to resolve
 	// slug → AgentRole. Built from agents.BuiltinAgents once at
 	// NewRunner. flows is the flow registry the dispatch path consults
-	// to pick the execution mode (implement/brainstorm/engine). Both
-	// are nil-safe: callers that bypass dispatch (direct runAgent,
-	// legacy ideate paths) never read them.
+	// to pick the execution mode (implement/engine). Both are nil-safe:
+	// callers that bypass dispatch (direct runAgent) never read them.
 	agentsReg  *agents.Registry
 	agentsDir  string // ~/.wallfacer/agents by default; user-authored YAML lives here
 	flows      *flow.Registry

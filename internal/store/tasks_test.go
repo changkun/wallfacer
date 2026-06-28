@@ -1901,12 +1901,12 @@ func TestUpdateTaskFlow_WritesField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
 	}
-	if err := s.UpdateTaskFlow(context.Background(), task.ID, "test-only"); err != nil {
+	if err := s.UpdateTaskFlow(context.Background(), task.ID, "implement"); err != nil {
 		t.Fatalf("UpdateTaskFlow: %v", err)
 	}
 	got, _ := s.GetTask(context.Background(), task.ID)
-	if got.FlowID != "test-only" {
-		t.Errorf("FlowID = %q, want test-only", got.FlowID)
+	if got.FlowID != "implement" {
+		t.Errorf("FlowID = %q, want implement", got.FlowID)
 	}
 
 	// Clearing works.

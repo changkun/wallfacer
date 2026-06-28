@@ -70,7 +70,6 @@ func TestSandboxByActivity(t *testing.T) {
 		TitleSandbox:          "claude",
 		OversightSandbox:      "codex",
 		CommitMessageSandbox:  "codex",
-		IdeaAgentSandbox:      "claude",
 	}
 	got := cfg.SandboxByActivity()
 	want := map[store.SandboxActivity]string{
@@ -79,7 +78,6 @@ func TestSandboxByActivity(t *testing.T) {
 		store.SandboxActivityTitle:          "claude",
 		store.SandboxActivityOversight:      "codex",
 		store.SandboxActivityCommitMessage:  "codex",
-		store.SandboxActivityIdeaAgent:      "claude",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("SandboxByActivity size = %d, want %d", len(got), len(want))
@@ -115,7 +113,7 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	defaultSandbox := harness.Codex
 	if err := UpdateSandboxSettings(path, &defaultSandbox, map[store.SandboxActivity]harness.ID{
 		store.SandboxActivityImplementation: harness.Codex,
-		store.SandboxActivityIdeaAgent:      harness.Claude,
+		store.SandboxActivityTitle:          harness.Claude,
 		store.SandboxActivityCommitMessage:  "",
 	}); err != nil {
 		t.Fatalf("UpdateSandboxSettings: %v", err)
@@ -138,8 +136,8 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	if cfg.CommitMessageSandbox != "" {
 		t.Errorf("CommitMessageSandbox should be cleared, got %q", cfg.CommitMessageSandbox)
 	}
-	if cfg.IdeaAgentSandbox != "claude" {
-		t.Errorf("IdeaAgentSandbox = %q, want claude", cfg.IdeaAgentSandbox)
+	if cfg.TitleSandbox != "claude" {
+		t.Errorf("TitleSandbox = %q, want claude", cfg.TitleSandbox)
 	}
 
 	raw, err := os.ReadFile(path)

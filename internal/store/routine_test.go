@@ -59,7 +59,7 @@ func TestCreateTaskWithOptions_NonRoutineIgnoresRoutineFields(t *testing.T) {
 		Timeout:                10,
 		RoutineIntervalSeconds: 999,
 		RoutineEnabled:         true,
-		RoutineSpawnKind:       TaskKindIdeaAgent,
+		RoutineSpawnKind:       TaskKindPlanning,
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -190,17 +190,13 @@ func TestUpdateRoutineWriters_UnknownID(t *testing.T) {
 	}
 }
 
-func TestTaskHelpers_IsRoutineAndIsIdeaAgent(t *testing.T) {
+func TestTaskHelpers_IsRoutine(t *testing.T) {
 	regular := &Task{Kind: TaskKindTask}
-	if regular.IsRoutine() || regular.IsIdeaAgent() {
-		t.Fatalf("regular task reported as special kind")
-	}
-	idea := &Task{Kind: TaskKindIdeaAgent}
-	if idea.IsRoutine() || !idea.IsIdeaAgent() {
-		t.Fatalf("idea-agent classification wrong")
+	if regular.IsRoutine() {
+		t.Fatalf("regular task reported as routine")
 	}
 	routine := &Task{Kind: TaskKindRoutine}
-	if !routine.IsRoutine() || routine.IsIdeaAgent() {
+	if !routine.IsRoutine() {
 		t.Fatalf("routine classification wrong")
 	}
 }
