@@ -277,6 +277,24 @@ scene loads on mount, saves debounced (1.5s) via `PUT`, follows the app theme by
 observing `<html data-theme>`, and the React root is torn down on unmount.
 `WhiteboardPage.test.ts` mocks the dynamic imports to verify the lifecycle.
 
+Native UI integration (`frontend/src/styles/whiteboard.css` + view): Excalidraw
+is themed to read as a wallfacer surface rather than a stock embed. Its
+default main menu and welcome screen are replaced with trimmed, branding-free
+versions (no Excalidraw+ promo, GitHub/social links, live collaboration, or
+sign-up); the Help dialog's external-links row is hidden. Excalidraw's themeable
+CSS variables (surfaces, text, borders, accent, inputs, buttons, sliders, and
+`--ui-font`) are remapped onto wallfacer design tokens for both light and dark
+(global `.excalidraw` selectors with `!important`, since dialogs/popovers portal
+outside the mount container). Libraries persist to `localStorage`
+(`onLibraryChange` + `initialData.libraryItems`) with cross-tab sync via the
+`storage` event and `excalidrawAPI.updateLibrary`, so the "Add to Excalidraw"
+import lands and survives reloads. A capture-phase Escape fallback closes an
+open Excalidraw dialog (the portaled dialog otherwise misses focus). The
+build-vs-buy question was revisited and resolved to keep Excalidraw: the goal is
+freeform sketching, which is not wallfacer's differentiation, and the dependency
+is isolated (one lazy island), MIT-licensed (forkable), and swap-ready behind
+the engine-agnostic storage + API.
+
 ### Future work: cloud sync
 
 This is a local-first feature; the scene is a per-workspace file on the host.
