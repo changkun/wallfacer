@@ -103,26 +103,38 @@ to and that works the task to an outcome. The honest tension is execution:
 - The **deterministic DAG** (steps + parallel) is clear and proven for ordered
   work, but it is the "flow/pipeline" framing the author finds confusing.
 
-**Recommendation (north star + de-risked path):** one authoring primitive (the
-**agent graph**) and a commitment to converge on **one execution engine (topos)**
-— but staged behind a feasibility spike, so the unified, coherent product ships
-before the risky execution migration. Concretely:
+**Recommendation — default path: ship the coherent surface; gate the engine
+convergence.** The author's actual pain is entirely in authoring and wiring: the
+editor is unoperable, parallel is drawn wrong, mesh connections cannot be edited,
+the board is not wired, "flow" is everywhere, nothing is cleaned up. **None of
+that requires touching execution.** So the default, low-risk path delivers the
+whole felt improvement while the proven `implement` loop keeps running untouched:
 
-- The agent graph is the single thing a user authors. It carries its
-  **coordination**: *delegating* (lead/mesh, runs on topos) or *deterministic*
-  (ordered DAG with parallel groups, the simple case). Both are "agent graphs";
-  the edges differ in meaning and are labelled as such.
-- A task runs on a chosen agent graph. The board picks a graph (not a "flow").
-- Execution converges on topos over time: a spike proves whether topos can carry
-  the `implement` loop's duties (worktree, commit, agon, oversight, multi-turn
-  coding). If yes, `implement` becomes a built-in agent graph on topos and the
-  legacy loop + flow engine are torn out. If not, the two execution semantics are
-  formalized cleanly under one surface and one dispatch, and the spike result
-  scopes a follow-up.
+- One authoring primitive: the **agent graph**. It carries its **coordination** —
+  *delegating* (lead/mesh) or *deterministic* (ordered DAG with parallel groups,
+  the simple case). Both are "agent graphs"; edges differ in meaning and are
+  labelled.
+- A task runs on a chosen agent graph; the board picks a graph (not a "flow"),
+  shows its coordination, and links back to the run on the graph.
+- One consistent free-form editing model (below) that fixes every review gap.
+- The surface absorbs the agents + flows pages; "flow" disappears from the UI.
 
-This keeps the user's model (graphs, delegation, a task worked to an outcome),
-delivers a coherent surface immediately, and makes the execution teardown an
-explicit, gated step rather than a leap.
+This is milestones A1–A3 and it changes no execution path. It is the bulk of the
+value and carries the least risk.
+
+**Engine convergence is the north star, but gated and contingent — not the
+headline.** Converging all three engines onto topos (making `implement` a graph
+that runs through topos, tearing out the flow engine and the special multi-turn
+loop) is the biggest cleanup payoff and matches the "one engine" ideal, but the
+author did not ask for it directly and it is the riskiest thing here. It is
+gated by a feasibility spike (S) that asks whether topos can carry the
+`implement` loop's duties (worktree, commit pipeline, agon, oversight, multi-turn
+coding). **If S returns yes**, A4 converges execution and tears the legacy
+engines out. **If S returns no, that is not a failure**: the honest end state is
+two clean coordination semantics (deterministic DAG + delegating fleet) under one
+surface and one dispatch — a perfectly good target. Either way the user-facing
+product (A1–A3) is already coherent and shipped before the execution question is
+forced.
 
 ## Target end-to-end
 
@@ -159,6 +171,10 @@ AgentsPage and FlowsPage:
   page).
 - Whether a task runs delegating or deterministic is a property of the chosen
   graph, not a hidden surprise — the composer shows the graph's coordination.
+- **Routines** spawn against a graph the same way the composer does:
+  `RoutineSpawnFlow` becomes `routine_spawn_graph` (an agent-graph id), and the
+  routine creator reuses the same graph picker. Old routines carrying a flow slug
+  resolve to the graph of the same id via the migration below.
 
 ### Execution (staged convergence on topos)
 
@@ -190,15 +206,19 @@ One model for the canvas, applied in every coordination mode — no special-casi
   a line. The edge meaning in a deterministic graph is "then / feeds", and
   concurrent siblings share a rank. The current linear flattening is a bug to
   delete.
-- **Edges are first-class and editable.** Draw an edge by dragging from a node's
-  out-port to another node; delete by selecting the edge. In a delegating graph
-  an edge means "may delegate to"; in a deterministic graph it means "runs
-  after / feeds". This requires storing **explicit edges** for delegating graphs
-  rather than only a `topology` enum (mesh/orchestrator-worker become presets
-  that seed edges, not the only expressible shapes). NOTE: arbitrary delegation
-  adjacency may require extending the topos `Region` model (today: entry + peers
-  + topology enum) to a per-agent reachability/directory; flagged as a topos-level
-  change with its own spike.
+- **Edges are first-class and editable** (directly answers "open mesh — how do I
+  change connections?"). Draw an edge by dragging from a node's out-port to
+  another node; delete by selecting the edge. In a delegating graph an edge means
+  "may delegate to"; in a deterministic graph it means "runs after / feeds". This
+  requires storing **explicit edges** for delegating graphs rather than only a
+  `topology` enum (mesh / orchestrator-worker become presets that seed edges, not
+  the only expressible shapes). This is a hard requirement, not a nicety, and it
+  is **gated by spike E** (below): arbitrary delegation adjacency likely needs
+  extending the topos `Region` model (today: entry + peers + topology enum) to a
+  per-agent reachability directory. If E shows topos cannot express arbitrary
+  adjacency cheaply, A1's "edges are first-class" promise is blocked and the
+  fallback is the two presets plus enable/disable per preset edge — the author
+  must know this before A1 promises free edge editing.
 - **Add / remove / undo are obvious.** Removing a node moves it back to the
   palette (it is not destroyed); re-adding is dragging it back, and there is an
   explicit undo for graph edits. The palette always shows every agent, so nothing
@@ -240,35 +260,58 @@ destructive lands before its replacement is proven.
    controls in favor of the coordination + edge-editing model; remove dead flow
    badges / pickers.
 
+6. **On-disk + records migration (concrete, not just "a shim").** Users have
+   `~/.wallfacer/flows/*.yaml` and tasks/routines carrying flow slugs. The
+   migration: the loader reads `flows/` and a new `agent-graphs/` dir (writing the
+   latter going forward), treating a flow YAML as a graph definition of the same
+   id (positions/edges default from coordination); `/api/flows` stays as an alias
+   of `/api/agent-graphs` for one release with a deprecation log, then is removed;
+   `Task.FlowID` / `RoutineSpawnFlow` are read as graph ids (same string), so no
+   row rewrite is required — only the field is renamed in new writes. A one-time
+   pass normalizes any record whose slug names a since-removed flow to `implement`
+   (the fallback already exists in `ResolveForTask`).
+
 Each teardown step ships with a regression test proving the capability survives
 (per the repo's test rule) and a `make build` gate.
 
 ## Milestones (sequenced; design-review gates the build)
 
-- **D: this design.** Accepted by the author before any code.
-- **S: execution feasibility spike.** Can topos run the `implement` job
-  (worktree, commit pipeline, agon, oversight, multi-turn coding) end to end?
-  Time-boxed; output is a go/no-go that scopes Milestone 3 of the teardown.
+- **D: this design.** Accepted by the author before any code. The default path is
+  A1 -> A2 -> A3 (the felt fix, no execution change); A4 is gated and optional.
+- **E: topos edge-adjacency spike.** Can the topos `Region` model express
+  arbitrary per-agent delegation adjacency cheaply (needed for editable mesh
+  connections)? Output gates how far A1's edge editing goes (full free edges vs
+  presets + per-edge enable). Run before A1 promises free edge editing.
 - **A1: editing model fix (no execution change).** Parallel-as-parallel,
-  free-form everywhere, explicit editable edges (frontend model first; topos
-  adjacency spike if needed), add/remove/undo, agon-as-detail. Makes the editor
-  correct and operable.
-- **A2: surface + terminology unification.** Fold agent CRUD in; retire
-  FlowsPage; one nav entry; "agent graph" everywhere (UI first, API shim).
-- **A3: board wiring.** Composer picks an agent graph (shows coordination); task
-  shows + links its run on the graph; default `implement` graph.
-- **A4: execution convergence (gated by S).** Converge on topos; tear out the
-  flow engine and the special implement loop; `implement` becomes a graph.
-- **A5: final cleanup.** Data-model teardown, API rename drop-shim, vestigial UI
-  removal, dead-code sweep.
+  free-form everywhere, editable edges (scope set by spike E), add/remove/undo,
+  agon-as-detail. Makes the editor correct and operable. **Highest user value,
+  lowest risk — do first.**
+- **A2: surface + terminology unification.** Fold agent CRUD into the graph
+  library; retire FlowsPage; one nav entry; "agent graph" everywhere (UI first,
+  API alias).
+- **A3: board wiring.** Composer + routines pick an agent graph (showing
+  coordination); task shows + links its run on the graph; default `implement`.
+- **S: execution feasibility spike (gates A4).** Can topos run the `implement`
+  job (worktree, commit pipeline, agon, oversight, multi-turn coding) end to end?
+  Time-boxed; output is a go/no-go. Run after A1-A3 are shipping, since A4 is not
+  required for the product to be coherent.
+- **A4 (optional, gated by S = yes): execution convergence.** Converge on topos;
+  tear out the flow engine and the special implement loop; `implement` becomes a
+  graph. If S = no, skip A4 and keep two clean coordination semantics — a fine
+  end state.
+- **A5: final cleanup.** Data-model + records migration, API alias drop,
+  vestigial UI removal (localStorage positions, raw agentic toggles), dead-code
+  sweep.
 
 ## Open questions for the author
 
-1. **One model or two semantics?** Commit to "everything becomes a delegating
-   fleet on topos" (max cleanup, riskier — gated by spike S), or keep two clear
-   coordination semantics (deterministic DAG + delegating fleet) under one
-   surface (less risky, two engines longer)? The plan above assumes the former as
-   the north star with a spike gate; confirm.
+1. **(Gating — answer this first.) One model or two semantics?** This decides
+   whether A4 exists and what `implement` becomes (Q4). The plan recommends:
+   ship A1-A3 either way (no execution change), then let spike S decide A4 — keep
+   the proven `implement` loop until topos is shown to replace it, and accept
+   "two clean coordination semantics under one surface" as a perfectly good end
+   state if S says no. Confirm this staging, or say if you want to commit up front
+   to one-engine-on-topos as a hard requirement (raises risk, front-loads S).
 2. **Editable arbitrary delegation edges** likely needs a topos `Region` change
    (from topology-enum to explicit adjacency). Acceptable to touch topos, or keep
    to the orchestrator-worker / mesh presets for now?
