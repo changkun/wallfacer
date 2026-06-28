@@ -9,7 +9,7 @@
     "build": "vue-tsc --noEmit && NODE_OPTIONS=--no-experimental-webstorage vite-ssg build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test": "vitest run"
+    "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.0",

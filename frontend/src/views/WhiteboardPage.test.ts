@@ -103,6 +103,7 @@ beforeEach(() => {
   createElementSpy.mockClear();
   serializeMock.mockClear();
   document.documentElement.removeAttribute('data-theme');
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -168,5 +169,45 @@ describe('WhiteboardPage', () => {
     const { app } = await mountPage();
     app.unmount();
     expect(unmountSpy).toHaveBeenCalled();
+  });
+
+  it('seeds the persisted library into initialData on mount', async () => {
+    const items = [{ id: 'lib-1', status: 'published' }];
+    window.localStorage.setItem('wallfacer-whiteboard-library', JSON.stringify(items));
+    await mountPage();
+    expect(lastExcalidrawProps().initialData.libraryItems).toEqual(items);
+  });
+
+  it('persists library changes to localStorage', async () => {
+    await mountPage();
+    const onLibraryChange = lastExcalidrawProps().onLibraryChange as (i: unknown) => void;
+    const items = [{ id: 'lib-2' }];
+    onLibraryChange(items);
+    expect(JSON.parse(window.localStorage.getItem('wallfacer-whiteboard-library') || 'null')).toEqual(items);
+  });
+
+  it('closes an open Excalidraw dialog on Escape', async () => {
+    await mountPage();
+    // Simulate Excalidraw's portaled dialog with a close button.
+    const modal = document.createElement('div');
+    modal.className = 'excalidraw-modal-container';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'Dialog__close';
+    let clicked = false;
+    closeBtn.addEventListener('click', () => { clicked = true; });
+    modal.appendChild(closeBtn);
+    document.body.appendChild(modal);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, bubbles: true }));
+    expect(clicked).toBe(true);
+  });
+
+  it('leaves Escape alone when no dialog is open', async () => {
+    await mountPage();
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, bubbles: true });
+    document.dispatchEvent(ev);
+    // No dialog present, so the handler must not consume the event (Excalidraw's
+    // own Escape — deselect / exit tool — stays intact).
+    expect(ev.defaultPrevented).toBe(false);
   });
 });
