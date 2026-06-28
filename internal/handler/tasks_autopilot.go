@@ -209,11 +209,10 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 // is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
 // Populated by Phase 1 and consumed by Phase 2 of the two-phase protocol.
 type autoPromoteCandidate struct {
-	task       store.Task
-	store      *store.Store // the store that owns this task
-	isResume   bool
-	agonResume bool // resume driven by unresolved agon attacks (vs failed test)
-	feedback   string
+	task     store.Task
+	store    *store.Store // the store that owns this task
+	isResume bool
+	feedback string
 }
 
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
@@ -276,27 +275,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 						store:    s,
 						isResume: true,
 						feedback: t.PendingTestFeedback,
-					})
-				}
-
-				// Agon-feedback resume: waiting tasks whose agon verdict left
-				// unresolved attacks queued as feedback (the agon analogue of the
-				// failed-test resume above). PendingAgonFeedback is only set under
-				// the retry cap, so its presence is the gate.
-				for i := range waitingTasks {
-					t := &waitingTasks[i]
-					if t.IsTestRun || t.PendingAgonFeedback == "" {
-						continue
-					}
-					if t.SessionID == nil || *t.SessionID == "" {
-						continue
-					}
-					candidates = append(candidates, autoPromoteCandidate{
-						task:       *t,
-						store:      s,
-						isResume:   true,
-						agonResume: true,
-						feedback:   t.PendingAgonFeedback,
 					})
 				}
 			})
@@ -404,30 +382,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			promoted := false
 
 			for _, c := range candidates {
-				if c.isResume && c.agonResume {
-					// Agon-feedback resume: re-verify with fresh state.
-					freshTask, err := c.store.GetTask(ctx, c.task.ID)
-					if err != nil || freshTask == nil {
-						continue
-					}
-					if freshTask.Status != store.TaskStatusWaiting || freshTask.IsTestRun || freshTask.PendingAgonFeedback == "" {
-						continue
-					}
-					if freshTask.SessionID == nil || *freshTask.SessionID == "" {
-						continue
-					}
-					logger.Handler.Info("auto-promote: resuming waiting task from agon feedback",
-						"task", freshTask.ID, "agon_retry_count", freshTask.AgonRetryCount)
-					if err := h.resumeWaitingTaskWithFeedbackLocked(ctx, freshTask, freshTask.PendingAgonFeedback, store.TriggerFeedback, "Autopilot: resuming task with unresolved agon attacks as feedback."); err != nil {
-						logger.Handler.Error("auto-promote resume agon feedback", "task", freshTask.ID, "error", err)
-						h.breakers["auto-promote"].recordFailure(&freshTask.ID, err.Error())
-						continue
-					}
-					h.incAutopilotAction("auto_promoter", "resumed_agon")
-					h.breakers["auto-promote"].recordSuccess()
-					promoted = true
-					continue
-				}
 				if c.isResume {
 					// Auto-resume: re-verify eligibility with fresh state.
 					freshTask, err := c.store.GetTask(ctx, c.task.ID)

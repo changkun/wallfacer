@@ -238,38 +238,15 @@ func (s *Store) UpdateTaskCriteria(_ context.Context, id uuid.UUID, criteria str
 	})
 }
 
-// ClearAgonResult clears a task's agon verdict (AgonUnresolved back to nil) and
-// the pending feedback, so the task is eligible for re-verification. Called when
-// a task is resumed for more work: the prior verdict was computed against an
-// earlier diff and is stale once new commits land, and the feedback has been
-// consumed by the resume. AgonRetryCount is preserved (it counts consecutive
-// resumes and resets only on a clean verdict). A no-op when nothing was set.
+// ClearAgonResult clears a task's agon verdict (AgonUnresolved back to nil) so
+// the task is eligible for re-verification. Called when a task is resumed for
+// more work: the prior verdict was computed against an earlier diff and is stale
+// once new commits land. A no-op when nothing was set.
 func (s *Store) ClearAgonResult(_ context.Context, id uuid.UUID) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.AgonUnresolved = nil
 		t.AgonHeadline = ""
 		t.AgonSessionDir = ""
-		t.PendingAgonFeedback = ""
-		return nil
-	})
-}
-
-// SetAgonFeedback stores the unresolved-attacks feedback awaiting auto-resume
-// and increments the consecutive agon-feedback retry counter.
-func (s *Store) SetAgonFeedback(_ context.Context, id uuid.UUID, feedback string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.PendingAgonFeedback = feedback
-		t.AgonRetryCount++
-		return nil
-	})
-}
-
-// ResetAgonRetry clears the pending agon feedback and resets the retry counter.
-// Called when a verdict comes back clean, ending the feedback cycle.
-func (s *Store) ResetAgonRetry(_ context.Context, id uuid.UUID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.PendingAgonFeedback = ""
-		t.AgonRetryCount = 0
 		return nil
 	})
 }

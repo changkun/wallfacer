@@ -370,37 +370,6 @@ func TestAgonSupersedesTest_Gate(t *testing.T) {
 	}
 }
 
-// TestTryAutoPromote_ResumesOnAgonFeedback proves the autopilot picks up a
-// waiting task with pending agon feedback and resumes it (the feedback loop's
-// auto-mode driver), clearing the feedback on resume.
-func TestTryAutoPromote_ResumesOnAgonFeedback(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	h.SetAutopilot(true)
-
-	ctx := context.Background()
-	s, ok := h.currentStore()
-	if !ok {
-		t.Fatal("no current store")
-	}
-	task := waitingTaskWithSession(t, s)
-	if err := s.SetAgonFeedback(ctx, task.ID, "fix: nil deref in foo()"); err != nil {
-		t.Fatalf("SetAgonFeedback: %v", err)
-	}
-
-	h.tryAutoPromote(ctx)
-
-	got, err := s.GetTask(ctx, task.ID)
-	if err != nil {
-		t.Fatalf("GetTask: %v", err)
-	}
-	if got.Status != store.TaskStatusInProgress {
-		t.Errorf("status = %s, want in_progress (resumed)", got.Status)
-	}
-	if got.PendingAgonFeedback != "" {
-		t.Errorf("pending agon feedback should be cleared on resume, got %q", got.PendingAgonFeedback)
-	}
-}
-
 // TestRunAgon_BlocksOnUnresolved proves an unresolved verdict is a hard barrier:
 // the verdict is persisted, the task stays parked in waiting, autopilot does not
 // auto-resume it, and a clean verdict clears the barrier. This is the
