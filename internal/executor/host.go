@@ -56,7 +56,16 @@ type HostBackendConfig struct {
 	CursorBinary   string // path to `cursor-agent` CLI; empty ⇒ exec.LookPath
 	OpenCodeBinary string // path to `opencode` CLI; empty ⇒ exec.LookPath
 	PiBinary       string // path to `pi` CLI; empty ⇒ exec.LookPath
+	// AgentNice is the niceness applied to launched agent processes so they and
+	// their tool subprocesses yield CPU to the foreground. 0 ⇒ defaultAgentNice;
+	// a negative value disables throttling. See applyAgentPriority.
+	AgentNice int
 }
+
+// defaultAgentNice is the niceness used when HostBackendConfig.AgentNice is unset
+// (zero). Lowered enough that agent work yields to interactive foreground apps
+// without being fully starved.
+const defaultAgentNice = 10
 
 // HostBackend runs the agent CLI directly as a host process — no container.
 // It reinterprets ContainerSpec fields as host semantics:
@@ -79,6 +88,8 @@ type HostBackend struct {
 	cursorBinary   string
 	openCodeBinary string
 	piBinary       string
+
+	agentNice int // resolved niceness passed to applyAgentPriority (0 ⇒ disabled)
 
 	procMu sync.Mutex
 	procs  map[string]*hostHandle // keyed by container name
@@ -116,12 +127,22 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	cursor, _ := resolveBinary(cfg.CursorBinary, "cursor-agent")
 	opencode, _ := resolveBinary(cfg.OpenCodeBinary, "opencode")
 	pi, _ := resolveBinary(cfg.PiBinary, "pi")
+	// Resolve niceness: 0 ⇒ default, negative ⇒ disabled (applyAgentPriority
+	// treats 0 as "no change").
+	nice := cfg.AgentNice
+	switch {
+	case nice == 0:
+		nice = defaultAgentNice
+	case nice < 0:
+		nice = 0
+	}
 	return &HostBackend{
 		claudeBinary:   claude,
 		codexBinary:    codex,
 		cursorBinary:   cursor,
 		openCodeBinary: opencode,
 		piBinary:       pi,
+		agentNice:      nice,
 		procs:          make(map[string]*hostHandle),
 	}, nil
 }
@@ -285,10 +306,12 @@ func (b *HostBackend) launchPlainHostAgent(ctx context.Context, spec ContainerSp
 	taskID := spec.Labels["wallfacer.task.id"]
 	h := newHostHandle(spec.Name, cmd, stdout, stderr, taskID, b)
 
+	configureProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		transition(&h.state, StateFailed)
 		return nil, fmt.Errorf("start host agent: %w", err)
 	}
+	applyAgentPriority(cmd.Process.Pid, b.agentNice)
 	transition(&h.state, StateRunning)
 
 	b.procMu.Lock()
@@ -457,8 +480,11 @@ func (h *hostHandle) signalAndEscalate() {
 	if h.cmd.Process == nil {
 		return
 	}
-	if err := h.cmd.Process.Signal(gracefulSig); err != nil {
-		_ = h.cmd.Process.Kill()
+	// Signal the whole process group, not just the leader: under Setpgid the
+	// agent's tool subprocesses (builds, test runners) are group members, and
+	// signalling only the leader would orphan them.
+	if err := terminateGroupSignal(h.cmd, gracefulSig); err != nil {
+		_ = terminateGroupKill(h.cmd)
 		return
 	}
 	go func() {
@@ -468,10 +494,9 @@ func (h *hostHandle) signalAndEscalate() {
 		case <-h.done:
 			// Wait() returned — process already reaped, nothing to escalate.
 		case <-timer.C:
-			// Grace period elapsed without the process exiting. os.Process.Kill
-			// is cross-platform and safe against a race with Wait reaping the
-			// child (the os package guards the Pid with an internal mutex).
-			_ = h.cmd.Process.Kill()
+			// Grace period elapsed without the process exiting. The group kill
+			// is safe against a race with Wait reaping the child.
+			_ = terminateGroupKill(h.cmd)
 		}
 	}()
 }
