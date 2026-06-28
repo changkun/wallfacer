@@ -5,6 +5,7 @@ import { computeLayout, type Point } from './layout';
 import { edgePaths } from './edges';
 import { DragBatcher } from './dragController';
 import { stateColor } from './nodeColors';
+import { hasPrimaryAction } from './actions';
 
 const props = defineProps<{
   graph: Graph;
@@ -42,7 +43,7 @@ const criticalSet = computed(() => new Set(props.graph.critical_path));
 const blockedSet = computed(() => new Set(props.graph.blocked));
 
 const readySet = computed(
-  () => new Set(props.graph.nodes.filter((n) => (n.available_actions?.length ?? 0) > 0).map((n) => n.id)),
+  () => new Set(props.graph.nodes.filter((n) => hasPrimaryAction(n.available_actions)).map((n) => n.id)),
 );
 
 // Live execution states drive the animation layer.
