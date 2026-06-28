@@ -200,71 +200,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Resolve the task's flow. Precedence: task.FlowID → legacy Kind
 	// mapping → "implement". The implement path stays on the turn loop
 	// below (multi-turn semantics the linear engine does not express
-	// yet); brainstorm keeps the existing ideation fast-path; any
-	// other flow runs through the flow engine.
+	// yet); any other flow runs through the flow engine.
 	flowSlug := "implement"
 	if r.flows != nil {
 		flowSlug = r.flows.ResolveForTask(task)
-	}
-
-	// Brainstorm tasks use a special execution path: run the brainstorm
-	// agent, create backlog tasks from the results, then move directly
-	// to done. Back-compat with the legacy Kind-based path.
-	if flowSlug == "brainstorm" || task.Kind == store.TaskKindIdeaAgent {
-		statusSet = true
-		ideaTimeout := time.Duration(task.Timeout) * time.Minute
-		if ideaTimeout <= 0 {
-			ideaTimeout = constants.DefaultTaskTimeout
-		}
-		ideaCtx, ideaCancel := context.WithTimeout(bgCtx, ideaTimeout)
-		defer ideaCancel()
-
-		if runErr := r.runIdeationTask(ideaCtx, task); runErr != nil {
-			// Don't overwrite a cancelled status.
-			if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
-				return
-			}
-			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-
-			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, classifyFailure(runErr, false, ""))
-
-			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
-
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
-
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-
-				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
-			return
-		}
-		r.GenerateOversightBackground(taskID)
-
-		// When auto-submit is enabled, transition straight through to done.
-		// When auto-submit is off, stop at waiting so the user can review
-		// proposed ideas before they are created as backlog tasks.
-		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
-
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-
-			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-
-		if r.isAutosubmitEnabled() {
-			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
-
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-
-				store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
-			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-
-				store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-
-				"result": "Ideation complete.",
-			})
-		}
-		return
 	}
 
 	// Agentic flows run through the in-process topos agent-graph runtime
@@ -280,7 +219,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		return
 	}
 
-	// Non-implement, non-brainstorm flows: run through the flow engine.
+	// Non-implement flows: run through the flow engine.
 	// The engine walks the flow's steps linearly (with parallel-sibling
 	// fan-out) and launches each agent via Runner.RunAgent. The
 	// implement flow stays on the turn loop below because it needs

@@ -140,33 +140,31 @@ func defaultAgentsDir() string {
 // Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
-	store                  *store.Store
-	storeMu                sync.RWMutex
-	wsKey                  string   // workspace key of the currently viewed group (guarded by storeMu)
-	taskWSKey              sync.Map // uuid.UUID → string: maps task IDs to their workspace group key
-	command                string
-	envFile                string
-	defaultEnvFile         string // fallback env file when envFile goes missing (see RunnerConfig.DefaultEnvFile)
-	workspaces             []string
-	worktreesDir           string
-	tmpDir                 string
-	workspaceManager       *workspace.Manager
-	codexAuthPath          string
-	promptsMgr             *prompts.Manager                     // prompt template manager
-	worktreeMu             sync.Mutex                           // serializes all worktree filesystem operations on worktreesDir
-	repoMu                 keyedmu.Map[string]                  // per-repo mutex for serializing rebase+merge
-	taskContainers         *containerRegistry                   // taskID → container name
-	ideateContainer        *containerRegistry                   // singleton: ideation container name
-	liveLogs               syncmap.Map[uuid.UUID, *livelog.Log] // live log buffers for in-progress turns
-	oversightMu            keyedmu.Map[string]                  // per-task mutex for serializing oversight generation
-	containerCB            *circuitbreaker.Breaker              // circuit breaker for container launch operations
-	backend                executor.Backend                     // pluggable sandbox backend (local podman/docker, host, future: k8s)
-	backgroundWg           trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
-	stopReasonMu           sync.RWMutex
-	onStopReason           func(taskID uuid.UUID, stopReason string)
-	autosubmitFn           func() bool           // returns true when auto-submit is enabled
-	ideationExploitRatioFn func() float64        // returns the current exploitation ratio (0–1)
-	agentSession           *agentsession.Runtime // agent session for ideation and chat; may be nil
+	store            *store.Store
+	storeMu          sync.RWMutex
+	wsKey            string   // workspace key of the currently viewed group (guarded by storeMu)
+	taskWSKey        sync.Map // uuid.UUID → string: maps task IDs to their workspace group key
+	command          string
+	envFile          string
+	defaultEnvFile   string // fallback env file when envFile goes missing (see RunnerConfig.DefaultEnvFile)
+	workspaces       []string
+	worktreesDir     string
+	tmpDir           string
+	workspaceManager *workspace.Manager
+	codexAuthPath    string
+	promptsMgr       *prompts.Manager                     // prompt template manager
+	worktreeMu       sync.Mutex                           // serializes all worktree filesystem operations on worktreesDir
+	repoMu           keyedmu.Map[string]                  // per-repo mutex for serializing rebase+merge
+	taskContainers   *containerRegistry                   // taskID → container name
+	liveLogs         syncmap.Map[uuid.UUID, *livelog.Log] // live log buffers for in-progress turns
+	oversightMu      keyedmu.Map[string]                  // per-task mutex for serializing oversight generation
+	containerCB      *circuitbreaker.Breaker              // circuit breaker for container launch operations
+	backend          executor.Backend                     // pluggable sandbox backend (local podman/docker, host, future: k8s)
+	backgroundWg     trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
+	stopReasonMu     sync.RWMutex
+	onStopReason     func(taskID uuid.UUID, stopReason string)
+	autosubmitFn     func() bool           // returns true when auto-submit is enabled
+	agentSession     *agentsession.Runtime // agent session for chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
@@ -293,25 +291,10 @@ func (r *Runner) isAutosubmitEnabled() bool {
 	return r.autosubmitFn()
 }
 
-// SetIdeationExploitRatioFunc registers a callback that returns the current
-// exploitation ratio (0–1) for the ideation prompt. Default is 0.8.
-func (r *Runner) SetIdeationExploitRatioFunc(fn func() float64) {
-	r.ideationExploitRatioFn = fn
-}
-
-// SetAgentSession registers the agent session so that ideation runs through
+// SetAgentSession registers the agent session so that chat runs through
 // the long-lived agent-session worker container instead of ephemeral containers.
 func (r *Runner) SetAgentSession(p *agentsession.Runtime) {
 	r.agentSession = p
-}
-
-// ideationExploitRatio returns the current exploitation ratio (0-1) for ideation.
-// Defaults to 0.8 when no callback is registered.
-func (r *Runner) ideationExploitRatio() float64 {
-	if r.ideationExploitRatioFn == nil {
-		return 0.8
-	}
-	return r.ideationExploitRatioFn()
 }
 
 // Shutdown waits for all tracked background goroutines to complete before
@@ -437,7 +420,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
 		taskContainers:   &containerRegistry{},
-		ideateContainer:  &containerRegistry{},
 		shutdownCh:       make(chan struct{}),
 	}
 	agentsDir := cfg.AgentsDir
@@ -846,21 +828,3 @@ func (r *Runner) WorkerStats() executor.WorkerStatsInfo {
 
 // StopTaskWorker is a no-op under the host backend.
 func (r *Runner) StopTaskWorker(_ uuid.UUID) {}
-
-// IdeateContainerName returns the name of the currently running ideation container,
-// or an empty string if no ideation is in progress.
-func (r *Runner) IdeateContainerName() string {
-	if name, ok := r.ideateContainer.GetSingleton(); ok {
-		return name
-	}
-	return ""
-}
-
-// KillIdeateContainer sends a kill signal to the running ideation container.
-// Kill goes through the SandboxHandle when registered; otherwise it is a no-op.
-// Safe to call when no ideation container is running.
-func (r *Runner) KillIdeateContainer() {
-	if h := r.ideateContainer.GetSingletonHandle(); h != nil {
-		_ = h.Kill()
-	}
-}

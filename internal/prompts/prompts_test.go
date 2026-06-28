@@ -270,26 +270,7 @@ func TestValidate_AllKnownNamesWithEmbeddedDefaults(t *testing.T) {
 	}
 }
 
-// --- Tests for all six remaining template renderers ---
-
-// TestIdeation_ReturnsNonEmptyRendered verifies that the ideation template
-// renders with existing tasks and categories populated.
-func TestIdeation_ReturnsNonEmptyRendered(t *testing.T) {
-	mgr := prompts.NewManager(t.TempDir())
-	data := prompts.IdeationData{
-		ExistingTasks: []prompts.IdeationTask{
-			{Title: "existing task", Status: "done", Prompt: "do something"},
-		},
-		Categories: []string{"feature", "bugfix"},
-	}
-	got := mgr.Ideation(data)
-	if strings.TrimSpace(got) == "" {
-		t.Error("Ideation returned empty string")
-	}
-	if strings.Contains(got, "{{") {
-		t.Errorf("Ideation returned unreplaced template syntax: %q", got)
-	}
-}
+// --- Tests for the remaining template renderers ---
 
 // TestOversight_ReturnsNonEmptyRendered verifies that the oversight template
 // renders with a sample activity log.
@@ -383,13 +364,6 @@ func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
 // Package-level delegation functions — each verifies that the package-level
 // convenience function delegates to Default and produces non-empty output.
 
-func TestPackageLevelIdeation_NonEmpty(t *testing.T) {
-	got := prompts.Ideation(prompts.IdeationData{})
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.Ideation() returned empty string")
-	}
-}
-
 func TestPackageLevelOversight_NonEmpty(t *testing.T) {
 	got := prompts.Oversight("some activity log")
 	if strings.TrimSpace(got) == "" {
@@ -422,17 +396,6 @@ func TestPackageLevelTitle_NonEmpty(t *testing.T) {
 	got := prompts.Title("my task prompt")
 	if strings.TrimSpace(got) == "" {
 		t.Error("prompts.Title() returned empty string")
-	}
-}
-
-// TestIdeation_EmptyData verifies that the ideation template renders
-// successfully even when all data fields are zero-valued (no existing tasks,
-// categories, or hotspots).
-func TestIdeation_EmptyData(t *testing.T) {
-	mgr := prompts.NewManager(t.TempDir())
-	got := mgr.Ideation(prompts.IdeationData{})
-	if strings.TrimSpace(got) == "" {
-		t.Error("Ideation with empty data returned empty string")
 	}
 }
 

@@ -13,7 +13,6 @@ import (
 	"embed"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -50,29 +49,11 @@ func templateFuncMap() template.FuncMap {
 		"add": func(a, b int) int { return a + b },
 		"mul": func(a, b float64) float64 { return a * b },
 		"sub": func(a, b float64) float64 { return a - b },
-		// exploitCount returns how many of `total` ideas should be exploitation-style,
-		// clamped to [0, total]. Used by the ideation template to split ideas.
-		"exploitCount": func(ratio float64, total int) int {
-			n := int(math.Round(ratio * float64(total)))
-			if n > total {
-				n = total
-			}
-			return n
-		},
-		// exploreCount is the complement of exploitCount: total minus the exploit share.
-		"exploreCount": func(ratio float64, total int) int {
-			n := int(math.Round(ratio * float64(total)))
-			if n > total {
-				n = total
-			}
-			return total - n
-		},
 	}
 }
 
 // embeddedToAPI maps embedded template file names to user-facing API names.
 var embeddedToAPI = map[string]string{
-	"ideation.tmpl":             "ideation",
 	"oversight.tmpl":            "oversight",
 	"title.tmpl":                "title",
 	"commit.tmpl":               "commit_message",
@@ -86,7 +67,6 @@ var embeddedToAPI = map[string]string{
 
 // apiToEmbedded maps user-facing API names to embedded template file names.
 var apiToEmbedded = map[string]string{
-	"ideation":             "ideation.tmpl",
 	"oversight":            "oversight.tmpl",
 	"title":                "title.tmpl",
 	"commit_message":       "commit.tmpl",
@@ -100,7 +80,6 @@ var apiToEmbedded = map[string]string{
 
 // knownNames is the ordered list of all user-facing template API names.
 var knownNames = []string{
-	"ideation",
 	"task_prompt_refine",
 	"oversight",
 	"title",
@@ -261,8 +240,6 @@ func mockContextFor(apiName string) (interface{}, bool) {
 			Status:    "backlog",
 			Prompt:    "example prompt",
 		}, true
-	case "ideation":
-		return IdeationData{}, true
 	case "commit_message":
 		return CommitData{
 			Prompt:   "example prompt",
@@ -324,80 +301,6 @@ type RefinementData struct {
 	UserInstructions string // optional; rendered only when non-empty
 }
 
-// IdeationTask represents a single existing task shown to the brainstorm agent
-// for deduplication context. Title and Prompt should already be pre-processed
-// (truncated, default title applied) by the caller.
-type IdeationTask struct {
-	Title  string
-	Status string
-	Prompt string
-}
-
-// WorkspaceSignal represents a single scored hotspot file from workspace analysis.
-// It carries enough context for the advisor to understand why the file was surfaced
-// and which workspace it belongs to when multiple workspaces are active.
-type WorkspaceSignal struct {
-	// DisplayPath is the path shown to the advisor. It is workspace-relative when
-	// only one workspace is active, and prefixed with the workspace basename
-	// (e.g. "wallfacer/internal/runner/ideate.go") when multiple workspaces exist.
-	DisplayPath string
-
-	// Score is the raw signal strength: commit count for churn signals, marker
-	// occurrence count for TODO signals.
-	Score int
-
-	// Reason is a human-readable description of why this file was selected,
-	// e.g. "11 commits" or "3 TODO markers".
-	Reason string
-
-	// Workspace is the basename of the workspace directory this path belongs to.
-	// Empty when only one workspace is active.
-	Workspace string
-
-	// Boosted is true when the path received a score multiplier for matching a
-	// preferred source directory pattern (internal/, ui/js/ non-vendor, ui/partials/,
-	// or a test file suffix). Boosted paths rank ahead of equivalent-count vendor paths.
-	Boosted bool
-}
-
-// IdeationData holds template variables for the ideation prompt.
-type IdeationData struct {
-	ExistingTasks  []IdeationTask
-	Categories     []string
-	FailureSignals []string // tasks that failed or had failing tests
-
-	// ChurnHotspots contains recently-modified files scored and filtered by the
-	// signal pipeline. Vendor/generated/artifact paths are excluded; files in
-	// actionable source directories are boosted.
-	ChurnHotspots []WorkspaceSignal
-
-	// TodoHotspots contains files with high TODO/FIXME/XXX marker density,
-	// scored and filtered. Prompt templates and vendor paths are excluded.
-	TodoHotspots []WorkspaceSignal
-
-	// FilteredChurnCount is the number of churn paths excluded by ignore rules
-	// (vendor, generated, minified). Used to inform the advisor that filtering occurred.
-	FilteredChurnCount int
-
-	// FilteredTodoCount is the number of TODO paths excluded by ignore rules
-	// (vendor, generated, prompt templates). Used to inform the advisor of filtering.
-	FilteredTodoCount int
-
-	RejectedTitles []string // previously proposed but rejected idea titles (within TTL)
-
-	// ExploitRatio is the fraction (0.0–1.0) of ideas that should be
-	// exploitation-style (improve existing code) vs exploration-style (new
-	// features / new directions). Default 0.8 means 80% exploitation.
-	ExploitRatio float64
-
-	// UserFocus is an optional free-form hint the user typed into the
-	// composer's prompt field when creating a Brainstorm task. Empty
-	// when the user left the prompt blank, in which case the agent
-	// scans the full workspace unbiased. When non-empty the template
-	// surfaces it prominently so the agent narrows its search.
-	UserFocus string
-}
-
 // CommitData holds template variables for the commit message prompt.
 type CommitData struct {
 	Prompt    string
@@ -436,9 +339,6 @@ type TestData struct {
 func (m *Manager) TaskPromptRefine(d RefinementData) string {
 	return m.render("task_prompt_refine.tmpl", d)
 }
-
-// Ideation renders the brainstorm agent prompt.
-func (m *Manager) Ideation(d IdeationData) string { return m.render("ideation.tmpl", d) }
 
 // Oversight renders the oversight summarization prompt for the given
 // pre-formatted activity log text.
@@ -485,9 +385,6 @@ func (m *Manager) SpecSystemNonempty() string {
 
 // TaskPromptRefine renders the task-mode spec-mode agent system prompt.
 func TaskPromptRefine(d RefinementData) string { return Default.TaskPromptRefine(d) }
-
-// Ideation renders the brainstorm agent prompt.
-func Ideation(d IdeationData) string { return Default.Ideation(d) }
 
 // Oversight renders the oversight summarization prompt for the given
 // pre-formatted activity log text.

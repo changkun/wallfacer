@@ -255,31 +255,7 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 }
 
 // buildRoutineInstancePrompt decides what prompt the spawned instance
-// runs with. For brainstorm-flow routines we delegate to the existing
-// BuildIdeationPrompt so the migrated system:ideation routine behaves
-// byte-identically to the old singleton. For every other flow we use
-// the routine card's own prompt verbatim. Legacy RoutineSpawnKind ==
-// TaskKindIdeaAgent records resolve to "brainstorm" via the flow
-// registry, so this check covers both old and new routines.
+// runs with: the routine card's own prompt verbatim.
 func (h *Handler) buildRoutineInstancePrompt(routineTask store.Task) string {
-	spawnFlow := flowRegistry().ResolveRoutineFlow(&routineTask)
-	if spawnFlow == "brainstorm" {
-		s, ok := h.currentStore()
-		if !ok {
-			return routineTask.Prompt
-		}
-		tasks, _ := s.ListTasks(context.Background(), false)
-		active := make([]store.Task, 0, len(tasks))
-		for _, t := range tasks {
-			if t.IsIdeaAgent() || t.IsRoutine() {
-				continue
-			}
-			switch t.Status {
-			case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
-				active = append(active, t)
-			}
-		}
-		return h.runner.BuildIdeationPrompt(active)
-	}
 	return routineTask.Prompt
 }

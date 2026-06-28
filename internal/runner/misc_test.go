@@ -1073,24 +1073,6 @@ func TestContainerCircuitOpen_DoesNotConsumeProbe(t *testing.T) {
 	}
 }
 
-// TestIdeateContainerName_Empty verifies that IdeateContainerName returns empty
-// when no ideation container is running.
-func TestIdeateContainerName_Empty(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	name := r.IdeateContainerName()
-	if name != "" {
-		t.Errorf("expected empty ideation container name, got %q", name)
-	}
-}
-
-// TestKillIdeateContainer_NoOp verifies KillIdeateContainer does not panic
-// when no ideation container is running.
-func TestKillIdeateContainer_NoOp(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// Should not panic.
-	r.KillIdeateContainer()
-}
-
 // ---------------------------------------------------------------------------
 // sandboxForTask / modelFromEnv / titleModelFromEnv
 // ---------------------------------------------------------------------------
@@ -1239,61 +1221,5 @@ func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
 	result := r.titleModelFromEnv()
 	if result != "claude-opus-4-5" {
 		t.Errorf("titleModelFromEnv fallback = %q, want %q", result, "claude-opus-4-5")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// IdeationCategories / IdeationIgnorePatterns (Runner methods)
-// ---------------------------------------------------------------------------
-
-// TestIdeationCategories_ReturnsNonEmpty verifies that IdeationCategories
-// returns a non-empty slice of category strings.
-func TestIdeationCategories_ReturnsNonEmpty(t *testing.T) {
-	_, r := setupRunnerWithCmd(t, nil, "echo")
-	cats := r.IdeationCategories()
-	if len(cats) == 0 {
-		t.Error("IdeationCategories returned empty slice, want non-empty")
-	}
-}
-
-// TestIdeationCategories_ReturnsCopy verifies that mutations to the returned
-// slice do not affect subsequent calls.
-func TestIdeationCategories_ReturnsCopy(t *testing.T) {
-	_, r := setupRunnerWithCmd(t, nil, "echo")
-	cats1 := r.IdeationCategories()
-	if len(cats1) == 0 {
-		t.Skip("no categories, nothing to mutate")
-	}
-	original := cats1[0]
-	cats1[0] = "mutated"
-	cats2 := r.IdeationCategories()
-	if cats2[0] != original {
-		t.Errorf("IdeationCategories not returning copy; original value changed to %q", cats2[0])
-	}
-}
-
-// TestIdeationIgnorePatterns_ReturnsNonEmpty verifies that
-// IdeationIgnorePatterns returns a non-empty slice of pattern strings.
-func TestIdeationIgnorePatterns_ReturnsNonEmpty(t *testing.T) {
-	_, r := setupRunnerWithCmd(t, nil, "echo")
-	pats := r.IdeationIgnorePatterns()
-	if len(pats) == 0 {
-		t.Error("IdeationIgnorePatterns returned empty slice, want non-empty")
-	}
-}
-
-// TestIdeationIgnorePatterns_ReturnsCopy verifies that mutations to the
-// returned slice do not affect subsequent calls.
-func TestIdeationIgnorePatterns_ReturnsCopy(t *testing.T) {
-	_, r := setupRunnerWithCmd(t, nil, "echo")
-	pats1 := r.IdeationIgnorePatterns()
-	if len(pats1) == 0 {
-		t.Skip("no patterns, nothing to mutate")
-	}
-	original := pats1[0]
-	pats1[0] = "mutated"
-	pats2 := r.IdeationIgnorePatterns()
-	if pats2[0] != original {
-		t.Errorf("IdeationIgnorePatterns not returning copy; original value changed to %q", pats2[0])
 	}
 }

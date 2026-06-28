@@ -183,18 +183,6 @@ func (m *MockRunner) GenerateBoardManifest(_ context.Context, _ uuid.UUID, _ boo
 	return &BoardManifest{}, nil
 }
 
-// BuildIdeationPrompt returns an empty prompt in the mock.
-func (m *MockRunner) BuildIdeationPrompt(_ []store.Task) string { return "" }
-
-// CreateIdeaBacklogTasks is a no-op in the mock.
-func (m *MockRunner) CreateIdeaBacklogTasks(_ context.Context, _ uuid.UUID) error { return nil }
-
-// IdeationCategories returns nil in the mock.
-func (m *MockRunner) IdeationCategories() []string { return nil }
-
-// IdeationIgnorePatterns returns nil in the mock.
-func (m *MockRunner) IdeationIgnorePatterns() []string { return nil }
-
 // HostCodexAuthStatus returns false in the mock.
 func (m *MockRunner) HostCodexAuthStatus(_ time.Time) (bool, string) { return false, "" }
 
