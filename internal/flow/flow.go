@@ -1,7 +1,5 @@
 package flow
 
-import "latere.ai/x/wallfacer/internal/store"
-
 // Flow is an ordered composition of sub-agent roles that a task
 // executes against. v1 scope is linear with parallel-sibling steps; a
 // full DAG model lands in a follow-up and replaces Steps with Graph.
@@ -22,13 +20,6 @@ type Flow struct {
 	// engine owns that semantics). Empty is legal but uncommon;
 	// v1 built-ins always have at least one step.
 	Steps []Step
-
-	// SpawnKind preserves the legacy TaskKind that tasks of this flow
-	// run as. Always "" now that the only flow that set it (the retired
-	// brainstorm flow) is gone; the generic field is retained on the
-	// wire to avoid rippling into the flow write API and is a candidate
-	// for a later dead-field sweep.
-	SpawnKind store.TaskKind
 
 	// Builtin is true for flows shipped in the embedded catalog.
 	// User-authored flows (future) set this to false so the UI
