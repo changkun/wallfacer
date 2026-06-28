@@ -1,6 +1,6 @@
 ---
 title: Agon Supersedes the Test Step (Verification Gate)
-status: complete
+status: archived
 depends_on:
   - agon-adversarial-verification
 affects:
