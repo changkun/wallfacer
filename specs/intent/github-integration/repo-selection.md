@@ -9,7 +9,8 @@ affects:
   - internal/handler/github.go
   - internal/coordinator/identity.go
   - internal/workspace/groups.go
-  - frontend/src/components/GithubPanel.vue
+  - frontend/src/views/GithubPage.vue
+  - frontend/src/components/github/RepoPicker.vue
   - frontend/src/stores/github.ts
 effort: medium
 created: 2026-06-26
@@ -47,15 +48,23 @@ associates with local workspace state, and how the org boundary is enforced.
 
 ## Options
 
-### Listing source
+### Listing source (default: installation repos)
 
-- **User-affiliated** (`GET /user/repos`): everything the user can see, simple,
-  but noisy for users in many orgs.
-- **Org-scoped** (`GET /orgs/{org}/repos`, filtered to the signed-in org):
-  matches repo-identity's org boundary; the natural default for team mode.
-- **GitHub App installation repos** (`GET /installation/repositories`): only
-  what the app was granted; tightest, depends on the App-type decision in the
-  oauth child.
+The umbrella resolved the app type to a **GitHub App**, so the default listing
+source is **installation repos**:
+
+- **GitHub App installation repos** (`GET /installation/repositories` or
+  `GET /user/installations/{id}/repositories`): only what the install was
+  granted. This is the default -- the install grant *is* the org-boundary
+  enforcement, so the list cannot leak repos outside what the org admin
+  approved, and there is no client-side org filtering to get wrong.
+- **Org-scoped** (`GET /orgs/{org}/repos`): only relevant under the OAuth-App
+  fallback; superseded by installation repos under the GitHub App path.
+- **User-affiliated** (`GET /user/repos`): not used; too broad for the
+  install-scoped model.
+
+When the install grants no repos (or the user lands before installing), the
+picker shows the install affordance rather than an empty list.
 
 ### Selection -> workspace association
 
@@ -69,18 +78,21 @@ associates with local workspace state, and how the org boundary is enforced.
 
 ## Open Questions
 
-1. Default listing scope: org-only (enforcing the boundary) or user-wide with
-   client-side filtering? How does this interact with the App-installation
-   model if the oauth child picks GitHub App?
+1. ~~Default listing scope?~~ **Resolved: installation repos** (GitHub App,
+   `GET /installation/repositories`). The install grant is the boundary; no
+   client-side org filtering.
 2. Pagination + search for users/orgs with hundreds of repos: server-side
    search param, incremental fetch, or cache the full list?
 3. Is "selected repo" a property of the workspace group, a separate GitHub
    selection state, or both? What does the read surface key on?
 4. When the user picks a repo with no local clone (local mode), what is the UX:
    disabled with a "clone via remote phase" hint, or an inline error?
-5. How is the org boundary enforced on the list call so a repo outside the
-   signed-in org never appears (filter server-side, reuse repo-identity's
-   perimeter check)?
+5. ~~How is the org boundary enforced on the list call?~~ **Mostly resolved**:
+   under the GitHub App, the installation grant scopes the list, so a repo
+   outside what was granted cannot appear. Remaining: confirm the
+   `host/owner/repo` of each listed repo still passes repo-identity's perimeter
+   check before selection (defense in depth), and that org-boundary still maps
+   to the signed-in org when one install spans repos.
 6. Does local v1 actually need repo-identity's **server registry** (org->repos
    Postgres, part of the unbuilt coordination plane), or only the already
    shipped `NormalizeRemoteURL` plus repo-identity's **local-credential-proof
@@ -90,9 +102,57 @@ associates with local workspace state, and how the org boundary is enforced.
    umbrella's "components 1-4 ship independently of remote execution" claim
    holds.
 
+## UI
+
+Contributes the **repo selector** to the `/github` page (the umbrella's
+[UI Architecture](../github-integration.md#ui-architecture)): a `RepoPicker.vue`
+under `components/github/`, surfaced both as the page header's repo dropdown and,
+when no repo is chosen, as the page's centered first-run picker. Selection state
+lives in `stores/github.ts` and keys the read/write surfaces.
+
+States this child owns from the shared matrix: **No repo selected**,
+**Org-boundary blocked**, **No local clone**. (**Disconnected** defers to
+component 1.)
+
+```
+No repo selected (centered first-run picker)
++--------------------------------------------------------------+
+|  Choose a repository                                         |
+|  Installed on: latere      [ Manage installation ↗ ]         |
+|  [ search granted repos... ]                                 |
+|  ----------------------------------------------------------- |
+|  ▸ latere/wallfacer      default · last push 2h ago   ● local|
+|  ▸ latere/agents         default · last push 1d ago   ○ no   |
+|  ▸ latere/terraform      default · last push 5d ago   ○ no   |
+|  ... (paginated / incremental)                              |
+|  + Install on another org or grant more repos ↗             |
++--------------------------------------------------------------+
+
+Selected (collapses into the page header dropdown)
+  [ latere/wallfacer ▾ ]   ● local checkout
+```
+
+- Each row shows `owner/repo`, the default branch, last-push recency, and a
+  **local-clone indicator** (`● local` when a `workspace.Group` member's
+  `origin` normalizes to the repo's `host/owner/repo`; `○ no` otherwise).
+- **Selecting a repo with a local clone** resolves to that workspace and enables
+  the full surface.
+- **No local clone** (`○ no`): selectable for read (PR/issue browse works
+  without a checkout), but a banner notes "no local checkout" and points at the
+  gated [cloud-remote-fix](cloud-remote-fix.md) phase for clone-and-fix; write
+  actions that need a working tree are disabled with that hint. Not an error.
+- **Install affordance** (`+ Install on another org or grant more repos`) deep
+  links to the GitHub App installation page; on return, the list refetches.
+- **Org-boundary blocked**: a repo whose identity fails the perimeter check is
+  omitted from the list; a direct selection attempt returns 403 surfaced as
+  "outside your organization".
+- **Search + pagination** follow open question 2 (server-side search vs cached
+  list); the UI assumes incremental load with a search box for large installs.
+
 ## Affects
 
 Adds repo-list + repo-select endpoints under `/api/github/repos`, a
-`internal/github` repo-list client, and the picker UI. Consumes
+`internal/github` repo-list client, and the `RepoPicker.vue` UI (see UI above).
+Consumes
 `NormalizeRemoteURL` to key selections; touches `workspace.Group` only if the
 selection is stored on the group.
