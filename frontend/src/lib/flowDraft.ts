@@ -113,6 +113,20 @@ export function appendStep(draft: EditableFlow, agentSlug: string, agentName = '
   return step;
 }
 
+// removeStep deletes the step for an agent and prunes every dangling reference
+// to it: a removed agent must also disappear from any sibling's
+// run_in_parallel_with, or the backend rejects the flow (a parallel ref must
+// resolve to a present sibling). Returns true when a step was removed.
+export function removeStep(draft: EditableFlow, agentSlug: string): boolean {
+  const idx = draft.steps.findIndex((s) => s.agent_slug === agentSlug);
+  if (idx === -1) return false;
+  draft.steps.splice(idx, 1);
+  for (const s of draft.steps) {
+    s.run_in_parallel_with = s.run_in_parallel_with.filter((p) => p !== agentSlug);
+  }
+  return true;
+}
+
 // draftToFlow projects a draft into the Flow shape the read-only canvas renders,
 // so the editor reuses one renderer for both the saved flow and the live draft.
 export function draftToFlow(draft: EditableFlow): Flow {

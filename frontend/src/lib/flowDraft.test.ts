@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDraftFromFlow,
   appendStep,
+  removeStep,
   draftToFlow,
   draftToPayload,
   suggestCloneSlug,
@@ -53,6 +54,27 @@ describe('flowDraft', () => {
 
     // An empty slug is a no-op.
     expect(appendStep(d, '')).toBeNull();
+  });
+
+  it('removes a step and prunes parallel references to it', () => {
+    const fan: Flow = {
+      slug: 'fan',
+      name: 'Fan',
+      builtin: false,
+      steps: [
+        { agent_slug: 'a', run_in_parallel_with: ['b'] },
+        { agent_slug: 'b', run_in_parallel_with: ['a'] },
+        { agent_slug: 'c' },
+      ],
+    };
+    const d = buildDraftFromFlow(fan, { clone: false });
+    expect(removeStep(d, 'b')).toBe(true);
+    expect(d.steps.map((s) => s.agent_slug)).toEqual(['a', 'c']);
+    // 'a' no longer references the removed 'b' (else the backend rejects it).
+    expect(d.steps[0].run_in_parallel_with).toEqual([]);
+    // Removing an absent agent is a no-op.
+    expect(removeStep(d, 'zzz')).toBe(false);
+    expect(d.steps).toHaveLength(2);
   });
 
   it('projects a draft into the Flow shape the canvas renders', () => {

@@ -9,7 +9,13 @@ import type { Flow, FlowStep, FlowTopology } from '../api/types';
 // GraphCanvas, which is bound to the spec/task Graph model (computeLayout,
 // edgePaths, nodeColors, actions). The SVG + curved-edge pattern follows
 // GraphCanvas; the layout is the flow's stage order.
-const props = defineProps<{ flow: Flow | null }>();
+// `editable` turns on per-node edit affordances (a remove control). The page
+// owns the draft; the canvas only emits intent, keyed by the step's agent_slug
+// (the flow's unique wiring key), so the renderer stays state-free.
+const props = withDefaults(defineProps<{ flow: Flow | null; editable?: boolean }>(), {
+  editable: false,
+});
+const emit = defineEmits<{ (e: 'remove', agentSlug: string): void }>();
 
 // Geometry. A stage is a column; parallel steps stack as rows within it.
 const NODE_W = 156;
@@ -20,6 +26,9 @@ const PAD = 24;
 
 interface LayoutNode {
   key: string;
+  // agent_slug of the step this node renders; empty for the synthetic entry
+  // ("Task") node, which is not a step and so is not removable.
+  slug: string;
   label: string;
   optional: boolean;
   x: number;
@@ -128,6 +137,7 @@ const layout = computed<Layout>(() => {
 
   const entry: LayoutNode = {
     key: 'entry',
+    slug: '',
     label: 'Task',
     optional: false,
     x: columnX(0),
@@ -139,6 +149,7 @@ const layout = computed<Layout>(() => {
   const stageNodes: LayoutNode[][] = gs.map((group, ci) =>
     group.map((step, ri) => ({
       key: `${ci}:${ri}:${step.agent_slug}`,
+      slug: step.agent_slug,
       label: stepLabel(step),
       optional: !!step.optional,
       x: columnX(ci + 1),
@@ -277,6 +288,32 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
               text-anchor="middle"
               dominant-baseline="central"
             >optional</text>
+
+            <!-- Remove control, edit mode only. Sits on the node's top-right
+                 corner; emits the step's agent_slug for the page to splice. -->
+            <g
+              v-if="editable && node.slug"
+              class="agc-node-remove"
+              role="button"
+              :aria-label="`Remove ${node.label}`"
+              tabindex="0"
+              @click="emit('remove', node.slug)"
+              @keydown.enter="emit('remove', node.slug)"
+            >
+              <circle
+                class="agc-node-remove-bg"
+                :cx="node.x + node.w - 9"
+                :cy="node.y + 9"
+                r="9"
+              />
+              <text
+                class="agc-node-remove-x"
+                :x="node.x + node.w - 9"
+                :y="node.y + 9"
+                text-anchor="middle"
+                dominant-baseline="central"
+              >&#215;</text>
+            </g>
           </g>
         </g>
       </svg>
@@ -362,5 +399,31 @@ const showTopology = computed(() => !!props.flow?.agentic && !!props.flow?.dynam
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.agc-node-remove {
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.agc-node:hover .agc-node-remove,
+.agc-node-remove:focus-visible {
+  opacity: 1;
+}
+.agc-node-remove-bg {
+  fill: var(--bg-elevated);
+  stroke: var(--danger, #d2453f);
+  stroke-width: 1.2;
+}
+.agc-node-remove:hover .agc-node-remove-bg {
+  fill: var(--danger, #d2453f);
+}
+.agc-node-remove-x {
+  fill: var(--danger, #d2453f);
+  font-size: 0.8rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.agc-node-remove:hover .agc-node-remove-x {
+  fill: #fff;
 }
 </style>

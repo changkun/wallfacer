@@ -124,6 +124,41 @@ describe('AgentGraphPage', () => {
     host.remove();
   });
 
+  it('removes a step when its canvas remove control is activated', async () => {
+    agents = [
+      { slug: 'impl', title: 'Implementation', builtin: true },
+      { slug: 'test', title: 'Testing', builtin: true },
+    ];
+    flows = [
+      {
+        slug: 'duo',
+        name: 'Duo',
+        builtin: false, // user flow: edits in place, no clone naming needed
+        steps: [
+          { agent_slug: 'impl', agent_name: 'Implementation' },
+          { agent_slug: 'test', agent_name: 'Testing' },
+        ],
+      },
+    ];
+
+    const { app, host } = await mount();
+    expect(host.querySelectorAll('.agc-node').length).toBe(2);
+
+    // Enter edit mode; remove controls render per node.
+    (host.querySelector('.ag-detail__edit') as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const removers = host.querySelectorAll('.agc-node-remove');
+    expect(removers.length).toBe(2);
+
+    // Activating one drops the node count to one.
+    (removers[0] as SVGGElement).dispatchEvent(new Event('click', { bubbles: true }));
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(host.querySelectorAll('.agc-node').length).toBe(1);
+
+    app.unmount();
+    host.remove();
+  });
+
   it('draws parallel steps as siblings in one stage', async () => {
     agents = [
       { slug: 'a', title: 'Agent A', builtin: true },
