@@ -154,8 +154,11 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     drag-to-add, remove, mark-parallel, ungroup, reorder, the agentic/topology
     controls, and a jump to the agent editor -- all persisting through the flow
     and agents CRUD.
-- **M6.3: run overlay.** Overlay a running/finished agentic task's lineage on the
-  canvas (status colors, handoff edges), polling/streaming the M5 endpoint.
+- **M6.3: run overlay. DONE** (fleet model). A read-only run picker lists the
+  selected fleet's agentic runs (tasks with `flow_id` == the fleet + a lineage);
+  choosing one fetches `GET /api/tasks/{id}/lineage` and colours the agent nodes
+  by status (running / done / failed), matched by lineage node name == agent
+  slug. Component-tested (filter by fleet, name-keyed status colouring).
 - **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;
   remove or redirect `AgentsPage`/`FlowsPage` once parity is confirmed. (Pairs with
   the onboarding spec: first-run lands here.)

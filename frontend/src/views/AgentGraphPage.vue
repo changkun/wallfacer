@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api/client';
-import type { Agent, Flow } from '../api/types';
+import type { Agent, Flow, Task, TaskLineage } from '../api/types';
 import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
 import {
   buildDraftFromFlow,
@@ -62,6 +62,50 @@ const flowOptions = computed(() => flows.value);
 const canvasFlow = computed<Flow | null>(() =>
   draft.value ? draftToFlow(draft.value) : selectedFlow.value,
 );
+
+// Run overlay (M6.3): the agentic runs of the selected fleet, and the lineage
+// status of the chosen run keyed by agent slug for the canvas to colour.
+const runs = ref<Task[]>([]);
+const selectedRunId = ref<string | null>(null);
+const runStatus = ref<Record<string, string>>({});
+
+async function loadRuns(slug: string) {
+  runs.value = [];
+  selectedRunId.value = null;
+  runStatus.value = {};
+  if (!slug) return;
+  try {
+    const all = await api<Task[]>('GET', '/api/tasks');
+    runs.value = (Array.isArray(all) ? all : [])
+      .filter((t) => t.flow_id === slug && !!t.lineage)
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  } catch (e) {
+    console.error('runs:', e);
+  }
+}
+
+async function onSelectRun(id: string | null) {
+  selectedRunId.value = id;
+  runStatus.value = {};
+  if (!id) return;
+  try {
+    const lin = await api<TaskLineage>('GET', `/api/tasks/${encodeURIComponent(id)}/lineage`);
+    const status: Record<string, string> = {};
+    for (const n of lin.nodes ?? []) {
+      // A lineage node's name is the agent slug it ran as (agentgraph adapter).
+      if (n.name) status[n.name] = n.status;
+    }
+    runStatus.value = status;
+  } catch (e) {
+    console.error('lineage:', e);
+  }
+}
+
+// Reload the fleet's runs whenever the selection changes (and not editing).
+watch([selectedSlug, draft], ([slug, d]) => {
+  if (d) return; // editing: no overlay
+  void loadRuns(slug ?? '');
+});
 
 // startEdit opens the selected flow for editing. A built-in is read-only, so it
 // is cloned into a new user flow (saving POSTs); a user flow is edited in place
@@ -274,6 +318,20 @@ onMounted(async () => {
                 :class="{ 'ag-detail__badge--user': !selectedFlow.builtin }"
               >{{ selectedFlow.builtin ? 'built-in' : 'user' }}</span>
               <code class="ag-detail__slug">{{ selectedFlow.slug }}</code>
+              <label v-if="runs.length" class="ag-detail__run">
+                <span>Run</span>
+                <select
+                  :value="selectedRunId"
+                  class="ag-detail__run-select"
+                  aria-label="Run overlay"
+                  @change="onSelectRun(($event.target as HTMLSelectElement).value || null)"
+                >
+                  <option :value="''">none</option>
+                  <option v-for="r in runs" :key="r.id" :value="r.id">
+                    {{ r.title || r.id.slice(0, 8) }} ({{ r.status }})
+                  </option>
+                </select>
+              </label>
               <button type="button" class="ag-detail__edit" @click="startEdit">
                 {{ selectedFlow.builtin ? 'Clone & edit' : 'Edit' }}
               </button>
@@ -350,6 +408,7 @@ onMounted(async () => {
               <AgentGraphCanvas
                 :flow="canvasFlow"
                 :editable="!!draft"
+                :run-status="draft ? undefined : runStatus"
                 @remove="onRemoveStep"
                 @set-lead="onSetLead"
                 @edit-agent="editAgent"
@@ -537,6 +596,26 @@ onMounted(async () => {
 .ag-detail__slug {
   font-size: 0.72rem;
   color: var(--text-muted);
+}
+.ag-detail__run {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+.ag-detail__run-select {
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.22rem 0.4rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
+}
+.ag-detail__run + .ag-detail__edit {
+  margin-left: 0;
 }
 .ag-detail__edit {
   margin-left: auto;

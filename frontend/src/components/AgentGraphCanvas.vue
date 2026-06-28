@@ -12,9 +12,14 @@ import { coordinationOf, type Coordination } from '../lib/flowDraft';
 // A task enters at the lead and the fleet works it to an outcome. Editing emits
 // intent keyed by agent_slug (remove, set-lead, edit-agent); the page owns the
 // draft. Free-form node positioning is a follow-up; this lays the fleet out.
-const props = withDefaults(defineProps<{ flow: Flow | null; editable?: boolean }>(), {
-  editable: false,
-});
+// runStatus overlays a run's lineage: agent_slug -> 'running' | 'done' |
+// 'failed'. When present (a run is selected) the matching agent nodes are
+// coloured by status, so a finished or in-flight run is visible on the same
+// graph that authored it.
+const props = withDefaults(
+  defineProps<{ flow: Flow | null; editable?: boolean; runStatus?: Record<string, string> }>(),
+  { editable: false, runStatus: undefined },
+);
 const emit = defineEmits<{
   (e: 'remove', agentSlug: string): void;
   (e: 'setLead', agentSlug: string): void;
@@ -279,6 +284,7 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
               'agc-node--editable': editable && node.kind === 'agent',
               'agc-node--draggable': draggable && node.kind === 'agent',
               'agc-node--dragging': dragSlug === node.slug,
+              [`agc-node--run-${runStatus?.[node.slug]}`]: !!(node.slug && runStatus?.[node.slug]),
             }"
             :data-node-slug="node.slug || null"
             @pointerdown="onNodePointerDown($event, node)"
@@ -425,6 +431,22 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
 .agc-node--lead .agc-node-box {
   stroke: var(--accent);
   stroke-width: 1.8;
+}
+/* Run overlay: status colours for the agent that ran. */
+.agc-node--run-running .agc-node-box {
+  stroke: var(--warning, #c98a00);
+  stroke-width: 2;
+  fill: color-mix(in srgb, var(--warning, #c98a00) 12%, var(--bg-elevated));
+}
+.agc-node--run-done .agc-node-box {
+  stroke: var(--success, #2e9e5b);
+  stroke-width: 2;
+  fill: color-mix(in srgb, var(--success, #2e9e5b) 12%, var(--bg-elevated));
+}
+.agc-node--run-failed .agc-node-box {
+  stroke: var(--danger, #d2453f);
+  stroke-width: 2;
+  fill: color-mix(in srgb, var(--danger, #d2453f) 12%, var(--bg-elevated));
 }
 .agc-node-text {
   fill: var(--text);

@@ -13,15 +13,22 @@ import type { Agent, Flow } from '../api/types';
 let originalFetch: typeof globalThis.fetch;
 let agents: Agent[];
 let flows: Flow[];
+let tasks: unknown[];
+let lineages: Record<string, unknown>;
 
 beforeEach(() => {
   agents = [];
   flows = [];
+  tasks = [];
+  lineages = {};
   originalFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
     let body: unknown = null;
+    const lin = url.match(/\/api\/tasks\/([^/?]+)\/lineage/);
     if (url.includes('/api/agents')) body = agents;
+    else if (lin) body = lineages[decodeURIComponent(lin[1])] ?? { nodes: [], edges: [] };
+    else if (url.includes('/api/tasks')) body = tasks;
     else {
       // GET /api/flows/<slug> returns a single flow (the detail route the editor
       // fetches before cloning); GET /api/flows returns the list.
@@ -190,6 +197,54 @@ describe('AgentGraphPage (fleet)', () => {
     // The lead node now reads Bravo.
     const leadNode = host.querySelector('.agc-node--lead');
     expect(leadNode?.textContent).toContain('Bravo');
+
+    app.unmount();
+    host.remove();
+  });
+
+  it('overlays a run: selecting a run colours the agent nodes by status', async () => {
+    agents = [{ slug: 'impl', title: 'Implementation', builtin: true }, { slug: 'test', title: 'Testing', builtin: true }];
+    flows = [
+      {
+        slug: 'runnable', name: 'Runnable', builtin: false,
+        agentic: true, dynamic: true, topology: 'orchestrator-worker',
+        steps: [
+          { agent_slug: 'impl', agent_name: 'Implementation' },
+          { agent_slug: 'test', agent_name: 'Testing' },
+        ],
+      },
+    ];
+    tasks = [
+      { id: 'task-1', title: 'A run', status: 'done', created_at: '2026-06-28T10:00:00Z', flow_id: 'runnable', lineage: '{...}' },
+      { id: 'task-x', title: 'Other', status: 'done', created_at: '2026-06-28T09:00:00Z', flow_id: 'other', lineage: '{...}' },
+    ];
+    lineages['task-1'] = {
+      nodes: [
+        { id: 'n1', name: 'impl', role: 'Implementation', status: 'done' },
+        { id: 'n2', name: 'test', role: 'Testing', status: 'failed' },
+      ],
+      edges: [],
+    };
+
+    const { app, host } = await mount();
+
+    // The run picker lists only this fleet's run (task-x is a different flow).
+    const sel = host.querySelector('select[aria-label="Run overlay"]') as HTMLSelectElement;
+    expect(sel).toBeTruthy();
+    const opts = Array.from(sel.querySelectorAll('option')).map((o) => o.value);
+    expect(opts).toContain('task-1');
+    expect(opts).not.toContain('task-x');
+
+    // No overlay until a run is chosen.
+    expect(host.querySelectorAll('[class*="agc-node--run-"]').length).toBe(0);
+
+    sel.value = 'task-1';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // impl -> done, test -> failed (matched by lineage node name == agent slug).
+    expect(host.querySelectorAll('.agc-node--run-done').length).toBe(1);
+    expect(host.querySelectorAll('.agc-node--run-failed').length).toBe(1);
 
     app.unmount();
     host.remove();

@@ -137,6 +137,9 @@ export interface Task {
   routine_last_fired_at?: string | null;
   routine_spawn_kind?: string;
   routine_spawn_flow?: string;
+  // flow_id is the fleet (flow slug) this task ran against; used by the
+  // agent-graph run overlay to find a fleet's runs.
+  flow_id?: string;
   // Budget guardrails — 0 / missing means unlimited.
   max_cost_usd?: number;
   max_input_tokens?: number;
