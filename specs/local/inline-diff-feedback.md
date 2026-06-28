@@ -1,6 +1,6 @@
 ---
 title: Inline Diff Feedback
-status: stale
+status: drafted
 depends_on: []
 affects:
   - frontend/src/lib/diff.ts
@@ -11,7 +11,7 @@ affects:
   - internal/cli/server.go
 effort: medium
 created: 2026-04-02
-updated: 2026-06-26
+updated: 2026-06-28
 author: changkun
 dispatched_task_id: null
 ---
