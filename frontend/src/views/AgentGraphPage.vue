@@ -8,22 +8,22 @@ import {
   buildDraftFromFlow,
   appendStep,
   removeStep,
-  setParallel,
-  clearParallel,
-  moveStage,
+  promoteToLead,
+  coordinationOf,
+  setCoordination,
   draftToFlow,
   draftToPayload,
+  type Coordination,
   type EditableFlow,
 } from '../lib/flowDraft';
 
 // AgentGraphPage is the unified agent-graph surface (spec:
-// unified-agent-graph-ui.md). Left is the agent palette (the merged registry,
-// searchable); centre renders a selected flow as an agent-graph. M6.1 was the
-// read-only scaffold; M6.2 adds editing: a flow is cloned (built-ins are
-// read-only) or edited in place into a draft, agents are dragged from the
-// palette onto the canvas to add steps, and the draft is saved through the flow
-// CRUD. When `draft` is null the page is read-only, which keeps the original
-// render path (and its component test) intact.
+// unified-agent-graph-ui.md). A flow is presented as an agent FLEET: the palette
+// (left) is the agent registry; the canvas (centre) renders the selected fleet
+// (lead + members, delegation edges). Editing clones a built-in or edits a user
+// fleet into a draft -- drag agents from the palette to add members, set the
+// lead, pick the coordination, remove -- and saves through the flow CRUD. When
+// `draft` is null the page is read-only.
 
 const router = useRouter();
 
@@ -111,23 +111,20 @@ function onRemoveStep(agentSlug: string) {
   saveError.value = '';
 }
 
-function onParallel(p: { from: string; to: string }) {
+function onSetLead(agentSlug: string) {
   if (!draft.value) return;
-  setParallel(draft.value, p.from, p.to);
+  promoteToLead(draft.value, agentSlug);
   saveError.value = '';
 }
 
-function onUngroup(agentSlug: string) {
-  if (!draft.value) return;
-  clearParallel(draft.value, agentSlug);
-  saveError.value = '';
-}
-
-function onReorder(p: { slug: string; toStage: number }) {
-  if (!draft.value) return;
-  moveStage(draft.value, p.slug, p.toStage);
-  saveError.value = '';
-}
+// coordination is the fleet's lead/mesh/sequence mode, read from and written to
+// the draft's agentic/dynamic/topology fields.
+const coordination = computed<Coordination>({
+  get: () => coordinationOf(draft.value ?? {}),
+  set: (c) => {
+    if (draft.value) setCoordination(draft.value, c);
+  },
+});
 
 // editAgent jumps to the existing Agents editor for an agent (deep link read by
 // AgentsPage). Suppressed while editing a flow so an unsaved draft is not lost
@@ -140,7 +137,7 @@ function editAgent(slug: string) {
 async function saveDraft() {
   if (!draft.value) return;
   if (draft.value.steps.length === 0) {
-    saveError.value = 'Add at least one step before saving.';
+    saveError.value = 'Add at least one agent before saving.';
     return;
   }
   saving.value = true;
@@ -202,17 +199,17 @@ onMounted(async () => {
           <div>
             <h2 class="ag-mode__title">Agent Graph</h2>
             <p class="ag-mode__subtitle">
-              One surface for agents and flows. The palette on the left lists the
-              agent registry; the canvas renders a flow as an agent-graph, with a
-              node per step and edges for order.
-              <template v-if="draft">Drag agents onto the canvas to add steps, then save.</template>
-              <template v-else>Clone or edit a flow to compose it; double-click an agent or node to edit the agent.</template>
+              An agent fleet works a task to an outcome. The palette lists the
+              agent registry; the canvas shows the selected fleet as a graph,
+              with the lead receiving the task and delegating to its members.
+              <template v-if="draft">Drag agents in, set the lead, pick how they coordinate, then save.</template>
+              <template v-else>Clone or edit a fleet to compose it; double-click an agent or node to edit the agent.</template>
             </p>
           </div>
           <div class="ag-mode__header-actions">
             <label class="ag-mode__flow-pick">
-              <span class="ag-mode__flow-pick-label">Flow</span>
-              <select v-model="selectedSlug" class="ag-mode__flow-select" aria-label="Flow">
+              <span class="ag-mode__flow-pick-label">Fleet</span>
+              <select v-model="selectedSlug" class="ag-mode__flow-select" aria-label="Fleet">
                 <option v-if="!flowOptions.length" :value="null">No flows</option>
                 <option v-for="f in flowOptions" :key="f.slug" :value="f.slug">
                   {{ f.name || f.slug }}
@@ -264,10 +261,10 @@ onMounted(async () => {
 
         <section class="ag-mode__detail">
           <div v-if="loading" class="ag-mode__empty-detail">
-            <p>Loading flow...</p>
+            <p>Loading fleet...</p>
           </div>
           <div v-else-if="!selectedFlow" class="ag-mode__empty-detail">
-            <p>Pick a flow above to render its agent-graph.</p>
+            <p>Pick a fleet above to render its agent-graph.</p>
           </div>
           <template v-else>
             <div v-if="!draft" class="ag-detail__head">
@@ -290,43 +287,32 @@ onMounted(async () => {
                 <input
                   v-model="draft.name"
                   class="ag-edit__name"
-                  placeholder="Flow name"
-                  aria-label="Flow name"
+                  placeholder="Fleet name"
+                  aria-label="Fleet name"
                 />
                 <input
                   v-model="draft.slug"
                   class="ag-edit__slug"
                   :readonly="!draft.isClone"
-                  placeholder="flow-slug"
-                  aria-label="Flow slug"
+                  placeholder="fleet-slug"
+                  aria-label="Fleet slug"
                 />
                 <span v-if="draft.isClone" class="ag-edit__hint">clone of {{ draft.sourceSlug }}</span>
               </div>
 
-              <!-- Topology: a pinned chain runs the steps deterministically; an
-                   agentic flow runs through the topos runtime, and a dynamic one
-                   lets the model delegate (orchestrator-worker or mesh, bounded
-                   by the handoff depth). Maps onto the M6.2a flow fields. -->
+              <!-- Coordination: how the fleet works a task. Lead delegates
+                   (orchestrator-worker) and Open mesh run through the topos
+                   delegation runtime; Fixed sequence is the simple deterministic
+                   chain. Maps onto the flow's agentic/dynamic/topology fields. -->
               <div class="ag-edit__topo">
-                <label class="ag-edit__toggle">
-                  <input type="checkbox" v-model="draft.agentic" aria-label="Agentic" />
-                  <span>Agentic</span>
-                </label>
-                <label v-if="draft.agentic" class="ag-edit__toggle">
-                  <input type="checkbox" v-model="draft.dynamic" aria-label="Dynamic" />
-                  <span>Dynamic</span>
-                </label>
-                <select
-                  v-if="draft.agentic && draft.dynamic"
-                  v-model="draft.topology"
-                  class="ag-edit__topo-select"
-                  aria-label="Topology"
-                >
-                  <option value="orchestrator-worker">orchestrator-worker</option>
-                  <option value="mesh">mesh</option>
+                <label class="ag-edit__field-label">Coordination</label>
+                <select v-model="coordination" class="ag-edit__topo-select" aria-label="Coordination">
+                  <option value="lead">Lead delegates</option>
+                  <option value="mesh">Open mesh</option>
+                  <option value="sequence">Fixed sequence</option>
                 </select>
-                <label v-if="draft.agentic && draft.dynamic" class="ag-edit__depth">
-                  <span>depth</span>
+                <label v-if="coordination === 'mesh'" class="ag-edit__depth">
+                  <span>handoff depth</span>
                   <input
                     type="number"
                     min="0"
@@ -350,8 +336,8 @@ onMounted(async () => {
               {{ selectedFlow.description }}
             </p>
             <p v-else-if="draft" class="ag-edit__tip">
-              Drag an agent from the palette to add a step; drag one step onto
-              another to run them in parallel, or into a gap to reorder.
+              Drag an agent from the palette to add a member; hover a member for
+              its controls (★ make lead, × remove). The lead receives the task.
             </p>
 
             <div
@@ -365,9 +351,7 @@ onMounted(async () => {
                 :flow="canvasFlow"
                 :editable="!!draft"
                 @remove="onRemoveStep"
-                @parallel="onParallel"
-                @ungroup="onUngroup"
-                @reorder="onReorder"
+                @set-lead="onSetLead"
                 @edit-agent="editAgent"
               />
             </div>
@@ -625,6 +609,12 @@ onMounted(async () => {
   align-items: center;
   gap: 0.3rem;
   cursor: pointer;
+}
+.ag-edit__field-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
 }
 .ag-edit__topo-select {
   font: inherit;

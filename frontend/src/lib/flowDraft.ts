@@ -244,6 +244,45 @@ export function moveStage(draft: EditableFlow, slug: string, toStage: number): b
   return true;
 }
 
+// Coordination is the fleet's user-facing model of how its agents work a task,
+// mapped onto the agentic/dynamic/topology fields:
+//   - sequence: a fixed deterministic chain (dynamic=false) -- the simple case.
+//   - lead:     orchestrator-worker -- only the lead delegates to members.
+//   - mesh:     any agent delegates to any peer (bounded by handoff depth).
+export type Coordination = 'sequence' | 'lead' | 'mesh';
+
+// coordinationOf reads the coordination mode off a flow/draft's fields.
+export function coordinationOf(f: {
+  dynamic?: boolean;
+  topology?: FlowTopology;
+}): Coordination {
+  if (!f.dynamic) return 'sequence';
+  return f.topology === 'mesh' ? 'mesh' : 'lead';
+}
+
+// setCoordination writes the mode back onto a draft. A delegating fleet (lead or
+// mesh) must be agentic to run through the topos runtime; sequence drops to a
+// pinned chain (agentic is left as-is so a legacy flow stays legacy).
+export function setCoordination(draft: EditableFlow, c: Coordination): void {
+  if (c === 'sequence') {
+    draft.dynamic = false;
+    return;
+  }
+  draft.agentic = true;
+  draft.dynamic = true;
+  draft.topology = c === 'mesh' ? 'mesh' : 'orchestrator-worker';
+}
+
+// promoteToLead moves a member to the front of the steps so it becomes the
+// fleet entry (lead). Returns false when it is missing or already the lead.
+export function promoteToLead(draft: EditableFlow, slug: string): boolean {
+  const i = draft.steps.findIndex((s) => s.agent_slug === slug);
+  if (i <= 0) return false;
+  const [s] = draft.steps.splice(i, 1);
+  draft.steps.unshift(s);
+  return true;
+}
+
 // draftToFlow projects a draft into the Flow shape the read-only canvas renders,
 // so the editor reuses one renderer for both the saved flow and the live draft.
 export function draftToFlow(draft: EditableFlow): Flow {
