@@ -2,7 +2,9 @@ package agentgraph
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"latere.ai/x/topos"
 	"latere.ai/x/wallfacer/internal/agents"
@@ -115,12 +117,25 @@ type Edge struct {
 	Kind string
 }
 
+// TraceEvent is the topos-free mirror of topos.Event: one observation emitted
+// during a run (lifecycle, tool use, delegation, per-turn assistant text). Node
+// is the lineage node id the event came from (it equals the emitting agent's
+// topos session id), so a consumer can join a live event to a Lineage node.
+// PayloadJSON is the full event payload, opaque to the seam.
+type TraceEvent struct {
+	Name        string
+	Node        string
+	AgentID     string
+	At          time.Time
+	PayloadJSON json.RawMessage
+}
+
 // RunFlowFake runs a flow through the agent-graph runtime with the deterministic,
 // network-free fake model, returning a topos-free Result. sessionID seeds the
 // run id so lineage node ids (<session>/<agent>) are stable. It is the explicit
 // fake entrypoint, equivalent to RunFlowWithModel with an unconfigured config.
 func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents.Registry, prompt string) (Result, error) {
-	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt)
+	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt, nil)
 }
 
 // toResult converts a topos.RunResult into the topos-free host Result.

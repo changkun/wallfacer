@@ -115,10 +115,29 @@ func RunOptions(sessionID string, c ModelConfig, f flow.Flow) topos.Options {
 // OQ-1 (sandbox) is resolved minimally for M4: Options.Sandbox is left nil, so a
 // run uses the topos local sandbox. Sharing wallfacer's executor.Backend through
 // a topos.Sandbox adapter is future work.
-func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt string) (Result, error) {
-	res, err := RunFlow(ctx, runOptions(sessionID, c, f), f, reg, prompt)
+func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt string, onEvent func(TraceEvent)) (Result, error) {
+	opts := runOptions(sessionID, c, f)
+	if onEvent != nil {
+		// Bridge topos's observer to a topos-free TraceEvent so only this seam
+		// names a topos type. The callback runs synchronously on the run's
+		// goroutine(s); the host's onEvent must be non-blocking.
+		opts.Observer = func(e topos.Event) { onEvent(toTraceEvent(e)) }
+	}
+	res, err := RunFlow(ctx, opts, f, reg, prompt)
 	if err != nil {
 		return Result{}, err
 	}
 	return toResult(res), nil
+}
+
+// toTraceEvent converts a topos.Event into the topos-free TraceEvent. Node is the
+// event's topos SessionID, which equals the emitting agent's lineage node id.
+func toTraceEvent(e topos.Event) TraceEvent {
+	return TraceEvent{
+		Name:        e.Name,
+		Node:        e.SessionID,
+		AgentID:     e.AgentID,
+		At:          e.At,
+		PayloadJSON: e.PayloadJSON,
+	}
 }
