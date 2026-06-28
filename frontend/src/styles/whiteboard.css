@@ -6,85 +6,90 @@
    already resolve to the correct light/dark value via [data-theme] on <html> —
    so a single mapping covers both themes.
 
-   Specificity: selectors are scoped under `.wb-canvas` (the mount container) and
-   duplicated for `.theme--dark` so they outrank Excalidraw's own
-   `.excalidraw` / `.excalidraw.theme--dark` rules regardless of stylesheet load
-   order (Excalidraw's CSS is imported dynamically, after this file).
+   Scope + specificity: rules target `.excalidraw` globally (not the mount
+   container) because Excalidraw portals dialogs/popovers into an
+   `.excalidraw-modal-container` appended outside the mount div — a
+   `.wb-canvas`-scoped rule would miss them. This file is only loaded on the
+   whiteboard route, so global `.excalidraw` selectors are safe. `!important` is
+   used on the variable values so they beat Excalidraw's own
+   `.excalidraw.theme--dark` rules regardless of stylesheet load order
+   (Excalidraw's CSS is imported dynamically, after this file).
 
    Coupled to @excalidraw/excalidraw@0.18 variable + class names. Excalidraw's
    dark-mode `--theme-filter` (canvas / color-swatch inversion) is intentionally
    left untouched, and it is not applied to the panels these variables drive.
    ======================================================================= */
 
-.wb-canvas .excalidraw,
-.wb-canvas .excalidraw.theme--dark {
+.excalidraw,
+.excalidraw.theme--dark {
   /* Typography */
-  --ui-font: var(--font-sans);
+  --ui-font: var(--font-sans) !important;
 
   /* Accent / primary — clay */
-  --color-primary: var(--accent);
-  --color-primary-darker: var(--accent-2);
-  --color-primary-darkest: var(--accent-2);
-  --color-primary-hover: var(--accent-hover);
-  --color-primary-light: var(--accent-tint);
-  --color-primary-light-darker: var(--accent-soft);
-  --color-brand-hover: var(--accent-hover);
-  --color-brand-active: var(--accent-2);
-  --color-selection: var(--accent);
-  --select-highlight-color: var(--accent);
-  --color-surface-primary-container: var(--accent-tint);
-  --color-on-primary-container: var(--accent);
+  --color-primary: var(--accent) !important;
+  --color-primary-darker: var(--accent-2) !important;
+  --color-primary-darkest: var(--accent-2) !important;
+  --color-primary-hover: var(--accent-hover) !important;
+  --color-primary-light: var(--accent-tint) !important;
+  --color-primary-light-darker: var(--accent-soft) !important;
+  --color-brand-hover: var(--accent-hover) !important;
+  --color-brand-active: var(--accent-2) !important;
+  --color-selection: var(--accent) !important;
+  --select-highlight-color: var(--accent) !important;
+  --color-surface-primary-container: var(--accent-tint) !important;
+  --color-on-primary-container: var(--accent) !important;
 
   /* Surfaces — islands/toolbar/dialogs read as elevated cards; recessed
      surfaces use the sunk token. */
-  --island-bg-color: var(--bg-card);
-  --default-bg-color: var(--bg-card);
-  --popup-bg-color: var(--bg-card);
-  --popup-secondary-bg-color: var(--bg-elevated);
-  --sidebar-bg-color: var(--bg-card);
-  --color-surface-high: var(--bg-card);
-  --color-surface-mid: var(--bg-elevated);
-  --color-surface-low: var(--bg-sunk);
-  --color-surface-lowest: var(--bg-sunk);
-  --color-on-surface: var(--text);
+  --island-bg-color: var(--bg-card) !important;
+  --default-bg-color: var(--bg-card) !important;
+  --popup-bg-color: var(--bg-card) !important;
+  --popup-secondary-bg-color: var(--bg-elevated) !important;
+  --sidebar-bg-color: var(--bg-card) !important;
+  --color-surface-high: var(--bg-card) !important;
+  --color-surface-mid: var(--bg-elevated) !important;
+  --color-surface-low: var(--bg-sunk) !important;
+  --color-surface-lowest: var(--bg-sunk) !important;
+  --color-on-surface: var(--text) !important;
 
   /* Text */
-  --text-primary-color: var(--text);
-  --color-muted: var(--text-muted);
-  --color-muted-darker: var(--text-muted);
-  --color-muted-darkest: var(--text);
-  --input-label-color: var(--text-muted);
+  --text-primary-color: var(--text) !important;
+  --color-muted: var(--text-muted) !important;
+  --color-muted-darker: var(--text-muted) !important;
+  --color-muted-darkest: var(--text) !important;
+  --input-label-color: var(--text-muted) !important;
 
   /* Borders */
-  --default-border-color: var(--border);
-  --dialog-border-color: var(--border);
-  --sidebar-border-color: var(--border);
-  --color-border-outline: var(--border);
-  --color-border-outline-variant: var(--border);
+  --default-border-color: var(--border) !important;
+  --dialog-border-color: var(--border) !important;
+  --sidebar-border-color: var(--border) !important;
+  --color-border-outline: var(--border) !important;
+  --color-border-outline-variant: var(--border) !important;
 
   /* Inputs */
-  --input-bg-color: var(--bg-input);
-  --input-border-color: var(--border);
-  --input-hover-bg-color: var(--bg-hover);
+  --input-bg-color: var(--bg-input) !important;
+  --input-border-color: var(--border) !important;
+  --input-hover-bg-color: var(--bg-hover) !important;
 
   /* Buttons */
-  --button-color: var(--text);
-  --button-hover-bg: var(--bg-hover);
-  --button-active-bg: var(--bg-active);
-  --button-hover-border: var(--border);
-  --button-active-border: var(--border);
+  --button-color: var(--text) !important;
+  --button-hover-bg: var(--bg-hover) !important;
+  --button-active-bg: var(--bg-active) !important;
+  --button-hover-border: var(--border) !important;
+  --button-active-border: var(--border) !important;
 
   /* Semantic */
-  --color-danger: var(--err);
-  --color-danger-text: var(--err);
-  --color-warning: var(--warn);
-  --color-success: var(--ok);
+  --color-danger: var(--err) !important;
+  --color-danger-text: var(--err) !important;
+  --color-warning: var(--warn) !important;
+  --color-success: var(--ok) !important;
 
   /* Match wallfacer's tighter corner radius on the floating chrome. */
-  --border-radius-lg: var(--r-lg);
-  --border-radius-md: var(--r-md);
+  --border-radius-lg: var(--r-lg) !important;
+  --border-radius-md: var(--r-md) !important;
 }
 
 /* Drop the external links (Documentation / blog / GitHub / YouTube) from the
-   Help dialog. The keyboard-shortcut reference below the header stays. */
-.wb-canvas .HelpDialog__header { display: none; }
+   Help dialog. The dialog is portaled outside the mount container, so this is
+   global; the keyboard-shortcut reference below the header stays. */
+.HelpDialog__header { display: none !important; }
