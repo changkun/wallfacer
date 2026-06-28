@@ -690,7 +690,10 @@
   padding: 12px;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-xl);
+  /* Concentric with the column tray (.col-bg, --r-xl) given the ~8px gutter:
+     14 − 8 = 6 (--r-md), so the composer's corners nest with the tray's
+     instead of two equal radii sitting offset. Matches the regular .card. */
+  border-radius: var(--r-md);
   font-size: var(--fs-10);
   color: var(--ink-2);
   box-shadow: var(--sh-2);
@@ -769,7 +772,9 @@
   background: var(--bg-card);
   color: var(--ink);
   border: 1px solid var(--rule);
-  border-radius: var(--r-md);
+  /* One step tighter than the composer card (--r-md) so the field reads as
+     nested inside it rather than echoing the same corner radius. */
+  border-radius: var(--r-sm);
   font-size: var(--fs-md);
   line-height: 1.45;
   font-family: inherit;
