@@ -8,6 +8,7 @@ import { api } from '../api/client';
 import GraphCanvas from '../components/map/GraphCanvas.vue';
 import MapNodePopup from '../components/map/MapNodePopup.vue';
 import { stateColor } from '../components/map/nodeColors';
+import { ACTION_LABELS, hasPrimaryAction } from '../components/map/actions';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 import TaskDetail from '../components/TaskDetail.vue';
 import type { Graph, GraphNode, GraphAction, Task } from '../api/types';
@@ -130,17 +131,6 @@ function openInBoard(taskId: string) {
 // stale button claiming something is possible).
 const actionBusy = ref(false);
 
-// User-facing labels for the transition verbs the backend marks available.
-const ACTION_LABELS: Record<GraphAction, string> = {
-  dispatch: 'Dispatch',
-  undispatch: 'Undispatch',
-  validate: 'Validate',
-  'force-complete': 'Force complete',
-  unstale: 'Un-stale',
-  unarchive: 'Unarchive',
-  start: 'Start',
-};
-
 // runAction fires one node action against the real API and re-syncs the graph.
 // 'start' promotes a task; every other verb is a spec transition. The server's
 // available_actions stays the source of truth — a failure re-fetches so a stale
@@ -177,7 +167,7 @@ async function runAction(node: GraphNode, action: GraphAction) {
 
 // Nodes the operator can act on right now — surfaced as an inspector list so
 // "what's actionable" is legible without hunting the canvas.
-const readyNodes = computed(() => graph.value.nodes.filter((n) => (n.available_actions?.length ?? 0) > 0));
+const readyNodes = computed(() => graph.value.nodes.filter((n) => hasPrimaryAction(n.available_actions)));
 function onResetClick() {
   mapSearch.value = '';
   canvas.value?.resetView();
