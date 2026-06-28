@@ -159,9 +159,15 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
   choosing one fetches `GET /api/tasks/{id}/lineage` and colours the agent nodes
   by status (running / done / failed), matched by lineage node name == agent
   slug. Component-tested (filter by fleet, name-keyed status colouring).
-- **M6.4: retire the old pages.** Point the Agents/Flows nav at the unified surface;
-  remove or redirect `AgentsPage`/`FlowsPage` once parity is confirmed. (Pairs with
-  the onboarding spec: first-run lands here.)
+- **M6.4: retire the old pages. PARITY DONE; cutover deferred.** The unified
+  fleet surface now has full CRUD parity with `FlowsPage`: clone/edit/save (M6.2),
+  delete a user fleet (inline two-step confirm), the run overlay (M6.3), and a
+  jump to the agent editor for per-agent edits (so `AgentsPage` stays as the
+  agent CRUD surface the fleet links to). The remaining step is the user-facing
+  nav cutover (redirect `/workflows` -> the fleet surface, drop the Workflows
+  item). That is a one-way change held for the author's go-ahead, since the
+  fleet reframe is under active review; the `FlowsPage`/`AgentsPage` components
+  are untouched so the cutover stays a trivial, reversible follow-up.
 
 ## Test strategy
 

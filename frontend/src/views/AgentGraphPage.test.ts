@@ -22,9 +22,15 @@ beforeEach(() => {
   tasks = [];
   lineages = {};
   originalFetch = globalThis.fetch;
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
+    const method = (init?.method || 'GET').toUpperCase();
     let body: unknown = null;
+    const flowDetail = url.match(/\/api\/flows\/([^/?]+)/);
+    if (method === 'DELETE' && flowDetail) {
+      flows = flows.filter((f) => f.slug !== decodeURIComponent(flowDetail[1]));
+      return new Response(null, { status: 204 });
+    }
     const lin = url.match(/\/api\/tasks\/([^/?]+)\/lineage/);
     if (url.includes('/api/agents')) body = agents;
     else if (lin) body = lineages[decodeURIComponent(lin[1])] ?? { nodes: [], edges: [] };
@@ -245,6 +251,40 @@ describe('AgentGraphPage (fleet)', () => {
     // impl -> done, test -> failed (matched by lineage node name == agent slug).
     expect(host.querySelectorAll('.agc-node--run-done').length).toBe(1);
     expect(host.querySelectorAll('.agc-node--run-failed').length).toBe(1);
+
+    app.unmount();
+    host.remove();
+  });
+
+  it('deletes a user fleet after an inline confirm; built-ins have no delete', async () => {
+    agents = [{ slug: 'a', title: 'Alpha', builtin: true }];
+    flows = [
+      { slug: 'builtin-one', name: 'Builtin', builtin: true, steps: [{ agent_slug: 'a', agent_name: 'Alpha' }] },
+      { slug: 'mine', name: 'Mine', builtin: false, steps: [{ agent_slug: 'a', agent_name: 'Alpha' }] },
+    ];
+
+    const { app, host } = await mount();
+    // Built-in (auto-selected first) exposes no Delete control.
+    expect(Array.from(host.querySelectorAll('button')).some((b) => b.textContent === 'Delete')).toBe(false);
+
+    // Switch to the user fleet.
+    const picker = host.querySelector('select.ag-mode__flow-select') as HTMLSelectElement;
+    picker.value = 'mine';
+    picker.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    const delBtn = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Delete') as HTMLButtonElement;
+    expect(delBtn).toBeTruthy();
+    delBtn.click(); // first click: arm the confirm
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+    const confirm = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Confirm') as HTMLButtonElement;
+    expect(confirm).toBeTruthy();
+    confirm.click();
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // The fleet is gone from the registry; the picker no longer lists it.
+    const opts = Array.from((host.querySelector('select.ag-mode__flow-select') as HTMLSelectElement).querySelectorAll('option')).map((o) => o.value);
+    expect(opts).not.toContain('mine');
 
     app.unmount();
     host.remove();

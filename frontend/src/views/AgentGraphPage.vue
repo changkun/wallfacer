@@ -103,6 +103,7 @@ async function onSelectRun(id: string | null) {
 
 // Reload the fleet's runs whenever the selection changes (and not editing).
 watch([selectedSlug, draft], ([slug, d]) => {
+  confirmingDelete.value = false;
   if (d) return; // editing: no overlay
   void loadRuns(slug ?? '');
 });
@@ -169,6 +170,26 @@ const coordination = computed<Coordination>({
     if (draft.value) setCoordination(draft.value, c);
   },
 });
+
+// Delete a user fleet. Built-ins are read-only; an inline two-step confirm
+// keeps the page store-free while still guarding a destructive action.
+const confirmingDelete = ref(false);
+const deleting = ref(false);
+async function deleteFleet() {
+  const f = selectedFlow.value;
+  if (!f || f.builtin) return;
+  deleting.value = true;
+  try {
+    await api('DELETE', `/api/flows/${encodeURIComponent(f.slug)}`);
+    confirmingDelete.value = false;
+    selectedSlug.value = null;
+    await loadFlows();
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    deleting.value = false;
+  }
+}
 
 // editAgent jumps to the existing Agents editor for an agent (deep link read by
 // AgentsPage). Suppressed while editing a flow so an unsaved draft is not lost
@@ -335,6 +356,21 @@ onMounted(async () => {
               <button type="button" class="ag-detail__edit" @click="startEdit">
                 {{ selectedFlow.builtin ? 'Clone & edit' : 'Edit' }}
               </button>
+              <template v-if="!selectedFlow.builtin">
+                <button
+                  v-if="!confirmingDelete"
+                  type="button"
+                  class="ag-detail__edit ag-detail__delete"
+                  @click="confirmingDelete = true"
+                >Delete</button>
+                <template v-else>
+                  <span class="ag-detail__confirm-label">Delete this fleet?</span>
+                  <button type="button" class="ag-detail__edit ag-detail__delete" :disabled="deleting" @click="deleteFleet">
+                    {{ deleting ? 'Deleting...' : 'Confirm' }}
+                  </button>
+                  <button type="button" class="ag-detail__edit" :disabled="deleting" @click="confirmingDelete = false">Keep</button>
+                </template>
+              </template>
             </div>
 
             <!-- Editing toolbar: name + slug (slug locked when editing in place,
@@ -630,6 +666,14 @@ onMounted(async () => {
 }
 .ag-detail__edit:hover {
   border-color: var(--accent);
+}
+.ag-detail__delete:hover {
+  border-color: var(--danger, #d2453f);
+  color: var(--danger, #d2453f);
+}
+.ag-detail__confirm-label {
+  font-size: 0.76rem;
+  color: var(--danger, #d2453f);
 }
 .ag-detail__desc {
   margin: 0.45rem 0 0;
