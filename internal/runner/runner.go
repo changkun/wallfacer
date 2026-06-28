@@ -163,7 +163,6 @@ type Runner struct {
 	backgroundWg     trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
-	autosubmitFn     func() bool           // returns true when auto-submit is enabled
 	agentSession     *agentsession.Runtime // agent session for chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
@@ -272,22 +271,6 @@ func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
 	if fn != nil {
 		fn(taskID, stopReason)
 	}
-}
-
-// SetAutosubmitFunc registers a callback that reports whether auto-submit is
-// currently enabled. The ideation pipeline uses this to decide whether to
-// create backlog tasks immediately or wait for manual approval.
-func (r *Runner) SetAutosubmitFunc(fn func() bool) {
-	r.autosubmitFn = fn
-}
-
-// isAutosubmitEnabled returns whether auto-submit is currently enabled.
-// Defaults to true for backward compatibility when no callback is registered.
-func (r *Runner) isAutosubmitEnabled() bool {
-	if r.autosubmitFn == nil {
-		return true // default to auto-create for backward compatibility
-	}
-	return r.autosubmitFn()
 }
 
 // SetAgentSession registers the agent session so that chat runs through
