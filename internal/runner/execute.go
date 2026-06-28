@@ -267,6 +267,19 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		return
 	}
 
+	// Agentic flows run through the in-process topos agent-graph runtime
+	// (internal/agentgraph) rather than the legacy flow engine. The flow is
+	// compiled into a topos.Region (entry + ordered peer chain), executed with
+	// the deterministic fake model for now (real Lux wiring is M4), and the
+	// resulting lineage graph is persisted on the task. This branch must run
+	// before the flow-engine branch below: an agentic flow has a non-implement
+	// slug and would otherwise be swallowed by the engine path.
+	if af, ok := r.flowBySlug(flowSlug); ok && af.Agentic {
+		statusSet = true
+		r.runAgenticFlow(bgCtx, taskID, *task, af, prompt)
+		return
+	}
+
 	// Non-implement, non-brainstorm flows: run through the flow engine.
 	// The engine walks the flow's steps linearly (with parallel-sibling
 	// fan-out) and launches each agent via Runner.RunAgent. The
