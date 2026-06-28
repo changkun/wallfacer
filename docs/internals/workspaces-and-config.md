@@ -127,7 +127,6 @@ Activities consulted by the env-file tier (`Runner.sandboxFromEnvForActivity()`,
 | `title` | `WALLFACER_SANDBOX_TITLE` | Auto title generation |
 | `oversight` | `WALLFACER_SANDBOX_OVERSIGHT` | Oversight summary generation |
 | `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
-| `idea_agent` | `WALLFACER_SANDBOX_IDEA_AGENT` | Brainstorm/ideation agent |
 
 The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `agent-session`, `test`, and `oversight-test`. These are not switched on by the env-file tier (the resolution switch covers only the six rows above). `test` and `oversight-test` exist for usage attribution, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent.
 
@@ -210,7 +209,6 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 | `test.tmpl` | `test_verification` | Test verification agent prompt |
 | `refinement.tmpl` | `refinement` | Prompt refinement agent |
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
-| `ideation.tmpl` | `ideation` | Brainstorm/ideation agent |
 | `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
 
 ### Override Storage
@@ -244,8 +242,6 @@ All templates (embedded and override) share a single `FuncMap`:
 - `add(a, b int) int`, integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
 - `mul(a, b float64) float64`, floating-point multiplication.
 - `sub(a, b float64) float64`, floating-point subtraction.
-- `exploitCount(ratio float64, total int) int`, compute exploitation count for ideation.
-- `exploreCount(ratio float64, total int) int`, compute exploration count for ideation.
 
 ### Validation
 

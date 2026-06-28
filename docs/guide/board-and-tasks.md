@@ -88,11 +88,11 @@ Allowed transitions:
 
 Click **+ New Task** in the Backlog column header to expand the creation form. The basic fields are:
 
-1. **Flow picker** lets you choose which sub-agent pipeline runs for this task. The dropdown is populated from `GET /api/flows` (built-ins plus any user-authored flows you've created). The default is **Implement**. **Brainstorm** accepts an empty prompt; **Test only** runs a single agent.
+1. **Flow picker** lets you choose which sub-agent pipeline runs for this task. The dropdown is populated from `GET /api/flows` (the built-in **Implement** flow plus any user-authored flows you've created). The default is **Implement**.
 
    See [Agents & Flows](agents-and-flows.md) for the full model: how to clone a built-in, pin a harness per agent, or compose a custom pipeline. This guide only covers the composer UI.
 
-2. **Prompt textarea** is where you describe what the agent should do. Markdown is supported. A draft is auto-saved to local storage so you do not lose work if you navigate away. Brainstorm flows accept an empty prompt; every other flow requires one.
+2. **Prompt textarea** is where you describe what the agent should do. Markdown is supported. A draft is auto-saved to local storage so you do not lose work if you navigate away. Every flow requires a prompt.
 
 3. **🏷️ Tags**: type a label and press Enter or comma to add it. Tags are lowercase. Use Backspace on an empty input to remove the last tag.
 
@@ -241,7 +241,7 @@ A routine card carries:
 - **Prompt**, what the spawned instance should do.
 - **Interval (minutes)**, the fixed schedule; minimum of 1 minute. Editable anytime.
 - **Enabled toggle** pauses the schedule without losing the interval.
-- **Spawn flow** (slug), the flow each spawned instance runs against. Defaults to `implement`; the system ideation routine uses `brainstorm`. See [Agents & Flows](agents-and-flows.md) for how to author or pick a flow.
+- **Spawn flow** (slug), the flow each spawned instance runs against. Defaults to `implement`. A recurring idea generator is just a routine on the `implement` flow with a prompt that asks the agent to scan the repository and create tasks; the routine creator offers that prompt as a one-click example. See [Agents & Flows](agents-and-flows.md) for how to author or pick a flow.
 
 The interactive controls live on the routine card. Programmatic access is exposed via the `/api/routines` endpoints:
 
@@ -440,9 +440,9 @@ A horizontal tab bar across the top of the modal switches what the main pane sho
 Each card on the board displays:
 
 - **Title** -- auto-generated from the prompt after creation, or set manually
-- **Prompt preview** -- the card body shows the task's prompt. For brainstorm-flow tasks (or legacy `idea-agent` kind), the execution prompt is shown instead.
+- **Prompt preview** -- the card body shows the task's prompt.
 - **Status badge** -- color-coded indicator of the current state (backlog, in progress, waiting, done, failed, cancelled)
-- **Tags** -- user-defined labels for categorization; special tag styles exist for `idea-agent` (legacy), `priority:N`, `impact:N`, and brainstorm categories
+- **Tags** -- user-defined labels for categorization; special tag styles exist for `priority:N` and `impact:N`
 - **Dependency badge** -- for backlog tasks with dependencies: amber "blocked" badge (with unmet count) or green "ready" badge when all prerequisites are done
 - **Time** -- elapsed time since the task started or was created
 - **Cost** -- accumulated USD cost across all turns
@@ -496,7 +496,6 @@ The **Agents** entry in the left sidebar opens the catalog of sub-agent roles th
 | **Title** | `title` | none | single-turn |
 | **Oversight** | `oversight` | none | single-turn |
 | **Commit message** | `commit-msg` | none | single-turn |
-| **Brainstorm** | `ideate` | `workspace.read` | single-turn |
 | **Implementation** | `impl` | `workspace.write`, `board.context` | multi-turn |
 | **Testing** | `test` | `workspace.write`, `board.context` | multi-turn |
 
@@ -573,6 +572,6 @@ clears the filter and re-lays-out.
 
 - [Workspaces](workspaces.md) -- workspace management, git branches, and multi-repo setups
 - [Automation](automation.md) -- autopilot, auto-test, auto-submit, auto-retry, and circuit breakers
-- [Refinement & Ideation](refinement-and-ideation.md) -- prompt refinement and brainstorm agents
+- [Prompt Refinement](refinement-and-ideation.md) -- shaping a task's prompt in the Plan task-mode chat
 - [Oversight & Analytics](oversight-and-analytics.md) -- oversight summaries, usage statistics, and cost tracking
 - [Configuration](configuration.md) -- environment variables, sandbox setup, and server settings

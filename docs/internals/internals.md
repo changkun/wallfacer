@@ -12,7 +12,7 @@ For the cloud control plane (identity, tenancy, deployment topology), see [Cloud
 
 [Architecture](architecture.md)
 
-System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop, the ideation fast path, and the engine). Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
+System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop and the engine). Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
 
 For a user-facing treatment of the same primitives (how to clone an agent, what the Harness pin does, recipes), see the [Agents & Flows](../guide/agents-and-flows.md) guide.
 
@@ -44,7 +44,7 @@ Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics
 
 [Automation](automation.md)
 
-Background watchers, the autopilot promotion loop, auto-test, auto-submit, auto-retry, circuit breakers, ideation scheduling, and startup sequence.
+Background watchers, the autopilot promotion loop, auto-test, auto-submit, auto-retry, circuit breakers, routine scheduling, and startup sequence.
 
 ### 7. Plan Mode
 

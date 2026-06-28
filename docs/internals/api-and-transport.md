@@ -28,10 +28,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/workspaces/mkdir` | Create a new directory under an absolute host path |
 | `POST /api/workspaces/rename` | Rename a file or directory at an absolute host path |
 | `PUT /api/workspaces` | Replace the active workspace set and switch the scoped task board |
-| **Ideation / brainstorm** | |
-| `GET /api/ideate` | Get brainstorm/ideation agent status |
-| `POST /api/ideate` | Trigger the ideation agent to generate new task ideas |
-| `DELETE /api/ideate` | Cancel an in-progress ideation run |
 | **Routines** | |
 | `GET /api/routines` | List routine cards with their schedules and next-run times |
 | `POST /api/routines` | Create a routine card that spawns instance tasks on a fixed interval |
@@ -424,7 +420,7 @@ Usage is displayed on task cards and aggregated in the Done column header. It pe
 
 In addition to the aggregate `TaskUsage`, each task records:
 
-- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `title`, `oversight`, `commit_message`, `idea_agent`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `title`, `oversight`, `commit_message`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
 - Per-turn `TurnUsageRecord` entries accessible via `GET /api/tasks/{id}/turn-usage`, providing detailed per-turn token consumption, stop reasons, and sub-agent labels.
 
 ## Task Search
@@ -551,6 +547,6 @@ sequenceDiagram
 ## See Also
 
 - [Architecture](architecture.md): System overview, design decisions, component responsibilities, concurrency model
-- [Automation](automation.md): Autopilot watchers, auto-retry, circuit breakers, oversight, ideation
+- [Automation](automation.md): Autopilot watchers, auto-retry, circuit breakers, oversight, routines
 - [Task Lifecycle](task-lifecycle.md): State machine, turn loop, data models
 - [Git Worktrees](git-worktrees.md): Per-task worktree isolation and commit pipeline

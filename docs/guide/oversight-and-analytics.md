@@ -7,7 +7,7 @@ Wallfacer provides a suite of monitoring and analytics tools that help you under
 - **Oversight** -- An AI-generated high-level summary of an agent's activity during a task, organized into logical phases (e.g., "Reading codebase", "Implementing feature", "Running tests"). Each phase lists the tools used, commands run, and key actions taken.
 - **Spans** -- Timed intervals recorded during task execution. Each span captures a discrete phase of work such as a single agent turn, harness run, worktree setup, or commit pipeline. Spans power both the flamegraph visualization and the span statistics table.
 - **Turns** -- Individual execution cycles of the agent. Each turn corresponds to one prompt-response round trip. Per-turn usage records track token consumption and cost for every turn.
-- **Usage** -- Token and cost accounting broken down by sub-agent activity (implementation, testing, refinement, title generation, oversight, commit message, ideation).
+- **Usage** -- Token and cost accounting broken down by sub-agent activity (implementation, testing, refinement, title generation, oversight, commit message).
 
 ```mermaid
 graph LR
@@ -180,7 +180,6 @@ Usage is further broken down by the type of agent activity that incurred it:
 | oversight | Oversight summary generation |
 | oversight-test | Test oversight summary generation |
 | commit_message | Commit message generation |
-| idea_agent | Brainstorm/ideation agent |
 
 ### Per-Turn Usage
 

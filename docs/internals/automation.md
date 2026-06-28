@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer runs six background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, and **AutoSubmitter**. Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests, submitting results, retrying failures, syncing worktrees, firing scheduled routines (including ideation), and generating oversight summaries without manual intervention.
+Wallfacer runs six background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, and **AutoSubmitter**. Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests, submitting results, retrying failures, syncing worktrees, firing scheduled routines, and generating oversight summaries without manual intervention.
 
 ## Background Goroutine Model
 
@@ -234,7 +234,7 @@ Non-git directories are supported as plain mount targets (no worktree, no commit
 
 Each routine card carries `RoutineEnabled` and `RoutineIntervalSeconds`. The reconciler maps an active, enabled card with a positive interval to a `routine.FixedInterval` schedule and registers it; cancelled, done, failed, archived, or disabled cards become `routine.Disabled()` and are dropped. When a routine's timer elapses, the engine invokes `h.fireRoutine`, which spawns a fresh task for that routine's flow.
 
-The `routine` package is stateless about tasks and stores: it owns one `time.AfterFunc` timer per registered UUID and calls back a `FireFunc`. The handler is the only consumer and reconciles the engine via `Register` / `Unregister`. Ideation is one instance of this primitive (see below).
+The `routine` package is stateless about tasks and stores: it owns one `time.AfterFunc` timer per registered UUID and calls back a `FireFunc`. The handler is the only consumer and reconciles the engine via `Register` / `Unregister`. A recurring idea-generation routine is one instance of this primitive (see [Recurring idea generation](#recurring-idea-generation)).
 
 ## Oversight Generation
 
@@ -263,27 +263,9 @@ The generator reads the task's trace events, passes them to the Claude API with 
 
 `POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
 
-## Ideation / Brainstorm
+## Recurring idea generation
 
-Ideation is the built-in `brainstorm` flow wrapping a single `ideate` agent. It runs via the standard task-and-flow dispatch path rather than a special case, and its timer lives inside the [RoutineEngine](#routineengine). The system-ideation routine is a routine card tagged `system:ideation` with `spawn_flow: brainstorm`; each fire spawns a fresh task whose `FlowID` is `brainstorm`. Legacy records written before the flow rewrite carry `Kind = "idea-agent"` and resolve to `brainstorm` via the legacy-kind mapper.
-
-```mermaid
-flowchart TD
-    Trigger["POST /api/ideate"] --> Fire["Fire system:ideation routine"]
-    Fire --> Create["Create task with<br/>FlowID = brainstorm"]
-    Create --> Launch["Run ideate agent<br/>as a host process"]
-    Launch --> Analyse["Read workspace contents<br/>analyse code structure"]
-    Analyse --> Generate["Create backlog tasks<br/>via wallfacer API<br/>(each tagged)"]
-    Generate --> Done["Agent process completes<br/>tasks appear on board"]
-
-    Status["GET /api/ideate<br/>returns session state"]
-    Cancel["DELETE /api/ideate<br/>signals the agent process<br/>(SIGTERM → SIGKILL)"]
-```
-
-- Each created task gets relevant `Tags` and an `ExecutionPrompt` (full instructions) separate from `Prompt` (the short card label).
-- Triggered via `POST /api/ideate` (fires the routine); cancelled via `DELETE /api/ideate`.
-- `GET /api/ideate` returns current ideation session state (task ID, status, created task count).
-- See [Agents & Flows](../guide/agents-and-flows.md) for how to clone the `ideate` agent with a different harness or a custom system prompt.
+There is no dedicated ideation watcher. Recurring idea generation is an ordinary [RoutineEngine](#routineengine) routine: a routine card on the `implement` flow whose prompt asks the agent to scan the repository and create tasks. Each fire spawns a normal task through the standard task-and-flow dispatch path. Legacy records written before the idea-agent subsystem was removed carry `Kind = "idea-agent"` or `FlowID = "brainstorm"`; both resolve to the default `implement` flow (the registry falls back when a pinned slug no longer names a registered flow), so existing routines keep firing.
 
 ## Conflict Resolution
 
