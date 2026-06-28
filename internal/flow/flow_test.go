@@ -52,19 +52,6 @@ func TestBuiltinRegistry_ImplementReferencesRealAgents(t *testing.T) {
 	}
 }
 
-// TestRegistry_ResolveLegacyKind_MapsEmptyToImplement covers the
-// default legacy task-kind.
-func TestRegistry_ResolveLegacyKind_MapsEmptyToImplement(t *testing.T) {
-	reg := NewBuiltinRegistry()
-	f, ok := reg.ResolveLegacyKind("")
-	if !ok {
-		t.Fatal("ResolveLegacyKind(\"\") returned ok=false")
-	}
-	if f.Slug != "implement" {
-		t.Errorf("slug = %q, want implement", f.Slug)
-	}
-}
-
 // registryWithUserFlow returns a registry containing the "implement"
 // built-in plus one user-authored flow, mirroring the merged catalog
 // the dispatcher resolves against in production. Used by resolution
@@ -77,20 +64,6 @@ func registryWithUserFlow(t *testing.T) (*Registry, string) {
 	}
 	user := Flow{Slug: "custom-flow", Name: "Custom", Steps: []Step{{AgentSlug: "impl"}}}
 	return NewRegistry(impl, user), user.Slug
-}
-
-// TestRegistry_ResolveLegacyKind_UnknownReturnsFalse guards the
-// deliberate falseness for kinds that don't yet have a flow mapping
-// (planning, routine). If this test starts failing, the caller needs
-// to explicitly opt the new kind into the resolver.
-func TestRegistry_ResolveLegacyKind_UnknownReturnsFalse(t *testing.T) {
-	reg := NewBuiltinRegistry()
-	if _, ok := reg.ResolveLegacyKind(store.TaskKindPlanning); ok {
-		t.Error("ResolveLegacyKind(planning) returned ok=true; want false until migrated")
-	}
-	if _, ok := reg.ResolveLegacyKind(store.TaskKindRoutine); ok {
-		t.Error("ResolveLegacyKind(routine) returned ok=true; want false until migrated")
-	}
 }
 
 // TestResolveForTask_ExplicitFlowIDWins confirms a task's explicit,

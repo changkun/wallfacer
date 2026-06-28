@@ -11,7 +11,7 @@ import AppSelect from './AppSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
 import type { PromptTemplate } from '../api/types';
 
-interface FlowOption { slug: string; name: string; spawn_kind?: string }
+interface FlowOption { slug: string; name: string }
 
 const props = defineProps<{ autoExpand?: boolean }>();
 const store = useTaskStore();
