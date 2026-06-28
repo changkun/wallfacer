@@ -68,10 +68,12 @@ func (b *HostBackend) launchOpenCode(ctx context.Context, spec ContainerSpec) (H
 	taskID := spec.Labels["wallfacer.task.id"]
 	h := newHostHandle(spec.Name, cmd, pipeR, ocStderr, taskID, b)
 
+	configureProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		transition(&h.state, StateFailed)
 		return nil, fmt.Errorf("start host agent: %w", err)
 	}
+	applyAgentPriority(cmd.Process.Pid, b.agentNice)
 	transition(&h.state, StateRunning)
 
 	b.procMu.Lock()
