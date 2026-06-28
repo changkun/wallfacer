@@ -13,7 +13,14 @@ export type TaskStatus = 'backlog' | 'in_progress' | 'waiting' | 'committing' | 
 
 export type GraphNodeKind = 'spec' | 'task';
 export type GraphEdgeKind = 'containment' | 'dispatch' | 'spec_dep' | 'task_dep';
-export type GraphAction = 'dispatch' | 'start';
+export type GraphAction =
+  | 'dispatch'
+  | 'undispatch'
+  | 'validate'
+  | 'force-complete'
+  | 'unstale'
+  | 'unarchive'
+  | 'start';
 
 export interface GraphNode {
   id: string; // "spec:<path>" or "task:<uuid>"
