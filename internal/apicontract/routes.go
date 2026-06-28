@@ -121,27 +121,6 @@ var Routes = []Route{
 		Tags:        []string{"workspaces"},
 	},
 
-	// --- Ideation / brainstorm agent ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/ideate", Name: "GetIdeationStatus",
-		JSName:      "status",
-		Description: "Get brainstorm/ideation agent status.",
-		Tags:        []string{"ideate"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/ideate", Name: "TriggerIdeation",
-		JSName:      "trigger",
-		Description: "Trigger the ideation agent to generate new task ideas.",
-		Tags:        []string{"ideate"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/ideate", Name: "CancelIdeation",
-		JSName:      "cancel",
-		Description: "Cancel an in-progress ideation run.",
-		Tags:        []string{"ideate"},
-	},
-
 	// --- Routines ---
 
 	{

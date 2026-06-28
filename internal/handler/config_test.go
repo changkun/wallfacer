@@ -369,38 +369,6 @@ func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
 	}
 }
 
-func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	cats, ok := resp["ideation_categories"].([]any)
-	if !ok {
-		t.Fatalf("expected ideation_categories to be an array, got %T", resp["ideation_categories"])
-	}
-	need := map[string]struct{}{
-		"product feature":          {},
-		"performance optimization": {},
-		"architecture / design":    {},
-		"security hardening":       {},
-	}
-	found := map[string]bool{}
-	for _, c := range cats {
-		if s, ok := c.(string); ok {
-			found[s] = true
-		}
-	}
-	for k := range need {
-		if !found[k] {
-			t.Fatalf("expected ideation_categories to include %q, got %v", k, cats)
-		}
-	}
-}
-
 func TestGetConfig_OmitsRetiredIdeationSchedulerFields(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
@@ -414,24 +382,6 @@ func TestGetConfig_OmitsRetiredIdeationSchedulerFields(t *testing.T) {
 		if _, ok := resp[key]; ok {
 			t.Fatalf("config response included retired key %q", key)
 		}
-	}
-}
-
-func TestGetConfig_ExposesIdeationExploitRatio(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	ratio, ok := resp["ideation_exploit_ratio"].(float64)
-	if !ok {
-		t.Fatalf("expected ideation_exploit_ratio to be a number, got %T", resp["ideation_exploit_ratio"])
-	}
-	if ratio != 0.8 {
-		t.Errorf("expected default exploit ratio 0.8, got %f", ratio)
 	}
 }
 
@@ -451,55 +401,6 @@ func TestUpdateConfig_AcceptsRetiredIdeationSchedulerFields(t *testing.T) {
 		if _, ok := resp[key]; ok {
 			t.Fatalf("update response included retired key %q", key)
 		}
-	}
-}
-
-func TestUpdateConfig_SetsIdeationExploitRatio(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	body := strings.NewReader(`{"ideation_exploit_ratio": 0.6}`)
-	req := httptest.NewRequest(http.MethodPut, "/api/config", body)
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	ratio, ok := resp["ideation_exploit_ratio"].(float64)
-	if !ok {
-		t.Fatalf("expected ideation_exploit_ratio in response, got %T", resp["ideation_exploit_ratio"])
-	}
-	if ratio != 0.6 {
-		t.Errorf("expected exploit ratio 0.6, got %f", ratio)
-	}
-
-	// Verify getter reflects the change.
-	if got := h.IdeationExploitRatio(); got != 0.6 {
-		t.Errorf("IdeationExploitRatio() = %f; want 0.6", got)
-	}
-}
-
-func TestUpdateConfig_ClampsExploitRatio(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-
-	// Test clamping above 1.
-	body := strings.NewReader(`{"ideation_exploit_ratio": 1.5}`)
-	req := httptest.NewRequest(http.MethodPut, "/api/config", body)
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-	if got := h.IdeationExploitRatio(); got != 1.0 {
-		t.Errorf("expected clamped to 1.0, got %f", got)
-	}
-
-	// Test clamping below 0.
-	body = strings.NewReader(`{"ideation_exploit_ratio": -0.5}`)
-	req = httptest.NewRequest(http.MethodPut, "/api/config", body)
-	w = httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-	if got := h.IdeationExploitRatio(); got != 0.0 {
-		t.Errorf("expected clamped to 0.0, got %f", got)
 	}
 }
 

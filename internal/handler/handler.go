@@ -125,8 +125,8 @@ type Handler struct {
 	// whiteboard scene.
 	scopedDataDir string
 	envFile       string
-	startTime  time.Time
-	reg        *metrics.Registry
+	startTime     time.Time
+	reg           *metrics.Registry
 
 	// commentRelay is the instance side of the spec-comment relay (cache + SSE
 	// fan-out + forward-up). Nil until SetCommentRelay; the comment endpoints
@@ -207,15 +207,6 @@ type Handler struct {
 	groupLimitsMu sync.RWMutex
 	groupLimits   map[string]groupLimitEntry
 
-	// ideationExploitRatio controls the exploitation fraction for the idea-
-	// agent prompt (0.0 = fully exploratory, 1.0 = fully exploitative). It
-	// is prompt-building state used by runner.BuildIdeationPrompt, not a
-	// user-facing toggle — the Automation menu and settings panel both
-	// dropped their ideation controls when ideation moved to the standard
-	// composer + optional routine flow.
-	ideationMu           sync.Mutex
-	ideationExploitRatio float64
-
 	agentSession    *agentsession.Runtime
 	commandRegistry *agentsession.CommandRegistry
 
@@ -258,7 +249,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		commitsBehindCache:   newCommitsBehindCache(constants.CommitsBehindCacheTTL),
 		fileIndex:            newFileIndex(),
 		startTime:            time.Now(),
-		ideationExploitRatio: constants.DefaultIdeationExploitRatio,
 		reg:                  reg,
 		sandboxTestPassed: map[harness.ID]bool{
 			harness.Claude: false,
@@ -773,22 +763,3 @@ func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) 
 	return h.openWatcherBreaker(watcher, taskID, reason)
 }
 
-// IdeationExploitRatio returns the exploitation fraction (0.0–1.0).
-func (h *Handler) IdeationExploitRatio() float64 {
-	h.ideationMu.Lock()
-	defer h.ideationMu.Unlock()
-	return h.ideationExploitRatio
-}
-
-// SetIdeationExploitRatio updates the exploitation fraction, clamped to [0,1].
-func (h *Handler) SetIdeationExploitRatio(r float64) {
-	if r < 0 {
-		r = 0
-	}
-	if r > 1 {
-		r = 1
-	}
-	h.ideationMu.Lock()
-	h.ideationExploitRatio = r
-	h.ideationMu.Unlock()
-}

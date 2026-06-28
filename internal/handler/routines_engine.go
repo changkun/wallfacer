@@ -90,14 +90,6 @@ func (h *Handler) reconcileRoutines(ctx context.Context) {
 		return
 	}
 
-	// Ideation used to auto-materialize a hidden system:ideation routine
-	// card here. That concept is retired — users now invoke ideation by
-	// creating a Kind=idea-agent task (optionally recurring) from the
-	// standard composer. Any routine card still carrying the legacy tag
-	// from a prior deployment is deleted on reconcile so it doesn't keep
-	// firing in the background.
-	h.cleanupLegacyIdeationRoutine(ctx, s)
-
 	tasks, err := s.ListTasks(ctx, false)
 	if err != nil {
 		logger.Handler.Warn("routine: reconcile list tasks", "error", err)

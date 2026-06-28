@@ -274,7 +274,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		}
 	})
 	r.SetAutosubmitFunc(h.AutosubmitEnabled)
-	r.SetIdeationExploitRatioFunc(h.IdeationExploitRatio)
 
 	// Create and wire the agent-session runtime.
 	p := agentsession.New(agentsession.Config{
@@ -1031,11 +1030,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetCoordinationStatus": h.GetCoordinationStatus,
 		"SetCoordinationOptIn":  h.SetCoordinationOptIn,
 
-		// Ideation agent.
-		"GetIdeationStatus": h.GetIdeationStatus,
-		"TriggerIdeation":   h.TriggerIdeation,
-		"CancelIdeation":    h.CancelIdeation,
-
 		// Agents catalog (read + user-authored CRUD).
 		"ListAgents":  h.ListAgents,
 		"GetAgent":    h.GetAgent,
@@ -1197,9 +1191,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Spec comments.
 		"SubmitSpecComment": handler.BodyLimitDefault,
-
-		// Ideation agent.
-		"TriggerIdeation": handler.BodyLimitDefault,
 
 		// Routines.
 		"CreateRoutine":         handler.BodyLimitDefault,
