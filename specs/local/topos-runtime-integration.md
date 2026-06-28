@@ -90,7 +90,11 @@ editing the graph edits the underlying agents/flows YAML registries.
   (`Role -> AgentSpec`, entry + peers chain). Remaining: the **dynamic/mesh** path
   (a flow opts into `Autonomy: Dynamic` + `Topology`, peers as a directory) and a
   richer `Role -> AgentSpec` mapping (Harness/Capabilities -> tools/scopes).
-- **M4: model + sandbox.** Lux model wiring; sandbox via `Options.Sandbox`.
+- **M4: model + sandbox. DONE** (`2eafc03b`). An agentic flow uses a real model via
+  Lux when wallfacer's `.env` configures one (`ANTHROPIC_API_KEY` + `ANTHROPIC_BASE_URL`
+  -> `ModelLux`; bare key -> `ModelDirect`; none -> `ModelFake`), mapped inside the
+  agentgraph seam. *Deferred:* OAuth/bearer credentials (a per-call `BearerSource`)
+  and the `executor.Backend -> topos.Sandbox` adapter (OQ-1: local sandbox for now).
 - **M5: live lineage in the Map.** Persist + serve + render the lineage sub-graph.
 - **M6: unified Agents/Flows graph UI.** Merge the two pages into the agent-graph
   editor over the same YAML registries. (Pairs with the onboarding spec
@@ -113,9 +117,9 @@ editing the graph edits the underlying agents/flows YAML registries.
 
 ## Open questions
 
-- **OQ-1**: sandbox strategy. Use the topos local sandbox, or adapt
-  `executor.Backend` to `topos.Sandbox`? Local is simplest for M2-M4; the adapter
-  lets a topos run share wallfacer's container/host execution. Decide at M4.
+- **OQ-1 RESOLVED** (M4, minimally): use the topos local sandbox (`Options.Sandbox`
+  nil) for now. The `executor.Backend -> topos.Sandbox` adapter (so a topos run
+  shares wallfacer's container/host execution) is deferred to a later milestone.
 - **OQ-2 RESOLVED** (M2): lineage is a typed `Task.Lineage *string` JSON field (an
   opaque string so the store never imports topos), keeping `Task.Result` for the
   agent's final text. `omitempty` means non-agentic tasks serialize byte-identically.
