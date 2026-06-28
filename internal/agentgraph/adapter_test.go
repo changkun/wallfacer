@@ -124,6 +124,46 @@ func TestFromFlow_Errors(t *testing.T) {
 	}
 }
 
+// TestRunFlowWithModel_ObserverReceivesEvents proves the observer seam: a run
+// delivers live trace events (lifecycle, per-turn assistant text, tool use) to
+// the host callback, and each event's Node joins to a lineage node.
+func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
+	reg, f := twoAgentFixture()
+	var got []agentgraph.TraceEvent
+	res, err := agentgraph.RunFlowWithModel(
+		context.Background(), "run-obs", agentgraph.ModelConfig{}, f, reg, "do the thing",
+		func(ev agentgraph.TraceEvent) { got = append(got, ev) },
+	)
+	if err != nil {
+		t.Fatalf("RunFlowWithModel: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("observer received no events")
+	}
+
+	names := map[string]bool{}
+	nodes := map[string]bool{}
+	for _, ev := range got {
+		names[ev.Name] = true
+		nodes[ev.Node] = true
+	}
+	for _, want := range []string{"SessionStart", "AssistantMessage", "PostToolUse", "SessionEnd"} {
+		if !names[want] {
+			t.Errorf("missing event %q; got %v", want, names)
+		}
+	}
+	// Every event's Node must be a real lineage node id (the join key).
+	lineageIDs := map[string]bool{}
+	for _, n := range res.Lineage.Nodes {
+		lineageIDs[n.ID] = true
+	}
+	for n := range nodes {
+		if n != "" && !lineageIDs[n] {
+			t.Errorf("event Node %q is not a lineage node id %v", n, res.Lineage.Nodes)
+		}
+	}
+}
+
 // TestRunFlowFake exercises the full headless path with the deterministic fake
 // model: a two-agent pinned chain produces a lineage with two nodes joined by a
 // single "next" edge, and a non-empty final text.

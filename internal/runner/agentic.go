@@ -59,6 +59,44 @@ func (r *Runner) flowBySlug(slug string) (flow.Flow, bool) {
 	return r.flows.Get(slug)
 }
 
+// agenticTraceEvent maps a topos trace event to a task-timeline event, returning
+// ok=false for events that should not surface (lifecycle bookkeeping, empty
+// payloads). It renders the agent-graph run as a readable live trace: each agent
+// turn's assistant text, delegations, and tool use. The agent label is the
+// lineage node id (ev.Node) so the timeline lines join to graph nodes.
+func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]string, bool) {
+	label := ev.AgentID
+	if label == "" {
+		label = ev.Node
+	}
+	switch ev.Name {
+	case "AssistantMessage":
+		var p struct {
+			Text string `json:"text"`
+		}
+		_ = json.Unmarshal(ev.PayloadJSON, &p)
+		if p.Text == "" {
+			return "", nil, false
+		}
+		return store.EventTypeSystem, map[string]string{"result": label + ": " + p.Text}, true
+	case "SubagentStart":
+		return store.EventTypeSystem, map[string]string{"result": "↳ delegated to " + label}, true
+	case "PostToolUse":
+		var p struct {
+			ToolCall struct {
+				Name string `json:"name"`
+			} `json:"tool_call"`
+		}
+		_ = json.Unmarshal(ev.PayloadJSON, &p)
+		if p.ToolCall.Name == "" {
+			return "", nil, false
+		}
+		return store.EventTypeSystem, map[string]string{"result": label + " used " + p.ToolCall.Name}, true
+	default:
+		return "", nil, false
+	}
+}
+
 // runAgenticFlow executes an agentic flow through the in-process topos
 // agent-graph runtime (internal/agentgraph) and maps the result back onto the
 // task. It compiles the flow into a topos.Region, runs it with the model
@@ -77,7 +115,34 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
 
-	res, err := agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt)
+	// Forward the topos run's live events onto the task timeline so the
+	// multi-agent trace (per-turn assistant text, delegations, tool use) is
+	// visible as the run proceeds, not just as a lineage graph at the end. The
+	// topos observer is called synchronously on the run goroutine(s), so it must
+	// not block: push to a buffered channel and drain into the store from a
+	// separate goroutine (dropping on overflow rather than backpressuring the run).
+	traceCh := make(chan agentgraph.TraceEvent, 256)
+	traceDone := make(chan struct{})
+	go func() {
+		defer close(traceDone)
+		for ev := range traceCh {
+			etype, data, ok := agenticTraceEvent(ev)
+			if !ok {
+				continue
+			}
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, etype, data)
+		}
+	}()
+	onEvent := func(ev agentgraph.TraceEvent) {
+		select {
+		case traceCh <- ev:
+		default: // buffer full: drop rather than stall the run
+		}
+	}
+
+	res, err := agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, onEvent)
+	close(traceCh)
+	<-traceDone
 	if err != nil {
 		if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 			return
