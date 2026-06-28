@@ -3,6 +3,8 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/agentgraph"
@@ -10,6 +12,67 @@ import (
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/store"
 )
+
+// writeEnvFile writes lines to a temp .env file and returns its path.
+func writeEnvFile(t *testing.T, lines string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	return path
+}
+
+// TestAgenticModelConfig covers the runner-side derivation of a ModelConfig from
+// wallfacer's .env credential settings: a bare key selects Direct, a key plus a
+// base URL routes through Lux (passing the URL/key/model through), and the
+// absence of an env file or an Anthropic key yields the zero config (which the
+// seam maps to the fake model). No model is called.
+func TestAgenticModelConfig(t *testing.T) {
+	t.Run("no env file falls back to fake", func(t *testing.T) {
+		r := &Runner{}
+		if cfg := r.agenticModelConfig(); cfg != (agentgraph.ModelConfig{}) {
+			t.Errorf("config = %+v, want zero (fake)", cfg)
+		}
+	})
+
+	t.Run("env without anthropic key falls back to fake", func(t *testing.T) {
+		r := &Runner{envFile: writeEnvFile(t, "WALLFACER_AUTO_PUSH=true\n")}
+		if cfg := r.agenticModelConfig(); cfg != (agentgraph.ModelConfig{}) {
+			t.Errorf("config = %+v, want zero (fake)", cfg)
+		}
+	})
+
+	t.Run("bare key selects direct", func(t *testing.T) {
+		r := &Runner{envFile: writeEnvFile(t, "ANTHROPIC_API_KEY=sk-test\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
+		cfg := r.agenticModelConfig()
+		want := agentgraph.ModelConfig{
+			Mode:     agentgraph.ModelModeDirect,
+			Provider: "anthropic",
+			Model:    "claude-sonnet-4-6",
+			APIKey:   "sk-test",
+		}
+		if cfg != want {
+			t.Errorf("config = %+v, want %+v", cfg, want)
+		}
+	})
+
+	t.Run("key plus base url routes through lux", func(t *testing.T) {
+		r := &Runner{envFile: writeEnvFile(t,
+			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai/anthropic\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
+		cfg := r.agenticModelConfig()
+		want := agentgraph.ModelConfig{
+			Mode:     agentgraph.ModelModeLux,
+			Provider: "anthropic",
+			Model:    "claude-sonnet-4-6",
+			BaseURL:  "https://lux.latere.ai/anthropic",
+			APIKey:   "lux_test",
+		}
+		if cfg != want {
+			t.Errorf("config = %+v, want %+v", cfg, want)
+		}
+	})
+}
 
 // TestRun_AgenticFlowReachesDoneWithLineage dispatches a task whose resolved
 // flow is marked Agentic. The runner must route it through the topos
