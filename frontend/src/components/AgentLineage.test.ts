@@ -1,7 +1,8 @@
-// AgentLineage fetches GET /api/tasks/{id}/lineage and renders the agent-graph:
-// each node as a labeled box (name + role + status) and each edge labeled by
-// kind. The component is self-contained, so the test mocks fetch (the transport
-// behind api()) and asserts the rendered output.
+// AgentLineage renders an agentic run's agent graph (from GET
+// /api/tasks/{id}/lineage) plus a live per-agent transcript (from the
+// agentgraph-tagged events on GET /api/tasks/{id}/events). The component is
+// self-contained, so the test mocks fetch (the transport behind api()) and
+// routes by URL.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, type App } from 'vue';
@@ -10,12 +11,18 @@ import type { TaskLineage } from '../api/types';
 
 let originalFetch: typeof globalThis.fetch;
 let lineage: TaskLineage | null;
+let events: unknown[];
 
 beforeEach(() => {
   lineage = null;
+  events = [];
   originalFetch = globalThis.fetch;
-  globalThis.fetch = vi.fn(async (): Promise<Response> => {
-    return new Response(JSON.stringify(lineage ?? { nodes: [], edges: [] }), { status: 200 });
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes('/lineage')) {
+      return new Response(JSON.stringify(lineage ?? { nodes: [], edges: [] }), { status: 200 });
+    }
+    return new Response(JSON.stringify(events), { status: 200 });
   }) as unknown as typeof globalThis.fetch;
 });
 
@@ -26,10 +33,9 @@ afterEach(() => {
 async function mount(): Promise<{ app: App; host: HTMLElement }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const app = createApp(AgentLineage, { taskId: 't1' });
+  const app = createApp(AgentLineage, { taskId: 't1', refreshKey: '1' });
   app.mount(host);
-  // Let the onMounted fetch + reactive updates settle.
-  for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
   return { app, host };
 }
 
@@ -44,24 +50,40 @@ describe('AgentLineage', () => {
     };
     const { app, host } = await mount();
     const text = host.textContent ?? '';
-    expect(text).toContain('planner');
     expect(text).toContain('Planner');
     expect(text).toContain('Builder');
-    expect(text).toContain('done');
-    expect(text).toContain('running');
     expect(text).toContain('next');
-    // Two node boxes and one edge row.
     expect(host.querySelectorAll('.lineage__node').length).toBe(2);
     expect(host.querySelectorAll('.lineage__edge').length).toBe(1);
     app.unmount();
     host.remove();
   });
 
-  it('shows an empty-state note when there is no lineage', async () => {
-    lineage = { nodes: [], edges: [] };
+  it('renders the per-agent transcript from agentgraph trace events', async () => {
+    events = [
+      { id: 1, event_type: 'system', data: { source: 'agentgraph', kind: 'assistant', agent: 'planner', text: 'here is the **plan**' } },
+      { id: 2, event_type: 'system', data: { source: 'agentgraph', kind: 'delegate', agent: 'builder', result: '↳ delegated to builder' } },
+      { id: 3, event_type: 'system', data: { result: 'unrelated system event' } },
+    ];
     const { app, host } = await mount();
-    expect(host.textContent ?? '').toContain('No lineage recorded for this run.');
-    expect(host.querySelectorAll('.lineage__node').length).toBe(0);
+    const text = host.textContent ?? '';
+    expect(text).toContain('planner');
+    expect(text).toContain('plan'); // markdown-rendered assistant text
+    expect(text).toContain('delegated to builder');
+    expect(text).not.toContain('unrelated system event'); // non-agentgraph filtered out
+    // Bold markdown actually rendered (not raw).
+    expect(host.querySelector('.lineage__turn-body strong')?.textContent).toBe('plan');
+    // No lineage yet -> a provisional node per agent seen in the trace.
+    expect(host.querySelectorAll('.lineage__node').length).toBe(2);
+    app.unmount();
+    host.remove();
+  });
+
+  it('renders nothing when there is no lineage and no trace', async () => {
+    lineage = { nodes: [], edges: [] };
+    events = [];
+    const { app, host } = await mount();
+    expect(host.querySelector('.lineage')).toBeNull();
     app.unmount();
     host.remove();
   });
