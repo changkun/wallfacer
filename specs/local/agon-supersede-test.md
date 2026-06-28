@@ -1,6 +1,6 @@
 ---
 title: Agon Supersedes the Test Step (Verification Gate + Feedback Loop)
-status: drafted
+status: complete
 depends_on:
   - agon-adversarial-verification
 affects:
@@ -100,6 +100,16 @@ func (h *Handler) taskVerifiedForSubmit(t *store.Task) bool {
 The `naturallyComplete` branch (end_turn, untested, autotest off) must also wait
 for agon when the agon gate applies — i.e. don't naturally-submit an
 agon-eligible task that agon hasn't cleared.
+
+## Outcome (2026-06-28)
+
+All three phases shipped. `agonSupersedesTest(t)` (agon enabled + session) is the
+single gate: `tryAutoTest` skips such tasks, `tryAutoSubmit` requires a clean
+agon verdict for them, and `tryAutoPromote` gained an agon-feedback resume branch
+that mirrors the failed-test one. `runAgon` drives the cycle (feedback from
+summary.md under `MaxAgonRetries=2`, reset on clean). Agon off → the test path is
+unchanged. Tests cover the gate, the feedback cycle (set/cap/reset), and the
+auto-resume; full handler+store suites and golangci-lint pass.
 
 ## Non-Goals
 
