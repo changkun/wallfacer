@@ -1,6 +1,6 @@
 ---
 title: Mission Control — Graph-Driven Coordination & Live Execution
-status: drafted
+status: complete
 depends_on:
   - specs/local/map-mission-control.md
 affects:
@@ -159,12 +159,43 @@ dropping the new node into the graph. Lower priority than A/B.
 
 ## Phased Breakdown (to be split via /wf-spec-breakdown)
 
-| # | Phase | Depends on | Effort |
-|---|-------|-----------|--------|
-| 1 | Rename Map → Mission Control (route+redirect, nav, copy, docs) | — | small |
-| 2 | Full legal `available_actions` from the state machine + node action menu (Tier A) | 1 | medium |
-| 3 | Focused-spec generative ops via `SpecChatPopup` reuse (Tier B) | 1 | medium |
-| 4 | Live task visualization: SSE-driven in-place updates, node animation, "you are here" | 1 | large |
+| # | Phase | Depends on | Effort | Status |
+|---|-------|-----------|--------|--------|
+| 1 | Rename Map → Mission Control (route+redirect, nav, copy, docs) | — | small | complete |
+| 2 | Full legal `available_actions` from the state machine + node action menu (Tier A) | 1 | medium | complete |
+| 3 | Focused-spec generative ops via `SpecChatPopup` reuse (Tier B) | 1 | medium | complete |
+| 4 | Live task visualization: SSE-driven in-place updates, node animation, "you are here" | 1 | large | complete |
+
+## Outcome (2026-06-28)
+
+Implemented directly, end to end, across the four phases (all reuse, no new
+engine), each verified by `make build` + the booted app:
+
+- **Phase 1 — rename** (`8b244478`): route `/mission` with `/map` redirecting;
+  sidebar label, page title/copy, and the docs guide now say "Mission Control".
+  `MapPage.vue` keeps its filename.
+- **Phase 2 — full coordination actions** (`0e58e0a3` backend, `78afb62d`
+  frontend): the graph builder derives each spec's legal forward-flow verbs
+  (validate, dispatch, undispatch, force-complete, unstale, unarchive) from the
+  canonical `spec.StatusMachine`, guarded by a drift test; the inspector renders
+  a button per available action wired to `POST /api/specs/transition` / the task
+  routes.
+- **Phase 3 — generative ops** (`fef2a2a5`): a "Refine / discuss" affordance on
+  spec nodes (and the double-click popup) sets `agentStore.focusSpec` and opens
+  the existing `SpecChatPopup`, so `/refine` `/break-down` etc. run from the
+  graph with zero new chat code.
+- **Phase 4 — live visualization** (`4f401cfc`): `GraphCanvas` relays out only
+  on structural change (positions survive a run), running/waiting nodes radiate
+  a pulse ring, running discs breathe, and a running node on the critical path
+  gets the "you are here" accent. Live status flows via the app-wide
+  `/api/tasks/stream` subscription. Respects `prefers-reduced-motion`.
+- **Follow-up** (`8bbf1014`): scoped the "ready to act" highlight to the forward
+  verbs (validate/dispatch/start) so recovery verbs don't swamp the list on a
+  repo full of stale specs.
+
+Deferred per the design: per-agent-step live activity (current tool, turns,
+token burn), Tier C "create from the graph", and dragged-position preservation
+across structural relayouts.
 
 ## Open Questions
 
