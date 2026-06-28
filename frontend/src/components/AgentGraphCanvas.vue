@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Flow } from '../api/types';
 import { coordinationOf, type Coordination } from '../lib/flowDraft';
 
@@ -26,6 +26,43 @@ const NODE_H = 48;
 const PAD = 28;
 const COL = 214;
 const ROW = 74;
+
+// Free-form positions. Agents auto-lay-out by default, but the author can drag
+// any agent anywhere; the override is keyed by agent_slug and persisted per
+// fleet in localStorage (it is a visual arrangement, not part of the flow, so it
+// does not touch the saved YAML). Task and Outcome stay anchored to the lead and
+// the rightmost agent.
+const svgRef = ref<SVGSVGElement | null>(null);
+const freePos = ref<Record<string, { x: number; y: number }>>({});
+const dragSlug = ref<string | null>(null);
+const dragOffset = ref({ x: 0, y: 0 });
+
+function posKey(slug: string): string {
+  return `agc-pos:${slug}`;
+}
+function loadPositions(slug: string): Record<string, { x: number; y: number }> {
+  try {
+    return JSON.parse(localStorage.getItem(posKey(slug)) || '{}');
+  } catch {
+    return {};
+  }
+}
+function savePositions() {
+  const slug = props.flow?.slug;
+  if (!slug) return;
+  try {
+    localStorage.setItem(posKey(slug), JSON.stringify(freePos.value));
+  } catch {
+    /* storage unavailable; positions stay in-memory only */
+  }
+}
+watch(
+  () => props.flow?.slug,
+  (slug) => {
+    freePos.value = slug ? loadPositions(slug) : {};
+  },
+  { immediate: true },
+);
 
 const mode = computed<Coordination>(() => coordinationOf(props.flow ?? {}));
 const modeLabel = computed(
@@ -66,6 +103,8 @@ interface LEdge {
 interface Layout {
   nodes: LNode[];
   edges: LEdge[];
+  vx: number;
+  vy: number;
   width: number;
   height: number;
 }
@@ -84,9 +123,10 @@ const layout = computed<Layout>(() => {
   const ags = agents.value;
   const nodes: LNode[] = [];
   const edges: LEdge[] = [];
-  if (ags.length === 0) return { nodes, edges, width: 0, height: 0 };
+  if (ags.length === 0) return { nodes, edges, vx: 0, vy: 0, width: 0, height: 0 };
 
-  // Fixed sequence: Task -> a0 -> a1 -> ... -> Outcome, one row.
+  // Fixed sequence: Task -> a0 -> a1 -> ... -> Outcome, one row, no free-form
+  // (the sequence IS the left-to-right order).
   if (mode.value === 'sequence') {
     const cols = ags.length + 2; // task + agents + outcome
     const width = PAD * 2 + cols * NODE_W + (cols - 1) * (COL - NODE_W);
@@ -102,37 +142,40 @@ const layout = computed<Layout>(() => {
       const b = nodes[i + 1];
       edges.push({ key: `e:${i}`, d: bezier(a.x + NODE_W, a.y + NODE_H / 2, b.x, b.y + NODE_H / 2), delegate: false, mesh: false });
     }
-    return { nodes, edges, width, height };
+    return { nodes, edges, vx: 0, vy: 0, width, height };
   }
 
-  // lead / mesh: Task | Lead | members (stacked) | Outcome.
+  // lead / mesh: free-form. Auto-layout (Lead | members) provides defaults; any
+  // agent's stored position overrides it. Task and Outcome anchor to the lead
+  // and the rightmost agent so the "enters / returns" reading survives a drag.
   const lead = ags[0];
   const members = ags.slice(1);
-  const rows = Math.max(1, members.length);
-  const height = PAD * 2 + rows * ROW - (ROW - NODE_H);
-  const width = PAD * 2 + 4 * NODE_W + 3 * (COL - NODE_W);
-  const midY = (height - NODE_H) / 2;
+  const autoHeight = PAD * 2 + Math.max(1, members.length) * ROW - (ROW - NODE_H);
+  const midY = (autoHeight - NODE_H) / 2;
   const rowY = (row: number): number => {
     const block = members.length * ROW - (ROW - NODE_H);
-    return (height - block) / 2 + row * ROW;
+    return (autoHeight - block) / 2 + row * ROW;
   };
+  const at = (slug: string, ax: number, ay: number) => freePos.value[slug] ?? { x: ax, y: ay };
 
-  const taskN: LNode = { key: 'task', kind: 'task', slug: '', name: 'Task', lead: false, member: false, x: colX(0), y: midY };
-  const leadN: LNode = { key: `a:${lead.slug}`, kind: 'agent', slug: lead.slug, name: lead.name, lead: true, member: false, x: colX(1), y: midY };
-  const memberNs: LNode[] = members.map((a, i) => ({
-    key: `a:${a.slug}`, kind: 'agent', slug: a.slug, name: a.name, lead: false, member: true, x: colX(2), y: rowY(i),
-  }));
-  const outN: LNode = { key: 'outcome', kind: 'outcome', slug: '', name: 'Outcome', lead: false, member: false, x: colX(3), y: midY };
+  const leadP = at(lead.slug, colX(1), midY);
+  const leadN: LNode = { key: `a:${lead.slug}`, kind: 'agent', slug: lead.slug, name: lead.name, lead: true, member: false, x: leadP.x, y: leadP.y };
+  const memberNs: LNode[] = members.map((a, i) => {
+    const p = at(a.slug, colX(2), rowY(i));
+    return { key: `a:${a.slug}`, kind: 'agent', slug: a.slug, name: a.name, lead: false, member: true, x: p.x, y: p.y };
+  });
+  const agentNs = [leadN, ...memberNs];
+  const maxX = Math.max(...agentNs.map((n) => n.x));
+
+  const taskN: LNode = { key: 'task', kind: 'task', slug: '', name: 'Task', lead: false, member: false, x: leadN.x - COL, y: leadN.y };
+  const outN: LNode = { key: 'outcome', kind: 'outcome', slug: '', name: 'Outcome', lead: false, member: false, x: maxX + COL, y: leadN.y };
   nodes.push(taskN, leadN, ...memberNs, outN);
 
-  // Task enters at the lead; the lead returns the outcome.
   edges.push({ key: 'e:enter', d: bezier(taskN.x + NODE_W, taskN.y + NODE_H / 2, leadN.x, leadN.y + NODE_H / 2), delegate: false, mesh: false });
   edges.push({ key: 'e:outcome', d: bezier(leadN.x + NODE_W, leadN.y + NODE_H / 2, outN.x, outN.y + NODE_H / 2), delegate: false, mesh: false });
-  // The lead delegates to each member.
   memberNs.forEach((mn, i) =>
     edges.push({ key: `e:deleg:${i}`, d: bezier(leadN.x + NODE_W, leadN.y + NODE_H / 2, mn.x, mn.y + NODE_H / 2), delegate: true, mesh: false }),
   );
-  // Open mesh: members also hand off among themselves (drawn vertically).
   if (mode.value === 'mesh') {
     for (let i = 0; i < memberNs.length - 1; i++) {
       const a = memberNs[i];
@@ -140,8 +183,42 @@ const layout = computed<Layout>(() => {
       edges.push({ key: `e:mesh:${i}`, d: bezier(a.x + NODE_W / 2, a.y + NODE_H, b.x + NODE_W / 2, b.y), delegate: false, mesh: true });
     }
   }
-  return { nodes, edges, width, height };
+
+  // Frame all nodes (free positions can run anywhere) with a padded viewBox.
+  const x0 = Math.min(...nodes.map((n) => n.x)) - PAD;
+  const y0 = Math.min(...nodes.map((n) => n.y)) - PAD;
+  const x1 = Math.max(...nodes.map((n) => n.x + NODE_W)) + PAD;
+  const y1 = Math.max(...nodes.map((n) => n.y + NODE_H)) + PAD;
+  return { nodes, edges, vx: x0, vy: y0, width: x1 - x0, height: y1 - y0 };
 });
+
+// clientToSvg maps a pointer's screen coordinates into the SVG user space
+// (accounting for the viewBox), so a drag tracks the cursor exactly.
+function clientToSvg(cx: number, cy: number): { x: number; y: number } {
+  const svg = svgRef.value;
+  const ctm = svg?.getScreenCTM?.();
+  if (!svg || !ctm) return { x: cx, y: cy };
+  const p = new DOMPoint(cx, cy).matrixTransform(ctm.inverse());
+  return { x: p.x, y: p.y };
+}
+function onNodePointerDown(e: PointerEvent, node: LNode) {
+  // Free-form repositioning applies to agents in the delegating fleet modes; a
+  // fixed sequence keeps its left-to-right order.
+  if (!props.editable || node.kind !== 'agent' || mode.value === 'sequence') return;
+  const p = clientToSvg(e.clientX, e.clientY);
+  dragSlug.value = node.slug;
+  dragOffset.value = { x: p.x - node.x, y: p.y - node.y };
+}
+function onSvgPointerMove(e: PointerEvent) {
+  if (!dragSlug.value) return;
+  const p = clientToSvg(e.clientX, e.clientY);
+  freePos.value = { ...freePos.value, [dragSlug.value]: { x: p.x - dragOffset.value.x, y: p.y - dragOffset.value.y } };
+}
+function onSvgPointerUp() {
+  if (dragSlug.value) savePositions();
+  dragSlug.value = null;
+}
+const draggable = computed(() => props.editable && mode.value !== 'sequence');
 </script>
 
 <template>
@@ -159,12 +236,17 @@ const layout = computed<Layout>(() => {
       </div>
 
       <svg
+        ref="svgRef"
         class="agc__svg"
-        :viewBox="`0 0 ${layout.width} ${layout.height}`"
+        :class="{ 'agc__svg--dragging': !!dragSlug }"
+        :viewBox="`${layout.vx} ${layout.vy} ${layout.width} ${layout.height}`"
         :width="layout.width"
         :height="layout.height"
         role="img"
         aria-label="Agent fleet graph"
+        @pointermove="onSvgPointerMove"
+        @pointerup="onSvgPointerUp"
+        @pointerleave="onSvgPointerUp"
       >
         <defs>
           <marker id="agc-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -195,8 +277,11 @@ const layout = computed<Layout>(() => {
               'agc-node--agent': node.kind === 'agent',
               'agc-node--lead': node.lead && mode !== 'sequence',
               'agc-node--editable': editable && node.kind === 'agent',
+              'agc-node--draggable': draggable && node.kind === 'agent',
+              'agc-node--dragging': dragSlug === node.slug,
             }"
             :data-node-slug="node.slug || null"
+            @pointerdown="onNodePointerDown($event, node)"
             @dblclick="node.slug && emit('editAgent', node.slug)"
           >
             <text
@@ -230,6 +315,7 @@ const layout = computed<Layout>(() => {
               role="button"
               :aria-label="`Make ${node.name} the lead`"
               tabindex="0"
+              @pointerdown.stop
               @click="emit('setLead', node.slug)"
               @keydown.enter="emit('setLead', node.slug)"
             >
@@ -245,6 +331,7 @@ const layout = computed<Layout>(() => {
               role="button"
               :aria-label="`Remove ${node.name}`"
               tabindex="0"
+              @pointerdown.stop
               @click="emit('remove', node.slug)"
               @keydown.enter="emit('remove', node.slug)"
             >
@@ -356,6 +443,15 @@ const layout = computed<Layout>(() => {
 }
 .agc-node--editable {
   cursor: pointer;
+}
+.agc-node--draggable {
+  cursor: grab;
+}
+.agc__svg--dragging .agc-node--draggable {
+  cursor: grabbing;
+}
+.agc-node--dragging .agc-node-box {
+  opacity: 0.7;
 }
 .agc-node-remove,
 .agc-node-lead-btn {
