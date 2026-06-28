@@ -32,6 +32,47 @@ func TestDescribeFlow_AgenticFields(t *testing.T) {
 	}
 }
 
+// TestFlowWrite_AgenticFieldsRoundTrip asserts the write request carries the
+// agentic execution knobs onto the flow (so the editor can persist them), and
+// that validateFlowWrite enforces the topology enum and a non-negative depth.
+func TestFlowWrite_AgenticFieldsRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithPrompts(t)
+
+	req := flowWriteRequest{
+		Slug: "mesh-demo", Name: "Mesh Demo",
+		Agentic: true, Dynamic: true, Topology: "mesh", MaxHandoffDepth: 4,
+		Steps: []flowStepWriteInput{{AgentSlug: "impl"}, {AgentSlug: "test"}},
+	}
+	f := req.toFlow()
+	if !f.Agentic || !f.Dynamic || f.Topology != flow.TopologyMesh || f.MaxHandoffDepth != 4 {
+		t.Errorf("agentic fields not carried onto flow: %+v", f)
+	}
+	if err := h.validateFlowWrite(req); err != nil {
+		t.Errorf("valid mesh flow rejected: %v", err)
+	}
+
+	bad := req
+	bad.Topology = "ring"
+	if err := h.validateFlowWrite(bad); err == nil {
+		t.Error("expected unknown topology to be rejected")
+	}
+
+	neg := req
+	neg.Topology = ""
+	neg.MaxHandoffDepth = -1
+	if err := h.validateFlowWrite(neg); err == nil {
+		t.Error("expected negative max_handoff_depth to be rejected")
+	}
+
+	// An empty topology is the orchestrator-worker default, not an error.
+	ok := req
+	ok.Topology = ""
+	ok.MaxHandoffDepth = 0
+	if err := h.validateFlowWrite(ok); err != nil {
+		t.Errorf("empty topology (default) rejected: %v", err)
+	}
+}
+
 // TestListFlows_ReturnsBuiltins asserts every built-in flow shows up
 // with a non-empty slug/name, declares builtin=true, and that the
 // "implement" flow includes the terminal parallel triple.
