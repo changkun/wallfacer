@@ -32,11 +32,33 @@ type agonFork struct {
 	Rounds []agonRound `json:"rounds"`
 }
 
+// agonRunConfig describes how this task's agon run is configured (what the
+// trigger actually does): critic fork count, per-fork round cap, token budget,
+// and the harnesses driving each role.
+type agonRunConfig struct {
+	Forks         int      `json:"forks"`
+	MaxRounds     int      `json:"max_rounds"`
+	CostCap       int      `json:"cost_cap"`
+	ProposerModel string   `json:"proposer_model"`
+	CriticModels  []string `json:"critic_models"`
+}
+
+// agonOutcome is the terminal result of a finished run, from end.json.
+type agonOutcome struct {
+	Termination  string         `json:"termination"`   // steady_state | cost_cap | max_turn | ...
+	TotalAttacks int            `json:"total_attacks"` // distinct attacks raised
+	ByStatus     map[string]int `json:"by_status"`     // open/conceded/rebutted/...
+	WallSeconds  int            `json:"wall_seconds"`
+	Tokens       int            `json:"tokens"`
+}
+
 // agonTranscriptResp is the GET /api/tasks/{id}/agon/transcript body.
 type agonTranscriptResp struct {
-	SessionID string     `json:"session_id"`
-	Running   bool       `json:"running"` // end.json absent => still in flight
-	Forks     []agonFork `json:"forks"`
+	SessionID string         `json:"session_id"`
+	Running   bool           `json:"running"`
+	Config    *agonRunConfig `json:"config,omitempty"`
+	Outcome   *agonOutcome   `json:"outcome,omitempty"`
+	Forks     []agonFork     `json:"forks"`
 }
 
 // agonTranscriptLine mirrors the subset of agon's state.TranscriptRecord we read
@@ -71,13 +93,52 @@ func (h *Handler) AgonTranscript(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
-	resp := agonTranscriptResp{SessionID: sessionID}
-	// running = the run has not written its terminal end.json yet.
-	if _, err := os.Stat(filepath.Join(sessionDir, "end.json")); err != nil {
-		resp.Running = true
+	forks, rounds, costCap := h.agonTuning()
+	resp := agonTranscriptResp{
+		SessionID: sessionID,
+		// Authoritative: the live in-flight set, not an on-disk signal.
+		Running: h.isAgonRunning(id),
+		Config: &agonRunConfig{
+			Forks:         forks,
+			MaxRounds:     rounds,
+			CostCap:       costCap,
+			ProposerModel: string(agonProposerHarness),
+			CriticModels:  agonCriticHarnessNames(),
+		},
+		Forks:   readAgonTranscript(sessionDir),
+		Outcome: readAgonOutcome(sessionDir),
 	}
-	resp.Forks = readAgonTranscript(sessionDir)
 	httpjson.Write(w, http.StatusOK, resp)
+}
+
+// readAgonOutcome reads the terminal stats from <sessionDir>/end.json. Returns
+// nil while the run is still in flight (no end.json yet).
+func readAgonOutcome(sessionDir string) *agonOutcome {
+	b, err := os.ReadFile(filepath.Join(sessionDir, "end.json"))
+	if err != nil {
+		return nil
+	}
+	var ef struct {
+		Termination struct {
+			Reason string `json:"reason"`
+		} `json:"termination"`
+		Stats struct {
+			TotalAttacks int            `json:"total_attacks"`
+			ByStatus     map[string]int `json:"by_status"`
+			TokensUsed   int            `json:"tokens_used"`
+			WallSeconds  int            `json:"wall_seconds"`
+		} `json:"stats"`
+	}
+	if err := json.Unmarshal(b, &ef); err != nil {
+		return nil
+	}
+	return &agonOutcome{
+		Termination:  ef.Termination.Reason,
+		TotalAttacks: ef.Stats.TotalAttacks,
+		ByStatus:     ef.Stats.ByStatus,
+		WallSeconds:  ef.Stats.WallSeconds,
+		Tokens:       ef.Stats.TokensUsed,
+	}
 }
 
 // newestAgonSession returns the most-recently-modified session dir under
