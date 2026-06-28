@@ -159,6 +159,47 @@ describe('AgentGraphPage', () => {
     host.remove();
   });
 
+  it('drives the topology indicator from the agentic toolbar controls', async () => {
+    agents = [{ slug: 'impl', title: 'Implementation', builtin: true }];
+    flows = [
+      {
+        slug: 'duo',
+        name: 'Duo',
+        builtin: false,
+        steps: [{ agent_slug: 'impl', agent_name: 'Implementation' }],
+      },
+    ];
+
+    const { app, host } = await mount();
+    // A non-agentic flow renders the pinned-chain indicator.
+    expect((host.textContent ?? '').toLowerCase()).toContain('pinned');
+
+    (host.querySelector('.ag-detail__edit') as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    function setCheckbox(label: string, value: boolean) {
+      const el = host.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement;
+      el.checked = value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    setCheckbox('Agentic', true);
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+    setCheckbox('Dynamic', true);
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+    const sel = host.querySelector('select[aria-label="Topology"]') as HTMLSelectElement;
+    sel.value = 'mesh';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // The canvas indicator now reflects the dynamic mesh topology live.
+    const t = (host.textContent ?? '').toLowerCase();
+    expect(t).toContain('mesh');
+    expect(t).not.toContain('pinned chain');
+
+    app.unmount();
+    host.remove();
+  });
+
   it('draws parallel steps as siblings in one stage', async () => {
     agents = [
       { slug: 'a', title: 'Agent A', builtin: true },
