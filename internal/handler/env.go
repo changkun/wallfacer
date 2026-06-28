@@ -12,6 +12,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
@@ -110,6 +111,11 @@ type envConfigResponse struct {
 	SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
 	MaxTestParallelTasks int                                  `json:"max_test_parallel_tasks"`
+	MaxAgents            int                                  `json:"max_agents"`
+	AgentNice            int                                  `json:"agent_nice"`
+	AgonForks            int                                  `json:"agon_forks"`
+	AgonRounds           int                                  `json:"agon_rounds"`
+	AgonCostCap          int                                  `json:"agon_cost_cap"`
 	OversightInterval    int                                  `json:"oversight_interval"`
 	ArchivedTasksPerPage int                                  `json:"archived_tasks_per_page"`
 	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
@@ -171,6 +177,25 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = constants.DefaultArchivedTasksPerPage
 	}
+	// Agon depth: report the effective value (env override, else the minimum
+	// floor defaults). agentNice 0 reports the backend default; negative means
+	// throttling is disabled. maxAgents 0 means unlimited.
+	agonForks := cfg.AgonForkCount
+	if agonForks <= 0 {
+		agonForks = agonForkCount
+	}
+	agonRounds := cfg.AgonMaxRounds
+	if agonRounds <= 0 {
+		agonRounds = agonMaxRounds
+	}
+	agonCap := cfg.AgonCostCap
+	if agonCap <= 0 {
+		agonCap = agonCostCap
+	}
+	agentNice := cfg.AgentNice
+	if agentNice == 0 {
+		agentNice = executor.DefaultAgentNice
+	}
 	httpjson.Write(w, http.StatusOK, envConfigResponse{
 		OAuthToken:           envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:               envconfig.MaskToken(cfg.APIKey),
@@ -186,6 +211,11 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		SandboxByActivity:    cfg.SandboxByActivity(),
 		MaxParallelTasks:     maxParallel,
 		MaxTestParallelTasks: maxTestParallel,
+		MaxAgents:            cfg.MaxAgents,
+		AgentNice:            agentNice,
+		AgonForks:            agonForks,
+		AgonRounds:           agonRounds,
+		AgonCostCap:          agonCap,
 		OversightInterval:    cfg.OversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPushEnabled:      cfg.AutoPushEnabled,
@@ -418,6 +448,11 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
 		MaxTestParallelTasks *int                                 `json:"max_test_parallel_tasks"`
+		MaxAgents            *int                                 `json:"max_agents"`
+		AgentNice            *int                                 `json:"agent_nice"`
+		AgonForks            *int                                 `json:"agon_forks"`
+		AgonRounds           *int                                 `json:"agon_rounds"`
+		AgonCostCap          *int                                 `json:"agon_cost_cap"`
 		OversightInterval    *int                                 `json:"oversight_interval"`
 		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
 		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
@@ -461,6 +496,62 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		s := fmt.Sprintf("%d", v)
 		maxTestParallel = &s
+	}
+
+	// Convert max_agents int to string. Clamp to [0, ∞): 0 = unlimited.
+	var maxAgents *string
+	if req.MaxAgents != nil {
+		v := *req.MaxAgents
+		if v < 0 {
+			v = 0
+		}
+		s := fmt.Sprintf("%d", v)
+		maxAgents = &s
+	}
+
+	// Convert agent_nice int to string. Clamp to [-1, 19]: -1 disables
+	// throttling, 0 keeps the backend default, 1..19 sets the niceness.
+	var agentNice *string
+	if req.AgentNice != nil {
+		v := *req.AgentNice
+		if v < -1 {
+			v = -1
+		}
+		if v > 19 {
+			v = 19
+		}
+		s := fmt.Sprintf("%d", v)
+		agentNice = &s
+	}
+
+	// Convert agon forks/rounds/cost-cap. Forks/rounds clamp to [1, ∞);
+	// cost cap to [1, ∞). These apply live (agonTuning re-reads on each run).
+	var agonForks *string
+	if req.AgonForks != nil {
+		v := *req.AgonForks
+		if v < 1 {
+			v = 1
+		}
+		s := fmt.Sprintf("%d", v)
+		agonForks = &s
+	}
+	var agonRounds *string
+	if req.AgonRounds != nil {
+		v := *req.AgonRounds
+		if v < 1 {
+			v = 1
+		}
+		s := fmt.Sprintf("%d", v)
+		agonRounds = &s
+	}
+	var agonCostCap *string
+	if req.AgonCostCap != nil {
+		v := *req.AgonCostCap
+		if v < 1 {
+			v = 1
+		}
+		s := fmt.Sprintf("%d", v)
+		agonCostCap = &s
 	}
 
 	// Convert oversight_interval int to string for the env file.
@@ -548,6 +639,11 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		CodexTitleModel:      req.CodexTitleModel,
 		MaxParallel:          maxParallel,
 		MaxTestParallel:      maxTestParallel,
+		MaxAgents:            maxAgents,
+		AgentNice:            agentNice,
+		AgonForks:            agonForks,
+		AgonRounds:           agonRounds,
+		AgonCostCap:          agonCostCap,
 		OversightInterval:    oversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPush:             autoPush,

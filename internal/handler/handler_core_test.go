@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -198,6 +199,50 @@ func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
 	}
 	if resp.ArchivedTasksPerPage != constants.DefaultArchivedTasksPerPage {
 		t.Errorf("expected default archived_tasks_per_page %d, got %d", constants.DefaultArchivedTasksPerPage, resp.ArchivedTasksPerPage)
+	}
+}
+
+// TestEnvConfig_ResourceGovernanceRoundTrip proves the new resource knobs
+// (max_agents, agent_nice, agon forks/rounds/cost-cap) report their defaults on
+// GET and persist through PUT.
+func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	get := func() envConfigResponse {
+		w := httptest.NewRecorder()
+		h.GetEnvConfig(w, httptest.NewRequest(http.MethodGet, "/api/env", nil))
+		var resp envConfigResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return resp
+	}
+
+	// Defaults: minimum agon floor, backend default nice, unlimited budget.
+	d := get()
+	if d.AgonForks != 1 || d.AgonRounds != 3 || d.AgonCostCap != 50000 {
+		t.Errorf("agon defaults = forks %d rounds %d cap %d; want 1/3/50000", d.AgonForks, d.AgonRounds, d.AgonCostCap)
+	}
+	if d.AgentNice != executor.DefaultAgentNice {
+		t.Errorf("agent_nice default = %d, want %d", d.AgentNice, executor.DefaultAgentNice)
+	}
+	if d.MaxAgents != 0 {
+		t.Errorf("max_agents default = %d, want 0 (unlimited)", d.MaxAgents)
+	}
+
+	// Persist new values via PUT.
+	body := `{"max_agents":4,"agent_nice":15,"agon_forks":2,"agon_rounds":5,"agon_cost_cap":80000}`
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body)))
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT = %d: %s", w.Code, w.Body.String())
+	}
+
+	// GET reflects the persisted values.
+	g := get()
+	if g.MaxAgents != 4 || g.AgentNice != 15 || g.AgonForks != 2 || g.AgonRounds != 5 || g.AgonCostCap != 80000 {
+		t.Errorf("after PUT = max_agents %d nice %d forks %d rounds %d cap %d; want 4/15/2/5/80000",
+			g.MaxAgents, g.AgentNice, g.AgonForks, g.AgonRounds, g.AgonCostCap)
 	}
 }
 

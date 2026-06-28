@@ -57,7 +57,7 @@ type HostBackendConfig struct {
 	OpenCodeBinary string // path to `opencode` CLI; empty ⇒ exec.LookPath
 	PiBinary       string // path to `pi` CLI; empty ⇒ exec.LookPath
 	// AgentNice is the niceness applied to launched agent processes so they and
-	// their tool subprocesses yield CPU to the foreground. 0 ⇒ defaultAgentNice;
+	// their tool subprocesses yield CPU to the foreground. 0 ⇒ DefaultAgentNice;
 	// a negative value disables throttling. See applyAgentPriority.
 	AgentNice int
 	// MaxAgents caps the number of agent processes that may run concurrently
@@ -67,10 +67,10 @@ type HostBackendConfig struct {
 	MaxAgents int
 }
 
-// defaultAgentNice is the niceness used when HostBackendConfig.AgentNice is unset
+// DefaultAgentNice is the niceness used when HostBackendConfig.AgentNice is unset
 // (zero). Lowered enough that agent work yields to interactive foreground apps
 // without being fully starved.
-const defaultAgentNice = 10
+const DefaultAgentNice = 10
 
 // HostBackend runs the agent CLI directly as a host process — no container.
 // It reinterprets ContainerSpec fields as host semantics:
@@ -138,7 +138,7 @@ func NewHostBackend(cfg HostBackendConfig) (*HostBackend, error) {
 	nice := cfg.AgentNice
 	switch {
 	case nice == 0:
-		nice = defaultAgentNice
+		nice = DefaultAgentNice
 	case nice < 0:
 		nice = 0
 	}
