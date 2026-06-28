@@ -90,9 +90,9 @@ func describeFlow(f flow.Flow) FlowResponse {
 		})
 	}
 	return FlowResponse{
-		Slug:        f.Slug,
-		Name:        f.Name,
-		Description: f.Description,
+		Slug:            f.Slug,
+		Name:            f.Name,
+		Description:     f.Description,
 		SpawnKind:       string(f.SpawnKind),
 		Builtin:         f.Builtin,
 		Steps:           steps,
@@ -133,6 +133,13 @@ type flowWriteRequest struct {
 	Description string               `json:"description"`
 	SpawnKind   string               `json:"spawn_kind"`
 	Steps       []flowStepWriteInput `json:"steps"`
+	// Agentic execution fields (mirror FlowResponse). They round-trip the
+	// topos runtime knobs through the flow editor; omitting them keeps a
+	// flow on the legacy engine, byte-identical to before.
+	Agentic         bool   `json:"agentic"`
+	Dynamic         bool   `json:"dynamic"`
+	Topology        string `json:"topology"`
+	MaxHandoffDepth int    `json:"max_handoff_depth"`
 }
 
 type flowStepWriteInput struct {
@@ -153,11 +160,15 @@ func (req flowWriteRequest) toFlow() flow.Flow {
 		}
 	}
 	return flow.Flow{
-		Slug:        req.Slug,
-		Name:        req.Name,
-		Description: req.Description,
-		SpawnKind:   store.TaskKind(req.SpawnKind),
-		Steps:       steps,
+		Slug:            req.Slug,
+		Name:            req.Name,
+		Description:     req.Description,
+		SpawnKind:       store.TaskKind(req.SpawnKind),
+		Steps:           steps,
+		Agentic:         req.Agentic,
+		Dynamic:         req.Dynamic,
+		Topology:        flow.Topology(req.Topology),
+		MaxHandoffDepth: req.MaxHandoffDepth,
 	}
 }
 
@@ -199,6 +210,18 @@ func (h *Handler) validateFlowWrite(req flowWriteRequest) error {
 				return fmt.Errorf("step %d: run_in_parallel_with %q is not a sibling step", i, peer)
 			}
 		}
+	}
+	// Agentic knobs. Topology is a closed enum; an empty value maps to the
+	// orchestrator-worker default. A negative depth is meaningless. The
+	// runtime ignores these on a non-agentic flow, so they are validated for
+	// shape regardless of the flag rather than rejected when unused.
+	switch flow.Topology(req.Topology) {
+	case "", flow.TopologyOrchestratorWorker, flow.TopologyMesh:
+	default:
+		return fmt.Errorf("topology %q is not one of %q or %q", req.Topology, flow.TopologyOrchestratorWorker, flow.TopologyMesh)
+	}
+	if req.MaxHandoffDepth < 0 {
+		return fmt.Errorf("max_handoff_depth must be >= 0, got %d", req.MaxHandoffDepth)
 	}
 	return nil
 }
