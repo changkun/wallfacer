@@ -8,6 +8,9 @@ import {
   parallelGroupSlugs,
   stagesOf,
   moveStage,
+  coordinationOf,
+  setCoordination,
+  promoteToLead,
   draftToFlow,
   draftToPayload,
   suggestCloneSlug,
@@ -182,6 +185,34 @@ describe('flowDraft', () => {
     const d = buildDraftFromFlow(f, { clone: false });
     expect(moveStage(d, 'a', 3)).toBe(true); // gap 3 = after the last stage
     expect(d.steps.map((s) => s.agent_slug)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('reads and writes the coordination mode', () => {
+    expect(coordinationOf({ dynamic: false })).toBe('sequence');
+    expect(coordinationOf({ dynamic: true, topology: 'orchestrator-worker' })).toBe('lead');
+    expect(coordinationOf({ dynamic: true, topology: 'mesh' })).toBe('mesh');
+
+    const d = buildDraftFromFlow(implementFlow, { clone: true });
+    setCoordination(d, 'mesh');
+    expect(d).toMatchObject({ agentic: true, dynamic: true, topology: 'mesh' });
+    expect(coordinationOf(d)).toBe('mesh');
+
+    setCoordination(d, 'lead');
+    expect(d).toMatchObject({ dynamic: true, topology: 'orchestrator-worker' });
+    expect(coordinationOf(d)).toBe('lead');
+
+    setCoordination(d, 'sequence');
+    expect(d.dynamic).toBe(false);
+    expect(coordinationOf(d)).toBe('sequence');
+  });
+
+  it('promotes a member to lead by moving it to the front', () => {
+    const d = buildDraftFromFlow(implementFlow, { clone: true }); // [impl, test]
+    expect(promoteToLead(d, 'test')).toBe(true);
+    expect(d.steps.map((s) => s.agent_slug)).toEqual(['test', 'impl']);
+    // Already-lead and unknown are no-ops.
+    expect(promoteToLead(d, 'test')).toBe(false);
+    expect(promoteToLead(d, 'nope')).toBe(false);
   });
 
   it('projects a draft into the Flow shape the canvas renders', () => {
