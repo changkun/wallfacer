@@ -48,7 +48,7 @@ The task board composer (`TaskComposer.vue`) uses a different composable, `front
 
 ## Problems
 
-1. **Commands are trapped in the planning namespace.** Adding a task-board command (e.g. `/template foo` to expand a saved prompt template) requires inventing a parallel registry or awkwardly extending the planning one.
+1. **Commands are trapped in the planning namespace.** Adding a task-board command (e.g. `/describe foo` to inject a file description) requires inventing a parallel registry or awkwardly extending the planning one.
 2. **No scoping model.** Even if the task board queried `/api/planning/commands`, it would see planning-only commands (`/impact`, `/wrapup`) that reference `FocusedSpec` and have no meaning on the board.
 3. **Template context is monolithic.** The `expandData` struct mixes variables from different surfaces (`FocusedSpec`, `Args`, `WordLimit`, `Title`, `State`). Adding a task-board command with its own context (`WorkspaceGroup`, `TaskID`) means either bloating the struct or forking the expansion path.
 4. **Discovery is one-off.** The only way to see "what commands exist and where" is to read `commands.go`. No CLI or API surfaces the catalog with scope metadata.
@@ -135,7 +135,6 @@ The 12 existing planning commands move to `internal/commands/` with `scopes: ["p
 
 Once the registry is scoped, the task board can adopt commands like:
 
-- `/template <name>`: expand a saved prompt template from `/api/templates`.
 - `/describe <path>`: inject a short description of a file or dir.
 - `/dependency <task-prefix>`: add a dependency by task ID.
 

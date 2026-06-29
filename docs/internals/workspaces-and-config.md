@@ -260,36 +260,6 @@ All templates (embedded and override) share a single `FuncMap`:
 | `PUT /api/system-prompts/{name}` | Validates and writes override to `~/.wallfacer/prompts/<name>.tmpl` |
 | `DELETE /api/system-prompts/{name}` | Deletes the override file, restoring the embedded default |
 
-## Prompt Templates
-
-Prompt templates are user-created reusable text fragments (distinct from the system prompt templates above). They are managed by `internal/handler/templates.go`.
-
-### Data Model
-
-```go
-type PromptTemplate struct {
-    ID        string    `json:"id"`
-    Name      string    `json:"name"`
-    Body      string    `json:"body"`
-    CreatedAt time.Time `json:"created_at"`
-}
-```
-
-- **ID**: UUID generated via `uuid.New().String()` on creation.
-- **CreatedAt**: set to `time.Now().UTC()` on creation.
-
-### Storage
-
-All templates are stored in a single JSON file at `~/.wallfacer/templates.json` as a JSON array. Reads and writes are protected by a package-level `sync.RWMutex` (`templatesMu`). Writes use the atomic temp-file-plus-rename pattern.
-
-### API Behavior
-
-| Endpoint | Notes |
-|---|---|
-| `GET /api/templates` | Returns all templates sorted by `created_at` descending (newest first). Returns `[]` when the file does not exist. |
-| `POST /api/templates` | Requires `name` and `body` (both non-empty). Returns 201 with the created template. |
-| `DELETE /api/templates/{id}` | Returns 404 if not found, 204 on success. |
-
 ## See Also
 
 - [Architecture](architecture.md), System overview, state machine, concurrency model

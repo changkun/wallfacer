@@ -141,7 +141,6 @@ The canonical shape is two flat fields per record (`...Sub string` for the princ
 | `APIKeyAction` (new, audit-log entry) | `internal/store/audit.go` (new) | `ActorSub`, `Action {rotate, reveal, test}` | pending | Sensitive env access |
 | `SpecDispatch` event | `internal/spec/`, `internal/handler/specs_dispatch.go` | `ActorSub` | pending | Which team member dispatched this spec |
 | `SystemPromptOverride` | existing | `UpdatedBy string` | pending | Who edited the built-in prompt template |
-| `PromptTemplate` | existing | `CreatedBy string`, `Visibility {private, shared}` | pending | Private-to-user vs shared-with-org |
 
 (The removed task-board refine subsystem is gone, so the original `RefinementSession` / `RefinementJob` actor row has been dropped. The planning `/refine` slash command, internal/planner/commands_templates/refine.tmpl, is a separate live feature and is unaffected.)
 
@@ -342,9 +341,6 @@ Legend: `A` = admin, `E` = editor, `V` = viewer. `self` means the actor can only
 | `GET /api/instructions` | ✓ | ✓ | ✓ | |
 | `PUT /api/instructions` | - | ✓ | ✓ | Shared `AGENTS.md`, editor allowed; event-sourced so reversible |
 | `POST /api/instructions/reinit` | - | - | ✓ | Destructive regenerate, admin only |
-| `GET /api/templates` | ✓ | ✓ | ✓ | |
-| `POST /api/templates` | - | ✓ | ✓ | |
-| `DELETE /api/templates/{id}` | - | `self` | ✓ | Delete own templates |
 
 ### Workspaces
 

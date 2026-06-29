@@ -1,6 +1,6 @@
 // Close a modal on the Escape key while it is open. Several modals
 // (ContainerMonitor, WorkspacePicker) hand-rolled this; this composable
-// is the shared version so SystemPromptsManager / TemplatesManager get
+// is the shared version so modals like SystemPromptsManager get
 // consistent keyboard-dismiss without duplicating
 // the listener-lifecycle boilerplate.
 //

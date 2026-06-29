@@ -450,27 +450,6 @@ var Routes = []Route{
 		Tags:        []string{"system-prompts"},
 	},
 
-	// --- Prompt templates ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/templates", Name: "ListTemplates",
-		JSName:      "list",
-		Description: "List all prompt templates sorted by created_at descending.",
-		Tags:        []string{"templates"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/templates", Name: "CreateTemplate",
-		JSName:      "create",
-		Description: "Create a new named prompt template.",
-		Tags:        []string{"templates"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/templates/{id}", Name: "DeleteTemplate",
-		JSName:      "delete",
-		Description: "Delete a prompt template by ID.",
-		Tags:        []string{"templates"},
-	},
-
 	// --- Whiteboard ---
 
 	{

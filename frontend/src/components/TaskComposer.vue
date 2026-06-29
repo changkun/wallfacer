@@ -5,11 +5,9 @@ import { api } from '../api/client';
 import { splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
-import TemplatePicker from './TemplatePicker.vue';
 import HarnessSelect from './HarnessSelect.vue';
 import AppSelect from './AppSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
-import type { PromptTemplate } from '../api/types';
 
 interface FlowOption { slug: string; name: string }
 
@@ -34,7 +32,6 @@ const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform
 // Advanced fields.
 const flows = ref<FlowOption[]>([]);
 const flow = ref('implement');
-const templates = ref<PromptTemplate[]>([]);
 // Tag chips: committed tags + a pending draft. comma/Enter commit the draft;
 // Backspace on an empty draft removes the last chip. Mirrors legacy tasks.js.
 const tags = ref<string[]>([]);
@@ -111,36 +108,6 @@ async function loadFlows() {
   }
 }
 
-async function loadTemplates() {
-  if (templates.value.length) return;
-  try {
-    templates.value = await api<PromptTemplate[]>('GET', '/api/templates');
-  } catch (e) {
-    console.error('load templates:', e);
-  }
-}
-
-function insertTemplate(body: string) {
-  if (!body) return;
-  const el = textareaRef.value;
-  if (el) {
-    const pos = el.selectionStart ?? el.value.length;
-    const before = el.value.slice(0, pos);
-    const after = el.value.slice(pos);
-    // Insert with a leading newline if the cursor isn't at the start of a
-    // blank line — keeps the inserted block from glueing onto the prior text.
-    const sep = before && !before.endsWith('\n') ? '\n' : '';
-    prompt.value = before + sep + body + after;
-    nextTick(() => {
-      const newPos = (before + sep + body).length;
-      el.focus();
-      el.setSelectionRange(newPos, newPos);
-    });
-  } else {
-    prompt.value = prompt.value ? prompt.value + '\n' + body : body;
-  }
-}
-
 // Inserts an "@" at the cursor (with a leading space if needed) and opens the
 // mention autocomplete, matching the legacy board-composer "@" action button.
 function insertAtMention() {
@@ -170,7 +137,6 @@ onMounted(() => {
 async function expand() {
   expanded.value = true;
   loadFlows();
-  loadTemplates();
   await nextTick();
   textareaRef.value?.focus();
 }
@@ -376,10 +342,6 @@ function onInput(e: Event) {
             aria-label="Custom timeout in minutes"
           />
         </div>
-      </label>
-      <label v-if="templates.length" class="composer__opt">
-        <span class="composer__opt-label">Template</span>
-        <TemplatePicker :templates="templates" @select="insertTemplate" />
       </label>
       <button
         type="button"
