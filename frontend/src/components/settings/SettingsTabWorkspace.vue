@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue';
-import { api } from '../../api/client';
-import { useTaskStore } from '../../stores/tasks';
 import { useWorkspacesStore } from '../../stores/workspaces';
 import { useDialogStore } from '../../stores/dialog';
-import type { Workspace, WorkspaceGroup } from '../../api/types';
+import { workspaceLabel } from '../../lib/workspaceLabel';
+import type { Workspace } from '../../api/types';
 
 const emit = defineEmits<{ workspaces: [] }>();
-const store = useTaskStore();
 const wsStore = useWorkspacesStore();
 const dialog = useDialogStore();
 const status = ref('');
-const switchingKey = ref<string | null>(null);
 
 // busyId tracks the workspace currently mid-mutation so its row controls
 // disable without freezing the whole list.
@@ -21,8 +18,6 @@ const busyId = ref<string | null>(null);
 const nameDrafts = reactive<Record<string, string>>({});
 
 const workspaces = computed<Workspace[]>(() => wsStore.workspaces);
-const activeWorkspaces = computed(() => store.config?.workspaces ?? []);
-const workspaceGroups = computed<WorkspaceGroup[]>(() => store.config?.workspace_groups ?? []);
 
 onMounted(() => {
   if (wsStore.workspaces.length === 0) void wsStore.list();
@@ -115,67 +110,21 @@ async function remove(ws: Workspace) {
   }
 }
 
-function workspaceGroupLabel(group: WorkspaceGroup): string {
-  if (!group || !Array.isArray(group.workspaces) || !group.workspaces.length) return 'Empty group';
-  if (group.name) return group.name;
-  const names = group.workspaces.map(p => {
-    const clean = String(p || '').replace(/[\\/]+$/, '');
-    const parts = clean.split(/[\\/]/);
-    return parts[parts.length - 1] || clean;
-  });
-  return names.join(' + ');
-}
-
-function isActiveGroup(group: WorkspaceGroup): boolean {
-  const a = group.workspaces;
-  const b = activeWorkspaces.value;
-  if (!Array.isArray(a) || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-async function useGroup(group: WorkspaceGroup) {
-  if (switchingKey.value) return;
-  switchingKey.value = group.key;
+// Per-workspace parallel overrides write through PUT /api/workspaces/{id}. A
+// number sets the cap; null (empty input) clears it so the global default takes
+// over again. The store replaces the local DTO from the response, so the inputs
+// reflect the saved value.
+async function saveLimits(ws: Workspace, maxParallel: number | null, maxTestParallel: number | null) {
+  if (busyId.value) return;
+  busyId.value = ws.id;
   status.value = '';
   try {
-    await api('PUT', '/api/workspaces', { workspaces: group.workspaces });
-    await store.fetchConfig();
-    await store.fetchTasks();
+    await wsStore.update(ws.id, { max_parallel: maxParallel, max_test_parallel: maxTestParallel });
+    setStatus('Saved.');
   } catch (e) {
-    status.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
+    setStatus('Error: ' + (e instanceof Error ? e.message : String(e)));
   } finally {
-    switchingKey.value = null;
-  }
-}
-
-// Per-group parallel overrides: writes the whole workspace_groups array
-// back to /api/config with the edited group's max_parallel /
-// max_test_parallel replaced. 0 / empty input clears the override so the
-// global default takes over again.
-const savingGroup = ref<string | null>(null);
-async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null, maxTestParallel: number | null) {
-  if (savingGroup.value) return;
-  savingGroup.value = group.key;
-  status.value = '';
-  try {
-    const next = workspaceGroups.value.map((g) => {
-      if (g.key !== group.key) return { name: g.name, workspaces: g.workspaces, max_parallel: g.max_parallel, max_test_parallel: g.max_test_parallel };
-      return {
-        name: g.name,
-        workspaces: g.workspaces,
-        max_parallel: maxParallel && maxParallel > 0 ? maxParallel : undefined,
-        max_test_parallel: maxTestParallel && maxTestParallel > 0 ? maxTestParallel : undefined,
-      };
-    });
-    await api('PUT', '/api/config', { workspace_groups: next });
-    await store.fetchConfig();
-    status.value = 'Saved.';
-    setTimeout(() => { if (status.value === 'Saved.') status.value = ''; }, 2000);
-  } catch (e) {
-    status.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
-  } finally {
-    savingGroup.value = null;
+    busyId.value = null;
   }
 }
 </script>
@@ -204,16 +153,7 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
           :class="{ 'ws-editor__row--active': wsStore.isActive(ws.id) }"
         >
           <div class="ws-editor__head">
-            <input
-              class="ws-editor__name"
-              type="text"
-              :value="nameDraft(ws)"
-              :disabled="busyId === ws.id"
-              placeholder="Workspace name"
-              @input="nameDrafts[ws.id] = ($event.target as HTMLInputElement).value"
-              @keydown.enter.prevent="rename(ws)"
-              @blur="rename(ws)"
-            />
+            <span class="ws-editor__label">{{ workspaceLabel(ws.name, ws.folders) }}</span>
             <span v-if="wsStore.isActive(ws.id)" class="ws-editor__badge ws-editor__badge--active">active</span>
             <span v-if="ws.dormant" class="ws-editor__badge ws-editor__badge--dormant">recovered</span>
             <div class="ws-editor__actions">
@@ -241,6 +181,42 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
                 @click="remove(ws)"
               >Delete</button>
             </div>
+          </div>
+          <input
+            class="ws-editor__name"
+            type="text"
+            :value="nameDraft(ws)"
+            :disabled="busyId === ws.id"
+            :placeholder="workspaceLabel(ws.name, ws.folders)"
+            aria-label="Rename workspace"
+            @input="nameDrafts[ws.id] = ($event.target as HTMLInputElement).value"
+            @keydown.enter.prevent="rename(ws)"
+            @blur="rename(ws)"
+          />
+          <!-- Per-workspace parallel overrides. Empty input = global default. -->
+          <div class="ws-editor__limits">
+            <label>
+              <span>Max parallel</span>
+              <input
+                type="number"
+                min="0"
+                :value="ws.max_parallel ?? ''"
+                placeholder="default"
+                :disabled="busyId === ws.id"
+                @change="saveLimits(ws, ($event.target as HTMLInputElement).valueAsNumber || null, ws.max_test_parallel ?? null)"
+              />
+            </label>
+            <label>
+              <span>Max test parallel</span>
+              <input
+                type="number"
+                min="0"
+                :value="ws.max_test_parallel ?? ''"
+                placeholder="default"
+                :disabled="busyId === ws.id"
+                @change="saveLimits(ws, ws.max_parallel ?? null, ($event.target as HTMLInputElement).valueAsNumber || null)"
+              />
+            </label>
           </div>
           <div class="ws-editor__folders">
             <div
@@ -274,80 +250,6 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
         >New / switch workspace…</button>
       </div>
     </div>
-
-    <div class="settings-section">
-      <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-        Saved Workspace Groups
-      </div>
-      <div
-        id="settings-workspace-groups"
-        style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-secondary);"
-      >
-        <div
-          v-if="workspaceGroups.length === 0"
-          style="color: var(--text-muted); font-size: 11px"
-        >Saved workspace groups will appear here after you switch boards.</div>
-        <div
-          v-for="group in workspaceGroups"
-          :key="group.key"
-          style="border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg-elevated); display: flex; flex-direction: column; gap: 8px;"
-        >
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-            <div style="font-size: 12px; font-weight: 600;">
-              {{ workspaceGroupLabel(group) }}
-              <span
-                v-if="isActiveGroup(group)"
-                style="font-size: 10px; color: var(--text-muted); font-weight: 500; margin-left: 4px;"
-              >Current</span>
-            </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <button
-                type="button"
-                class="btn-icon"
-                style="font-size: 11px; padding: 3px 8px;"
-                :disabled="switchingKey !== null"
-                @click="useGroup(group)"
-              >{{ switchingKey === group.key ? 'Switching…' : 'Use' }}</button>
-            </div>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <div
-              v-for="path in group.workspaces"
-              :key="path"
-              style="font-family: monospace; font-size: 11px; color: var(--text-muted); word-break: break-all;"
-            >{{ path }}</div>
-          </div>
-          <!-- Per-group parallel overrides. 0/empty = use global default. -->
-          <div class="group-limits">
-            <label>
-              <span>Max parallel</span>
-              <input
-                type="number"
-                min="0"
-                :value="group.max_parallel ?? ''"
-                placeholder="default"
-                :disabled="savingGroup === group.key"
-                @change="saveGroupLimits(group, ($event.target as HTMLInputElement).valueAsNumber || null, group.max_test_parallel ?? null)"
-              />
-            </label>
-            <label>
-              <span>Max test parallel</span>
-              <input
-                type="number"
-                min="0"
-                :value="group.max_test_parallel ?? ''"
-                placeholder="default"
-                :disabled="savingGroup === group.key"
-                @change="saveGroupLimits(group, group.max_parallel ?? null, ($event.target as HTMLInputElement).valueAsNumber || null)"
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-      <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-        Workspace groups are saved automatically when they become active, so you can switch back without rebuilding the same folder set.
-      </div>
-    </div>
   </div>
 </template>
 
@@ -375,16 +277,28 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
   gap: 6px;
   flex-wrap: wrap;
 }
-.ws-editor__name {
-  flex: 1;
-  min-width: 120px;
+.ws-editor__label {
   font-size: 13px;
   font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ws-editor__name {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 500;
   padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-input);
   color: var(--text);
+}
+.ws-editor__name::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
 }
 .ws-editor__badge {
   font-size: 9px;
@@ -437,21 +351,21 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
   line-height: 1;
   padding: 0 6px;
 }
-.group-limits {
+.ws-editor__limits {
   display: flex;
   gap: 12px;
   border-top: 1px dashed var(--border);
   padding-top: 6px;
   margin-top: 2px;
 }
-.group-limits label {
+.ws-editor__limits label {
   display: flex;
   flex-direction: column;
   gap: 2px;
   font-size: 11px;
   color: var(--text-muted);
 }
-.group-limits input {
+.ws-editor__limits input {
   width: 80px;
   padding: 3px 6px;
   font-size: 12px;

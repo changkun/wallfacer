@@ -165,6 +165,23 @@ useKeyboard({
     <ConfirmDialog />
     <Toaster />
     <SpecChatPopup v-if="showChatPopup" />
+
+    <!-- Full-UI blocking overlay during a workspace switch. Rendered as the last
+         child of .app-shell so it stacks above every modal (WorkspacePicker
+         z-50) and the collapsed sidebar popover (z-200). Keeps the user from
+         seeing the new active state painted over stale old content mid-switch. -->
+    <div
+      v-if="ui.switchingWorkspace"
+      class="ws-switch-overlay"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div class="ws-switch-overlay__panel">
+        <span class="ws-switch-overlay__spinner" aria-hidden="true" />
+        <span class="ws-switch-overlay__label">Switching workspace…</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -197,5 +214,40 @@ useKeyboard({
   color: var(--ink);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
+}
+/* Sits above every modal (z-50) and the collapsed sidebar popover (z-200). */
+.ws-switch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--bg) 55%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.ws-switch-overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+}
+.ws-switch-overlay__spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in oklab, var(--ink) 20%, transparent);
+  border-top-color: var(--accent);
+  animation: ws-switch-spin 0.7s linear infinite;
+}
+.ws-switch-overlay__label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+@keyframes ws-switch-spin {
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -247,9 +247,18 @@ export interface Workspace {
   folders: string[];
   dormant: boolean;
   active: boolean;
+  // Per-workspace parallelism overrides. null/absent means "use the global
+  // default". Surfaced as the registry editor's Max parallel / Max test
+  // parallel inputs.
+  max_parallel?: number | null;
+  max_test_parallel?: number | null;
 }
 
 export interface WorkspaceGroup {
+  // id ties a saved group back to its first-class workspace in the registry, so
+  // group actions (switch / rename / delete) route through the id-based
+  // endpoints instead of the legacy path-based PUT.
+  id?: string;
   name?: string;
   workspaces: string[];
   key: string;

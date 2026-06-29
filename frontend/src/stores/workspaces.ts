@@ -16,6 +16,7 @@ import { ref, computed } from 'vue';
 
 import { api } from '../api/client';
 import { useTaskStore } from './tasks';
+import { useUiStore } from './ui';
 import type { ServerConfig, Workspace } from '../api/types';
 
 export const useWorkspacesStore = defineStore('workspaces', () => {
@@ -70,7 +71,12 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
   // History is preserved server-side; the returned DTO replaces the local copy.
   async function update(
     id: string,
-    patch: { name?: string; folders?: string[] },
+    patch: {
+      name?: string;
+      folders?: string[];
+      max_parallel?: number | null;
+      max_test_parallel?: number | null;
+    },
   ): Promise<Workspace> {
     error.value = null;
     const ws = await api<Workspace>('PUT', `/api/workspaces/${id}`, patch);
@@ -93,12 +99,21 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
   // task list for the new active workspace.
   async function activate(id: string): Promise<void> {
     error.value = null;
-    const config = await api<ServerConfig>('POST', `/api/workspaces/${id}/activate`);
-    const tasks = useTaskStore();
-    // Writing config flips activeId (derived from config.workspace_id) and the
-    // per-row active state reactively; no manual bookkeeping needed.
-    tasks.config = config;
-    await tasks.fetchTasks();
+    // Raise the blocking overlay for the whole switch so the UI never paints
+    // the new active state over stale old content; lower it in finally even on
+    // failure.
+    const ui = useUiStore();
+    ui.switchingWorkspace = true;
+    try {
+      const config = await api<ServerConfig>('POST', `/api/workspaces/${id}/activate`);
+      const tasks = useTaskStore();
+      // Writing config flips activeId (derived from config.workspace_id) and the
+      // per-row active state reactively; no manual bookkeeping needed.
+      tasks.config = config;
+      await tasks.fetchTasks();
+    } finally {
+      ui.switchingWorkspace = false;
+    }
   }
 
   return {

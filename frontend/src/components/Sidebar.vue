@@ -7,14 +7,17 @@ import AccountControl from './AccountControl.vue';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
 import { useUiStore } from '../stores/ui';
+import { useWorkspacesStore } from '../stores/workspaces';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
-import { api } from '../api/client';
 import { derivePresence } from '../lib/presence';
 import { hasUnseen } from '../lib/unread';
-import { basename, groupLabel } from '../lib/workspaceLabel';
+import { groupLabel, workspaceLabel } from '../lib/workspaceLabel';
 
 interface WorkspaceGroup {
+  // id ties the saved group back to its registry workspace; group actions route
+  // through the id-based registry endpoints (the legacy path-based PUT is gone).
+  id?: string;
   name?: string;
   workspaces: string[];
   key?: string;
@@ -24,6 +27,7 @@ const route = useRoute();
 const store = useTaskStore();
 const auth = useAuthStore();
 const ui = useUiStore();
+const wsStore = useWorkspacesStore();
 const dialog = useDialogStore();
 const toast = useToastStore();
 
@@ -50,15 +54,21 @@ function groupBadge(g: WorkspaceGroup): { inProgress: number; waiting: number } 
 function activeKey(): string {
   return JSON.stringify(store.config?.workspaces ?? []);
 }
+// Active marker follows the registry's single source of truth (config's
+// workspace_id) when the group carries an id; older groups without one fall
+// back to comparing the folder set.
 function isActiveGroup(g: WorkspaceGroup): boolean {
+  if (g.id) return wsStore.isActive(g.id);
   return JSON.stringify(g.workspaces) === activeKey();
 }
+// Switch the board by activating the group's registry workspace. activate()
+// updates config, reloads the board, and raises the blocking overlay.
 async function switchToGroup(g: WorkspaceGroup) {
   if (isActiveGroup(g) || switchingKey.value) return;
+  if (!g.id) return; // pre-migration group without an id: skip rather than crash
   switchingKey.value = g.key ?? JSON.stringify(g.workspaces);
   try {
-    await api('PUT', '/api/workspaces', { workspaces: g.workspaces });
-    await Promise.all([store.fetchConfig(), store.fetchTasks({ includeArchived: ui.showArchived })]);
+    await wsStore.activate(g.id);
     toast.push(`Switched to ${g.name || 'workspace'}`, { kind: 'success' });
     wsPopoverOpen.value = false;
   } catch (e) {
@@ -71,6 +81,7 @@ function isSwitching(g: WorkspaceGroup): boolean {
   return switchingKey.value === (g.key ?? JSON.stringify(g.workspaces));
 }
 async function renameGroup(g: WorkspaceGroup) {
+  if (!g.id) return; // no registry id: nothing to rename through
   const name = await dialog.prompt({
     title: 'Rename workspace',
     message: 'New name:',
@@ -78,31 +89,30 @@ async function renameGroup(g: WorkspaceGroup) {
     placeholder: 'My workspace',
   });
   if (name == null) return;
-  const next = workspaceGroups.value.map((x) =>
-    x.key === g.key ? { ...x, name: name.trim() } : x,
-  );
-  await saveGroups(next, 'Renamed');
+  try {
+    await wsStore.update(g.id, { name: name.trim() });
+    await store.fetchConfig();
+    toast.push('Renamed workspace', { kind: 'success' });
+  } catch (e) {
+    toast.push(`Rename failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+  }
 }
 async function deleteGroup(g: WorkspaceGroup) {
+  if (!g.id) return; // no registry id: nothing to delete through
   const ok = await dialog.confirm({
     title: 'Delete workspace',
-    message: `Remove the ${g.name || 'unnamed'} workspace group? Tasks under it stay on disk but will no longer be reachable until the group is recreated.`,
+    message: `Remove the ${g.name || 'unnamed'} workspace? Folders on disk are not touched, but the workspace will no longer be reachable until recreated.`,
     confirmLabel: 'Delete',
     danger: true,
   });
   if (!ok) return;
-  const next = workspaceGroups.value.filter((x) => x.key !== g.key);
-  await saveGroups(next, 'Deleted');
-}
-async function saveGroups(next: WorkspaceGroup[], verb: string) {
   try {
-    await api('PUT', '/api/config', {
-      workspace_groups: next.map(({ name, workspaces }) => ({ name, workspaces })),
-    });
+    // The registry rejects deleting the active workspace (409); surface it.
+    await wsStore.remove(g.id);
     await store.fetchConfig();
-    toast.push(`${verb} workspace group`, { kind: 'success' });
+    toast.push('Deleted workspace', { kind: 'success' });
   } catch (e) {
-    toast.push(`${verb} failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+    toast.push(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
   }
 }
 
@@ -135,13 +145,16 @@ watch(
 watch(() => route.path, (p) => { if (p === '/') markBoardSeen(); });
 
 const activeWorkspaceLabel = computed(() => {
+  // Prefer the registry's active workspace (stable label across folder edits);
+  // the shared helper guarantees an unnamed one still reads as its folders.
+  const active = wsStore.active;
+  if (active) return workspaceLabel(active.name, active.folders);
   const ws = store.config?.workspaces;
   if (!ws || ws.length === 0) return 'No workspace';
   const groups = store.config?.workspace_groups ?? [];
   const key = JSON.stringify(ws);
   const matched = groups.find(g => JSON.stringify(g.workspaces) === key);
-  if (matched?.name) return matched.name;
-  return ws.map(basename).join(' + ');
+  return workspaceLabel(matched?.name, ws);
 });
 
 // The global nav, mapped onto the shared ConsoleSidebar model. Board carries an
