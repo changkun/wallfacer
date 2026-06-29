@@ -1,6 +1,6 @@
 ---
 title: Workspace Model
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/workspace/groups.go
@@ -361,6 +361,91 @@ project rule.
 - **`workspace-groups.json` readers outside the workspace package.** Confirm no
   other component reads the old file directly; all access should route through
   the workspace package so the rename is contained.
+
+## Outcome
+
+**Summary.** Implemented directly (not dispatched) across six commits
+(`f9dcb1a6`, `d010290a`, `afa00ad5`, `00a66a9f`, `0d7dcb2a`, `6d0981fb`). A
+workspace is now a first-class object with a stable UUID and a stable `DataKey`
+storage handle, both independent of its mutable folder set; the legacy
+path-keyed `workspace-groups.json` migrates to `workspaces.json` with orphaned
+task history adopted as dormant workspaces. Drift: Minimal — all 9 acceptance
+criteria satisfied.
+
+**What shipped.**
+- `internal/workspace`: `Workspace` record (id, folders, DataKey, dormant,
+  owner, timestamps) replacing `Group`; `prompts.WorkspaceDataKey` (migration
+  seed) + `NewDataKey` (random, identity-first); manager `Create` /
+  `UpdateFolders` / `Rename` / `Delete` / `SwitchByID` / `ListWorkspaces` /
+  `WorkspaceByID`; `Snapshot` carries `WorkspaceID` + `DataKey`; `migrate.go`
+  (`MigrateToWorkspaces`, wired into server startup before the manager loads).
+- Key-source audit so a folder edit never strands data: the two
+  `AgentSessionGroupKey` callers, the `/api/config` group key, and the
+  coordinator `LocalKey` now read the active snapshot's stable key.
+- HTTP (`internal/handler` + `apicontract`, no new package): `GET`/`POST`
+  `/api/workspaces`, `PUT`/`DELETE` `/api/workspaces/{id}`, `POST`
+  `/api/workspaces/{id}/activate`; `/api/config` carries `workspace_id`.
+- Frontend: `stores/workspaces.ts`, evolved `WorkspacePicker.vue` (list +
+  activate + create-then-activate), `SettingsTabWorkspace.vue` registry editor,
+  `StatusBar.vue` active-name display.
+- Tests: workspace package (identity stable across `UpdateFolders` incl.
+  agent-session history survival, random-key empty start, same-folder
+  coexistence, migration fixture with zero-move + idempotency + orphan
+  adoption), handler CRUD lifecycle + cloud visibility isolation, frontend
+  store round-trip. Migration was additionally dry-run-validated against the
+  real `~/.wallfacer`: all 9 live keys matched their existing data dirs, 11
+  orphans were adopted as dormant, 6 empty dirs skipped.
+
+**Design evolution (diverged).**
+- `Switch(paths)` was kept as a transitional resolve-or-create shim feeding a
+  shared `activate()`, rather than removed in favor of `Switch(id)` as the
+  "Runtime: the manager" section implies; `SwitchByID` is the by-id path. Reason:
+  keep the legacy `PUT /api/workspaces` and env-based restore working through
+  the transition.
+- `GroupsForPrincipal` was retained as a thin alias of `WorkspacesForPrincipal`
+  rather than renamed outright, avoiding wide call-site churn for no behavior
+  change.
+- `ClaimGroup` was kept: `Create` stamps the owner at creation (replacing lazy
+  claim-on-switch), but the still-live legacy path-switch keeps calling
+  `ClaimGroup`; it retires when that route does.
+- `workspaces.json` supersedes `workspace-groups.json` via a read-fallback
+  (`LoadGroups` prefers the new file) rather than an in-place rename, so an
+  un-migrated install keeps loading.
+
+**Not implemented (deferred).**
+- Startup restore-by-id: the server boots the manager empty (unchanged from
+  before), so restore stays env/frontend-driven. Persisting an active
+  `WALLFACER_WORKSPACE_ID` for unambiguous restore of same-folder workspaces is
+  deferred; no regression versus prior behavior.
+- Non-goals held as scoped: cloud workspace-object sync, multi-repo
+  association, folder sandboxing, org-admin RBAC create-gate.
+
+**Unspecified work.**
+- Agent-session / config / coordinator key-source fixes — bug-prevention
+  (scaffolding); without them a folder edit would strand transcripts/usage.
+- `StatusBar.vue` active-workspace name display — improvement.
+
+**Decisions / surprises / follow-ups.**
+- `NormalizeGroups` dedup switched from folder-set to **id**, so duplicate
+  folder sets coexist (criterion 3); legacy id-less records still folder-dedup.
+- Orphan adoption gates on *task history* (a child dir with `task.json`), not
+  mere directory non-emptiness — the real-data run adopted 11 and skipped 6
+  empty shells, matching the "non-empty" intent precisely.
+- Folder recovery reads the `worktree_paths` keys (source paths) from
+  `task.json`; paths no longer on disk are dropped, leaving some dormant
+  workspaces folderless awaiting re-point (expected).
+- **Verification gap (honest):** the migration was dry-run-validated on real
+  data and the integration is covered by unit/handler tests, but a live
+  `wallfacer run` round-trip (boot → edit folders → board unchanged → restart)
+  was not manually exercised. The migration fires automatically on the next
+  `wallfacer run` (backed up to `migration-backup-workspaces-<ts>/`, idempotent,
+  zero-move) — a manual round-trip is recommended before relying on it.
+- Pre-existing `TaskDetail.results` and `WhiteboardPage` vitest failures are
+  unrelated (fail identically on the clean tree).
+- Follow-ups: remove the legacy `PUT /api/workspaces` + `ClaimGroup` once the
+  frontend fully drops the path-switch; add `WALLFACER_WORKSPACE_ID` restore;
+  surface dormant re-point more prominently. The deferred cloud-objects and
+  git-repo work build on this foundation.
 
 ## Proposed breakdown (non-leaf)
 
