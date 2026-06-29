@@ -1,6 +1,6 @@
 ---
 title: Agent Resource Governance (Priority + Global Budget + Tunable Verification Depth)
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/executor/host.go
