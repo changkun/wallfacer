@@ -20,19 +20,6 @@ const ui = useUiStore();
 const dialog = useDialogStore();
 const toast = useToastStore();
 
-// Create a new folder under the current browse path, then refresh the listing.
-async function createFolder() {
-  const name = await dialog.prompt({ title: 'New folder', message: `Create a folder inside ${browsePath.value}:`, initial: '' });
-  if (!name) return;
-  try {
-    await api('POST', '/api/workspaces/mkdir', { path: browsePath.value, name: name.trim() });
-    await browse(browsePath.value);
-    toast.push(`Created ${name.trim()}`, { kind: 'success' });
-  } catch (e) {
-    toast.push(`Create failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
-  }
-}
-
 // Rename a browsed directory entry, then refresh the listing.
 async function renameEntry(entry: { path: string; name: string }) {
   const name = await dialog.prompt({ title: 'Rename folder', message: `Rename "${entry.name}" to:`, initial: entry.name });
@@ -178,6 +165,18 @@ onBeforeUnmount(() => {
 function addFolder(path: string) {
   if (!folders.value.includes(path)) {
     folders.value.push(path);
+  }
+}
+
+// Open the host OS native folder chooser and add the picked folder to the list.
+// When no native picker is available (501: cloud/headless/unknown platform) we
+// fall back to the in-app directory browser shown below.
+async function pickFolderNative() {
+  try {
+    const res = await api<{ path?: string; cancelled?: boolean }>('POST', '/api/workspaces/pick-folder');
+    if (res.path) addFolder(res.path);
+  } catch {
+    toast.push('Native folder picker unavailable here — browse below instead.', { kind: 'info' });
   }
 }
 
@@ -351,9 +350,16 @@ function filteredEntries() {
 
         <div v-show="step === 1" class="ws-picker__body ws-picker__body--step">
         <p class="ws-step__instruction">
-          Browse to your project directories and click + Add. Git repos are marked.
-          Add as many as you want.
+          Pick your project folders with the system file browser. Add as many as
+          you want — each appears in the list below.
         </p>
+        <div class="ws-picker__pick-row">
+          <button type="button" class="btn btn-accent ws-picker__pick-btn" @click="pickFolderNative">
+            📁 Choose folder…
+          </button>
+          <span class="ws-picker__pick-hint">Opens your system file browser</span>
+        </div>
+        <p class="ws-picker__manual-label">Or browse manually:</p>
         <div class="ws-picker__browser">
           <div class="ws-picker__path-row">
             <input
@@ -398,25 +404,14 @@ function filteredEntries() {
               <input v-model="showHidden" type="checkbox" />
               Show hidden
             </label>
-            <div class="ws-picker__toolbar-actions">
-              <button
-                type="button"
-                class="btn-ghost ws-picker__new-folder-btn"
-                :disabled="browsePath === '/'"
-                title="Create a new folder here"
-                @click="createFolder"
-              >
-                + New Folder
-              </button>
-              <button
-                type="button"
-                class="btn-ghost ws-picker__add-folder-btn"
-                :disabled="folders.includes(browsePath)"
-                @click="addFolder(browsePath)"
-              >
-                + Add current folder
-              </button>
-            </div>
+            <button
+              type="button"
+              class="btn-ghost ws-picker__add-folder-btn"
+              :disabled="folders.includes(browsePath)"
+              @click="addFolder(browsePath)"
+            >
+              + Add this folder
+            </button>
           </div>
 
           <div class="ws-picker__status">
@@ -685,5 +680,23 @@ function filteredEntries() {
 }
 .ws-picker__name-input {
   width: 100%;
+}
+.ws-picker__pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ws-picker__pick-btn {
+  font-size: 13px;
+}
+.ws-picker__pick-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.ws-picker__manual-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 6px 0 4px;
 }
 </style>
