@@ -61,10 +61,18 @@ type claudeUsage struct {
 }
 
 // claudeStreamLine is the discriminator for non-terminal stream-json
-// events. The terminal result line has no `type` field.
+// events. The terminal result line has no `type` field. The model is
+// reported in two shapes: the system/init line carries it top-level
+// (`model`, including a context-window variant suffix such as "[1m]"),
+// while each assistant line carries the per-turn model nested under
+// `message.model`.
 type claudeStreamLine struct {
 	Type    string `json:"type"`
 	Subtype string `json:"subtype"`
+	Model   string `json:"model"`
+	Message *struct {
+		Model string `json:"model"`
+	} `json:"message"`
 }
 
 // ParseEvent maps one NDJSON line of claude output to a canonical Event.
@@ -81,9 +89,13 @@ func (claudeHarness) ParseEvent(raw []byte) (Event, error) {
 	switch line.Type {
 	case "system":
 		evt.Kind = KindSystemInit
+		evt.Model = line.Model
 		return evt, nil
 	case "assistant":
 		evt.Kind = KindAssistantText
+		if line.Message != nil {
+			evt.Model = line.Message.Model
+		}
 		return evt, nil
 	case "user":
 		evt.Kind = KindUserResult
