@@ -37,13 +37,14 @@ func (r *Runner) parseAgentStream(sb harness.ID, raw string) (*agentOutput, erro
 //     parseOutput's "no valid JSON object found".
 func parseHarnessOutput(h harness.Harness, raw string) (*agentOutput, error) {
 	var (
-		terminal     *harness.Event
-		sessionID    string
-		lastText     string
-		sawAnyResult bool
-		sawAnyEvent  bool
+		terminal      *harness.Event
+		sessionID     string
+		lastText      string
+		observedModel string
+		sawAnyResult  bool
+		sawAnyEvent   bool
 	)
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {
 			continue
@@ -57,6 +58,11 @@ func parseHarnessOutput(h harness.Harness, raw string) (*agentOutput, error) {
 		}
 		if evt.SessionID != "" {
 			sessionID = evt.SessionID
+		}
+		// First reported model wins: the init line carries the session
+		// primary, which is the value provenance should record.
+		if observedModel == "" && evt.Model != "" {
+			observedModel = evt.Model
 		}
 		// Only assistant prose is a candidate for the final-answer fallback.
 		// Thinking blocks (KindThinking) also carry Text but are reasoning, not
@@ -78,14 +84,15 @@ func parseHarnessOutput(h harness.Harness, raw string) (*agentOutput, error) {
 		// Recognised non-terminal events only (e.g. an init line with a
 		// session id but no result yet). Surface what we have so callers
 		// that tolerate a missing result still see the session id.
-		return &agentOutput{SessionID: sessionID}, nil
+		return &agentOutput{SessionID: sessionID, ObservedModel: observedModel}, nil
 	}
 
 	out := &agentOutput{
-		SessionID:  terminal.SessionID,
-		StopReason: terminal.StopReason,
-		IsError:    terminal.Kind == harness.KindError,
-		Result:     terminal.Text,
+		SessionID:     terminal.SessionID,
+		StopReason:    terminal.StopReason,
+		IsError:       terminal.Kind == harness.KindError,
+		Result:        terminal.Text,
+		ObservedModel: observedModel,
 	}
 	if out.Result == "" {
 		out.Result = lastText

@@ -30,3 +30,26 @@ func TestParseHarnessOutput_ThinkingInert(t *testing.T) {
 		t.Errorf("Result = %q, want %q (reasoning must not become the answer)", out.Result, "the real answer")
 	}
 }
+
+// TestParseHarnessOutput_ObservedModel verifies the accumulator lifts the
+// model the claude harness reports (init line, first-wins) into agentOutput,
+// so task provenance can supersede the often-empty requested model with what
+// actually ran.
+func TestParseHarnessOutput_ObservedModel(t *testing.T) {
+	h, ok := harness.Lookup(harness.Claude)
+	if !ok {
+		t.Fatal("claude harness not registered")
+	}
+	raw := `{"type":"system","subtype":"init","model":"claude-opus-4-8[1m]","session_id":"s"}
+{"type":"assistant","message":{"model":"claude-haiku-4-5","content":[{"type":"text","text":"hi"}]}}
+{"session_id":"s","stop_reason":"end_turn","result":"hi"}`
+
+	out, err := parseHarnessOutput(h, raw)
+	if err != nil {
+		t.Fatalf("parseHarnessOutput: %v", err)
+	}
+	// First reported model wins: the init line's session-primary model.
+	if out.ObservedModel != "claude-opus-4-8[1m]" {
+		t.Errorf("ObservedModel = %q, want %q", out.ObservedModel, "claude-opus-4-8[1m]")
+	}
+}

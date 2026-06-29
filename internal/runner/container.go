@@ -38,6 +38,10 @@ type agentOutput struct {
 	TotalCostUSD  float64    `json:"total_cost_usd"`
 	Usage         agentUsage `json:"usage"`
 	ActualSandbox harness.ID `json:"-"`
+	// ObservedModel is the model the harness reported during the run (from
+	// the init/assistant events), not the model the runner requested. Empty
+	// when the harness does not report one. Populated by parseHarnessOutput.
+	ObservedModel string `json:"-"`
 }
 
 // Package-level aliases for SandboxActivity constants to reduce verbosity
