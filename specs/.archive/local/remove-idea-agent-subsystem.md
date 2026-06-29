@@ -1,6 +1,6 @@
 ---
 title: Remove the idea-agent (brainstorm) subsystem and the test-only flow
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/runner/
@@ -15,7 +15,7 @@ affects:
   - docs/
 effort: large
 created: 2026-06-28
-updated: 2026-06-28
+updated: 2026-06-30
 author: changkun
 dispatched_task_id: null
 ---
