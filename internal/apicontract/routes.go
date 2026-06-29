@@ -103,6 +103,12 @@ var Routes = []Route{
 		Tags:        []string{"workspaces"},
 	},
 	{
+		Method: http.MethodPost, Pattern: "/api/workspaces/pick-folder", Name: "PickFolder",
+		JSName:      "pickFolder",
+		Description: "Open the host OS native folder chooser and return the picked absolute path. Local-display only; 501 when no native picker is available (headless/cloud).",
+		Tags:        []string{"workspaces"},
+	},
+	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/mkdir", Name: "MkdirWorkspace",
 		JSName:      "mkdir",
 		Description: "Create a new directory under an absolute host path.",

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 133,
+  "route_count": 134,
   "routes": [
     {
       "method": "GET",
@@ -80,6 +80,15 @@
       "pattern": "/api/workspaces/browse",
       "name": "BrowseWorkspaces",
       "description": "List child directories for an absolute host path.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/workspaces/pick-folder",
+      "name": "PickFolder",
+      "description": "Open the host OS native folder chooser and return the picked absolute path. Local-display only; 501 when no native picker is available (headless/cloud).",
       "tags": [
         "workspaces"
       ]
