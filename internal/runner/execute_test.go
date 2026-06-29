@@ -286,6 +286,39 @@ func TestRunEndTurnRecordsResult(t *testing.T) {
 	}
 }
 
+// TestRunRecordsObservedModel verifies that the model the harness reports in
+// its init line supersedes the requested model in task provenance. With no env
+// default and no per-task override, the start-time capture leaves ModelName
+// empty; the observed model from the stream must fill it.
+func TestRunRecordsObservedModel(t *testing.T) {
+	repo := setupTestRepo(t)
+	// Claude stream-json: an init line carrying the session-primary model,
+	// then a terminal result line.
+	output := `{"type":"system","subtype":"init","model":"claude-opus-4-8[1m]","session_id":"sess1"}
+{"result":"task complete","session_id":"sess1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+	cmd := fakeCmdScript(t, output, 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Observed model test", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Environment == nil {
+		t.Fatal("expected execution environment to be recorded")
+	}
+	if updated.Environment.ModelName != "claude-opus-4-8[1m]" {
+		t.Errorf("Environment.ModelName = %q, want %q (observed model should supersede)",
+			updated.Environment.ModelName, "claude-opus-4-8[1m]")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // SyncWorktrees
 // ---------------------------------------------------------------------------

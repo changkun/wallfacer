@@ -497,6 +497,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			"session_id":  output.SessionID,
 		})
 
+		// Supersede the best-effort requested model captured at task start
+		// (often empty when the harness self-selects) with the model the
+		// harness actually reported. The init line carries it on the first
+		// turn; read-modify-write execEnv so the other provenance fields are
+		// preserved, and only rewrite when the model changed.
+		if output.ObservedModel != "" && output.ObservedModel != execEnv.ModelName {
+			execEnv.ModelName = output.ObservedModel
+			if err := r.taskStore(taskID).UpdateTaskEnvironment(bgCtx, taskID, execEnv); err != nil {
+				slog.Warn("failed to update execution environment with observed model", "task", taskID, "err", err)
+			}
+		}
+
 		if isTestRun {
 			// During a test run, preserve the implementation agent's result and
 			// session ID — only track the turn count so progress is visible.
