@@ -2,7 +2,7 @@
 // AgentChatPanel.vue so they can be unit-tested in isolation and reused
 // by the streaming code path (which also needs to parse incoming NDJSON).
 import { renderMarkdown } from './markdown';
-import { parseTurn, parseFrameLine, type ActivityRow, type Frame } from './prettyNdjson';
+import { parseTurn, parseFrameLine, frameModel, type ActivityRow, type Frame } from './prettyNdjson';
 import { parseTurnUsage, type TurnUsage } from './agentUsage';
 import type { AgentMessage } from '../stores/agentSession';
 
@@ -21,6 +21,10 @@ export interface RenderedBubble {
   // Token/cost usage for an assistant turn, parsed from its raw_output result
   // frame. Null/absent for user turns and turns with no usage reported.
   usage?: TurnUsage | null;
+  // model is the per-turn model that produced this assistant bubble, parsed
+  // from its raw_output assistant frame(s). Empty for user turns and turns
+  // whose stream reports no model.
+  model?: string;
   // id is a stable client-side identifier assigned to a streaming bubble so
   // its incremental updates can locate it by identity rather than by a cached
   // array index (which goes stale if the rendered list is replaced mid-stream).
@@ -79,6 +83,31 @@ export function extractAssistantText(raw: string): string {
     if (frame) text += frameAssistantText(frame);
   }
   return text;
+}
+
+/** The per-turn model (the assistant model) from a raw NDJSON stream, or ''. */
+export function extractModel(raw: string): string {
+  let model = '';
+  for (const line of raw.split('\n')) {
+    const frame = parseFrameLine(line);
+    if (frame && frame.type === 'assistant') {
+      const m = frameModel(frame);
+      if (m) model = m;
+    }
+  }
+  return model;
+}
+
+/** The session-primary model (the system/init line) from a raw NDJSON stream. */
+export function extractPrimaryModel(raw: string): string {
+  for (const line of raw.split('\n')) {
+    const frame = parseFrameLine(line);
+    if (frame && frame.type === 'system') {
+      const m = frameModel(frame);
+      if (m) return m;
+    }
+  }
+  return '';
 }
 
 /** Return the most recent `result.is_error` message from a raw NDJSON stream. */
@@ -146,6 +175,7 @@ export function bubbleFromMessage(m: AgentMessage): RenderedBubble {
         isStreaming: false,
         errorText,
         usage: parseTurnUsage(m.raw_output),
+        model: extractModel(m.raw_output),
       };
     }
     return {

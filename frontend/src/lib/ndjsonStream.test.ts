@@ -75,3 +75,25 @@ describe('createNdjsonStreamParser', () => {
     expect(p.state().text).toBe('tail');
   });
 });
+
+describe('createNdjsonStreamParser model capture', () => {
+  it('captures the session-primary (init) and per-turn (assistant) models', () => {
+    const raw = [
+      JSON.stringify({ type: 'system', subtype: 'init', model: 'claude-opus-4-8[1m]' }),
+      JSON.stringify({ type: 'assistant', message: { model: 'claude-opus-4-8', content: [{ type: 'text', text: 'hi' }] } }),
+    ].join('\n');
+    const p = createNdjsonStreamParser();
+    p.push(raw);
+    p.finalize();
+    const st = p.state();
+    expect(st.primaryModel).toBe('claude-opus-4-8[1m]');
+    expect(st.model).toBe('claude-opus-4-8');
+  });
+  it('leaves models empty when none reported', () => {
+    const p = createNdjsonStreamParser();
+    p.push(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'x' }] } }));
+    p.finalize();
+    expect(p.state().primaryModel).toBe('');
+    expect(p.state().model).toBe('');
+  });
+});

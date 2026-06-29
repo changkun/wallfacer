@@ -35,9 +35,21 @@ interface ContentBlock {
 
 export interface Frame {
   type?: string;
-  message?: { content?: ContentBlock[] };
+  /** Session-primary model, carried top-level on the system/init line
+   *  (e.g. "claude-opus-4-8[1m]"). */
+  model?: string;
+  message?: { model?: string; content?: ContentBlock[] };
   is_error?: boolean;
   result?: string;
+}
+
+// frameModel returns the model a frame reports, or '' when it reports none.
+// The system/init line carries the session-primary model top-level; an
+// assistant line carries the per-turn model nested under message.model.
+export function frameModel(frame: Frame): string {
+  if (frame.type === 'system' && frame.model) return frame.model;
+  if (frame.type === 'assistant' && frame.message?.model) return frame.message.model;
+  return '';
 }
 
 const MAX_SUMMARY = 220;

@@ -7,6 +7,8 @@ import {
   activitySummary,
   bubbleFromMessage,
   applyStreamingUpdate,
+  extractModel,
+  extractPrimaryModel,
   type RenderedBubble,
 } from './agentBubble';
 import type { ActivityRow } from './prettyNdjson';
@@ -164,5 +166,28 @@ describe('bubbleFromMessage', () => {
     expect(b.role).toBe('assistant');
     expect(b.rawText).toBe('streamed');
     expect(b.rawOutput).toBe(raw_output);
+  });
+});
+
+describe('model extraction', () => {
+  const raw = [
+    JSON.stringify({ type: 'system', subtype: 'init', model: 'claude-opus-4-8[1m]' }),
+    JSON.stringify({ type: 'assistant', message: { model: 'claude-opus-4-8', content: [{ type: 'text', text: 'hi' }] } }),
+    JSON.stringify({ session_id: 's', stop_reason: 'end_turn', result: 'hi' }),
+  ].join('\n');
+
+  it('extractPrimaryModel reads the system/init model', () => {
+    expect(extractPrimaryModel(raw)).toBe('claude-opus-4-8[1m]');
+  });
+  it('extractModel reads the per-turn assistant model', () => {
+    expect(extractModel(raw)).toBe('claude-opus-4-8');
+  });
+  it('returns empty when no model is present', () => {
+    expect(extractModel('{"type":"assistant","message":{"content":[]}}')).toBe('');
+    expect(extractPrimaryModel('{"type":"assistant","message":{"content":[]}}')).toBe('');
+  });
+  it('bubbleFromMessage carries the per-turn model', () => {
+    const b = bubbleFromMessage({ role: 'assistant', content: '', raw_output: raw });
+    expect(b.model).toBe('claude-opus-4-8');
   });
 });

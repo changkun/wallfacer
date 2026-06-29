@@ -14,6 +14,7 @@ import { frameError } from './agentBubble';
 import {
   parseFrameLine,
   accumulateFrame,
+  frameModel,
   type ActivityRow,
   type TurnAccumulator,
 } from './prettyNdjson';
@@ -28,6 +29,10 @@ export interface NdjsonStreamState {
   errorText: string;
   /** True once any step (and thus any trajectory) exists. */
   hasActivity: boolean;
+  /** Session-primary model from the system/init line, or '' until seen. */
+  primaryModel: string;
+  /** Per-turn model from the latest assistant frame, or '' until seen. */
+  model: string;
 }
 
 export interface NdjsonStreamParser {
@@ -43,6 +48,8 @@ export function createNdjsonStreamParser(): NdjsonStreamParser {
   let lineBuf = ''; // bytes after the last newline, not yet a complete line
   const acc: TurnAccumulator = { rows: [], pending: '' };
   let errorText = '';
+  let primaryModel = '';
+  let model = '';
 
   function consumeLine(line: string): void {
     const frame = parseFrameLine(line);
@@ -50,6 +57,11 @@ export function createNdjsonStreamParser(): NdjsonStreamParser {
     accumulateFrame(frame, acc);
     const err = frameError(frame);
     if (err) errorText = err; // last error wins
+    const m = frameModel(frame);
+    if (m) {
+      if (frame.type === 'system' && !primaryModel) primaryModel = m; // first init wins
+      if (frame.type === 'assistant') model = m; // last assistant wins
+    }
   }
 
   return {
@@ -74,6 +86,8 @@ export function createNdjsonStreamParser(): NdjsonStreamParser {
         activity: acc.rows,
         errorText,
         hasActivity: acc.rows.length > 0,
+        primaryModel,
+        model,
       };
     },
   };
