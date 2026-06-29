@@ -25,6 +25,7 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/executor"
+	"latere.ai/x/wallfacer/internal/github"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/metrics"
@@ -180,6 +181,16 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	go r.StartWorktreeHealthWatcher(ctx)
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
+
+	// GitHub integration: a principal-scoped token store under the config dir
+	// backs /api/github/*. The live broker (the "Latere AI" GitHub App via the
+	// ../auth service) is left nil until that capability ships; status and
+	// disconnect work against the store, and connect reports unavailable.
+	if ghStore, gerr := github.NewFileStore(filepath.Join(configDir, "github")); gerr != nil {
+		logger.Main.Warn("github: token store unavailable", "error", gerr)
+	} else {
+		h.SetGitHub(&github.Provider{Store: ghStore})
+	}
 
 	// Cloud mode: wire latere.ai sign-in. Both the WALLFACER_CLOUD flag
 	// and the AUTH_* vars resolve from shell env first, .env file
@@ -1177,6 +1188,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"AuthDeviceStart":  http.HandlerFunc(h.AuthDeviceStart),
 		"AuthDevicePoll":   http.HandlerFunc(h.AuthDevicePoll),
 		"AuthDeviceCancel": http.HandlerFunc(h.AuthDeviceCancel),
+
+		// GitHub integration auth surface (spec: github-integration #1).
+		"GitHubAuthStatus":     http.HandlerFunc(h.GitHubAuthStatus),
+		"GitHubAuthConnect":    http.HandlerFunc(h.GitHubAuthConnect),
+		"GitHubAuthDisconnect": http.HandlerFunc(h.GitHubAuthDisconnect),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes

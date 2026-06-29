@@ -801,4 +801,22 @@ var Routes = []Route{
 		Description: "Cancel the in-flight local-mode device-code flow.",
 		Tags:        []string{"login"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/github/auth/status", Name: "GitHubAuthStatus",
+		JSName:      "githubAuthStatus",
+		Description: "GitHub connection state for the principal: connected, login, account, granted permissions, and whether the connect flow is available.",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/github/auth/connect", Name: "GitHubAuthConnect",
+		JSName:      "githubAuthConnect",
+		Description: "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the ../auth broker.",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/github/auth/disconnect", Name: "GitHubAuthDisconnect",
+		JSName:      "githubAuthDisconnect",
+		Description: "Disconnect GitHub by clearing the principal's stored token.",
+		Tags:        []string{"github"},
+	},
 }
