@@ -250,6 +250,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 
 	resp := map[string]any{
 		"workspaces":                workspaces,
+		"workspace_id":              h.activeWorkspaceID(),
 		"workspace_browser_path":    workspaceBrowserPath,
 		"workspace_groups":          keyedGroups,
 		"prompts_dir":               promptsDir,

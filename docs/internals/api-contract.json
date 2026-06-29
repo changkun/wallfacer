@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 132,
+  "route_count": 137,
   "routes": [
     {
       "method": "GET",
@@ -106,7 +106,52 @@
       "method": "PUT",
       "pattern": "/api/workspaces",
       "name": "UpdateWorkspaces",
-      "description": "Replace the active workspace set and switch the scoped task board.",
+      "description": "Replace the active workspace set and switch the scoped task board (legacy path-based switch).",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/workspaces",
+      "name": "ListWorkspaces",
+      "description": "List workspaces visible to the caller, each flagged active or dormant.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/workspaces",
+      "name": "CreateWorkspace",
+      "description": "Create a workspace (stable id, random storage key) from a name and folder set.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/workspaces/{id}",
+      "name": "UpdateWorkspace",
+      "description": "Rename a workspace and/or replace its folder set without re-keying its history.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/workspaces/{id}",
+      "name": "DeleteWorkspace",
+      "description": "Delete a workspace record (its data directory is left on disk).",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/workspaces/{id}/activate",
+      "name": "ActivateWorkspace",
+      "description": "Activate a workspace by id and switch the scoped task board.",
       "tags": [
         "workspaces"
       ]

@@ -1029,12 +1029,17 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetFiles": h.GetFiles,
 
 		// Server configuration.
-		"GetConfig":        h.GetConfig,
-		"UpdateConfig":     h.UpdateConfig,
-		"BrowseWorkspaces": h.BrowseWorkspaces,
-		"MkdirWorkspace":   h.MkdirWorkspace,
-		"RenameWorkspace":  h.RenameWorkspace,
-		"UpdateWorkspaces": h.UpdateWorkspaces,
+		"GetConfig":         h.GetConfig,
+		"UpdateConfig":      h.UpdateConfig,
+		"BrowseWorkspaces":  h.BrowseWorkspaces,
+		"MkdirWorkspace":    h.MkdirWorkspace,
+		"RenameWorkspace":   h.RenameWorkspace,
+		"UpdateWorkspaces":  h.UpdateWorkspaces,
+		"ListWorkspaces":    h.ListWorkspaces,
+		"CreateWorkspace":   h.CreateWorkspace,
+		"UpdateWorkspace":   h.UpdateWorkspace,
+		"DeleteWorkspace":   h.DeleteWorkspace,
+		"ActivateWorkspace": h.ActivateWorkspace,
 
 		// Spec tree.
 		"GetSpecTree":               h.GetSpecTree,
@@ -1444,7 +1449,10 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 // is not applied and requests succeed even before workspaces are configured.
 func requiresStore(name string) bool {
 	switch name {
-	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "MkdirWorkspace", "RenameWorkspace", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":
+	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "MkdirWorkspace", "RenameWorkspace", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream",
+		// Workspace management works before any workspace is open (the picker
+		// needs to list/create/activate without an active store).
+		"ListWorkspaces", "CreateWorkspace", "UpdateWorkspace", "DeleteWorkspace", "ActivateWorkspace":
 		return false
 	default:
 		return true
