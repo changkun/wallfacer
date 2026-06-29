@@ -18,11 +18,21 @@ import WorkspacePicker from './WorkspacePicker.vue';
 // driven without a real backend.
 const apiCalls: { method: string; path: string }[] = [];
 let browseEntries: { name: string; path: string; is_git_repo: boolean }[] = [];
+let registryWorkspaces: { id: string; name: string; folders: string[]; dormant: boolean; active: boolean }[] = [];
 vi.mock('../api/client', () => ({
   api: vi.fn((method: string, path: string) => {
     apiCalls.push({ method, path });
+    if (path === '/api/workspaces' && method === 'GET') {
+      return Promise.resolve({ workspaces: registryWorkspaces, active_id: '' });
+    }
     if (path.startsWith('/api/workspaces/browse')) {
       return Promise.resolve({ path: '/home/u', entries: browseEntries });
+    }
+    if (path.includes('/activate')) {
+      return Promise.resolve({ workspaces: [], workspace_id: 'a', workspace_groups: [], active_groups: [] });
+    }
+    if (path === '/api/tasks') {
+      return Promise.resolve([]);
     }
     return Promise.resolve({});
   }),
@@ -77,6 +87,7 @@ describe('WorkspacePicker wizard', () => {
   beforeEach(() => {
     apiCalls.length = 0;
     browseEntries = [];
+    registryWorkspaces = [];
   });
 
   afterEach(() => {
@@ -92,6 +103,28 @@ describe('WorkspacePicker wizard', () => {
     expect(browse).toBeDefined();
     // Empty path makes the backend resolve to the user's home directory.
     expect(browse!.path).toBe('/api/workspaces/browse?path=');
+  });
+
+  it('opens to the list view when workspaces exist and activates the clicked one', async () => {
+    registryWorkspaces = [
+      { id: 'a', name: 'Alpha', folders: ['/x'], dormant: false, active: false },
+      { id: 'b', name: 'Beta', folders: ['/y'], dormant: true, active: false },
+    ];
+    ({ app, host } = await mountOpen());
+    // Let the registry load resolve and promote the modal to the list view.
+    await Promise.resolve();
+    await nextTick();
+    await nextTick();
+
+    // The list view renders one row per registry workspace (not the wizard).
+    const items = host!.querySelectorAll('.ws-list__item');
+    expect(items.length).toBe(2);
+    expect(host!.querySelector('.ws-picker__list-view')).not.toBeNull();
+
+    // Clicking a non-dormant workspace activates it by id.
+    (host!.querySelector('.ws-list__main') as HTMLButtonElement).click();
+    await nextTick();
+    expect(apiCalls.some((c) => c.method === 'POST' && c.path === '/api/workspaces/a/activate')).toBe(true);
   });
 
   it('sinks already-added folders to the bottom of the browse list', async () => {

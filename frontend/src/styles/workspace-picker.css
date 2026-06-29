@@ -36,6 +36,16 @@
   padding: 14px 16px;
   height: 520px;
 }
+/* The workspace list is a single column, NOT the wizard's 2-column grid.
+   Without this override it inherits .ws-picker__body's grid and the list gets
+   crammed into the narrow right cell with collapsed, overlapping rows. */
+.ws-picker__list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  height: 520px;
+}
 .ws-picker__browser {
   display: flex;
   flex-direction: column;
