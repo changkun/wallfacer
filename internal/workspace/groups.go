@@ -162,15 +162,19 @@ func NormalizeGroups(groups []Workspace) []Workspace {
 		if len(ws) == 0 && !group.Dormant {
 			continue
 		}
-		// Deduplicate non-dormant workspaces by their folder set, as before.
-		// Dormant workspaces are keyed by ID and never collapsed by paths.
-		if !group.Dormant {
-			key := GroupKey(ws)
-			if seen.Has(key) {
-				continue
-			}
-			seen.Add(key)
+		// Deduplicate by stable identity. A workspace with an ID dedupes by ID,
+		// so two distinct workspaces may share a folder set without collapsing
+		// (the redesign drops the path-set uniqueness constraint). Legacy
+		// records that predate IDs still dedupe by folder set, preserving the
+		// old behavior until migration assigns IDs.
+		dedupKey := group.ID
+		if dedupKey == "" {
+			dedupKey = "folders:" + GroupKey(ws)
 		}
+		if seen.Has(dedupKey) {
+			continue
+		}
+		seen.Add(dedupKey)
 		normalized := group
 		normalized.Folders = ws
 		normalized.MaxParallel = sanitizeLimit(group.MaxParallel)
@@ -228,6 +232,26 @@ func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
 		return nil
 	}
 	return SaveGroups(configDir, groups)
+}
+
+// WorkspacesForPrincipal returns the subset of `groups` that `p` can see.
+// It is the redesign's name for GroupsForPrincipal; the older name is kept as
+// a thin alias while callers migrate.
+func WorkspacesForPrincipal(groups []Workspace, p *Principal) []Workspace {
+	return GroupsForPrincipal(groups, p)
+}
+
+// findByID returns the index of the workspace with the given id, or -1.
+func findByID(groups []Workspace, id string) int {
+	if id == "" {
+		return -1
+	}
+	for i := range groups {
+		if groups[i].ID == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // GroupsForPrincipal returns the subset of `groups` that `p` can

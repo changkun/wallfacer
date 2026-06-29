@@ -237,7 +237,7 @@ func filterTasksByWorkspace(tasks []store.Task, ws string) ([]store.Task, bool) 
 //
 // An empty or missing agent-session directory yields an empty map (never nil) so
 // the JSON response serializes as "agent_sessions":{} rather than "agent_sessions":null.
-func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, since time.Time) map[string]AgentSessionGroupStat {
+func aggregateAgentSessionStats(configDir string, activeKey string, activeWorkspaces []string, since time.Time) map[string]AgentSessionGroupStat {
 	result := make(map[string]AgentSessionGroupStat)
 	if configDir == "" {
 		return result
@@ -246,11 +246,6 @@ func aggregateAgentSessionStats(configDir string, activeWorkspaces []string, sin
 	entries, err := os.ReadDir(agentSessionDir)
 	if err != nil {
 		return result
-	}
-
-	activeKey := ""
-	if len(activeWorkspaces) > 0 {
-		activeKey = store.AgentSessionGroupKey(activeWorkspaces)
 	}
 
 	for _, e := range entries {
@@ -342,7 +337,12 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 			since = time.Now().UTC().AddDate(0, 0, -n)
 		}
 	}
-	resp.AgentSessions = aggregateAgentSessionStats(h.configDir, h.visibleWorkspaces(r.Context()), since)
+	vis := h.visibleWorkspaces(r.Context())
+	activeKey := ""
+	if len(vis) > 0 {
+		activeKey = h.activeDataKey()
+	}
+	resp.AgentSessions = aggregateAgentSessionStats(h.configDir, activeKey, vis, since)
 
 	httpjson.Write(w, http.StatusOK, resp)
 }

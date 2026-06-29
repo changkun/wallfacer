@@ -784,7 +784,12 @@ func (h *Handler) persistAgentRoundUsage(raw []byte) {
 	if !ok {
 		return
 	}
-	groupKey := store.AgentSessionGroupKey(workspaces)
+	// Key by the active workspace's stable DataKey, not by a hash recomputed
+	// from the current folders: editing folders must not strand prior usage.
+	groupKey := h.activeDataKey()
+	if groupKey == "" {
+		return
+	}
 	existing, _ := store.ReadAgentSessionUsage(h.configDir, groupKey, time.Time{})
 	rec := store.TurnUsageRecord{
 		Turn:                 len(existing) + 1,

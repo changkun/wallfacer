@@ -225,10 +225,16 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 	keyedGroups := make([]keyedGroup, len(groups))
 	for i, g := range groups {
+		// Report the workspace's stable DataKey. Falling back to the path-seeded
+		// key keeps legacy records (no DataKey yet) correct until migration.
+		key := g.DataKey
+		if key == "" {
+			key = prompts.WorkspaceDataKey(g.Folders)
+		}
 		keyedGroups[i] = keyedGroup{
 			Name:            g.Name,
 			Workspaces:      g.Folders,
-			Key:             prompts.WorkspaceDataKey(g.Folders),
+			Key:             key,
 			MaxParallel:     g.MaxParallel,
 			MaxTestParallel: g.MaxTestParallel,
 		}

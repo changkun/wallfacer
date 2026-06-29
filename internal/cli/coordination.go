@@ -274,11 +274,13 @@ func coordinationManifestFunc(instanceID, hostLabel, version string, wsMgr *work
 		seen := make(map[string]bool)
 		if wsMgr != nil {
 			for _, snap := range wsMgr.AllActiveSnapshots() {
-				// LocalKey must be an opaque hash, never a path: GroupKey joins the
-				// raw local folder paths, so hash it before it crosses the wire
-				// (the data boundary forbids local paths). The coordinator ignores
-				// it anyway; it joins on the canonical remote.
-				localKey := hashLocalKey(workspace.GroupKey(snap.Workspaces))
+				// LocalKey is the instance's own routing handle. Derive it from the
+				// workspace's stable DataKey, not the folder paths: it must stay
+				// constant when the workspace's folders are edited, and must never
+				// carry raw local paths across the wire (the data boundary forbids
+				// them). hashLocalKey keeps it an opaque digest. The coordinator
+				// ignores it anyway; it joins on the canonical remote.
+				localKey := hashLocalKey(snap.Key)
 				for _, path := range snap.Workspaces {
 					remote := coordinator.NormalizeRemoteURL(gitutil.WorkspaceStatus(path).RemoteURL)
 					if remote == "" || seen[remote] {
