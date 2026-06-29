@@ -8,11 +8,17 @@ import { ref, computed } from 'vue';
 import { useChatSession } from '../composables/useChatSession';
 import { aggregateUsage, formatTokens, formatCost, formatPercent } from '../lib/agentUsage';
 import BrandMark from '../components/BrandMark.vue';
+import HarnessBadge from '../components/HarnessBadge.vue';
 import SessionList from '../components/plan/SessionList.vue';
 import ChatMessageList from '../components/plan/ChatMessageList.vue';
 import ChatComposer from '../components/plan/ChatComposer.vue';
+import { modelLabel } from '../lib/harness';
 
 const chat = useChatSession();
+
+// The chat runtime is Claude-only today; the live transparency gap is the
+// model, which the harness reports in its stream. Show it as a header chip.
+const modelText = computed(() => modelLabel(chat.primaryModel.value));
 
 // Entry screen while the active session has no messages; the first user bubble
 // flips this to the conversation view, producing the centered→docked morph.
@@ -84,6 +90,15 @@ function applyQuick(insert: string) {
         <div v-else key="conversation" class="chat-conversation">
           <header class="chat-conversation-head">
             <span class="chat-conversation-title">Chat</span>
+            <span
+              v-if="modelText"
+              class="chat-model-badge"
+              :title="chat.primaryModel.value"
+            >
+              <HarnessBadge harness="claude" :size="14" />
+              <span class="chat-model-sep" aria-hidden="true">·</span>
+              <span class="chat-model-name">{{ modelText }}</span>
+            </span>
             <div v-if="usage.rounds > 0" class="chat-usage" :title="usageTooltip">
               <span class="chat-usage-item">{{ usage.rounds }} {{ usage.rounds === 1 ? 'round' : 'rounds' }}</span>
               <span class="chat-usage-item">↑ {{ formatTokens(usage.inputTokens) }}</span>
@@ -245,6 +260,21 @@ function applyQuick(insert: string) {
   font-weight: 600;
   color: var(--ink);
 }
+
+/* Model badge sits next to the title; margin-right:auto absorbs the free
+   space so the usage rollup still aligns to the right. */
+.chat-model-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--ink-4);
+  cursor: default;
+  white-space: nowrap;
+}
+.chat-model-sep { color: var(--ink-5, var(--ink-4)); }
+.chat-model-name { font-weight: 500; color: var(--ink-3); }
 
 .chat-usage {
   display: flex;

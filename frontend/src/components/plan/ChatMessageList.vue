@@ -6,10 +6,22 @@
 // Chat view, the docked panel, and the spec-mode popup alike.
 import { activityIcon, activitySummary } from '../../lib/agentBubble';
 import { formatTokens, formatCost } from '../../lib/agentUsage';
+import { modelLabel } from '../../lib/harness';
 import type { ChatSession } from '../../composables/useChatSession';
 
 const props = defineProps<{ session: ChatSession; emptyText?: string }>();
 const s = props.session;
+
+// A per-turn model chip is shown only when this turn ran on a different model
+// than the session primary (a sub-agent or a fallback) — comparing labels so
+// the init line's context-variant suffix (e.g. "[1m]") does not register as a
+// difference. The common case stays quiet.
+function turnModelLabel(model?: string): string {
+  if (!model) return '';
+  const label = modelLabel(model);
+  if (!label || label === modelLabel(s.primaryModel.value)) return '';
+  return label;
+}
 </script>
 
 <template>
@@ -100,6 +112,11 @@ const s = props.session;
               v-html="m.contentHtml"
             />
             <div v-else-if="m.isStreaming" class="pcp-thinking"><i></i><i></i><i></i></div>
+            <div
+              v-if="turnModelLabel(m.model)"
+              class="pcp-turn-model"
+              :title="m.model"
+            >{{ turnModelLabel(m.model) }}</div>
             <div v-if="m.usage" class="pcp-usage">
               <span class="pcp-usage-item" title="Input tokens (fresh, not cached)">↑ {{ formatTokens(m.usage.inputTokens) }}</span>
               <span class="pcp-usage-item" title="Output tokens (includes reasoning)">↓ {{ formatTokens(m.usage.outputTokens) }}</span>
