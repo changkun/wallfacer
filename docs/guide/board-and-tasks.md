@@ -256,19 +256,6 @@ Routine cards are filtered out of auto-promote, auto-refine, and the dependency 
 
 Cancelling or archiving a routine card also **clears its enabled flag** and drops its scheduler timer, so the card's enabled state stays consistent with its status: a cancelled routine no longer shows as enabled in the routines list, and cannot silently resume firing if its status is later moved back to an active lane (you would re-enable it deliberately). This differs from a routine that merely *lands* in Done/Failed: those keep their enabled flag so moving the card back to Backlog re-arms the schedule.
 
-### Prompt Templates
-
-Save reusable prompt patterns so you do not have to retype common instructions:
-
-- **Save a template**: open **Settings > Prompt Templates** (or the Templates Manager from the new task form). Enter a name and body, then click Save.
-- **Insert a template**: click the **Templates** button in the new task form. A searchable dropdown appears; click a template to replace the prompt content.
-- **Delete a template**: open the Templates Manager, find the template, and click Delete.
-
-Templates are also available via the API:
-- `GET /api/templates` -- list all templates
-- `POST /api/templates` -- create a new template (`{name, body}`)
-- `DELETE /api/templates/{id}` -- delete a template
-
 ### Batch Task Creation
 
 Use `POST /api/tasks/batch` to create multiple tasks in a single atomic operation. This endpoint supports **symbolic dependency wiring**: tasks in the batch can reference each other by their position index so that dependencies are wired up without needing to know task IDs in advance.

@@ -346,12 +346,6 @@ export interface SystemPromptTemplate {
   content: string;
 }
 
-export interface PromptTemplate {
-  id: string;
-  name: string;
-  body: string;
-}
-
 export interface SandboxTestResponse {
   task_id: string;
   sandbox: string;

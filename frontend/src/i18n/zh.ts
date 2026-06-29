@@ -59,7 +59,7 @@ export const zh: Record<string, string> = {
   'wf.cap.5.title': '仓库操作',
   'wf.cap.5.desc': '多工作区组、分支切换、同步/变基助手、自动提交和推送、任务分叉。',
   'wf.cap.6.title': '开发工具',
-  'wf.cap.6.desc': '文件浏览器与编辑器、交互式主机终端、提示词模板、系统提示词自定义。',
+  'wf.cap.6.desc': '文件浏览器与编辑器、交互式主机终端、系统提示词自定义。',
 
   // Download page
   'wf.dl.title': '<span class="wallfacer-brand">下载</span>',

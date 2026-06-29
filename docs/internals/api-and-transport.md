@@ -54,10 +54,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/system-prompts/{name}` | Get a single built-in system prompt template by name |
 | `PUT /api/system-prompts/{name}` | Write a user override for a built-in system prompt template; validates before writing |
 | `DELETE /api/system-prompts/{name}` | Remove user override, restoring the embedded default |
-| **Prompt templates** | |
-| `GET /api/templates` | List all prompt templates sorted by created_at descending |
-| `POST /api/templates` | Create a new named prompt template |
-| `DELETE /api/templates/{id}` | Delete a prompt template by ID |
 | **Git workspace operations** | |
 | `GET /api/git/status` | Git status for all mounted workspaces |
 | `GET /api/git/stream` | SSE stream of git status updates for all workspaces |

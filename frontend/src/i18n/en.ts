@@ -59,7 +59,7 @@ export const en: Record<string, string> = {
   'wf.cap.5.title': 'Repo operations',
   'wf.cap.5.desc': 'Multi-workspace groups, branch switching, sync/rebase helpers, auto-commit and push, task forking.',
   'wf.cap.6.title': 'Dev tools',
-  'wf.cap.6.desc': 'File browser and editor, interactive host terminal, prompt templates, system prompt customization.',
+  'wf.cap.6.desc': 'File browser and editor, interactive host terminal, system prompt customization.',
 
   // Download page
   'wf.dl.title': '<span class="wallfacer-brand">Download</span>',

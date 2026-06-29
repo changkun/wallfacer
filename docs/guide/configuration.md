@@ -386,22 +386,6 @@ Delete a user override via the template editor or the API (`DELETE /api/system-p
 
 Each task runs with its git worktree as the working directory, so agents read each repository's own `AGENTS.md` or `CLAUDE.md` natively. Add those files to your repos for per-repo guidance; Wallfacer does not generate or inject a separate workspace-level instructions file.
 
-### Prompt Templates
-
-Prompt templates are reusable named prompt fragments for common task patterns.
-
-#### Creating a Template
-
-Open **Settings > Prompts > Prompt Templates > Manage**. Enter a name and body, then save. Templates are stored in `~/.wallfacer/templates.json`.
-
-#### Using Templates
-
-When creating a new task, select a template from the template picker to insert its body into the prompt field. You can then edit the inserted text before submitting.
-
-#### Managing Templates
-
-From the template manager, you can view all templates sorted by creation date and delete templates you no longer need.
-
 ### CLI Reference
 
 #### wallfacer run

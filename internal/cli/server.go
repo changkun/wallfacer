@@ -1098,15 +1098,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateEnvConfig": h.UpdateEnvConfig,
 		"TestSandbox":     h.TestSandbox,
 
-		// Prompt templates.
+		// System prompt templates.
 		"ListSystemPrompts":  h.ListSystemPrompts,
 		"GetSystemPrompt":    h.GetSystemPrompt,
 		"UpdateSystemPrompt": h.UpdateSystemPrompt,
 		"DeleteSystemPrompt": h.DeleteSystemPrompt,
-
-		"ListTemplates":  h.ListTemplates,
-		"CreateTemplate": h.CreateTemplate,
-		"DeleteTemplate": h.DeleteTemplate,
 
 		// Whiteboard.
 		"GetWhiteboard": http.HandlerFunc(h.GetWhiteboard),
@@ -1248,9 +1244,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// System prompt templates.
 		"UpdateSystemPrompt": handler.BodyLimitDefault,
-
-		// Prompt templates.
-		"CreateTemplate": handler.BodyLimitDefault,
 
 		// Whiteboard scene (allows embedded images, so larger than default).
 		"PutWhiteboard": handler.BodyLimitWhiteboard,
