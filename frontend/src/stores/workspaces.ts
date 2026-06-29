@@ -20,9 +20,19 @@ import type { ServerConfig, Workspace } from '../api/types';
 
 export const useWorkspacesStore = defineStore('workspaces', () => {
   const workspaces = ref<Workspace[]>([]);
-  const activeId = ref('');
   const loading = ref(false);
   const error = ref<string | null>(null);
+
+  // The active workspace is whatever the server reports in /api/config
+  // (workspace_id) — the single source of truth. Deriving it (rather than
+  // caching a per-fetch `active` flag) keeps the sidebar, settings, and picker
+  // in agreement no matter which path performed the switch. Components should
+  // determine "is this workspace active" via isActive(), not the DTO's stale
+  // `active` field.
+  const activeId = computed(() => useTaskStore().config?.workspace_id ?? '');
+  function isActive(id: string): boolean {
+    return id !== '' && id === activeId.value;
+  }
 
   const active = computed(() =>
     workspaces.value.find(w => w.id === activeId.value) ?? null,
@@ -40,7 +50,6 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
       const resp = await api<{ workspaces: Workspace[]; active_id: string }>(
         'GET', '/api/workspaces');
       workspaces.value = resp.workspaces ?? [];
-      activeId.value = resp.active_id ?? '';
     } catch (e) {
       setError(e);
     } finally {
@@ -86,14 +95,14 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
     error.value = null;
     const config = await api<ServerConfig>('POST', `/api/workspaces/${id}/activate`);
     const tasks = useTaskStore();
+    // Writing config flips activeId (derived from config.workspace_id) and the
+    // per-row active state reactively; no manual bookkeeping needed.
     tasks.config = config;
-    activeId.value = config.workspace_id ?? id;
-    for (const w of workspaces.value) w.active = w.id === activeId.value;
     await tasks.fetchTasks();
   }
 
   return {
-    workspaces, activeId, loading, error, active,
+    workspaces, activeId, isActive, loading, error, active,
     list, create, update, remove, activate,
   };
 });
