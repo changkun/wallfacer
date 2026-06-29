@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { basename, groupLabel } from './workspaceLabel';
+import { basename, groupLabel, workspaceLabel } from './workspaceLabel';
 
 describe('basename', () => {
   it('returns the last path segment', () => {
@@ -26,5 +26,21 @@ describe('groupLabel', () => {
   });
   it('returns a placeholder when there are no workspaces', () => {
     expect(groupLabel({ workspaces: [] })).toBe('Workspace');
+  });
+});
+
+describe('workspaceLabel', () => {
+  it('prefers the trimmed name', () => {
+    expect(workspaceLabel('  Oblivion  ', ['/a/b'])).toBe('Oblivion');
+  });
+  it('falls back to folder basenames joined with " + " when unnamed', () => {
+    // Regression: nameless workspaces used to render blank in the sidebar,
+    // picker, settings, and status bar.
+    expect(workspaceLabel('', ['/dev/agon', '/dev/wallfacer'])).toBe('agon + wallfacer');
+    expect(workspaceLabel(undefined, ['/dev/wallfacer/'])).toBe('wallfacer');
+  });
+  it('never renders blank: placeholder when name and folders are empty', () => {
+    expect(workspaceLabel('   ', [])).toBe('Untitled workspace');
+    expect(workspaceLabel(undefined, [])).toBe('Untitled workspace');
   });
 });

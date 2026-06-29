@@ -6,6 +6,7 @@ import { useWorkspacesStore } from '../stores/workspaces';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
+import { workspaceLabel } from '../lib/workspaceLabel';
 import type { Workspace } from '../api/types';
 
 interface BrowseEntry {
@@ -102,10 +103,6 @@ function basenames(paths: string[]): string {
       return parts[parts.length - 1] || clean;
     })
     .join(', ');
-}
-
-function workspaceLabel(ws: Workspace): string {
-  return ws.name?.trim() || basenames(ws.folders) || ws.id;
 }
 
 // Enter the wizard to create a new workspace from scratch. Returns the browse
@@ -373,7 +370,7 @@ function breadcrumbSegments() {
               @click="activateExisting(ws)"
             >
               <span class="ws-list__name">
-                {{ workspaceLabel(ws) }}
+                {{ workspaceLabel(ws.name, ws.folders) }}
                 <span v-if="wsStore.isActive(ws.id)" class="ws-list__badge ws-list__badge--active">active</span>
                 <span v-if="ws.dormant" class="ws-list__badge ws-list__badge--dormant">recovered</span>
               </span>

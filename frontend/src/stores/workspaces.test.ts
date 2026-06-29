@@ -6,6 +6,7 @@ vi.mock('../api/client', () => ({ api: apiMock }));
 
 import { useWorkspacesStore } from './workspaces';
 import { useTaskStore } from './tasks';
+import { useUiStore } from './ui';
 
 function ws(over: Partial<{ id: string; name: string; folders: string[]; dormant: boolean; active: boolean }> = {}) {
   return { id: 'w1', name: 'One', folders: ['/a'], dormant: false, active: false, ...over };
@@ -96,5 +97,40 @@ describe('workspaces store activate', () => {
     // The tasks store (config-bearing) reflects the switch.
     const tasks = useTaskStore();
     expect(tasks.config?.workspace_id).toBe('w2');
+  });
+
+  // The blocking overlay (ui.switchingWorkspace) must be raised for the whole
+  // switch and lowered after, so the UI never paints the new active state over
+  // stale old content mid-switch.
+  it('raises ui.switchingWorkspace during the switch and lowers it after', async () => {
+    const store = useWorkspacesStore();
+    const ui = useUiStore();
+
+    // Capture the flag at the moment the activate request is in flight.
+    let flagDuringActivate = false;
+    apiMock.mockImplementation((_method: string, path: string) => {
+      if (path.endsWith('/activate')) {
+        flagDuringActivate = ui.switchingWorkspace;
+        return Promise.resolve({ workspaces: ['/c'], workspace_id: 'w2' });
+      }
+      return Promise.resolve([]); // fetchTasks
+    });
+
+    expect(ui.switchingWorkspace).toBe(false);
+    await store.activate('w2');
+
+    expect(flagDuringActivate).toBe(true);
+    expect(ui.switchingWorkspace).toBe(false);
+  });
+
+  // Failures must still lower the overlay (the finally branch), else the UI
+  // stays blocked forever after a bad switch.
+  it('lowers ui.switchingWorkspace even when activate fails', async () => {
+    const store = useWorkspacesStore();
+    const ui = useUiStore();
+    apiMock.mockRejectedValueOnce(new Error('boom'));
+
+    await expect(store.activate('w2')).rejects.toThrow('boom');
+    expect(ui.switchingWorkspace).toBe(false);
   });
 });

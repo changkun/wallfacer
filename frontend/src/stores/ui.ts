@@ -25,6 +25,13 @@ export const useUiStore = defineStore('ui', () => {
   const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
+  // True while a workspace switch is in flight. AppLayout renders a full-UI
+  // blocking overlay (above every modal) so the user never sees the new active
+  // state painted over stale old content mid-switch.
+  const switchingWorkspace = ref(false);
+  function beginSwitch() { switchingWorkspace.value = true; }
+  function endSwitch() { switchingWorkspace.value = false; }
+
   // Task ids freshly dispatched from Plan mode; a TaskCard consumes its own id
   // on mount to play a one-shot "just created" pulse, even after navigating to
   // the board (mirrors ui/js/dispatch-toast.js highlight).
@@ -75,6 +82,7 @@ export const useUiStore = defineStore('ui', () => {
     showSettings, showWorkspaces, showPalette,
     showSystemPrompts, showTemplates, showTerminal,
     showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
+    switchingWorkspace, beginSwitch, endSwitch,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
     openSettings, closeSettings,

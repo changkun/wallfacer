@@ -7,6 +7,7 @@ import { useToastStore } from '../stores/toast';
 import { api, ApiError } from '../api/client';
 import { useSse } from '../composables/useSse';
 import { formatGitConflict } from '../lib/gitConflict';
+import { workspaceLabel as deriveWorkspaceLabel } from '../lib/workspaceLabel';
 import BranchDropdown from './BranchDropdown.vue';
 
 // connState is the tri-state SSE health ('ok' | 'reconnecting' | 'closed'),
@@ -79,20 +80,17 @@ const waitingCount = computed(
 const workspaceLabel = computed(() => {
   const ws = store.config?.workspaces ?? [];
   if (!ws.length) return '';
-  // Prefer the active workspace's name from the first-class registry; this is
-  // stable across folder edits. Fall back to a matching saved group name, then
-  // to the first folder's basename when the workspace is unnamed/unknown.
+  // Prefer the active workspace from the first-class registry; the shared helper
+  // yields a stable name, or its folder basenames when unnamed (never blank).
   const active = workspacesStore.active;
-  if (active?.name?.trim()) return active.name.trim();
+  if (active) return deriveWorkspaceLabel(active.name, active.folders);
   const groups = store.config?.workspace_groups ?? [];
   const matched = groups.find(g =>
     Array.isArray(g.workspaces)
       && g.workspaces.length === ws.length
       && g.workspaces.every((p, i) => p === ws[i]),
   );
-  if (matched?.name) return matched.name;
-  const first = ws[0].replace(/\/+$/, '').split('/');
-  return first[first.length - 1] || ws[0];
+  return deriveWorkspaceLabel(matched?.name, ws);
 });
 
 const renderableWorkspaces = computed(() =>
