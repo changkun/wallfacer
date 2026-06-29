@@ -288,12 +288,12 @@ onUnmounted(removeWsOutsideHandler);
           >
             <button
               v-for="g in workspaceGroups"
-              :key="g.key ?? g.workspaces.join('|')"
+              :key="g.key ?? (g.workspaces ?? []).join('|')"
               type="button"
               class="sb-ws-popover__item"
               :class="{ active: isActiveGroup(g) }"
               role="menuitem"
-              :title="g.workspaces.join(', ')"
+              :title="(g.workspaces ?? []).join(', ')"
               @click="switchToGroup(g)"
             >
               <span class="sb-ws-popover__check">{{ isActiveGroup(g) ? '✓' : '' }}</span>
