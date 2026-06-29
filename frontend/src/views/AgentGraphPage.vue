@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 import type { Agent, Flow, Task, TaskLineage } from '../api/types';
 import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
+import AgentEditor from '../components/AgentEditor.vue';
 import {
   buildDraftFromFlow,
   appendStep,
@@ -24,8 +24,6 @@ import {
 // fleet into a draft -- drag agents from the palette to add members, set the
 // lead, pick the coordination, remove -- and saves through the flow CRUD. When
 // `draft` is null the page is read-only.
-
-const router = useRouter();
 
 const agents = ref<Agent[]>([]);
 const flows = ref<Flow[]>([]);
@@ -191,12 +189,44 @@ async function deleteFleet() {
   }
 }
 
-// editAgent jumps to the existing Agents editor for an agent (deep link read by
-// AgentsPage). Suppressed while editing a flow so an unsaved draft is not lost
-// to the navigation; the affordance is for the read-only graph.
+// Agent editor, embedded here so defining an agent and wiring it into a graph
+// are one surface (no jump to a separate Agents page). The modal opens over the
+// canvas; on save/delete the palette reloads.
+const agentEditorOpen = ref(false);
+const agentEditorIsNew = ref(false);
+const agentEditorAgent = ref<Agent | null>(null);
+
+function openNewAgent() {
+  agentEditorAgent.value = null;
+  agentEditorIsNew.value = true;
+  agentEditorOpen.value = true;
+}
+// editAgent opens the in-place editor for an agent slug (palette double-click or
+// a canvas node). Works whether or not a graph draft is open -- it is a modal,
+// so no graph edit is lost.
 function editAgent(slug: string) {
-  if (draft.value || !slug) return;
-  void router.push({ path: '/agents', query: { agent: slug } });
+  if (!slug) return;
+  const a = agents.value.find((x) => x.slug === slug) || null;
+  agentEditorAgent.value = a;
+  agentEditorIsNew.value = false;
+  agentEditorOpen.value = true;
+}
+function closeAgentEditor() {
+  agentEditorOpen.value = false;
+  agentEditorIsNew.value = false;
+  agentEditorAgent.value = null;
+}
+async function onAgentSaved() {
+  closeAgentEditor();
+  await loadAgents();
+}
+async function onAgentDeleted() {
+  closeAgentEditor();
+  await loadAgents();
+}
+function onAgentClone(a: Agent) {
+  agentEditorAgent.value = a;
+  agentEditorIsNew.value = true;
 }
 
 async function saveDraft() {
@@ -288,7 +318,7 @@ onMounted(async () => {
 
       <div class="ag-mode__split">
         <aside class="ag-mode__rail">
-          <div class="ag-mode__search">
+          <div class="ag-mode__rail-head">
             <input
               v-model="search"
               type="search"
@@ -296,6 +326,9 @@ onMounted(async () => {
               aria-label="Search agents"
               autocomplete="off"
             />
+            <button type="button" class="ag-mode__new-agent" @click="openNewAgent" title="Create an agent">
+              + New agent
+            </button>
           </div>
           <div class="ag-mode__rail-list">
             <p v-if="loading" class="ag-mode__empty">Loading agents...</p>
@@ -462,10 +495,89 @@ onMounted(async () => {
         </section>
       </div>
     </div>
+
+    <!-- Agent editor (create / clone / edit / delete), embedded so agent
+         definition lives on the same surface as graph composition. -->
+    <div v-if="agentEditorOpen" class="ag-agent-modal" @click.self="closeAgentEditor">
+      <div class="ag-agent-modal__panel">
+        <button type="button" class="ag-agent-modal__close" aria-label="Close agent editor" @click="closeAgentEditor">&#215;</button>
+        <AgentEditor
+          :agent="agentEditorAgent"
+          :is-new="agentEditorIsNew"
+          @saved="onAgentSaved"
+          @deleted="onAgentDeleted"
+          @cancel="closeAgentEditor"
+          @clone="onAgentClone"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.ag-mode__rail-head {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.ag-mode__rail-head input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text);
+}
+.ag-mode__new-agent {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ag-agent-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  background: color-mix(in srgb, var(--bg-sunk) 70%, transparent);
+  backdrop-filter: blur(2px);
+  overflow: auto;
+}
+.ag-agent-modal__panel {
+  position: relative;
+  width: min(720px, 100%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.ag-agent-modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunk);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
 .ag-mode-container {
   height: 100%;
   overflow: hidden;
