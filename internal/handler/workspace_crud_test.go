@@ -85,6 +85,47 @@ func TestWorkspaceCRUDLifecycle(t *testing.T) {
 	}
 }
 
+// TestWorkspaceUpdate_Limits verifies per-workspace parallel overrides:
+// a present field is applied, an absent field is left unchanged, and a present
+// null clears the override.
+func TestWorkspaceUpdate_Limits(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	body, _ := json.Marshal(map[string]any{"name": "A", "folders": []string{ws}})
+	rec := httptest.NewRecorder()
+	h.CreateWorkspace(rec, httptest.NewRequest(http.MethodPost, "/api/workspaces", bytes.NewReader(body)))
+	var created workspaceDTO
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+
+	put := func(payload string) workspaceDTO {
+		r := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+created.ID, bytes.NewReader([]byte(payload)))
+		r.SetPathValue("id", created.ID)
+		w := httptest.NewRecorder()
+		h.UpdateWorkspace(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("update %s: %d %s", payload, w.Code, w.Body.String())
+		}
+		var dto workspaceDTO
+		_ = json.Unmarshal(w.Body.Bytes(), &dto)
+		return dto
+	}
+
+	// Set max_parallel=2.
+	d := put(`{"max_parallel":2}`)
+	if d.MaxParallel == nil || *d.MaxParallel != 2 || d.MaxTestParallel != nil {
+		t.Fatalf("after set max_parallel: %+v", d)
+	}
+	// Set max_test_parallel=1, max_parallel absent -> unchanged (still 2).
+	d = put(`{"max_test_parallel":1}`)
+	if d.MaxParallel == nil || *d.MaxParallel != 2 || d.MaxTestParallel == nil || *d.MaxTestParallel != 1 {
+		t.Fatalf("absent field should be preserved: %+v", d)
+	}
+	// Clear max_parallel via null; max_test_parallel untouched.
+	d = put(`{"max_parallel":null}`)
+	if d.MaxParallel != nil || d.MaxTestParallel == nil || *d.MaxTestParallel != 1 {
+		t.Fatalf("null should clear only max_parallel: %+v", d)
+	}
+}
+
 // TestWorkspaceUpdate_VisibilityIsolation verifies that in cloud mode a caller
 // who cannot see an org-stamped workspace gets 404 (not found, no leak) on a
 // mutation, while the owning org caller passes the guard.

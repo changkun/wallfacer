@@ -1,20 +1,39 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
+// parseLimit decodes a per-workspace concurrency override from a present JSON
+// value: null (or blank) clears the override (nil); a non-negative integer caps
+// it. A negative value is treated as "clear".
+func parseLimit(raw json.RawMessage) *int {
+	s := strings.TrimSpace(string(raw))
+	if s == "" || s == "null" {
+		return nil
+	}
+	var n int
+	if err := json.Unmarshal(raw, &n); err != nil || n < 0 {
+		return nil
+	}
+	return &n
+}
+
 // workspaceDTO is the JSON shape of a workspace returned by the CRUD endpoints.
 type workspaceDTO struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Folders []string `json:"folders"`
-	Dormant bool     `json:"dormant"`
-	Active  bool     `json:"active"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Folders         []string `json:"folders"`
+	Dormant         bool     `json:"dormant"`
+	Active          bool     `json:"active"`
+	MaxParallel     *int     `json:"max_parallel,omitempty"`
+	MaxTestParallel *int     `json:"max_test_parallel,omitempty"`
 }
 
 func (h *Handler) workspaceDTO(ws workspace.Workspace) workspaceDTO {
@@ -25,11 +44,13 @@ func (h *Handler) workspaceDTO(ws workspace.Workspace) workspaceDTO {
 		folders = []string{}
 	}
 	return workspaceDTO{
-		ID:      ws.ID,
-		Name:    ws.Name,
-		Folders: folders,
-		Dormant: ws.Dormant,
-		Active:  ws.ID != "" && ws.ID == h.activeWorkspaceID(),
+		ID:              ws.ID,
+		Name:            ws.Name,
+		Folders:         folders,
+		Dormant:         ws.Dormant,
+		Active:          ws.ID != "" && ws.ID == h.activeWorkspaceID(),
+		MaxParallel:     ws.MaxParallel,
+		MaxTestParallel: ws.MaxTestParallel,
 	}
 }
 
@@ -126,6 +147,10 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Name    *string  `json:"name"`
 		Folders []string `json:"folders"`
+		// RawMessage so a present-but-null value (clear the override) is
+		// distinguishable from an absent key (leave the override unchanged).
+		MaxParallel     json.RawMessage `json:"max_parallel"`
+		MaxTestParallel json.RawMessage `json:"max_test_parallel"`
 	}](w, r)
 	if !ok {
 		return
@@ -144,6 +169,27 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Name != nil {
 		if ws, err = h.workspace.Rename(id, *req.Name); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		updated = true
+	}
+	if req.MaxParallel != nil || req.MaxTestParallel != nil {
+		// Merge against the current record so an absent field is left unchanged
+		// while a present (incl. null) field is applied.
+		cur, found, cerr := h.workspace.WorkspaceByID(id)
+		if cerr != nil || !found {
+			http.Error(w, "workspace not found", http.StatusNotFound)
+			return
+		}
+		mp, mtp := cur.MaxParallel, cur.MaxTestParallel
+		if req.MaxParallel != nil {
+			mp = parseLimit(req.MaxParallel)
+		}
+		if req.MaxTestParallel != nil {
+			mtp = parseLimit(req.MaxTestParallel)
+		}
+		if ws, err = h.workspace.SetLimits(id, mp, mtp); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

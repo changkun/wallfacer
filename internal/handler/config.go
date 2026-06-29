@@ -217,6 +217,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	// them against activeGroupInfos entries. Per-group concurrency overrides
 	// ride along so the In-Progress column editor can show the current value.
 	type keyedGroup struct {
+		ID              string   `json:"id,omitempty"`
 		Name            string   `json:"name,omitempty"`
 		Workspaces      []string `json:"workspaces"`
 		Key             string   `json:"key"`
@@ -244,6 +245,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 			folders = []string{} // never marshal null; the frontend joins this
 		}
 		keyedGroups = append(keyedGroups, keyedGroup{
+			ID:              g.ID,
 			Name:            g.Name,
 			Workspaces:      folders,
 			Key:             key,
