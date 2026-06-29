@@ -364,7 +364,7 @@ function breadcrumbSegments() {
             v-for="ws in existing"
             :key="ws.id"
             class="ws-list__item"
-            :class="{ 'ws-list__item--active': ws.active }"
+            :class="{ 'ws-list__item--active': wsStore.isActive(ws.id) }"
           >
             <button
               type="button"
@@ -374,7 +374,7 @@ function breadcrumbSegments() {
             >
               <span class="ws-list__name">
                 {{ workspaceLabel(ws) }}
-                <span v-if="ws.active" class="ws-list__badge ws-list__badge--active">active</span>
+                <span v-if="wsStore.isActive(ws.id)" class="ws-list__badge ws-list__badge--active">active</span>
                 <span v-if="ws.dormant" class="ws-list__badge ws-list__badge--dormant">recovered</span>
               </span>
               <span class="ws-list__paths" :title="ws.folders.join('\n')">

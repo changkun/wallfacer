@@ -79,7 +79,7 @@ async function removeFolder(ws: Workspace, path: string) {
 }
 
 async function activate(ws: Workspace) {
-  if (busyId.value || ws.active) return;
+  if (busyId.value || wsStore.isActive(ws.id)) return;
   busyId.value = ws.id;
   status.value = '';
   try {
@@ -95,7 +95,7 @@ async function activate(ws: Workspace) {
 // remove deletes a workspace. The active one is guarded server-side (409) and
 // disabled in the UI; switch away first.
 async function remove(ws: Workspace) {
-  if (busyId.value || ws.active) return;
+  if (busyId.value || wsStore.isActive(ws.id)) return;
   const ok = await dialog.confirm({
     title: 'Delete workspace',
     message: `Delete "${ws.name || basename(ws.folders[0] ?? '')}"? Folders on disk are not touched.`,
@@ -201,7 +201,7 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
           v-for="ws in workspaces"
           :key="ws.id"
           class="ws-editor__row"
-          :class="{ 'ws-editor__row--active': ws.active }"
+          :class="{ 'ws-editor__row--active': wsStore.isActive(ws.id) }"
         >
           <div class="ws-editor__head">
             <input
@@ -214,11 +214,11 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
               @keydown.enter.prevent="rename(ws)"
               @blur="rename(ws)"
             />
-            <span v-if="ws.active" class="ws-editor__badge ws-editor__badge--active">active</span>
+            <span v-if="wsStore.isActive(ws.id)" class="ws-editor__badge ws-editor__badge--active">active</span>
             <span v-if="ws.dormant" class="ws-editor__badge ws-editor__badge--dormant">recovered</span>
             <div class="ws-editor__actions">
               <button
-                v-if="!ws.active"
+                v-if="!wsStore.isActive(ws.id)"
                 type="button"
                 class="btn-icon"
                 style="font-size: 11px; padding: 3px 8px;"
@@ -236,8 +236,8 @@ async function saveGroupLimits(group: WorkspaceGroup, maxParallel: number | null
                 type="button"
                 class="btn-icon ws-editor__delete"
                 style="font-size: 11px; padding: 3px 8px;"
-                :disabled="ws.active || busyId !== null"
-                :title="ws.active ? 'Switch to another workspace before deleting' : 'Delete this workspace'"
+                :disabled="wsStore.isActive(ws.id) || busyId !== null"
+                :title="wsStore.isActive(ws.id) ? 'Switch to another workspace before deleting' : 'Delete this workspace'"
                 @click="remove(ws)"
               >Delete</button>
             </div>
