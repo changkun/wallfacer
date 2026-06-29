@@ -26,6 +26,7 @@ import {
   type RenderedBubble,
   bubbleFromMessage,
   applyStreamingUpdate,
+  extractPrimaryModel,
 } from '../lib/agentBubble';
 
 export interface QueueItem { id: number; text: string }
@@ -38,6 +39,10 @@ export interface ChatSession {
   messagesEl: Ref<HTMLElement | null>;
   userScrolledUp: Ref<boolean>;
   latestRound: ComputedRef<number>;
+  // Session-primary model observed from the harness's init line (e.g.
+  // "claude-opus-4-8[1m]"), surfaced as the chat header badge. Empty until a
+  // turn has reported one.
+  primaryModel: Ref<string>;
 
   // ── Actions ──
   loadHistory: () => Promise<void>;
@@ -88,6 +93,7 @@ export function useChatSession(): ChatSession {
 
   const renderedMessages = ref<RenderedBubble[]>([]);
   const interruptedAt = ref<number>(-1);
+  const primaryModel = ref<string>('');
 
   let streamHandle: StreamingFetchHandle | null = null;
   // Pending reconnect timer scheduled by the streaming retry path. Tracked so
@@ -179,6 +185,16 @@ export function useChatSession(): ChatSession {
       // the live bubble (e.g. a freshly promoted draft's just-sent message).
       if (token !== historyToken || fetched !== activeThreadId.value) return;
       const next = (msgs ?? []).map(bubbleFromMessage);
+      // The session-primary model is the first init model reported across the
+      // thread; every claude turn re-emits it, so the earliest raw_output that
+      // carries one wins.
+      primaryModel.value = '';
+      for (const m of msgs ?? []) {
+        if (m.raw_output) {
+          const pm = extractPrimaryModel(m.raw_output);
+          if (pm) { primaryModel.value = pm; break; }
+        }
+      }
       // An in-flight turn isn't persisted yet, so a reload would drop it. If we
       // are streaming this thread, carry the live bubble across the reload.
       if (streaming.value && streamingThreadId.value === fetched && activeStreamBubbleId) {
@@ -237,7 +253,8 @@ export function useChatSession(): ChatSession {
         onChunk: (chunk: string) => {
           rawBuffer += chunk;
           parser.push(chunk);
-          const { text, activity, errorText, hasActivity: hasAct } = parser.state();
+          const { text, activity, errorText, hasActivity: hasAct, primaryModel: pm, model } = parser.state();
+          if (pm && !primaryModel.value) primaryModel.value = pm;
           if (!receivedContent && (text || hasAct)) receivedContent = true;
           if (receivedContent) {
             // Locate the bubble by id, not a cached index: if the active thread
@@ -251,6 +268,7 @@ export function useChatSession(): ChatSession {
               activity,
               hasActivity: hasAct,
               errorText: errorText || undefined,
+              model: model || undefined,
             });
           }
           void scrollToBottom();
@@ -263,7 +281,8 @@ export function useChatSession(): ChatSession {
           }
           // Parse any buffered trailing line that never got a newline.
           parser.finalize();
-          const { text, activity, errorText } = parser.state();
+          const { text, activity, errorText, primaryModel: pm, model } = parser.state();
+          if (pm && !primaryModel.value) primaryModel.value = pm;
           applyStreamingUpdate(renderedMessages.value, bubbleId, {
             rawText: text,
             contentHtml: text ? renderMarkdown(text) : '',
@@ -273,6 +292,7 @@ export function useChatSession(): ChatSession {
             errorText: errorText || undefined,
             isStreaming: false,
             usage: parseTurnUsage(rawBuffer),
+            model: model || undefined,
           });
           finishStreaming(false);
         },
@@ -891,7 +911,7 @@ export function useChatSession(): ChatSession {
   });
 
   return {
-    renderedMessages, streaming, interruptedAt, messagesEl, userScrolledUp, latestRound,
+    renderedMessages, streaming, interruptedAt, messagesEl, userScrolledUp, latestRound, primaryModel,
     loadHistory, sendMessage, onInterrupt, clearHistory, appendSystem, onScroll, undoRound,
     currentQueue, editingQueueId, editQueueDraft, removeFromQueue, startQueueEdit, commitQueueEdit, cancelQueueEdit,
     draft, createThread, switchToThread, archiveThread, unarchiveThread, deleteThread,

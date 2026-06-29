@@ -405,6 +405,20 @@
 .pcp-usage-cache { color: var(--ok); }
 .pcp-usage-cost { color: var(--ink-3); }
 
+/* Per-turn model chip: surfaces only when this turn ran on a model other than
+   the session primary (sub-agent / fallback). */
+.pcp-turn-model {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-3);
+  cursor: default;
+}
+
 /* ── System / interrupted ──────────────────────────────────────────── */
 
 .pcp-system {
