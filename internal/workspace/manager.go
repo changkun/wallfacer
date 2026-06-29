@@ -22,7 +22,7 @@ type Snapshot struct {
 	Workspaces    []string     // sorted, deduplicated absolute paths
 	Store         *store.Store // scoped task store for this workspace set (may be shared across snapshots)
 	ScopedDataDir string       // per-workspace-key data directory under the global data dir
-	Key           string       // deterministic key derived from sorted workspace paths (via prompts.InstructionsKey)
+	Key           string       // deterministic key derived from sorted workspace paths (via prompts.WorkspaceDataKey)
 	Generation    uint64       // monotonically increasing counter; incremented on each successful Switch
 }
 
@@ -113,12 +113,12 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 	// a warning and fall through to the next; if none are valid, start with
 	// no workspace so the picker opens instead of crashing.
 	for _, g := range groups {
-		if _, verr := validate(g.Workspaces); verr != nil {
-			logger.Main.Warn("skipping invalid saved workspace group at startup",
-				"workspaces", g.Workspaces, "error", verr)
+		if _, verr := validate(g.Folders); verr != nil {
+			logger.Main.Warn("skipping invalid saved workspace at startup",
+				"folders", g.Folders, "error", verr)
 			continue
 		}
-		return cloneStrings(g.Workspaces)
+		return cloneStrings(g.Folders)
 	}
 	return nil
 }
@@ -138,7 +138,7 @@ func NewStatic(store *store.Store, workspaces []string) *Manager {
 		Generation: 1,
 	}
 	if len(ws) > 0 {
-		m.current.Key = prompts.InstructionsKey(ws)
+		m.current.Key = prompts.WorkspaceDataKey(ws)
 	}
 	if store != nil {
 		m.current.ScopedDataDir = store.DataDir()
@@ -233,7 +233,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 
 	// Build the candidate snapshot. All external side effects happen here,
 	// before the atomic swap, so the manager is never left in a partial state.
-	key := prompts.InstructionsKey(validated)
+	key := prompts.WorkspaceDataKey(validated)
 	swap := pendingSwap{
 		next: Snapshot{
 			Key:           key,

@@ -52,8 +52,8 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 
 	wsA := t.TempDir()
 	wsB := t.TempDir()
-	if err := SaveGroups(configDir, []Group{
-		{Workspaces: []string{wsA, wsB}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Folders: []string{wsA, wsB}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
 	}
@@ -87,9 +87,9 @@ func TestNewManagerSkipsStaleSavedGroupAtStartup(t *testing.T) {
 	stale := filepath.Join(t.TempDir(), "deleted-workspace") // never created
 	valid := t.TempDir()
 	// Most-recent group first (stale), valid group second.
-	if err := SaveGroups(configDir, []Group{
-		{Workspaces: []string{stale}},
-		{Workspaces: []string{valid}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Folders: []string{stale}},
+		{Folders: []string{valid}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
 	}
@@ -115,9 +115,9 @@ func TestNewManagerAllSavedGroupsStaleStartsEmpty(t *testing.T) {
 		t.Fatalf("write env file: %v", err)
 	}
 
-	if err := SaveGroups(configDir, []Group{
-		{Workspaces: []string{filepath.Join(t.TempDir(), "gone-a")}},
-		{Workspaces: []string{filepath.Join(t.TempDir(), "gone-b")}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Folders: []string{filepath.Join(t.TempDir(), "gone-a")}},
+		{Folders: []string{filepath.Join(t.TempDir(), "gone-b")}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
 	}
@@ -143,8 +143,8 @@ func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T)
 	}
 
 	ws := t.TempDir()
-	if err := SaveGroups(configDir, []Group{
-		{Workspaces: []string{ws}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Folders: []string{ws}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
 	}
@@ -738,7 +738,7 @@ func TestSwitchKeepsStoreForRunningTasks(t *testing.T) {
 		t.Fatalf("Switch to B: %v", err)
 	}
 
-	// Group A's store should remain open and in activeGroups.
+	// Workspace A's store should remain open and in activeGroups.
 	if storeA.IsClosed() {
 		t.Fatal("expected group A store to remain open (has running tasks)")
 	}
@@ -771,7 +771,7 @@ func TestSwitchClosesIdleGroup(t *testing.T) {
 		t.Fatalf("Switch to B: %v", err)
 	}
 
-	// Group A's store should be closed and removed.
+	// Workspace A's store should be closed and removed.
 	if !storeA.IsClosed() {
 		t.Fatal("expected group A store to be closed (no running tasks)")
 	}

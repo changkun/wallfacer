@@ -73,14 +73,14 @@ func TestClaimGroup_NilPrincipalIsNoOp(t *testing.T) {
 }
 
 // fixture builds a groups slice spanning the three shapes.
-func fixture() []workspace.Group {
-	return []workspace.Group{
-		{Workspaces: []string{"/legacy"}},                                               // legacy
-		{Workspaces: []string{"/alice-personal"}, CreatedBy: "alice"},                   // alice's personal
-		{Workspaces: []string{"/bob-personal"}, CreatedBy: "bob"},                       // bob's personal
-		{Workspaces: []string{"/org-a-shared"}, CreatedBy: "alice", OrgID: "org-a"},     // org-a
-		{Workspaces: []string{"/org-a-other"}, CreatedBy: "contractor", OrgID: "org-a"}, // org-a (different owner)
-		{Workspaces: []string{"/org-b-shared"}, CreatedBy: "bob", OrgID: "org-b"},       // org-b
+func fixture() []workspace.Workspace {
+	return []workspace.Workspace{
+		{Folders: []string{"/legacy"}},                                               // legacy
+		{Folders: []string{"/alice-personal"}, CreatedBy: "alice"},                   // alice's personal
+		{Folders: []string{"/bob-personal"}, CreatedBy: "bob"},                       // bob's personal
+		{Folders: []string{"/org-a-shared"}, CreatedBy: "alice", OrgID: "org-a"},     // org-a
+		{Folders: []string{"/org-a-other"}, CreatedBy: "contractor", OrgID: "org-a"}, // org-a (different owner)
+		{Folders: []string{"/org-b-shared"}, CreatedBy: "bob", OrgID: "org-b"},       // org-b
 	}
 }
 
@@ -103,7 +103,7 @@ func TestGroupsForPrincipal_AlicePersonal(t *testing.T) {
 	}
 	seen := map[string]bool{}
 	for _, g := range got {
-		seen[g.Workspaces[0]] = true
+		seen[g.Folders[0]] = true
 	}
 	for _, p := range wantPaths {
 		if !seen[p] {
@@ -133,9 +133,9 @@ func TestGroupsForPrincipal_AliceInOrgA(t *testing.T) {
 // workspace groups yet should see an empty list (plus legacy).
 func TestGroupsForPrincipal_FreshUserInOrgSeesEmpty(t *testing.T) {
 	// No legacy; only alice's stuff and an org-a record.
-	groups := []workspace.Group{
-		{Workspaces: []string{"/alice-personal"}, CreatedBy: "alice"},
-		{Workspaces: []string{"/org-a-shared"}, CreatedBy: "alice", OrgID: "org-a"},
+	groups := []workspace.Workspace{
+		{Folders: []string{"/alice-personal"}, CreatedBy: "alice"},
+		{Folders: []string{"/org-a-shared"}, CreatedBy: "alice", OrgID: "org-a"},
 	}
 	got := workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: "carol", OrgID: "org-c"})
 	if len(got) != 0 {

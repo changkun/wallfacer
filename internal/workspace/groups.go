@@ -12,38 +12,79 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/set"
 )
 
-// Group represents a named set of workspace paths.
-type Group struct {
-	Name       string   `json:"name,omitempty"`
-	Workspaces []string `json:"workspaces"`
+// Workspace is an owned, stably-identified set of folder paths. Its identity
+// (ID) and its storage handle (DataKey) are independent of its membership
+// (Folders), so the owner may change folders without orphaning history.
+//
+// ID and DataKey are empty on records loaded from the legacy
+// workspace-groups.json (which keyed identity off the path set). Migration
+// (see migrate.go) assigns them once and writes workspaces.json; until then
+// the manager derives the scoped-data key from the folder paths exactly as
+// before, so legacy records keep working.
+type Workspace struct {
+	ID      string   `json:"id,omitempty"`       // stable UUIDv4, assigned once at creation/migration
+	Name    string   `json:"name,omitempty"`     // optional human label
+	Folders []string `json:"folders"`            // mutable; absolute, clean, sorted, deduped
+	DataKey string   `json:"data_key,omitempty"` // stable storage handle under data/<DataKey>
+
 	// MaxParallel, when non-nil, overrides WALLFACER_MAX_PARALLEL for this
-	// group only. A value of 0 means "unlimited"; negative values are
+	// workspace only. A value of 0 means "unlimited"; negative values are
 	// normalized to nil (inherit the env-file default). Pointer so that an
 	// absent field in on-disk JSON deserializes to nil rather than 0.
 	MaxParallel *int `json:"max_parallel,omitempty"`
 	// MaxTestParallel does the same for WALLFACER_MAX_TEST_PARALLEL.
 	MaxTestParallel *int `json:"max_test_parallel,omitempty"`
 
-	// Automation toggles are per-group so that switching workspaces does
-	// not carry an "autoimplement on" state into a group the user expected to
-	// operate manually. Pointers so that absent fields in on-disk JSON
+	// Automation toggles are per-workspace so that switching workspaces does
+	// not carry an "autoimplement on" state into a workspace the user expected
+	// to operate manually. Pointers so that absent fields in on-disk JSON
 	// deserialize to nil (meaning "unset, default off"), distinguishable
 	// from an explicit false the user saved. Autopush is intentionally
-	// NOT per-group: push credentials / remote setup are global, so the
+	// NOT per-workspace: push credentials / remote setup are global, so the
 	// auto-push flag continues to live in the env file.
-	Autoimplement  *bool `json:"autoimplement,omitempty"`
-	Autotest   *bool `json:"autotest,omitempty"`
-	Autosubmit *bool `json:"autosubmit,omitempty"`
-	Autosync   *bool `json:"autosync,omitempty"`
+	Autoimplement *bool `json:"autoimplement,omitempty"`
+	Autotest      *bool `json:"autotest,omitempty"`
+	Autosubmit    *bool `json:"autosubmit,omitempty"`
+	Autosync      *bool `json:"autosync,omitempty"`
 
 	// CreatedBy records the principal sub of the user who first owned
-	// this group in cloud mode. Empty on groups created pre-cloud or in
+	// this workspace in cloud mode. Empty on workspaces created pre-cloud or in
 	// local mode. Mirrors store.Task.CreatedBy semantics.
 	CreatedBy string `json:"created_by,omitempty"`
-	// OrgID records the org context the group is scoped to. Empty when
-	// the group is personal (CreatedBy!="") or legacy (CreatedBy==""
+	// OrgID records the org context the workspace is scoped to. Empty when
+	// the workspace is personal (CreatedBy!="") or legacy (CreatedBy==""
 	// and OrgID==""). Mirrors store.Task.OrgID semantics.
 	OrgID string `json:"org_id,omitempty"`
+
+	// Dormant marks a workspace recovered from orphaned task history during
+	// migration: its DataKey addresses real history but its Folders may be
+	// empty or only best-effort recovered. The owner re-points it later.
+	Dormant bool `json:"dormant,omitempty"`
+
+	// CreatedAt/UpdatedAt are RFC3339 timestamps for bookkeeping. Empty on
+	// legacy records.
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+// UnmarshalJSON accepts both the current `folders` key and the legacy
+// `workspaces` key (used by the pre-redesign workspace-groups.json), so the
+// existing on-disk file still loads until migration rewrites it. When both are
+// present `folders` wins.
+func (w *Workspace) UnmarshalJSON(data []byte) error {
+	type alias Workspace // avoid recursion
+	var shadow struct {
+		alias
+		LegacyWorkspaces []string `json:"workspaces"`
+	}
+	if err := json.Unmarshal(data, &shadow); err != nil {
+		return err
+	}
+	*w = Workspace(shadow.alias)
+	if len(w.Folders) == 0 && len(shadow.LegacyWorkspaces) > 0 {
+		w.Folders = shadow.LegacyWorkspaces
+	}
+	return nil
 }
 
 // groupsFilePath returns the path to the workspace-groups.json file within configDir.
@@ -51,8 +92,8 @@ func groupsFilePath(configDir string) string {
 	return filepath.Join(configDir, "workspace-groups.json")
 }
 
-// LoadGroups reads workspace groups from the config directory.
-func LoadGroups(configDir string) ([]Group, error) {
+// LoadGroups reads workspaces from the config directory.
+func LoadGroups(configDir string) ([]Workspace, error) {
 	raw, err := os.ReadFile(groupsFilePath(configDir))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -60,15 +101,15 @@ func LoadGroups(configDir string) ([]Group, error) {
 	if err != nil {
 		return nil, err
 	}
-	var groups []Group
+	var groups []Workspace
 	if err := json.Unmarshal(raw, &groups); err != nil {
 		return nil, err
 	}
 	return NormalizeGroups(groups), nil
 }
 
-// SaveGroups writes workspace groups to the config directory atomically.
-func SaveGroups(configDir string, groups []Group) error {
+// SaveGroups writes workspaces to the config directory atomically.
+func SaveGroups(configDir string, groups []Workspace) error {
 	path := groupsFilePath(configDir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -76,10 +117,11 @@ func SaveGroups(configDir string, groups []Group) error {
 	return atomicfile.WriteJSON(path, NormalizeGroups(groups), 0o644)
 }
 
-// UpsertGroup adds or promotes a workspace group to the front of the list,
+// UpsertGroup adds or promotes a workspace to the front of the list,
 // implementing most-recently-used (MRU) ordering for session restore.
-// If the group already exists (matching by GroupKey), it is moved to position 0
-// with its name preserved. If it does not exist, a new unnamed group is prepended.
+// If the workspace already exists (matching by GroupKey), it is moved to
+// position 0 with its metadata preserved. If it does not exist, a new unnamed
+// workspace is prepended.
 func UpsertGroup(configDir string, workspaces []string) error {
 	workspaces = normalizeGroupPaths(workspaces)
 	if len(workspaces) == 0 {
@@ -91,65 +133,54 @@ func UpsertGroup(configDir string, workspaces []string) error {
 	}
 	key := GroupKey(workspaces)
 	for i, group := range groups {
-		if GroupKey(group.Workspaces) == key {
+		if GroupKey(group.Folders) == key {
 			if i == 0 {
 				return nil
 			}
-			promoted := Group{
-				Name:            group.Name,
-				Workspaces:      workspaces,
-				MaxParallel:     group.MaxParallel,
-				MaxTestParallel: group.MaxTestParallel,
-				Autoimplement:       group.Autoimplement,
-				Autotest:        group.Autotest,
-				Autosubmit:      group.Autosubmit,
-				Autosync:        group.Autosync,
-				CreatedBy:       group.CreatedBy,
-				OrgID:           group.OrgID,
-			}
-			reordered := append([]Group{promoted}, groups[:i]...)
+			promoted := group
+			promoted.Folders = workspaces
+			reordered := append([]Workspace{promoted}, groups[:i]...)
 			reordered = append(reordered, groups[i+1:]...)
 			return SaveGroups(configDir, reordered)
 		}
 	}
-	groups = append([]Group{{Workspaces: workspaces}}, groups...)
+	groups = append([]Workspace{{Folders: workspaces}}, groups...)
 	return SaveGroups(configDir, groups)
 }
 
-// NormalizeGroups deduplicates and cleans workspace groups.
-func NormalizeGroups(groups []Group) []Group {
+// NormalizeGroups deduplicates and cleans workspaces.
+func NormalizeGroups(groups []Workspace) []Workspace {
 	if len(groups) == 0 {
 		return nil
 	}
-	out := make([]Group, 0, len(groups))
+	out := make([]Workspace, 0, len(groups))
 	seen := set.New[string]()
 	for _, group := range groups {
-		ws := normalizeGroupPaths(group.Workspaces)
-		if len(ws) == 0 {
+		ws := normalizeGroupPaths(group.Folders)
+		// A dormant workspace may legitimately have no folders (recovered
+		// history awaiting re-point); it is keyed by ID/DataKey instead.
+		if len(ws) == 0 && !group.Dormant {
 			continue
 		}
-		key := GroupKey(ws)
-		if seen.Has(key) {
-			continue
+		// Deduplicate non-dormant workspaces by their folder set, as before.
+		// Dormant workspaces are keyed by ID and never collapsed by paths.
+		if !group.Dormant {
+			key := GroupKey(ws)
+			if seen.Has(key) {
+				continue
+			}
+			seen.Add(key)
 		}
-		seen.Add(key)
-		out = append(out, Group{
-			Name:            group.Name,
-			Workspaces:      ws,
-			MaxParallel:     sanitizeLimit(group.MaxParallel),
-			MaxTestParallel: sanitizeLimit(group.MaxTestParallel),
-			Autoimplement:       group.Autoimplement,
-			Autotest:        group.Autotest,
-			Autosubmit:      group.Autosubmit,
-			Autosync:        group.Autosync,
-			CreatedBy:       group.CreatedBy,
-			OrgID:           group.OrgID,
-		})
+		normalized := group
+		normalized.Folders = ws
+		normalized.MaxParallel = sanitizeLimit(group.MaxParallel)
+		normalized.MaxTestParallel = sanitizeLimit(group.MaxTestParallel)
+		out = append(out, normalized)
 	}
 	return out
 }
 
-// Principal is the minimal identity surface for group visibility.
+// Principal is the minimal identity surface for workspace visibility.
 // Matches store.Principal in shape but kept local so the workspace
 // package doesn't import the store layer.
 type Principal struct {
@@ -157,15 +188,15 @@ type Principal struct {
 	OrgID string
 }
 
-// ClaimGroup stamps the current principal onto the group matching
-// `workspaces` if the group has no owner yet (CreatedBy=="" AND
-// OrgID==""). Existing stamps are never overwritten: a group
+// ClaimGroup stamps the current principal onto the workspace matching
+// `workspaces` if the workspace has no owner yet (CreatedBy=="" AND
+// OrgID==""). Existing stamps are never overwritten: a workspace
 // originally claimed by user A stays tagged to A even if user B
-// later switches to the same workspace set. Idempotent.
+// later switches to the same folder set. Idempotent.
 //
 // Called from the PUT /api/workspaces handler after a successful
-// Switch, so groups created in cloud mode are attributed from the
-// moment they're persisted. Groups created in local mode or by
+// Switch, so workspaces created in cloud mode are attributed from the
+// moment they're persisted. Workspaces created in local mode or by
 // startup restore remain unclaimed (legacy) until a signed-in
 // session first opens them.
 func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
@@ -183,7 +214,7 @@ func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
 	key := GroupKey(workspaces)
 	changed := false
 	for i, g := range groups {
-		if GroupKey(g.Workspaces) != key {
+		if GroupKey(g.Folders) != key {
 			continue
 		}
 		if g.CreatedBy == "" && g.OrgID == "" {
@@ -205,20 +236,20 @@ func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
 //	┌─────────────────────────────┬──────────────────────────────────┐
 //	│ Caller view                 │ Sees                             │
 //	├─────────────────────────────┼──────────────────────────────────┤
-//	│ local (nil principal)       │ every group                      │
+//	│ local (nil principal)       │ every workspace                  │
 //	│ personal (OrgID == "")      │ own personal + legacy no-owner   │
-//	│ org X (OrgID == "X")        │ only OrgID=="X" groups (strict)  │
+//	│ org X (OrgID == "X")        │ only OrgID=="X" workspaces        │
 //	└─────────────────────────────┴──────────────────────────────────┘
 //
-// The org view does NOT include personal or legacy groups — those
-// belong to the user's personal workspace, not the org. Switching
-// into an org should feel like a clean workspace, not a merged
+// The org view does NOT include personal or legacy workspaces — those
+// belong to the user's personal account, not the org. Switching
+// into an org should feel like a clean slate, not a merged
 // view of private + org data.
-func GroupsForPrincipal(groups []Group, p *Principal) []Group {
+func GroupsForPrincipal(groups []Workspace, p *Principal) []Workspace {
 	if p == nil {
 		return groups
 	}
-	out := make([]Group, 0, len(groups))
+	out := make([]Workspace, 0, len(groups))
 	for _, g := range groups {
 		if p.OrgID != "" {
 			if g.OrgID == p.OrgID {
@@ -276,7 +307,7 @@ func normalizeGroupPaths(paths []string) []string {
 
 // GroupKey returns a canonical, deterministic key for a set of workspace paths.
 // Paths must be pre-sorted (as done by normalizeGroupPaths) so that the same
-// set of workspaces always produces the same key regardless of input order.
+// set of folders always produces the same key regardless of input order.
 // The key uses newline as separator because it cannot appear in filesystem paths.
 func GroupKey(paths []string) string {
 	return strings.Join(paths, "\n")

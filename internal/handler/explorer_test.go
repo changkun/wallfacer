@@ -796,8 +796,8 @@ func TestExplorerStream_DetectsDeepChangeInExpandedDir(t *testing.T) {
 func TestExplorerStream_HiddenWorkspaceNoLeak(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
 	h.SetCloudMode(true)
-	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
-		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
 		t.Fatal(err)
 	}

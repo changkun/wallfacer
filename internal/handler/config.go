@@ -79,10 +79,10 @@ func defaultSandbox(cfg envconfig.Config) harness.ID {
 // is present in the principal-visible group list. Used to drop a cross-org
 // active workspace from the config so an org switch doesn't carry the previous
 // org's board over.
-func workspaceVisible(groups []workspace.Group, workspaces []string) bool {
+func workspaceVisible(groups []workspace.Workspace, workspaces []string) bool {
 	key := workspace.GroupKey(workspaces)
 	for _, g := range groups {
-		if workspace.GroupKey(g.Workspaces) == key {
+		if workspace.GroupKey(g.Folders) == key {
 			return true
 		}
 	}
@@ -199,17 +199,17 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		key := workspace.GroupKey(workspaces)
 		found := false
 		for i, g := range groups {
-			if workspace.GroupKey(g.Workspaces) == key {
+			if workspace.GroupKey(g.Folders) == key {
 				// Promote existing group to front, preserving its Name.
 				promoted := g
-				promoted.Workspaces = workspaces
-				groups = append([]workspace.Group{promoted}, append(groups[:i], groups[i+1:]...)...)
+				promoted.Folders = workspaces
+				groups = append([]workspace.Workspace{promoted}, append(groups[:i], groups[i+1:]...)...)
 				found = true
 				break
 			}
 		}
 		if !found {
-			groups = append([]workspace.Group{{Workspaces: workspaces}}, groups...)
+			groups = append([]workspace.Workspace{{Folders: workspaces}}, groups...)
 		}
 		groups = workspace.NormalizeGroups(groups)
 	}
@@ -227,8 +227,8 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	for i, g := range groups {
 		keyedGroups[i] = keyedGroup{
 			Name:            g.Name,
-			Workspaces:      g.Workspaces,
-			Key:             prompts.InstructionsKey(g.Workspaces),
+			Workspaces:      g.Folders,
+			Key:             prompts.WorkspaceDataKey(g.Folders),
 			MaxParallel:     g.MaxParallel,
 			MaxTestParallel: g.MaxTestParallel,
 		}
@@ -253,7 +253,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"sandbox_usable":            allSandboxesUsable(),
 		"sandbox_reasons":           map[string]string{},
 		"activity_sandboxes":        map[string]string{},
-		"autoimplement":                 h.AutoimplementEnabled(),
+		"autoimplement":             h.AutoimplementEnabled(),
 		"autotest":                  h.AutotestEnabled(),
 		"autosubmit":                h.AutosubmitEnabled(),
 		"autosync":                  h.AutosyncEnabled(),
@@ -316,15 +316,15 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		Autoimplement        *bool             `json:"autoimplement"`
-		Autotest         *bool             `json:"autotest"`
-		Autosubmit       *bool             `json:"autosubmit"`
-		Autosync         *bool             `json:"autosync"`
-		Autopush         *bool             `json:"autopush"`
-		Agon             *bool             `json:"agon"`
-		Ideation         *bool             `json:"ideation"`          // retired; accepted for old clients but ignored
-		IdeationInterval *int              `json:"ideation_interval"` // retired; accepted for old clients but ignored
-		WorkspaceGroups  []workspace.Group `json:"workspace_groups"`
+		Autoimplement    *bool                 `json:"autoimplement"`
+		Autotest         *bool                 `json:"autotest"`
+		Autosubmit       *bool                 `json:"autosubmit"`
+		Autosync         *bool                 `json:"autosync"`
+		Autopush         *bool                 `json:"autopush"`
+		Agon             *bool                 `json:"agon"`
+		Ideation         *bool                 `json:"ideation"`          // retired; accepted for old clients but ignored
+		IdeationInterval *int                  `json:"ideation_interval"` // retired; accepted for old clients but ignored
+		WorkspaceGroups  []workspace.Workspace `json:"workspace_groups"`
 	}](w, r)
 	if !ok {
 		return
@@ -367,12 +367,12 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	resp := map[string]any{
-		"autoimplement":  h.AutoimplementEnabled(),
-		"autotest":   h.AutotestEnabled(),
-		"autosubmit": h.AutosubmitEnabled(),
-		"autosync":   h.AutosyncEnabled(),
-		"autopush":   h.AutopushEnabled(),
-		"agon":       h.AgonEnabled(),
+		"autoimplement": h.AutoimplementEnabled(),
+		"autotest":      h.AutotestEnabled(),
+		"autosubmit":    h.AutosubmitEnabled(),
+		"autosync":      h.AutosyncEnabled(),
+		"autopush":      h.AutopushEnabled(),
+		"agon":          h.AgonEnabled(),
 	}
 	httpjson.Write(w, http.StatusOK, resp)
 }
