@@ -235,6 +235,27 @@ func (m *Manager) Rename(id, name string) (Workspace, error) {
 	return groups[i], nil
 }
 
+// SetLimits sets (or clears) a workspace's per-workspace concurrency overrides.
+// A nil value clears the override so the workspace inherits the global default;
+// a non-negative value caps it (0 meaning unlimited, per Group semantics).
+func (m *Manager) SetLimits(id string, maxParallel, maxTestParallel *int) (Workspace, error) {
+	groups, err := LoadGroups(m.configDir)
+	if err != nil {
+		return Workspace{}, err
+	}
+	i := findByID(groups, id)
+	if i < 0 {
+		return Workspace{}, fmt.Errorf("workspace not found: %s", id)
+	}
+	groups[i].MaxParallel = maxParallel
+	groups[i].MaxTestParallel = maxTestParallel
+	groups[i].UpdatedAt = nowStamp()
+	if err := SaveGroups(m.configDir, groups); err != nil {
+		return Workspace{}, err
+	}
+	return groups[i], nil
+}
+
 // Delete removes a workspace record. It is idempotent (deleting an unknown id is
 // a no-op) and refuses to delete the currently active workspace; switch away
 // first. The workspace's data directory is intentionally left on disk.
