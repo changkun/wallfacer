@@ -15,11 +15,12 @@ const cloudRoutes: RouteRecordRaw[] = [
 // "no workspace" state. Settings and docs are workspace-independent.
 export const localRoutes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/BoardPage.vue'), meta: { needsWorkspace: true } },
-  { path: '/agents', component: () => import('./views/AgentsPage.vue'), meta: { needsWorkspace: true } },
-  // The agent-graph surface is the single place to compose agents into graphs;
-  // it supersedes the old Flows composer (FlowsPage), so /workflows and /flows
-  // redirect here (e2e design: teardown of the legacy flow surface).
+  // The agent-graph surface is the single place to define agents AND compose
+  // them into graphs (it embeds the agent editor). It supersedes both the old
+  // Flows composer and the Agents page, so /agents, /workflows and /flows all
+  // redirect here (e2e design: teardown of the legacy flow + agents surfaces).
   { path: '/agent-graph', component: () => import('./views/AgentGraphPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/agents', redirect: '/agent-graph', meta: { needsWorkspace: true } },
   { path: '/workflows', redirect: '/agent-graph', meta: { needsWorkspace: true } },
   { path: '/flows', redirect: '/agent-graph', meta: { needsWorkspace: true } },
   { path: '/routines', component: () => import('./views/RoutinesPage.vue'), meta: { needsWorkspace: true } },
