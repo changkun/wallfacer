@@ -1,76 +1,10 @@
 package workspace_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/workspace"
 )
-
-// TestClaimGroup_StampsPrincipalOnce: the first ClaimGroup for a
-// previously-unowned group records CreatedBy + OrgID. A second
-// ClaimGroup from a different principal must NOT overwrite — the
-// group stays with its original owner.
-func TestClaimGroup_StampsPrincipalOnce(t *testing.T) {
-	dir := t.TempDir()
-	if err := workspace.UpsertGroup(dir, []string{"/tmp/ws-a"}); err != nil {
-		t.Fatalf("UpsertGroup: %v", err)
-	}
-	// First claim: alice in org-a.
-	if err := workspace.ClaimGroup(dir, []string{"/tmp/ws-a"}, &workspace.Principal{Sub: "alice", OrgID: "org-a"}); err != nil {
-		t.Fatalf("ClaimGroup: %v", err)
-	}
-	// Second claim with bob must be a no-op.
-	if err := workspace.ClaimGroup(dir, []string{"/tmp/ws-a"}, &workspace.Principal{Sub: "bob", OrgID: "org-b"}); err != nil {
-		t.Fatalf("ClaimGroup second: %v", err)
-	}
-	got, err := workspace.LoadGroups(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("groups len = %d, want 1", len(got))
-	}
-	if got[0].CreatedBy != "alice" || got[0].OrgID != "org-a" {
-		t.Errorf("got CreatedBy=%q OrgID=%q, want alice/org-a", got[0].CreatedBy, got[0].OrgID)
-	}
-}
-
-// TestClaimGroup_SurvivesReload writes a claim, reloads from disk,
-// confirms the fields round-trip through the JSON layer.
-func TestClaimGroup_SurvivesReload(t *testing.T) {
-	dir := t.TempDir()
-	if err := workspace.UpsertGroup(dir, []string{"/tmp/ws-b"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := workspace.ClaimGroup(dir, []string{"/tmp/ws-b"}, &workspace.Principal{Sub: "alice", OrgID: "org-a"}); err != nil {
-		t.Fatal(err)
-	}
-	// Manually reload by opening the file from a sibling temp var.
-	g2, err := workspace.LoadGroups(filepath.Clean(dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if g2[0].CreatedBy != "alice" || g2[0].OrgID != "org-a" {
-		t.Errorf("round-trip lost fields: %+v", g2[0])
-	}
-}
-
-// TestClaimGroup_NilPrincipalIsNoOp covers the local-mode path
-// where ClaimGroup is called without claims in context.
-func TestClaimGroup_NilPrincipalIsNoOp(t *testing.T) {
-	dir := t.TempDir()
-	if err := workspace.UpsertGroup(dir, []string{"/tmp/ws-c"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := workspace.ClaimGroup(dir, []string{"/tmp/ws-c"}, nil); err != nil {
-		t.Fatalf("nil principal should not error: %v", err)
-	}
-	got, _ := workspace.LoadGroups(dir)
-	if got[0].CreatedBy != "" || got[0].OrgID != "" {
-		t.Errorf("nil principal leaked into group: %+v", got[0])
-	}
-}
 
 // fixture builds a groups slice spanning the three shapes.
 func fixture() []workspace.Workspace {
@@ -87,7 +21,7 @@ func fixture() []workspace.Workspace {
 // TestGroupsForPrincipal_NilShowsAll covers local-mode.
 func TestGroupsForPrincipal_NilShowsAll(t *testing.T) {
 	groups := fixture()
-	got := workspace.GroupsForPrincipal(groups, nil)
+	got := workspace.WorkspacesForPrincipal(groups, nil)
 	if len(got) != len(groups) {
 		t.Fatalf("nil principal filtered %d → %d", len(groups), len(got))
 	}
@@ -96,7 +30,7 @@ func TestGroupsForPrincipal_NilShowsAll(t *testing.T) {
 // TestGroupsForPrincipal_AlicePersonal covers alice signed in with
 // no active org: she sees legacy + her personal, nothing else.
 func TestGroupsForPrincipal_AlicePersonal(t *testing.T) {
-	got := workspace.GroupsForPrincipal(fixture(), &workspace.Principal{Sub: "alice"})
+	got := workspace.WorkspacesForPrincipal(fixture(), &workspace.Principal{Sub: "alice"})
 	wantPaths := []string{"/legacy", "/alice-personal"}
 	if len(got) != len(wantPaths) {
 		t.Fatalf("alice personal view saw %d groups, want %d: %v", len(got), len(wantPaths), got)
@@ -116,7 +50,7 @@ func TestGroupsForPrincipal_AlicePersonal(t *testing.T) {
 // org-a groups. Her own personal, legacy, other users' personal,
 // other orgs — all hidden. Org view is strict.
 func TestGroupsForPrincipal_AliceInOrgA(t *testing.T) {
-	got := workspace.GroupsForPrincipal(fixture(), &workspace.Principal{Sub: "alice", OrgID: "org-a"})
+	got := workspace.WorkspacesForPrincipal(fixture(), &workspace.Principal{Sub: "alice", OrgID: "org-a"})
 	wantPaths := []string{"/org-a-shared", "/org-a-other"}
 	if len(got) != len(wantPaths) {
 		t.Fatalf("alice@org-a saw %d groups, want %d (strict org): %+v", len(got), len(wantPaths), got)
@@ -137,7 +71,7 @@ func TestGroupsForPrincipal_FreshUserInOrgSeesEmpty(t *testing.T) {
 		{Folders: []string{"/alice-personal"}, CreatedBy: "alice"},
 		{Folders: []string{"/org-a-shared"}, CreatedBy: "alice", OrgID: "org-a"},
 	}
-	got := workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: "carol", OrgID: "org-c"})
+	got := workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: "carol", OrgID: "org-c"})
 	if len(got) != 0 {
 		t.Fatalf("fresh user in empty org saw %d groups, want 0: %v", len(got), got)
 	}

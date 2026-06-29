@@ -130,37 +130,6 @@ func SaveGroups(configDir string, groups []Workspace) error {
 	return atomicfile.WriteJSON(path, NormalizeGroups(groups), 0o644)
 }
 
-// UpsertGroup adds or promotes a workspace to the front of the list,
-// implementing most-recently-used (MRU) ordering for session restore.
-// If the workspace already exists (matching by GroupKey), it is moved to
-// position 0 with its metadata preserved. If it does not exist, a new unnamed
-// workspace is prepended.
-func UpsertGroup(configDir string, workspaces []string) error {
-	workspaces = normalizeGroupPaths(workspaces)
-	if len(workspaces) == 0 {
-		return nil
-	}
-	groups, err := LoadGroups(configDir)
-	if err != nil {
-		return err
-	}
-	key := GroupKey(workspaces)
-	for i, group := range groups {
-		if GroupKey(group.Folders) == key {
-			if i == 0 {
-				return nil
-			}
-			promoted := group
-			promoted.Folders = workspaces
-			reordered := append([]Workspace{promoted}, groups[:i]...)
-			reordered = append(reordered, groups[i+1:]...)
-			return SaveGroups(configDir, reordered)
-		}
-	}
-	groups = append([]Workspace{{Folders: workspaces}}, groups...)
-	return SaveGroups(configDir, groups)
-}
-
 // NormalizeGroups deduplicates and cleans workspaces.
 func NormalizeGroups(groups []Workspace) []Workspace {
 	if len(groups) == 0 {
@@ -205,55 +174,6 @@ type Principal struct {
 	OrgID string
 }
 
-// ClaimGroup stamps the current principal onto the workspace matching
-// `workspaces` if the workspace has no owner yet (CreatedBy=="" AND
-// OrgID==""). Existing stamps are never overwritten: a workspace
-// originally claimed by user A stays tagged to A even if user B
-// later switches to the same folder set. Idempotent.
-//
-// Called from the PUT /api/workspaces handler after a successful
-// Switch, so workspaces created in cloud mode are attributed from the
-// moment they're persisted. Workspaces created in local mode or by
-// startup restore remain unclaimed (legacy) until a signed-in
-// session first opens them.
-func ClaimGroup(configDir string, workspaces []string, p *Principal) error {
-	if p == nil || (p.Sub == "" && p.OrgID == "") {
-		return nil
-	}
-	workspaces = normalizeGroupPaths(workspaces)
-	if len(workspaces) == 0 {
-		return nil
-	}
-	groups, err := LoadGroups(configDir)
-	if err != nil {
-		return err
-	}
-	key := GroupKey(workspaces)
-	changed := false
-	for i, g := range groups {
-		if GroupKey(g.Folders) != key {
-			continue
-		}
-		if g.CreatedBy == "" && g.OrgID == "" {
-			groups[i].CreatedBy = p.Sub
-			groups[i].OrgID = p.OrgID
-			changed = true
-		}
-		break
-	}
-	if !changed {
-		return nil
-	}
-	return SaveGroups(configDir, groups)
-}
-
-// WorkspacesForPrincipal returns the subset of `groups` that `p` can see.
-// It is the redesign's name for GroupsForPrincipal; the older name is kept as
-// a thin alias while callers migrate.
-func WorkspacesForPrincipal(groups []Workspace, p *Principal) []Workspace {
-	return GroupsForPrincipal(groups, p)
-}
-
 // findByID returns the index of the workspace with the given id, or -1.
 func findByID(groups []Workspace, id string) int {
 	if id == "" {
@@ -267,7 +187,7 @@ func findByID(groups []Workspace, id string) int {
 	return -1
 }
 
-// GroupsForPrincipal returns the subset of `groups` that `p` can
+// WorkspacesForPrincipal returns the subset of `groups` that `p` can
 // see. Mirrors store.TasksForPrincipal's strict isolation:
 //
 //	┌─────────────────────────────┬──────────────────────────────────┐
@@ -282,7 +202,7 @@ func findByID(groups []Workspace, id string) int {
 // belong to the user's personal account, not the org. Switching
 // into an org should feel like a clean slate, not a merged
 // view of private + org data.
-func GroupsForPrincipal(groups []Workspace, p *Principal) []Workspace {
+func WorkspacesForPrincipal(groups []Workspace, p *Principal) []Workspace {
 	if p == nil {
 		return groups
 	}

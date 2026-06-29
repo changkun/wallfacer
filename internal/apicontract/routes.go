@@ -115,12 +115,6 @@ var Routes = []Route{
 		Tags:        []string{"workspaces"},
 	},
 	{
-		Method: http.MethodPut, Pattern: "/api/workspaces", Name: "UpdateWorkspaces",
-		JSName:      "update",
-		Description: "Replace the active workspace set and switch the scoped task board (legacy path-based switch).",
-		Tags:        []string{"workspaces"},
-	},
-	{
 		Method: http.MethodGet, Pattern: "/api/workspaces", Name: "ListWorkspaces",
 		JSName:      "list",
 		Description: "List workspaces visible to the caller, each flagged active or dormant.",

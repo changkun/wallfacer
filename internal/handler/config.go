@@ -109,7 +109,7 @@ func (h *Handler) workspaceVisibleTo(ctx context.Context, workspaces []string) b
 		return true
 	}
 	groups, _ := workspace.LoadGroups(h.configDir)
-	groups = workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+	groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
 	return workspaceVisible(groups, workspaces)
 }
 
@@ -174,7 +174,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	// never hides the user's own workspaces. We resolve the principal directly
 	// from ctx since buildConfigResponse doesn't take *Request.
 	if c, ok := auth.PrincipalFromContext(ctx); h.cloudMode && ok && c != nil {
-		groups = workspace.GroupsForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+		groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
 		// The active workspace is global server state. After an org switch it
 		// may still point at the previous org's group; if this principal can't
 		// see that group, don't present it as active. They get their org's

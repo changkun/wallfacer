@@ -45,39 +45,6 @@ func TestUnmarshalFoldersKeyWinsOverLegacy(t *testing.T) {
 	}
 }
 
-// TestUpsertMovesExistingGroupToFront verifies that upserting an existing group
-// promotes it to position 0 without duplicating it.
-func TestUpsertMovesExistingGroupToFront(t *testing.T) {
-	configDir := t.TempDir()
-	wsA := t.TempDir()
-	wsB := t.TempDir()
-
-	if err := SaveGroups(configDir, []Workspace{
-		{Folders: []string{wsA}},
-		{Folders: []string{wsB}},
-	}); err != nil {
-		t.Fatalf("SaveGroups: %v", err)
-	}
-
-	if err := UpsertGroup(configDir, []string{wsB}); err != nil {
-		t.Fatalf("UpsertGroup: %v", err)
-	}
-
-	groups, err := LoadGroups(configDir)
-	if err != nil {
-		t.Fatalf("LoadGroups: %v", err)
-	}
-	if len(groups) != 2 {
-		t.Fatalf("expected 2 groups, got %d", len(groups))
-	}
-	if got := groups[0].Folders; len(got) != 1 || got[0] != wsB {
-		t.Fatalf("expected wsB group first, got %#v", got)
-	}
-	if got := groups[1].Folders; len(got) != 1 || got[0] != wsA {
-		t.Fatalf("expected wsA group second, got %#v", got)
-	}
-}
-
 // TestNormalizeGroups_DeduplicatesGroups verifies that groups with identical
 // workspace sets (after path sorting) are collapsed to a single entry.
 func TestNormalizeGroups_DeduplicatesGroups(t *testing.T) {
@@ -241,35 +208,6 @@ func TestNormalizeGroups_MultiGroup(t *testing.T) {
 	}
 }
 
-// TestUpsertGroup_NewGroup_AddedToFront verifies that a previously unseen
-// group is prepended to the list.
-func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
-	configDir := t.TempDir()
-	wsA := t.TempDir()
-	wsB := t.TempDir()
-
-	if err := SaveGroups(configDir, []Workspace{
-		{Folders: []string{wsA}},
-	}); err != nil {
-		t.Fatalf("SaveGroups: %v", err)
-	}
-
-	if err := UpsertGroup(configDir, []string{wsB}); err != nil {
-		t.Fatalf("UpsertGroup new group: %v", err)
-	}
-
-	groups, err := LoadGroups(configDir)
-	if err != nil {
-		t.Fatalf("LoadGroups: %v", err)
-	}
-	if len(groups) != 2 {
-		t.Fatalf("expected 2 groups, got %d", len(groups))
-	}
-	if groups[0].Folders[0] != wsB {
-		t.Errorf("expected new group at front, got %v", groups[0].Folders)
-	}
-}
-
 // TestNormalizeGroups_PreservesName verifies that user-assigned group names
 // survive normalization.
 func TestNormalizeGroups_PreservesName(t *testing.T) {
@@ -284,40 +222,6 @@ func TestNormalizeGroups_PreservesName(t *testing.T) {
 	}
 	if result[0].Name != "My Project" {
 		t.Errorf("expected Name=%q, got %q", "My Project", result[0].Name)
-	}
-}
-
-// TestUpsertGroup_PreservesExistingName verifies that promoting a group to the
-// front retains its user-assigned name.
-func TestUpsertGroup_PreservesExistingName(t *testing.T) {
-	configDir := t.TempDir()
-	wsA := t.TempDir()
-	wsB := t.TempDir()
-
-	if err := SaveGroups(configDir, []Workspace{
-		{Name: "First", Folders: []string{wsA}},
-		{Name: "Second", Folders: []string{wsB}},
-	}); err != nil {
-		t.Fatalf("SaveGroups: %v", err)
-	}
-
-	// Promote wsB to front — its name "Second" should be preserved.
-	if err := UpsertGroup(configDir, []string{wsB}); err != nil {
-		t.Fatalf("UpsertGroup: %v", err)
-	}
-
-	groups, err := LoadGroups(configDir)
-	if err != nil {
-		t.Fatalf("LoadGroups: %v", err)
-	}
-	if len(groups) != 2 {
-		t.Fatalf("expected 2 groups, got %d", len(groups))
-	}
-	if groups[0].Name != "Second" {
-		t.Errorf("promoted group: expected Name=%q, got %q", "Second", groups[0].Name)
-	}
-	if groups[1].Name != "First" {
-		t.Errorf("remaining group: expected Name=%q, got %q", "First", groups[1].Name)
 	}
 }
 
@@ -398,30 +302,6 @@ func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
 	}
 }
 
-// TestUpsertGroup_EmptyWorkspaces_NoOp verifies that upserting an empty
-// workspace list does not modify the existing groups.
-func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {
-	configDir := t.TempDir()
-	wsA := t.TempDir()
-
-	if err := SaveGroups(configDir, []Workspace{{Folders: []string{wsA}}}); err != nil {
-		t.Fatalf("SaveGroups: %v", err)
-	}
-
-	// UpsertGroup with empty slice should be a no-op.
-	if err := UpsertGroup(configDir, []string{}); err != nil {
-		t.Fatalf("UpsertGroup empty: %v", err)
-	}
-
-	groups, err := LoadGroups(configDir)
-	if err != nil {
-		t.Fatalf("LoadGroups: %v", err)
-	}
-	if len(groups) != 1 {
-		t.Fatalf("expected 1 group after no-op upsert, got %d", len(groups))
-	}
-}
-
 // TestLoadGroups_ReadError verifies that a non-ErrNotExist read error is returned.
 func TestLoadGroups_ReadError(t *testing.T) {
 	configDir := t.TempDir()
@@ -460,19 +340,6 @@ func TestSaveGroups_MkdirAllError(t *testing.T) {
 	err := SaveGroups(configDir, []Workspace{{Folders: []string{"/a"}}})
 	if err == nil {
 		t.Fatal("expected error when parent dir cannot be created")
-	}
-}
-
-// TestUpsertGroup_LoadError verifies that UpsertGroup propagates LoadGroups errors.
-func TestUpsertGroup_LoadError(t *testing.T) {
-	configDir := t.TempDir()
-	// Place invalid JSON so LoadGroups fails.
-	if err := os.WriteFile(workspacesFilePath(configDir), []byte("bad"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	err := UpsertGroup(configDir, []string{t.TempDir()})
-	if err == nil {
-		t.Fatal("expected error when LoadGroups fails")
 	}
 }
 

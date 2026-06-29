@@ -7,10 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // workspaceBrowseEntry describes a single directory entry returned by
@@ -135,39 +133,4 @@ func (h *Handler) RenameWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpjson.Write(w, http.StatusOK, map[string]string{"path": target})
-}
-
-// UpdateWorkspaces switches the active workspace set.
-func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
-	req, ok := httpjson.DecodeBody[struct {
-		Workspaces []string `json:"workspaces"`
-	}](w, r)
-	if !ok {
-		return
-	}
-
-	snap, err := h.workspace.Switch(req.Workspaces)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	// Claim the group for the current signed-in principal if it was
-	// previously unowned. Idempotent; no-op in local mode or when the
-	// group already has an owner. This is what enables the "switch to
-	// org X → see org X's workspace groups only" UX downstream.
-	if p := principalFromRequest(r); p != nil {
-		_ = workspace.ClaimGroup(h.configDir, req.Workspaces, &workspace.Principal{Sub: p.Sub, OrgID: p.OrgID})
-	}
-	// h.store and h.workspaces are updated asynchronously by the workspace
-	// subscription goroutine started in NewHandler; no direct assignment here.
-	if snap.Store != nil {
-		h.runner.PruneUnknownWorktrees()
-	}
-	var cfg *envconfig.Config
-	if h.envFile != "" {
-		if parsed, err := envconfig.Parse(h.envFile); err == nil {
-			cfg = &parsed
-		}
-	}
-	httpjson.Write(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
 }
