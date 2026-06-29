@@ -41,10 +41,13 @@ const emit = defineEmits<{
   (e: 'clone', agent: Agent): void;
 }>();
 
-// The new-agent draft is exposed via v-model so the parent rail can render
-// its live title/slug pill as the user types. All seeding (including the
-// async clone fill) happens inside this component.
-const draft = defineModel<Draft | null>('draft', { default: null });
+// The new-agent / clone draft. Local component state (not a v-model): the
+// embedding page mounts this editor as a modal and reads results via the
+// `saved`/`deleted` events, so a plain ref is what drives the form. A
+// defineModel without a parent binding does not deep-react to nested writes
+// (draft.harness = ...), which silently froze the harness segmented control.
+// All seeding (including the async clone fill) happens inside this component.
+const draft = ref<Draft | null>(null);
 
 const store = useTaskStore();
 const dialog = useDialogStore();
