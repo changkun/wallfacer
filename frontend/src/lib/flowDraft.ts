@@ -95,6 +95,27 @@ export function buildDraftFromFlow(flow: Flow, opts: { clone: boolean }): Editab
   };
 }
 
+// newFleetDraft returns a blank editable fleet: no steps, a default name/slug,
+// and isClone=true so the first save POSTs a new user flow (there is no source
+// flow to update in place). A fresh fleet runs as a fixed sequence -- the
+// production path -- until the user adds agents and optionally switches
+// coordination. Saving is gated on at least one agent (AgentGraphPage), so the
+// empty default cannot be persisted as-is.
+export function newFleetDraft(): EditableFlow {
+  return {
+    slug: 'new-fleet',
+    name: 'New fleet',
+    description: '',
+    sourceSlug: null,
+    isClone: true,
+    steps: [],
+    agentic: false,
+    dynamic: false,
+    topology: 'orchestrator-worker',
+    max_handoff_depth: 0,
+  };
+}
+
 // appendStep adds a sequential step for an agent and returns the new step. A
 // flow may not reference the same agent twice (the backend rejects duplicates,
 // since agent_slug is the wiring key), so a slug already present is a no-op and

@@ -317,4 +317,33 @@ describe('AgentGraphPage (fleet)', () => {
     app.unmount();
     host.remove();
   });
+
+  it('starts a brand-new empty fleet from the New fleet action', async () => {
+    agents = [{ slug: 'impl', title: 'Implementation', builtin: true }];
+    flows = []; // no fleets exist yet
+
+    const { app, host } = await mount();
+
+    // With no fleets, the detail prompts to start one.
+    expect((host.textContent ?? '')).toContain('start a New fleet');
+
+    const newBtn = Array.from(host.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === '+ New fleet',
+    ) as HTMLButtonElement;
+    expect(newBtn).toBeTruthy();
+    newBtn.click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    // The editor opens on an empty draft: edit toolbar present, no agent nodes.
+    expect(host.querySelector('.ag-edit')).toBeTruthy();
+    expect(host.querySelectorAll('.agc-node--agent').length).toBe(0);
+
+    // Saving an empty fleet is rejected until an agent is added.
+    (host.querySelector('.ag-edit__btn--save') as HTMLButtonElement).click();
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+    expect((host.textContent ?? '')).toContain('Add at least one agent');
+
+    app.unmount();
+    host.remove();
+  });
 });
