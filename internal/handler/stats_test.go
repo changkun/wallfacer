@@ -600,7 +600,7 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 
 func TestAggregateAgentSessionStats_EmptyDir(t *testing.T) {
 	configDir := t.TempDir()
-	got := aggregateAgentSessionStats(configDir, nil, time.Time{})
+	got := aggregateAgentSessionStats(configDir, "", nil, time.Time{})
 	if got == nil {
 		t.Fatal("got nil, want non-nil empty map")
 	}
@@ -632,7 +632,7 @@ func TestAggregateAgentSessionStats_Aggregation(t *testing.T) {
 		t.Fatalf("append B: %v", err)
 	}
 
-	got := aggregateAgentSessionStats(configDir, wsA, time.Time{})
+	got := aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(wsA), wsA, time.Time{})
 
 	if len(got) != 2 {
 		t.Fatalf("want 2 groups, got %d", len(got))
@@ -686,7 +686,7 @@ func TestAggregateAgentSessionStats_RespectsSince(t *testing.T) {
 	}
 
 	since := base.Add(-30 * time.Minute)
-	got := aggregateAgentSessionStats(configDir, ws, since)
+	got := aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(ws), ws, since)
 
 	stat, ok := got[key]
 	if !ok {
@@ -720,7 +720,7 @@ func TestAggregateAgentSessionStats_TimelineOrdered(t *testing.T) {
 		}
 	}
 
-	got := aggregateAgentSessionStats(configDir, ws, time.Time{})
+	got := aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(ws), ws, time.Time{})
 	tl := got[key].Timeline
 	if len(tl) != 3 {
 		t.Fatalf("Timeline length = %d, want 3", len(tl))
@@ -759,7 +759,7 @@ func TestGetStats_ExecutionUnchangedByAgentSession(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed agent-session: %v", err)
 	}
-	withAgentSession.AgentSessions = aggregateAgentSessionStats(configDir, ws, time.Time{})
+	withAgentSession.AgentSessions = aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(ws), ws, time.Time{})
 
 	// Zero out the AgentSessions field on both sides, then compare the rest
 	// via JSON round-trip to catch any silent drift in execution buckets.

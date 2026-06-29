@@ -19,10 +19,11 @@ import (
 // Snapshot holds the immutable state of a workspace configuration at a point in time.
 // Callers receive copies (via cloneSnapshot) so they cannot mutate manager internals.
 type Snapshot struct {
-	Workspaces    []string     // sorted, deduplicated absolute paths
+	WorkspaceID   string       // stable id of the active workspace (empty for ad-hoc/legacy path switches pre-migration)
+	Workspaces    []string     // sorted, deduplicated absolute paths (the active workspace's folders)
 	Store         *store.Store // scoped task store for this workspace set (may be shared across snapshots)
 	ScopedDataDir string       // per-workspace-key data directory under the global data dir
-	Key           string       // deterministic key derived from sorted workspace paths (via prompts.WorkspaceDataKey)
+	Key           string       // the active workspace's stable DataKey; addresses ScopedDataDir and agent-session storage
 	Generation    uint64       // monotonically increasing counter; incremented on each successful Switch
 }
 
@@ -225,17 +226,44 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		return m.Snapshot(), nil
 	}
 
+	// Resolve (or transitionally create) the workspace record backing these
+	// folders, assigning a stable id and DataKey if missing. This is what binds
+	// the active snapshot to a stable storage handle instead of a path hash.
+	ws, err := m.resolveWorkspaceForPaths(validated)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("resolve workspace: %w", err)
+	}
+	return m.activate(ws)
+}
+
+// activate installs `ws` as the current workspace: it opens or reuses the store
+// keyed by ws.DataKey (NOT by the folder paths), persists the active folder set
+// to the env file, performs the atomic snapshot swap, and publishes. ws.Folders
+// must already be validated/normalized and ws.DataKey must be non-empty.
+//
+// Because the store is keyed by DataKey, changing a workspace's folders (via
+// UpdateFolders) keeps pointing at the same store; only Switch/SwitchByID, which
+// move between distinct workspaces, route through here.
+func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 	// Determine the factory to use (supports injection in tests).
 	newStoreFn := m.newStore
 	if newStoreFn == nil {
 		newStoreFn = store.NewFileStore
 	}
 
+	key := ws.DataKey
+	if key == "" {
+		// Defensive: resolve/SwitchByID guarantee a key, but never address
+		// data/<""> if a malformed record slips through.
+		key = prompts.WorkspaceDataKey(ws.Folders)
+	}
+	validated := ws.Folders
+
 	// Build the candidate snapshot. All external side effects happen here,
 	// before the atomic swap, so the manager is never left in a partial state.
-	key := prompts.WorkspaceDataKey(validated)
 	swap := pendingSwap{
 		next: Snapshot{
+			WorkspaceID:   ws.ID,
 			Key:           key,
 			ScopedDataDir: filepath.Join(m.dataDir, key),
 		},
@@ -271,10 +299,6 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		}
 	}
 
-	if err := UpsertGroup(m.configDir, validated); err != nil {
-		swap.cleanup()
-		return Snapshot{}, fmt.Errorf("persist workspace group: %w", err)
-	}
 	if m.envFile != "" {
 		encoded := envconfig.FormatWorkspaces(validated)
 		if err := envconfig.Update(m.envFile, envconfig.Updates{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"path/filepath"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -375,6 +376,24 @@ func (h *Handler) currentWorkspaces() []string {
 // workspace-relative paths at call time.
 func (h *Handler) CurrentWorkspaces() []string {
 	return h.currentWorkspaces()
+}
+
+// activeDataKey returns the active workspace's stable storage key (DataKey),
+// which addresses both data/<key>/ and the agent-session storage directory.
+// Unlike recomputing the key from the current folder paths, this stays stable
+// when a workspace's folders are edited, so transcripts and usage stay attached.
+// Returns "" when no workspace is active.
+func (h *Handler) activeDataKey() string {
+	if h.workspace == nil {
+		h.snapshotMu.RLock()
+		dir := h.scopedDataDir
+		h.snapshotMu.RUnlock()
+		if dir == "" {
+			return ""
+		}
+		return filepath.Base(dir)
+	}
+	return h.workspace.Snapshot().Key
 }
 
 // applySnapshot updates all handler fields that mirror the active workspace
