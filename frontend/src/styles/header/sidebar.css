@@ -172,6 +172,7 @@
   line-height: 1;
 }
 .sb-ws-popover__row-btn:hover { background: var(--bg-hover); color: var(--ink); }
+.sb-ws-popover__row-btn--edit { font-size: 11px; font-weight: 600; }
 .sb-ws-popover[hidden] {
   display: none;
 }

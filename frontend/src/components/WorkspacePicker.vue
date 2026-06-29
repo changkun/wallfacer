@@ -3,28 +3,20 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useWorkspacesStore } from '../stores/workspaces';
+import { useUiStore } from '../stores/ui';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
+import { useFolderBrowser, type BrowseEntry } from '../composables/useFolderBrowser';
 import { workspaceLabel } from '../lib/workspaceLabel';
 import type { Workspace } from '../api/types';
-
-interface BrowseEntry {
-  name: string;
-  path: string;
-  is_git_repo: boolean;
-}
-
-interface BrowseResponse {
-  path: string;
-  entries: BrowseEntry[];
-}
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const store = useTaskStore();
 const wsStore = useWorkspacesStore();
+const ui = useUiStore();
 const dialog = useDialogStore();
 const toast = useToastStore();
 
@@ -68,13 +60,10 @@ const editingId = ref<string | null>(null);
 const wsName = ref('');
 
 const folders = ref<string[]>([]);
-const browsePath = ref('/');
-const pathInput = ref('/');
-const browseEntries = ref<BrowseEntry[]>([]);
-const browseLoading = ref(false);
-const browseError = ref('');
-const filter = ref('');
-const showHidden = ref(false);
+const {
+  browsePath, pathInput, browseEntries, browseLoading, browseError, filter, showHidden,
+  browse, navigateUp, navigateInto, goToPath, onPathKeydown, shortenPath, breadcrumbSegments,
+} = useFolderBrowser();
 const saving = ref(false);
 const applyStatus = ref('');
 const activatingId = ref<string | null>(null);
@@ -186,45 +175,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey);
 });
 
-async function browse(path: string) {
-  browseLoading.value = true;
-  browseError.value = '';
-  try {
-    const res = await api<BrowseResponse>(
-      'GET',
-      `/api/workspaces/browse?path=${encodeURIComponent(path)}`,
-    );
-    browsePath.value = res.path;
-    pathInput.value = res.path;
-    browseEntries.value = res.entries;
-  } catch (e: unknown) {
-    browseError.value = e instanceof Error ? e.message : 'Failed to browse directory';
-    browseEntries.value = [];
-  } finally {
-    browseLoading.value = false;
-  }
-}
-
-function navigateUp() {
-  const parent = browsePath.value.split('/').slice(0, -1).join('/') || '/';
-  browse(parent);
-}
-
-function navigateInto(entry: BrowseEntry) {
-  browse(entry.path);
-}
-
-function goToPath() {
-  if (pathInput.value.trim()) browse(pathInput.value.trim());
-}
-
-function onPathKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    goToPath();
-  }
-}
-
 function addFolder(path: string) {
   if (!folders.value.includes(path)) {
     folders.value.push(path);
@@ -307,24 +257,6 @@ function filteredEntries() {
   const added = (e: BrowseEntry) => folders.value.includes(e.path);
   return [...entries].sort((a, b) => Number(added(a)) - Number(added(b)));
 }
-
-// Collapse a home directory prefix to '~' for display (full path stays in title).
-function shortenPath(path: string) {
-  const m = path.match(/^(\/(?:Users|home)\/[^/]+|[A-Z]:\\Users\\[^\\]+)/);
-  if (m) return '~' + path.substring(m[1].length);
-  return path;
-}
-
-function breadcrumbSegments() {
-  const parts = browsePath.value.split('/').filter(Boolean);
-  const segs: { label: string; path: string }[] = [{ label: '/', path: '/' }];
-  let acc = '';
-  for (const p of parts) {
-    acc += `/${p}`;
-    segs.push({ label: p, path: acc });
-  }
-  return segs;
-}
 </script>
 
 <template>
@@ -380,8 +312,8 @@ function breadcrumbSegments() {
             <button
               type="button"
               class="btn-ghost ws-list__edit"
-              title="Edit name and folders"
-              @click="enterEdit(ws)"
+              title="Edit name, folders, and limits"
+              @click="close(); ui.openWorkspaceEdit(ws.id)"
             >Edit</button>
           </div>
         </div>

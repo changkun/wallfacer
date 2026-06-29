@@ -80,22 +80,13 @@ async function switchToGroup(g: WorkspaceGroup) {
 function isSwitching(g: WorkspaceGroup): boolean {
   return switchingKey.value === (g.key ?? JSON.stringify(g.workspaces));
 }
-async function renameGroup(g: WorkspaceGroup) {
-  if (!g.id) return; // no registry id: nothing to rename through
-  const name = await dialog.prompt({
-    title: 'Rename workspace',
-    message: 'New name:',
-    initial: g.name ?? '',
-    placeholder: 'My workspace',
-  });
-  if (name == null) return;
-  try {
-    await wsStore.update(g.id, { name: name.trim() });
-    await store.fetchConfig();
-    toast.push('Renamed workspace', { kind: 'success' });
-  } catch (e) {
-    toast.push(`Rename failed: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
-  }
+// Open the full workspace settings popup (name, folders, limits, delete) for a
+// group's registry workspace. Groups predating the registry have no id; skip
+// rather than open an empty editor.
+function editGroup(g: WorkspaceGroup) {
+  if (!g.id) return;
+  wsPopoverOpen.value = false;
+  ui.openWorkspaceEdit(g.id);
 }
 async function deleteGroup(g: WorkspaceGroup) {
   if (!g.id) return; // no registry id: nothing to delete through
@@ -317,7 +308,7 @@ onUnmounted(removeWsOutsideHandler);
                 <span v-if="groupBadge(g).waiting > 0" class="badge badge-waiting" :title="`${groupBadge(g).waiting} waiting`">{{ groupBadge(g).waiting }}</span>
               </span>
               <span class="sb-ws-popover__row-actions">
-                <button type="button" class="sb-ws-popover__row-btn" :title="`Rename ${g.name || 'workspace'}`" @click.stop="renameGroup(g)">✎</button>
+                <button type="button" class="sb-ws-popover__row-btn sb-ws-popover__row-btn--edit" :title="`Edit ${g.name || 'workspace'}`" @click.stop="editGroup(g)">Edit</button>
                 <button type="button" class="sb-ws-popover__row-btn" :title="`Delete ${g.name || 'workspace'}`" @click.stop="deleteGroup(g)">×</button>
               </span>
             </button>
