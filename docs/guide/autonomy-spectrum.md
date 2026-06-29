@@ -94,7 +94,7 @@ graph TD
     S3["Manual approve & push"]
   end
   subgraph Full["🚀 Full Auto"]
-    F1["Autopilot promotes backlog"]
+    F1["Autoimplement promotes backlog"]
     F2["Auto-submit on pass"]
     F3["Auto-push to remote"]
   end
@@ -105,9 +105,9 @@ graph TD
 
 **Semi-automatic** -- Agents execute and test automatically, but you approve before changes are merged. Auto-test catches regressions; auto-retry handles transient failures. You still review and accept.
 
-**Full automatic** -- Autopilot promotes backlog tasks as capacity opens. Auto-submit merges passing work without approval. Auto-push sends changes to the remote. You monitor rather than manage.
+**Full automatic** -- Autoimplement promotes backlog tasks as capacity opens. Auto-submit merges passing work without approval. Auto-push sends changes to the remote. You monitor rather than manage.
 
-These modes are not discrete settings but composable toggles. Enable auto-test without auto-submit. Turn on autopilot but keep auto-push off. The combination you choose defines where you sit on the spectrum for any given session.
+These modes are not discrete settings but composable toggles. Enable auto-test without auto-submit. Turn on autoimplement but keep auto-push off. The combination you choose defines where you sit on the spectrum for any given session.
 
 ---
 

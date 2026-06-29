@@ -5,7 +5,7 @@ depends_on: []
 affects:
   - internal/executor/host.go
   - internal/executor/spec.go
-  - internal/handler/tasks_autopilot.go
+  - internal/handler/tasks_autoimplement.go
   - internal/handler/config.go
   - internal/constants/constants.go
   - internal/envconfig/envconfig.go
@@ -41,7 +41,7 @@ slowdown persists regardless of which UI tab is open, so it is not the frontend)
    tasks.
 
 3. **Verification depth is high by default and hidden.** Agon defaults to
-   `agonForkCount = 2`, `agonMaxRounds = 4` (`tasks_autopilot.go:1199-1203`); a
+   `agonForkCount = 2`, `agonMaxRounds = 4` (`tasks_autoimplement.go:1199-1203`); a
    2-fork run also pulls in a second agent family (the Codex critic, fork 2 of the
    `{Claude, Codex}` rotation). These are env-only (`WALLFACER_AGON_*`) with no
    settings UI, so the expensive default is invisible and effectively unchangeable
@@ -115,7 +115,7 @@ change); used by the linux path and the darwin fallback. (The darwin BG policy i
 a boolean, not a level — the nice value tunes only the non-darwin path.) Read live
 per launch (cheap); no restart required.
 
-### B. Global agent budget (`internal/executor` + autopilot gates)
+### B. Global agent budget (`internal/executor` + autoimplement gates)
 
 The executor is the only chokepoint every agent CLI passes through (`b.procs`
 already tracks live processes), and crucially there is **no nesting** — the
@@ -127,7 +127,7 @@ self-deadlock.
   `HostBackend`, capacity = the global budget. `Launch` acquires (honoring
   `ctx`); the handle's wait/cleanup releases exactly once.
 - Keep the per-kind caps (`maxConcurrentTasks` etc.) as cheap *admission* checks
-  so the autopilot does not even begin a unit of work whose silo is full; the
+  so the autoimplement does not even begin a unit of work whose silo is full; the
   executor semaphore is the *hard* ceiling on concurrent processes.
 - Config: `WALLFACER_MAX_AGENTS`, default a conservative small value (e.g.
   `max(2, NumCPU/2)` — finalize in OQ-1). `0` = unlimited (matches the group
@@ -135,12 +135,12 @@ self-deadlock.
 
 Lock-ordering note: self-nesting is safe (no held slot launches another agent —
 agon critic one-shots are launched by the agon run goroutine, which holds no
-executor slot). The real hazard is **stalling the autopilot**: a blocking
+executor slot). The real hazard is **stalling the autoimplement**: a blocking
 semaphore acquire must never happen under `promoteMu`, a store lock, or inside a
 synchronous watcher `Action`. Phase 4 acquires *outside* any lock and launches in
 a goroutine, so a full budget delays a launch without serializing the gates.
 
-### C. Minimal agon default (`tasks_autopilot.go`, `constants.go`)
+### C. Minimal agon default (`tasks_autoimplement.go`, `constants.go`)
 
 - `agonForkCount` default `2 → 1`. One fork = one actor/critic pair, Claude-only
   (fork 2, the Codex critic, is opt-in). This halves run count and drops the

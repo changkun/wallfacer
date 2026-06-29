@@ -371,12 +371,12 @@ func TestAgonSupersedesTest_Gate(t *testing.T) {
 }
 
 // TestRunAgon_BlocksOnUnresolved proves an unresolved verdict is a hard barrier:
-// the verdict is persisted, the task stays parked in waiting, autopilot does not
+// the verdict is persisted, the task stays parked in waiting, autoimplement does not
 // auto-resume it, and a clean verdict clears the barrier. This is the
 // block-on-first-failure behavior that replaced the old auto-feedback loop.
 func TestRunAgon_BlocksOnUnresolved(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref"}}
 	h.verifier = v
 
@@ -399,7 +399,7 @@ func TestRunAgon_BlocksOnUnresolved(t *testing.T) {
 		t.Errorf("status = %s, want waiting (task halted for review)", got.Status)
 	}
 
-	// Autopilot must not auto-resume a task halted by unresolved attacks: it stays
+	// Autoimplement must not auto-resume a task halted by unresolved attacks: it stays
 	// waiting until a human confirms or resumes it with steering.
 	h.tryAutoPromote(ctx)
 	got, _ = s.GetTask(ctx, task.ID)

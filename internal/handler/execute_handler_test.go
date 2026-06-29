@@ -472,7 +472,7 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)
 	t.Cleanup(func() { waitForBackground(2000) })
@@ -514,7 +514,7 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "2" {
 		t.Fatalf("expected fallback commit to land on repo, got %s commits", got)
 	}
-	if !h.AutopilotEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
+	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
 		t.Fatal("expected fallback commit path to leave automation toggles unchanged")
 	}
 }

@@ -8,7 +8,7 @@ Tasks progress through a well-defined set of states. Every transition is recorde
 stateDiagram-v2
     [*] --> backlog
 
-    backlog --> in_progress : drag / autopilot
+    backlog --> in_progress : drag / autoimplement
 
     in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
     in_progress --> waiting : end_turn / empty stop_reason
@@ -191,7 +191,7 @@ After reviewing the verdict, the user can:
 - Provide feedback to fix issues, then re-test
 - Cancel the task
 
-## Autopilot
+## Autoimplement
 
 See [Automation](automation.md).
 
@@ -333,7 +333,7 @@ Conservative semantics: a malformed UUID or a deleted dependency is treated as u
 
 ### Dependency in Auto-Promoter
 
-The auto-promoter (`tryAutoPromote` in `internal/handler/tasks_autopilot.go`) checks dependencies as part of candidate selection:
+The auto-promoter (`tryAutoPromote` in `internal/handler/tasks_autoimplement.go`) checks dependencies as part of candidate selection:
 
 1. Lists all backlog tasks sorted by position.
 2. For each candidate, calls `AreDependenciesSatisfied`, skips if any dependency is not `done`.
@@ -420,6 +420,6 @@ See [Data & Storage](data-and-storage.md).
 - [Internals Index](internals.md), Overview and reading order for all internals docs
 - [Architecture](architecture.md), System design, component overview, and design decisions
 - [Data & Storage](data-and-storage.md), Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
-- [Automation](automation.md), Autopilot, oversight generation, scheduled routines
+- [Automation](automation.md), Autoimplement, oversight generation, scheduled routines
 - [Git Worktrees](git-worktrees.md), Worktree lifecycle, branch naming, cleanup
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

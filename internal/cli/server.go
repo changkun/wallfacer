@@ -276,12 +276,12 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		// completed task runs the drift tester before the spec lands.
 		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces, handler.NewRunnerDriftTester(r), nil)
 	}
-	// Safety valve: disable autopilot if any task hits the max_tokens limit,
+	// Safety valve: disable autoimplement if any task hits the max_tokens limit,
 	// which indicates context window exhaustion — continuing blindly would
 	// waste budget without progress.
 	r.SetStopReasonHandler(func(_ uuid.UUID, stopReason string) {
 		if stopReason == "max_tokens" {
-			h.SetAutopilot(false)
+			h.SetAutoimplement(false)
 		}
 	})
 
@@ -406,8 +406,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		},
 	)
 	reg.Counter(
-		"wallfacer_autopilot_actions_total",
-		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
+		"wallfacer_autoimplement_actions_total",
+		"Total number of autonomous actions taken by autoimplement watchers, by watcher and outcome.",
 	)
 
 	// Bind the listening socket. If the requested port is taken (e.g. another

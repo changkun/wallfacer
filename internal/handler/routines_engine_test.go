@@ -274,7 +274,7 @@ func TestReconcileRoutines_UnregistersCancelledRoutines(t *testing.T) {
 // for the recurring "cancelled routine keeps firing" class of bug. It
 // exercises the path where a routine's status transitions to cancelled
 // via any route that does NOT call unregisterRoutine (runner recovery
-// paths, autopilot bulk transitions, a future handler that forgets, or
+// paths, autoimplement bulk transitions, a future handler that forgets, or
 // the 250 ms reconcile settle window). A timer that later fires must
 // both refuse to spawn AND drop the engine entry so no further timers
 // are armed. Otherwise the entry keeps re-arming forever and the UI
@@ -304,7 +304,7 @@ func TestFireRoutine_StoppedRoutineSelfUnregisters(t *testing.T) {
 
 	// Flip status to cancelled WITHOUT going through any handler. This
 	// simulates every code path that doesn't know about the engine
-	// (runner recovery, autopilot, future handlers) and the race window
+	// (runner recovery, autoimplement, future handlers) and the race window
 	// before reconcile notices.
 	if err := s.ForceUpdateTaskStatus(ctx, routineTask.ID, store.TaskStatusCancelled); err != nil {
 		t.Fatalf("force cancel: %v", err)

@@ -136,6 +136,6 @@ Windows users can also run Wallfacer inside WSL2 with the same experience as nat
 
 ## Next Steps
 
-- [Usage Guide](usage.md): how to create tasks, handle feedback, use autopilot, and manage results
+- [Usage Guide](usage.md): how to create tasks, handle feedback, use autoimplement, and manage results
 - [Configuration](configuration.md): env vars, sandbox routing, and advanced settings
 - [Architecture](../internals/architecture.md): system design and internals for contributors

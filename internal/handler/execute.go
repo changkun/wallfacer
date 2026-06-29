@@ -164,7 +164,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 
 	// Submitting feedback to a waiting task is always allowed even when max
 	// concurrent tasks is reached. The task was previously in_progress and
-	// paused for user input — blocking it would leave it stuck when autopilot
+	// paused for user input — blocking it would leave it stuck when autoimplement
 	// fills all slots.
 	if err := h.resumeWaitingTaskWithFeedbackLocked(r.Context(), task, req.Message, store.TriggerFeedback, ""); err != nil {
 		promoteMu.Unlock()
@@ -580,9 +580,9 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	prevStatus := task.Status
 
 	// Resuming a failed task is always allowed even when max concurrent tasks
-	// is reached. When autopilot is on, all slots are filled by auto-promotion
+	// is reached. When autoimplement is on, all slots are filled by auto-promotion
 	// and the user would otherwise be unable to resume any failed task. The
-	// autopilot will naturally refrain from promoting another backlog task while
+	// autoimplement will naturally refrain from promoting another backlog task while
 	// this resumed task is running, so the over-capacity is transient.
 	promoteMu.Lock()
 	if err := s.ResumeTask(r.Context(), id, req.Timeout); err != nil {
@@ -878,7 +878,7 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	// valid operational flow not in the automated state machine.
 	// Syncing a waiting/failed task must not be blocked by the regular
 	// in-progress capacity limit. Like resume/feedback, this is follow-up work
-	// on an existing task, and rejecting it when autopilot has filled all slots
+	// on an existing task, and rejecting it when autoimplement has filled all slots
 	// leaves the user unable to recover or update the task.
 	promoteMu.Lock()
 	if err := s.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {

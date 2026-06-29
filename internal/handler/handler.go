@@ -141,7 +141,7 @@ type Handler struct {
 	// out). Nil until SetCoordinationLogout. Guarded by snapshotMu.
 	coordLogout func()
 
-	autopilot   atomic.Bool
+	autoimplement   atomic.Bool
 	autotest    atomic.Bool
 	autosubmit  atomic.Bool
 	autosync    atomic.Bool
@@ -396,7 +396,7 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 
 	// Switching groups must also swap the automation toggle state so a
 	// group the user expected to operate manually does not inherit an
-	// autopilot-on flag from the previous group. Autopush is a global
+	// autoimplement-on flag from the previous group. Autopush is a global
 	// env-file flag and is not touched here.
 	h.applyGroupToggles(snap.Workspaces)
 }
@@ -427,13 +427,13 @@ func (h *Handler) applyGroupToggles(ws []string) {
 		return *v
 	}
 	if g == nil {
-		h.autopilot.Store(false)
+		h.autoimplement.Store(false)
 		h.autotest.Store(false)
 		h.autosubmit.Store(false)
 		h.autosync.Store(false)
 		return
 	}
-	h.autopilot.Store(pick(g.Autopilot))
+	h.autoimplement.Store(pick(g.Autoimplement))
 	h.autotest.Store(pick(g.Autotest))
 	h.autosubmit.Store(pick(g.Autosubmit))
 	h.autosync.Store(pick(g.Autosync))
@@ -456,14 +456,14 @@ func (h *Handler) persistCurrentGroupToggles() {
 	}
 	key := workspace.GroupKey(ws)
 	b := func(v bool) *bool { x := v; return &x }
-	autopilot := b(h.autopilot.Load())
+	autoimplement := b(h.autoimplement.Load())
 	autotest := b(h.autotest.Load())
 	autosubmit := b(h.autosubmit.Load())
 	autosync := b(h.autosync.Load())
 	found := false
 	for i := range groups {
 		if workspace.GroupKey(groups[i].Workspaces) == key {
-			groups[i].Autopilot = autopilot
+			groups[i].Autoimplement = autoimplement
 			groups[i].Autotest = autotest
 			groups[i].Autosubmit = autosubmit
 			groups[i].Autosync = autosync
@@ -474,7 +474,7 @@ func (h *Handler) persistCurrentGroupToggles() {
 	if !found {
 		groups = append([]workspace.Group{{
 			Workspaces: ws,
-			Autopilot:  autopilot,
+			Autoimplement:  autoimplement,
 			Autotest:   autotest,
 			Autosubmit: autosubmit,
 			Autosync:   autosync,
@@ -650,24 +650,24 @@ func (h *Handler) RequirePrincipalMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// incAutopilotAction increments the autopilot action counter for the given
+// incAutoimplementAction increments the autoimplement action counter for the given
 // watcher and outcome. It is a no-op when no registry is configured.
-func (h *Handler) incAutopilotAction(watcher, outcome string) {
+func (h *Handler) incAutoimplementAction(watcher, outcome string) {
 	if h.reg == nil {
 		return
 	}
-	h.reg.Counter("wallfacer_autopilot_actions_total", "").Inc(map[string]string{
+	h.reg.Counter("wallfacer_autoimplement_actions_total", "").Inc(map[string]string{
 		"watcher": watcher,
 		"outcome": outcome,
 	})
 }
 
-// incAutopilotPhase2Miss increments the phase-2 miss counter for the named watcher.
-func (h *Handler) incAutopilotPhase2Miss(watcher string) {
+// incAutoimplementPhase2Miss increments the phase-2 miss counter for the named watcher.
+func (h *Handler) incAutoimplementPhase2Miss(watcher string) {
 	if h.reg == nil {
 		return
 	}
-	h.reg.Counter("wallfacer_autopilot_phase2_miss_total", "").Inc(map[string]string{
+	h.reg.Counter("wallfacer_autoimplement_phase2_miss_total", "").Inc(map[string]string{
 		"watcher": watcher,
 	})
 }
@@ -702,11 +702,11 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	}
 }
 
-// AutopilotEnabled returns whether autopilot mode is active.
-func (h *Handler) AutopilotEnabled() bool { return h.autopilot.Load() }
+// AutoimplementEnabled returns whether autoimplement mode is active.
+func (h *Handler) AutoimplementEnabled() bool { return h.autoimplement.Load() }
 
-// SetAutopilot enables or disables autopilot mode.
-func (h *Handler) SetAutopilot(enabled bool) { h.autopilot.Store(enabled) }
+// SetAutoimplement enables or disables autoimplement mode.
+func (h *Handler) SetAutoimplement(enabled bool) { h.autoimplement.Store(enabled) }
 
 // AutotestEnabled returns whether auto-test mode is active.
 func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }

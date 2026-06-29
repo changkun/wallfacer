@@ -112,7 +112,7 @@ prompt (this commit). Final gate green: `go build ./...`, `go test ./...`
   from `flow/builtins.go`; drop the `idea-agent` case from `registry.go`;
   remove `TaskKindIdeaAgent`/`IsIdeaAgent`/`SandboxActivityIdeaAgent`
   (`store/models.go`), the `allowedRoutineSpawnKinds` entry (`routines.go`),
-  the autopilot `IsIdeaAgent` skip (`tasks_autopilot.go`), the `tasks.go`
+  the autoimplement `IsIdeaAgent` skip (`tasks_autoimplement.go`), the `tasks.go`
   brainstorm branch, the `IdeaAgent` agent (`agents/builtins.go` +
   `inspector.go`), and `envconfig` `IdeaAgentSandbox`. Fix every remaining test
   (flow, agents, routines, store, runner). This is the commit that closes the

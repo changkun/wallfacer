@@ -44,19 +44,19 @@ func TestCurrentWorkspaces_WorkspaceManagerNil_WithWorkspaces(t *testing.T) {
 	}
 }
 
-// --- incAutopilotPhase2Miss ---
+// --- incAutoimplementPhase2Miss ---
 
-// TestIncAutopilotPhase2Miss_NilRegistry verifies that incAutopilotPhase2Miss
+// TestIncAutoimplementPhase2Miss_NilRegistry verifies that incAutoimplementPhase2Miss
 // is a no-op (does not panic) when no metrics registry is configured.
-func TestIncAutopilotPhase2Miss_NilRegistry(t *testing.T) {
+func TestIncAutoimplementPhase2Miss_NilRegistry(t *testing.T) {
 	h := newTestHandler(t) // h.reg is nil
 	// Should not panic.
-	h.incAutopilotPhase2Miss("auto-promote")
+	h.incAutoimplementPhase2Miss("auto-promote")
 }
 
-// TestIncAutopilotPhase2Miss_WithRegistry verifies that incAutopilotPhase2Miss
+// TestIncAutoimplementPhase2Miss_WithRegistry verifies that incAutoimplementPhase2Miss
 // increments the counter when a metrics registry is configured.
-func TestIncAutopilotPhase2Miss_WithRegistry(t *testing.T) {
+func TestIncAutoimplementPhase2Miss_WithRegistry(t *testing.T) {
 	storeDir, err := os.MkdirTemp("", "wallfacer-handler-util-test-*")
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestIncAutopilotPhase2Miss_WithRegistry(t *testing.T) {
 
 	h := NewHandler(s, r, t.TempDir(), nil, reg)
 	// Should not panic and should increment the counter.
-	h.incAutopilotPhase2Miss("auto-promote")
+	h.incAutoimplementPhase2Miss("auto-promote")
 }
 
 // --- BrowseWorkspaces ---

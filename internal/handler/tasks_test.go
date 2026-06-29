@@ -1396,7 +1396,7 @@ func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
 	}
 	h.runner = &runner.MockRunner{}
 	h.cachedMaxParallel.Invalidate()
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 
 	ctx := context.Background()
 	// dep: already in_progress (simulating it was started earlier), so it is
@@ -1441,7 +1441,7 @@ func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
 // done is promoted normally.
 func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 
 	ctx := context.Background()
 	dep, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dep", Timeout: 15})
@@ -1466,7 +1466,7 @@ func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 // so testing tasks cannot starve regular backlog promotions.
 func TestTryAutoPromote_DoesNotCountTestRuns(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 	ctx := context.Background()
 
 	// Set regular max to 1.
@@ -2194,7 +2194,7 @@ func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 	}
 }
 
-func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing.T) {
+func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutoimplementEnabled(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
@@ -2225,7 +2225,7 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 	h := NewHandler(s, r, t.TempDir(), []string{repo}, nil)
 	// Only one task is promoted here and nothing else occupies a slot, so the
 	// default cap of 1 is enough — no parallelism override needed.
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed test follow-up", Timeout: 15})
@@ -2632,7 +2632,7 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)
 	t.Cleanup(func() { waitForBackground(2000) })
@@ -2671,7 +2671,7 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "2" {
 		t.Fatalf("expected fallback commit to land on repo, got %s commits", got)
 	}
-	if !h.AutopilotEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
+	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
 		t.Fatal("expected automation toggles to remain enabled after fallback commit message")
 	}
 }
@@ -2682,7 +2682,7 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 // event emitted by tryAutoPromote contains "trigger": "auto_promote".
 func TestTryAutoPromote_EventHasAutoPromoteTrigger(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task to promote", Timeout: 15})
@@ -2820,7 +2820,7 @@ func TestUpdateTask_RejectsUnknownFields(t *testing.T) {
 // goroutine would never arrive and the test would time out.
 func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	// Limit to 1 concurrent task so the second goroutine's Phase 2 is a no-op.
@@ -3134,7 +3134,7 @@ func TestBatchCreateTasks_EmptyBatch(t *testing.T) {
 // scheduled time has passed.
 func TestTryAutoPromote_SkipsFutureScheduledTask(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 
 	ctx := context.Background()
 
@@ -3160,7 +3160,7 @@ func TestTryAutoPromote_SkipsFutureScheduledTask(t *testing.T) {
 // with a ScheduledAt in the past IS promoted normally.
 func TestTryAutoPromote_PromotesPastScheduledTask(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 
 	ctx := context.Background()
 
@@ -3186,7 +3186,7 @@ func TestTryAutoPromote_PromotesPastScheduledTask(t *testing.T) {
 // the unscheduled one is promoted.
 func TestTryAutoPromote_SkipsFutureButPromotesUnscheduled(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilot.Store(true)
+	h.autoimplement.Store(true)
 
 	ctx := context.Background()
 
@@ -3735,7 +3735,7 @@ drain2:
 // tryAutoPromote cannot promote it before the schedule fires.
 func TestCreateTask_ScheduledTaskNotAutoPromotedBeforeScheduledAt(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
 	futureTime := time.Now().Add(24 * time.Hour)
 	body, _ := json.Marshal(map[string]any{
@@ -4469,7 +4469,7 @@ func TestCancelTask_RemovesOnlyOrphanedEntry(t *testing.T) {
 // both cancelled (removing them from C.DependsOn), the auto-promoter promotes C.
 func TestAutoPromote_PromotesAfterOrphanedDepCleared(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 15})

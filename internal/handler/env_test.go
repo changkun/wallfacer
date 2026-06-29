@@ -72,13 +72,13 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 }
 
 // TestUpdateEnvConfig_TriggersAutoPromote verifies that updating
-// max_parallel_tasks immediately triggers auto-promotion when autopilot is
+// max_parallel_tasks immediately triggers auto-promotion when autoimplement is
 // enabled and there are backlog tasks waiting.
 func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 
-	// Enable autopilot so tryAutoPromote will act.
-	h.autopilot.Store(true)
+	// Enable autoimplement so tryAutoPromote will act.
+	h.autoimplement.Store(true)
 
 	// Create a backlog task.
 	ctx := context.Background()
@@ -125,11 +125,11 @@ func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
 	}
 }
 
-// TestUpdateEnvConfig_NoAutoPromoteWhenAutopilotOff verifies that no
-// auto-promotion happens when autopilot is disabled.
-func TestUpdateEnvConfig_NoAutoPromoteWhenAutopilotOff(t *testing.T) {
+// TestUpdateEnvConfig_NoAutoPromoteWhenAutoimplementOff verifies that no
+// auto-promotion happens when autoimplement is disabled.
+func TestUpdateEnvConfig_NoAutoPromoteWhenAutoimplementOff(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	// autopilot is false by default.
+	// autoimplement is false by default.
 
 	ctx := context.Background()
 	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
@@ -154,7 +154,7 @@ func TestUpdateEnvConfig_NoAutoPromoteWhenAutopilotOff(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(tasks) > 0 && tasks[0].Status == "in_progress" {
-		t.Errorf("expected task to remain in backlog when autopilot is off, got in_progress")
+		t.Errorf("expected task to remain in backlog when autoimplement is off, got in_progress")
 	}
 }
 

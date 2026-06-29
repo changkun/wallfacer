@@ -112,7 +112,7 @@ Read more: [Agents & Flows](docs/guide/agents-and-flows.md).
 
 ### Task board: managed execution
 
-The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens. Each task runs as a host process in its own git worktree.
+The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autoimplement promote backlog items as capacity opens. Each task runs as a host process in its own git worktree.
 
 ### Plan mode: structured design
 
@@ -134,7 +134,7 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 
 - **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
 - **Spec.** Six-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
-- **Task.** Host-process execution, per-task git worktrees, autopilot, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
+- **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
 Five composable sub-agent roles (each pinned to any installed harness) arrange into flows (`implement`, plus user-authored clones) that can be inspected or rewritten from the sidebar.
@@ -176,7 +176,7 @@ Development is organized into three parallel tracks with shared foundations. See
 
 | Guide | Topics |
 |-------|--------|
-| [Automation](docs/guide/automation.md) | Autopilot, auto-test, auto-submit, auto-retry |
+| [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry |
 | [Oversight & Analytics](docs/guide/oversight-and-analytics.md) | Oversight summaries, costs, timeline, logs |
 | [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |
 | [Configuration](docs/guide/configuration.md) | Settings, env vars, harnesses, CLI, shortcuts |
@@ -191,7 +191,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
-| [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, routines |
+| [Automation](docs/internals/automation.md) | Background watchers, autoimplement, circuit breakers, routines |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 

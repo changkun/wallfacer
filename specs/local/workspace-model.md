@@ -61,7 +61,7 @@ The current vocabulary is inverted relative to the target. Today a single folder
 path is called a "workspace" and a *set* of folders is a `Group`
 (`internal/workspace/groups.go:16`). A `Group` already carries the ownership
 fields this redesign needs (`CreatedBy`, `OrgID`), per-group automation toggles
-(`Autopilot`, `Autotest`, `Autosubmit`, `Autosync`), and concurrency overrides
+(`Autoimplement`, `Autotest`, `Autosubmit`, `Autosync`), and concurrency overrides
 (`MaxParallel`, `MaxTestParallel`). Groups persist as a JSON array in
 `~/.wallfacer/workspace-groups.json` and are visibility-filtered by principal via
 `GroupsForPrincipal` (`groups.go:217`), which already implements the
@@ -150,7 +150,7 @@ type Workspace struct {
     // Per-workspace automation + concurrency (carried forward from Group).
     MaxParallel     *int  `json:"max_parallel,omitempty"`
     MaxTestParallel *int  `json:"max_test_parallel,omitempty"`
-    Autopilot       *bool `json:"autopilot,omitempty"`
+    Autoimplement       *bool `json:"autoimplement,omitempty"`
     Autotest        *bool `json:"autotest,omitempty"`
     Autosubmit      *bool `json:"autosubmit,omitempty"`
     Autosync        *bool `json:"autosync,omitempty"`

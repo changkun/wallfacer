@@ -253,7 +253,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"sandbox_usable":            allSandboxesUsable(),
 		"sandbox_reasons":           map[string]string{},
 		"activity_sandboxes":        map[string]string{},
-		"autopilot":                 h.AutopilotEnabled(),
+		"autoimplement":                 h.AutoimplementEnabled(),
 		"autotest":                  h.AutotestEnabled(),
 		"autosubmit":                h.AutosubmitEnabled(),
 		"autosync":                  h.AutosyncEnabled(),
@@ -316,7 +316,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		Autopilot        *bool             `json:"autopilot"`
+		Autoimplement        *bool             `json:"autoimplement"`
 		Autotest         *bool             `json:"autotest"`
 		Autosubmit       *bool             `json:"autosubmit"`
 		Autosync         *bool             `json:"autosync"`
@@ -339,7 +339,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Background passes outlive the HTTP request, so they must run on a
 	// detached context: r.Context() is cancelled the moment UpdateConfig
 	// returns (mirrors the agent exec goroutine).
-	applyBoolToggle(context.Background(), req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
+	applyBoolToggle(context.Background(), req.Autoimplement, h.SetAutoimplement, h.AutoimplementEnabled, h.tryAutoPromote)
 	applyBoolToggle(context.Background(), req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	applyBoolToggle(context.Background(), req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
@@ -348,7 +348,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// and back does not reset the user's automation choices, and a
 	// different group on this server stays manual unless the user turns
 	// automation on for it explicitly.
-	if req.Autopilot != nil || req.Autotest != nil ||
+	if req.Autoimplement != nil || req.Autotest != nil ||
 		req.Autosubmit != nil || req.Autosync != nil {
 		h.persistCurrentGroupToggles()
 	}
@@ -367,7 +367,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	resp := map[string]any{
-		"autopilot":  h.AutopilotEnabled(),
+		"autoimplement":  h.AutoimplementEnabled(),
 		"autotest":   h.AutotestEnabled(),
 		"autosubmit": h.AutosubmitEnabled(),
 		"autosync":   h.AutosyncEnabled(),

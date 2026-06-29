@@ -10,11 +10,11 @@ import (
 )
 
 // insertEventOrLog calls InsertEvent and logs any error via the structured
-// logger and the autopilot error counter. It is a convenience wrapper for
+// logger and the autoimplement error counter. It is a convenience wrapper for
 // call sites that cannot meaningfully recover from an event-write failure (e.g.
 // the task was deleted between a status update and the subsequent event write,
 // or the underlying trace file hit a disk error). Using this helper prevents
-// silent state/event-log divergence while keeping autopilot code paths clean.
+// silent state/event-log divergence while keeping autoimplement code paths clean.
 //
 // Also stamps the ctx with actor attribution (store.WithActorPrincipal)
 // derived from auth.PrincipalFromContext so every handler-layer event
@@ -34,14 +34,14 @@ func (h *Handler) insertEventOrLogTo(ctx context.Context, s *store.Store, taskID
 	if s == nil {
 		logger.Handler.Error("InsertEvent skipped: no store",
 			"task", taskID, "event_type", eventType)
-		h.incAutopilotAction("event_write", "error")
+		h.incAutoimplementAction("event_write", "error")
 		return
 	}
 	ctx = stampEventActor(ctx)
 	if err := s.InsertEvent(ctx, taskID, eventType, data); err != nil {
 		logger.Handler.Error("InsertEvent failed",
 			"task", taskID, "event_type", eventType, "error", err)
-		h.incAutopilotAction("event_write", "error")
+		h.incAutoimplementAction("event_write", "error")
 	}
 }
 

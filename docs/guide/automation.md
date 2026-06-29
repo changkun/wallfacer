@@ -32,14 +32,14 @@ or directly at `/settings?tab=execution`. The toggles are:
 
 | Toggle | Label in menu | What it controls |
 |--------|---------------|------------------|
-| Autopilot | **Implement** | Automatic promotion of backlog tasks to In Progress |
+| Autoimplement | **Implement** | Automatic promotion of backlog tasks to In Progress |
 | Catch Up | **Catch Up** | Automatic rebase of waiting tasks onto latest branch |
 | Auto-test | **Test** | Automatic test verification of waiting tasks |
 | Auto-submit | **Submit** | Automatic completion of verified waiting tasks |
 | Auto-push | **Push** | Automatic git push after task completion |
 
 Toggles (except Auto-push) are **persisted per workspace group**
-in `workspace-groups.json`: enabling Autopilot in group A does not
+in `workspace-groups.json`: enabling Autoimplement in group A does not
 follow you to group B, and switching back to A restores A's choices.
 A freshly created group starts with every toggle off. Auto-push stays
 global and continues to persist via the env file.
@@ -63,16 +63,16 @@ global and continues to persist via the env file.
 > column shows the active limit as a read-only `max N` tag. Values
 > persist in `workspace-groups.json`.
 
-### Enabling Autopilot
+### Enabling Autoimplement
 
-Autopilot (the **Implement** toggle) automatically promotes the
+Autoimplement (the **Implement** toggle) automatically promotes the
 highest-priority eligible backlog task to In Progress whenever there is
 available capacity. The number of tasks that can run simultaneously is
 controlled by `WALLFACER_MAX_PARALLEL`. In host mode the default is 1;
 the claude/codex CLIs share state across concurrent runs, so raise the
 limit only after verifying your CLI tolerates parallel invocations.
 Enable it from Settings -> Execution or via `PUT /api/config` with
-`autopilot: true`.
+`autoimplement: true`.
 
 ### Enabling Auto-Test
 
@@ -115,9 +115,9 @@ flowchart LR
     Failed -->|auto-retry| Implement
 ```
 
-<!-- In-app animated illustration: a pulse flowing through the autopilot pipeline.
+<!-- In-app animated illustration: a pulse flowing through the autoimplement pipeline.
      Renders in the in-app docs viewer; GitHub shows the diagram above. -->
-<svg viewBox="0 0 720 96" role="img" aria-label="A pulse moving through the autopilot pipeline: Implement, Catch Up, Test, Submit, Push" style="display:block;width:100%;max-width:520px;height:auto;margin:1.25rem auto;font-family:inherit">
+<svg viewBox="0 0 720 96" role="img" aria-label="A pulse moving through the autoimplement pipeline: Implement, Catch Up, Test, Submit, Push" style="display:block;width:100%;max-width:520px;height:auto;margin:1.25rem auto;font-family:inherit">
   <line x1="72" y1="40" x2="648" y2="40" stroke="var(--border,#e2e4e8)" stroke-width="2"/>
   <g fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)" stroke-width="1.5">
     <circle cx="72"  cy="40" r="18"/>
@@ -145,7 +145,7 @@ flowchart LR
   </circle>
 </svg>
 
-1. 🤖 **Implement** (Autopilot) -- promote backlog tasks to In Progress.
+1. 🤖 **Implement** (Autoimplement) -- promote backlog tasks to In Progress.
 2. 🔗 **Catch Up** -- rebase waiting tasks onto the latest branch to prevent merge conflicts.
 3. 🧪 **Test** -- run the verification agent on waiting tasks.
 4. ✅ **Submit** -- move verified, conflict-free tasks to Done.
@@ -161,7 +161,7 @@ attempt.
 
 ### Stage Reference (Deep Dive)
 
-#### Implement (Autopilot)
+#### Implement (Autoimplement)
 
 When enabled, the auto-promoter watches for available capacity and
 promotes the highest-priority eligible backlog task to In Progress.
@@ -413,7 +413,7 @@ failures and uses a closed/open/half-open three-state model. See
 
 Automation-related environment variables (`WALLFACER_MAX_PARALLEL`, `WALLFACER_MAX_TEST_PARALLEL`, `WALLFACER_AUTO_PUSH`, `WALLFACER_AUTO_PUSH_THRESHOLD`, `WALLFACER_CONTAINER_CB_THRESHOLD`, `WALLFACER_CONTAINER_CB_OPEN_SECONDS`) are documented, with defaults, in [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
 
-All automation toggles (except Auto-push) are also available via `PUT /api/config` with the fields `autopilot`, `autotest`, `autosubmit`, and `autosync`.
+All automation toggles (except Auto-push) are also available via `PUT /api/config` with the fields `autoimplement`, `autotest`, `autosubmit`, and `autosync`.
 
 For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
 

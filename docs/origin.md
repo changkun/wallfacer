@@ -4,7 +4,7 @@ Wallfacer started as a practical response to a repeated workflow: write a task p
 
 The first version was a Go server with a minimal web UI. Tasks moved from backlog to in progress, executed in isolated git worktrees as host processes, and landed in done when complete. Each task got its own worktree, so many tasks could run in parallel on the same repository without colliding.
 
-Then the system kept growing into its own gaps. The execution engine gained process reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handles implementation, testing, auto-retry, and autopilot promotion. An oversight layer (live logs, timelines, traces, diffs, and per-turn cost breakdown) ensures every agent decision is auditable before results are accepted.
+Then the system kept growing into its own gaps. The execution engine gained process reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handles implementation, testing, auto-retry, and autoimplement promotion. An oversight layer (live logs, timelines, traces, diffs, and per-turn cost breakdown) ensures every agent decision is auditable before results are accepted.
 
 Work is no longer one monolithic prompt per task. A dispatch layer composes specialized built-in agents (title, oversight, commit message, implementation, testing) into flows, so a single run can implement, test, then write a commit message, title, and oversight summary in one pass.
 

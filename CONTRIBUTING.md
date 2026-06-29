@@ -26,7 +26,7 @@ implementation detail, architecture, and the APIs that connect everything.
 | 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | 4 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
-| 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers, ideation |
+| 6 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, circuit breakers, ideation |
 | 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | 8 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 

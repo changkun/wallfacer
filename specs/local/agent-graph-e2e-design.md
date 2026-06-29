@@ -104,7 +104,7 @@ redesign, not a port.** The agentic/topos path (`runAgenticFlow` ->
 
 Worktrees, the commit pipeline, oversight, and agon are all wallfacer-specific
 runner/handler code (`runner/worktree.go`, `runner/commit.go`,
-`runner/oversight.go`, `handler/tasks_autopilot.go`), orthogonal to topos's
+`runner/oversight.go`, `handler/tasks_autoimplement.go`), orthogonal to topos's
 generic multi-agent-graph orchestration. Moving them in is foundational work
 (an `executor.Backend` topos-sandbox adapter, git abstraction, session
 persistence across topos runs, output capture) -- a redesign.

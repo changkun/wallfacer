@@ -85,13 +85,13 @@ var Routes = []Route{
 	{
 		Method: http.MethodGet, Pattern: "/api/config", Name: "GetConfig",
 		JSName:      "get",
-		Description: "Get server configuration (workspaces, autopilot flags, sandbox list).",
+		Description: "Get server configuration (workspaces, autoimplement flags, sandbox list).",
 		Tags:        []string{"config"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/config", Name: "UpdateConfig",
 		JSName:      "update",
-		Description: "Update server configuration (autopilot, autotest, autosubmit, sandbox assignments).",
+		Description: "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
 		Tags:        []string{"config"},
 	},
 

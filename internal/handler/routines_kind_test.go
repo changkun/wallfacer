@@ -13,10 +13,10 @@ import (
 
 // TestTryAutoPromote_SkipsRoutineCards verifies that a routine card in
 // backlog is never promoted to in_progress. Routine cards are schedule
-// templates; the scheduler engine — not the autopilot — fires them.
+// templates; the scheduler engine — not the autoimplement — fires them.
 func TestTryAutoPromote_SkipsRoutineCards(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	routine, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{

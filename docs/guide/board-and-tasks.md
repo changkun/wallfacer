@@ -106,7 +106,7 @@ For advanced creation options (templates, batch creation, dependencies, budgets,
 
 ### Running a Task
 
-When a task moves from Backlog to In Progress (by dragging the card, clicking "Start task" in the detail modal, or via Autopilot), the server:
+When a task moves from Backlog to In Progress (by dragging the card, clicking "Start task" in the detail modal, or via Autoimplement), the server:
 
 1. Creates an isolated git branch (`task/<uuid-prefix>`) for each workspace
 2. Sets up git worktrees so the agent works on a copy, not your main branch
@@ -291,7 +291,7 @@ In this example, task 1 depends on task 0, and task 2 depends on both tasks 0 an
 
 #### Declaring Prerequisites
 
-When creating or editing a backlog task, use the **Depends on** picker to select prerequisite tasks. A task with unmet dependencies will not be auto-promoted by Autopilot even if capacity is available.
+When creating or editing a backlog task, use the **Depends on** picker to select prerequisite tasks. A task with unmet dependencies will not be auto-promoted by Autoimplement even if capacity is available.
 
 #### Dependency Badges
 
@@ -571,7 +571,7 @@ clears the filter and re-lays-out.
 ## See Also
 
 - [Workspaces](workspaces.md) -- workspace management, git branches, and multi-repo setups
-- [Automation](automation.md) -- autopilot, auto-test, auto-submit, auto-retry, and circuit breakers
+- [Automation](automation.md) -- autoimplement, auto-test, auto-submit, auto-retry, and circuit breakers
 - [Prompt Refinement](refinement-and-ideation.md) -- shaping a task's prompt in the Plan task-mode chat
 - [Oversight & Analytics](oversight-and-analytics.md) -- oversight summaries, usage statistics, and cost tracking
 - [Configuration](configuration.md) -- environment variables, sandbox setup, and server settings

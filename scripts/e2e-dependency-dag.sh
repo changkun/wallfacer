@@ -7,7 +7,7 @@
 #   b,c,d,e,f,g: update test.md to '0','1','2','3','4','5' (all depend on a)
 #   h: delete test.md (depends on b,c,d,e,f,g)
 #
-# Enables autopilot, autotest, autosubmit (not ideation or push).
+# Enables autoimplement, autotest, autosubmit (not ideation or push).
 # Verifies each task produces one commit and test.md is deleted at the end.
 # Reports the commit order at the end.
 #
@@ -97,16 +97,16 @@ step "setting max parallel tasks to 3"
 api PUT "/api/env" -d '{"max_parallel_tasks": 3}' >/dev/null
 pass "max parallel tasks: 3"
 
-# Enable automation (autopilot, autotest, autosubmit) but not ideation/push.
+# Enable automation (autoimplement, autotest, autosubmit) but not ideation/push.
 step "enabling automation"
 api PUT "/api/config" -d '{
-    "autopilot": true,
+    "autoimplement": true,
     "autotest": true,
     "autosubmit": true,
     "autosync": true,
     "autopush": false
 }' >/dev/null
-pass "autopilot, autotest, autosubmit, autosync enabled"
+pass "autoimplement, autotest, autosubmit, autosync enabled"
 
 # --- Create task DAG ---
 section "create tasks"
@@ -143,11 +143,11 @@ task_h_id=$(echo "$batch_resp" | jq -r '.ref_to_id.h')
 # --- Execute ---
 section "execute"
 
-# Autopilot auto-promotes task a (no dependencies) and then the rest
+# Autoimplement auto-promotes task a (no dependencies) and then the rest
 # as dependencies resolve. The auto-promoter ticks every 60s
 # (constants.AutoPromoteInterval), so allow up to 90s for the first
 # task to leave backlog.
-step "waiting for autopilot to pick up task a (promote interval: 60s)"
+step "waiting for autoimplement to pick up task a (promote interval: 60s)"
 ap_elapsed=0
 while [ "$ap_elapsed" -lt 90 ]; do
     task_a_status=$(api GET "/api/tasks" | jq -r --arg id "$task_a_id" '.[] | select(.id == $id) | .status')
@@ -158,7 +158,7 @@ while [ "$ap_elapsed" -lt 90 ]; do
     ap_elapsed=$((ap_elapsed + 5))
 done
 if [ "$task_a_status" = "backlog" ]; then
-    fail "autopilot did not promote task a within 90s"
+    fail "autoimplement did not promote task a within 90s"
 else
     pass "task a promoted to $task_a_status"
 fi
