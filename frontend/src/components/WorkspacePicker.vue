@@ -2,9 +2,11 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
+import { useWorkspacesStore } from '../stores/workspaces';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
+import type { Workspace } from '../api/types';
 
 interface BrowseEntry {
   name: string;
@@ -21,6 +23,7 @@ const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const store = useTaskStore();
+const wsStore = useWorkspacesStore();
 const dialog = useDialogStore();
 const toast = useToastStore();
 
@@ -52,7 +55,18 @@ async function renameEntry(entry: { path: string; name: string }) {
 
 const cardRef = ref<HTMLElement | null>(null);
 useFocusTrap(cardRef, computed(() => props.modelValue));
-const workspaces = ref<string[]>([]);
+
+// view splits the modal into two surfaces: 'list' picks an existing workspace
+// to activate; 'wizard' is the create/edit folder-browse flow. The default is
+// 'wizard' so a fresh mount (no registry loaded) lands on the folder browser —
+// the first-run experience and the shape the wizard tests assert against.
+const view = ref<'list' | 'wizard'>('wizard');
+// editingId is the workspace being re-pointed; null means the wizard creates a
+// brand new workspace on confirm.
+const editingId = ref<string | null>(null);
+const wsName = ref('');
+
+const folders = ref<string[]>([]);
 const browsePath = ref('/');
 const pathInput = ref('/');
 const browseEntries = ref<BrowseEntry[]>([]);
@@ -62,10 +76,11 @@ const filter = ref('');
 const showHidden = ref(false);
 const saving = ref(false);
 const applyStatus = ref('');
+const activatingId = ref<string | null>(null);
 
-// Two step wizard: 1 = choose folders, 2 = review and activate.
+// Two step wizard: 1 = choose folders, 2 = name, review and activate.
 const step = ref(1);
-const canProceed = computed(() => workspaces.value.length > 0);
+const canProceed = computed(() => folders.value.length > 0);
 
 function goNext() {
   if (!canProceed.value) return;
@@ -76,21 +91,90 @@ function goBack() {
   step.value = 1;
 }
 
+const existing = computed<Workspace[]>(() => wsStore.workspaces);
+
+// Folder basenames make a readable fallback label for unnamed workspaces.
+function basenames(paths: string[]): string {
+  return paths
+    .map(p => {
+      const clean = String(p || '').replace(/[\\/]+$/, '');
+      const parts = clean.split(/[\\/]/);
+      return parts[parts.length - 1] || clean;
+    })
+    .join(', ');
+}
+
+function workspaceLabel(ws: Workspace): string {
+  return ws.name?.trim() || basenames(ws.folders) || ws.id;
+}
+
+// Enter the wizard to create a new workspace from scratch. Returns the browse
+// promise so callers (the open watcher) can await the first listing.
+function enterNewWorkspace(): Promise<void> {
+  editingId.value = null;
+  wsName.value = '';
+  folders.value = [];
+  step.value = 1;
+  view.value = 'wizard';
+  return browse('');
+}
+
+// Enter the wizard to re-point an existing workspace's folders (used for
+// dormant workspaces recovered without folders, and the generic edit path).
+function enterEdit(ws: Workspace) {
+  editingId.value = ws.id;
+  wsName.value = ws.name ?? '';
+  folders.value = [...ws.folders];
+  step.value = 1;
+  view.value = 'wizard';
+  browse('');
+}
+
+// Activate an existing workspace and close. Dormant workspaces missing folders
+// cannot run a board, so route the user into editing folders first.
+async function activateExisting(ws: Workspace) {
+  if (activatingId.value) return;
+  if (ws.dormant && ws.folders.length === 0) {
+    enterEdit(ws);
+    return;
+  }
+  activatingId.value = ws.id;
+  applyStatus.value = '';
+  try {
+    await wsStore.activate(ws.id);
+    close();
+  } catch (e) {
+    applyStatus.value = e instanceof Error ? e.message : 'Failed to activate';
+  } finally {
+    activatingId.value = null;
+  }
+}
+
 watch(
   () => props.modelValue,
   async (open) => {
     if (!open) return;
-    workspaces.value = [...(store.config?.workspaces ?? [])];
     browsePath.value = '';
     pathInput.value = '';
     browseError.value = '';
     filter.value = '';
     applyStatus.value = '';
+    editingId.value = null;
+    wsName.value = '';
+    folders.value = [];
     step.value = 1;
-    // Empty path: the backend resolves it to the user's home directory, a
-    // saner starting point than filesystem root for picking project folders.
-    await browse('');
+    // Default to the create wizard and kick off the first directory listing
+    // immediately; the registry load runs concurrently and promotes the modal
+    // to the list view when workspaces already exist (no folder-browse flash on
+    // first run, which is the common path when there are none).
+    view.value = 'wizard';
     document.addEventListener('keydown', onKey);
+    const browseP = browse('');
+    await wsStore.list();
+    if (existing.value.length > 0) {
+      view.value = 'list';
+    }
+    await browseP;
   },
 );
 
@@ -144,34 +228,55 @@ function onPathKeydown(e: KeyboardEvent) {
   }
 }
 
-function addWorkspace(path: string) {
-  if (!workspaces.value.includes(path)) {
-    workspaces.value.push(path);
+function addFolder(path: string) {
+  if (!folders.value.includes(path)) {
+    folders.value.push(path);
   }
 }
 
-function removeWorkspace(index: number) {
-  workspaces.value.splice(index, 1);
+function removeFolder(index: number) {
+  folders.value.splice(index, 1);
 }
 
 function clearSelection() {
-  workspaces.value = [];
+  folders.value = [];
 }
 
-async function save() {
+// Effective workspace name: the typed name, or a basename fallback so the
+// created workspace is never blank.
+function effectiveName(): string {
+  return wsName.value.trim() || basenames(folders.value);
+}
+
+// Confirm the wizard: create a new workspace (or re-point the one being
+// edited), then activate it so the board switches immediately. Replaces the
+// legacy path-based PUT /api/workspaces switch.
+async function confirm() {
+  if (!folders.value.length) return;
   saving.value = true;
   applyStatus.value = 'Applying...';
   try {
-    await api('PUT', '/api/workspaces', { workspaces: workspaces.value });
-    await store.fetchConfig();
+    let id = editingId.value;
+    if (id) {
+      await wsStore.update(id, { name: effectiveName(), folders: [...folders.value] });
+    } else {
+      const created = await wsStore.create(effectiveName(), [...folders.value]);
+      id = created.id;
+    }
+    await wsStore.activate(id);
     applyStatus.value = '';
     close();
   } catch (e) {
-    console.error('save workspaces:', e);
+    console.error('save workspace:', e);
     applyStatus.value = e instanceof Error ? e.message : 'Failed to apply';
   } finally {
     saving.value = false;
   }
+}
+
+function backToList() {
+  if (existing.value.length === 0) return;
+  view.value = 'list';
 }
 
 function close() {
@@ -202,7 +307,7 @@ function filteredEntries() {
   }
   // Already-added folders sink to the bottom so the list stays a queue of
   // things still left to add; relative order within each group is preserved.
-  const added = (e: BrowseEntry) => workspaces.value.includes(e.path);
+  const added = (e: BrowseEntry) => folders.value.includes(e.path);
   return [...entries].sort((a, b) => Number(added(a)) - Number(added(b)));
 }
 
@@ -234,7 +339,9 @@ function breadcrumbSegments() {
     <div ref="cardRef" class="modal-card ws-picker" role="dialog" aria-modal="true" aria-label="Workspace Picker">
       <div class="ws-picker__header">
         <div style="flex: 1; min-width: 0">
-          <h3 class="ws-picker__title">Select Workspaces</h3>
+          <h3 class="ws-picker__title">
+            {{ view === 'list' ? 'Select Workspace' : editingId ? 'Edit Workspace' : 'New Workspace' }}
+          </h3>
         </div>
         <button
           v-if="dismissable"
@@ -247,30 +354,74 @@ function breadcrumbSegments() {
         </button>
       </div>
 
-      <div class="ws-stepper" role="tablist" aria-label="Workspace setup steps">
-        <button
-          type="button"
-          class="ws-step"
-          :class="{ 'ws-step--active': step === 1, 'ws-step--done': step > 1 }"
-          @click="goBack"
-        >
-          <span class="ws-step__circle">1</span>
-          <span class="ws-step__label">Choose folders</span>
-        </button>
-        <span class="ws-step__connector" :class="{ 'ws-step__connector--done': step > 1 }"></span>
-        <button
-          type="button"
-          class="ws-step"
-          :class="{ 'ws-step--active': step === 2, 'ws-step--upcoming': step < 2 }"
-          :disabled="!canProceed"
-          @click="goNext"
-        >
-          <span class="ws-step__circle">2</span>
-          <span class="ws-step__label">Review &amp; activate</span>
-        </button>
+      <!-- List view: pick an existing workspace to activate. -->
+      <div v-if="view === 'list'" class="ws-picker__body ws-picker__list-view">
+        <p class="ws-step__instruction">
+          Click a workspace to switch the board to it. Editing folders never loses history.
+        </p>
+        <div class="ws-list">
+          <div
+            v-for="ws in existing"
+            :key="ws.id"
+            class="ws-list__item"
+            :class="{ 'ws-list__item--active': ws.active }"
+          >
+            <button
+              type="button"
+              class="ws-list__main"
+              :disabled="activatingId !== null"
+              @click="activateExisting(ws)"
+            >
+              <span class="ws-list__name">
+                {{ workspaceLabel(ws) }}
+                <span v-if="ws.active" class="ws-list__badge ws-list__badge--active">active</span>
+                <span v-if="ws.dormant" class="ws-list__badge ws-list__badge--dormant">recovered</span>
+              </span>
+              <span class="ws-list__paths" :title="ws.folders.join('\n')">
+                {{ ws.folders.length ? ws.folders.map(shortenPath).join('  ·  ') : 'No folders — re-point to use' }}
+              </span>
+            </button>
+            <button
+              type="button"
+              class="btn-ghost ws-list__edit"
+              title="Edit name and folders"
+              @click="enterEdit(ws)"
+            >Edit</button>
+          </div>
+        </div>
+        <div class="ws-step__footer">
+          <span class="ws-picker__apply-status">{{ applyStatus }}</span>
+          <button type="button" class="btn btn-accent" @click="enterNewWorkspace">
+            + New workspace
+          </button>
+        </div>
       </div>
 
-      <div v-show="step === 1" class="ws-picker__body ws-picker__body--step">
+      <template v-else>
+        <div class="ws-stepper" role="tablist" aria-label="Workspace setup steps">
+          <button
+            type="button"
+            class="ws-step"
+            :class="{ 'ws-step--active': step === 1, 'ws-step--done': step > 1 }"
+            @click="goBack"
+          >
+            <span class="ws-step__circle">1</span>
+            <span class="ws-step__label">Choose folders</span>
+          </button>
+          <span class="ws-step__connector" :class="{ 'ws-step__connector--done': step > 1 }"></span>
+          <button
+            type="button"
+            class="ws-step"
+            :class="{ 'ws-step--active': step === 2, 'ws-step--upcoming': step < 2 }"
+            :disabled="!canProceed"
+            @click="goNext"
+          >
+            <span class="ws-step__circle">2</span>
+            <span class="ws-step__label">Name &amp; activate</span>
+          </button>
+        </div>
+
+        <div v-show="step === 1" class="ws-picker__body ws-picker__body--step">
         <p class="ws-step__instruction">
           Browse to your project directories and click + Add. Git repos are marked.
           Add as many as you want.
@@ -332,8 +483,8 @@ function breadcrumbSegments() {
               <button
                 type="button"
                 class="btn-ghost ws-picker__add-folder-btn"
-                :disabled="workspaces.includes(browsePath)"
-                @click="addWorkspace(browsePath)"
+                :disabled="folders.includes(browsePath)"
+                @click="addFolder(browsePath)"
               >
                 + Add current folder
               </button>
@@ -385,10 +536,10 @@ function breadcrumbSegments() {
                   @click="renameEntry(entry)"
                 >✎</button>
                 <button
-                  v-if="!workspaces.includes(entry.path)"
+                  v-if="!folders.includes(entry.path)"
                   type="button"
                   class="btn-ghost ws-entry__add"
-                  @click="addWorkspace(entry.path)"
+                  @click="addFolder(entry.path)"
                 >
                   + Add
                 </button>
@@ -405,8 +556,16 @@ function breadcrumbSegments() {
         </div>
 
         <div class="ws-step__footer">
+          <button
+            v-if="existing.length > 0"
+            type="button"
+            class="btn btn-ghost"
+            @click="backToList"
+          >
+            &larr; Back to list
+          </button>
           <span class="ws-step__count">
-            {{ workspaces.length }} {{ workspaces.length === 1 ? 'folder' : 'folders' }} added
+            {{ folders.length }} {{ folders.length === 1 ? 'folder' : 'folders' }} added
           </span>
           <button
             type="button"
@@ -414,22 +573,33 @@ function breadcrumbSegments() {
             :disabled="!canProceed"
             @click="goNext"
           >
-            Next: Review &rarr;
+            Next: Name &rarr;
           </button>
         </div>
       </div>
 
-      <div v-show="step === 2" class="ws-picker__body ws-picker__body--step">
+        <div v-show="step === 2" class="ws-picker__body ws-picker__body--step">
         <p class="ws-step__instruction">
-          These folders become task boards. Remove any you do not want, then activate.
+          Name this workspace and review its folders. The name is stable across folder edits.
         </p>
+        <div class="ws-picker__name-row">
+          <label class="ws-picker__name-label" for="ws-name-input">Workspace name</label>
+          <input
+            id="ws-name-input"
+            v-model="wsName"
+            class="field ws-picker__name-input"
+            type="text"
+            :placeholder="basenames(folders) || 'My workspace'"
+            autocomplete="off"
+          />
+        </div>
         <div class="ws-picker__selection ws-picker__selection--review">
           <div class="ws-picker__selection-header">
-            <span class="ws-picker__selection-label">Selected</span>
+            <span class="ws-picker__selection-label">Folders</span>
             <button
               type="button"
               class="btn-ghost ws-picker__clear-btn"
-              :disabled="workspaces.length === 0"
+              :disabled="folders.length === 0"
               @click="clearSelection"
             >
               Clear all
@@ -437,21 +607,21 @@ function breadcrumbSegments() {
           </div>
           <div class="ws-picker__selection-list">
             <div
-              v-if="workspaces.length === 0"
+              v-if="folders.length === 0"
               style="font-size: 11px; color: var(--text-muted); padding: 4px 2px"
             >
               No folders selected. Go back to step 1 to add some.
             </div>
             <div
-              v-for="(ws, i) in workspaces"
-              :key="ws"
+              v-for="(f, i) in folders"
+              :key="f"
               class="ws-selected-item"
             >
-              <span class="ws-selected-item__path" :title="ws">{{ shortenPath(ws) }}</span>
+              <span class="ws-selected-item__path" :title="f">{{ shortenPath(f) }}</span>
               <button
                 type="button"
                 class="btn-ghost ws-selected-item__remove"
-                @click="removeWorkspace(i)"
+                @click="removeFolder(i)"
               >
                 &times;
               </button>
@@ -466,8 +636,8 @@ function breadcrumbSegments() {
               <button
                 type="button"
                 class="btn btn-accent"
-                :disabled="saving"
-                @click="save"
+                :disabled="saving || folders.length === 0"
+                @click="confirm"
               >
                 {{ saving ? 'Applying...' : 'Activate' }}
               </button>
@@ -475,6 +645,100 @@ function breadcrumbSegments() {
           </div>
         </div>
       </div>
+      </template>
     </div>
   </div>
 </template>
+
+<style scoped>
+.ws-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+.ws-list__item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.ws-list__item--active {
+  border-color: var(--accent);
+}
+.ws-list__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  color: var(--text);
+}
+.ws-list__main:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.08));
+}
+.ws-list__name {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ws-list__paths {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.ws-list__badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+}
+.ws-list__badge--active {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+.ws-list__badge--dormant {
+  background: #b8860b;
+  color: #fff;
+}
+.ws-list__edit {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 0 12px;
+  align-self: center;
+}
+.ws-picker__name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.ws-picker__name-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ws-picker__name-input {
+  width: 100%;
+}
+</style>

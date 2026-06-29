@@ -15,6 +15,7 @@ import Toaster from '../components/Toaster.vue';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
 import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
+import { useWorkspacesStore } from '../stores/workspaces';
 import { useUiStore } from '../stores/ui';
 import { useKeyboard } from '../composables/useKeyboard';
 import { getStored, setStored } from '../lib/storage';
@@ -22,6 +23,7 @@ import { shouldRefetchOnVisible } from '../lib/visibility';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
+const workspaces = useWorkspacesStore();
 const ui = useUiStore();
 const router = useRouter();
 // Sidebar collapse persists across refreshes — losing it on every reload
@@ -41,6 +43,10 @@ const showChatPopup = computed(() =>
 
 onMounted(async () => {
   if (!store.config) await store.fetchConfig();
+  // Load the first-class workspace registry so the status bar and picker can
+  // show workspace names (not just folder basenames). Best-effort: failures
+  // are held in the store and fall back to basename display.
+  void workspaces.list();
   // First-run guard: when the server has no active workspace yet, open
   // the picker automatically so the user can wire one up before tasks
   // fail with "no workspace selected" errors downstream. Mirrors the

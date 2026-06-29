@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useTaskStore } from '../stores/tasks';
+import { useWorkspacesStore } from '../stores/workspaces';
 import { useUiStore } from '../stores/ui';
 import { useToastStore } from '../stores/toast';
 import { api, ApiError } from '../api/client';
@@ -31,6 +32,7 @@ interface GitWorkspace {
 }
 
 const store = useTaskStore();
+const workspacesStore = useWorkspacesStore();
 const ui = useUiStore();
 const toast = useToastStore();
 const workspaces = ref<GitWorkspace[]>([]);
@@ -77,6 +79,11 @@ const waitingCount = computed(
 const workspaceLabel = computed(() => {
   const ws = store.config?.workspaces ?? [];
   if (!ws.length) return '';
+  // Prefer the active workspace's name from the first-class registry; this is
+  // stable across folder edits. Fall back to a matching saved group name, then
+  // to the first folder's basename when the workspace is unnamed/unknown.
+  const active = workspacesStore.active;
+  if (active?.name?.trim()) return active.name.trim();
   const groups = store.config?.workspace_groups ?? [];
   const matched = groups.find(g =>
     Array.isArray(g.workspaces)

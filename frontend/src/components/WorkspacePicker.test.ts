@@ -128,7 +128,7 @@ describe('WorkspacePicker wizard', () => {
     expect(stepOne.style.display).not.toBe('none');
     expect(stepTwo.style.display).toBe('none');
 
-    const next = findByText(host, 'button', 'Next: Review');
+    const next = findByText(host, 'button', 'Next: Name');
     expect(next).not.toBeNull();
     expect((next as HTMLButtonElement).disabled).toBe(true);
 

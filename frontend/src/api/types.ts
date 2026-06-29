@@ -235,6 +235,20 @@ export interface RetryRecord {
   failure_category?: string;
 }
 
+// --- Workspace registry (GET/POST/PUT/DELETE /api/workspaces) ---
+// A workspace is a first-class object with a stable id, owned by a user/org,
+// holding a mutable set of folder paths. Identity is decoupled from membership:
+// editing folders never loses history. `dormant` marks a workspace recovered
+// from history whose folders may need re-pointing; `active` marks the one whose
+// board is currently shown.
+export interface Workspace {
+  id: string;
+  name: string;
+  folders: string[];
+  dormant: boolean;
+  active: boolean;
+}
+
 export interface WorkspaceGroup {
   name?: string;
   workspaces: string[];
@@ -245,6 +259,9 @@ export interface WorkspaceGroup {
 
 export interface ServerConfig {
   workspaces: string[];
+  // workspace_id is the stable id of the active workspace (the new workspace
+  // model). Absent on older payloads; consumers fall back to folder basenames.
+  workspace_id?: string;
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
   prompts_dir?: string;
