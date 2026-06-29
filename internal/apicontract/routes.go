@@ -819,4 +819,16 @@ var Routes = []Route{
 		Description: "Disconnect GitHub by clearing the principal's stored token.",
 		Tags:        []string{"github"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/github/repos", Name: "GitHubRepos",
+		JSName:      "githubRepos",
+		Description: "List repositories the \"Latere AI\" install grants the principal (the install grant is the org boundary).",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/github/repo/select", Name: "GitHubRepoSelect",
+		JSName:      "githubRepoSelect",
+		Description: "Validate a chosen repo is within the install grant and resolve it to its canonical host/owner/repo identity.",
+		Tags:        []string{"github"},
+	},
 }
