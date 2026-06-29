@@ -73,6 +73,34 @@ describe('workspaces store update', () => {
     expect(store.workspaces[0].name).toBe('Renamed');
     expect(store.workspaces[0].folders).toEqual(['/a', '/b']);
   });
+
+  // Editing the ACTIVE workspace's folders must refetch /api/config so
+  // folder-derived views (Mission Control graph, spec tree) refresh instead of
+  // staying stale until a tab switch.
+  it('refetches config when the active workspace folders change', async () => {
+    apiMock.mockResolvedValueOnce({ workspaces: [ws({ id: 'w1' })], active_id: 'w1' });
+    const store = useWorkspacesStore();
+    await store.list();
+    useTaskStore().config = { workspace_id: 'w1' } as never; // w1 is active
+
+    apiMock.mockReset();
+    apiMock.mockResolvedValueOnce(ws({ id: 'w1', folders: ['/a', '/b'] })); // PUT
+    apiMock.mockResolvedValueOnce({ workspaces: ['/a', '/b'], workspace_id: 'w1' }); // GET /api/config
+    await store.update('w1', { folders: ['/a', '/b'] });
+    expect(apiMock).toHaveBeenCalledWith('GET', '/api/config');
+  });
+
+  it('does NOT refetch config when a non-active workspace is edited', async () => {
+    apiMock.mockResolvedValueOnce({ workspaces: [ws({ id: 'w1' }), ws({ id: 'w2' })], active_id: 'w1' });
+    const store = useWorkspacesStore();
+    await store.list();
+    useTaskStore().config = { workspace_id: 'w1' } as never; // w1 active, edit w2
+
+    apiMock.mockReset();
+    apiMock.mockResolvedValueOnce(ws({ id: 'w2', folders: ['/c'] }));
+    await store.update('w2', { folders: ['/c'] });
+    expect(apiMock).not.toHaveBeenCalledWith('GET', '/api/config');
+  });
 });
 
 describe('workspaces store activate', () => {
