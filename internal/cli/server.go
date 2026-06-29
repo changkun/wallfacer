@@ -1195,6 +1195,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GitHubAuthDisconnect": http.HandlerFunc(h.GitHubAuthDisconnect),
 		"GitHubRepos":          http.HandlerFunc(h.GitHubRepos),
 		"GitHubRepoSelect":     http.HandlerFunc(h.GitHubRepoSelect),
+		"GitHubPulls":          http.HandlerFunc(h.GitHubPulls),
+		"GitHubPull":           http.HandlerFunc(h.GitHubPull),
+		"GitHubIssues":         http.HandlerFunc(h.GitHubIssues),
+		"GitHubIssue":          http.HandlerFunc(h.GitHubIssue),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes

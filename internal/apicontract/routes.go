@@ -831,4 +831,28 @@ var Routes = []Route{
 		Description: "Validate a chosen repo is within the install grant and resolve it to its canonical host/owner/repo identity.",
 		Tags:        []string{"github"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/github/pulls", Name: "GitHubPulls",
+		JSName:      "githubPulls",
+		Description: "List pull requests for the selected repo (?repo=owner/name&state=open|closed|all).",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/github/pulls/{number}", Name: "GitHubPull",
+		JSName:      "githubPull",
+		Description: "Pull request detail plus its conversation comment thread (?repo=owner/name).",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/github/issues", Name: "GitHubIssues",
+		JSName:      "githubIssues",
+		Description: "List issues for the selected repo, excluding pull requests (?repo=owner/name&state=open|closed|all).",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/github/issues/{number}", Name: "GitHubIssue",
+		JSName:      "githubIssue",
+		Description: "Issue detail plus its conversation comment thread (?repo=owner/name).",
+		Tags:        []string{"github"},
+	},
 }
