@@ -67,6 +67,7 @@ type Event struct {
 	Tool       *ToolCall       // populated for KindToolCall{Start,End}
 	Usage      *Usage          // populated on KindResult when EmitsUsage
 	StopReason string          // populated on KindResult
+	Model      string          // model the harness reports for this event: init lines carry the session primary, assistant lines the per-turn model; empty when the harness does not report one
 	Raw        json.RawMessage // original line — always preserved for replay / debugging
 }
 

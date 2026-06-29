@@ -90,18 +90,37 @@ func TestClaude_ParseEvent_IsErrorMapsToKindError(t *testing.T) {
 }
 
 func TestClaude_ParseEvent_SystemInit(t *testing.T) {
-	raw := []byte(`{"type":"system","subtype":"init","model":"claude-opus-4-5"}`)
+	raw := []byte(`{"type":"system","subtype":"init","model":"claude-opus-4-8[1m]"}`)
 	evt, _ := claudeHarness{}.ParseEvent(raw)
 	if evt.Kind != KindSystemInit {
 		t.Errorf("Kind = %v, want KindSystemInit", evt.Kind)
 	}
+	// The init line carries the session-primary model top-level, including
+	// the context-window variant suffix; ParseEvent must lift it verbatim.
+	if evt.Model != "claude-opus-4-8[1m]" {
+		t.Errorf("Model = %q, want %q", evt.Model, "claude-opus-4-8[1m]")
+	}
 }
 
 func TestClaude_ParseEvent_Assistant(t *testing.T) {
-	raw := []byte(`{"type":"assistant","content":[{"type":"text","text":"hello"}]}`)
+	raw := []byte(`{"type":"assistant","message":{"model":"claude-opus-4-8","content":[{"type":"text","text":"hello"}]}}`)
 	evt, _ := claudeHarness{}.ParseEvent(raw)
 	if evt.Kind != KindAssistantText {
 		t.Errorf("Kind = %v, want KindAssistantText", evt.Kind)
+	}
+	// The per-turn model rides nested under message.model.
+	if evt.Model != "claude-opus-4-8" {
+		t.Errorf("Model = %q, want %q", evt.Model, "claude-opus-4-8")
+	}
+}
+
+func TestClaude_ParseEvent_NoModel(t *testing.T) {
+	// An assistant line with no model field leaves Model empty rather than
+	// inventing a value.
+	raw := []byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`)
+	evt, _ := claudeHarness{}.ParseEvent(raw)
+	if evt.Model != "" {
+		t.Errorf("Model = %q, want empty", evt.Model)
 	}
 }
 
