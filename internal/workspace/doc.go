@@ -1,13 +1,15 @@
 // Package workspace manages workspace lifecycle, scoped store switching, and
 // change subscriptions.
 //
-// A workspace is a set of host directories that tasks operate on. The [Manager]
-// coordinates runtime workspace switching: when the user selects different
-// workspaces, it atomically swaps the underlying [store.Store], derives the
-// instructions file path, and notifies subscribers via channels. Workspace groups
-// are persisted as JSON in the config directory for session restore. Each unique
-// workspace combination is identified by a deterministic key for scoped data
-// isolation.
+// A workspace is an owned, stably-identified set of host directories that tasks
+// operate on. Its identity (ID) and storage handle (DataKey) are independent of
+// its folder set, so folders can be edited without re-keying the scoped store,
+// transcripts, or planning state. The [Manager] coordinates runtime switching:
+// it atomically swaps the underlying [store.Store] keyed by DataKey and notifies
+// subscribers via channels. Workspaces are persisted as JSON (workspaces.json)
+// in the config directory for session restore; [MigrateToWorkspaces] performs
+// the one-time migration from the legacy path-keyed workspace-groups.json,
+// adopting orphaned data directories as dormant workspaces.
 //
 // # Connected packages
 //

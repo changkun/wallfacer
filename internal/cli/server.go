@@ -102,6 +102,16 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		logger.Main.Info("migrated legacy planning/ dir to agent-sessions/")
 	}
 
+	// One-time migration of the legacy path-keyed workspace-groups.json to the
+	// stable-identity workspaces.json, adopting orphaned data directories as
+	// dormant workspaces. Idempotent; runs before the workspace manager loads.
+	migrationStamp := time.Now().UTC().Format("20060102-150405")
+	if migrated, err := workspace.MigrateToWorkspaces(configDir, cfg.DataDir, migrationStamp); err != nil {
+		logger.Main.Warn("workspace migration failed", "error", err)
+	} else if migrated {
+		logger.Main.Info("migrated workspace groups to workspaces.json")
+	}
+
 	// Workspaces start empty; the manager restores the last active set from
 	// the persisted env file (WALLFACER_WORKSPACES). Users configure them
 	// later via the Settings UI or PUT /api/workspaces.

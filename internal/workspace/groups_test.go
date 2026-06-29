@@ -198,7 +198,7 @@ func TestSaveGroups_AtomicWrite(t *testing.T) {
 	}
 
 	// .tmp file should not exist after successful save.
-	tmpPath := groupsFilePath(configDir) + ".tmp"
+	tmpPath := workspacesFilePath(configDir) + ".tmp"
 	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
 		t.Errorf("expected .tmp file to be removed after SaveGroups, but it exists")
 	}
@@ -426,7 +426,7 @@ func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {
 func TestLoadGroups_ReadError(t *testing.T) {
 	configDir := t.TempDir()
 	// Place a directory where the file is expected, causing a read error.
-	if err := os.MkdirAll(groupsFilePath(configDir), 0o755); err != nil {
+	if err := os.MkdirAll(workspacesFilePath(configDir), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	_, err := LoadGroups(configDir)
@@ -438,7 +438,7 @@ func TestLoadGroups_ReadError(t *testing.T) {
 // TestLoadGroups_InvalidJSON verifies that malformed JSON returns an error.
 func TestLoadGroups_InvalidJSON(t *testing.T) {
 	configDir := t.TempDir()
-	if err := os.WriteFile(groupsFilePath(configDir), []byte("not json"), 0o644); err != nil {
+	if err := os.WriteFile(workspacesFilePath(configDir), []byte("not json"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	_, err := LoadGroups(configDir)
@@ -467,7 +467,7 @@ func TestSaveGroups_MkdirAllError(t *testing.T) {
 func TestUpsertGroup_LoadError(t *testing.T) {
 	configDir := t.TempDir()
 	// Place invalid JSON so LoadGroups fails.
-	if err := os.WriteFile(groupsFilePath(configDir), []byte("bad"), 0o644); err != nil {
+	if err := os.WriteFile(workspacesFilePath(configDir), []byte("bad"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	err := UpsertGroup(configDir, []string{t.TempDir()})
