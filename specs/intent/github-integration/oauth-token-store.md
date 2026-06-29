@@ -93,14 +93,18 @@ Consequences:
   wallfacer's `internal/github` client + token store run against a mock; the
   `Direct` localhost path below is retained only as a dev stopgap behind the same
   client seam, not as the shipping model.
-- **Cross-repo open decision -- credential kind.** The `../auth` spec's central
-  fork ripples here: an **installation token minted on demand** (recommended;
-  bot attribution, no token at rest) keeps wallfacer's `Broker.Token(ctx,
-  principal)` seam unchanged but leaves `Token.Login`/`RefreshToken` unused and
-  turns the settings "Signed in as @login" into "Installed on \<org\>"; a
-  **persisted user-to-server token** (user attribution) matches the current
-  `Token` model but needs new secret-at-rest plumbing in `../auth`. Resolve this
-  jointly with the `../auth` spec before implementing the live `Broker`.
+- **Cross-repo decision -- credential kind (recommended: user-to-server).** The
+  `../auth` spec recommends a **user-to-server token** so actions are authored
+  **as the user**, matching how Claude Code's GitHub connector behaves (GitHub
+  App install, durable, repo-select, acts as you) and matching this `Token` model
+  (`Login`, `RefreshToken`) and the "Signed in as @login" UI already built here
+  -- so no wallfacer rework; the live `Broker` just calls auth's
+  `/internal/github/token`. The cost is encrypted refresh-token storage in
+  `../auth`. The alternative (installation token, bot attribution, no token at
+  rest) would instead leave `Login`/`RefreshToken` unused and reword the settings
+  UI to "Installed on \<org\>". Durability and repo-selection are the same either
+  way (both are GitHub App installs). Confirm before implementing the live
+  `Broker`.
 - **Cross-product token scope.** Because the app is shared, the token store keys
   on the principal (user/org), and the same brokered credential can serve other
   latere products; wallfacer must not assume it owns the registration.
