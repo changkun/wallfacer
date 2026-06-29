@@ -653,9 +653,13 @@ function filteredEntries() {
 }
 .ws-list__edit {
   flex-shrink: 0;
-  font-size: 11px;
-  padding: 0 12px;
   align-self: center;
+  /* Proper button height (was padding:0 → cramped, mis-aligned with the
+   * two-line content) and breathing room from the row's right edge. */
+  padding: 6px 14px;
+  margin-right: 10px;
+  font-size: 11px;
+  line-height: 1;
 }
 /* The close button must be a rounded square so its focus ring isn't a sharp
  * rectangle (the outline follows border-radius). */
