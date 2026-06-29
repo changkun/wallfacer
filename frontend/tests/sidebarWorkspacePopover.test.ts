@@ -24,15 +24,16 @@ describe('collapsed workspace popover', () => {
   });
 });
 
-// The two workspace surfaces (sidebar popover + settings tab) are unified onto
-// the first-class registry. The legacy path-based PUT /api/workspaces switch and
-// the config workspace_groups writes are retired from both; group/workspace
-// actions route through the id-based registry store, and active state derives
-// from isActive() (config workspace_id), never a folder-key/DTO comparison.
-describe('sidebar + settings unified on the workspace registry', () => {
+// Workspace management is unified onto the first-class registry and now lives
+// only in the sidebar popover (the Settings → Workspace tab is retired). The
+// legacy path-based PUT /api/workspaces switch and config workspace_groups
+// writes are gone; group/workspace actions route through the id-based registry
+// store, and active state derives from isActive() (config workspace_id), never a
+// folder-key/DTO comparison. Per-workspace settings (rename, folders, limits,
+// delete) are edited in the WorkspaceEditModal, opened by id from the popover.
+describe('sidebar unified on the workspace registry', () => {
   const root = process.cwd();
   const sidebar = readFileSync(resolve(root, 'src/components/Sidebar.vue'), 'utf8');
-  const settings = readFileSync(resolve(root, 'src/components/settings/SettingsTabWorkspace.vue'), 'utf8');
 
   it('sidebar drops the legacy path-based switch and activates by id', () => {
     // No legacy path-based PUT switch and no config workspace_groups write.
@@ -40,8 +41,7 @@ describe('sidebar + settings unified on the workspace registry', () => {
     expect(sidebar).not.toMatch(/'PUT',\s*'\/api\/config'/);
     // switchToGroup goes through the registry store's activate(id).
     expect(sidebar).toMatch(/wsStore\.activate\(g\.id\)/);
-    // Rename / delete route through the id-based registry endpoints.
-    expect(sidebar).toMatch(/wsStore\.update\(g\.id/);
+    // Delete routes through the id-based registry endpoint.
     expect(sidebar).toMatch(/wsStore\.remove\(g\.id\)/);
   });
 
@@ -49,13 +49,14 @@ describe('sidebar + settings unified on the workspace registry', () => {
     expect(sidebar).toMatch(/wsStore\.isActive\(g\.id\)/);
   });
 
-  it('settings retires the Saved Workspace Groups section and uses isActive', () => {
-    expect(settings).not.toMatch(/Saved Workspace Groups/);
-    // No legacy api() writes remain in the settings tab.
-    expect(settings).not.toMatch(/'\/api\/config'/);
-    expect(settings).toMatch(/wsStore\.isActive\(ws\.id\)/);
-    // Per-workspace parallel overrides write through the registry update.
-    expect(settings).toMatch(/saveLimits/);
-    expect(settings).toMatch(/max_parallel/);
+  it('sidebar opens the full workspace editor by id (rename pencil retired)', () => {
+    // The popover row's Edit affordance raises the registry-backed edit modal.
+    expect(sidebar).toMatch(/ui\.openWorkspaceEdit\(g\.id\)/);
+  });
+
+  it('the Settings → Workspace tab is removed from the settings registry', () => {
+    const settingsPage = readFileSync(resolve(root, 'src/views/SettingsPage.vue'), 'utf8');
+    expect(settingsPage).not.toMatch(/SettingsTabWorkspace/);
+    expect(settingsPage).not.toMatch(/key:\s*'workspace'/);
   });
 });

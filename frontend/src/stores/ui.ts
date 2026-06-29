@@ -14,9 +14,12 @@ function readShowArchived(): boolean {
 export const useUiStore = defineStore('ui', () => {
   const showSettings = ref(false);
   const showWorkspaces = ref(false);
+  // Id of the workspace whose settings popup (WorkspaceEditModal) is open, or
+  // null when closed. Opened from the sidebar switcher and the picker's per-row
+  // Edit. A single app-level modal reads this so any surface can raise it.
+  const editWorkspaceId = ref<string | null>(null);
   const showPalette = ref(false);
   const showSystemPrompts = ref(false);
-  const showTemplates = ref(false);
   // Terminal visibility now lives in the dock store (the terminal is a dockable
   // panel). These delegate so existing callers keep working unchanged.
   const showTerminal = computed(() => useDockStore().terminalOpen);
@@ -59,14 +62,14 @@ export const useUiStore = defineStore('ui', () => {
   function closeSettings() { showSettings.value = false; }
   function openWorkspaces() { showWorkspaces.value = true; }
   function closeWorkspaces() { showWorkspaces.value = false; }
+  function openWorkspaceEdit(id: string) { editWorkspaceId.value = id; }
+  function closeWorkspaceEdit() { editWorkspaceId.value = null; }
   const paletteSeed = ref('');
   function openPalette() { showPalette.value = true; }
   function openPaletteWith(seed: string) { paletteSeed.value = seed; showPalette.value = true; }
   function closePalette() { showPalette.value = false; }
   function openSystemPrompts() { showSettings.value = false; showSystemPrompts.value = true; }
   function closeSystemPrompts() { showSystemPrompts.value = false; }
-  function openTemplates() { showSettings.value = false; showTemplates.value = true; }
-  function closeTemplates() { showTemplates.value = false; }
   function openTerminal() { useDockStore().openTerminal(); }
   function closeTerminal() { useDockStore().closeTerminal(); }
   function toggleTerminal() { useDockStore().toggleTerminal(); }
@@ -79,18 +82,18 @@ export const useUiStore = defineStore('ui', () => {
   function closeShortcuts() { showShortcuts.value = false; }
 
   return {
-    showSettings, showWorkspaces, showPalette,
-    showSystemPrompts, showTemplates, showTerminal,
+    showSettings, showWorkspaces, editWorkspaceId, showPalette,
+    showSystemPrompts, showTerminal,
     showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
     switchingWorkspace, beginSwitch, endSwitch,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
     openSettings, closeSettings,
     openWorkspaces, closeWorkspaces,
+    openWorkspaceEdit, closeWorkspaceEdit,
     openPalette, openPaletteWith, closePalette,
 
     openSystemPrompts, closeSystemPrompts,
-    openTemplates, closeTemplates,
     openTerminal, closeTerminal, toggleTerminal,
     openExplorer, closeExplorer, toggleExplorer,
     openTrash, closeTrash,

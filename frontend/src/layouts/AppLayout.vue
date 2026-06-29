@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useHead } from '@unhead/vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import Sidebar from '../components/Sidebar.vue';
 import StatusBar from '../components/StatusBar.vue';
 import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
+import WorkspaceEditModal from '../components/WorkspaceEditModal.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
-import TemplatesManager from '../components/TemplatesManager.vue';
 import DockWorkspace from '../components/DockWorkspace.vue';
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -26,6 +26,7 @@ const store = useTaskStore();
 const workspaces = useWorkspacesStore();
 const ui = useUiStore();
 const router = useRouter();
+const route = useRoute();
 // Sidebar collapse persists across refreshes — losing it on every reload
 // is a real micro-regression vs the legacy wallfacer-sidebar-collapsed.
 const SIDEBAR_KEY = 'wallfacer-sidebar-collapsed';
@@ -42,11 +43,25 @@ const showChatPopup = computed(() =>
 );
 
 onMounted(async () => {
+  // Capture the deep-link target BEFORE any await: the activeId watcher below
+  // fires the moment fetchConfig resolves (activeId flips '' -> server value)
+  // and rewrites the URL, which would wipe ?ws before it can be read.
+  const incomingWs = typeof route.query.ws === 'string' ? route.query.ws : '';
   if (!store.config) await store.fetchConfig();
   // Load the first-class workspace registry so the status bar and picker can
-  // show workspace names (not just folder basenames). Best-effort: failures
-  // are held in the store and fall back to basename display.
-  void workspaces.list();
+  // show workspace names (not just folder basenames), and so the deep-link
+  // target can be validated against known ids. Awaited (not fire-and-forget)
+  // so the activate-from-URL below sees a populated registry.
+  await workspaces.list();
+  // Deep link: if ?ws=<id> names a known workspace that isn't already active,
+  // jump to it. Unknown/invalid ids are ignored (no crash). Runs once on load.
+  if (
+    incomingWs &&
+    incomingWs !== workspaces.activeId &&
+    workspaces.workspaces.some(w => w.id === incomingWs)
+  ) {
+    try { await workspaces.activate(incomingWs); } catch { /* ignore bad deep link */ }
+  }
   // First-run guard: when the server has no active workspace yet, open
   // the picker automatically so the user can wire one up before tasks
   // fail with "no workspace selected" errors downstream. Mirrors the
@@ -54,6 +69,16 @@ onMounted(async () => {
   if (!(store.config?.workspaces?.length)) {
     ui.showWorkspaces = true;
   }
+});
+
+// Keep ?ws=<id> in the URL in sync with the active workspace so a copied link
+// reopens the same project (important in cloud mode). router.replace avoids
+// polluting history; the equality guard prevents a feedback loop with the
+// activate-from-URL path above.
+watch(() => workspaces.activeId, (id) => {
+  if (!id) return;
+  if (route.query.ws === id) return;
+  void router.replace({ path: route.path, query: { ...route.query, ws: id } });
 });
 
 // On tab refocus, refetch the task list so any SSE events missed while the
@@ -159,8 +184,8 @@ useKeyboard({
     </div>
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
+    <WorkspaceEditModal v-if="ui.editWorkspaceId" />
     <SystemPromptsManager v-model="ui.showSystemPrompts" />
-    <TemplatesManager v-model="ui.showTemplates" />
     <KeyboardShortcutsModal v-model="ui.showShortcuts" />
     <ConfirmDialog />
     <Toaster />
