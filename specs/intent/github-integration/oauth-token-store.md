@@ -83,15 +83,24 @@ Consequences:
   userinfo, and discards the token -- there is no connected-account / external
   token store). The "Latere AI" GitHub *App* is a separate credential class
   (repo-scoped `contents`/`pull_requests`/`issues`/`metadata`) that `../auth`
-  does **not** broker today. The new `../auth` work: register the GitHub App
-  (App ID + private key, distinct from the existing social-login
-  `GITHUB_CLIENT_ID/SECRET`), add the install + user-to-server flow, **persist**
-  the resulting token, and **expose** it to consuming products (wallfacer) via
-  an endpoint the wallfacer server calls for the principal's GitHub token.
-  Terraform only carries the app secrets. Until that lands, wallfacer's
-  `internal/github` client + token store run against a mock; the `Direct`
-  localhost path below is retained only as a dev stopgap behind the same client
-  seam, not as the shipping model.
+  does **not** broker today. The new `../auth` work is now specced at
+  [auth/specs/github-app-brokering.md](../../../auth/specs/github-app-brokering.md):
+  register the App, the install flow, and a `/internal/github/installation-token`
+  mint endpoint gated by a `github:mint-token` service scope. Notably, the
+  capability **previously existed in `../auth`** and was removed in `870d9f6`
+  (incidental to a sandbox-admin cut); that removed code is the design
+  precedent. Terraform only carries the app secrets. Until the endpoint lands,
+  wallfacer's `internal/github` client + token store run against a mock; the
+  `Direct` localhost path below is retained only as a dev stopgap behind the same
+  client seam, not as the shipping model.
+- **Cross-repo open decision -- credential kind.** The `../auth` spec's central
+  fork ripples here: an **installation token minted on demand** (recommended;
+  bot attribution, no token at rest) keeps wallfacer's `Broker.Token(ctx,
+  principal)` seam unchanged but leaves `Token.Login`/`RefreshToken` unused and
+  turns the settings "Signed in as @login" into "Installed on \<org\>"; a
+  **persisted user-to-server token** (user attribution) matches the current
+  `Token` model but needs new secret-at-rest plumbing in `../auth`. Resolve this
+  jointly with the `../auth` spec before implementing the live `Broker`.
 - **Cross-product token scope.** Because the app is shared, the token store keys
   on the principal (user/org), and the same brokered credential can serve other
   latere products; wallfacer must not assume it owns the registration.
