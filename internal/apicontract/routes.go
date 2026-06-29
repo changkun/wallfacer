@@ -117,7 +117,37 @@ var Routes = []Route{
 	{
 		Method: http.MethodPut, Pattern: "/api/workspaces", Name: "UpdateWorkspaces",
 		JSName:      "update",
-		Description: "Replace the active workspace set and switch the scoped task board.",
+		Description: "Replace the active workspace set and switch the scoped task board (legacy path-based switch).",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/workspaces", Name: "ListWorkspaces",
+		JSName:      "list",
+		Description: "List workspaces visible to the caller, each flagged active or dormant.",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/workspaces", Name: "CreateWorkspace",
+		JSName:      "create",
+		Description: "Create a workspace (stable id, random storage key) from a name and folder set.",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: http.MethodPut, Pattern: "/api/workspaces/{id}", Name: "UpdateWorkspace",
+		JSName:      "updateOne",
+		Description: "Rename a workspace and/or replace its folder set without re-keying its history.",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: http.MethodDelete, Pattern: "/api/workspaces/{id}", Name: "DeleteWorkspace",
+		JSName:      "remove",
+		Description: "Delete a workspace record (its data directory is left on disk).",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/workspaces/{id}/activate", Name: "ActivateWorkspace",
+		JSName:      "activate",
+		Description: "Activate a workspace by id and switch the scoped task board.",
 		Tags:        []string{"workspaces"},
 	},
 

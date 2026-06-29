@@ -1,0 +1,121 @@
+package handler
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/workspace"
+)
+
+// TestWorkspaceCRUDLifecycle exercises create -> list -> activate -> edit
+// folders -> delete-guard end to end through the HTTP handlers.
+func TestWorkspaceCRUDLifecycle(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	ws2 := t.TempDir()
+
+	// Create.
+	body, _ := json.Marshal(map[string]any{"name": "proj", "folders": []string{ws}})
+	rec := httptest.NewRecorder()
+	h.CreateWorkspace(rec, httptest.NewRequest(http.MethodPost, "/api/workspaces", bytes.NewReader(body)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: got %d: %s", rec.Code, rec.Body.String())
+	}
+	var created workspaceDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created: %v", err)
+	}
+	if created.ID == "" || created.Name != "proj" || created.Active {
+		t.Fatalf("unexpected created workspace: %+v", created)
+	}
+
+	// List contains it, not yet active.
+	lrec := httptest.NewRecorder()
+	h.ListWorkspaces(lrec, httptest.NewRequest(http.MethodGet, "/api/workspaces", nil))
+	var list struct {
+		Workspaces []workspaceDTO `json:"workspaces"`
+		ActiveID   string         `json:"active_id"`
+	}
+	if err := json.Unmarshal(lrec.Body.Bytes(), &list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(list.Workspaces) == 0 {
+		t.Fatal("list returned no workspaces")
+	}
+
+	// Activate by id; config carries the active id.
+	arec := httptest.NewRecorder()
+	areq := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+created.ID+"/activate", nil)
+	areq.SetPathValue("id", created.ID)
+	h.ActivateWorkspace(arec, areq)
+	if arec.Code != http.StatusOK {
+		t.Fatalf("activate: got %d: %s", arec.Code, arec.Body.String())
+	}
+	var cfg map[string]any
+	_ = json.Unmarshal(arec.Body.Bytes(), &cfg)
+	if cfg["workspace_id"] != created.ID {
+		t.Fatalf("config workspace_id = %v, want %q", cfg["workspace_id"], created.ID)
+	}
+
+	// Edit folders (add ws2). Identity preserved, still active.
+	ubody, _ := json.Marshal(map[string]any{"folders": []string{ws, ws2}})
+	urec := httptest.NewRecorder()
+	ureq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+created.ID, bytes.NewReader(ubody))
+	ureq.SetPathValue("id", created.ID)
+	h.UpdateWorkspace(urec, ureq)
+	if urec.Code != http.StatusOK {
+		t.Fatalf("update: got %d: %s", urec.Code, urec.Body.String())
+	}
+	var updated workspaceDTO
+	_ = json.Unmarshal(urec.Body.Bytes(), &updated)
+	if updated.ID != created.ID || len(updated.Folders) != 2 || !updated.Active {
+		t.Fatalf("update did not preserve identity/activeness: %+v", updated)
+	}
+
+	// Deleting the active workspace is refused.
+	drec := httptest.NewRecorder()
+	dreq := httptest.NewRequest(http.MethodDelete, "/api/workspaces/"+created.ID, nil)
+	dreq.SetPathValue("id", created.ID)
+	h.DeleteWorkspace(drec, dreq)
+	if drec.Code != http.StatusConflict {
+		t.Fatalf("delete active: got %d, want 409", drec.Code)
+	}
+}
+
+// TestWorkspaceUpdate_VisibilityIsolation verifies that in cloud mode a caller
+// who cannot see an org-stamped workspace gets 404 (not found, no leak) on a
+// mutation, while the owning org caller passes the guard.
+func TestWorkspaceUpdate_VisibilityIsolation(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	h.SetCloudMode(true)
+	const id = "ws-fixed-1"
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{ID: id, Folders: []string{ws}, DataKey: "deadbeefdeadbeef", CreatedBy: "owner", OrgID: "org-a"},
+	}); err != nil {
+		t.Fatalf("seed workspace: %v", err)
+	}
+	rename, _ := json.Marshal(map[string]any{"name": "x"})
+
+	// Personal caller (different principal) cannot see it: 404.
+	preq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+id, bytes.NewReader(rename))
+	preq = preq.WithContext(auth.WithIdentity(preq.Context(), &auth.Identity{Sub: "u", OrgID: ""}))
+	preq.SetPathValue("id", id)
+	prec := httptest.NewRecorder()
+	h.UpdateWorkspace(prec, preq)
+	if prec.Code != http.StatusNotFound {
+		t.Fatalf("personal caller: got %d, want 404", prec.Code)
+	}
+
+	// Owning org caller passes the guard.
+	oreq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+id, bytes.NewReader(rename))
+	oreq = oreq.WithContext(auth.WithIdentity(oreq.Context(), &auth.Identity{Sub: "owner", OrgID: "org-a"}))
+	oreq.SetPathValue("id", id)
+	orec := httptest.NewRecorder()
+	h.UpdateWorkspace(orec, oreq)
+	if orec.Code != http.StatusOK {
+		t.Fatalf("owner caller: got %d, want 200: %s", orec.Code, orec.Body.String())
+	}
+}
