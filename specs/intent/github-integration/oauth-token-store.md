@@ -60,7 +60,33 @@ actions), and an installation id persisted alongside the principal. The
 implementation can fall back to a plain OAuth App if install friction proves too
 high in practice; the UI and scopes below assume the GitHub App path.
 
-The remaining options (brokering, storage) stay open and are recorded below.
+## Resolved: brokering is a central "Latere AI" GitHub App
+
+Brokering is resolved to the **brokered-via-latere.ai** model, and deliberately
+**product-general**: a single GitHub App named **"Latere AI"** is registered once
+at the latere.ai org level and shared across latere products (lectio, lux,
+wallfacer, ...), not a wallfacer-specific app. Users install "Latere AI" on their
+org once; the install/authorize callback rides latere.ai's auth infra (the same
+place the public OIDC client lives), and wallfacer receives the brokered token
+scoped to the principal. This mirrors how `AccountControl.vue` already federates
+identity through shared latere-ui + latere.ai OIDC rather than per-app sign-in.
+
+Consequences:
+
+- **No per-install app registration.** Installs do not each create a GitHub App;
+  they install the one central "Latere AI" app. The client secret / app private
+  key lives in latere.ai infra, never in a wallfacer instance.
+- **Infra dependency.** This needs the central app registered and a callback
+  route on the latere.ai side (`../terraform` / the auth gateway). If that infra
+  is not yet present, local development can run the `internal/github` client and
+  token store against a mock while the live brokered flow is wired separately;
+  the `Direct` localhost path below is retained only as a dev stopgap behind the
+  same client seam, not as the shipping model.
+- **Cross-product token scope.** Because the app is shared, the token store keys
+  on the principal (user/org), and the same brokered credential can serve other
+  latere products; wallfacer must not assume it owns the registration.
+
+The remaining option (storage) stays open and is recorded below.
 
 ## Options
 
@@ -79,15 +105,18 @@ Kept for rationale; the decision is recorded above.
 Decided: **GitHub App** (see "Resolved" above), with the OAuth-App fallback kept
 behind the `internal/github` client seam.
 
-### OAuth brokering for a localhost server
+### OAuth brokering for a localhost server (resolved -> brokered via latere.ai)
+
+Kept for rationale; the decision (central "Latere AI" app, brokered) is recorded
+above.
 
 - **Direct**: the wallfacer server registers its own callback
   (`http://127.0.0.1:<port>/api/github/auth/callback`); the client secret lives
-  server-side. Works for self-hosted/local.
-- **Brokered via latere.ai**: the OAuth App is registered once centrally, and
-  the callback rides the existing latere.ai auth infra (like the public OIDC
-  client). Avoids every install registering its own GitHub app; necessary for
-  the cloud/multi-instance story.
+  server-side. Retained only as a dev stopgap behind the client seam.
+- **Brokered via latere.ai** (decided): the central "Latere AI" GitHub App is
+  registered once, and the callback rides the existing latere.ai auth infra (like
+  the public OIDC client). Avoids every install registering its own app;
+  necessary for the cloud/multi-instance and cross-product story.
 
 ### Token storage
 
@@ -100,8 +129,10 @@ behind the `internal/github` client seam.
 ## Open Questions
 
 1. ~~OAuth App or GitHub App for v1?~~ **Resolved: GitHub App** (see above).
-2. Self-registered localhost callback, or brokered through latere.ai's auth
-   infra so installs do not each register a GitHub app?
+2. ~~Self-registered localhost callback, or brokered through latere.ai?~~
+   **Resolved: brokered** via a single central "Latere AI" GitHub App (see
+   above). Remaining sub-question: is the latere.ai-side callback/app-registration
+   infra already present, or does it need building in `../terraform` first?
 3. Which scopes/permissions are the minimum for read + PR-create + comment
    (`repo`, `read:org`, `read:user`; or GitHub App `contents`, `pull_requests`,
    `issues`, `metadata`)?
