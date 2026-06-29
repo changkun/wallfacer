@@ -165,8 +165,8 @@ describe('WorkspacePicker wizard', () => {
     expect(next).not.toBeNull();
     expect((next as HTMLButtonElement).disabled).toBe(true);
 
-    // Add the current folder ('/'), which flips canProceed without browsing.
-    const addCurrent = findByText(host, 'button', '+ Add current folder');
+    // Add the browsed folder ('/'), which flips canProceed without browsing.
+    const addCurrent = findByText(host, 'button', '+ Add this folder');
     expect(addCurrent).not.toBeNull();
     (addCurrent as HTMLButtonElement).click();
     await nextTick();
