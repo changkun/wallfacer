@@ -16,6 +16,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/github"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/metrics"
@@ -183,6 +184,13 @@ type Handler struct {
 	// SetDeviceAuth in local-mode wiring; nil for cloud-mode deployments
 	// (cloud mode uses /login + the OAuth code flow instead).
 	deviceAuth *DeviceAuth
+
+	// github backs the /api/github/* surface with a principal-scoped GitHub
+	// App token provider. Nil until SetGitHub; endpoints then report the
+	// GitHub surface unavailable. The live connect flow additionally needs the
+	// ../auth broker (github.Provider.Broker); status and disconnect work with
+	// the token store alone.
+	github *github.Provider
 
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache

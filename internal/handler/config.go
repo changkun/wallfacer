@@ -266,6 +266,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"terminal_enabled":          true,
 		"agent_session_window_days": 30,
 		"auth_enabled":              h.auth != nil,
+		"github":                    h.githubStatus(ctx),
 	}
 	if h.authURL != "" {
 		resp["auth_url"] = h.authURL

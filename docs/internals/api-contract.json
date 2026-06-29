@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 123,
+  "route_count": 126,
   "routes": [
     {
       "method": "GET",
@@ -1117,6 +1117,33 @@
       "description": "Cancel the in-flight local-mode device-code flow.",
       "tags": [
         "login"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/github/auth/status",
+      "name": "GitHubAuthStatus",
+      "description": "GitHub connection state for the principal: connected, login, account, granted permissions, and whether the connect flow is available.",
+      "tags": [
+        "github"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/github/auth/connect",
+      "name": "GitHubAuthConnect",
+      "description": "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the ../auth broker.",
+      "tags": [
+        "github"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/github/auth/disconnect",
+      "name": "GitHubAuthDisconnect",
+      "description": "Disconnect GitHub by clearing the principal's stored token.",
+      "tags": [
+        "github"
       ]
     }
   ]
