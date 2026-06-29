@@ -75,13 +75,33 @@ func TestWorkspaceCRUDLifecycle(t *testing.T) {
 		t.Fatalf("update did not preserve identity/activeness: %+v", updated)
 	}
 
-	// Deleting the active workspace is refused.
+	// Deleting the active workspace is allowed; it returns 200 with the new
+	// config and (no other workspace exists) the empty active state.
 	drec := httptest.NewRecorder()
 	dreq := httptest.NewRequest(http.MethodDelete, "/api/workspaces/"+created.ID, nil)
 	dreq.SetPathValue("id", created.ID)
 	h.DeleteWorkspace(drec, dreq)
-	if drec.Code != http.StatusConflict {
-		t.Fatalf("delete active: got %d, want 409", drec.Code)
+	if drec.Code != http.StatusOK {
+		t.Fatalf("delete active: got %d, want 200: %s", drec.Code, drec.Body.String())
+	}
+	var delCfg map[string]any
+	_ = json.Unmarshal(drec.Body.Bytes(), &delCfg)
+	// The active workspace must have switched away from the deleted one (to
+	// another workspace or the empty state) — never still point at it.
+	if delCfg["workspace_id"] == created.ID {
+		t.Fatalf("active workspace still points at the deleted one: %v", delCfg["workspace_id"])
+	}
+	// The workspace is gone from the registry.
+	lrec2 := httptest.NewRecorder()
+	h.ListWorkspaces(lrec2, httptest.NewRequest(http.MethodGet, "/api/workspaces", nil))
+	var list2 struct {
+		Workspaces []workspaceDTO `json:"workspaces"`
+	}
+	_ = json.Unmarshal(lrec2.Body.Bytes(), &list2)
+	for _, ws := range list2.Workspaces {
+		if ws.ID == created.ID {
+			t.Fatal("deleted workspace still listed")
+		}
 	}
 }
 

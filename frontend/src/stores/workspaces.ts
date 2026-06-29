@@ -85,12 +85,17 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
     return ws;
   }
 
-  // remove deletes a workspace. The server returns 409 for the active one, so
-  // callers must switch away first.
+  // remove permanently deletes a workspace and wipes its data. The active
+  // workspace may be deleted: the server auto-switches the board (to the next
+  // workspace or the empty state) and returns the resulting config, which we
+  // apply so the sidebar + board reflect the deletion in one round-trip.
   async function remove(id: string): Promise<void> {
     error.value = null;
-    await api<void>('DELETE', `/api/workspaces/${id}`);
+    const config = await api<ServerConfig>('DELETE', `/api/workspaces/${id}`);
     workspaces.value = workspaces.value.filter(w => w.id !== id);
+    const tasks = useTaskStore();
+    tasks.config = config;
+    await tasks.fetchTasks();
   }
 
   // activate switches the board to a workspace. The endpoint returns the full

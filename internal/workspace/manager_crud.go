@@ -2,12 +2,15 @@ package workspace
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // newWorkspaceID mints a fresh stable workspace identity.
@@ -256,25 +259,92 @@ func (m *Manager) SetLimits(id string, maxParallel, maxTestParallel *int) (Works
 	return groups[i], nil
 }
 
-// Delete removes a workspace record. It is idempotent (deleting an unknown id is
-// a no-op) and refuses to delete the currently active workspace; switch away
-// first. The workspace's data directory is intentionally left on disk.
-func (m *Manager) Delete(id string) error {
-	m.mu.RLock()
-	active := m.current.WorkspaceID == id && id != ""
-	m.mu.RUnlock()
-	if active {
-		return fmt.Errorf("cannot delete the active workspace; switch away first")
+// Delete removes a workspace and permanently wipes its scoped data — the task
+// store, transcripts, planning state, whiteboard, and agent-session history.
+// The active workspace may be deleted: the board auto-switches to the next
+// usable workspace (MRU order), or to the empty "no workspace" state when none
+// remain (which prompts the picker). Idempotent for an unknown id. Returns the
+// resulting active snapshot so callers can reflect the switch.
+func (m *Manager) Delete(id string) (Snapshot, error) {
+	if id == "" {
+		return m.Snapshot(), nil
 	}
 	groups, err := LoadGroups(m.configDir)
 	if err != nil {
-		return err
+		return Snapshot{}, err
 	}
 	i := findByID(groups, id)
 	if i < 0 {
-		return nil
+		return m.Snapshot(), nil // idempotent: already gone
 	}
-	return SaveGroups(m.configDir, append(groups[:i:i], groups[i+1:]...))
+	target := groups[i]
+	m.mu.RLock()
+	wasActive := m.current.WorkspaceID == id
+	m.mu.RUnlock()
+
+	// Persist the removal first so the auto-switch below resolves against the
+	// remaining set.
+	remaining := make([]Workspace, 0, len(groups)-1)
+	remaining = append(remaining, groups[:i]...)
+	remaining = append(remaining, groups[i+1:]...)
+	if err := SaveGroups(m.configDir, remaining); err != nil {
+		return Snapshot{}, err
+	}
+
+	// If the deleted workspace was active, move the board to the next usable
+	// workspace, or to the empty state when none remain.
+	if wasActive {
+		if next := firstActivatable(remaining); next != "" {
+			if _, err := m.SwitchByID(next); err != nil {
+				if _, serr := m.Switch(nil); serr != nil {
+					return Snapshot{}, serr
+				}
+			}
+		} else if _, err := m.Switch(nil); err != nil {
+			return Snapshot{}, err
+		}
+	}
+
+	m.wipeWorkspaceData(target.DataKey)
+	return m.Snapshot(), nil
+}
+
+// firstActivatable returns the id of the first workspace with usable folders
+// (non-dormant, at least one currently-valid folder), or "" if none qualify.
+func firstActivatable(groups []Workspace) string {
+	for _, g := range groups {
+		if g.ID == "" || g.Dormant || len(g.Folders) == 0 {
+			continue
+		}
+		if _, err := validate(g.Folders); err != nil {
+			continue
+		}
+		return g.ID
+	}
+	return ""
+}
+
+// wipeWorkspaceData closes the scoped store (if still open) and removes the
+// workspace's data directory and agent-session directory. A "" key is a no-op
+// so it can never escalate to removing a parent directory.
+func (m *Manager) wipeWorkspaceData(dataKey string) {
+	if dataKey == "" {
+		return
+	}
+	m.mu.Lock()
+	if ag, ok := m.activeGroups[dataKey]; ok {
+		if ag.snapshot.Store != nil && !ag.snapshot.Store.IsClosed() {
+			ag.snapshot.Store.Close()
+		}
+		delete(m.activeGroups, dataKey)
+	}
+	m.mu.Unlock()
+	if m.dataDir != "" {
+		_ = os.RemoveAll(filepath.Join(m.dataDir, dataKey))
+	}
+	if m.configDir != "" {
+		_ = os.RemoveAll(store.AgentSessionUsageDir(m.configDir, dataKey))
+	}
 }
 
 // ListWorkspaces returns the workspaces visible to p (nil = local, sees all).
