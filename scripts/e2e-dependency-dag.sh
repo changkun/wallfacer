@@ -87,10 +87,11 @@ fi
 
 # --- Configure workspace ---
 section "setup"
-step "setting workspace to $WORKSPACE"
-api PUT "/api/workspaces" -d "{\"workspaces\":[\"$WORKSPACE\"]}" >/dev/null
+step "creating + activating workspace $WORKSPACE"
+WS_ID=$(api POST "/api/workspaces" -d "{\"name\":\"e2e\",\"folders\":[\"$WORKSPACE\"]}" | jq -r '.id')
+api POST "/api/workspaces/${WS_ID}/activate" >/dev/null
 sleep 2
-pass "workspace set"
+pass "workspace set (id ${WS_ID})"
 
 # Set max parallel tasks to 3.
 step "setting max parallel tasks to 3"

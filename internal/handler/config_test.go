@@ -271,7 +271,7 @@ func TestUpdateWorkspaces_RoundTripsToConfig(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{"workspaces": []string{pick}})
 	req := httptest.NewRequest(http.MethodPut, "/api/workspaces", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("PUT /api/workspaces: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -308,7 +308,7 @@ func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/workspaces", bytes.NewReader(body))
 	req = req.WithContext(auth.WithIdentity(req.Context(), id))
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("PUT /api/workspaces: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1271,6 +1271,25 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	return h, wsMgr, ws
 }
 
+// switchWorkspacesViaConfig performs the workspace switch the retired
+// PUT /api/workspaces handler used to do (decode {workspaces}, switch the
+// manager) and renders the config response via GetConfig, so the
+// buildConfigResponse behavior these tests assert is still exercised end to end.
+func switchWorkspacesViaConfig(h *Handler, w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	if _, err := h.workspace.Switch(body.Workspaces); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	getReq := httptest.NewRequest(http.MethodGet, "/api/config", nil).WithContext(r.Context())
+	h.GetConfig(w, getReq)
+}
+
 // TestUpdateWorkspaces_SwitchesToNewWorkspace verifies that POST /api/workspaces
 // with a valid new workspace switches the active workspace and returns a config
 // response that reflects the new workspace set.
@@ -1285,7 +1304,7 @@ func TestUpdateWorkspaces_SwitchesToNewWorkspace(t *testing.T) {
 	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -1331,7 +1350,7 @@ func TestUpdateWorkspaces_AllowedDuringInProgress(t *testing.T) {
 	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200 when switching with tasks in progress, got %d: %s", w.Code, w.Body.String())
@@ -1346,7 +1365,7 @@ func TestUpdateWorkspaces_InvalidWorkspaceReturns400(t *testing.T) {
 	body := strings.NewReader(`{"workspaces":["/does/not/exist/at/all"]}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for non-existent workspace, got %d: %s", w.Code, w.Body.String())
@@ -1373,7 +1392,7 @@ func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
 	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -1436,7 +1455,7 @@ func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
 	newWS := t.TempDir()
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("switch group: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1525,7 +1544,7 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 	newWS := t.TempDir()
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
 	w := httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("switch group: %d: %s", w.Code, w.Body.String())
 	}
@@ -1637,7 +1656,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	wsB := t.TempDir()
 	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, wsB))
 	w = httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("switch to B: %d: %s", w.Code, w.Body.String())
 	}
@@ -1664,7 +1683,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	// Switch back to A and the toggles must return to their saved state.
 	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, wsA))
 	w = httptest.NewRecorder()
-	h.UpdateWorkspaces(w, req)
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("switch back to A: %d: %s", w.Code, w.Body.String())
 	}

@@ -645,7 +645,7 @@ func TestNormalizeBrowserVisibleHostPort(t *testing.T) {
 func TestRequiresStore(t *testing.T) {
 	storeIndependent := []string{
 		"GetConfig", "UpdateConfig", "BrowseWorkspaces", "MkdirWorkspace",
-		"RenameWorkspace", "UpdateWorkspaces", "GetEnvConfig",
+		"RenameWorkspace", "GetEnvConfig",
 		"UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream",
 	}
 	for _, name := range storeIndependent {

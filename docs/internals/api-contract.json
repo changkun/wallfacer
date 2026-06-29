@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 137,
+  "route_count": 136,
   "routes": [
     {
       "method": "GET",
@@ -98,15 +98,6 @@
       "pattern": "/api/workspaces/rename",
       "name": "RenameWorkspace",
       "description": "Rename a directory at an absolute host path.",
-      "tags": [
-        "workspaces"
-      ]
-    },
-    {
-      "method": "PUT",
-      "pattern": "/api/workspaces",
-      "name": "UpdateWorkspaces",
-      "description": "Replace the active workspace set and switch the scoped task board (legacy path-based switch).",
       "tags": [
         "workspaces"
       ]
