@@ -343,8 +343,7 @@ function breadcrumbSegments() {
         <button
           v-if="dismissable"
           type="button"
-          class="btn-ghost"
-          style="font-size: 18px; padding: 2px 8px; flex-shrink: 0"
+          class="btn-ghost ws-picker__close"
           @click="close"
         >
           &times;
@@ -687,12 +686,16 @@ function breadcrumbSegments() {
 .ws-list__name {
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.4;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .ws-list__paths {
   font-size: 11px;
+  /* Without an explicit line-height the single-line box collapses to the font
+   * size and overflow:hidden clips the descenders ("half visible" paths). */
+  line-height: 1.6;
   color: var(--text-muted);
   font-family: monospace;
   overflow: hidden;
@@ -721,6 +724,15 @@ function breadcrumbSegments() {
   font-size: 11px;
   padding: 0 12px;
   align-self: center;
+}
+/* The close button must be a rounded square so its focus ring isn't a sharp
+ * rectangle (the outline follows border-radius). */
+.ws-picker__close {
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 9px;
+  flex-shrink: 0;
+  border-radius: 8px;
 }
 .ws-picker__name-row {
   display: flex;
