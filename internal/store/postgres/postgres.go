@@ -15,10 +15,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5" // registers the pgx5:// driver
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"latere.ai/x/pkg/pgxmigrate"
 )
 
 //go:embed migrations/*.sql
@@ -48,20 +48,10 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 }
 
 func runMigrations(dsn string) error {
-	src, err := iofs.New(migrationsFS, "migrations")
-	if err != nil {
-		return err
-	}
-	// golang-migrate's pgx/v5 driver expects a pgx5:// scheme.
-	m, err := migrate.NewWithSourceInstance("iofs", src, pgxScheme(dsn))
-	if err != nil {
-		return err
-	}
-	defer func() { _, _ = m.Close() }()
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return err
-	}
-	return nil
+	// golang-migrate's pgx/v5 driver expects a pgx5:// scheme. The shared
+	// pgxmigrate helper runs Up and closes migrate's own pool; the pgx5
+	// driver is blank-imported above since pgxmigrate selects it by scheme.
+	return pgxmigrate.Up(pgxScheme(dsn), migrationsFS, "migrations")
 }
 
 // pgxScheme rewrites a postgres:// (or postgresql://) DSN to the pgx5:// scheme

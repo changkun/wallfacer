@@ -15,7 +15,7 @@ require (
 	golang.org/x/text v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 	latere.ai/x/agon v0.1.2
-	latere.ai/x/pkg v0.22.0
+	latere.ai/x/pkg v0.23.0
 	latere.ai/x/topos v0.0.5
 )
 
