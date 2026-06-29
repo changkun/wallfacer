@@ -1059,7 +1059,7 @@ func TestSwitch_UpsertGroupError(t *testing.T) {
 	origSnap := m.Snapshot()
 
 	// Block UpsertGroup by making workspace-groups.json unreadable (a directory).
-	if err := os.MkdirAll(groupsFilePath(configDir), 0o755); err != nil {
+	if err := os.MkdirAll(workspacesFilePath(configDir), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 

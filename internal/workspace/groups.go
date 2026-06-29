@@ -87,16 +87,29 @@ func (w *Workspace) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// groupsFilePath returns the path to the workspace-groups.json file within configDir.
-func groupsFilePath(configDir string) string {
+// workspacesFilePath returns the path to the canonical workspaces.json file.
+func workspacesFilePath(configDir string) string {
+	return filepath.Join(configDir, "workspaces.json")
+}
+
+// legacyGroupsFilePath returns the path to the pre-redesign
+// workspace-groups.json file, read as a fallback until migration rewrites it.
+func legacyGroupsFilePath(configDir string) string {
 	return filepath.Join(configDir, "workspace-groups.json")
 }
 
-// LoadGroups reads workspaces from the config directory.
+// LoadGroups reads workspaces from the config directory. It prefers the
+// canonical workspaces.json and falls back to the legacy workspace-groups.json
+// (whose records the Workspace UnmarshalJSON still understands) so an
+// un-migrated install keeps working.
 func LoadGroups(configDir string) ([]Workspace, error) {
-	raw, err := os.ReadFile(groupsFilePath(configDir))
+	path := workspacesFilePath(configDir)
+	raw, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		raw, err = os.ReadFile(legacyGroupsFilePath(configDir))
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -108,9 +121,9 @@ func LoadGroups(configDir string) ([]Workspace, error) {
 	return NormalizeGroups(groups), nil
 }
 
-// SaveGroups writes workspaces to the config directory atomically.
+// SaveGroups writes workspaces to the canonical workspaces.json atomically.
 func SaveGroups(configDir string, groups []Workspace) error {
-	path := groupsFilePath(configDir)
+	path := workspacesFilePath(configDir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
