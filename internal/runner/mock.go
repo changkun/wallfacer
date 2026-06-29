@@ -35,6 +35,11 @@ type MockRunner struct {
 	WtDir       string
 	CodexPath   string
 
+	// WorkspaceMgr, when set, is returned by WorkspaceManager so integration
+	// tests can drive a real (switchable) workspace manager through the handler
+	// instead of the static fallback NewHandler builds when this is nil.
+	WorkspaceMgr *workspace.Manager
+
 	// Recorded call arguments (mutex-protected for race-safety).
 	RunBackgroundCalls          []uuid.UUID
 	KillContainerCalls          []uuid.UUID
@@ -264,8 +269,9 @@ func (m *MockRunner) AutoPushWorkspaceCalls() []string {
 	return slices.Clone(m.MaybeAutoPushWorkspaceCalls)
 }
 
-// WorkspaceManager returns nil.
-func (m *MockRunner) WorkspaceManager() *workspace.Manager { return nil }
+// WorkspaceManager returns the injected manager (or nil, the default, which
+// makes NewHandler fall back to a static manager).
+func (m *MockRunner) WorkspaceManager() *workspace.Manager { return m.WorkspaceMgr }
 
 // AgentsRegistry returns the built-in catalog. Sufficient for handler
 // tests that need slug lookups without hitting the disk.
