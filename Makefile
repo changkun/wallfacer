@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag commit-seq push-once
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once
 
 # Full build gate: fmt + frontend assets + lint + binary.
 build: fmt frontend-build lint build-binary
@@ -95,6 +95,14 @@ ifndef WORKSPACE
 	$(error WORKSPACE is required. Create a fresh git repo and pass its path.)
 endif
 	sh scripts/e2e-dependency-dag.sh $(WORKSPACE)
+
+# UI regression checks: boot wallfacer against seeded demo data and assert UI
+# invariants (render-crash + broken-layout) in a real browser. Catches the class
+# of bug jsdom unit tests cannot. SKIP_BUILD=1 reuses an existing ./wallfacer.
+#   make ui-test
+#   SKIP_BUILD=1 make ui-test
+ui-test:
+	sh frontend/scripts/ui-shots/ui-test.sh
 
 # ---- wallfacerd (wf.latere.ai) ----
 

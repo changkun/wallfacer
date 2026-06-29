@@ -80,6 +80,37 @@ node frontend/scripts/ui-shots/snap.mjs --base http://localhost:8099 --out /tmp/
 node frontend/scripts/ui-shots/snap.mjs --base http://localhost:8099 --out /tmp/wf-shots --theme dark
 ```
 
+## UI regression checks (`checks.mjs` + `ui-test.sh`)
+
+`snap.mjs` captures images; `checks.mjs` **asserts** invariants in a real
+browser, so it catches the two regression classes jsdom unit tests cannot:
+
+- **Render crashes** — a thrown render blanks a region (e.g. "the entire
+  sidebar disappeared"). Detected via uncaught page errors + structural
+  presence checks (the element has a non-zero bounding box).
+- **Broken layout** — CSS mislays / clips / overlaps elements (e.g. the
+  Select Workspace list crammed into the wizard's narrow grid cell). Detected
+  by measuring `getBoundingClientRect` geometry: row width vs. modal width,
+  left offset, vertical overlap, overflow.
+
+This is deterministic (geometry assertions), not pixel-diffing, so it does not
+drift across machines/fonts.
+
+```bash
+make ui-test                  # build SPA + binary, seed, boot, assert; non-zero on regression
+SKIP_BUILD=1 make ui-test     # reuse an existing ./wallfacer + dist (fast iteration)
+node checks.mjs --base http://localhost:8099 --only picker,board   # against an already-booted server
+node checks.mjs --list        # scene names
+```
+
+Scenes: `board` (app shell + sidebar present), `switcher` (popover open doesn't
+drop the sidebar), `picker` (Select Workspace list is a full-width,
+non-overlapping, in-bounds column), plus `settings` / `plan` / `analytics` /
+`agents` / `flows` smoke (route renders, no uncaught error). Add a scene by
+appending to the `SCENES` table in `checks.mjs`. Playwright runs from the same
+throwaway `/tmp` sandbox as `snap.mjs` (never under `frontend/`, which would
+break the vite-ssg build).
+
 ## Docs screenshots
 
 Guide images live in `docs/guide/images/` as a `foo.png` (light) + `foo-dark.png`
