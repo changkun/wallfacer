@@ -315,7 +315,7 @@ func (r *Runner) Shutdown() {
 }
 
 // RunBackground launches Run in a background goroutine tracked by backgroundWg.
-// Callers (handlers, autopilot) should use this instead of a bare "go r.Run(...)"
+// Callers (handlers, autoimplement) should use this instead of a bare "go r.Run(...)"
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {

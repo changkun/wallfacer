@@ -21,8 +21,8 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
-| `GET /api/config` | Get server configuration (workspaces, autopilot flags, harness list, payload limits) |
-| `PUT /api/config` | Update server configuration (autopilot, autotest, autosubmit, harness assignments) |
+| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits) |
+| `PUT /api/config` | Update server configuration (autoimplement, autotest, autosubmit, harness assignments) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
 | `POST /api/workspaces/mkdir` | Create a new directory under an absolute host path |
@@ -381,7 +381,7 @@ All metrics are served at `GET /metrics` in Prometheus text exposition format vi
 | Metric | Labels | Description |
 |---|---|---|
 | `wallfacer_http_requests_total` | `method`, `route`, `status` | Total HTTP requests. Route uses `r.Pattern` (Go 1.22+) to collapse parameterised paths. |
-| `wallfacer_autopilot_actions_total` | `watcher`, `outcome` | Autonomous actions taken by autopilot watchers (e.g. promote, retry, test, submit). |
+| `wallfacer_autoimplement_actions_total` | `watcher`, `outcome` | Autonomous actions taken by autoimplement watchers (e.g. promote, retry, test, submit). |
 
 ### Histograms
 
@@ -547,6 +547,6 @@ sequenceDiagram
 ## See Also
 
 - [Architecture](architecture.md): System overview, design decisions, component responsibilities, concurrency model
-- [Automation](automation.md): Autopilot watchers, auto-retry, circuit breakers, oversight, routines
+- [Automation](automation.md): Autoimplement watchers, auto-retry, circuit breakers, oversight, routines
 - [Task Lifecycle](task-lifecycle.md): State machine, turn loop, data models
 - [Git Worktrees](git-worktrees.md): Per-task worktree isolation and commit pipeline

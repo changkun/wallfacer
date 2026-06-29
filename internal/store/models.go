@@ -459,7 +459,7 @@ func (t *Task) HasTag(tag string) bool {
 
 // IsRoutine reports whether the task is a routine schedule template.
 // Routine cards live outside the normal lifecycle — they stay in backlog
-// forever and are filtered out of autopilot, archiving, and dep-graph walks.
+// forever and are filtered out of autoimplement, archiving, and dep-graph walks.
 func (t *Task) IsRoutine() bool {
 	return t.Kind == TaskKindRoutine
 }

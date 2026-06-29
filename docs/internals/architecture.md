@@ -70,7 +70,7 @@ The codebase moved off three older designs. The docs and symbols below reflect t
 stateDiagram-v2
     [*] --> backlog
 
-    backlog --> in_progress : drag / autopilot
+    backlog --> in_progress : drag / autoimplement
 
     in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
     in_progress --> waiting : end_turn
@@ -342,7 +342,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Add a field to Task | `internal/store/models.go` -> `internal/store/migrate.go` |
 | Change the turn loop | `internal/runner/execute.go` (`Run()`) |
 | Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `internal/gitutil/ops.go` |
-| Add a new automation watcher | `internal/handler/tasks_autopilot.go` (follow `SubscribeWake` pattern) |
+| Add a new automation watcher | `internal/handler/tasks_autoimplement.go` (follow `SubscribeWake` pattern) |
 | Change the agent launch spec | `internal/runner/container.go` (`buildContainerSpecForSandbox()`) + `internal/executor/host.go` |
 | Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `registry.go`) |
 | Add a new env config variable | `internal/envconfig/envconfig.go` |
@@ -429,7 +429,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 
 | File | Concern | Key endpoints |
 |---|---|---|
-| `handler.go` | Core `Handler` struct, constructor, autopilot toggle state, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
+| `handler.go` | Core `Handler` struct, constructor, autoimplement toggle state, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
 | `principal.go` | Request principal plumbing used by auth/cloud middleware |, (internal) |
 | `force_login.go` | Force-login gate applied in cloud mode (`Handler.ForceLogin`) |, (internal) |
@@ -441,9 +441,9 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
-| `tasks_autopilot.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, etc. |
+| `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, etc. |
 | `stream.go` | SSE streaming for live task updates and agent logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |
-| `config.go` | Server configuration (autopilot flags, harness list, watcher health) | `GET /api/config`, `PUT /api/config` |
+| `config.go` | Server configuration (autoimplement flags, harness list, watcher health) | `GET /api/config`, `PUT /api/config` |
 | `env.go` | Environment configuration (API tokens, model settings, harness routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |
 | `git.go` | Git workspace operations (status, push, sync, rebase, branches, checkout) | `GET /api/git/status`, `POST /api/git/push`, `POST /api/git/sync`, etc. |
 | `execute.go` | Task execution trigger (delegates to runner) |, (internal, called by task status transitions) |
@@ -451,7 +451,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `spans.go` | Span timing statistics (per-task and aggregate) | `GET /api/debug/spans`, `GET /api/tasks/{id}/spans` |
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |
 | `sandbox_gate.go` | Harness usability checks (auth validation before task launch) |, (internal helpers) |
-| `watcher.go` | Shared two-phase watcher helper used by the autopilot loops in `tasks_autopilot.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |
+| `watcher.go` | Shared two-phase watcher helper used by the autoimplement loops in `tasks_autoimplement.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |
 | `agentsession.go` | Agent session chat: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/agent/messages`, `GET /api/agent/messages/stream`, `POST /api/agent/messages/interrupt`, `GET /api/agent/commands` |
 | `agentsession_tool.go` | Plan task-mode tools, including prompt refinement | `POST /api/agent/tool/update_task_prompt` |
 | `agentsession_threads.go` | Agent session CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/agent/sessions`, `PATCH /api/agent/sessions/{id}` |

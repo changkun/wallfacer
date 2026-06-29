@@ -356,7 +356,7 @@ func TestGetSpecTree_HiddenForMismatchedPrincipal(t *testing.T) {
 	}
 }
 
-func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
+func TestGetConfig_AutoimplementFalseByDefault(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	w := httptest.NewRecorder()
@@ -364,8 +364,8 @@ func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
 
 	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
-	if autopilot, ok := resp["autopilot"].(bool); !ok || autopilot {
-		t.Errorf("expected autopilot=false by default, got %v", resp["autopilot"])
+	if autoimplement, ok := resp["autoimplement"].(bool); !ok || autoimplement {
+		t.Errorf("expected autoimplement=false by default, got %v", resp["autoimplement"])
 	}
 }
 
@@ -704,13 +704,13 @@ func TestUpdateConfig_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestUpdateConfig_EnableAutopilot(t *testing.T) {
+func TestUpdateConfig_EnableAutoimplement(t *testing.T) {
 	h := newTestHandler(t)
-	if h.AutopilotEnabled() {
-		t.Fatal("autopilot should be off initially")
+	if h.AutoimplementEnabled() {
+		t.Fatal("autoimplement should be off initially")
 	}
 
-	body := `{"autopilot": true}`
+	body := `{"autoimplement": true}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -722,19 +722,19 @@ func TestUpdateConfig_EnableAutopilot(t *testing.T) {
 	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-	if enabled, ok := resp["autopilot"].(bool); !ok || !enabled {
-		t.Errorf("expected autopilot=true in response, got %v", resp["autopilot"])
+	if enabled, ok := resp["autoimplement"].(bool); !ok || !enabled {
+		t.Errorf("expected autoimplement=true in response, got %v", resp["autoimplement"])
 	}
-	if !h.AutopilotEnabled() {
-		t.Error("expected autopilot to be enabled after update")
+	if !h.AutoimplementEnabled() {
+		t.Error("expected autoimplement to be enabled after update")
 	}
 }
 
-func TestUpdateConfig_DisableAutopilot(t *testing.T) {
+func TestUpdateConfig_DisableAutoimplement(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
-	body := `{"autopilot": false}`
+	body := `{"autoimplement": false}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -742,16 +742,16 @@ func TestUpdateConfig_DisableAutopilot(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	if h.AutopilotEnabled() {
-		t.Error("expected autopilot to be disabled")
+	if h.AutoimplementEnabled() {
+		t.Error("expected autoimplement to be disabled")
 	}
 }
 
 func TestUpdateConfig_NoFieldChangesNothing(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
-	// Empty body — should not change autopilot.
+	// Empty body — should not change autoimplement.
 	body := `{}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -760,8 +760,8 @@ func TestUpdateConfig_NoFieldChangesNothing(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	if !h.AutopilotEnabled() {
-		t.Error("expected autopilot to remain enabled when not specified in request")
+	if !h.AutoimplementEnabled() {
+		t.Error("expected autoimplement to remain enabled when not specified in request")
 	}
 }
 
@@ -1568,19 +1568,19 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 }
 
 // TestAutomationToggles_ScopedPerWorkspaceGroup pins that automation
-// toggles (autopilot, autotest, etc.) are stored per workspace group:
-// toggling autopilot on in group A and switching to group B (which has
-// never been toggled) must leave autopilot off in B. Switching back to
+// toggles (autoimplement, autotest, etc.) are stored per workspace group:
+// toggling autoimplement on in group A and switching to group B (which has
+// never been toggled) must leave autoimplement off in B. Switching back to
 // A must restore it. Autopush stays global and is deliberately excluded.
 func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	h, wsMgr, wsA := newTestHandlerWithRealWorkspaceManager(t)
 
-	// Enable autopilot and autotest in group A via the HTTP handler so
+	// Enable autoimplement and autotest in group A via the HTTP handler so
 	// the persistence side-effect matches production.
 	pilot := true
 	tst := true
 	b, _ := json.Marshal(struct {
-		Autopilot *bool `json:"autopilot"`
+		Autoimplement *bool `json:"autoimplement"`
 		Autotest  *bool `json:"autotest"`
 	}{&pilot, &tst})
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
@@ -1589,7 +1589,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("enable in A: %d: %s", w.Code, w.Body.String())
 	}
-	if !h.AutopilotEnabled() || !h.AutotestEnabled() {
+	if !h.AutoimplementEnabled() || !h.AutotestEnabled() {
 		t.Fatalf("toggles should be on in A")
 	}
 
@@ -1606,7 +1606,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	// applySnapshot runs on the manager's subscription goroutine.
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		if !h.AutopilotEnabled() && !h.AutotestEnabled() {
+		if !h.AutoimplementEnabled() && !h.AutotestEnabled() {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -1614,8 +1614,8 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 
 	// Group B has never seen a toggle before — every automation must be
 	// off regardless of what A had on.
-	if h.AutopilotEnabled() {
-		t.Errorf("autopilot leaked into fresh group B")
+	if h.AutoimplementEnabled() {
+		t.Errorf("autoimplement leaked into fresh group B")
 	}
 	if h.AutotestEnabled() {
 		t.Errorf("autotest leaked into fresh group B")
@@ -1633,14 +1633,14 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	// before applySnapshot runs on the subscription goroutine.
 	deadline = time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		if h.AutopilotEnabled() && h.AutotestEnabled() {
+		if h.AutoimplementEnabled() && h.AutotestEnabled() {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if !h.AutopilotEnabled() || !h.AutotestEnabled() {
-		t.Errorf("toggles should be restored in A after round-trip (autopilot=%v autotest=%v)",
-			h.AutopilotEnabled(), h.AutotestEnabled())
+	if !h.AutoimplementEnabled() || !h.AutotestEnabled() {
+		t.Errorf("toggles should be restored in A after round-trip (autoimplement=%v autotest=%v)",
+			h.AutoimplementEnabled(), h.AutotestEnabled())
 	}
 	_ = wsMgr
 }
@@ -1650,7 +1650,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.
 func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	body := `{"autopilot": true, "unknown_field": "surprise"}`
+	body := `{"autoimplement": true, "unknown_field": "surprise"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -1664,7 +1664,7 @@ func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
 // the JSON object returns 400.
 func TestUpdateConfig_RejectsTrailingContent(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	body := `{"autopilot": true} trailing`
+	body := `{"autoimplement": true} trailing`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)

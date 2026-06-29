@@ -25,7 +25,7 @@ Start here for the full reading order.
 
 ### Operate
 
-- [Automation](automation.md). Autopilot, auto-test, auto-submit, auto-retry, circuit breakers.
+- [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
 - [Oversight & Analytics](oversight-and-analytics.md). Oversight summaries, costs, timeline, logs.
 - [Workspaces](workspaces.md). Workspace management, git integration, branches, auto-push.
 - [Configuration](configuration.md). Settings, env vars, harness selection, CLI, keyboard shortcuts.
@@ -54,7 +54,7 @@ See [Agents & Flows](agents-and-flows.md) for the full recipes and runtime-scope
 
 ### Parallel feature development
 
-Create multiple Backlog tasks, enable [Autopilot](automation.md), and let Wallfacer run them concurrently. Each task works on a separate branch, so there are no conflicts during execution. Conflicts (if any) are resolved at merge time.
+Create multiple Backlog tasks, enable [Autoimplement](automation.md), and let Wallfacer run them concurrently. Each task works on a separate branch, so there are no conflicts during execution. Conflicts (if any) are resolved at merge time.
 
 ### Iterative refinement
 
@@ -71,7 +71,7 @@ Create multiple Backlog tasks, enable [Autopilot](automation.md), and let Wallfa
 
 ### Fully automated pipeline
 
-1. Enable Autopilot + Auto-Test + Auto-Submit (see [Automation](automation.md)).
+1. Enable Autoimplement + Auto-Test + Auto-Submit (see [Automation](automation.md)).
 2. Create backlog tasks with dependencies (see [Board & Tasks](board-and-tasks.md)).
 3. Tasks are automatically promoted, tested, and submitted as they complete.
 

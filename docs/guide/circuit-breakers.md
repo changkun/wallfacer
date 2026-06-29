@@ -56,7 +56,7 @@ Watcher breakers only affect **automated** actions. You can still:
 - Manually trigger refinement or testing
 - Use all other UI features normally
 
-Automation toggles (Autopilot, Auto-test, etc.) remain independent of
+Automation toggles (Autoimplement, Auto-test, etc.) remain independent of
 breaker state. The breaker is a transient safety layer, not a
 configuration change.
 

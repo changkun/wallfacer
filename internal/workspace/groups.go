@@ -25,13 +25,13 @@ type Group struct {
 	MaxTestParallel *int `json:"max_test_parallel,omitempty"`
 
 	// Automation toggles are per-group so that switching workspaces does
-	// not carry an "autopilot on" state into a group the user expected to
+	// not carry an "autoimplement on" state into a group the user expected to
 	// operate manually. Pointers so that absent fields in on-disk JSON
 	// deserialize to nil (meaning "unset, default off"), distinguishable
 	// from an explicit false the user saved. Autopush is intentionally
 	// NOT per-group: push credentials / remote setup are global, so the
 	// auto-push flag continues to live in the env file.
-	Autopilot  *bool `json:"autopilot,omitempty"`
+	Autoimplement  *bool `json:"autoimplement,omitempty"`
 	Autotest   *bool `json:"autotest,omitempty"`
 	Autosubmit *bool `json:"autosubmit,omitempty"`
 	Autosync   *bool `json:"autosync,omitempty"`
@@ -100,7 +100,7 @@ func UpsertGroup(configDir string, workspaces []string) error {
 				Workspaces:      workspaces,
 				MaxParallel:     group.MaxParallel,
 				MaxTestParallel: group.MaxTestParallel,
-				Autopilot:       group.Autopilot,
+				Autoimplement:       group.Autoimplement,
 				Autotest:        group.Autotest,
 				Autosubmit:      group.Autosubmit,
 				Autosync:        group.Autosync,
@@ -138,7 +138,7 @@ func NormalizeGroups(groups []Group) []Group {
 			Workspaces:      ws,
 			MaxParallel:     sanitizeLimit(group.MaxParallel),
 			MaxTestParallel: sanitizeLimit(group.MaxTestParallel),
-			Autopilot:       group.Autopilot,
+			Autoimplement:       group.Autoimplement,
 			Autotest:        group.Autotest,
 			Autosubmit:      group.Autosubmit,
 			Autosync:        group.Autosync,

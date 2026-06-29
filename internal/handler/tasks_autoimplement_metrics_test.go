@@ -42,17 +42,17 @@ func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 	// Pre-register the counter so it appears in exposition even before any
 	// increments occur.
 	reg.Counter(
-		"wallfacer_autopilot_actions_total",
-		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
+		"wallfacer_autoimplement_actions_total",
+		"Total number of autonomous actions taken by autoimplement watchers, by watcher and outcome.",
 	)
 	h := NewHandler(s, r, t.TempDir(), nil, reg)
 	return h, reg
 }
 
-// autopilotCounterValue returns the current value of the
-// wallfacer_autopilot_actions_total counter for the given watcher/outcome pair
+// autoimplementCounterValue returns the current value of the
+// wallfacer_autoimplement_actions_total counter for the given watcher/outcome pair
 // by parsing the Prometheus text exposition from the registry.
-func autopilotCounterValue(t *testing.T, reg *metrics.Registry, watcher, outcome string) float64 {
+func autoimplementCounterValue(t *testing.T, reg *metrics.Registry, watcher, outcome string) float64 {
 	t.Helper()
 	var sb strings.Builder
 	reg.WritePrometheus(&sb)
@@ -62,7 +62,7 @@ func autopilotCounterValue(t *testing.T, reg *metrics.Registry, watcher, outcome
 	// before watcher in the label set.
 	target := fmt.Sprintf(`outcome="%s",watcher="%s"`, outcome, watcher)
 	for _, line := range strings.Split(body, "\n") {
-		if !strings.HasPrefix(line, "wallfacer_autopilot_actions_total{") {
+		if !strings.HasPrefix(line, "wallfacer_autoimplement_actions_total{") {
 			continue
 		}
 		if !strings.Contains(line, target) {
@@ -85,7 +85,7 @@ func autopilotCounterValue(t *testing.T, reg *metrics.Registry, watcher, outcome
 // zero the auto_retrier emits a suppressed_budget counter and does not promote.
 func TestAutoRetrySuppressedBudget(t *testing.T) {
 	h, reg := newTestHandlerWithRegistry(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget test", Timeout: 15, Kind: store.TaskKindTask})
@@ -116,7 +116,7 @@ func TestAutoRetrySuppressedBudget(t *testing.T) {
 	snap, _ := h.store.GetTask(ctx, task.ID)
 	h.tryAutoRetry(ctx, h.store, *snap)
 
-	if got := autopilotCounterValue(t, reg, "auto_retrier", "suppressed_budget"); got != 1 {
+	if got := autoimplementCounterValue(t, reg, "auto_retrier", "suppressed_budget"); got != 1 {
 		t.Errorf("expected suppressed_budget=1, got %v", got)
 	}
 	after, _ := h.store.GetTask(ctx, task.ID)
@@ -130,7 +130,7 @@ func TestAutoRetrySuppressedBudget(t *testing.T) {
 // promote, even when the per-category budget is non-zero.
 func TestAutoRetrySuppressedMaxCount(t *testing.T) {
 	h, reg := newTestHandlerWithRegistry(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "max count test", Timeout: 15, Kind: store.TaskKindTask})
@@ -159,7 +159,7 @@ func TestAutoRetrySuppressedMaxCount(t *testing.T) {
 	snap, _ := h.store.GetTask(ctx, task.ID)
 	h.tryAutoRetry(ctx, h.store, *snap)
 
-	if got := autopilotCounterValue(t, reg, "auto_retrier", "suppressed_max_count"); got != 1 {
+	if got := autoimplementCounterValue(t, reg, "auto_retrier", "suppressed_max_count"); got != 1 {
 		t.Errorf("expected suppressed_max_count=1, got %v", got)
 	}
 	after, _ := h.store.GetTask(ctx, task.ID)
@@ -170,11 +170,11 @@ func TestAutoRetrySuppressedMaxCount(t *testing.T) {
 
 // TestTryAutoPromote_PromotedCounterIncrements verifies that successfully
 // promoting a backlog task increments the
-// wallfacer_autopilot_actions_total{watcher="auto_promoter",outcome="promoted"}
+// wallfacer_autoimplement_actions_total{watcher="auto_promoter",outcome="promoted"}
 // counter by exactly 1.
 func TestTryAutoPromote_PromotedCounterIncrements(t *testing.T) {
 	h, reg := newTestHandlerWithRegistry(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	// Create a single backlog task.
@@ -184,7 +184,7 @@ func TestTryAutoPromote_PromotedCounterIncrements(t *testing.T) {
 
 	h.tryAutoPromote(ctx)
 
-	got := autopilotCounterValue(t, reg, "auto_promoter", "promoted")
+	got := autoimplementCounterValue(t, reg, "auto_promoter", "promoted")
 	if got != 1 {
 		t.Errorf("expected promoted counter = 1, got %v", got)
 	}

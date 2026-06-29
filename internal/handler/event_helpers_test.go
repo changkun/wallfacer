@@ -44,7 +44,7 @@ func (h *logCaptureHandler) hasError(msg string) bool {
 
 // TestInsertEventOrLog_ErrorNoPanic verifies that insertEventOrLog does not
 // panic when InsertEvent returns an error (task deleted between status update
-// and event write), increments the autopilot error counter, and emits a
+// and event write), increments the autoimplement error counter, and emits a
 // structured ERROR log record.
 func TestInsertEventOrLog_ErrorNoPanic(t *testing.T) {
 	h, reg := newTestHandlerWithRegistry(t)
@@ -71,7 +71,7 @@ func TestInsertEventOrLog_ErrorNoPanic(t *testing.T) {
 	h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "probe"})
 
 	// (b) The error counter must have been incremented.
-	got := autopilotCounterValue(t, reg, "event_write", "error")
+	got := autoimplementCounterValue(t, reg, "event_write", "error")
 	if got != 1 {
 		t.Errorf("expected event_write/error counter = 1, got %v", got)
 	}
@@ -95,14 +95,14 @@ func TestInsertEventOrLog_SuccessNoCounter(t *testing.T) {
 
 	h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "ok"})
 
-	got := autopilotCounterValue(t, reg, "event_write", "error")
+	got := autoimplementCounterValue(t, reg, "event_write", "error")
 	if got != 0 {
 		t.Errorf("expected event_write/error counter = 0, got %v", got)
 	}
 }
 
 // TestInsertEventOrLog_NilRegistryNoPanic verifies that insertEventOrLog
-// handles a nil registry gracefully (incAutopilotAction is a no-op when
+// handles a nil registry gracefully (incAutoimplementAction is a no-op when
 // h.reg == nil).
 func TestInsertEventOrLog_NilRegistryNoPanic(t *testing.T) {
 	// newTestHandler creates a Handler with a nil registry.

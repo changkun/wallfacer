@@ -3,7 +3,7 @@
 //
 // The [Handler] struct is the central dependency container, holding references
 // to the task store, runner, workspace manager, prompt manager, metrics registry,
-// and automation state (autopilot, autotest, autosubmit, etc.). Each concern is
+// and automation state (autoimplement, autotest, autosubmit, etc.). Each concern is
 // implemented in a separate file: tasks, configuration, git operations, streaming,
 // refinement, oversight, and more. The package uses stdlib net/http
 // (Go 1.22+ pattern routing) with no framework. Background automation watchers

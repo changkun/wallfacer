@@ -25,7 +25,7 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer today is a **single-user, single-process server**. Every request is anonymous once the shared bearer token matches, every in-memory map is process-global, and every state-changing action (creating a task, dragging it to *In Progress*, submitting feedback, editing the workspace `AGENTS.md`, toggling autopilot, rotating the Anthropic API key) is indistinguishable from any other. There is no concept of "who did this."
+Wallfacer today is a **single-user, single-process server**. Every request is anonymous once the shared bearer token matches, every in-memory map is process-global, and every state-changing action (creating a task, dragging it to *In Progress*, submitting feedback, editing the workspace `AGENTS.md`, toggling autoimplement, rotating the Anthropic API key) is indistinguishable from any other. There is no concept of "who did this."
 
 Note: the identity *plumbing* (the data fields and the actor context carrier) has since shipped. The store now records `Task.CreatedBy` / `Task.OrgID` and `TaskEvent.ActorSub` / `TaskEvent.ActorType`, and handlers stamp the actor at the request boundary. See the Data Model section for exactly what landed and what remains. The remaining gap is the collaboration surface on top of those fields: presence, RBAC role gates, the audit log, optimistic concurrency, and the attribution UI.
 
@@ -34,8 +34,8 @@ This blocks the cloud movement in ways that the (now archived) `cloud/multi-tena
 1. **Teams are the unit that buys software, not individuals.** A team on `wallfacer.latere.ai` wants a **shared board** (multiple engineers seeing the same task list, same planning threads, same oversight history) not N isolated per-user instances that only communicate through GitHub PRs.
 2. **No attribution in the UI.** The store carries the actor now, but the board still renders timelines as *"moved to In Progress at 14:02"*. In a shared board it must say *"Alice moved to In Progress"* using the actor fields that already exist on `TaskEvent`.
 3. **No presence.** Two engineers dragging the same card, editing the same spec, or chatting in the same planning thread have no idea the other is there. They step on each other's work silently.
-4. **No permission boundaries.** Everything is admin-equivalent. A junior contributor can rotate the org API key, disable autopilot, delete production tasks, or edit the shared `AGENTS.md` template, no different from the team lead who pays the bill.
-5. **Automation loops have no distinct identity.** Autopilot promotion, auto-retry, title generation, oversight runs all stamp a single generic `ActorType "system"` with an empty sub today. In an audit-conscious multi-user setup these need clearly-named per-loop service actors, and the toggle that enables them needs an admin gate.
+4. **No permission boundaries.** Everything is admin-equivalent. A junior contributor can rotate the org API key, disable autoimplement, delete production tasks, or edit the shared `AGENTS.md` template, no different from the team lead who pays the bill.
+5. **Automation loops have no distinct identity.** Autoimplement promotion, auto-retry, title generation, oversight runs all stamp a single generic `ActorType "system"` with an empty sub today. In an audit-conscious multi-user setup these need clearly-named per-loop service actors, and the toggle that enables them needs an admin gate.
 
 Until presence, attribution UI, and RBAC exist on top of the data model, *"wallfacer runs in the cloud"* only means *"each user runs their own private wallfacer in the cloud."* That is a hosted single-tenant product, not a collaboration platform. This spec defines the work needed to close that gap.
 
@@ -90,11 +90,11 @@ The actor that lands on a stored mutation is two flat fields, not a nested struc
 | Principal sub | `Identity.Sub` | `Task.CreatedBy`, `TaskEvent.ActorSub` | `u_01J8B…` |
 | Org | `Identity.OrgID` | `Task.OrgID` | `org_01J…` |
 | Actor type | `Identity.PrincipalType` / context | `TaskEvent.ActorType` | `"user"`, `"service"`, `"apikey"`, `"system"`, `""` |
-| Service actor (future) | Constant sentinel | per-loop `ActorSub` | `service:autopilot`, `service:auto-retry`, `service:title-gen` |
+| Service actor (future) | Constant sentinel | per-loop `ActorSub` | `service:autoimplement`, `service:auto-retry`, `service:title-gen` |
 
 The shipped `store.ActorType` enum is `{ActorUser "user", ActorService "service", ActorAPIKey "apikey", ActorSystem "system", ActorAnonymous ""}`. Note that the *future* "service actor" namespace (`service:<name>` sentinel **subs** for distinguishing automation loops) is a different thing from the shipped `ActorService` **type** (which means "service-account JWT"). Reconciling the two is called out in Open Questions; it is not yet built.
 
-A `service:<name>` actor would be a reserved `ActorSub` namespace used when wallfacer's own automation mutates state on nobody's behalf. It is not minted by the auth service; it is a local constant. The UI would render service actors with a distinct chip color so the timeline is unambiguous: *"autopilot moved task X to In Progress"*.
+A `service:<name>` actor would be a reserved `ActorSub` namespace used when wallfacer's own automation mutates state on nobody's behalf. It is not minted by the auth service; it is a local constant. The UI would render service actors with a distinct chip color so the timeline is unambiguous: *"autoimplement moved task X to In Progress"*.
 
 ### Roles
 
@@ -104,7 +104,7 @@ The minimum viable permission set wallfacer recognizes:
 
 | Role (scope group) | Within wallfacer |
 |---|---|
-| `admin` | All editor permissions + settings, env, API keys, executor routing, autopilot toggles, instruction templates, member removal (via auth service), task force-delete, audit log access |
+| `admin` | All editor permissions + settings, env, API keys, executor routing, autoimplement toggles, instruction templates, member removal (via auth service), task force-delete, audit log access |
 | `editor` | Create/update/cancel/feedback/delete-own tasks; edit planning specs; edit instructions; send planning chat; dispatch specs |
 | `viewer` | Read-only: board, task events, diffs, oversight, usage, planning chat history, spec tree |
 
@@ -137,7 +137,7 @@ The canonical shape is two flat fields per record (`...Sub string` for the princ
 | `PlanningThread` | `internal/planner/threads.go` | `CreatedBy string`, `Visibility {private, shared}` | pending | Private = only creator; shared = any org member (no visibility yet) |
 | `WorkspaceInstructions` (AGENTS.md edit log) | `internal/prompts/` | `UpdatedBy string`, `UpdatedAt time.Time` | pending | Who last edited the shared instruction template |
 | `EnvEdit` (new, audit-log entry) | `internal/store/audit.go` (new) | `ActorSub`, `Diff []string` (field names only, never values) | pending | Admin edit of `.env` |
-| `ConfigEdit` (new, audit-log entry) | `internal/store/audit.go` (new) | `ActorSub`, `Field`, `Old`, `New` | pending | Admin toggle of autopilot/automation |
+| `ConfigEdit` (new, audit-log entry) | `internal/store/audit.go` (new) | `ActorSub`, `Field`, `Old`, `New` | pending | Admin toggle of autoimplement/automation |
 | `APIKeyAction` (new, audit-log entry) | `internal/store/audit.go` (new) | `ActorSub`, `Action {rotate, reveal, test}` | pending | Sensitive env access |
 | `SpecDispatch` event | `internal/spec/`, `internal/handler/specs_dispatch.go` | `ActorSub` | pending | Which team member dispatched this spec |
 | `SystemPromptOverride` | existing | `UpdatedBy string` | pending | Who edited the built-in prompt template |
@@ -397,7 +397,7 @@ Every automation mutation is currently faceless: the runner and scheduler gorout
 
 | Loop | Service actor (sub) | Admin gate for enable/disable |
 |---|---|---|
-| Autopilot (backlog → in_progress promotion) | `service:autopilot` | `PUT /api/config` (admin) |
+| Autoimplement (backlog → in_progress promotion) | `service:autoimplement` | `PUT /api/config` (admin) |
 | Auto-retry (failed retry on budget) | `service:auto-retry` | `PUT /api/config` (admin) |
 | Auto-submit (commit + push on done) | `service:auto-submit` | `PUT /api/config` (admin) |
 | Auto-sync (rebase on main) | `service:auto-sync` | `PUT /api/config` (admin) |
@@ -409,14 +409,14 @@ Every automation mutation is currently faceless: the runner and scheduler gorout
 
 Service actors appear in `TaskEvent.ActorSub`, in `ConfigEdit` (as the actor for cascading changes), and on audit-log entries for their own mutations. Implementing this means replacing the single `WithSystemActor` stamp with a per-loop sub, and reconciling it with the existing `ActorType` enum (see Open Questions): the natural shape is `ActorType "system"` (or a new `"service-loop"`) plus a `service:<name>` sub.
 
-Every config change that toggles an automation loop writes two records: a `ConfigEdit` audit entry with the admin actor, and a `task.event` on each task that is immediately affected (e.g. autopilot being disabled mid-queue emits *"autopilot disabled by Alice, 3 waiting tasks remain in backlog"* on the stats dashboard).
+Every config change that toggles an automation loop writes two records: a `ConfigEdit` audit entry with the admin actor, and a `task.event` on each task that is immediately affected (e.g. autoimplement being disabled mid-queue emits *"autoimplement disabled by Alice, 3 waiting tasks remain in backlog"* on the stats dashboard).
 
-### Per-member autopilot budget
+### Per-member autoimplement budget
 
-A member with role `editor` can create tasks that the admin-enabled autopilot will promote. Per-org config (`admin`-only) adds:
+A member with role `editor` can create tasks that the admin-enabled autoimplement will promote. Per-org config (`admin`-only) adds:
 
-- `WALLFACER_AUTOPILOT_ALLOWED_ACTORS` - optional allow-list of principal subs whose tasks autopilot will promote. Empty (default) means "any member."
-- `WALLFACER_AUTOPILOT_PER_ACTOR_LIMIT` - cap on concurrent in_progress tasks promoted by autopilot per actor. Prevents one member hogging the entire parallel-worker budget.
+- `WALLFACER_AUTOIMPLEMENT_ALLOWED_ACTORS` - optional allow-list of principal subs whose tasks autoimplement will promote. Empty (default) means "any member."
+- `WALLFACER_AUTOIMPLEMENT_PER_ACTOR_LIMIT` - cap on concurrent in_progress tasks promoted by autoimplement per actor. Prevents one member hogging the entire parallel-worker budget.
 
 Both are org-level config, admin-editable via `PUT /api/config`.
 
@@ -430,7 +430,7 @@ Append-only, admin-read. Covers every write the RBAC matrix labels as admin-only
 
 1. `env.edit` - admin edited `.env`. Payload: actor, timestamp, list of **field names** (never values). `ANTHROPIC_API_KEY` → `{"fields": ["ANTHROPIC_API_KEY"]}` is the entire diff.
 2. `env.test` - `POST /api/env/test` called. Payload: actor, timestamp, provider.
-3. `config.edit` - admin changed autopilot / automation / workspace. Payload: actor, timestamp, field, old value, new value (only non-secret fields).
+3. `config.edit` - admin changed autoimplement / automation / workspace. Payload: actor, timestamp, field, old value, new value (only non-secret fields).
 4. `workspace.switch` - workspace group changed. Payload: actor, old fingerprint, new fingerprint.
 5. `git.checkout` / `git.rebase-on-main` - branch-level mutation. Payload: actor, workspace, from/to.
 6. `task.delete.admin` - admin force-deleted another user's task. Payload: actor, task, original-creator.
@@ -438,7 +438,7 @@ Append-only, admin-read. Covers every write the RBAC matrix labels as admin-only
 8. `instructions.reinit` - workspace instructions regenerated.
 9. `system-prompt.override-write` / `system-prompt.override-delete`.
 10. `apikey.rotate` / `apikey.reveal` - sensitive env surface access.
-11. `automation.toggle` - autopilot / auto-retry / auto-submit / auto-sync flipped.
+11. `automation.toggle` - autoimplement / auto-retry / auto-submit / auto-sync flipped.
 
 ### Storage
 
@@ -500,7 +500,7 @@ Additions to the existing SSE stream on `/api/tasks/stream`. The event types gro
 | `presence` | Server → client | `{present: [{id, name, avatar, role, focus: {task_id?, thread_id?, editing?}}]}` |
 | `task-updated` | Server → client | (existing; gains `actor` field in diff) |
 | `conflict` | Server → client | `{resource: "task:<id>", actor, reason}` surfaced when a 409 happened on any peer mutation |
-| `config-changed` | Server → client | `{actor, field, value}` so everyone's autopilot toggle updates live |
+| `config-changed` | Server → client | `{actor, field, value}` so everyone's autoimplement toggle updates live |
 | `member-joined` / `member-left` | Server → client | Derived from presence; rendered as a toast |
 
 Client-initiated via POST (not SSE):
@@ -554,7 +554,7 @@ Sequenced to deliver value at each step and avoid a year-long landing. Each step
 9. **Attribution UI** - timeline actor chips, created-by chips on cards, audit log tab. **Pending.**
 10. **Planning thread visibility** - `Visibility` field, creator-gated read for private, admin-only visibility change, lock icon in the tab bar. **Pending.**
 11. **Typing indicators + compose awareness** - optional polish; last to land because it is the least load-bearing. **Pending.**
-12. **Per-member autopilot controls** - `WALLFACER_AUTOPILOT_ALLOWED_ACTORS`, `WALLFACER_AUTOPILOT_PER_ACTOR_LIMIT`, admin UI. **Pending.**
+12. **Per-member autoimplement controls** - `WALLFACER_AUTOIMPLEMENT_ALLOWED_ACTORS`, `WALLFACER_AUTOIMPLEMENT_PER_ACTOR_LIMIT`, admin UI. **Pending.**
 
 Steps 1-5 form the **RBAC-on-rails** minimum viable milestone. Steps 1-2 have landed; with steps 3-5 any cloud-hosted deployment can launch with correct attribution + authorization; 6-12 layer collaborative polish.
 
@@ -569,7 +569,7 @@ This spec is large enough that it should be broken down into child specs under `
 - `presence.md` (steps 8, 11)
 - `attribution-ui.md` (step 9)
 - `private-threads.md` (step 10)
-- `autopilot-fairness.md` (step 12)
+- `autoimplement-fairness.md` (step 12)
 
 Each child is `large` or smaller and dispatchable as a single agent task once its parent chunk's interfaces are validated.
 
@@ -582,7 +582,7 @@ Each child is `large` or smaller and dispatchable as a single agent task once it
 3. A viewer attempting any mutating endpoint receives 403. An editor attempting an admin-only endpoint receives 403. The 403 body is consistent shape across all refused routes.
 4. Dragging the same card to *In Progress* simultaneously from two browsers: exactly one wins, the other sees a 409 and a "refresh" toast, no card is duplicated.
 5. Editing the shared `AGENTS.md` concurrently from two admins: one commits, the other gets a merge UI showing both versions.
-6. Toggling autopilot is admin-only; the audit log has a `config.edit` entry with the admin's actor and the old→new value. Every task promoted by autopilot carries `service:autopilot` as its state-change actor in the timeline.
+6. Toggling autoimplement is admin-only; the audit log has a `config.edit` entry with the admin's actor and the old→new value. Every task promoted by autoimplement carries `service:autoimplement` as its state-change actor in the timeline.
 7. Creating a private planning thread and sending messages: a peer member's `GET /api/planning/messages?thread=<id>` returns 404 (not 403).
 8. Upgrading a pre-multi-user wallfacer installation preserves all existing tasks, which appear with empty (legacy) attribution rendered as *"(unknown)"* on legacy events and `admin`-equivalent behavior until the auth service is configured. (The store-side legacy handling already ships via `principalSeesTask`.)
 9. Audit log endpoint rejects non-admin reads and never leaks token values: fuzz test with every admin-touched endpoint confirms no secret-shaped string appears in any audit entry.

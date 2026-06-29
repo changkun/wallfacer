@@ -106,7 +106,7 @@ event so the trace reads as a transcript:
   seam: only `internal/agentgraph` names topos types) and hands it to a per-run
   sink passed in by the runner.
 - The sink is non-blocking: it appends to an in-memory ring buffer and fans out
-  to live subscribers (mirror the agon in-flight pattern in `tasks_autopilot.go`,
+  to live subscribers (mirror the agon in-flight pattern in `tasks_autoimplement.go`,
   but event-driven, not polled).
 
 ### D. wallfacer — persist + serve

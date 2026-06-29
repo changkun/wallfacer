@@ -13,7 +13,7 @@ import (
 // The two-phase design avoids holding a global lock during slow I/O operations
 // (git subprocess calls, disk reads) that happen in Phase 1. Only the fast
 // in-memory state verification and status transition happen under the lock in
-// Phase 2. This prevents autopilot watchers from serialising against each other
+// Phase 2. This prevents autoimplement watchers from serialising against each other
 // when multiple tasks are eligible simultaneously.
 type TwoPhaseWatcherConfig struct {
 	// Name is used in log messages.

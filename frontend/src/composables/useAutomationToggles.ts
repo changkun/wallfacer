@@ -8,14 +8,14 @@ import { useTaskStore } from '../stores/tasks';
 // AutomationMenu popover and the Execution settings tab so both read and
 // write the same state.
 export type AutomationKey =
-  | 'autopilot'
+  | 'autoimplement'
   | 'autotest'
   | 'autosubmit'
   | 'autosync'
   | 'autopush';
 
 export const AUTOMATION_KEYS: AutomationKey[] = [
-  'autopilot',
+  'autoimplement',
   'autotest',
   'autosubmit',
   'autosync',
@@ -23,7 +23,7 @@ export const AUTOMATION_KEYS: AutomationKey[] = [
 ];
 
 export const automationLabels: Record<AutomationKey, string> = {
-  autopilot: 'Implement',
+  autoimplement: 'Implement',
   autotest: 'Test',
   autosubmit: 'Submit',
   autosync: 'Catch up',
@@ -31,7 +31,7 @@ export const automationLabels: Record<AutomationKey, string> = {
 };
 
 export const automationHints: Record<AutomationKey, string> = {
-  autopilot: 'Auto-promote backlog tasks into In Progress',
+  autoimplement: 'Auto-promote backlog tasks into In Progress',
   autotest: 'Run verification automatically',
   autosubmit: 'Mark waiting → done once verified',
   autosync: 'Rebase waiting tasks onto the default branch',
@@ -39,7 +39,7 @@ export const automationHints: Record<AutomationKey, string> = {
 };
 
 const busy = ref<Record<AutomationKey, boolean>>({
-  autopilot: false,
+  autoimplement: false,
   autotest: false,
   autosubmit: false,
   autosync: false,

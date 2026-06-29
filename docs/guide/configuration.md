@@ -574,7 +574,7 @@ Access via **Settings > Workspace**.
 ## See Also
 
 - [Getting Started](getting-started.md) -- initial setup and first task
-- [Usage Guide](usage.md) -- task creation, feedback, autopilot, and results
+- [Usage Guide](usage.md) -- task creation, feedback, autoimplement, and results
 - [Circuit Breakers](circuit-breakers.md) -- agent launch failure protection
 - [Prompt Refinement](refinement-and-ideation.md) -- shaping a task's prompt in the Plan task-mode chat
 - [Architecture](../internals/architecture.md) -- system design for contributors

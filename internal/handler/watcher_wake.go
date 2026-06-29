@@ -7,7 +7,7 @@ import (
 
 // resubscribingWakeSource implements watcher.WakeSource by forwarding wake
 // signals from the currently viewed store, automatically re-subscribing
-// when the workspace group changes. Without this adapter, autopilot watchers
+// when the workspace group changes. Without this adapter, autoimplement watchers
 // would stop receiving task-change notifications after a workspace switch
 // because the underlying store (and its pub/sub hub) is replaced.
 type resubscribingWakeSource struct {

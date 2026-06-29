@@ -109,14 +109,14 @@ The launch circuit breaker is initialized in `NewRunner()` with:
 
 After the threshold is exceeded, the circuit opens and rejects further agent launches. After the open duration, it enters half-open state and allows a single probe. A successful probe resets the breaker; a failed probe re-opens it.
 
-## Autopilot (Auto-Promotion)
+## Autoimplement (Auto-Promotion)
 
-When autopilot is enabled, the server automatically promotes backlog tasks to `in_progress` as capacity becomes available, without requiring the user to drag cards manually.
+When autoimplement is enabled, the server automatically promotes backlog tasks to `in_progress` as capacity becomes available, without requiring the user to drag cards manually.
 
 ```mermaid
 flowchart TD
-    Enable["PUT /api/config<br/>autopilot: true"] --> Subscribe["StartAutoPromoter<br/>subscribes to store changes"]
-    Subscribe --> Check{"On each state change:<br/>autopilot enabled?"}
+    Enable["PUT /api/config<br/>autoimplement: true"] --> Subscribe["StartAutoPromoter<br/>subscribes to store changes"]
+    Subscribe --> Check{"On each state change:<br/>autoimplement enabled?"}
     Check -->|no| Skip[Skip]
     Check -->|yes| Capacity{"in_progress count<br/>< MAX_PARALLEL?"}
     Capacity -->|no| Skip
@@ -126,9 +126,9 @@ flowchart TD
     Deps -->|yes| Promote["Promote to in_progress<br/>launch runner.Run"]
 ```
 
-`WALLFACER_MAX_PARALLEL` defaults to 5. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit. Autopilot state is toggled via `PUT /api/config {"autopilot": true/false}` and does not persist across restarts.
+`WALLFACER_MAX_PARALLEL` defaults to 5. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit. Autoimplement state is toggled via `PUT /api/config {"autoimplement": true/false}` and does not persist across restarts.
 
-Concurrency limit is read from `WALLFACER_MAX_PARALLEL` in the env file (default: 5). Autopilot is off by default and does not persist across server restarts.
+Concurrency limit is read from `WALLFACER_MAX_PARALLEL` in the env file (default: 5). Autoimplement is off by default and does not persist across server restarts.
 
 Tasks whose `DependsOn` list contains any task not yet in `done` status are skipped by the auto-promoter even when the in-progress count is below `WALLFACER_MAX_PARALLEL`.
 
@@ -185,9 +185,9 @@ After reviewing the verdict, the user can:
 
 ## Auto-Submit
 
-Auto-submit is part of the autopilot pipeline. When enabled via `PUT /api/config {"autosubmit": true}`, the `StartAutoSubmitter` watcher monitors tasks that reach `waiting` state with a passing test verdict. It automatically marks them as done, triggering the commit-and-push pipeline without manual intervention.
+Auto-submit is part of the autoimplement pipeline. When enabled via `PUT /api/config {"autosubmit": true}`, the `StartAutoSubmitter` watcher monitors tasks that reach `waiting` state with a passing test verdict. It automatically marks them as done, triggering the commit-and-push pipeline without manual intervention.
 
-This completes the autonomous loop: autopilot promotes → agent executes → auto-tester verifies → auto-submit commits.
+This completes the autonomous loop: autoimplement promotes → agent executes → auto-tester verifies → auto-submit commits.
 
 ## Auto-Retry
 

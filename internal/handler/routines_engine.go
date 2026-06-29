@@ -187,7 +187,7 @@ func (h *Handler) unregisterRoutine(id uuid.UUID) {
 // archived) MUST call unregisterRoutine before returning. That single
 // chokepoint replaces the historical web of per-handler unregister calls.
 // If any code path transitions a routine to a terminal status without
-// notifying the engine (runner recovery, autopilot bulk transitions, a
+// notifying the engine (runner recovery, autoimplement bulk transitions, a
 // future handler that forgets, or the 250 ms reconcile settle window),
 // the next timer tick self-cleans here. Bugs of the shape "cancelled
 // routine keeps firing" are prevented systemically, not per call site.

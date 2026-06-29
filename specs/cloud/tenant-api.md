@@ -74,7 +74,7 @@ All tenant API routes are prefixed with `/api/v1/`. Authentication is per-tenant
 These internal API areas are explicitly excluded from the tenant API:
 
 - `GET/PUT /api/env`: Tenant cannot read or modify API keys / server env
-- `GET/PUT /api/config`: Server configuration (autopilot, executor routing)
+- `GET/PUT /api/config`: Server configuration (autoimplement, executor routing)
 - `POST /api/env/test`: Credential validation
 - `GET/PUT/DELETE /api/system-prompts/*`: System prompt overrides
 - `GET/PUT /api/instructions`: Workspace AGENTS.md

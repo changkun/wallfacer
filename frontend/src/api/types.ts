@@ -248,7 +248,7 @@ export interface ServerConfig {
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
   prompts_dir?: string;
-  autopilot: boolean;
+  autoimplement: boolean;
   autotest: boolean;
   autosubmit: boolean;
   autosync: boolean;

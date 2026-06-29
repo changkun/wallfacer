@@ -61,7 +61,7 @@
       "method": "GET",
       "pattern": "/api/config",
       "name": "GetConfig",
-      "description": "Get server configuration (workspaces, autopilot flags, sandbox list).",
+      "description": "Get server configuration (workspaces, autoimplement flags, sandbox list).",
       "tags": [
         "config"
       ]
@@ -70,7 +70,7 @@
       "method": "PUT",
       "pattern": "/api/config",
       "name": "UpdateConfig",
-      "description": "Update server configuration (autopilot, autotest, autosubmit, sandbox assignments).",
+      "description": "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
       "tags": [
         "config"
       ]

@@ -16,35 +16,35 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// TestSetAutopilot verifies that autopilot state can be toggled.
-func TestSetAutopilot_Enable(t *testing.T) {
+// TestSetAutoimplement verifies that autoimplement state can be toggled.
+func TestSetAutoimplement_Enable(t *testing.T) {
 	h := newTestHandler(t)
-	if h.AutopilotEnabled() {
-		t.Fatal("expected autopilot to be disabled by default")
+	if h.AutoimplementEnabled() {
+		t.Fatal("expected autoimplement to be disabled by default")
 	}
 
-	h.SetAutopilot(true)
-	if !h.AutopilotEnabled() {
-		t.Error("expected autopilot to be enabled after SetAutopilot(true)")
+	h.SetAutoimplement(true)
+	if !h.AutoimplementEnabled() {
+		t.Error("expected autoimplement to be enabled after SetAutoimplement(true)")
 	}
 }
 
-func TestSetAutopilot_Disable(t *testing.T) {
+func TestSetAutoimplement_Disable(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
-	h.SetAutopilot(false)
-	if h.AutopilotEnabled() {
-		t.Error("expected autopilot to be disabled after SetAutopilot(false)")
+	h.SetAutoimplement(true)
+	h.SetAutoimplement(false)
+	if h.AutoimplementEnabled() {
+		t.Error("expected autoimplement to be disabled after SetAutoimplement(false)")
 	}
 }
 
-func TestSetAutopilot_Toggle(t *testing.T) {
+func TestSetAutoimplement_Toggle(t *testing.T) {
 	h := newTestHandler(t)
 	for i := 0; i < 5; i++ {
 		enabled := i%2 == 0
-		h.SetAutopilot(enabled)
-		if h.AutopilotEnabled() != enabled {
-			t.Errorf("iteration %d: expected autopilot=%v, got %v", i, enabled, h.AutopilotEnabled())
+		h.SetAutoimplement(enabled)
+		if h.AutoimplementEnabled() != enabled {
+			t.Errorf("iteration %d: expected autoimplement=%v, got %v", i, enabled, h.AutoimplementEnabled())
 		}
 	}
 }
@@ -54,7 +54,7 @@ func TestSetAutopilot_Toggle(t *testing.T) {
 // disable user-controlled automation toggles.
 func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)
 
@@ -77,8 +77,8 @@ func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
 	}
 
 	// User-controlled toggles must NOT be disabled by a circuit breaker event.
-	if !h.AutopilotEnabled() {
-		t.Error("expected autopilot toggle to remain enabled")
+	if !h.AutoimplementEnabled() {
+		t.Error("expected autoimplement toggle to remain enabled")
 	}
 	if !h.AutotestEnabled() {
 		t.Error("expected autotest toggle to remain enabled")
@@ -299,10 +299,10 @@ func TestUpdateEnvConfig_EmptyTokenTreatedAsNoChange(t *testing.T) {
 	}
 }
 
-// TestTryAutoPromote_NoTasksWhenAutopilotOff verifies no promotion when autopilot disabled.
-func TestTryAutoPromote_NoPromotionWhenAutopilotOff(t *testing.T) {
+// TestTryAutoPromote_NoTasksWhenAutoimplementOff verifies no promotion when autoimplement disabled.
+func TestTryAutoPromote_NoPromotionWhenAutoimplementOff(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(false)
+	h.SetAutoimplement(false)
 
 	ctx := h.store // use store indirectly
 	_ = ctx
@@ -315,7 +315,7 @@ func TestTryAutoPromote_NoPromotionWhenAutopilotOff(t *testing.T) {
 func TestTryAutoPromote_PromotesWhenCapacityAvailable(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
 	_ = envPath
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
 	// Set max parallel to 1 so we know the limit.
 	body := `{"max_parallel_tasks": 1}`
@@ -333,7 +333,7 @@ func TestTryAutoPromote_PromotesWhenCapacityAvailable(t *testing.T) {
 // "idea-agent" (created by the brainstorm agent) ARE auto-promoted like normal tasks.
 func TestTryAutoPromote_PromotesIdeaAgentTaggedTasks(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	// Create a task tagged "idea-agent" (created by brainstorm, Kind=TaskKindTask).

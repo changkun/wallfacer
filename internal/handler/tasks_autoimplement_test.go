@@ -26,7 +26,7 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-type autopilotPhase1Store struct {
+type autoimplementPhase1Store struct {
 	waitingTasks []store.Task
 	waitingErr   error
 	backlogTasks []store.Task
@@ -34,7 +34,7 @@ type autopilotPhase1Store struct {
 	calls        []store.TaskStatus
 }
 
-func (m *autopilotPhase1Store) ListTasksByStatus(_ context.Context, status store.TaskStatus) ([]store.Task, error) {
+func (m *autoimplementPhase1Store) ListTasksByStatus(_ context.Context, status store.TaskStatus) ([]store.Task, error) {
 	m.calls = append(m.calls, status)
 	switch status {
 	case store.TaskStatusWaiting:
@@ -52,14 +52,14 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		store        autopilotPhase1Store
+		store        autoimplementPhase1Store
 		wantErr      error
 		wantCalls    []store.TaskStatus
 		wantLogError string
 	}{
 		{
 			name: "waiting_list_error",
-			store: autopilotPhase1Store{
+			store: autoimplementPhase1Store{
 				waitingErr: waitingErr,
 			},
 			wantErr:      waitingErr,
@@ -68,7 +68,7 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 		},
 		{
 			name: "backlog_list_error",
-			store: autopilotPhase1Store{
+			store: autoimplementPhase1Store{
 				backlogErr: backlogErr,
 			},
 			wantErr:      backlogErr,
@@ -170,7 +170,7 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 // the task on the next failure.
 func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
 	ctx := context.Background()
 
@@ -263,7 +263,7 @@ func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
 		t.Skip("os.Chmod cannot enforce read-only directories on Windows")
 	}
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutotest(true)
 
 	ctx := context.Background()
@@ -345,14 +345,14 @@ func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
 // TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker verifies that a
 // store write failure inside tryAutoTest's Phase2 loop (e.g. UpdateTaskTestRun
 // or UpdateTaskStatus) uses recordFailure on the "auto-test" breaker rather
-// than pauseAllAutomation, so global autopilot remains enabled and no other
+// than pauseAllAutomation, so global autoimplement remains enabled and no other
 // watcher breakers are affected.
 func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("os.Chmod cannot enforce read-only directories on Windows")
 	}
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutotest(true)
 
 	ctx := context.Background()
@@ -388,9 +388,9 @@ func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
 	h.tryAutoTest(ctx)
 
 	// Global automation must NOT be paused — a transient store error must only
-	// open the per-watcher breaker, not the global autopilot toggle.
-	if !h.AutopilotEnabled() {
-		t.Error("AutopilotEnabled() = false after store error in tryAutoTest; expected true")
+	// open the per-watcher breaker, not the global autoimplement toggle.
+	if !h.AutoimplementEnabled() {
+		t.Error("AutoimplementEnabled() = false after store error in tryAutoTest; expected true")
 	}
 	if !h.breakers["auto-test"].isOpen() {
 		t.Error("expected auto-test breaker to be open after store write failure in Phase2")
@@ -615,7 +615,7 @@ func TestTaskReachableInAdj(t *testing.T) {
 	}
 }
 
-// Tests for Start* autopilot goroutine launchers.
+// Tests for Start* autoimplement goroutine launchers.
 // Each function spawns a goroutine that exits when ctx is cancelled.
 // Pre-cancelling the context causes the goroutine to exit almost immediately,
 // allowing tests to verify the function does not panic or block indefinitely.
@@ -1355,7 +1355,7 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 // auto-submission, even when it has passed testing and its worktrees are up to date.
 func TestTryAutoSubmit_SkipsTaskWithRecentFetchError(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutosubmit(true)
 
 	ctx := context.Background()
@@ -1407,7 +1407,7 @@ func TestTryAutoSubmit_SkipsTaskWithRecentFetchError(t *testing.T) {
 // remote checks.
 func TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutosubmit(true)
 
 	ctx := context.Background()
@@ -1465,7 +1465,7 @@ func TestTryAutoPromote_PromotesMultipleTasks(t *testing.T) {
 	}
 	h.runner = &runner.MockRunner{}
 	h.cachedMaxParallel.Invalidate()
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
 	ctx := context.Background()
 
@@ -1501,7 +1501,7 @@ func TestTryAutoPromote_PromotesMultipleTasks(t *testing.T) {
 // slots.
 func TestTryAutoPromote_RespectsCapacityLimit(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
 	ctx := context.Background()
 
@@ -1559,7 +1559,7 @@ func TestTryAutoPromote_RespectsCapacityLimit(t *testing.T) {
 // and the status transition.
 func TestCheckAndSyncWaitingTasks_SkipsAlreadyPromotedTask(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, nil)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	ctx := context.Background()
 
 	// Create a git repo with a remote so the sync watcher's fetch/behind checks apply.
@@ -1600,7 +1600,7 @@ func TestCheckAndSyncWaitingTasks_SkipsAlreadyPromotedTask(t *testing.T) {
 // previously blocked task becomes eligible and is auto-submitted.
 func TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 	h.SetAutosubmit(true)
 
 	ctx := context.Background()
@@ -1653,7 +1653,7 @@ func TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared(t *testing.T) {
 
 func TestAutoPromoter_SkipsLockedTask(t *testing.T) {
 	h := newAgentSessionHandlerWithThreads(t)
-	h.SetAutopilot(true)
+	h.SetAutoimplement(true)
 
 	ctx := context.Background()
 

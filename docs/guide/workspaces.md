@@ -235,4 +235,4 @@ For the full HTTP API reference (workspace and git endpoints), see [API & Transp
 
 ## See Also
 
-[Board & Tasks](board-and-tasks.md) for task lifecycle details, [Automation](automation.md) for autopilot and auto-sync settings, [Configuration](configuration.md) for the full environment variable reference.
+[Board & Tasks](board-and-tasks.md) for task lifecycle details, [Automation](automation.md) for autoimplement and auto-sync settings, [Configuration](configuration.md) for the full environment variable reference.

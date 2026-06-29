@@ -85,7 +85,7 @@ SANDBOX ?=
 e2e-lifecycle:
 	sh scripts/e2e-lifecycle.sh $(SANDBOX)
 
-# End-to-end: dependency DAG (8 tasks with fan-out/fan-in, conflict resolution, autopilot).
+# End-to-end: dependency DAG (8 tasks with fan-out/fan-in, conflict resolution, autoimplement).
 # Requires a running wallfacer server. Pass WORKSPACE= pointing at a fresh git repo.
 # Usage:
 #   WORKSPACE=$$(mktemp -d) && git -C $$WORKSPACE init -b main && git -C $$WORKSPACE commit --allow-empty -m init

@@ -14,7 +14,7 @@ type commitsBehindResult struct {
 }
 
 // commitsBehindCache is a short-lived in-memory cache for gitutil.CommitsBehind
-// results, shared across the three autopilot watchers that poll waiting tasks:
+// results, shared across the three autoimplement watchers that poll waiting tasks:
 // checkAndSyncWaitingTasks, tryAutoTest, and tryAutoSubmit. Each CommitsBehind
 // call runs 3–6 git subprocesses, so deduplication within a polling window
 // substantially reduces subprocess overhead when N waiting tasks exist.
