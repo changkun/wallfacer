@@ -13,7 +13,7 @@ affects:
   - frontend/src/api/types.ts
 effort: xlarge
 created: 2026-06-28
-updated: 2026-06-28
+updated: 2026-06-30
 author: changkun
 dispatched_task_id: null
 ---
