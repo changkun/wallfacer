@@ -6,6 +6,7 @@ import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
 import AgentEditor from '../components/AgentEditor.vue';
 import {
   buildDraftFromFlow,
+  newFleetDraft,
   appendStep,
   removeStep,
   promoteToLead,
@@ -110,6 +111,13 @@ watch([selectedSlug, draft], ([slug, d]) => {
 // is cloned into a new user flow (saving POSTs); a user flow is edited in place
 // (saving PUTs). The full step list is fetched first so a list-view summary
 // (which may omit steps) doesn't seed an empty draft.
+// startNewFleet opens a blank draft so a fleet can be composed from scratch,
+// rather than only by cloning a built-in. Saving POSTs a new user flow.
+function startNewFleet() {
+  saveError.value = '';
+  draft.value = newFleetDraft();
+}
+
 async function startEdit() {
   const f = selectedFlow.value;
   if (!f) return;
@@ -299,10 +307,17 @@ onMounted(async () => {
               the lead agent receiving the task. A fleet either runs its agents in
               a fixed order or lets the lead delegate to members (its coordination).
               <template v-if="draft">Drag agents in, set the lead, pick how they coordinate, then save.</template>
-              <template v-else>Clone or edit a fleet to compose it; double-click an agent or node to edit the agent.</template>
+              <template v-else>Start a New fleet, or clone/edit one to compose it; double-click an agent or node to edit the agent.</template>
             </p>
           </div>
           <div class="ag-mode__header-actions">
+            <button
+              type="button"
+              class="ag-mode__new-fleet"
+              :disabled="!!draft"
+              title="Start a new empty fleet"
+              @click="startNewFleet"
+            >+ New fleet</button>
             <label class="ag-mode__flow-pick">
               <span class="ag-mode__flow-pick-label">Fleet</span>
               <select v-model="selectedSlug" class="ag-mode__flow-select" aria-label="Fleet">
@@ -362,11 +377,11 @@ onMounted(async () => {
           <div v-if="loading" class="ag-mode__empty-detail">
             <p>Loading fleet...</p>
           </div>
-          <div v-else-if="!selectedFlow" class="ag-mode__empty-detail">
-            <p>Pick a fleet above to see its agents.</p>
+          <div v-else-if="!selectedFlow && !draft" class="ag-mode__empty-detail">
+            <p>Pick a fleet above to see its agents, or start a New fleet.</p>
           </div>
           <template v-else>
-            <div v-if="!draft" class="ag-detail__head">
+            <div v-if="!draft && selectedFlow" class="ag-detail__head">
               <h3 class="ag-detail__title">{{ selectedFlow.name || selectedFlow.slug }}</h3>
               <span
                 class="ag-detail__badge"
@@ -410,7 +425,7 @@ onMounted(async () => {
             <!-- Editing toolbar: name + slug (slug locked when editing in place,
                  editable when naming a clone), the topology controls, and the
                  save/cancel actions. -->
-            <div v-else class="ag-edit">
+            <div v-else-if="draft" class="ag-edit">
               <div class="ag-edit__fields">
                 <input
                   v-model="draft.name"
@@ -467,8 +482,8 @@ onMounted(async () => {
             </div>
 
             <p v-if="draft && saveError" class="ag-edit__error">{{ saveError }}</p>
-            <p v-else-if="!draft && selectedFlow.description" class="ag-detail__desc">
-              {{ selectedFlow.description }}
+            <p v-else-if="!draft && selectedFlow?.description" class="ag-detail__desc">
+              {{ selectedFlow?.description }}
             </p>
             <p v-else-if="draft" class="ag-edit__tip">
               Drag an agent from the palette to add a member; hover a member for
@@ -607,6 +622,27 @@ onMounted(async () => {
   max-width: 46rem;
   font-size: 0.84rem;
   color: var(--text-secondary);
+}
+.ag-mode__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.ag-mode__new-fleet {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ag-mode__new-fleet:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .ag-mode__flow-pick {
   display: inline-flex;
