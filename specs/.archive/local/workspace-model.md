@@ -1,6 +1,6 @@
 ---
 title: Workspace Model
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/workspace/groups.go
@@ -18,7 +18,7 @@ affects:
   - frontend/src/stores/tasks.ts
 effort: xlarge
 created: 2026-06-29
-updated: 2026-06-29
+updated: 2026-06-30
 author: changkun
 dispatched_task_id: null
 ---
