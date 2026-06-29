@@ -23,6 +23,7 @@ export const localRoutes: RouteRecordRaw[] = [
   { path: '/workflows', redirect: '/agent-graph', meta: { needsWorkspace: true } },
   { path: '/flows', redirect: '/agent-graph', meta: { needsWorkspace: true } },
   { path: '/routines', component: () => import('./views/RoutinesPage.vue'), meta: { needsWorkspace: true } },
+  { path: '/github', component: () => import('./views/GithubPage.vue'), meta: { needsWorkspace: true } },
   { path: '/analytics', component: () => import('./views/AnalyticsPage.vue'), meta: { needsWorkspace: true } },
   // /chat is the dedicated chat surface; /plan is the spec-mode page (kept as
   // "Plan" in the UI for non-technical friendliness — the route is unchanged).
