@@ -132,6 +132,14 @@ const SCENES = {
       expect('picker', sorted[i].top >= sorted[i - 1].bottom - 2,
         `list rows overlap vertically (row ${i} top ${Math.round(sorted[i].top)} < prev bottom ${Math.round(sorted[i - 1].bottom)})`);
     }
+
+    // Content must not be vertically clipped: each row's name + folder-path line
+    // must render fully (scrollHeight <= clientHeight). Catches the "half
+    // visible path" regression that row-width/overlap checks miss.
+    const clipped = await page.$$eval('.ws-list__item .ws-list__name, .ws-list__item .ws-list__paths',
+      (els) => els.filter((e) => e.scrollHeight > e.clientHeight + 1)
+        .map((e) => `${e.className}: ${e.scrollHeight}>${e.clientHeight}`));
+    expect('picker', clipped.length === 0, `workspace row text is clipped: ${clipped.join('; ')}`);
   },
 };
 
