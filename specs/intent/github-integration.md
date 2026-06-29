@@ -123,9 +123,11 @@ pull-request.md) and the gated cloud-clone phase (reaches the Executor seam).
 
 #### 1. GitHub OAuth App + token store
 
-The auth foundation every other component needs. A **GitHub App** (decided; see
-the child) installed per org, with a user-to-server OAuth flow initiated from the
-UI and an install step that grants per-repo permissions
+The auth foundation every other component needs. A single central **GitHub App**
+named **"Latere AI"** (decided; see the child), registered once at the latere.ai
+org level and shared across latere products, installed per org by users, with a
+user-to-server OAuth flow brokered through latere.ai auth and an install step that
+grants per-repo permissions
 (`contents`, `pull_requests`, `issues`, `metadata`). Tokens are stored
 server-side, scoped to the principal (user/org from
 [authentication.md](../identity/authentication.md)), and refreshed on expiry.
@@ -352,12 +354,19 @@ graph LR
   style EX stroke-dasharray: 5 5
 ```
 
-**Resolved cross-cutting decisions:** the app type is **GitHub App** (per-org
-install, per-repo permissions) -- this fixes the connect flow (install + grant
-step) and the repo-list source (installation repos) for #1 and #2. The UI shell
-is settled in [UI Architecture](#ui-architecture): a Settings tab for connect,
-a `/github` Workspace page for browse, and the shared state matrix all children
-draw from.
+**Resolved cross-cutting decisions:**
+
+- **App type: GitHub App** (per-org install, per-repo permissions) -- fixes the
+  connect flow (install + grant step) and the repo-list source (installation
+  repos) for #1 and #2.
+- **Brokering: a single central "Latere AI" GitHub App**, registered once at the
+  latere.ai org level and shared across latere products, brokered through
+  latere.ai auth (not a wallfacer-specific app, not per-install registration).
+  This adds a latere.ai-side infra dependency (central app + callback route in
+  `../terraform`); local dev can run against a mock until that lands.
+- **UI shell** is settled in [UI Architecture](#ui-architecture): a Settings tab
+  for connect, a `/github` Workspace page for browse, and the shared state matrix
+  all children draw from.
 
 **Recommended iteration order:** #1 leads and blocks everything (no GitHub call
 works without a token). Once it settles, #2, #3, and #4 iterate largely in
