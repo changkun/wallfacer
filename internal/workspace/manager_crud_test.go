@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // newCountingManager builds a Manager whose store factory counts how many
@@ -27,7 +28,7 @@ func newCountingManager(t *testing.T) (m *Manager, configDir string, opens *int)
 	count := 0
 	mgr.newStore = func(dir string) (*store.Store, error) {
 		count++
-		return store.NewFileStore(dir)
+		return storetest.NewFileStore(t, dir)
 	}
 	return mgr, configDir, &count
 }
