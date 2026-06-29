@@ -8,8 +8,19 @@ import DependencyPicker from './DependencyPicker.vue';
 import HarnessSelect from './HarnessSelect.vue';
 import AppSelect from './AppSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
+import { coordinationOf, type Coordination } from '../lib/flowDraft';
+import type { FlowTopology } from '../api/types';
 
-interface FlowOption { slug: string; name: string }
+// FlowOption mirrors the agent-graph (flow) list from GET /api/flows. The
+// coordination fields let the composer show how the chosen graph runs, and warn
+// when it is a delegating (experimental) one.
+interface FlowOption {
+  slug: string;
+  name: string;
+  agentic?: boolean;
+  dynamic?: boolean;
+  topology?: FlowTopology;
+}
 
 const props = defineProps<{ autoExpand?: boolean }>();
 const store = useTaskStore();
@@ -62,6 +73,20 @@ const timeoutMin = computed<number | null>(() => {
 
 // Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
 const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
+
+// Coordination of the selected agent graph: how it runs a task. Delegating modes
+// (lead / mesh) are experimental (no durable commits yet), so the composer warns.
+const selectedFlowOption = computed(() => flows.value.find((f) => f.slug === flow.value));
+const selectedCoordination = computed<Coordination>(() =>
+  coordinationOf(selectedFlowOption.value ?? {}),
+);
+const coordinationLabel = computed(
+  () =>
+    ({ sequence: 'Fixed sequence', lead: 'Lead delegates', mesh: 'Open mesh' })[
+      selectedCoordination.value
+    ],
+);
+const coordinationExperimental = computed(() => selectedCoordination.value !== 'sequence');
 const promptPlaceholder = computed(() => {
   const f = flow.value || 'implement';
   return `Describe the task… (graph: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
@@ -301,6 +326,14 @@ function onInput(e: Event) {
       <label class="composer__opt">
         <span class="composer__opt-label">Agent graph</span>
         <AppSelect v-model="flow" :options="flowOptions" aria-label="Agent graph" block />
+        <span
+          v-if="flow"
+          class="composer__coord"
+          :class="{ 'composer__coord--experimental': coordinationExperimental }"
+          :title="coordinationExperimental
+            ? 'Delegating graphs are experimental: no durable commits yet. Use a Fixed sequence graph for real runs.'
+            : 'Runs the graph\'s agents in a fixed order.'"
+        >{{ coordinationLabel }}<template v-if="coordinationExperimental"> · experimental</template></span>
       </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Tags</span>
@@ -491,6 +524,15 @@ function onInput(e: Event) {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+.composer__coord {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: help;
+}
+.composer__coord--experimental {
+  color: var(--warning, #c98a00);
 }
 .composer__select,
 .composer__input {
