@@ -292,12 +292,12 @@ onMounted(async () => {
       <header class="ag-mode__header">
         <div class="ag-mode__header-row">
           <div>
-            <h2 class="ag-mode__title">Agent Graph</h2>
+            <h2 class="ag-mode__title">Agent Fleets</h2>
             <p class="ag-mode__subtitle">
-              An agent graph works a task to an outcome. The palette lists the
-              agent registry; the canvas shows the selected graph, with the lead
-              agent receiving the task. A graph either runs its agents in a fixed
-              order or lets the lead delegate to members (its coordination).
+              A fleet assembles agents to work a task to an outcome. The palette
+              lists the agent registry; the canvas shows the selected fleet, with
+              the lead agent receiving the task. A fleet either runs its agents in
+              a fixed order or lets the lead delegate to members (its coordination).
               <template v-if="draft">Drag agents in, set the lead, pick how they coordinate, then save.</template>
               <template v-else>Clone or edit a fleet to compose it; double-click an agent or node to edit the agent.</template>
             </p>
@@ -306,7 +306,7 @@ onMounted(async () => {
             <label class="ag-mode__flow-pick">
               <span class="ag-mode__flow-pick-label">Fleet</span>
               <select v-model="selectedSlug" class="ag-mode__flow-select" aria-label="Fleet">
-                <option v-if="!flowOptions.length" :value="null">No flows</option>
+                <option v-if="!flowOptions.length" :value="null">No fleets</option>
                 <option v-for="f in flowOptions" :key="f.slug" :value="f.slug">
                   {{ f.name || f.slug }}
                 </option>
@@ -363,7 +363,7 @@ onMounted(async () => {
             <p>Loading fleet...</p>
           </div>
           <div v-else-if="!selectedFlow" class="ag-mode__empty-detail">
-            <p>Pick a fleet above to render its agent-graph.</p>
+            <p>Pick a fleet above to see its agents.</p>
           </div>
           <template v-else>
             <div v-if="!draft" class="ag-detail__head">
