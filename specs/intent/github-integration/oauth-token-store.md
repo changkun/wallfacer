@@ -76,12 +76,22 @@ Consequences:
 - **No per-install app registration.** Installs do not each create a GitHub App;
   they install the one central "Latere AI" app. The client secret / app private
   key lives in latere.ai infra, never in a wallfacer instance.
-- **Infra dependency.** This needs the central app registered and a callback
-  route on the latere.ai side (`../terraform` / the auth gateway). If that infra
-  is not yet present, local development can run the `internal/github` client and
-  token store against a mock while the live brokered flow is wired separately;
-  the `Direct` localhost path below is retained only as a dev stopgap behind the
-  same client seam, not as the shipping model.
+- **Brokering home is the `../auth` service, not terraform.** `../auth` already
+  brokers external OAuth providers (`internal/authn/providers.go`: google,
+  github, x) but its GitHub provider is **social-login / identity only** (scopes
+  `read:user`, `user:email`; `HandleCallback` exchanges the code, fetches
+  userinfo, and discards the token -- there is no connected-account / external
+  token store). The "Latere AI" GitHub *App* is a separate credential class
+  (repo-scoped `contents`/`pull_requests`/`issues`/`metadata`) that `../auth`
+  does **not** broker today. The new `../auth` work: register the GitHub App
+  (App ID + private key, distinct from the existing social-login
+  `GITHUB_CLIENT_ID/SECRET`), add the install + user-to-server flow, **persist**
+  the resulting token, and **expose** it to consuming products (wallfacer) via
+  an endpoint the wallfacer server calls for the principal's GitHub token.
+  Terraform only carries the app secrets. Until that lands, wallfacer's
+  `internal/github` client + token store run against a mock; the `Direct`
+  localhost path below is retained only as a dev stopgap behind the same client
+  seam, not as the shipping model.
 - **Cross-product token scope.** Because the app is shared, the token store keys
   on the principal (user/org), and the same brokered credential can serve other
   latere products; wallfacer must not assume it owns the registration.
@@ -131,8 +141,10 @@ above.
 1. ~~OAuth App or GitHub App for v1?~~ **Resolved: GitHub App** (see above).
 2. ~~Self-registered localhost callback, or brokered through latere.ai?~~
    **Resolved: brokered** via a single central "Latere AI" GitHub App (see
-   above). Remaining sub-question: is the latere.ai-side callback/app-registration
-   infra already present, or does it need building in `../terraform` first?
+   above). Remaining sub-question: the brokering home is the `../auth` service,
+   which today brokers GitHub only for social login (identity) -- the GitHub App
+   repo-access brokering is new `../auth` work and must be built there before the
+   live flow works; wallfacer runs against a mock until then.
 3. Which scopes/permissions are the minimum for read + PR-create + comment
    (`repo`, `read:org`, `read:user`; or GitHub App `contents`, `pull_requests`,
    `issues`, `metadata`)?

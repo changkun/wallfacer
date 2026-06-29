@@ -362,8 +362,16 @@ graph LR
 - **Brokering: a single central "Latere AI" GitHub App**, registered once at the
   latere.ai org level and shared across latere products, brokered through
   latere.ai auth (not a wallfacer-specific app, not per-install registration).
-  This adds a latere.ai-side infra dependency (central app + callback route in
-  `../terraform`); local dev can run against a mock until that lands.
+  This adds a dependency on the **`../auth` service**: it already brokers
+  external OAuth providers (`internal/authn/providers.go` has google/github/x),
+  but its GitHub provider is **social login / identity only** (scopes
+  `read:user`, `user:email`; the callback fetches userinfo and discards the
+  token). The "Latere AI" GitHub *App* is a distinct credential class
+  (`contents`/`pull_requests`/`issues` repo access) that `../auth` does **not**
+  broker yet -- it needs a new connected-account flow there that persists and
+  exposes the brokered token to products. Terraform only carries the app
+  secrets (App ID, private key). Local dev can run wallfacer against a mock
+  until that `../auth` capability lands.
 - **UI shell** is settled in [UI Architecture](#ui-architecture): a Settings tab
   for connect, a `/github` Workspace page for browse, and the shared state matrix
   all children draw from.
