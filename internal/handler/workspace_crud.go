@@ -18,10 +18,16 @@ type workspaceDTO struct {
 }
 
 func (h *Handler) workspaceDTO(ws workspace.Workspace) workspaceDTO {
+	// A dormant workspace may have no folders yet; serialize an empty array
+	// rather than null so the frontend can safely .map/.join over it.
+	folders := ws.Folders
+	if folders == nil {
+		folders = []string{}
+	}
 	return workspaceDTO{
 		ID:      ws.ID,
 		Name:    ws.Name,
-		Folders: ws.Folders,
+		Folders: folders,
 		Dormant: ws.Dormant,
 		Active:  ws.ID != "" && ws.ID == h.activeWorkspaceID(),
 	}

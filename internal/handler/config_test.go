@@ -158,6 +158,46 @@ func TestGetConfig_ReturnsWorkspaces(t *testing.T) {
 	}
 }
 
+// TestGetConfig_ExcludesDormantFromWorkspaceGroups is the regression guard for
+// "the sidebar disappears after switching projects": a dormant workspace
+// (recovered orphan history, possibly with no folders) must NOT appear in
+// workspace_groups — that list is the legacy path-switcher, and a nil folder set
+// marshals to "workspaces": null, which the Sidebar popover renders with
+// g.workspaces.join(...) and crashes the whole layout. Every workspace_groups
+// entry must also carry a non-null workspaces array.
+func TestGetConfig_ExcludesDormantFromWorkspaceGroups(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, Name: "Live"},
+		{ID: "dormant-1", DataKey: "deadbeefdeadbeef", Dormant: true, Name: "Recovered"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		WorkspaceGroups []struct {
+			Name       string    `json:"name"`
+			Workspaces *[]string `json:"workspaces"` // pointer distinguishes null from []
+		} `json:"workspace_groups"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, g := range resp.WorkspaceGroups {
+		if g.Name == "Recovered" {
+			t.Errorf("dormant workspace leaked into workspace_groups: %+v", g)
+		}
+		if g.Workspaces == nil {
+			t.Errorf("workspace_groups entry %q has null workspaces (crashes the Sidebar)", g.Name)
+		}
+	}
+}
+
 func TestGetConfig_UsesCWDForWorkspaceBrowserPathWithoutWorkspaces(t *testing.T) {
 	h := newTestHandler(t)
 	cwd, err := os.Getwd()

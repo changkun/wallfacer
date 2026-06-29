@@ -223,21 +223,33 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		MaxParallel     *int     `json:"max_parallel,omitempty"`
 		MaxTestParallel *int     `json:"max_test_parallel,omitempty"`
 	}
-	keyedGroups := make([]keyedGroup, len(groups))
-	for i, g := range groups {
+	keyedGroups := make([]keyedGroup, 0, len(groups))
+	for _, g := range groups {
+		// workspace_groups is the legacy path-switcher list. Dormant workspaces
+		// (recovered orphan history, often with no folders) are not
+		// path-switchable and would marshal a nil folder set to
+		// "workspaces": null, which the Sidebar popover renders and crashes on.
+		// They are surfaced through the /api/workspaces registry instead.
+		if g.Dormant {
+			continue
+		}
 		// Report the workspace's stable DataKey. Falling back to the path-seeded
 		// key keeps legacy records (no DataKey yet) correct until migration.
 		key := g.DataKey
 		if key == "" {
 			key = prompts.WorkspaceDataKey(g.Folders)
 		}
-		keyedGroups[i] = keyedGroup{
+		folders := g.Folders
+		if folders == nil {
+			folders = []string{} // never marshal null; the frontend joins this
+		}
+		keyedGroups = append(keyedGroups, keyedGroup{
 			Name:            g.Name,
-			Workspaces:      g.Folders,
+			Workspaces:      folders,
 			Key:             key,
 			MaxParallel:     g.MaxParallel,
 			MaxTestParallel: g.MaxTestParallel,
-		}
+		})
 	}
 
 	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-agon"}
