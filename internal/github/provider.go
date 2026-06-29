@@ -33,9 +33,23 @@ type Broker interface {
 // Store may be nil, in which case Provider is a thin pass-through to the broker
 // (no caching); Broker may be nil, in which case Provider only serves what is
 // already stored and returns [ErrNotConnected] when a refresh would be needed.
+//
+// Client is the shared API transport the repo/read/write surfaces use; nil
+// means a default [Client] against the public API. Bundling it here keeps the
+// handler's GitHub dependency a single field.
 type Provider struct {
 	Store  Store
 	Broker Broker
+	Client *Client
+}
+
+// APIClient returns the configured transport, or a default one against the
+// public API when none is set.
+func (pr *Provider) APIClient() *Client {
+	if pr.Client != nil {
+		return pr.Client
+	}
+	return &Client{}
 }
 
 // Get returns a valid token for p, refreshing and persisting as needed.
