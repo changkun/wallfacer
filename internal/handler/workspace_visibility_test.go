@@ -19,8 +19,8 @@ import (
 func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
 	h.SetCloudMode(true) // org isolation only applies to cloud deployments
-	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
-		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +55,8 @@ func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 func TestVisibleWorkspaces_LocalModeShowsOrgStampedWorkspace(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
 	// cloudMode left at its default (false) — this is a local run.
-	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
-		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
 		t.Fatal(err)
 	}

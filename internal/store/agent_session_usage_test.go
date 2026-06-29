@@ -82,18 +82,18 @@ func TestReadAgentSessionUsage_FiltersBySince(t *testing.T) {
 	}
 }
 
-func TestAgentSessionUsageDir_UsesInstructionsKey(t *testing.T) {
+func TestAgentSessionUsageDir_UsesWorkspaceDataKey(t *testing.T) {
 	paths := []string{"/repo/a", "/repo/b"}
 	// Use an order-swapped list to confirm the key is order-insensitive
-	// (matches InstructionsKey which sorts before hashing).
+	// (matches WorkspaceDataKey which sorts before hashing).
 	swapped := []string{"/repo/b", "/repo/a"}
 
 	root := "/tmp/wf-test"
-	want := prompts.InstructionsKey(paths)
+	want := prompts.WorkspaceDataKey(paths)
 
 	dir := AgentSessionUsageDir(root, AgentSessionGroupKey(paths))
 	if !strings.HasSuffix(dir, string(filepath.Separator)+want) {
-		t.Errorf("dir %q does not end with InstructionsKey %q", dir, want)
+		t.Errorf("dir %q does not end with WorkspaceDataKey %q", dir, want)
 	}
 
 	dirSwapped := AgentSessionUsageDir(root, AgentSessionGroupKey(swapped))

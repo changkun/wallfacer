@@ -14,7 +14,7 @@ import (
 // workspace AGENTS.md (internal/prompts) so the same set of workspaces
 // always resolves to the same agent-session directory regardless of order.
 func AgentSessionGroupKey(workspaces []string) string {
-	return prompts.InstructionsKey(workspaces)
+	return prompts.WorkspaceDataKey(workspaces)
 }
 
 // agentSessionsDirName is the per-root directory that holds agent-session

@@ -1,47 +1,90 @@
 package prompts
 
-import "testing"
+import (
+	"regexp"
+	"testing"
+)
 
 // ---------------------------------------------------------------------------
-// InstructionsKey
+// WorkspaceDataKey
 // ---------------------------------------------------------------------------
 
-// TestInstructionsKeyStable verifies that the same workspace list always
+// TestWorkspaceDataKeyStable verifies that the same workspace list always
 // produces the same key.
-func TestInstructionsKeyStable(t *testing.T) {
+func TestWorkspaceDataKeyStable(t *testing.T) {
 	ws := []string{"/home/user/projectA", "/home/user/projectB"}
-	k1 := InstructionsKey(ws)
-	k2 := InstructionsKey(ws)
+	k1 := WorkspaceDataKey(ws)
+	k2 := WorkspaceDataKey(ws)
 	if k1 != k2 {
 		t.Fatalf("key should be stable: got %q then %q", k1, k2)
 	}
 }
 
-// TestInstructionsKeyOrderIndependent verifies that workspace order does not
+// TestWorkspaceDataKeyOrderIndependent verifies that workspace order does not
 // affect the key, so wallfacer run ~/a ~/b and wallfacer run ~/b ~/a share
 // the same key.
-func TestInstructionsKeyOrderIndependent(t *testing.T) {
+func TestWorkspaceDataKeyOrderIndependent(t *testing.T) {
 	ws1 := []string{"/home/user/alpha", "/home/user/beta"}
 	ws2 := []string{"/home/user/beta", "/home/user/alpha"}
-	if InstructionsKey(ws1) != InstructionsKey(ws2) {
-		t.Fatalf("key must be order-independent: %q != %q", InstructionsKey(ws1), InstructionsKey(ws2))
+	if WorkspaceDataKey(ws1) != WorkspaceDataKey(ws2) {
+		t.Fatalf("key must be order-independent: %q != %q", WorkspaceDataKey(ws1), WorkspaceDataKey(ws2))
 	}
 }
 
-// TestInstructionsKeyDifferentWorkspaces verifies that distinct workspace sets
+// TestWorkspaceDataKeyDifferentWorkspaces verifies that distinct workspace sets
 // produce distinct keys.
-func TestInstructionsKeyDifferentWorkspaces(t *testing.T) {
-	k1 := InstructionsKey([]string{"/home/user/foo"})
-	k2 := InstructionsKey([]string{"/home/user/bar"})
+func TestWorkspaceDataKeyDifferentWorkspaces(t *testing.T) {
+	k1 := WorkspaceDataKey([]string{"/home/user/foo"})
+	k2 := WorkspaceDataKey([]string{"/home/user/bar"})
 	if k1 == k2 {
 		t.Fatalf("different workspaces should produce different keys, both got %q", k1)
 	}
 }
 
-// TestInstructionsKeyLength verifies the key is exactly 16 hex characters.
-func TestInstructionsKeyLength(t *testing.T) {
-	k := InstructionsKey([]string{"/some/path"})
+// TestWorkspaceDataKeyLength verifies the key is exactly 16 hex characters.
+func TestWorkspaceDataKeyLength(t *testing.T) {
+	k := WorkspaceDataKey([]string{"/some/path"})
 	if len(k) != 16 {
 		t.Fatalf("expected 16-char key, got %d chars: %q", len(k), k)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// NewDataKey
+// ---------------------------------------------------------------------------
+
+var hex16 = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// TestNewDataKeyShape verifies a fresh key is 16 lowercase hex chars, matching
+// the width of WorkspaceDataKey so both address data/<key> uniformly.
+func TestNewDataKeyShape(t *testing.T) {
+	k := NewDataKey()
+	if !hex16.MatchString(k) {
+		t.Fatalf("expected 16-char hex key, got %q", k)
+	}
+}
+
+// TestNewDataKeyUnique verifies successive calls return distinct keys: identity
+// is independent of the folder set, so two workspaces never collide by storage.
+func TestNewDataKeyUnique(t *testing.T) {
+	seen := make(map[string]bool, 1000)
+	for i := range 1000 {
+		k := NewDataKey()
+		if seen[k] {
+			t.Fatalf("NewDataKey returned a duplicate key %q after %d draws", k, i)
+		}
+		seen[k] = true
+	}
+}
+
+// TestNewDataKeyIndependentOfPaths verifies a new key is NOT derived from any
+// folder set: it must differ from WorkspaceDataKey of an arbitrary path set, so
+// a new workspace sharing folders with a migrated one starts with empty history.
+func TestNewDataKeyIndependentOfPaths(t *testing.T) {
+	seeded := WorkspaceDataKey([]string{"/home/user/projectA"})
+	for range 100 {
+		if NewDataKey() == seeded {
+			t.Fatal("NewDataKey collided with a path-seeded key; identity is not independent of folders")
+		}
 	}
 }

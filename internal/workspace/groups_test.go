@@ -1,10 +1,49 @@
 package workspace
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+// TestUnmarshalLegacyWorkspacesKey verifies that a record persisted by the
+// pre-redesign format (which used the "workspaces" key for the folder set, and
+// had no id/data_key) still loads, populating Folders from the legacy key. This
+// is what lets the existing workspace-groups.json keep working until migration
+// rewrites it.
+func TestUnmarshalLegacyWorkspacesKey(t *testing.T) {
+	const legacy = `{"name":"Legacy","workspaces":["/a","/b"],"autoimplement":false}`
+	var w Workspace
+	if err := json.Unmarshal([]byte(legacy), &w); err != nil {
+		t.Fatalf("unmarshal legacy record: %v", err)
+	}
+	if w.Name != "Legacy" {
+		t.Errorf("name: got %q, want %q", w.Name, "Legacy")
+	}
+	if len(w.Folders) != 2 || w.Folders[0] != "/a" || w.Folders[1] != "/b" {
+		t.Errorf("folders not populated from legacy workspaces key: got %v", w.Folders)
+	}
+	if w.ID != "" || w.DataKey != "" {
+		t.Errorf("legacy record must have empty id/data_key, got id=%q data_key=%q", w.ID, w.DataKey)
+	}
+}
+
+// TestUnmarshalFoldersKeyWinsOverLegacy verifies the current "folders" key takes
+// precedence when both are present, and that new fields round-trip.
+func TestUnmarshalFoldersKeyWinsOverLegacy(t *testing.T) {
+	const both = `{"id":"id-1","data_key":"abc123","folders":["/new"],"workspaces":["/old"],"dormant":true}`
+	var w Workspace
+	if err := json.Unmarshal([]byte(both), &w); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(w.Folders) != 1 || w.Folders[0] != "/new" {
+		t.Errorf("folders key should win over legacy workspaces: got %v", w.Folders)
+	}
+	if w.ID != "id-1" || w.DataKey != "abc123" || !w.Dormant {
+		t.Errorf("new fields did not round-trip: id=%q data_key=%q dormant=%v", w.ID, w.DataKey, w.Dormant)
+	}
+}
 
 // TestUpsertMovesExistingGroupToFront verifies that upserting an existing group
 // promotes it to position 0 without duplicating it.
@@ -13,9 +52,9 @@ func TestUpsertMovesExistingGroupToFront(t *testing.T) {
 	wsA := t.TempDir()
 	wsB := t.TempDir()
 
-	if err := SaveGroups(configDir, []Group{
-		{Workspaces: []string{wsA}},
-		{Workspaces: []string{wsB}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Folders: []string{wsA}},
+		{Folders: []string{wsB}},
 	}); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
 	}
@@ -31,10 +70,10 @@ func TestUpsertMovesExistingGroupToFront(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 groups, got %d", len(groups))
 	}
-	if got := groups[0].Workspaces; len(got) != 1 || got[0] != wsB {
+	if got := groups[0].Folders; len(got) != 1 || got[0] != wsB {
 		t.Fatalf("expected wsB group first, got %#v", got)
 	}
-	if got := groups[1].Workspaces; len(got) != 1 || got[0] != wsA {
+	if got := groups[1].Folders; len(got) != 1 || got[0] != wsA {
 		t.Fatalf("expected wsA group second, got %#v", got)
 	}
 }
@@ -46,9 +85,9 @@ func TestNormalizeGroups_DeduplicatesGroups(t *testing.T) {
 	wsB := t.TempDir()
 
 	// Two groups with same workspaces (but different order to make normalizeGroupPaths sort them).
-	input := []Group{
-		{Workspaces: []string{wsA, wsB}},
-		{Workspaces: []string{wsB, wsA}}, // same after normalizeGroupPaths sorts
+	input := []Workspace{
+		{Folders: []string{wsA, wsB}},
+		{Folders: []string{wsB, wsA}}, // same after normalizeGroupPaths sorts
 	}
 	result := NormalizeGroups(input)
 	if len(result) != 1 {
@@ -61,23 +100,23 @@ func TestNormalizeGroups_DeduplicatesGroups(t *testing.T) {
 func TestNormalizeGroups_RemovesEmptyWorkspaces(t *testing.T) {
 	wsA := t.TempDir()
 
-	input := []Group{
-		{Workspaces: []string{"", wsA, ""}},
+	input := []Workspace{
+		{Folders: []string{"", wsA, ""}},
 	}
 	result := NormalizeGroups(input)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(result))
 	}
-	if len(result[0].Workspaces) != 1 || result[0].Workspaces[0] != wsA {
-		t.Fatalf("expected single non-empty workspace, got %v", result[0].Workspaces)
+	if len(result[0].Folders) != 1 || result[0].Folders[0] != wsA {
+		t.Fatalf("expected single non-empty workspace, got %v", result[0].Folders)
 	}
 }
 
 // TestNormalizeGroups_RemovesGroupsWithNoValidWorkspaces verifies that groups
 // containing only empty/whitespace paths are dropped entirely.
 func TestNormalizeGroups_RemovesGroupsWithNoValidWorkspaces(t *testing.T) {
-	input := []Group{
-		{Workspaces: []string{"", "   "}},
+	input := []Workspace{
+		{Folders: []string{"", "   "}},
 	}
 	result := NormalizeGroups(input)
 	if len(result) != 0 {
@@ -91,7 +130,7 @@ func TestNormalizeGroups_EmptyInput(t *testing.T) {
 	if result != nil {
 		t.Fatalf("NormalizeGroups(nil) = %v, want nil", result)
 	}
-	result = NormalizeGroups([]Group{})
+	result = NormalizeGroups([]Workspace{})
 	if result != nil {
 		t.Fatalf("NormalizeGroups([]) = %v, want nil", result)
 	}
@@ -131,9 +170,9 @@ func TestSaveGroups_RoundTrip(t *testing.T) {
 	wsA := t.TempDir()
 	wsB := t.TempDir()
 
-	input := []Group{
-		{Workspaces: []string{wsA}},
-		{Workspaces: []string{wsB}},
+	input := []Workspace{
+		{Folders: []string{wsA}},
+		{Folders: []string{wsB}},
 	}
 	if err := SaveGroups(configDir, input); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
@@ -154,7 +193,7 @@ func TestSaveGroups_AtomicWrite(t *testing.T) {
 	// Verify that .tmp file is cleaned up and the actual file exists.
 	configDir := t.TempDir()
 	wsA := t.TempDir()
-	if err := SaveGroups(configDir, []Group{{Workspaces: []string{wsA}}}); err != nil {
+	if err := SaveGroups(configDir, []Workspace{{Folders: []string{wsA}}}); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
 	}
 
@@ -173,14 +212,14 @@ func TestNormalizeGroups_SortsPaths(t *testing.T) {
 	wsB := t.TempDir()
 
 	// Use wsB, wsA order - should get sorted.
-	input := []Group{
-		{Workspaces: []string{wsB, wsA}},
+	input := []Workspace{
+		{Folders: []string{wsB, wsA}},
 	}
 	result := NormalizeGroups(input)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(result))
 	}
-	ws := result[0].Workspaces
+	ws := result[0].Folders
 	if ws[0] >= ws[1] {
 		t.Errorf("expected sorted workspaces, got %v", ws)
 	}
@@ -192,9 +231,9 @@ func TestNormalizeGroups_MultiGroup(t *testing.T) {
 	wsB := t.TempDir()
 	wsC := t.TempDir()
 
-	input := []Group{
-		{Workspaces: []string{wsA}},
-		{Workspaces: []string{wsB, wsC}},
+	input := []Workspace{
+		{Folders: []string{wsA}},
+		{Folders: []string{wsB, wsC}},
 	}
 	result := NormalizeGroups(input)
 	if len(result) != 2 {
@@ -209,8 +248,8 @@ func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
 	wsA := t.TempDir()
 	wsB := t.TempDir()
 
-	if err := SaveGroups(configDir, []Group{
-		{Workspaces: []string{wsA}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Folders: []string{wsA}},
 	}); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
 	}
@@ -226,8 +265,8 @@ func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 groups, got %d", len(groups))
 	}
-	if groups[0].Workspaces[0] != wsB {
-		t.Errorf("expected new group at front, got %v", groups[0].Workspaces)
+	if groups[0].Folders[0] != wsB {
+		t.Errorf("expected new group at front, got %v", groups[0].Folders)
 	}
 }
 
@@ -236,8 +275,8 @@ func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
 func TestNormalizeGroups_PreservesName(t *testing.T) {
 	wsA := t.TempDir()
 
-	input := []Group{
-		{Name: "My Project", Workspaces: []string{wsA}},
+	input := []Workspace{
+		{Name: "My Project", Folders: []string{wsA}},
 	}
 	result := NormalizeGroups(input)
 	if len(result) != 1 {
@@ -255,9 +294,9 @@ func TestUpsertGroup_PreservesExistingName(t *testing.T) {
 	wsA := t.TempDir()
 	wsB := t.TempDir()
 
-	if err := SaveGroups(configDir, []Group{
-		{Name: "First", Workspaces: []string{wsA}},
-		{Name: "Second", Workspaces: []string{wsB}},
+	if err := SaveGroups(configDir, []Workspace{
+		{Name: "First", Folders: []string{wsA}},
+		{Name: "Second", Folders: []string{wsB}},
 	}); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
 	}
@@ -288,8 +327,8 @@ func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
 
-	input := []Group{
-		{Name: "Named Group", Workspaces: []string{wsA}},
+	input := []Workspace{
+		{Name: "Named Workspace", Folders: []string{wsA}},
 	}
 	if err := SaveGroups(configDir, input); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
@@ -302,8 +341,8 @@ func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("round-trip: expected 1 group, got %d", len(got))
 	}
-	if got[0].Name != "Named Group" {
-		t.Errorf("round-trip: expected Name=%q, got %q", "Named Group", got[0].Name)
+	if got[0].Name != "Named Workspace" {
+		t.Errorf("round-trip: expected Name=%q, got %q", "Named Workspace", got[0].Name)
 	}
 }
 
@@ -320,10 +359,10 @@ func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
 	mp, mtp := 3, 2
 	zero := 0
 	neg := -1
-	input := []Group{
-		{Name: "Limited", Workspaces: []string{wsA}, MaxParallel: &mp, MaxTestParallel: &mtp},
-		{Name: "Unlimited", Workspaces: []string{wsB}, MaxParallel: &zero},
-		{Name: "NegativeSanitized", Workspaces: []string{wsC}, MaxParallel: &neg},
+	input := []Workspace{
+		{Name: "Limited", Folders: []string{wsA}, MaxParallel: &mp, MaxTestParallel: &mtp},
+		{Name: "Unlimited", Folders: []string{wsB}, MaxParallel: &zero},
+		{Name: "NegativeSanitized", Folders: []string{wsC}, MaxParallel: &neg},
 	}
 	if err := SaveGroups(configDir, input); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
@@ -336,7 +375,7 @@ func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
 		t.Fatalf("round-trip: expected 3 groups, got %d", len(got))
 	}
 
-	byName := map[string]Group{}
+	byName := map[string]Workspace{}
 	for _, g := range got {
 		byName[g.Name] = g
 	}
@@ -365,7 +404,7 @@ func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
 
-	if err := SaveGroups(configDir, []Group{{Workspaces: []string{wsA}}}); err != nil {
+	if err := SaveGroups(configDir, []Workspace{{Folders: []string{wsA}}}); err != nil {
 		t.Fatalf("SaveGroups: %v", err)
 	}
 
@@ -418,7 +457,7 @@ func TestSaveGroups_MkdirAllError(t *testing.T) {
 	}
 	// configDir is blocker/sub — MkdirAll will fail because blocker is a file.
 	configDir := filepath.Join(blocker, "sub")
-	err := SaveGroups(configDir, []Group{{Workspaces: []string{"/a"}}})
+	err := SaveGroups(configDir, []Workspace{{Folders: []string{"/a"}}})
 	if err == nil {
 		t.Fatal("expected error when parent dir cannot be created")
 	}

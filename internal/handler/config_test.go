@@ -31,8 +31,8 @@ import (
 func TestBuildConfigResponse_HidesCrossOrgWorkspace(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 	h.SetCloudMode(true) // org isolation only applies to cloud deployments
-	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
-		{Workspaces: []string{ws}, OrgID: "org-a"},
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, OrgID: "org-a"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -298,8 +298,8 @@ func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
 func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
 	h.SetCloudMode(true) // org isolation only applies to cloud deployments
-	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
-		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -339,8 +339,8 @@ func TestGetSpecTree_HiddenForMismatchedPrincipal(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(specsDir, "README.md"), []byte("# Specs\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := workspace.SaveGroups(h.configDir, []workspace.Group{
-		{Workspaces: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1428,7 +1428,7 @@ func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
 		t.Fatalf("forEachActiveStore should see both groups while A has in-progress work; saw %d (snapshots=%d)", len(seenByEach), len(snaps))
 	}
 
-	// forCurrentStore must visit only the viewed group (B). Group A, though
+	// forCurrentStore must visit only the viewed group (B). Workspace A, though
 	// still active, is out of scope for automation.
 	var seenByCurrent []*store.Store
 	h.forCurrentStore(func(s *store.Store, _ []string) {
@@ -1497,7 +1497,7 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	// Group B is empty; its concurrency budget must be fresh (0), even
+	// Workspace B is empty; its concurrency budget must be fresh (0), even
 	// though group A still has a regular + test task running.
 	if got := h.countGlobalInProgress(); got != 0 {
 		t.Errorf("viewing empty B: countGlobalInProgress = %d, want 0 (A's in-flight must not consume B's budget)", got)
@@ -1523,10 +1523,10 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 
 	// Save a group entry with MaxParallel=2 for the viewed workspace.
 	type reqBody struct {
-		WorkspaceGroups []workspace.Group `json:"workspace_groups"`
+		WorkspaceGroups []workspace.Workspace `json:"workspace_groups"`
 	}
 	two := 2
-	body := reqBody{WorkspaceGroups: []workspace.Group{{Workspaces: []string{ws}, MaxParallel: &two}}}
+	body := reqBody{WorkspaceGroups: []workspace.Workspace{{Folders: []string{ws}, MaxParallel: &two}}}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
 	w := httptest.NewRecorder()
@@ -1541,7 +1541,7 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 
 	// Stored override of 0 means unlimited (sentinel huge value).
 	zero := 0
-	body = reqBody{WorkspaceGroups: []workspace.Group{{Workspaces: []string{ws}, MaxParallel: &zero}}}
+	body = reqBody{WorkspaceGroups: []workspace.Workspace{{Folders: []string{ws}, MaxParallel: &zero}}}
 	b, _ = json.Marshal(body)
 	req = httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
 	w = httptest.NewRecorder()
@@ -1554,7 +1554,7 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 	}
 
 	// Removing the override (nil pointer) falls back to the env default.
-	body = reqBody{WorkspaceGroups: []workspace.Group{{Workspaces: []string{ws}}}}
+	body = reqBody{WorkspaceGroups: []workspace.Workspace{{Folders: []string{ws}}}}
 	b, _ = json.Marshal(body)
 	req = httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
 	w = httptest.NewRecorder()
@@ -1581,7 +1581,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	tst := true
 	b, _ := json.Marshal(struct {
 		Autoimplement *bool `json:"autoimplement"`
-		Autotest  *bool `json:"autotest"`
+		Autotest      *bool `json:"autotest"`
 	}{&pilot, &tst})
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
 	w := httptest.NewRecorder()
@@ -1612,7 +1612,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	// Group B has never seen a toggle before — every automation must be
+	// Workspace B has never seen a toggle before — every automation must be
 	// off regardless of what A had on.
 	if h.AutoimplementEnabled() {
 		t.Errorf("autoimplement leaked into fresh group B")

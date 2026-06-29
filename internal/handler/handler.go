@@ -141,12 +141,12 @@ type Handler struct {
 	// out). Nil until SetCoordinationLogout. Guarded by snapshotMu.
 	coordLogout func()
 
-	autoimplement   atomic.Bool
-	autotest    atomic.Bool
-	autosubmit  atomic.Bool
-	autosync    atomic.Bool
-	autopush    atomic.Bool
-	agonEnabled atomic.Bool
+	autoimplement atomic.Bool
+	autotest      atomic.Bool
+	autosubmit    atomic.Bool
+	autosync      atomic.Bool
+	autopush      atomic.Bool
+	agonEnabled   atomic.Bool
 
 	// verifier drives adversarial post-run verification (agon). It is set
 	// once in NewHandler and never mutated; AgonEnabled() is the runtime gate.
@@ -407,13 +407,13 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 // to off, which matches the user expectation that a brand-new group
 // starts fully manual.
 func (h *Handler) applyGroupToggles(ws []string) {
-	var g *workspace.Group
+	var g *workspace.Workspace
 	if len(ws) > 0 {
 		groups, err := workspace.LoadGroups(h.configDir)
 		if err == nil {
 			key := workspace.GroupKey(ws)
 			for i := range groups {
-				if workspace.GroupKey(groups[i].Workspaces) == key {
+				if workspace.GroupKey(groups[i].Folders) == key {
 					g = &groups[i]
 					break
 				}
@@ -462,7 +462,7 @@ func (h *Handler) persistCurrentGroupToggles() {
 	autosync := b(h.autosync.Load())
 	found := false
 	for i := range groups {
-		if workspace.GroupKey(groups[i].Workspaces) == key {
+		if workspace.GroupKey(groups[i].Folders) == key {
 			groups[i].Autoimplement = autoimplement
 			groups[i].Autotest = autotest
 			groups[i].Autosubmit = autosubmit
@@ -472,12 +472,12 @@ func (h *Handler) persistCurrentGroupToggles() {
 		}
 	}
 	if !found {
-		groups = append([]workspace.Group{{
-			Workspaces: ws,
-			Autoimplement:  autoimplement,
-			Autotest:   autotest,
-			Autosubmit: autosubmit,
-			Autosync:   autosync,
+		groups = append([]workspace.Workspace{{
+			Folders:       ws,
+			Autoimplement: autoimplement,
+			Autotest:      autotest,
+			Autosubmit:    autosubmit,
+			Autosync:      autosync,
 		}}, groups...)
 	}
 	if err := workspace.SaveGroups(h.configDir, groups); err != nil {
@@ -505,7 +505,7 @@ func (h *Handler) reloadGroupLimits() {
 			if g.MaxParallel == nil && g.MaxTestParallel == nil {
 				continue
 			}
-			limits[workspace.GroupKey(g.Workspaces)] = groupLimitEntry{
+			limits[workspace.GroupKey(g.Folders)] = groupLimitEntry{
 				maxParallel:     g.MaxParallel,
 				maxTestParallel: g.MaxTestParallel,
 			}
