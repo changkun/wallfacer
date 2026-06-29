@@ -4,7 +4,7 @@
 //  - folder add/remove and caps persist via wsStore.update (never the wizard's
 //    activate-on-confirm path),
 //  - the last folder cannot be removed (server 400s on an empty set),
-//  - delete is blocked for the active workspace (server 409s).
+//  - the active workspace is deletable (server wipes data + auto-switches).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, nextTick, type App } from 'vue';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
@@ -13,6 +13,7 @@ import WorkspaceEditModal from './WorkspaceEditModal.vue';
 import { useWorkspacesStore } from '../stores/workspaces';
 import { useUiStore } from '../stores/ui';
 import { useTaskStore } from '../stores/tasks';
+import { useDialogStore } from '../stores/dialog';
 import type { Workspace } from '../api/types';
 
 // Capture every api call (with body) and answer the few endpoints the modal hits.
@@ -29,7 +30,10 @@ vi.mock('../api/client', () => ({
       const id = path.split('/').pop()!;
       return Promise.resolve({ id, name: '', folders: [], dormant: false, active: false, ...(body as object) });
     }
-    if (method === 'DELETE') return Promise.resolve(undefined);
+    if (method === 'DELETE') {
+      return Promise.resolve({ workspaces: [], workspace_id: '', workspace_groups: [], active_groups: [] });
+    }
+    if (path === '/api/tasks') return Promise.resolve([]);
     return Promise.resolve({});
   }),
 }));
@@ -145,10 +149,19 @@ describe('WorkspaceEditModal', () => {
     expect((put!.body as { folders: string[] }).folders).toEqual(['/x', '/y', '/home/u/gamma']);
   });
 
-  it('blocks deleting the active workspace', async () => {
-    seed([{ ...wsA }], 'a', 'a');
+  it('allows deleting the active workspace and issues DELETE', async () => {
+    seed([{ ...wsA }], 'a', 'a'); // wsA is the active workspace
     ({ app, host } = await mount());
     const del = Array.from(host!.querySelectorAll('button')).find(b => b.textContent?.includes('Delete workspace')) as HTMLButtonElement;
-    expect(del.disabled).toBe(true);
+    // The active workspace is now deletable (server wipes data + auto-switches).
+    expect(del.disabled).toBe(false);
+
+    vi.spyOn(useDialogStore(), 'confirm').mockResolvedValue(true);
+    del.click();
+    await nextTick();
+    await Promise.resolve();
+    await nextTick();
+    await nextTick();
+    expect(apiCalls.some(c => c.method === 'DELETE' && c.path === '/api/workspaces/a')).toBe(true);
   });
 });

@@ -167,35 +167,72 @@ func TestSameFolderWorkspacesCoexist(t *testing.T) {
 	}
 }
 
-// TestDelete_RefusesActive verifies the active workspace cannot be deleted out
-// from under the running session, and that deleting an inactive one works and is
-// idempotent.
-func TestDelete_RefusesActive(t *testing.T) {
-	m, _, _ := newCountingManager(t)
-	dirA := t.TempDir()
-	ws, err := m.Create("p", []string{dirA}, nil)
+// TestDelete_WipesDataAndAutoSwitches verifies the redesigned delete: the
+// active workspace CAN be deleted; its scoped data + agent-session history are
+// wiped from disk; the board auto-switches to the next usable workspace; and
+// deleting the last one leaves the empty (no-active) state. Idempotent.
+func TestDelete_WipesDataAndAutoSwitches(t *testing.T) {
+	m, configDir, _ := newCountingManager(t)
+	dirA, dirB := t.TempDir(), t.TempDir()
+	a, err := m.Create("A", []string{dirA}, nil)
 	if err != nil {
-		t.Fatalf("Create: %v", err)
+		t.Fatalf("Create A: %v", err)
 	}
-	if _, err := m.SwitchByID(ws.ID); err != nil {
-		t.Fatalf("SwitchByID: %v", err)
-	}
-	if err := m.Delete(ws.ID); err == nil {
-		t.Fatal("expected Delete of the active workspace to be refused")
+	b, err := m.Create("B", []string{dirB}, nil)
+	if err != nil {
+		t.Fatalf("Create B: %v", err)
 	}
 
-	other, err := m.Create("q", []string{t.TempDir()}, nil)
+	// Activate A and seed both its scoped store dir and its agent-session dir.
+	snapA, err := m.SwitchByID(a.ID)
 	if err != nil {
-		t.Fatalf("Create other: %v", err)
+		t.Fatalf("SwitchByID A: %v", err)
 	}
-	if err := m.Delete(other.ID); err != nil {
-		t.Fatalf("Delete inactive: %v", err)
+	if err := store.AppendAgentSessionUsage(configDir, snapA.Key, store.TurnUsageRecord{Turn: 1}); err != nil {
+		t.Fatalf("seed usage: %v", err)
 	}
-	if err := m.Delete(other.ID); err != nil {
-		t.Fatalf("Delete is not idempotent: %v", err)
+	dataA := filepath.Join(m.dataDir, snapA.Key)
+	sessA := store.AgentSessionUsageDir(configDir, snapA.Key)
+	if _, err := os.Stat(dataA); err != nil {
+		t.Fatalf("A data dir should exist before delete: %v", err)
 	}
-	if _, found, _ := m.WorkspaceByID(other.ID); found {
-		t.Fatal("deleted workspace still present")
+	if _, err := os.Stat(sessA); err != nil {
+		t.Fatalf("A session dir should exist before delete: %v", err)
+	}
+
+	// Delete the ACTIVE workspace A → auto-switch to B, wipe A's data.
+	snap, err := m.Delete(a.ID)
+	if err != nil {
+		t.Fatalf("Delete active A: %v", err)
+	}
+	if snap.WorkspaceID != b.ID {
+		t.Fatalf("expected auto-switch to B (%s), got %q", b.ID, snap.WorkspaceID)
+	}
+	if _, found, _ := m.WorkspaceByID(a.ID); found {
+		t.Fatal("deleted workspace A still present")
+	}
+	if _, err := os.Stat(dataA); !os.IsNotExist(err) {
+		t.Errorf("A data dir not wiped: %v", err)
+	}
+	if _, err := os.Stat(sessA); !os.IsNotExist(err) {
+		t.Errorf("A session dir not wiped: %v", err)
+	}
+
+	// Delete the LAST workspace B (now active) → empty active state.
+	snap2, err := m.Delete(b.ID)
+	if err != nil {
+		t.Fatalf("Delete last B: %v", err)
+	}
+	if snap2.WorkspaceID != "" || len(snap2.Workspaces) != 0 {
+		t.Fatalf("expected no active workspace after deleting the last, got id=%q ws=%v", snap2.WorkspaceID, snap2.Workspaces)
+	}
+	if list, _ := m.ListWorkspaces(nil); len(list) != 0 {
+		t.Fatalf("expected empty registry, got %d", len(list))
+	}
+
+	// Idempotent: deleting an already-gone id is a no-op.
+	if _, err := m.Delete(b.ID); err != nil {
+		t.Fatalf("idempotent delete: %v", err)
 	}
 }
 

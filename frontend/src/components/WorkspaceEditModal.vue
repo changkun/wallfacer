@@ -135,10 +135,14 @@ async function removeFolder(path: string) {
 
 async function remove() {
   const w = ws.value;
-  if (!w || busy.value || wsStore.isActive(w.id)) return;
+  if (!w || busy.value) return;
+  const active = wsStore.isActive(w.id);
   const ok = await dialog.confirm({
     title: 'Delete workspace',
-    message: `Delete "${workspaceLabel(w.name, w.folders)}"? Folders on disk are not touched, but the workspace will no longer be reachable until recreated.`,
+    message:
+      `Permanently delete "${workspaceLabel(w.name, w.folders)}" and wipe all its task history, ` +
+      `transcripts, and session data? Your folders on disk are not touched, but this cannot be undone.` +
+      (active ? ' The board will switch to another workspace.' : ''),
     confirmLabel: 'Delete',
     danger: true,
   });
@@ -148,6 +152,8 @@ async function remove() {
     await wsStore.remove(w.id);
     toast.push('Deleted workspace', { kind: 'success' });
     close();
+    // If that was the last workspace, prompt the user to create one.
+    if (wsStore.workspaces.length === 0) ui.openWorkspaces();
   } catch (e) {
     setStatus('Error: ' + (e instanceof Error ? e.message : String(e)));
     busy.value = false;
@@ -372,12 +378,12 @@ function onBackdrop(e: MouseEvent) {
           <button
             type="button"
             class="btn ws-edit__delete"
-            :disabled="wsStore.isActive(ws.id) || busy"
-            :title="wsStore.isActive(ws.id) ? 'Switch to another workspace before deleting' : 'Delete this workspace'"
+            :disabled="busy"
+            title="Permanently delete this workspace and wipe its data"
             @click="remove"
           >Delete workspace</button>
-          <span v-if="wsStore.isActive(ws.id)" class="ws-edit__danger-note">
-            Active workspace — switch away to delete.
+          <span class="ws-edit__danger-note">
+            Wipes all task history + session data.{{ ws && wsStore.isActive(ws.id) ? ' Switches the board to another workspace.' : '' }}
           </span>
         </div>
       </div>

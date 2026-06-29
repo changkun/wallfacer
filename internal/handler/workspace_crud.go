@@ -205,19 +205,25 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, h.workspaceDTO(ws))
 }
 
-// DeleteWorkspace removes a workspace record (its data directory is left on
-// disk). The active workspace cannot be deleted; switch away first.
+// DeleteWorkspace permanently deletes a workspace and wipes all its session
+// data. Deleting the active workspace auto-switches the board to the next
+// usable workspace (or the empty state). Returns the resulting config so the
+// caller can refresh the sidebar and active board in one round-trip.
 func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !h.workspaceVisibleByID(r, id) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if err := h.workspace.Delete(id); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+	snap, err := h.workspace.Delete(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	if snap.Store != nil {
+		h.runner.PruneUnknownWorktrees()
+	}
+	httpjson.Write(w, http.StatusOK, h.buildConfigResponse(r.Context(), nil))
 }
 
 // ActivateWorkspace switches the active workspace by id and returns the updated
