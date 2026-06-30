@@ -78,6 +78,7 @@ export const useGithubStore = defineStore('github', () => {
   const detail = ref<GithubPull | GithubIssue | null>(null);
 
   const loading = ref(false);
+  const commenting = ref(false);
   const error = ref<string | null>(null);
 
   const connected = computed(() => status.value.connected);
@@ -212,6 +213,43 @@ export const useGithubStore = defineStore('github', () => {
     }
   }
 
+  // comment posts a conversation comment on the open PR/issue, then refreshes
+  // the detail so the new comment appears in the thread.
+  async function comment(body: string): Promise<void> {
+    if (!selectedRepo.value || !detail.value || !body.trim()) return;
+    commenting.value = true;
+    error.value = null;
+    try {
+      await api('POST', '/api/github/comments', {
+        repo: selectedRepo.value.full_name,
+        number: detail.value.number,
+        body,
+      });
+      await openDetail(detail.value.number);
+    } catch (e) {
+      setError(e);
+    } finally {
+      commenting.value = false;
+    }
+  }
+
+  // createPull opens a PR from head into base for the selected repo, returning
+  // the created (or existing) PR. The branch must already be pushed.
+  async function createPull(params: {
+    base: string; head: string; title: string; body?: string; draft?: boolean;
+  }): Promise<GithubPull | null> {
+    if (!selectedRepo.value) return null;
+    error.value = null;
+    try {
+      return await api<GithubPull>('POST', '/api/github/pulls', {
+        repo: selectedRepo.value.full_name, ...params,
+      });
+    } catch (e) {
+      setError(e);
+      return null;
+    }
+  }
+
   async function setTab(next: GithubTab): Promise<void> {
     tab.value = next;
     detail.value = null;
@@ -225,8 +263,9 @@ export const useGithubStore = defineStore('github', () => {
 
   return {
     status, repos, selectedRepo, tab, stateFilter, pulls, issues, detail,
-    loading, error, connected, hasRepo,
+    loading, commenting, error, connected, hasRepo,
     fetchStatus, connect, disconnect, fetchRepos, selectRepo,
     fetchPulls, fetchIssues, refresh, openDetail, setTab, setStateFilter,
+    comment, createPull,
   };
 });
