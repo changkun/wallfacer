@@ -44,12 +44,65 @@ type installationReposPage struct {
 }
 
 // ListInstallationRepos returns every repository the "Latere AI" install grants
-// the principal, following pagination. The install grant is the org boundary:
-// repos outside what the org admin approved are not returned, so no client-side
-// org filtering is applied here.
+// the principal, across all of the user's installations (personal + every org
+// they installed on). It uses the user-to-server endpoints -- /user/installations
+// then /user/installations/{id}/repositories -- which are the correct ones for
+// the brokered user token (the installation-scoped /installation/repositories
+// requires an installation token and is not usable here). The install grant per
+// account is the org boundary; results are deduped by full name.
 func ListInstallationRepos(ctx context.Context, c *Client, token *Token) ([]Repo, error) {
+	installs, err := listUserInstallations(ctx, c, token)
+	if err != nil {
+		return nil, err
+	}
 	var repos []Repo
-	path := "/installation/repositories?per_page=100"
+	seen := map[string]bool{}
+	for _, id := range installs {
+		rs, err := listUserInstallationRepos(ctx, c, token, id)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rs {
+			if r.FullName == "" || seen[r.FullName] {
+				continue
+			}
+			seen[r.FullName] = true
+			repos = append(repos, r)
+		}
+	}
+	return repos, nil
+}
+
+// listUserInstallations returns the installation ids the user token can access
+// (one per account the "Latere AI" app is installed on).
+func listUserInstallations(ctx context.Context, c *Client, token *Token) ([]int64, error) {
+	var ids []int64
+	path := "/user/installations?per_page=100"
+	for page := 0; page < maxRepoPages && path != ""; page++ {
+		resp, err := c.Do(ctx, token, http.MethodGet, path, nil)
+		if err != nil {
+			return nil, fmt.Errorf("github: list user installations: %w", err)
+		}
+		var decoded struct {
+			Installations []struct {
+				ID int64 `json:"id"`
+			} `json:"installations"`
+		}
+		if err := json.Unmarshal(resp.Body, &decoded); err != nil {
+			return nil, fmt.Errorf("github: decode user installations: %w", err)
+		}
+		for _, inst := range decoded.Installations {
+			ids = append(ids, inst.ID)
+		}
+		path = resp.NextPage
+	}
+	return ids, nil
+}
+
+// listUserInstallationRepos lists the repos one installation grants the user.
+func listUserInstallationRepos(ctx context.Context, c *Client, token *Token, installID int64) ([]Repo, error) {
+	var repos []Repo
+	path := fmt.Sprintf("/user/installations/%d/repositories?per_page=100", installID)
 	for page := 0; page < maxRepoPages && path != ""; page++ {
 		resp, err := c.Do(ctx, token, http.MethodGet, path, nil)
 		if err != nil {
