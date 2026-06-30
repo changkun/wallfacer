@@ -279,15 +279,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Native Topos harness: an implement-path task whose resolved harness runs
 	// in-process executes as a single in-process topos agent (a one-node region)
 	// instead of launching a subprocess harness. The flow branches above take
-	// precedence, so by here flowSlug == "implement". Until harness.Default()
+	// precedence, so by here flowSlug == "implement". The actual dispatch happens
+	// below, AFTER worktree setup, so the agent's tools run in the task's worktree;
+	// the oversight worker and turn loop are skipped for it. Until harness.Default()
 	// flips to Topos this only triggers for a task explicitly pinned to the topos
-	// harness (opt-in). Test runs keep the subprocess verification path for now —
-	// the native path does not yet run verification.
-	if !task.IsTestRun && harness.InProcess(r.sandboxForTask(task)) {
-		statusSet = true
-		r.runNativeTopos(bgCtx, taskID, *task, prompt)
-		return
-	}
+	// harness (opt-in). Test runs keep the subprocess verification path for now.
+	nativeTopos := !task.IsTestRun && harness.InProcess(r.sandboxForTask(task))
 
 	isTestRun := task.IsTestRun
 
@@ -308,8 +305,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Launch periodic oversight generation while the turn-loop executes.
 	// The goroutine exits when Run returns (oversightCancel is deferred).
 	// Skip for test runs — those are short verification passes where the
-	// implementation oversight is already finalised.
-	if !isTestRun {
+	// implementation oversight is already finalised — and for native topos
+	// runs, which produce their own live trace and never enter the turn loop.
+	if !isTestRun && !nativeTopos {
 		oversightCtx, oversightCancel := context.WithCancel(ctx)
 		defer oversightCancel()
 		go r.periodicOversightWorker(oversightCtx, taskID)
@@ -372,6 +370,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if err := r.taskStore(taskID).UpdateTaskWorktrees(bgCtx, taskID, worktreePaths, branchName); err != nil {
 			logger.Runner.Error("save worktree paths", "task", taskID, "error", err)
 		}
+	}
+
+	// Native Topos harness dispatch: now that the worktree exists, run the task
+	// as a single in-process topos agent rooted at that worktree (so its tools
+	// edit the real repo), bypassing the subprocess turn loop below.
+	if nativeTopos {
+		statusSet = true
+		r.runNativeTopos(bgCtx, taskID, *task, prompt, firstWorktreePath(worktreePaths))
+		return
 	}
 
 	turns := task.Turns

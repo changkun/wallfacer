@@ -128,10 +128,22 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 // and walks the state machine, but it does not yet make a durable git commit or
 // run verification — commit/verify parity with the subprocess harnesses is
 // tracked in the topos-native-harness spec.
-func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task store.Task, prompt string) {
+func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task store.Task, prompt, worktree string) {
+	// worktree is the task's set-up worktree (the real repo) so the agent's tools
+	// edit actual files; an empty worktree falls back to the topos temp-dir sandbox.
 	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error) {
-		return agentgraph.RunAgent(ctx, task.ID.String(), r.agenticModelConfig(), "implement", "", prompt, onEvent)
+		return agentgraph.RunAgent(ctx, task.ID.String(), r.agenticModelConfig(), "implement", "", prompt, worktree, onEvent)
 	})
+}
+
+// firstWorktreePath returns one worktree path from the map (the primary repo's
+// worktree), or "" when none is set up. WorktreePaths is keyed by host repo path;
+// a single-repo task has one entry.
+func firstWorktreePath(worktreePaths map[string]string) string {
+	for _, wt := range worktreePaths {
+		return wt
+	}
+	return ""
 }
 
 // driveToposRun executes an in-process topos run (a multi-agent agentic flow or a
