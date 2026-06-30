@@ -278,6 +278,23 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		})
 	}
 
+	// Wire the live GitHub broker: wallfacer fetches the principal's GitHub
+	// token from the ../auth self endpoint using the signed-in user's OIDC
+	// token (the same token the coordination connector reads). With it set,
+	// the /api/github/* connect + read/write surface goes live.
+	if authCfg.AuthURL != "" && coordTokenStore != nil {
+		h.SetGitHubBroker(&github.HTTPBroker{
+			AuthBaseURL: authCfg.AuthURL,
+			TokenSource: func(context.Context) (string, error) {
+				tok, err := coordTokenStore.Load()
+				if err != nil || tok == nil {
+					return "", err
+				}
+				return tok.AccessToken, nil
+			},
+		})
+	}
+
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
 		// Drift pipeline: the agent-backed tester is wired, but gated behind

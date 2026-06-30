@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,42 @@ func TestGitHubAuthConnect_UnavailableWithoutBroker(t *testing.T) {
 	h.GitHubAuthConnect(rec, httptest.NewRequest(http.MethodPost, "/api/github/auth/connect", nil))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("connect without broker = %d, want 503", rec.Code)
+	}
+}
+
+func TestGitHubAuthConnect_ReturnsInstallURL(t *testing.T) {
+	store, _ := github.NewFileStore(t.TempDir())
+	h := &Handler{}
+	h.SetGitHub(&github.Provider{Store: store, Broker: &github.HTTPBroker{}})
+	h.authURL = "https://auth.latere.ai"
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/github/auth/connect?return_to=/settings", nil)
+	h.GitHubAuthConnect(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("connect = %d, want 200 (body %s)", rec.Code, rec.Body)
+	}
+	var resp struct {
+		InstallURL string `json:"install_url"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if !strings.HasPrefix(resp.InstallURL, "https://auth.latere.ai/me/integrations/github/install/start") {
+		t.Errorf("install_url = %q", resp.InstallURL)
+	}
+	if !strings.Contains(resp.InstallURL, "return_to=%2Fsettings") {
+		t.Errorf("install_url missing return_to: %q", resp.InstallURL)
+	}
+}
+
+// Broker set but auth URL unknown -> still unavailable (cannot build install URL).
+func TestGitHubAuthConnect_NoAuthURLUnavailable(t *testing.T) {
+	store, _ := github.NewFileStore(t.TempDir())
+	h := &Handler{}
+	h.SetGitHub(&github.Provider{Store: store, Broker: &github.HTTPBroker{}})
+	rec := httptest.NewRecorder()
+	h.GitHubAuthConnect(rec, httptest.NewRequest(http.MethodPost, "/api/github/auth/connect", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("connect without authURL = %d, want 503", rec.Code)
 	}
 }
 
