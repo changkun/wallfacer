@@ -37,6 +37,25 @@ describe('agentStore.applyTree bootstrap choreography', () => {
     expect(toast.toasts).toHaveLength(0);
   });
 
+  // Per-folder grouping: applyTree exposes the groups verbatim, with each
+  // folder's progress kept independent even when two folders share a relative
+  // spec path (the collision the flat merge would lose).
+  it('exposes independent per-folder groups', () => {
+    const agentStore = useAgentStore();
+    agentStore.applyTree({
+      nodes: [node('specs/local/foo.md')],
+      groups: [
+        { workspace: '/a', label: 'a', nodes: [node('specs/local/foo.md')], progress: { 'specs/local': { Complete: 1, Total: 2 } }, index: null },
+        { workspace: '/b', label: 'b', nodes: [node('specs/local/foo.md')], progress: { 'specs/local': { Complete: 0, Total: 3 } }, index: null },
+      ],
+    });
+    expect(agentStore.treeGroups.length).toBe(2);
+    expect(agentStore.treeGroups[0].workspace).toBe('/a');
+    expect(agentStore.treeGroups[1].workspace).toBe('/b');
+    expect(agentStore.treeGroups[0].progress['specs/local'].Total).toBe(2);
+    expect(agentStore.treeGroups[1].progress['specs/local'].Total).toBe(3);
+  });
+
   it('fires focus + toast when the first spec is created after an empty load', () => {
     const agentStore = useAgentStore();
     const toast = useToastStore();

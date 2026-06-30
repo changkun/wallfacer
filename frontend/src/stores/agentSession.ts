@@ -48,10 +48,24 @@ export interface SpecIndexMeta {
   modified?: string;
 }
 
+// SpecGroup is one workspace folder's self-contained spec tree. When a
+// workspace spans multiple folders that each have specs/, the navigation
+// renders each group separately (keyed by workspace) instead of merging them.
+export interface SpecGroup {
+  workspace: string;
+  label: string;
+  nodes: SpecNode[];
+  progress: Record<string, SpecProgress>;
+  index: SpecIndexMeta | null;
+}
+
 export interface SpecTreeData {
+  // Flat merged view (kept for the common single-folder case + back-compat).
   nodes: SpecNode[];
   index: SpecIndexMeta | null;
   progress: Record<string, SpecProgress>;
+  // Per-folder groups; present when the server splits specs by folder.
+  groups?: SpecGroup[];
 }
 
 export interface AgentSession {
@@ -113,6 +127,9 @@ export const useAgentStore = defineStore('agentSession', () => {
   const tree = ref<SpecNode[]>([]);
   const treeProgress = ref<Record<string, SpecProgress>>({});
   const treeIndex = ref<SpecIndexMeta | null>(null);
+  // Per-folder spec groups (empty/single for the common one-folder workspace;
+  // multiple when the workspace spans several folders with their own specs/).
+  const treeGroups = ref<SpecGroup[]>([]);
   const treeLoading = ref(true);
 
   // Advisory stale-candidate scan results, keyed by spec path. Populated on
@@ -192,6 +209,7 @@ export const useAgentStore = defineStore('agentSession', () => {
     tree.value = nextNodes;
     treeIndex.value = data.index ?? null;
     treeProgress.value = data.progress ?? {};
+    treeGroups.value = data.groups ?? [];
     treeLoading.value = false;
   }
 
@@ -396,7 +414,7 @@ export const useAgentStore = defineStore('agentSession', () => {
   }
 
   return {
-    tree, treeProgress, treeIndex, treeLoading,
+    tree, treeProgress, treeIndex, treeGroups, treeLoading,
     staleCandidates,
     focusedSpecPath, focusedIsIndex,
     focusedTaskId, focusedTaskTitle, focusedTaskPrompt,
