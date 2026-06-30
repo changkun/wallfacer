@@ -16,6 +16,13 @@ const (
 	Cursor   ID = "cursor"
 	OpenCode ID = "opencode"
 	Pi       ID = "pi"
+
+	// Topos is the native, in-process latere.ai harness. Unlike the Tier-A
+	// CLI harnesses it does not shell out to a subprocess; the runner drives
+	// it in-process through internal/agentgraph (a single-agent run is a
+	// one-node topos region). BuildArgv therefore returns an error — see
+	// topos.go — and callers must route Topos through the in-process seam.
+	Topos ID = "topos"
 )
 
 // Harness adapts a coding-agent CLI to wallfacer's canonical task model.
