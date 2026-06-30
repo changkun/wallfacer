@@ -164,6 +164,62 @@ func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 	}
 }
 
+// TestRunAgent_SingleNode exercises the native-harness entry point: a single
+// agent runs as a one-node pinned region with the deterministic fake model,
+// producing a non-empty final text, exactly one lineage node (<session>/<name>,
+// status done), no edges, and live observer events that join to that node.
+func TestRunAgent_SingleNode(t *testing.T) {
+	var got []agentgraph.TraceEvent
+	res, err := agentgraph.RunAgent(
+		context.Background(), "run-native", agentgraph.ModelConfig{}, "implement", "you implement", "do the thing",
+		func(ev agentgraph.TraceEvent) { got = append(got, ev) },
+	)
+	if err != nil {
+		t.Fatalf("RunAgent: %v", err)
+	}
+	if res.Final == "" {
+		t.Error("final text is empty")
+	}
+	if len(res.Lineage.Nodes) != 1 {
+		t.Fatalf("nodes = %+v, want exactly 1", res.Lineage.Nodes)
+	}
+	n := res.Lineage.Nodes[0]
+	if n.ID != "run-native/implement" {
+		t.Errorf("node id = %q, want run-native/implement", n.ID)
+	}
+	if n.Status != "done" {
+		t.Errorf("node status = %q, want done", n.Status)
+	}
+	if len(res.Lineage.Edges) != 0 {
+		t.Errorf("edges = %+v, want none (single agent, no delegation)", res.Lineage.Edges)
+	}
+
+	names := map[string]bool{}
+	for _, ev := range got {
+		names[ev.Name] = true
+		if ev.Node != "" && ev.Node != n.ID {
+			t.Errorf("event Node %q is not the single lineage node %q", ev.Node, n.ID)
+		}
+	}
+	for _, want := range []string{"SessionStart", "AssistantMessage", "SessionEnd"} {
+		if !names[want] {
+			t.Errorf("missing event %q; got %v", want, names)
+		}
+	}
+}
+
+// TestRunAgent_DefaultName falls back to a stable node name when none is given,
+// and works with a nil observer.
+func TestRunAgent_DefaultName(t *testing.T) {
+	res, err := agentgraph.RunAgent(context.Background(), "run-x", agentgraph.ModelConfig{}, "", "", "hi", nil)
+	if err != nil {
+		t.Fatalf("RunAgent: %v", err)
+	}
+	if len(res.Lineage.Nodes) != 1 || res.Lineage.Nodes[0].ID != "run-x/agent" {
+		t.Fatalf("nodes = %+v, want one node run-x/agent", res.Lineage.Nodes)
+	}
+}
+
 // TestRunFlowFake exercises the full headless path with the deterministic fake
 // model: a two-agent pinned chain produces a lineage with two nodes joined by a
 // single "next" edge, and a non-empty final text.
