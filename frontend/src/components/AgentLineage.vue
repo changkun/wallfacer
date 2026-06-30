@@ -115,8 +115,26 @@ function renderTurn(text: string): string {
 <template>
   <section v-if="visible" class="lineage">
     <header class="lineage__header">
-      <span class="lineage__icon" aria-hidden="true">&#9783;</span>
+      <svg
+        class="lineage__logo"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="6" cy="7" r="2.2" />
+        <circle cx="17" cy="6" r="2.2" />
+        <circle cx="18" cy="17" r="2.2" />
+        <circle cx="7" cy="18" r="2.2" />
+        <path d="M8.1 7.4c2.3 1.3 4.8 1.1 6.9-.5M16.5 8.1c1.4 2 1.8 4.3 1.5 6.7M15.9 17.4c-2.1.9-4.4 1.1-6.7.6M6.8 15.8c-.7-2.2-.8-4.4-.2-6.6M9 9.1l6 6" />
+      </svg>
       <span>Agent Graph</span>
+      <span class="lineage__powered">powered by <span class="topos-brand">Topos</span></span>
     </header>
 
     <p v-if="error" class="lineage__note lineage__note--error">Trace unavailable: {{ error }}</p>
@@ -178,9 +196,15 @@ function renderTurn(text: string): string {
   font-weight: 600;
   font-size: 0.9rem;
 }
-.lineage__icon {
+.lineage__logo {
   color: var(--accent);
-  font-size: 1.05rem;
+  flex: none;
+}
+.lineage__powered {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-left: 0.15rem;
 }
 .lineage__note {
   margin: 0.55rem 0 0;

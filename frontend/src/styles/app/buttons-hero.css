@@ -155,6 +155,21 @@
     padding-right: 0.15em;
 }
 
+/* ===== Topos Brand ===== */
+/* The native latere.ai agent runtime. Gradient (teal -> olive -> amber)
+   matches the .topos-brand wordmark in the agents/topos surfaces so the
+   identity is consistent across products. */
+.topos-brand {
+    font-family: 'Instrument Serif', Georgia, serif !important;
+    font-style: italic !important;
+    font-weight: 400 !important;
+    background: linear-gradient(135deg, #55707a 0%, #6f8a56 58%, #a07045 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 0.15em;
+}
+
 /* ===== Product Hero ===== */
 .product-hero {
     padding: 40px 0 24px;
