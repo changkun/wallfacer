@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 134,
+  "route_count": 136,
   "routes": [
     {
       "method": "GET",
@@ -1214,6 +1214,24 @@
       "pattern": "/api/github/issues/{number}",
       "name": "GitHubIssue",
       "description": "Issue detail plus its conversation comment thread (?repo=owner/name).",
+      "tags": [
+        "github"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/github/pulls",
+      "name": "GitHubCreatePull",
+      "description": "Create a pull request from head into base; returns the open PR if one already exists for the branch.",
+      "tags": [
+        "github"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/github/comments",
+      "name": "GitHubCreateComment",
+      "description": "Post a conversation comment to a pull request or issue.",
       "tags": [
         "github"
       ]

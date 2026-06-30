@@ -1227,6 +1227,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GitHubPull":           http.HandlerFunc(h.GitHubPull),
 		"GitHubIssues":         http.HandlerFunc(h.GitHubIssues),
 		"GitHubIssue":          http.HandlerFunc(h.GitHubIssue),
+		"GitHubCreatePull":     http.HandlerFunc(h.GitHubCreatePull),
+		"GitHubCreateComment":  http.HandlerFunc(h.GitHubCreateComment),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes

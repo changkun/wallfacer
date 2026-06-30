@@ -864,4 +864,16 @@ var Routes = []Route{
 		Description: "Issue detail plus its conversation comment thread (?repo=owner/name).",
 		Tags:        []string{"github"},
 	},
+	{
+		Method: http.MethodPost, Pattern: "/api/github/pulls", Name: "GitHubCreatePull",
+		JSName:      "githubCreatePull",
+		Description: "Create a pull request from head into base; returns the open PR if one already exists for the branch.",
+		Tags:        []string{"github"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/github/comments", Name: "GitHubCreateComment",
+		JSName:      "githubCreateComment",
+		Description: "Post a conversation comment to a pull request or issue.",
+		Tags:        []string{"github"},
+	},
 }
