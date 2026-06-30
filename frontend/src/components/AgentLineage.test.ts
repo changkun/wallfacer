@@ -79,6 +79,22 @@ describe('AgentLineage', () => {
     host.remove();
   });
 
+  it('brands the header with the Topos node-graph logo and wordmark', async () => {
+    lineage = {
+      nodes: [{ id: 'run-x/implement', name: 'implement', role: '', status: 'done' }],
+      edges: [],
+    };
+    const { app, host } = await mount();
+    // The native runtime is surfaced: the node-graph logo + "powered by Topos"
+    // wordmark (the global .topos-brand gradient class).
+    expect(host.querySelector('.lineage__header .lineage__logo')).not.toBeNull();
+    const brand = host.querySelector('.lineage__header .topos-brand');
+    expect(brand?.textContent).toBe('Topos');
+    expect(host.querySelector('.lineage__powered')?.textContent).toContain('powered by');
+    app.unmount();
+    host.remove();
+  });
+
   it('renders nothing when there is no lineage and no trace', async () => {
     lineage = { nodes: [], edges: [] };
     events = [];
