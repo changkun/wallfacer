@@ -60,11 +60,77 @@ func (h *Handler) collectSpecTree(ctx context.Context) spec.TreeResponse {
 	}
 }
 
-// GetSpecTree returns the full spec tree with metadata, progress, and
-// an optional roadmap index for all workspaces. Each workspace's specs/
-// directory is scanned and the results are merged into a single response.
+// specGroup is one workspace folder's spec tree, self-contained so a folder's
+// Nodes / Progress / Index can never collide with another folder's (two folders
+// may both have a `local/` track or a `README.md` root). The frontend renders
+// each group separately, keyed by Workspace.
+type specGroup struct {
+	Workspace string                   `json:"workspace"` // source folder absolute path
+	Label     string                   `json:"label"`     // display label (folder basename)
+	Nodes     []spec.NodeResponse      `json:"nodes"`
+	Progress  map[string]spec.Progress `json:"progress"`
+	Index     *spec.Index              `json:"index,omitempty"`
+}
+
+// groupedTreeResponse is the spec-navigation payload: one group per workspace
+// folder that has a specs/ directory.
+type groupedTreeResponse struct {
+	Groups []specGroup `json:"groups"`
+}
+
+// collectGroupedSpecTree builds one self-contained spec tree per workspace
+// folder so the navigation can show each folder's specs separately. A folder is
+// included when it has either spec nodes or a roadmap README. Shared by
+// GetSpecTree and SpecTreeStream.
+func (h *Handler) collectGroupedSpecTree(ctx context.Context) groupedTreeResponse {
+	workspaces := h.visibleWorkspaces(ctx)
+	groups := make([]specGroup, 0, len(workspaces))
+	for _, ws := range workspaces {
+		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
+		if err != nil {
+			continue // no specs/ in this folder — skip silently
+		}
+		resp := spec.SerializeTree(tree)
+		index, err := spec.ResolveIndex([]string{ws})
+		if err != nil {
+			slog.Warn("resolve roadmap index failed", "workspace", ws, "err", err)
+		}
+		if len(resp.Nodes) == 0 && index == nil {
+			continue
+		}
+		groups = append(groups, specGroup{
+			Workspace: ws,
+			Label:     filepath.Base(ws),
+			Nodes:     resp.Nodes,
+			Progress:  resp.Progress,
+			Index:     index,
+		})
+	}
+	return groupedTreeResponse{Groups: groups}
+}
+
+// specTreeResponse is backward-compatible: it carries the flat merged tree
+// (Nodes/Progress/Index — what every existing consumer reads) AND the per-folder
+// Groups. A frontend that ignores Groups behaves exactly as before; one that
+// reads Groups can show each folder's specs separately.
+type specTreeResponse struct {
+	spec.TreeResponse
+	Groups []specGroup `json:"groups"`
+}
+
+// specTree assembles the combined flat + grouped payload.
+func (h *Handler) specTree(ctx context.Context) specTreeResponse {
+	return specTreeResponse{
+		TreeResponse: h.collectSpecTree(ctx),
+		Groups:       h.collectGroupedSpecTree(ctx).Groups,
+	}
+}
+
+// GetSpecTree returns the spec tree both merged (flat Nodes/Progress/Index) and
+// grouped per workspace folder (Groups), so the navigation can show specs from
+// different folders separately while older consumers keep working.
 func (h *Handler) GetSpecTree(w http.ResponseWriter, r *http.Request) {
-	httpjson.Write(w, http.StatusOK, h.collectSpecTree(r.Context()))
+	httpjson.Write(w, http.StatusOK, h.specTree(r.Context()))
 }
 
 // SpecTreeStream sends SSE notifications when the spec tree changes.
@@ -79,9 +145,9 @@ func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collectTree := func() spec.TreeResponse { return h.collectSpecTree(r.Context()) }
+	collectTree := func() specTreeResponse { return h.specTree(r.Context()) }
 
-	send := func(tree spec.TreeResponse) ([]byte, bool) {
+	send := func(tree specTreeResponse) ([]byte, bool) {
 		data, err := json.Marshal(tree)
 		if err != nil {
 			return nil, false
