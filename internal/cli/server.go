@@ -1221,12 +1221,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GitHubAuthStatus":     http.HandlerFunc(h.GitHubAuthStatus),
 		"GitHubAuthConnect":    http.HandlerFunc(h.GitHubAuthConnect),
 		"GitHubAuthDisconnect": http.HandlerFunc(h.GitHubAuthDisconnect),
-		"GitHubRepos":          http.HandlerFunc(h.GitHubRepos),
-		"GitHubRepoSelect":     http.HandlerFunc(h.GitHubRepoSelect),
-		"GitHubPulls":          http.HandlerFunc(h.GitHubPulls),
-		"GitHubPull":           http.HandlerFunc(h.GitHubPull),
-		"GitHubIssues":         http.HandlerFunc(h.GitHubIssues),
-		"GitHubIssue":          http.HandlerFunc(h.GitHubIssue),
 		"GitHubCreatePull":     http.HandlerFunc(h.GitHubCreatePull),
 		"GitHubCreateComment":  http.HandlerFunc(h.GitHubCreateComment),
 	}

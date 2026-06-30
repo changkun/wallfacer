@@ -5,16 +5,12 @@ import (
 	"net/http"
 
 	"latere.ai/x/wallfacer/internal/github"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
-// GitHub repo surface (spec: github-integration component 2, repo-selection):
-//
-//	GET  /api/github/repos        -> repos the "Latere AI" install grants
-//	POST /api/github/repo/select  -> validate a choice, resolve to host/owner/repo
-//
-// Both require a connected token (resolved via the provider) and operate over
-// installation repos, so the install grant is the org boundary.
+// Shared helpers for the GitHub write surface (spec: github-integration
+// component 4). The standalone repo/PR/issue browse handlers were removed in the
+// task-centric redesign; what remains is token resolution and API-error mapping,
+// used by the create-PR and comment handlers.
 
 // githubToken resolves a usable token for the request principal, writing the
 // appropriate error response and returning ok=false when none is available.
@@ -52,72 +48,4 @@ func mapGitHubAPIError(w http.ResponseWriter, err error) {
 	default:
 		http.Error(w, "github request failed", http.StatusBadGateway)
 	}
-}
-
-// GitHubRepos lists the repositories the install grants the principal.
-func (h *Handler) GitHubRepos(w http.ResponseWriter, r *http.Request) {
-	tok, ok := h.githubToken(w, r)
-	if !ok {
-		return
-	}
-	repos, err := github.ListInstallationRepos(r.Context(), h.github.APIClient(), tok)
-	if err != nil {
-		mapGitHubAPIError(w, err)
-		return
-	}
-	httpjson.Write(w, http.StatusOK, map[string]any{"repos": repos})
-}
-
-type repoSelectRequest struct {
-	// Repo is the chosen repository as "owner/name".
-	Repo string `json:"repo"`
-}
-
-type repoSelectResponse struct {
-	FullName      string `json:"full_name"`
-	Owner         string `json:"owner"`
-	Name          string `json:"name"`
-	DefaultBranch string `json:"default_branch"`
-	HTMLURL       string `json:"html_url,omitempty"`
-	// Identity is the canonical host/owner/repo join key (repo-identity).
-	Identity string `json:"identity"`
-}
-
-// GitHubRepoSelect validates that the chosen repo is within the install grant
-// (the org boundary) and resolves it to its canonical host/owner/repo identity.
-// Selection state itself is held client-side; this endpoint is the server-side
-// validation + identity resolution the read/write surfaces key on.
-func (h *Handler) GitHubRepoSelect(w http.ResponseWriter, r *http.Request) {
-	body, ok := httpjson.DecodeBody[repoSelectRequest](w, r)
-	if !ok {
-		return
-	}
-	if body.Repo == "" {
-		http.Error(w, "repo is required", http.StatusBadRequest)
-		return
-	}
-	tok, ok := h.githubToken(w, r)
-	if !ok {
-		return
-	}
-	repos, err := github.ListInstallationRepos(r.Context(), h.github.APIClient(), tok)
-	if err != nil {
-		mapGitHubAPIError(w, err)
-		return
-	}
-	for _, repo := range repos {
-		if repo.FullName == body.Repo {
-			httpjson.Write(w, http.StatusOK, repoSelectResponse{
-				FullName:      repo.FullName,
-				Owner:         repo.Owner,
-				Name:          repo.Name,
-				DefaultBranch: repo.DefaultBranch,
-				HTMLURL:       repo.HTMLURL,
-				Identity:      "github.com/" + repo.FullName,
-			})
-			return
-		}
-	}
-	// Not in the install grant: outside the org boundary, never silently widened.
-	http.Error(w, "repo outside your organization's installation", http.StatusForbidden)
 }

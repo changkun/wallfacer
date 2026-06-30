@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 136,
+  "route_count": 130,
   "routes": [
     {
       "method": "GET",
@@ -1160,60 +1160,6 @@
       "pattern": "/api/github/auth/disconnect",
       "name": "GitHubAuthDisconnect",
       "description": "Disconnect GitHub by clearing the principal's stored token.",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/github/repos",
-      "name": "GitHubRepos",
-      "description": "List repositories the \"Latere AI\" install grants the principal (the install grant is the org boundary).",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/github/repo/select",
-      "name": "GitHubRepoSelect",
-      "description": "Validate a chosen repo is within the install grant and resolve it to its canonical host/owner/repo identity.",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/github/pulls",
-      "name": "GitHubPulls",
-      "description": "List pull requests for the selected repo (?repo=owner/name\u0026state=open|closed|all).",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/github/pulls/{number}",
-      "name": "GitHubPull",
-      "description": "Pull request detail plus its conversation comment thread (?repo=owner/name).",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/github/issues",
-      "name": "GitHubIssues",
-      "description": "List issues for the selected repo, excluding pull requests (?repo=owner/name\u0026state=open|closed|all).",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/github/issues/{number}",
-      "name": "GitHubIssue",
-      "description": "Issue detail plus its conversation comment thread (?repo=owner/name).",
       "tags": [
         "github"
       ]

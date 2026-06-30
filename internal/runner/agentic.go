@@ -111,16 +111,40 @@ func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]st
 }
 
 // runAgenticFlow executes an agentic flow through the in-process topos
-// agent-graph runtime (internal/agentgraph) and maps the result back onto the
-// task. It compiles the flow into a topos.Region, runs it with the model
-// wallfacer is configured for (a real provider through Lux when a credential is
-// set, else the deterministic fake model; see agenticModelConfig), persists the
-// final text and the JSON-marshalled lineage graph, then drives the task through
-// the same
+// agent-graph runtime (internal/agentgraph): it compiles the flow into a
+// multi-agent topos.Region and drives the resulting run onto the task via
+// driveToposRun. The caller sets statusSet=true before invoking this.
+func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt string) {
+	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error) {
+		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, onEvent)
+	})
+}
+
+// runNativeTopos executes a plain task through the native Topos harness: a single
+// in-process agent (a one-node topos region) rather than a multi-agent flow. It
+// is the path a task resolves to when its harness is Topos (the native default,
+// once harness.Default() is flipped; until then only an explicit topos pin
+// reaches here). Like the agentic-flow path it produces a final text + lineage
+// and walks the state machine, but it does not yet make a durable git commit or
+// run verification — commit/verify parity with the subprocess harnesses is
+// tracked in the topos-native-harness spec.
+func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task store.Task, prompt string) {
+	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error) {
+		return agentgraph.RunAgent(ctx, task.ID.String(), r.agenticModelConfig(), "implement", "", prompt, onEvent)
+	})
+}
+
+// driveToposRun executes an in-process topos run (a multi-agent agentic flow or a
+// single-agent native-harness run) supplied as runFn, and maps the outcome onto
+// the task. It forwards the run's live trace events onto the task timeline (so
+// the per-turn assistant text, delegations, and tool use are visible as the run
+// proceeds, not just as a lineage graph at the end), persists the final text and
+// the JSON-marshalled lineage graph, then walks the task through the same
 // in_progress -> waiting -> committing -> done state machine the flow-engine and
 // ideation branches use (the state machine forbids a direct in_progress -> done
-// transition). The caller sets statusSet=true before invoking this.
-func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt string) {
+// transition). runFn performs the actual topos run, wired with the supplied
+// non-blocking observer. The caller sets statusSet=true before invoking this.
+func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task store.Task, runFn func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error)) {
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
 		timeout = constants.DefaultTaskTimeout
@@ -128,12 +152,10 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
 
-	// Forward the topos run's live events onto the task timeline so the
-	// multi-agent trace (per-turn assistant text, delegations, tool use) is
-	// visible as the run proceeds, not just as a lineage graph at the end. The
-	// topos observer is called synchronously on the run goroutine(s), so it must
-	// not block: push to a buffered channel and drain into the store from a
-	// separate goroutine (dropping on overflow rather than backpressuring the run).
+	// Forward the topos run's live events onto the task timeline. The topos
+	// observer is called synchronously on the run goroutine(s), so it must not
+	// block: push to a buffered channel and drain into the store from a separate
+	// goroutine (dropping on overflow rather than backpressuring the run).
 	traceCh := make(chan agentgraph.TraceEvent, 256)
 	traceDone := make(chan struct{})
 	go func() {
@@ -153,14 +175,14 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 		}
 	}
 
-	res, err := agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, onEvent)
+	res, err := runFn(ctx, onEvent)
 	close(traceCh)
 	<-traceDone
 	if err != nil {
 		if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 			return
 		}
-		logger.Runner.Error("agentic flow run", "task", taskID, "flow", f.Slug, "error", err)
+		logger.Runner.Error("topos run", "task", taskID, "error", err)
 		category := classifyFailure(err, false, "")
 		_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 		if r.tryAutoRetry(bgCtx, taskID, category) {

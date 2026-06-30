@@ -10,6 +10,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -79,6 +80,60 @@ func TestAgenticModelConfig(t *testing.T) {
 // agent-graph runtime (with the deterministic fake model), reach done via the
 // normal state machine, record the final text, and persist a lineage graph with
 // the expected two-node / one-next-edge shape. No container backend is invoked.
+// TestRun_NativeToposHarnessReachesDoneInProcess covers the native-harness
+// dispatch: a plain implement-path task pinned to the topos harness runs
+// in-process as a single topos agent (zero container launches), reaches done,
+// and persists a one-node lineage (no delegation edges).
+func TestRun_NativeToposHarnessReachesDoneInProcess(t *testing.T) {
+	r, backend, s := newAgentTestRunner(t)
+
+	ctx := context.Background()
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "native topos task",
+		Timeout: 5,
+		Sandbox: harness.Topos,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	r.Run(task.ID, "native topos task", "", false)
+	r.WaitBackground()
+	s.WaitCompaction()
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusDone {
+		t.Fatalf("status = %q, want done", updated.Status)
+	}
+	if updated.Result == nil || *updated.Result == "" {
+		t.Error("result was not recorded")
+	}
+	// The native harness runs in-process via topos; it must not launch a container.
+	if n := len(filterTaskCalls(backend.RunArgsCalls())); n != 0 {
+		t.Errorf("expected 0 container launches for the native topos harness, got %d", n)
+	}
+
+	if updated.Lineage == nil {
+		t.Fatal("lineage was not persisted")
+	}
+	var lin agentgraph.Lineage
+	if err := json.Unmarshal([]byte(*updated.Lineage), &lin); err != nil {
+		t.Fatalf("unmarshal lineage: %v", err)
+	}
+	if len(lin.Nodes) != 1 {
+		t.Fatalf("lineage nodes = %+v, want 1 (single agent)", lin.Nodes)
+	}
+	if lin.Nodes[0].Name != "implement" {
+		t.Errorf("node name = %q, want implement", lin.Nodes[0].Name)
+	}
+	if len(lin.Edges) != 0 {
+		t.Errorf("lineage edges = %+v, want none (no delegation)", lin.Edges)
+	}
+}
+
 func TestRun_AgenticFlowReachesDoneWithLineage(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	r.agentsReg = agents.NewRegistry(
