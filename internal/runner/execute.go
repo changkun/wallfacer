@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -272,6 +273,19 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
+		return
+	}
+
+	// Native Topos harness: an implement-path task whose resolved harness runs
+	// in-process executes as a single in-process topos agent (a one-node region)
+	// instead of launching a subprocess harness. The flow branches above take
+	// precedence, so by here flowSlug == "implement". Until harness.Default()
+	// flips to Topos this only triggers for a task explicitly pinned to the topos
+	// harness (opt-in). Test runs keep the subprocess verification path for now —
+	// the native path does not yet run verification.
+	if !task.IsTestRun && harness.InProcess(r.sandboxForTask(task)) {
+		statusSet = true
+		r.runNativeTopos(bgCtx, taskID, *task, prompt)
 		return
 	}
 
