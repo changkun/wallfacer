@@ -104,7 +104,12 @@ export const useGithubStore = defineStore('github', () => {
   async function connect(): Promise<void> {
     error.value = null;
     try {
-      const resp = await api<{ install_url?: string }>('POST', '/api/github/auth/connect');
+      // Pass the current page as return_to so the ../auth install flow returns
+      // here (loopback returns are allowed by auth) instead of dropping the user
+      // on auth.latere.ai/me.
+      const returnTo = encodeURIComponent(window.location.href);
+      const resp = await api<{ install_url?: string }>(
+        'POST', `/api/github/auth/connect?return_to=${returnTo}`);
       if (resp?.install_url) {
         window.location.href = resp.install_url;
         return;
