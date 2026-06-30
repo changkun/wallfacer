@@ -234,6 +234,53 @@ Surface the native-harness identity:
   does this spec wait on the in-progress GraphCanvas/MapPage work or proceed in parallel
   on the harness layer only.
 
+## Implementation Status (2026-07-01)
+
+Built and tested (opt-in native harness — a task pinned to `topos` runs end to
+end in-process):
+
+- **Decoupling audit DONE** (`9059cb99`). The harness resolver's final fallback
+  (`sandboxForTaskActivity`, `runAgent` tier-6, the plan-commit-message helper)
+  routes through `harness.Default()` instead of a literal `harness.Claude`;
+  behaviour-identical today. The Claude→Codex token-limit fallback is correctly
+  left keyed on the *resolved* primary (Claude-specific, not default-specific).
+- **Harness registration DONE** (`26a8d02f`). `harness.Topos` + a `toposHarness`
+  registry citizen; in-process (`BuildArgv` returns `ErrInProcess`); an
+  `InProcess(id)` predicate; surfaced in `harness.All()` (UI selector). Pkg cov
+  90.5%.
+- **Single-agent seam DONE** (`e865d461`). `agentgraph.RunAgent` runs a one-node
+  pinned region through the same engine/observer/model wiring as the multi-agent
+  path. Pkg cov 90.1%.
+- **Runner wiring DONE** (`519a1dd9`). `execute.go` routes an implement-path task
+  whose resolved harness is in-process to `runNativeTopos` (zero container
+  launches, single-node lineage). Shared `driveToposRun` extracted from
+  `runAgenticFlow`. Integration-tested.
+- **Branding DONE** (`52d11106`). `.topos-brand` wordmark + the node-graph logo
+  in `AgentLineage.vue` ("Agent Graph · powered by Topos").
+
+**Remaining (the `Default()` flip is gated on this — NOT yet done):**
+
+1. **Worktree execution (keystone).** The native run currently uses the topos
+   *local* sandbox, which execs in a per-sandbox temp dir, not the task's git
+   worktree — so it cannot modify the user's repo. Real native execution needs an
+   `executor.Backend → sandbox.Provider` adapter (the deferred
+   [[topos-runtime-integration]] OQ-1) so a topos run reuses wallfacer's vetted
+   sandboxed execution in the worktree, injected via `topos.Options.Sandbox`. The
+   `sandbox.Provider` interface (Create/Destroy/Exec/StreamExec/ReadFile/
+   WriteFile/ListFiles/HealthCheck) lives in the public `latere.ai/x/topos`; a
+   wallfacer-side adapter avoids gated topos-repo changes.
+2. **Commit + verification parity.** After the run, `runNativeTopos` must make a
+   durable git commit of the worktree changes and run the verification/test step,
+   matching what the subprocess path does — today it persists text + lineage and
+   walks the state machine without committing.
+3. **Auth-gated local/cloud.** Resolve the execution mode from login state
+   (local `sandbox/local` default vs logged-in Topos cloud + Cella `sandbox/cella`
+   remote workspace) — Component 3 above.
+4. **`Default()` flip + `defaultSandbox` UI default** — flip `registry.go`
+   `Default()` to `Topos` and the `config.go` `defaultSandbox` pre-selection,
+   ONLY after 1–2 land, else real task runs stop committing code. Update
+   `TestDefault`.
+
 ## Notes
 
 - [[topos-runtime-integration]]'s frontmatter is **stale**: marked `drafted` though
