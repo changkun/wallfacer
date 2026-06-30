@@ -484,7 +484,7 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 	commitPrompt := r.promptsMgr.CommitMessage(data)
 	labels := map[string]string{"wallfacer.task.activity": "commit_message_planning"}
 
-	initial := harness.Claude
+	initial := harness.Default()
 	output, err := r.runCommitContainer(ctx, containerName, commitPrompt, initial, labels)
 	if err != nil {
 		if isLikelyTokenLimitError(err.Error()) {
