@@ -165,16 +165,18 @@ func TestWorkspaceLifecycleE2E(t *testing.T) {
 		t.Fatalf("workspace B over the same folder inherited history: got %d tasks, want 0", n)
 	}
 
-	// Deleting the active workspace (B) is refused; an inactive one (A) succeeds.
+	// Deleting a workspace returns 200 with the new config. The active one is
+	// deletable now (it wipes data + auto-switches): delete active B → the board
+	// switches to A; then delete A → 200 (no workspaces left).
 	delB := wsReq(t, http.MethodDelete, srv.URL+"/api/workspaces/"+idB, "")
 	_ = delB.Body.Close()
-	if delB.StatusCode != http.StatusConflict {
-		t.Fatalf("delete active B: status %d, want 409", delB.StatusCode)
+	if delB.StatusCode != http.StatusOK {
+		t.Fatalf("delete active B: status %d, want 200", delB.StatusCode)
 	}
 	delA := wsReq(t, http.MethodDelete, srv.URL+"/api/workspaces/"+idA, "")
 	_ = delA.Body.Close()
-	if delA.StatusCode != http.StatusNoContent {
-		t.Fatalf("delete inactive A: status %d, want 204", delA.StatusCode)
+	if delA.StatusCode != http.StatusOK {
+		t.Fatalf("delete A: status %d, want 200", delA.StatusCode)
 	}
 }
 
