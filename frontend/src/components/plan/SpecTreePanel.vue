@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { api } from '../../api/client';
 import { useAgentStore } from '../../stores/agentSession';
-import type { SpecNode } from '../../stores/agentSession';
+import type { SpecNode, SpecIndexMeta, SpecProgress } from '../../stores/agentSession';
 import { isNodeCheckable, nodeUnmetDeps, selectableRange } from './specTreeSelect';
 import { useTaskStore } from '../../stores/tasks';
 import { useUiStore } from '../../stores/ui';
@@ -19,7 +19,7 @@ const taskStore = useTaskStore();
 const ui = useUiStore();
 const dialog = useDialogStore();
 const {
-  tree, treeProgress, treeIndex, treeLoading,
+  tree, treeProgress, treeIndex, treeGroups, treeLoading,
   focusedSpecPath, focusedIsIndex, focusedTaskId, staleCandidates,
 } = storeToRefs(agentStore);
 
@@ -183,9 +183,21 @@ interface RenderedNode {
 }
 
 interface RenderedTrack {
+  key: string; // expansion key (namespaced by folder so groups toggle independently)
   name: string;
   expanded: boolean;
   nodes: RenderedNode[];
+}
+
+// A workspace folder's spec subtree, rendered separately when the workspace
+// spans multiple folders that each have specs/.
+interface RenderedGroup {
+  key: string;
+  label: string;
+  showHeader: boolean;
+  index: SpecIndexMeta | null;
+  progress: Record<string, SpecProgress>;
+  tracks: RenderedTrack[];
 }
 
 // Shared path->node index over the whole tree. Reused by renderedTracks,
@@ -197,11 +209,14 @@ const byPath = computed(() => {
   return m;
 });
 
-const renderedTracks = computed<RenderedTrack[]>(() => {
-  // Group root nodes by track.
+// buildTracks renders a set of root-and-descendant nodes into expandable tracks,
+// using the supplied path index (so each folder resolves children within its own
+// subtree). keyPrefix namespaces the track expansion keys so two folders that
+// both have a `local/` track toggle independently.
+function buildTracks(nodes: SpecNode[], byPathMap: Map<string, SpecNode>, keyPrefix: string): RenderedTrack[] {
   const trackOrder: string[] = [];
   const groups: Record<string, SpecNode[]> = {};
-  for (const node of tree.value) {
+  for (const node of nodes) {
     if (node.depth !== 0) continue;
     // Loose top-level specs (no folder) carry an empty track; group them
     // under "other" so they still render rather than under a blank header.
@@ -215,18 +230,18 @@ const renderedTracks = computed<RenderedTrack[]>(() => {
 
   const out: RenderedTrack[] = [];
   for (const track of trackOrder) {
-    const trackKey = '__track__' + track;
-    const expanded = expandedPaths.value.has(trackKey) || !!textFilter.value;
-    const nodes: RenderedNode[] = [];
+    const key = keyPrefix + '__track__' + track;
+    const expanded = expandedPaths.value.has(key) || !!textFilter.value;
+    const rnodes: RenderedNode[] = [];
 
     function walk(node: SpecNode, depth: number) {
-      if (!nodeMatches(node, byPath.value)) return;
+      if (!nodeMatches(node, byPathMap)) return;
       const hasChildren = (node.children?.length ?? 0) > 0;
       const isExpanded = expandedPaths.value.has(node.path) || !!textFilter.value;
-      nodes.push({ node, depth, hasChildren, expanded: isExpanded });
+      rnodes.push({ node, depth, hasChildren, expanded: isExpanded });
       if (hasChildren && isExpanded) {
         for (const childPath of node.children ?? []) {
-          const child = byPath.value.get(childPath);
+          const child = byPathMap.get(childPath);
           if (child) walk(child, depth + 1);
         }
       }
@@ -236,15 +251,39 @@ const renderedTracks = computed<RenderedTrack[]>(() => {
       for (const root of groups[track]) walk(root, 0);
     }
 
-    out.push({ name: track, expanded, nodes });
+    out.push({ key, name: track, expanded, nodes: rnodes });
   }
   return out;
+}
+
+// renderedGroups splits the tree by workspace folder. The server sends one
+// self-contained group per folder; when only one folder has specs there is a
+// single group (no folder header). Falls back to the flat tree if an older
+// payload arrives without groups.
+const renderedGroups = computed<RenderedGroup[]>(() => {
+  const source = treeGroups.value.length > 0
+    ? treeGroups.value
+    : (tree.value.length > 0
+        ? [{ workspace: '', label: '', nodes: tree.value, progress: treeProgress.value, index: treeIndex.value }]
+        : []);
+  const multi = source.length > 1;
+  return source.map((g) => {
+    const bp = new Map<string, SpecNode>();
+    for (const n of g.nodes) bp.set(n.path, n);
+    return {
+      key: g.workspace || '__single__',
+      label: g.label,
+      showHeader: multi,
+      index: g.index,
+      progress: g.progress,
+      tracks: buildTracks(g.nodes, bp, multi ? g.workspace : ''),
+    };
+  });
 });
 
 // ── Interactions ───────────────────────────────────────────────────
 
-function toggleTrack(name: string) {
-  const key = '__track__' + name;
+function toggleTrack(key: string) {
   if (expandedPaths.value.has(key)) expandedPaths.value.delete(key);
   else expandedPaths.value.add(key);
   expandedPaths.value = new Set(expandedPaths.value);
@@ -311,7 +350,7 @@ function isCheckable(node: SpecNode): boolean {
 
 const flatLeafIndex = computed(() => {
   const list: string[] = [];
-  for (const t of renderedTracks.value) for (const n of t.nodes) list.push(n.node.path);
+  for (const g of renderedGroups.value) for (const t of g.tracks) for (const n of t.nodes) list.push(n.node.path);
   return list;
 });
 
@@ -569,58 +608,63 @@ onUnmounted(() => {
           <span class="stp-pinned-icon">📋</span> Roadmap
         </div>
 
-        <div v-for="track in renderedTracks" :key="track.name" class="stp-track">
-          <div class="stp-track-header" @click="toggleTrack(track.name)">
-            <span class="stp-chev" :class="{ open: track.expanded }" />
-            <span class="stp-track-name">{{ track.name }}</span>
+        <template v-for="group in renderedGroups" :key="group.key">
+          <div v-if="group.showHeader" class="stp-group-header" :title="group.key">
+            <span class="stp-group-icon">📁</span>{{ group.label }}
           </div>
-          <template v-if="track.expanded">
-            <div
-              v-for="rn in track.nodes"
-              :key="rn.node.path"
-              class="stp-node"
-              :class="{
-                'stp-node--leaf': rn.node.is_leaf,
-                'stp-node--archived': rn.node.spec?.status === 'archived',
-                'stp-node--doc': rn.node.spec?.doc,
-                'stp-node--focused': focusedSpecPath === rn.node.path && !focusedIsIndex,
-              }"
-              :style="{ paddingLeft: 8 + rn.depth * 14 + 'px' }"
-              @click="selectNode(rn.node)"
-            >
-              <span
-                v-if="rn.hasChildren"
-                class="stp-chev"
-                :class="{ open: rn.expanded }"
-                @click.stop="toggleNode(rn.node.path)"
-              />
-              <span v-else class="stp-chev-spacer" />
-              <input
-                v-if="isCheckable(rn.node)"
-                type="checkbox"
-                class="stp-checkbox"
-                :checked="selectedPaths.has(rn.node.path)"
-                :disabled="unmetDeps(rn.node).length > 0"
-                :title="unmetDeps(rn.node).length > 0 ? 'Blocked by: ' + unmetDeps(rn.node).join(', ') : ''"
-                @click.stop
-                @change="onCheckboxChange($event, rn.node)"
-              />
-              <span class="stp-icon">{{ rn.node.spec?.doc ? '📄' : (STATUS_ICONS[rn.node.spec?.status ?? ''] ?? '') }}</span>
-              <span class="stp-title">{{ rn.node.spec?.title || rn.node.path }}</span>
-              <span
-                v-if="staleCandidates[rn.node.path]"
-                class="stp-stale-candidate"
-                :title="staleCandidates[rn.node.path].reason"
-              >⚠ stale candidate</span>
-              <span
-                v-if="!rn.node.is_leaf && treeProgress[rn.node.path]"
-                class="stp-progress"
-              >{{ treeProgress[rn.node.path].Complete }}/{{ treeProgress[rn.node.path].Total }}</span>
+          <div v-for="track in group.tracks" :key="track.key" class="stp-track">
+            <div class="stp-track-header" @click="toggleTrack(track.key)">
+              <span class="stp-chev" :class="{ open: track.expanded }" />
+              <span class="stp-track-name">{{ track.name }}</span>
             </div>
-          </template>
-        </div>
+            <template v-if="track.expanded">
+              <div
+                v-for="rn in track.nodes"
+                :key="rn.node.path"
+                class="stp-node"
+                :class="{
+                  'stp-node--leaf': rn.node.is_leaf,
+                  'stp-node--archived': rn.node.spec?.status === 'archived',
+                  'stp-node--doc': rn.node.spec?.doc,
+                  'stp-node--focused': focusedSpecPath === rn.node.path && !focusedIsIndex,
+                }"
+                :style="{ paddingLeft: 8 + rn.depth * 14 + 'px' }"
+                @click="selectNode(rn.node)"
+              >
+                <span
+                  v-if="rn.hasChildren"
+                  class="stp-chev"
+                  :class="{ open: rn.expanded }"
+                  @click.stop="toggleNode(rn.node.path)"
+                />
+                <span v-else class="stp-chev-spacer" />
+                <input
+                  v-if="isCheckable(rn.node)"
+                  type="checkbox"
+                  class="stp-checkbox"
+                  :checked="selectedPaths.has(rn.node.path)"
+                  :disabled="unmetDeps(rn.node).length > 0"
+                  :title="unmetDeps(rn.node).length > 0 ? 'Blocked by: ' + unmetDeps(rn.node).join(', ') : ''"
+                  @click.stop
+                  @change="onCheckboxChange($event, rn.node)"
+                />
+                <span class="stp-icon">{{ rn.node.spec?.doc ? '📄' : (STATUS_ICONS[rn.node.spec?.status ?? ''] ?? '') }}</span>
+                <span class="stp-title">{{ rn.node.spec?.title || rn.node.path }}</span>
+                <span
+                  v-if="staleCandidates[rn.node.path]"
+                  class="stp-stale-candidate"
+                  :title="staleCandidates[rn.node.path].reason"
+                >⚠ stale candidate</span>
+                <span
+                  v-if="!rn.node.is_leaf && group.progress[rn.node.path]"
+                  class="stp-progress"
+                >{{ group.progress[rn.node.path].Complete }}/{{ group.progress[rn.node.path].Total }}</span>
+              </div>
+            </template>
+          </div>
+        </template>
 
-        <div v-if="renderedTracks.length === 0" class="stp-empty">No specs match the filter.</div>
+        <div v-if="renderedGroups.every(g => g.tracks.length === 0)" class="stp-empty">No specs match the filter.</div>
       </template>
     </div>
 
@@ -825,6 +869,23 @@ onUnmounted(() => {
 
 .stp-pinned-icon {
   font-size: 13px;
+}
+
+/* Folder group header — shown only when the workspace spans multiple folders
+   that each have specs/, separating one folder's spec tree from the next. */
+.stp-group-header {
+  padding: 8px 10px 4px;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--rule);
+  background: var(--bg-2, var(--bg-card));
+}
+.stp-group-icon {
+  font-size: 12px;
 }
 
 .stp-track-header {

@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useAgentStore } from '../stores/agentSession';
-import type { SpecNode, SpecIndexMeta, SpecProgress } from '../stores/agentSession';
+import type { SpecNode, SpecIndexMeta, SpecProgress, SpecGroup } from '../stores/agentSession';
 import { useTaskStore } from '../stores/tasks';
 import { useSse } from '../composables/useSse';
 import { watchThemeReinit } from '../lib/mermaidRender';
@@ -201,11 +201,13 @@ useSse({
           nodes?: SpecNode[];
           index?: SpecIndexMeta | null;
           progress?: Record<string, SpecProgress>;
+          groups?: SpecGroup[];
         };
         agentStore.applyTree({
           nodes: d.nodes ?? [],
           index: d.index ?? null,
           progress: d.progress ?? {},
+          groups: d.groups ?? [],
         });
       }
     },
