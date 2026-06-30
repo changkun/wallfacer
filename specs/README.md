@@ -58,6 +58,7 @@ Shared Design - 4 complete
   ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
   ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
   ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
+  ○ Topos as Native Harness (Topos = default; decouple Claude Code default)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -232,6 +233,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [extensible-prompts.md](.archive/shared/extensible-prompts.md) | **Archived** | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. Archived: superseded by the Topos agent-document model (the discoverable/composable unit is now the `topos.latere.ai/v1` agent document, with the `harness/skills` layer for capabilities); what remains in `internal/prompts/` is internal harness plumbing that benefits from staying typed and compiled. Was its prompt-provider for the archived `agent-abstraction`. |
 | [agent-session-vocabulary.md](shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
+| [topos-native-harness.md](shared/topos-native-harness.md) | Not started | Both | Make Topos the first-class native harness and default; decouple Claude Code from being the hardcoded default while keeping all harnesses selectable. In-process local (offline) vs logged-in Topos cloud + Cella remote workspaces; auth-gated sandbox swap; brand surfacing. |
 
 ### Why these are shared
 
