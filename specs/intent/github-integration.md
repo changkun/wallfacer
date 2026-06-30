@@ -30,6 +30,40 @@ under `github-integration/`.
 
 ---
 
+## Redesign 2026-06-30: task-centric, drop the standalone surface
+
+After components 1-4 shipped, product feedback reframed the wallfacer GitHub UX
+away from a standalone browser toward **GitHub as a property of tasks/specs**.
+The brokering (component 1, `../auth` Latere AI App, deployed) and the write
+surface (component 4) stay; the standalone browse surface is removed.
+
+**Removed:**
+- The `/github` page, its Sidebar "GitHub" entry, and the repo picker
+  (`GithubPage.vue`, `components/github/RepoPicker.vue`). Rationale: connection
+  lives in Settings, so a separate destination is redundant; the repo is derived
+  from a task's workspace git origin, so there is nothing to pick.
+- **Issues entirely** -- no issue list, detail, or read endpoints.
+- The standalone PR list/detail browse (`ListPulls`/`GetPull`,
+  `GitHubRepos`/`GitHubRepoSelect`, `GitHubPulls`/`GitHubIssues*`).
+
+**Kept:** connect/disconnect in Settings (+ the `../auth` `/me` card), the
+brokered token plumbing (`internal/github` client/store/provider/broker), and
+the write surface (`CreatePull`, `CreateComment`, existing-PR detection).
+
+**New (task-centric PRs):**
+- **Task detail** -- a Create PR / View PR action with PR status (open/merged,
+  link) and a comment box. Repo from the task's workspace origin, head = the
+  task's branch, base = the remote default.
+- **Board cards** -- a small PR badge (e.g. `#42 open`).
+- **Spec items** -- a PR link when a spec maps to a branch/task.
+
+GitHub stops being a destination and becomes metadata on the work: connect once
+in Settings, then PRs appear where the work is. The child specs `read-surface`
+and `repo-selection` are superseded by this section; `pull-request` (write) is
+retained and extended to the task-attached form.
+
+---
+
 ## Problem
 
 Wallfacer treats a workspace as a pre-cloned local folder and never talks to
