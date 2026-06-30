@@ -185,8 +185,8 @@ func (r *Runner) runAgent(
 	//   3. Per-task sandbox.
 	//   4. Env-file per-activity setting.
 	//   5. Env-file default sandbox.
-	//   6. Claude (hardcoded fallback).
-	primary := harness.Claude
+	//   6. harness.Default() — the configured native default (final fallback).
+	primary := harness.Default()
 	if pin := harness.ID(strings.ToLower(strings.TrimSpace(role.Harness))); pin.IsValid() {
 		primary = pin
 	} else if task != nil {

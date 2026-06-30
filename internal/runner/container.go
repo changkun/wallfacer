@@ -246,10 +246,13 @@ func (r *Runner) sandboxForTask(task *store.Task) harness.ID {
 
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
 // Resolution priority: per-task per-activity override → per-task sandbox → env-file
-// per-activity setting → env-file default sandbox → Claude (hardcoded fallback).
+// per-activity setting → env-file default sandbox → the configured default harness
+// (harness.Default(), the final fallback). Keying the fallback on Default() rather
+// than a literal harness.Claude is what lets the native default change without
+// touching this resolver.
 func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) harness.ID {
 	if task == nil {
-		return harness.Claude
+		return harness.Default()
 	}
 	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
 	if task.SandboxByActivity != nil {
@@ -263,7 +266,7 @@ func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.Sandbox
 	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
 		return sb
 	}
-	return harness.Claude
+	return harness.Default()
 }
 
 // sandboxFromEnvForActivity reads the env-file sandbox routing for a specific activity.

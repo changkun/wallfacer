@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/circuitbreaker"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/store"
@@ -1077,13 +1078,15 @@ func TestContainerCircuitOpen_DoesNotConsumeProbe(t *testing.T) {
 // sandboxForTask / modelFromEnv / titleModelFromEnv
 // ---------------------------------------------------------------------------
 
-// TestSandboxForTask_NilTask_DefaultsClaude verifies that sandboxForTask with
-// a nil task returns the "claude" sandbox as the default.
-func TestSandboxForTask_NilTask_DefaultsClaude(t *testing.T) {
+// TestSandboxForTask_NilTask_DefaultsToDefaultHarness verifies that
+// sandboxForTask with a nil task falls back to the configured default harness.
+// Pinning the assertion to harness.Default() (not a literal "claude") keeps the
+// decoupling contract: when the native default changes, the resolver follows.
+func TestSandboxForTask_NilTask_DefaultsToDefaultHarness(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	result := r.sandboxForTask(nil)
-	if result != "claude" {
-		t.Errorf("sandboxForTask(nil) = %q, want %q", result, "claude")
+	if result != harness.Default() {
+		t.Errorf("sandboxForTask(nil) = %q, want %q", result, harness.Default())
 	}
 }
 
@@ -1098,14 +1101,16 @@ func TestSandboxForTask_TaskWithSandbox(t *testing.T) {
 	}
 }
 
-// TestSandboxForTask_EmptyTask_DefaultsClaude verifies that a task with no
-// sandbox configured falls back to the "claude" default.
-func TestSandboxForTask_EmptyTask_DefaultsClaude(t *testing.T) {
+// TestSandboxForTask_EmptyTask_DefaultsToDefaultHarness verifies that a task
+// with no sandbox configured falls back to the configured default harness.
+// Asserts against harness.Default() so the decoupling holds when the default
+// changes.
+func TestSandboxForTask_EmptyTask_DefaultsToDefaultHarness(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	task := &store.Task{}
 	result := r.sandboxForTask(task)
-	if result != "claude" {
-		t.Errorf("sandboxForTask(empty task) = %q, want %q", result, "claude")
+	if result != harness.Default() {
+		t.Errorf("sandboxForTask(empty task) = %q, want %q", result, harness.Default())
 	}
 }
 

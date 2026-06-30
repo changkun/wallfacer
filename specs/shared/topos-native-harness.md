@@ -82,12 +82,12 @@ Two ways to make Topos satisfy the harness contract:
   boundary wallfacer already avoids for agentic runs, plus a hard dependency on an
   installed `latere` binary, duplicating an embed wallfacer already has.
 
-**Recommendation: (A).** wallfacer already embeds Topos in-process for multi-agent runs
-([[topos-runtime-integration]]); the native harness should be the *same* engine at
-single-agent scale, not a second copy reached through a subprocess. `../latere-cli`'s
-`topos_*.go` commands are the **reference for the driver logic** (region build, provider
-selection, sandbox wiring, streaming), not a binary to shell out to. This is the primary
-open question to ratify before implementation (OQ-1).
+**Decision: (A), ratified 2026-06-30.** wallfacer already embeds Topos in-process for
+multi-agent runs ([[topos-runtime-integration]]); the native harness is the *same* engine
+at single-agent scale, not a second copy reached through a subprocess. **CLI invocation of
+`latere` is explicitly rejected** — no subprocess boundary for the native path.
+`../latere-cli`'s `topos_*.go` commands are the **reference for the driver logic** (region
+build, provider selection, sandbox wiring, streaming), not a binary to shell out to.
 
 ## Architecture
 
@@ -221,9 +221,9 @@ Surface the native-harness identity:
 
 ## Open Questions
 
-- **OQ-1 (ratify first).** In-process harness (recommendation A: generalize the seam,
-  reuse the agentgraph embed) vs CLI subprocess over `latere` (B). Determines the shape
-  of the `Harness` interface change.
+- **OQ-1 RESOLVED (2026-06-30).** Approach **A** — in-process harness: generalize the
+  seam, reuse the agentgraph embed, map `topos.Event` → canonical `Event`. CLI subprocess
+  over `latere` (B) is rejected; no subprocess boundary for the native path.
 - **OQ-2.** Where the user chooses local vs cloud execution — per run, per workspace, or
   a global setting — and the default for a logged-in user (local unless explicitly opted
   into cloud).
