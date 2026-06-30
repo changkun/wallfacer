@@ -96,13 +96,18 @@ export const useGithubStore = defineStore('github', () => {
     }
   }
 
-  // connect opens the brokered install + grant flow. Until the ../auth broker
-  // ships, the endpoint reports unavailable; surface that as an error state
-  // rather than throwing past the caller.
+  // connect starts the brokered install + grant flow. The server returns the
+  // ../auth install-start URL; navigating there runs the GitHub install and the
+  // ../auth callback captures the user token. On return, fetchStatus resolves it
+  // via the broker and flips to connected.
   async function connect(): Promise<void> {
     error.value = null;
     try {
-      await api('POST', '/api/github/auth/connect');
+      const resp = await api<{ install_url?: string }>('POST', '/api/github/auth/connect');
+      if (resp?.install_url) {
+        window.location.href = resp.install_url;
+        return;
+      }
       await fetchStatus();
     } catch (e) {
       setError(e);
