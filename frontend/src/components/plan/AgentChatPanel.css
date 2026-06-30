@@ -24,6 +24,10 @@
   color: var(--ink-3);
 }
 
+/* The model badge sits after the title and absorbs the free space so the
+   header actions stay right-aligned; renders nothing until a model is seen. */
+.pcp-head-model { margin-right: auto; margin-left: 8px; }
+
 .pcp-header-actions {
   display: flex;
   gap: 4px;
