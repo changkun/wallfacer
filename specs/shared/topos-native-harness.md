@@ -260,15 +260,27 @@ end in-process):
 
 **Remaining (the `Default()` flip is gated on this — NOT yet done):**
 
-1. **Worktree execution (keystone).** The native run currently uses the topos
-   *local* sandbox, which execs in a per-sandbox temp dir, not the task's git
-   worktree — so it cannot modify the user's repo. Real native execution needs an
-   `executor.Backend → sandbox.Provider` adapter (the deferred
-   [[topos-runtime-integration]] OQ-1) so a topos run reuses wallfacer's vetted
-   sandboxed execution in the worktree, injected via `topos.Options.Sandbox`. The
-   `sandbox.Provider` interface (Create/Destroy/Exec/StreamExec/ReadFile/
-   WriteFile/ListFiles/HealthCheck) lives in the public `latere.ai/x/topos`; a
-   wallfacer-side adapter avoids gated topos-repo changes.
+1. **Worktree execution (keystone) — BLOCKED on a topos-side seam.** The native
+   run currently uses the topos *local* sandbox, which execs in a per-sandbox
+   temp dir, not the task's git worktree, so it cannot modify the user's repo.
+   The fix requires injecting a worktree-rooted `topos.Options.Sandbox`, but
+   that field is typed `sandbox.Provider` — a topos *subpackage* type. The
+   embeddable-boundary test (`agentgraph/boundary_test.go`,
+   `TestWallfacerImportsOnlyRootTopos`) forbids wallfacer from importing any
+   `latere.ai/x/topos/...` subpackage; only the root package is allowed. The
+   root `topos` package exposes **no** sandbox constructor or working-directory
+   option (`topos.Options` has `SessionID/Model/Budget/MaxHandoffDepth/Observer/
+   Sandbox/Brain` — no `Workdir`). So wallfacer cannot construct or inject a
+   worktree sandbox today. **Required topos change (gated push — user-owned):**
+   add to the root `latere.ai/x/topos` either (a) an `Options.Workdir string`
+   that the default local provider roots execution at, or (b) a root-level
+   constructor like `topos.LocalSandbox(root string)` returning a value
+   assignable to `Options.Sandbox`. (a) is the smallest, most embedder-friendly
+   surface. Once it lands and wallfacer bumps the topos version, the worktree is
+   threaded through `agentgraph.RunAgent` from the task's `WorktreePaths`.
+   A worktree-rooted `worktreeSandbox` provider was prototyped wallfacer-side but
+   reverted — it necessarily imports `topos/sandbox{,/local}` and so violates the
+   boundary; the seam must come from topos.
 2. **Commit + verification parity.** After the run, `runNativeTopos` must make a
    durable git commit of the worktree changes and run the verification/test step,
    matching what the subprocess path does — today it persists text + lineage and
