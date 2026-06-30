@@ -14,8 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 func doTransition(t *testing.T, fn http.HandlerFunc, path string) *httptest.ResponseRecorder {
@@ -521,21 +523,28 @@ func TestGetSpecTree_ReturnsIndexField(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
 	}
-	var resp spec.TreeResponse
+	var resp groupedTreeResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.Index == nil {
-		t.Fatalf("Index is nil, want non-nil\nbody: %s", w.Body.String())
+	if len(resp.Groups) != 1 {
+		t.Fatalf("Groups len = %d, want 1\nbody: %s", len(resp.Groups), w.Body.String())
 	}
-	if resp.Index.Title != "My Roadmap" {
-		t.Errorf("Index.Title = %q, want %q", resp.Index.Title, "My Roadmap")
+	g := resp.Groups[0]
+	if g.Workspace != ws {
+		t.Errorf("group.Workspace = %q, want %q", g.Workspace, ws)
 	}
-	if resp.Index.Path != "specs/README.md" {
-		t.Errorf("Index.Path = %q, want specs/README.md", resp.Index.Path)
+	if g.Index == nil {
+		t.Fatalf("group.Index is nil, want non-nil\nbody: %s", w.Body.String())
 	}
-	if resp.Index.Workspace != ws {
-		t.Errorf("Index.Workspace = %q, want %q", resp.Index.Workspace, ws)
+	if g.Index.Title != "My Roadmap" {
+		t.Errorf("Index.Title = %q, want %q", g.Index.Title, "My Roadmap")
+	}
+	if g.Index.Path != "specs/README.md" {
+		t.Errorf("Index.Path = %q, want specs/README.md", g.Index.Path)
+	}
+	if g.Index.Workspace != ws {
+		t.Errorf("Index.Workspace = %q, want %q", g.Index.Workspace, ws)
 	}
 }
 
@@ -548,16 +557,115 @@ func TestGetSpecTree_IndexNullWhenMissing(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	var resp spec.TreeResponse
+	var resp groupedTreeResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.Index != nil {
-		t.Errorf("Index = %+v, want nil when no README exists", resp.Index)
+	// A folder with no specs/ produces no group at all.
+	if len(resp.Groups) != 0 {
+		t.Errorf("Groups = %+v, want empty when no specs exist", resp.Groups)
 	}
 	// With omitempty, a nil Index should not serialize an "index" field at all.
 	if strings.Contains(w.Body.String(), `"index":`) {
 		t.Errorf("response should omit index field when nil; body: %s", w.Body.String())
+	}
+}
+
+// writeSpecFile writes a minimal valid spec (frontmatter + body) at a workspace
+// -relative path under specs/, for grouping assertions.
+func writeSpecFile(t *testing.T, ws, rel, title string) {
+	t.Helper()
+	p := filepath.Join(ws, "specs", rel)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\ntitle: " + title + "\nstatus: validated\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\nBody.\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// newHandlerForFolders builds a handler whose active workspace spans the given
+// folders, for multi-folder spec-tree assertions.
+func newHandlerForFolders(t *testing.T, folders ...string) *Handler {
+	t.Helper()
+	configDir := t.TempDir()
+	envPath := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envPath, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := storetest.NewFileStore(t, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, Workspaces: folders})
+	t.Cleanup(r.WaitBackground)
+	return NewHandler(s, r, configDir, folders, nil)
+}
+
+// TestGetSpecTree_GroupsByFolder is the per-folder navigation guard: two
+// workspace folders with the SAME relative spec paths (which the old flat merge
+// would collide) must appear as two separate, self-contained groups.
+func TestGetSpecTree_GroupsByFolder(t *testing.T) {
+	wsA, wsB := t.TempDir(), t.TempDir()
+	for _, ws := range []string{wsA, wsB} {
+		writeReadmeIn(t, ws, "# Roadmap "+filepath.Base(ws)+"\n")
+		// Identical relative path in both folders — the collision case.
+		writeSpecFile(t, ws, "local/feature.md", "Feature in "+filepath.Base(ws))
+	}
+	h := newHandlerForFolders(t, wsA, wsB)
+
+	w := httptest.NewRecorder()
+	h.GetSpecTree(w, httptest.NewRequest(http.MethodGet, "/api/specs/tree", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	// Decode into a relaxed shape (the spec.Date round-trip is a spec-package
+	// concern unrelated to grouping).
+	type relaxedGroup struct {
+		Workspace string                  `json:"workspace"`
+		Label     string                  `json:"label"`
+		Index     *struct{ Title string } `json:"index"`
+		Nodes     []struct {
+			Path string                  `json:"path"`
+			Spec *struct{ Title string } `json:"spec"`
+		} `json:"nodes"`
+	}
+	var resp struct {
+		Groups []relaxedGroup `json:"groups"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Groups) != 2 {
+		t.Fatalf("Groups len = %d, want 2 (one per folder)\nbody: %s", len(resp.Groups), w.Body.String())
+	}
+	for _, ws := range []string{wsA, wsB} {
+		var g *relaxedGroup
+		for i := range resp.Groups {
+			if resp.Groups[i].Workspace == ws {
+				g = &resp.Groups[i]
+			}
+		}
+		if g == nil {
+			t.Fatalf("no group for folder %s", ws)
+		}
+		if g.Label != filepath.Base(ws) {
+			t.Errorf("group %s label = %q, want %q", ws, g.Label, filepath.Base(ws))
+		}
+		if g.Index == nil {
+			t.Errorf("group %s missing its own roadmap index", ws)
+		}
+		// The folder's own feature spec lives in its own group (not merged away).
+		found := false
+		for _, n := range g.Nodes {
+			if n.Spec != nil && n.Spec.Title == "Feature in "+filepath.Base(ws) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("group %s missing its feature spec (collided/merged?)", ws)
+		}
 	}
 }
 
