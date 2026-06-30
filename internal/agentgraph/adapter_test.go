@@ -2,6 +2,9 @@ package agentgraph_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"latere.ai/x/topos"
@@ -171,7 +174,7 @@ func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 func TestRunAgent_SingleNode(t *testing.T) {
 	var got []agentgraph.TraceEvent
 	res, err := agentgraph.RunAgent(
-		context.Background(), "run-native", agentgraph.ModelConfig{}, "implement", "you implement", "do the thing",
+		context.Background(), "run-native", agentgraph.ModelConfig{}, "implement", "you implement", "do the thing", "",
 		func(ev agentgraph.TraceEvent) { got = append(got, ev) },
 	)
 	if err != nil {
@@ -208,10 +211,32 @@ func TestRunAgent_SingleNode(t *testing.T) {
 	}
 }
 
+// TestRunAgent_WithWorktreeExecutesInRepo proves end-to-end worktree execution:
+// with a worktree set, the run's tools execute in that directory. The fake model
+// runs `echo <prompt>` in the sandbox, so a prompt that redirects to a file lands
+// that file in the worktree — demonstrating the native harness edits the real repo
+// (via topos Options.Workdir).
+func TestRunAgent_WithWorktreeExecutesInRepo(t *testing.T) {
+	worktree := t.TempDir()
+	_, err := agentgraph.RunAgent(
+		context.Background(), "run-wt", agentgraph.ModelConfig{}, "implement", "", "hi > marker.txt", worktree, nil,
+	)
+	if err != nil {
+		t.Fatalf("RunAgent with worktree: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(worktree, "marker.txt"))
+	if err != nil {
+		t.Fatalf("marker.txt not created in the worktree: %v", err)
+	}
+	if !strings.Contains(string(got), "hi") {
+		t.Errorf("marker.txt = %q, want it to contain the echoed prompt", got)
+	}
+}
+
 // TestRunAgent_DefaultName falls back to a stable node name when none is given,
 // and works with a nil observer.
 func TestRunAgent_DefaultName(t *testing.T) {
-	res, err := agentgraph.RunAgent(context.Background(), "run-x", agentgraph.ModelConfig{}, "", "", "hi", nil)
+	res, err := agentgraph.RunAgent(context.Background(), "run-x", agentgraph.ModelConfig{}, "", "", "hi", "", nil)
 	if err != nil {
 		t.Fatalf("RunAgent: %v", err)
 	}

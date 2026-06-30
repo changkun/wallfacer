@@ -92,7 +92,7 @@ func RunFlow(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.R
 // system prompt; onEvent may be nil. Like RunFlowWithModel, an unconfigured
 // ModelConfig transparently uses the deterministic fake model, so tests and
 // no-credential dev keep working.
-func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt string, onEvent func(TraceEvent)) (Result, error) {
+func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt, worktree string, onEvent func(TraceEvent)) (Result, error) {
 	if name == "" {
 		name = "agent"
 	}
@@ -101,6 +101,14 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 		Autonomy: topos.Pinned,
 	}
 	opts := runOptions(sessionID, c, flow.Flow{})
+	if worktree != "" {
+		// Run the agent's tools in the task's git worktree (the real repo) rather
+		// than a temp dir, so a native run reads and writes actual files. Workdir
+		// is a plain root-level topos.Options field, so this stays within the
+		// embeddable boundary (no topos/sandbox subpackage import). Empty worktree
+		// keeps the default temp-dir sandbox.
+		opts.Workdir = worktree
+	}
 	if onEvent != nil {
 		// Same topos-free observer bridge as RunFlowWithModel; this seam is the
 		// only place that names a topos type.

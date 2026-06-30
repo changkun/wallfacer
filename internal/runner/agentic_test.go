@@ -82,8 +82,11 @@ func TestAgenticModelConfig(t *testing.T) {
 // the expected two-node / one-next-edge shape. No container backend is invoked.
 // TestRun_NativeToposHarnessReachesDoneInProcess covers the native-harness
 // dispatch: a plain implement-path task pinned to the topos harness runs
-// in-process as a single topos agent (zero container launches), reaches done,
-// and persists a one-node lineage (no delegation edges).
+// in-process as a single topos agent (zero container launches), reaches done, and
+// persists a one-node lineage (no delegation edges). End-to-end worktree
+// execution (the agent's tools running in the worktree via topos Options.Workdir)
+// is proven directly at the agentgraph layer by TestRunAgent_WithWorktreeExecutesInRepo,
+// since this runner harness does not provision a workspace.
 func TestRun_NativeToposHarnessReachesDoneInProcess(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 
