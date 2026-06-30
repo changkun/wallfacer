@@ -9,6 +9,7 @@ import { useAgentStore } from '../../stores/agentSession';
 import { useChatSession } from '../../composables/useChatSession';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
+import ChatModelBadge from './ChatModelBadge.vue';
 
 defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
@@ -29,6 +30,7 @@ defineExpose({
   <aside v-show="visible" class="agent-chat-panel">
     <header class="pcp-header">
       <span class="pcp-title">Chat</span>
+      <ChatModelBadge class="pcp-head-model" :model="chat.primaryModel.value" />
       <div class="pcp-header-actions">
         <button
           type="button"

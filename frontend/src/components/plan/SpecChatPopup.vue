@@ -10,6 +10,7 @@ import { useAgentStore } from '../../stores/agentSession';
 import { useChatSession } from '../../composables/useChatSession';
 import ChatMessageList from './ChatMessageList.vue';
 import ChatComposer from './ChatComposer.vue';
+import ChatModelBadge from './ChatModelBadge.vue';
 
 const agentStore = useAgentStore();
 const { threads, threadOrder, activeThreadId } = storeToRefs(agentStore);
@@ -291,6 +292,7 @@ defineExpose({
             </button>
           </div>
         </div>
+        <ChatModelBadge class="scp-head-model" :model="chat.primaryModel.value" />
         <div class="scp-header-actions">
           <button type="button" class="scp-iconbtn" title="Hide chat (C)" @click="toggle">✕</button>
         </div>
