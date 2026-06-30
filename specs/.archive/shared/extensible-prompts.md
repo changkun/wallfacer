@@ -1,6 +1,6 @@
 ---
 title: Extensible Prompt System
-status: vague
+status: archived
 depends_on: []
 affects:
   - internal/prompts/
@@ -8,12 +8,40 @@ affects:
   - internal/runner/
 effort: large
 created: 2026-04-03
-updated: 2026-06-14
+updated: 2026-06-30
 author: changkun
 dispatched_task_id: null
 ---
 
 # Extensible Prompt System
+
+## Status (2026-06-30): Archived
+
+Superseded by the agent-document model. This spec was authored (2026-04-03) as the
+prompt-provider for `agent-abstraction.md` — the assumption being that "agent roles"
+would be resolved at runtime by discovering skill-like prompt files. That consumer was
+archived, and the capability it wanted has since been built elsewhere:
+
+- **Agent definition moved to Topos.** The `topos.latere.ai/v1` agent document is now
+  the discoverable, user-creatable, composable unit (name, role, when-to-use, system
+  prompt, topology, peer directory). Mesh discovery auto-injects each agent's
+  description into a directory so peers can find and delegate to each other — exactly
+  the "skills as files / discovery / declarative routing" direction proposed below,
+  realized as agent documents rather than prompt files.
+- **The skill layer already exists** (the Topos `harness/skills` package and the
+  repo/global `.claude/skills/` mechanism) for discoverable, composable *capabilities*.
+
+What physically remains in `internal/prompts/` after the idea-agent teardown and the
+planning→spec vocabulary migration is **not** agent definitions — it is wallfacer's own
+internal harness plumbing (`commit`, `title`, `oversight`, `drift`, `conflict`, `test`,
+`spec`/`spec_system_*`, `task_prompt_refine`). These are LLM utility calls the harness
+makes on its own behalf and benefit from staying typed and compiled, not from being a
+user-editable runtime registry. The premise "prompts should be a discoverable,
+user-creatable resource" therefore applies to a category that has migrated to Topos and
+does not apply to what remains here. No replacement spec; revive only if a concrete
+consumer for runtime-discovered wallfacer-local prompts appears.
+
+The design below is retained for context.
 
 ## Overview
 

@@ -56,7 +56,7 @@ Local Product - 21 shipped, rest pending (※ = stale, needs refresh)
 Shared Design - 4 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
   ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
-  ○ Token & Cost Optimization      ○ Extensible Prompts
+  ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
   ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
@@ -229,7 +229,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [harness-abstraction/opencode.md](shared/harness-abstraction/opencode.md) | **Complete** | Both | OpenCode (`opencode run`) harness, provider auth managed by the harness itself. Shipped: harness adapter, host-mode launcher (synthesizes the terminal result opencode omits), config/env wiring, docs, gated live e2e. |
 | ↳ [harness-abstraction/pi.md](shared/harness-abstraction/pi.md) | **Complete** | Both | Pi (earendil-works coding agent) harness, JSON mode. Shipped: `harness.Pi` adapter, `launchPi` host wiring, config/UI surfacing, docs, unit + build-tag-gated e2e tests. |
 | [token-cost-optimization.md](shared/token-cost-optimization.md) | **Archived** | Both | Cache observability, `--resume` correctness audit, host-side shell output compression, regression model, budgeting. Archived: baseline cost-visibility tiles shipped; the rest is premised on caching wallfacer doesn't control or is speculative polish. Sat drafted from April with 0/14 criteria built. |
-| [extensible-prompts.md](shared/extensible-prompts.md) | Vague | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. |
+| [extensible-prompts.md](.archive/shared/extensible-prompts.md) | **Archived** | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. Archived: superseded by the Topos agent-document model (the discoverable/composable unit is now the `topos.latere.ai/v1` agent document, with the `harness/skills` layer for capabilities); what remains in `internal/prompts/` is internal harness plumbing that benefits from staying typed and compiled. Was its prompt-provider for the archived `agent-abstraction`. |
 | [agent-session-vocabulary.md](shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
 
