@@ -84,6 +84,39 @@ func RunFlow(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.R
 	return runner.Run(ctx, region, prompt)
 }
 
+// RunAgent runs a single agent in-process as a one-node topos region — the
+// degenerate, non-delegating case that backs the native Topos harness. A plain
+// task with no multi-agent flow executes as one agent, sharing the same engine,
+// lineage, observer, and model selection the multi-agent path uses. name is the
+// agent's lineage identity (node ids are <session>/<name>); systemPrompt is its
+// system prompt; onEvent may be nil. Like RunFlowWithModel, an unconfigured
+// ModelConfig transparently uses the deterministic fake model, so tests and
+// no-credential dev keep working.
+func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt string, onEvent func(TraceEvent)) (Result, error) {
+	if name == "" {
+		name = "agent"
+	}
+	region := topos.Region{
+		Entry:    topos.AgentSpec{Name: name, SystemPrompt: systemPrompt},
+		Autonomy: topos.Pinned,
+	}
+	opts := runOptions(sessionID, c, flow.Flow{})
+	if onEvent != nil {
+		// Same topos-free observer bridge as RunFlowWithModel; this seam is the
+		// only place that names a topos type.
+		opts.Observer = func(e topos.Event) { onEvent(toTraceEvent(e)) }
+	}
+	runner, err := NewRunner(opts)
+	if err != nil {
+		return Result{}, err
+	}
+	res, err := runner.Run(ctx, region, prompt)
+	if err != nil {
+		return Result{}, err
+	}
+	return toResult(res), nil
+}
+
 // Result is the host-facing outcome of an agent-graph run. It mirrors
 // topos.RunResult with topos-free types so a wallfacer package (e.g. the runner)
 // can consume a run without importing topos and crossing the seam.
