@@ -258,37 +258,30 @@ end in-process):
 - **Branding DONE** (`52d11106`). `.topos-brand` wordmark + the node-graph logo
   in `AgentLineage.vue` ("Agent Graph · powered by Topos").
 
-**Remaining (the `Default()` flip is gated on this — NOT yet done):**
+**Worktree execution DONE (end-to-end, locally) — `wallfacer 72f3fa2f` + `topos 0e8c971`.**
+`agentgraph.RunAgent` threads the task worktree into `topos.Options.Workdir` (a
+root field — boundary-safe); `execute.go` dispatches the native run after worktree
+setup and skips the oversight worker + turn loop. `TestRunAgent_WithWorktreeExecutesInRepo`
+proves a native run's tool writes a file into the real worktree. Green under the
+co-dev `go.work`; **standalone/CI is gated on the topos release** (push+tag
+`0e8c971`, bump wallfacer `go.mod`), else `GOWORK=off` fails on the missing
+`Options.Workdir`.
 
-1. **Worktree execution (keystone) — topos seam DONE locally, pending release.**
-   The native run currently uses the topos *local* sandbox, which execs in a
-   per-sandbox temp dir, not the task's git worktree, so it cannot modify the
-   user's repo. Injecting a worktree-rooted `topos.Options.Sandbox` was a
-   non-starter: that field is typed `sandbox.Provider` (a topos *subpackage*
-   type) and the embeddable-boundary test (`agentgraph/boundary_test.go`,
-   `TestWallfacerImportsOnlyRootTopos`) forbids wallfacer from importing any
-   `latere.ai/x/topos/...` subpackage. **Resolved with a zero-import root seam in
-   topos** (`latere.ai/x/topos` commit `0e8c971`): a new `Options.Workdir string`
-   (plain string on the root package) roots the default local provider at a host
-   directory via the new `local.NewAt(root)` (Create shares the caller-owned dir
-   with distinct ids; Destroy never deletes it). Tested (root 97.3% / local
-   96.5%, lint clean). **Gated on:** the user pushing + tagging topos (e.g.
-   v0.0.6); committing the wallfacer side before then breaks `GOWORK=off` CI
-   (pinned topos v0.0.5 has no `Workdir`). **Then the wallfacer follow-up** (a
-   single commit once topos is bumped): thread the task's worktree (`WorktreePaths`)
-   into `agentgraph.RunAgent` → `opts.Workdir` (root field, boundary-safe), and
-   move the native dispatch branch in `execute.go` to *after* worktree setup so a
-   worktree exists.
-2. **Commit + verification parity.** After the run, `runNativeTopos` must make a
-   durable git commit of the worktree changes and run the verification/test step,
-   matching what the subprocess path does — today it persists text + lineage and
-   walks the state machine without committing.
-3. **Auth-gated local/cloud.** Resolve the execution mode from login state
+**Remaining (the `Default()` flip is gated on these — NOT yet done):**
+
+0. **Release the topos seam** (user action): push + tag `latere.ai/x/topos`
+   `0e8c971` (e.g. v0.0.6), bump wallfacer `go.mod`, so standalone/CI builds.
+1. **Commit + verification parity.** After the native run edits the worktree,
+   `runNativeTopos`/`driveToposRun` must make a durable git commit of the changes
+   and run the verification/test step (wallfacer owns the worktree + git, so this
+   is wallfacer-side, no topos change). Today the run edits the worktree but walks
+   the state machine through `committing` without committing.
+2. **Auth-gated local/cloud.** Resolve the execution mode from login state
    (local `sandbox/local` default vs logged-in Topos cloud + Cella `sandbox/cella`
    remote workspace) — Component 3 above.
-4. **`Default()` flip + `defaultSandbox` UI default** — flip `registry.go`
+3. **`Default()` flip + `defaultSandbox` UI default** — flip `registry.go`
    `Default()` to `Topos` and the `config.go` `defaultSandbox` pre-selection,
-   ONLY after 1–2 land, else real task runs stop committing code. Update
+   ONLY after 0–1 land, else real task runs stop committing code. Update
    `TestDefault`.
 
 ## Notes
