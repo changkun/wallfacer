@@ -3,7 +3,7 @@
 // the repo selector (component 2), the PRs/Issues tabs, and the master-detail
 // list/detail. Owns the Disconnected call-to-action, Loading, Empty, and Error
 // states from the umbrella matrix; connect itself lives in the Settings tab.
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useGithubStore, type GithubState } from '../stores/github';
 import RepoPicker from '../components/github/RepoPicker.vue';
 
@@ -14,6 +14,14 @@ onMounted(async () => {
 });
 
 const states: GithubState[] = ['open', 'closed', 'all'];
+
+const draft = ref('');
+async function postComment() {
+  const body = draft.value;
+  if (!body.trim()) return;
+  await github.comment(body);
+  if (!github.error) draft.value = '';
+}
 </script>
 
 <template>
@@ -84,6 +92,23 @@ const states: GithubState[] = ['open', 'closed', 'all'];
                   <p>{{ c.body }}</p>
                 </div>
               </div>
+              <!-- Comment box (component 4, write surface) -->
+              <div class="gh-commentbox">
+                <textarea
+                  v-model="draft"
+                  class="gh-commentinput"
+                  rows="3"
+                  placeholder="Leave a comment…"
+                  :disabled="github.commenting"
+                ></textarea>
+                <button
+                  class="gh-commentbtn"
+                  :disabled="github.commenting || !draft.trim()"
+                  @click="postComment"
+                >
+                  {{ github.commenting ? 'Posting…' : 'Comment' }}
+                </button>
+              </div>
             </article>
           </section>
         </div>
@@ -119,6 +144,10 @@ const states: GithubState[] = ['open', 'closed', 'all'];
 .gh-comments { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
 .gh-comment { border-top: 1px solid var(--border, #2a2a2a); padding-top: 0.5rem; }
 .gh-comment p { white-space: pre-wrap; margin: 0.25rem 0 0; }
+.gh-commentbox { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.gh-commentinput { width: 100%; padding: 0.5rem; border: 1px solid var(--border, #444); border-radius: 6px; background: var(--surface, #161616); color: inherit; resize: vertical; font: inherit; }
+.gh-commentbtn { align-self: flex-end; padding: 0.35rem 0.9rem; border: 1px solid transparent; border-radius: 6px; background: var(--accent, #2563eb); color: #fff; cursor: pointer; }
+.gh-commentbtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .gh-link { color: var(--accent, #3b82f6); }
 .gh-muted { color: var(--text-muted, #888); padding: 0.5rem; }
 .gh-error { color: var(--danger, #dc2626); font-size: 0.85rem; }

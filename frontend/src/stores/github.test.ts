@@ -91,6 +91,50 @@ describe('github store read surface', () => {
   });
 });
 
+describe('github store write surface', () => {
+  async function selectAndOpen(store: ReturnType<typeof useGithubStore>) {
+    apiMock.mockResolvedValueOnce({ owner: 'l', name: 'w', full_name: 'l/w', default_branch: 'main', private: false });
+    apiMock.mockResolvedValueOnce({ pulls: [] });
+    await store.selectRepo('l/w');
+    apiMock.mockResolvedValueOnce({ number: 42, title: 'T', state: 'open', author: 'o', comments: [] });
+    await store.openDetail(42);
+  }
+
+  it('posts a comment then refreshes the detail thread', async () => {
+    const store = useGithubStore();
+    await selectAndOpen(store);
+
+    apiMock.mockResolvedValueOnce({}); // POST comment
+    apiMock.mockResolvedValueOnce({ number: 42, title: 'T', state: 'open', author: 'o', comments: [{ author: 'me', body: 'hi' }] }); // re-open
+    await store.comment('hi');
+
+    expect(apiMock).toHaveBeenNthCalledWith(4, 'POST', '/api/github/comments', { repo: 'l/w', number: 42, body: 'hi' });
+    expect(store.detail?.comments).toHaveLength(1);
+  });
+
+  it('does not post an empty comment', async () => {
+    const store = useGithubStore();
+    await selectAndOpen(store);
+    const before = apiMock.mock.calls.length;
+    await store.comment('   ');
+    expect(apiMock.mock.calls.length).toBe(before);
+  });
+
+  it('creates a pull request for the selected repo', async () => {
+    const store = useGithubStore();
+    apiMock.mockResolvedValueOnce({ owner: 'l', name: 'w', full_name: 'l/w', default_branch: 'main', private: false });
+    apiMock.mockResolvedValueOnce({ pulls: [] });
+    await store.selectRepo('l/w');
+
+    apiMock.mockResolvedValueOnce({ number: 7, title: 'T', state: 'open', author: 'me', html_url: 'u' });
+    const pr = await store.createPull({ base: 'main', head: 'feature', title: 'T', body: 'B' });
+    expect(pr?.number).toBe(7);
+    expect(apiMock).toHaveBeenLastCalledWith('POST', '/api/github/pulls', {
+      repo: 'l/w', base: 'main', head: 'feature', title: 'T', body: 'B',
+    });
+  });
+});
+
 describe('github store disconnect', () => {
   it('clears selection and reloads status', async () => {
     const store = useGithubStore();
