@@ -136,7 +136,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/me/switch-org` | Switch the active organization (latere-ui session convention); validates membership, clears the session, returns `{redirect}` to `/login?org_id=<target>` |
 | **Local device-code sign-in** (RFC 8628; local mode) | |
 | `POST /api/auth/device/start` | Start a device-code flow; returns the user code and verification URI |
-| `GET /api/auth/device/poll` | Poll the in-flight flow; returns `{status: idle\|pending\|done\|denied\|expired}` |
+| `GET /api/auth/device/poll` | Poll the in-flight flow; returns `{status: idle\|pending\|done\|denied\|expired}`. The `done` response also sets the session cookie (minted from the issued token via `oidc.SessionFromToken`), so a subsequent `/api/me` reflects the sign-in. |
 | `POST /api/auth/device/cancel` | Cancel the in-flight device-code flow |
 
 ### Triggering Task Execution
