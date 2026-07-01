@@ -504,30 +504,41 @@ function onInput(e: Event) {
 .composer__mention:hover { background: var(--bg-hover); }
 .composer__opts {
   display: flex;
-  gap: 8px;
-  margin-top: 6px;
-  align-items: flex-end;
+  gap: 10px 12px;
+  margin-top: 10px;
+  /* Align every option at the TOP so labels line up in a row and each control
+     sits at the same y. (Was flex-end, which bottom-aligned the boxes — the
+     Agent-graph "Fixed sequence" sublabel made that column taller and shoved its
+     select upward, misaligning the row.) */
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 .composer__opt {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0;
 }
-.composer__opt--grow { flex: 1 1 auto; min-width: 120px; }
+/* Growable text fields share one flex basis and a max width so no single field
+   (e.g. Depends on) balloons far wider than its neighbours when a row wraps. */
+.composer__opt--grow { flex: 1 1 200px; min-width: 150px; max-width: 380px; }
 /* Keep the timeout preset select and its "Custom…" minutes input on one row
    beneath the label, rather than letting the input drop to a new line (the
    parent .composer__opt is a vertical column). */
 .composer__opt-controls { display: flex; align-items: center; gap: 4px; }
 .composer__opt-label {
   font-size: 10px;
+  line-height: 14px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+/* The coordination hint hangs BELOW the Agent-graph select without affecting the
+   row's alignment (align-items: flex-start), so neighbouring controls stay level. */
 .composer__coord {
-  margin-top: 2px;
+  margin-top: 3px;
   font-size: 10px;
+  line-height: 14px;
   color: var(--text-secondary);
   cursor: help;
 }
@@ -536,6 +547,8 @@ function onInput(e: Event) {
 }
 .composer__select,
 .composer__input {
+  box-sizing: border-box;
+  height: 30px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text);
@@ -545,7 +558,20 @@ function onInput(e: Event) {
   font-family: var(--font-sans);
   outline: none;
 }
-.composer__input--num { width: 72px; }
+.composer__input--num { width: 88px; }
+/* Match the custom pickers (AppSelect, HarnessSelect, DependencyPicker) to the
+   native control height and let them fill their column, so every control on a
+   row lines up in height and left edge. HarnessSelect's trigger already reuses
+   .composer__select above. */
+.composer__opt :deep(.app-select),
+.composer__opt :deep(.harness-select),
+.composer__opt :deep(.dep-picker) { width: 100%; }
+.composer__opt :deep(.app-select__trigger),
+.composer__opt :deep(.dep-picker-trigger) {
+  box-sizing: border-box;
+  min-height: 30px;
+  width: 100%;
+}
 .composer__tags {
   display: flex;
   flex-wrap: wrap;
@@ -555,7 +581,8 @@ function onInput(e: Event) {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 3px 6px;
-  min-height: 28px;
+  box-sizing: border-box;
+  min-height: 30px;
 }
 .composer__tag-chip {
   display: inline-flex;
@@ -575,12 +602,18 @@ function onInput(e: Event) {
   box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 .composer__more {
+  /* Labels add ~18px (10px label + 4px gap) above each control; these label-less
+     utility buttons get the same offset so they align with the control row rather
+     than floating up at the label line. */
+  margin-top: 18px;
+  align-self: flex-start;
   background: none;
   border: none;
   color: var(--text-muted);
   font-size: 11px;
   cursor: pointer;
   padding: 4px 6px;
+  line-height: 20px;
 }
 .composer__more:hover { color: var(--text); }
 .composer__toggle {
