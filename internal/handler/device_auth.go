@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -51,6 +52,10 @@ type deviceFlowState struct {
 
 	// Populated when the poll loop finishes.
 	finalErr error
+	// token holds the issued token once the poll loop succeeds, so the poll
+	// request that observes completion can mint the session cookie (the start
+	// goroutine's ResponseWriter is long gone by then). Nil on error.
+	token *oauth2.Token
 }
 
 // Mount registers the device-auth routes on mux. Safe to call when DeviceAuth
@@ -186,6 +191,9 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 			d.mu.Unlock()
 			return
 		}
+		d.mu.Lock()
+		flow.token = tok
+		d.mu.Unlock()
 	}()
 
 	expiresIn := int(time.Until(flow.expiresAt).Seconds())
@@ -218,6 +226,7 @@ func (d *DeviceAuth) poll(w http.ResponseWriter, _ *http.Request) {
 	case <-flow.done:
 		d.mu.Lock()
 		err := flow.finalErr
+		tok := flow.token
 		// Clear the flow now that it's terminal.
 		d.flow = nil
 		d.mu.Unlock()
@@ -234,6 +243,16 @@ func (d *DeviceAuth) poll(w http.ResponseWriter, _ *http.Request) {
 			}
 			httpjson.Write(w, http.StatusOK, pollResponse{Status: status, Error: err.Error()})
 			return
+		}
+		// Mint the session cookie on this response so /api/me reflects the
+		// sign-in. The token is also in the shared file store (for the CLI /
+		// coordination connector), but /api/me reads the cookie session. A
+		// cookie-write failure is non-fatal: the login still succeeded and the
+		// file-store consumers work; the SPA's fetchMe just falls back to 204.
+		if d.OIDC != nil && tok != nil {
+			if serr := d.OIDC.SetSession(w, oidc.SessionFromToken(tok, 0)); serr != nil {
+				slog.Warn("device-auth: set session cookie", "error", serr)
+			}
 		}
 		httpjson.Write(w, http.StatusOK, pollResponse{Status: "done"})
 	default:
