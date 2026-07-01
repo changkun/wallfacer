@@ -1174,9 +1174,12 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"AgonTranscript": withID(h.AgonTranscript),
 		"TaskLineage":    withID(h.TaskLineage),
 
-		"TaskDiff":     withID(h.TaskDiff),
-		"StreamLogs":   withID(h.StreamLogs),
-		"GetTurnUsage": withID(h.GetTurnUsage),
+		"TaskDiff":      withID(h.TaskDiff),
+		"TaskPRStatus":  withID(h.TaskPRStatus),
+		"CreateTaskPR":  withID(h.CreateTaskPR),
+		"TaskPRComment": withID(h.TaskPRComment),
+		"StreamLogs":    withID(h.StreamLogs),
+		"GetTurnUsage":  withID(h.GetTurnUsage),
 
 		// ServeOutput needs both {id} (UUID) and {filename} path values.
 		"ServeOutput": func(w http.ResponseWriter, r *http.Request) {

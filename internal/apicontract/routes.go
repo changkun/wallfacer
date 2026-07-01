@@ -658,6 +658,21 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/pr", Name: "TaskPRStatus",
+		Description: "The GitHub pull request for the task's branch, or null.",
+		Tags:        []string{"tasks", "github"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/pr", Name: "CreateTaskPR",
+		Description: "Create (or return the existing) GitHub pull request for the task's branch; repo and base derived from the workspace.",
+		Tags:        []string{"tasks", "github"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/pr/comment", Name: "TaskPRComment",
+		Description: "Post a comment to the task's pull request.",
+		Tags:        []string{"tasks", "github"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/logs", Name: "StreamLogs",
 		Description: "SSE stream of live container logs for a running task.",
 		Tags:        []string{"tasks", "sse"},

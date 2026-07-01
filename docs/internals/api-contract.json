@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 130,
+  "route_count": 133,
   "routes": [
     {
       "method": "GET",
@@ -898,6 +898,36 @@
       "description": "Git diff of task worktrees versus the default branch.",
       "tags": [
         "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/pr",
+      "name": "TaskPRStatus",
+      "description": "The GitHub pull request for the task's branch, or null.",
+      "tags": [
+        "tasks",
+        "github"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/pr",
+      "name": "CreateTaskPR",
+      "description": "Create (or return the existing) GitHub pull request for the task's branch; repo and base derived from the workspace.",
+      "tags": [
+        "tasks",
+        "github"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/pr/comment",
+      "name": "TaskPRComment",
+      "description": "Post a comment to the task's pull request.",
+      "tags": [
+        "tasks",
+        "github"
       ]
     },
     {
