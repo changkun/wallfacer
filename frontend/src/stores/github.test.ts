@@ -14,11 +14,22 @@ beforeEach(() => {
 
 describe('github store status', () => {
   it('loads connection status', async () => {
-    apiMock.mockResolvedValueOnce({ available: true, connected: true, login: 'octocat', can_connect: false });
+    apiMock.mockResolvedValueOnce({
+      available: true, connected: true, login: 'octocat', can_connect: false,
+      manage_url: 'https://auth.latere.ai/me',
+    });
     const store = useGithubStore();
     await store.fetchStatus();
     expect(store.connected).toBe(true);
     expect(store.status.login).toBe('octocat');
+    expect(store.manageUrl).toBe('https://auth.latere.ai/me');
+  });
+
+  it('falls back to a default manage url', async () => {
+    apiMock.mockResolvedValueOnce({ available: true, connected: false, can_connect: false });
+    const store = useGithubStore();
+    await store.fetchStatus();
+    expect(store.manageUrl).toBe('https://auth.latere.ai/me');
   });
 
   it('resets to disconnected on status error', async () => {
@@ -27,16 +38,5 @@ describe('github store status', () => {
     await store.fetchStatus();
     expect(store.connected).toBe(false);
     expect(store.error).toBe('boom');
-  });
-});
-
-describe('github store disconnect', () => {
-  it('clears and reloads status', async () => {
-    const store = useGithubStore();
-    apiMock.mockResolvedValueOnce(undefined); // disconnect POST
-    apiMock.mockResolvedValueOnce({ available: true, connected: false, can_connect: false }); // fetchStatus
-    await store.disconnect();
-    expect(store.connected).toBe(false);
-    expect(apiMock).toHaveBeenNthCalledWith(1, 'POST', '/api/github/auth/disconnect');
   });
 });

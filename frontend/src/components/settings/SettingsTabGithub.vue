@@ -1,62 +1,48 @@
 <script setup lang="ts">
-// GitHub connect/disconnect settings tab (spec: github-integration component 1).
-// Owns the Disconnected / Connecting / Connected / token-expired states from the
-// umbrella state matrix. Connect opens the brokered "Latere AI" install + grant
-// flow; until the ../auth broker ships, the endpoint reports it unavailable and
-// the tab surfaces that rather than erroring.
-import { onMounted, ref } from 'vue';
+// GitHub settings tab. wallfacer does not connect GitHub itself -- connections
+// are managed centrally at auth.latere.ai (the connectors hub). This tab only
+// reflects state derived from the latere.ai sign-in:
+//   - not signed in       -> prompt to sign in via latere.ai
+//   - signed in, connected -> show the borrowed connection + a manage link
+//   - signed in, not connected -> link to connect GitHub at auth.latere.ai
+import { computed, onMounted } from 'vue';
 import { useGithubStore } from '../../stores/github';
+import { useAuthStore } from '../../stores/auth';
 
 const github = useGithubStore();
-const connecting = ref(false);
+const auth = useAuthStore();
 
-onMounted(() => github.fetchStatus());
+const signedIn = computed(() => !!auth.me);
 
-async function onConnect() {
-  connecting.value = true;
-  try {
-    await github.connect();
-  } finally {
-    connecting.value = false;
-  }
-}
+onMounted(() => {
+  if (signedIn.value) void github.fetchStatus();
+});
 </script>
 
 <template>
   <div class="gh-settings">
     <h2 class="gh-h">GitHub</h2>
 
-    <!-- Disconnected -->
-    <div v-if="!github.connected" class="gh-block">
+    <!-- Not signed in via latere.ai -->
+    <div v-if="!signedIn" class="gh-block">
       <p class="gh-muted">
-        Connect a GitHub App installation to browse and open pull requests and
-        issues from inside the workspace.
+        Sign in via latere.ai to use GitHub in wallfacer. GitHub is connected
+        once in your latere.ai account and shared across latere products.
       </p>
-      <button
-        class="gh-btn gh-btn--primary"
-        :disabled="connecting || !github.status.can_connect"
-        @click="onConnect"
-      >
-        {{ connecting ? 'Connecting…' : 'Connect GitHub' }}
-      </button>
-      <p v-if="!github.status.can_connect" class="gh-hint">
-        The GitHub connect flow is not available in this deployment yet.
-      </p>
-      <p v-if="github.error" class="gh-error">{{ github.error }}</p>
+      <button class="gh-btn gh-btn--primary" @click="auth.login()">Sign in via latere.ai</button>
     </div>
 
-    <!-- Connected -->
+    <!-- Signed in, GitHub connected (borrowed from latere.ai) -->
+    <div v-else-if="github.connected" class="gh-block">
+      <div class="gh-row"><span class="gh-label">Connected as</span><span>@{{ github.status.login }}</span></div>
+      <p class="gh-muted">GitHub is connected through your latere.ai account.</p>
+      <a class="gh-link" :href="github.manageUrl" target="_blank" rel="noopener">Manage connections at latere.ai ↗</a>
+    </div>
+
+    <!-- Signed in, GitHub not connected -->
     <div v-else class="gh-block">
-      <div class="gh-row"><span class="gh-label">Signed in as</span><span>@{{ github.status.login }}</span></div>
-      <div v-if="github.status.account" class="gh-row">
-        <span class="gh-label">Installed on</span><span>{{ github.status.account }}</span>
-      </div>
-      <div v-if="github.status.permissions?.length" class="gh-row">
-        <span class="gh-label">Permissions</span><span>{{ github.status.permissions.join(', ') }}</span>
-      </div>
-      <div class="gh-actions">
-        <button class="gh-btn" @click="github.disconnect()">Disconnect</button>
-      </div>
+      <p class="gh-muted">GitHub is not connected to your latere.ai account yet.</p>
+      <a class="gh-link gh-link--btn" :href="github.manageUrl" target="_blank" rel="noopener">Connect GitHub at latere.ai ↗</a>
       <p v-if="github.error" class="gh-error">{{ github.error }}</p>
     </div>
   </div>
@@ -65,13 +51,11 @@ async function onConnect() {
 <style scoped>
 .gh-settings { max-width: 36rem; }
 .gh-h { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.75rem; }
-.gh-block { display: flex; flex-direction: column; gap: 0.6rem; }
+.gh-block { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
 .gh-muted { color: var(--text-muted, #888); margin: 0; }
 .gh-row { display: flex; gap: 0.75rem; }
 .gh-label { width: 8rem; color: var(--text-muted, #888); }
-.gh-actions { margin-top: 0.5rem; }
 .gh-btn {
-  align-self: flex-start;
   padding: 0.4rem 0.9rem;
   border: 1px solid var(--border, #444);
   border-radius: 6px;
@@ -80,7 +64,11 @@ async function onConnect() {
   cursor: pointer;
 }
 .gh-btn--primary { background: var(--accent, #2563eb); color: #fff; border-color: transparent; }
-.gh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.gh-hint { color: var(--text-muted, #888); font-size: 0.85rem; margin: 0; }
+.gh-link { color: var(--accent, #3b82f6); text-decoration: none; }
+.gh-link--btn {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--border, #444);
+  border-radius: 6px;
+}
 .gh-error { color: var(--danger, #dc2626); font-size: 0.85rem; margin: 0; }
 </style>

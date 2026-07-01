@@ -57,6 +57,10 @@ type githubAuthStatus struct {
 	// CanConnect reports whether the live connect flow can run (the ../auth
 	// broker is wired). When false the UI shows connect as unavailable.
 	CanConnect bool `json:"can_connect"`
+	// ManageURL is the ../auth account page where the user connects/manages
+	// GitHub centrally. wallfacer does not connect GitHub itself; it borrows the
+	// connection from the signed-in latere.ai account and points here.
+	ManageURL string `json:"manage_url,omitempty"`
 }
 
 // githubStatus computes the current status for the principal from the token
@@ -85,14 +89,25 @@ func (h *Handler) githubStatus(ctx context.Context) githubAuthStatus {
 	return st
 }
 
-// GitHubAuthStatus reports whether the principal has a connected GitHub App
-// token, plus the login/account/permissions for the connected UI.
+// GitHubAuthStatus reports the connection state for the signed-in principal.
+// It best-effort resolves the token via the broker first, so the status
+// reflects the GitHub connection held in ../auth for the user (wallfacer borrows
+// it -- there is no wallfacer-side connect). It also surfaces the ../auth manage
+// URL for the UI to link to.
 func (h *Handler) GitHubAuthStatus(w http.ResponseWriter, r *http.Request) {
 	if h.github == nil {
 		httpjson.Write(w, http.StatusOK, githubAuthStatus{})
 		return
 	}
-	httpjson.Write(w, http.StatusOK, h.githubStatus(r.Context()))
+	if h.github.Broker != nil {
+		// Populates the local store from ../auth when a connection exists.
+		_, _ = h.github.Get(r.Context(), h.githubPrincipal(r.Context()))
+	}
+	st := h.githubStatus(r.Context())
+	if h.authURL != "" {
+		st.ManageURL = strings.TrimRight(h.authURL, "/") + "/me"
+	}
+	httpjson.Write(w, http.StatusOK, st)
 }
 
 // GitHubAuthConnect starts the brokered install + grant flow. Gated on the
