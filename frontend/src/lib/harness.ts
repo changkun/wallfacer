@@ -7,6 +7,7 @@ export const HARNESS_LABELS: Record<string, string> = {
   cursor: 'Cursor',
   opencode: 'OpenCode',
   pi: 'Pi',
+  topos: 'Topos',
 };
 
 // harnessLabel returns the brand-cased display name for a harness id,

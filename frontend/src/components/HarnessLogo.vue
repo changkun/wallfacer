@@ -19,6 +19,7 @@ const MARKS: Record<string, Mark> = {
   cursor: { viewBox: '0 0 24 24' },
   opencode: { viewBox: '0 0 24 24' },
   pi: { viewBox: '0 0 800 800' },
+  topos: { viewBox: '0 0 24 24', brand: '#55707a' },
 };
 
 // Unique per instance so the OpenAI blossom's <use> refs never collide when
@@ -64,6 +65,22 @@ const fill = computed(() => (props.color && mark.value.brand) ? mark.value.brand
     <g v-else-if="id === 'pi'" fill-rule="evenodd">
       <path d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z" />
       <path d="M517.36 400 H634.72 V634.72 H517.36 Z" />
+    </g>
+
+    <!-- Topos (latere.ai native runtime) — 4-node mesh graph -->
+    <g
+      v-else-if="id === 'topos'"
+      fill="none"
+      :stroke="fill"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="6" cy="7" r="2.2" />
+      <circle cx="17" cy="6" r="2.2" />
+      <circle cx="18" cy="17" r="2.2" />
+      <circle cx="7" cy="18" r="2.2" />
+      <path d="M8.1 7.4c2.3 1.3 4.8 1.1 6.9-.5M16.5 8.1c1.4 2 1.8 4.3 1.5 6.7M15.9 17.4c-2.1.9-4.4 1.1-6.7.6M6.8 15.8c-.7-2.2-.8-4.4-.2-6.6M9 9.1l6 6" />
     </g>
 
     <!-- Fallback: generic agent dot -->
