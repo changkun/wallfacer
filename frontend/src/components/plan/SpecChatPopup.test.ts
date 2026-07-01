@@ -95,6 +95,22 @@ describe('SpecChatPopup geometry', () => {
     expect(host.querySelector('.scp-window')?.matches('[style*="display: none"]')).toBe(true);
   });
 
+  it('opens the popup next to the launcher, not at its last free-floating spot', async () => {
+    // Launcher moved to the top-left; the popup's stored position is bottom-right.
+    memStore.set(KEY, JSON.stringify({ x: 900, y: 600, w: 400, h: 480, lx: 120, ly: 130, open: false }));
+    const { host } = await mount();
+    const fab = host.querySelector('.scp-launcher') as HTMLElement;
+    // A plain click (no drag) opens.
+    fab.dispatchEvent(pointer('pointerdown', 120, 130));
+    window.dispatchEvent(pointer('pointerup', 120, 130));
+    await nextTick();
+    const win = host.querySelector('.scp-window') as HTMLElement;
+    expect(win.style.display).not.toBe('none');
+    // Anchored to the launcher (top-left quadrant → aligned to it), not (900, 600).
+    expect(win.style.left).toBe('120px');
+    expect(win.style.top).toBe('130px');
+  });
+
   it('clamps a launcher drag so it stays fully on-screen', async () => {
     const { host } = await mount();
     const fab = host.querySelector('.scp-launcher') as HTMLElement;
