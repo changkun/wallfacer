@@ -208,13 +208,13 @@ No new routes. Activates the existing contract endpoints (previously 503 in loca
 
 ## Outcome
 
-**Summary.** Implemented directly in-session (not dispatched) across four commits —
+**Summary.** Implemented directly in-session (not dispatched) across five commits —
 `152162b4` (backend driver), `ab280b01` (boot wiring), `067a39db` (frontend), `692af58b`
-(docs). The account menu's "Sign in via latere.ai" now drives the RFC 8628 device flow in
-local mode and mints the session cookie on completion, so `/api/me` reflects the sign-in.
-Drift: Moderate — every acceptance item satisfied functionally, with two mechanism
-divergences (the session-cookie writer and the frontend mode gate) that simplified the
-design; the spec body was corrected inline to match.
+(docs), `d2deb0c3` (end-to-end sign-in test). The account menu's "Sign in via latere.ai"
+now drives the RFC 8628 device flow in local mode and mints the session cookie on
+completion, so `/api/me` reflects the sign-in. Drift: Moderate — every acceptance item
+satisfied, with two mechanism divergences (the session-cookie writer and the frontend mode
+gate) that simplified the design; the spec body was corrected inline to match.
 
 **What Shipped.**
 - No new HTTP routes — activated the existing `/api/auth/device/{start,poll,cancel}` (they
@@ -226,9 +226,12 @@ design; the spec body was corrected inline to match.
 - Frontend (~250 LOC): `useDeviceSignIn` composable (start/poll/cancel + the fallback
   decision), presentational `DeviceSignInModal.vue`, `AccountControl.vue` interception,
   `DeviceStartResponse`/`DevicePollResponse` types, en+zh i18n.
-- Tests: backend — driver lifecycle now asserts the `done` poll sets a session cookie, plus
-  a `SetDeviceAuth` 503-vs-200 wiring test; frontend — 7 composable + 3 modal tests. All
-  green; `make lint` 0 issues; `make build` clean; vue-tsc clean.
+- Tests: backend — driver lifecycle asserts the `done` poll sets a session cookie, a
+  `SetDeviceAuth` 503-vs-200 wiring test, and an end-to-end `TestDeviceAuth_SignsInViaAuthMe`
+  that shares one OIDC client between the auth provider and the driver, drives
+  start→poll→done, feeds the minted cookie into `AuthMe`, and asserts it flips from 204 to
+  200 with the principal; frontend — 7 composable + 3 modal tests. All green; `make lint` 0
+  issues; `make build` clean; vue-tsc clean.
 
 **Design Evolution.**
 - **Session-cookie writer** — the spec proposed an injectable `SetSession func` field on
@@ -243,11 +246,10 @@ design; the spec body was corrected inline to match.
   the landing nav, which never loads `/api/config` (`ab280b01`, `067a39db`).
 
 **Not Implemented.**
-- The full `/api/me`-round-trip integration test (device `done` → 200 principal) was
-  descoped: with fake, non-JWT tokens `BuildMe` degrades unpredictably. The bridge is
-  instead pinned at the driver level (the `done` poll emits a session cookie) plus the
-  runtime confirmation that `resolveAuthConfig` always sets a cookie key + RedirectURL. No
-  follow-up needed.
+- None. The one initially-descoped item — the full `/api/me` round-trip test — was added
+  after review (`TestDeviceAuth_SignsInViaAuthMe`): the read path decodes claims without
+  verifying the signature, so a well-formed unsigned JWT from a stub `/token` drives it
+  deterministically.
 
 **Unspecified Work.**
 - `docs/internals/api-and-transport.md` poll-row note that `done` mints the cookie
