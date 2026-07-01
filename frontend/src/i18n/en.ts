@@ -8,6 +8,19 @@ export const en: Record<string, string> = {
   'nav.me': 'My Page',
   'nav.admin': 'Admin Panel',
 
+  // Device-code sign-in (local mode)
+  'auth.device.title': 'Sign in via latere.ai',
+  'auth.device.step': 'Open the verification page and enter this code:',
+  'auth.device.open': 'Open verification page',
+  'auth.device.waiting': 'Waiting for approval…',
+  'auth.device.success': 'Signed in.',
+  'auth.device.cancel': 'Cancel',
+  'auth.device.close': 'Close',
+  'auth.device.retry': 'Try again',
+  'auth.device.error.denied': 'Sign-in was denied.',
+  'auth.device.error.expired': 'The code expired. Try again.',
+  'auth.device.error.generic': 'Sign-in failed. Try again.',
+
   // Wallfacer page
   'wf.hero.title': '<span class="wallfacer-brand">Wallfacer</span> is an autonomous engineering platform.',
   'wf.hero.sub': 'Full autonomy when you trust it. Full control when you don\'t.',

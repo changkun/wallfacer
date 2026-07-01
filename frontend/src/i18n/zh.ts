@@ -8,6 +8,19 @@ export const zh: Record<string, string> = {
   'nav.me': '个人页面',
   'nav.admin': '管理面板',
 
+  // 设备码登录（本地模式）
+  'auth.device.title': '通过 latere.ai 登录',
+  'auth.device.step': '打开验证页面并输入此代码：',
+  'auth.device.open': '打开验证页面',
+  'auth.device.waiting': '等待确认…',
+  'auth.device.success': '已登录。',
+  'auth.device.cancel': '取消',
+  'auth.device.close': '关闭',
+  'auth.device.retry': '重试',
+  'auth.device.error.denied': '登录被拒绝。',
+  'auth.device.error.expired': '代码已过期，请重试。',
+  'auth.device.error.generic': '登录失败，请重试。',
+
   // Wallfacer page
   'wf.hero.title': '<span class="wallfacer-brand">Wallfacer</span> 是一个自主工程平台。',
   'wf.hero.sub': '信任时全自主运行。需要时完全掌控。',

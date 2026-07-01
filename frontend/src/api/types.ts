@@ -53,6 +53,20 @@ export interface Me {
   auth_url?: string;
 }
 
+// Local-mode RFC 8628 device-code sign-in. POST /api/auth/device/start returns
+// the code + verification URL; GET /api/auth/device/poll reports progress.
+export interface DeviceStartResponse {
+  verification_uri: string;
+  verification_uri_complete?: string;
+  user_code: string;
+  expires_in: number;
+}
+
+export interface DevicePollResponse {
+  status: 'idle' | 'pending' | 'done' | 'denied' | 'expired';
+  error?: string;
+}
+
 export type TaskStatus = 'backlog' | 'in_progress' | 'waiting' | 'committing' | 'done' | 'failed' | 'cancelled';
 
 // --- Unified spec+task graph (GET /api/graph) ---
