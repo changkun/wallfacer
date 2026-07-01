@@ -15,6 +15,11 @@ const current = computed(() => pr.prFor(props.task.id));
 const busy = computed(() => !!pr.loading[props.task.id]);
 const draft = ref('');
 
+// Offer "Create PR" only while a PR still makes sense. A done task's changes are
+// already merged, so creating a PR there is noise -- but an existing PR (e.g.
+// the one that merged it) is still worth showing.
+const canCreate = computed(() => hasBranch.value && props.task.status !== 'done');
+
 async function load() {
   if (hasBranch.value) await pr.fetchTaskPR(props.task.id);
 }
@@ -32,7 +37,7 @@ async function postComment() {
 </script>
 
 <template>
-  <div v-if="hasBranch" class="pr-panel">
+  <div v-if="hasBranch && (current || canCreate)" class="pr-panel">
     <div class="mdl-h">Pull Request</div>
 
     <div v-if="busy && current === undefined" class="pr-muted">Checking…</div>
@@ -48,7 +53,7 @@ async function postComment() {
       <button class="pr-btn" :disabled="!draft.trim()" @click="postComment">Comment</button>
     </template>
 
-    <template v-else>
+    <template v-else-if="canCreate">
       <p class="pr-muted">No pull request yet.</p>
       <button class="pr-btn pr-btn--primary" :disabled="busy" @click="create">
         {{ busy ? 'Creating…' : 'Create PR' }}
