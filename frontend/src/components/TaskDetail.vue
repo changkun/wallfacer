@@ -20,6 +20,7 @@ import AgonVerification from './AgonVerification.vue';
 import AgentLineage from './AgentLineage.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
+import TaskPrPanel from './TaskPrPanel.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
 import { harnessLabel, supportedHarnesses } from '../lib/harness';
@@ -1501,6 +1502,10 @@ async function submitReview() {
                   <span class="badge" :class="badgeClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
                   <span class="dep-row__label">{{ d.label }}</span>
                 </button>
+              </div>
+
+              <div class="mdl-section modal-aside__pr">
+                <TaskPrPanel :task="props.task" />
               </div>
 
               <div class="mdl-section modal-aside__actions">
