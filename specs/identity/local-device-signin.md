@@ -1,15 +1,17 @@
 ---
 title: Local-Mode Device-Code Sign-In (UI re-home)
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/handler/device_auth.go
   - internal/handler/login.go
   - internal/cli/server.go
-  - internal/handler/handler.go
   - frontend/src/components/AccountControl.vue
-  - frontend/src/stores/auth.ts
+  - frontend/src/components/DeviceSignInModal.vue
+  - frontend/src/composables/useDeviceSignIn.ts
   - frontend/src/api/types.ts
+  - frontend/src/i18n/en.ts
+  - frontend/src/i18n/zh.ts
 effort: medium
 created: 2026-07-01
 updated: 2026-07-01
@@ -146,10 +148,13 @@ sequenceDiagram
 
 ### Frontend — mode-gated login + device modal (`AccountControl.vue`, `auth.ts`, `types.ts`)
 
-- Determine mode from `/api/config` (`cloud: bool`, `auth_url: string`) — already surfaced;
-  add typed fields if missing. Local = `!cloud`.
-- Intercept the menu's login: in cloud mode call `auth.login()` (unchanged redirect); in
-  local mode open a device-sign-in modal and call `POST /api/auth/device/start`.
+- Mode is inferred from the endpoint itself rather than a config flag: the driver is wired
+  local-mode-only (`!cloudMode`, see boot), so `POST /api/auth/device/start` returns 200 in
+  local mode and 503 in cloud. This keeps the shared `AccountControl` working on both the
+  landing nav (no config loaded) and the app sidebar without plumbing a `cloud` flag.
+- Intercept the menu's login: try `POST /api/auth/device/start`; on success open a
+  device-sign-in modal; on 503 (or any start failure) fall back to `auth.login()` (the
+  unchanged browser redirect).
 - Modal shows `user_code` prominently, the `verification_uri`, and an "Open verification page"
   action (opens `verification_uri_complete` when present). Poll `GET /api/auth/device/poll`
   on the returned `interval` (default 5s) until `done` / `denied` / `expired`. On `done`,
@@ -166,7 +171,7 @@ No new routes. Activates the existing contract endpoints (previously 503 in loca
 - `GET  /api/auth/device/poll`  → `{ status: idle|pending|done|denied|expired, error? }`;
   now also emits `Set-Cookie` on the `done` response.
 - `POST /api/auth/device/cancel` → 204.
-- `GET /api/config` continues to expose `cloud` / `auth_url` for the frontend mode gate.
+- No `/api/config` change: mode is inferred from `device/start`'s 200-vs-503, not a flag.
 
 ## Error Handling
 
@@ -200,3 +205,66 @@ No new routes. Activates the existing contract endpoints (previously 503 in loca
 - **Manual E2E**: `wallfacer run` on a non-8080 port, sign in via the modal against real
   `auth.latere.ai`, confirm the account menu shows the principal and `wallfacer auth whoami`
   sees the same token (shared file store).
+
+## Outcome
+
+**Summary.** Implemented directly in-session (not dispatched) across four commits —
+`152162b4` (backend driver), `ab280b01` (boot wiring), `067a39db` (frontend), `692af58b`
+(docs). The account menu's "Sign in via latere.ai" now drives the RFC 8628 device flow in
+local mode and mints the session cookie on completion, so `/api/me` reflects the sign-in.
+Drift: Moderate — every acceptance item satisfied functionally, with two mechanism
+divergences (the session-cookie writer and the frontend mode gate) that simplified the
+design; the spec body was corrected inline to match.
+
+**What Shipped.**
+- No new HTTP routes — activated the existing `/api/auth/device/{start,poll,cancel}` (they
+  were built but never wired; always 503). Endpoint verified live at `auth.latere.ai/device/code`.
+- Backend: `Handler.SetDeviceAuth` (`login.go`); `deviceFlowState.token` retention and a
+  session-cookie mint on the `poll` `done` branch via `oidc.SessionFromToken` +
+  `Client.SetSession` (`device_auth.go`); local-mode-only construction in boot reusing
+  `authClient` + the shared `latere/token.json` store (`server.go`).
+- Frontend (~250 LOC): `useDeviceSignIn` composable (start/poll/cancel + the fallback
+  decision), presentational `DeviceSignInModal.vue`, `AccountControl.vue` interception,
+  `DeviceStartResponse`/`DevicePollResponse` types, en+zh i18n.
+- Tests: backend — driver lifecycle now asserts the `done` poll sets a session cookie, plus
+  a `SetDeviceAuth` 503-vs-200 wiring test; frontend — 7 composable + 3 modal tests. All
+  green; `make lint` 0 issues; `make build` clean; vue-tsc clean.
+
+**Design Evolution.**
+- **Session-cookie writer** — the spec proposed an injectable `SetSession func` field on
+  `DeviceAuth`. Shipped using the `OIDC *oidc.Client` the driver already holds
+  (`d.OIDC.SetSession(w, oidc.SessionFromToken(tok, 0))`), since that adds no new coupling
+  and is directly testable (the test client carries a cookie key). `ttl=0` matches local
+  mode's default `SessionTTL`, mirroring `HandleCallback` (`152162b4`).
+- **Frontend mode gate** — the spec gated the modal on a new `/api/config` `cloud` flag.
+  Shipped a self-configuring gate instead: the driver is wired `!cloudMode` only, so the
+  frontend *tries* `device/start` and falls back to the `/login` redirect on 503. This
+  avoids adding a config field and the harder problem that `AccountControl` is shared with
+  the landing nav, which never loads `/api/config` (`ab280b01`, `067a39db`).
+
+**Not Implemented.**
+- The full `/api/me`-round-trip integration test (device `done` → 200 principal) was
+  descoped: with fake, non-JWT tokens `BuildMe` degrades unpredictably. The bridge is
+  instead pinned at the driver level (the `done` poll emits a session cookie) plus the
+  runtime confirmation that `resolveAuthConfig` always sets a cookie key + RedirectURL. No
+  follow-up needed.
+
+**Unspecified Work.**
+- `docs/internals/api-and-transport.md` poll-row note that `done` mints the cookie
+  (improvement, `692af58b`).
+
+**Decisions / surprises / follow-ups.**
+- The device grant is **not advertised** in `auth.latere.ai`'s OIDC discovery document, yet
+  `POST /device/code` works (the oidc lib builds `AuthURL + "/device/code"`). Probing the
+  discovery doc alone is misleading — hit the real path.
+- `auth.Client` is a **type alias** for `oidc.Client`, so `authClient` is passed directly as
+  the driver's `OIDC` and shares the browser flow's cookie key — no separate client.
+- Pre-existing, unrelated test failures observed and left as-is:
+  `internal/cli` `TestSessionTokenBridgeCapturesCookie` (bare client without RedirectURL) and
+  `frontend` `TaskDetail.results.test.ts` (verification copy) — both fail at the base commit.
+- The original reported symptom (a stale-binary 404 on `/login`) is a separate operational
+  issue with no code change: a current `wallfacer run` binary 302-redirects `/login` to a
+  provisioned auth service. Rebuilding/reinstalling the binary on the affected machine
+  resolves it.
+- Follow-up: none required. Optional — surface a signed-in confirmation toast, and consider
+  driving device sign-in from the settings surface too.
