@@ -79,6 +79,19 @@
   background: var(--tint-neutral);
   color: var(--tint-neutral-ink);
 }
+/* GitHub PR state badges (task-centric redesign). */
+.badge-pr-open {
+  background: var(--tint-green);
+  color: var(--tint-green-ink);
+}
+.badge-pr-closed {
+  background: var(--tint-red);
+  color: var(--tint-red-ink);
+}
+.badge-pr-merged {
+  background: var(--tint-purple, var(--tint-neutral));
+  color: var(--tint-purple-ink, var(--tint-neutral-ink));
+}
 .badge-blocked,
 .badge-dep-cancelled,
 .badge-deps-met,

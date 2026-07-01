@@ -11,6 +11,7 @@ import { classifyTag, type RenderedTag } from '../lib/tagBadge';
 import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import AppSelect from './AppSelect.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
+import { useGithubPrStore } from '../stores/githubPr';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { useNow } from '../composables/useNow';
 import { toRef } from 'vue';
@@ -50,6 +51,20 @@ const uiStore = useUiStore();
 const justDispatched = ref(false);
 let pulseHandle: ReturnType<typeof setTimeout> | null = null;
 
+const prStore = useGithubPrStore();
+
+// PR badge for the card's Row 1: shows the task branch's PR state at a glance.
+// Reads the per-task PR cache; populated by the fetch below for branched tasks.
+const prBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
+  const pr = prStore.prFor(props.task.id);
+  if (!pr) return null;
+  return {
+    label: `#${pr.number} ${pr.state}`,
+    cls: `badge-pr-${pr.state}`,
+    title: `Pull request #${pr.number} (${pr.state})`,
+  };
+});
+
 onMounted(() => {
   if (uiStore.dispatchedIds.has(props.task.id)) {
     justDispatched.value = true;
@@ -57,6 +72,11 @@ onMounted(() => {
       justDispatched.value = false;
       uiStore.consumeDispatched(props.task.id);
     }, 1500);
+  }
+  // Populate the PR badge for tasks that have a branch (only a subset of the
+  // board), so the card can show PR state without opening the task.
+  if (props.task.branch_name && prStore.prFor(props.task.id) === undefined) {
+    void prStore.fetchTaskPR(props.task.id);
   }
 });
 
@@ -477,6 +497,11 @@ function onCardKeydown(e: KeyboardEvent) {
           :class="['badge', testBadge.cls]"
           :title="testBadge.title"
         >{{ testBadge.label }}</span>
+        <span
+          v-if="prBadge"
+          :class="['badge', prBadge.cls]"
+          :title="prBadge.title"
+        >{{ prBadge.label }}</span>
       </div>
       <div class="flex items-center gap-1.5 card-meta-right">
         <span
