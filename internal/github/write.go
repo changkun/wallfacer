@@ -43,7 +43,7 @@ func CreatePull(ctx context.Context, c *Client, token *Token, owner, repo string
 	if err != nil {
 		var apiErr *APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnprocessableEntity {
-			if existing, lookupErr := findOpenPull(ctx, c, token, owner, repo, p.Head); lookupErr == nil && existing != nil {
+			if existing, lookupErr := PullForBranch(ctx, c, token, owner, repo, p.Head); lookupErr == nil && existing != nil {
 				return existing, nil
 			}
 		}
@@ -57,10 +57,10 @@ func CreatePull(ctx context.Context, c *Client, token *Token, owner, repo string
 	return &out, nil
 }
 
-// findOpenPull returns the open PR whose head branch matches, or (nil, nil) if
-// none. Used for existing-PR detection. head is matched as owner:branch per the
-// GitHub list filter.
-func findOpenPull(ctx context.Context, c *Client, token *Token, owner, repo, head string) (*PullRequest, error) {
+// PullForBranch returns the open PR whose head branch matches, or (nil, nil) if
+// none. Used for existing-PR detection and task PR-status lookup. head is
+// matched as owner:branch per the GitHub list filter.
+func PullForBranch(ctx context.Context, c *Client, token *Token, owner, repo, head string) (*PullRequest, error) {
 	// GitHub's head filter is "user:ref"; the branch alone also works for
 	// same-repo PRs. Query by branch and match client-side to be safe.
 	path := fmt.Sprintf("/repos/%s/%s/pulls?state=open&head=%s:%s&per_page=10",
