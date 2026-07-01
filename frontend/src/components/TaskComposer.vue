@@ -98,14 +98,14 @@ const criteria = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const dependsOn = ref<string[]>([]);
-const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'>('');
+const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode' | 'topos'>('');
 // Harness options for the picker: prefer the server's registered list so a
 // newly added harness appears without editing this component; fall back to
 // the known set before config loads.
 const harnessOptions = computed<string[]>(() =>
   store.config?.sandboxes?.length
     ? store.config.sandboxes
-    : ['claude', 'codex', 'cursor', 'pi', 'opencode'],
+    : ['claude', 'codex', 'cursor', 'pi', 'opencode', 'topos'],
 );
 function onHarnessChange(v: string): void {
   sandbox.value = v as typeof sandbox.value;

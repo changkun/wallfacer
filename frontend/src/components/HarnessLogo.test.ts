@@ -45,6 +45,18 @@ describe('HarnessLogo', () => {
     }
   });
 
+  it('tints Topos with its brand color when color is set', () => {
+    const svg = render({ harness: 'topos', color: true });
+    expect(svg.getAttribute('fill')).toBe('#55707a');
+  });
+
+  it('renders the Topos node-graph mark (4 nodes + connecting path)', () => {
+    const svg = render({ harness: 'topos' });
+    expect(svg.getAttribute('fill')).toBe('currentColor');
+    expect(svg.querySelectorAll('circle').length).toBe(4);
+    expect(svg.querySelector('path')).not.toBeNull();
+  });
+
   it('renders the fallback glyph for an unknown harness', () => {
     const svg = render({ harness: 'totally-unknown' });
     expect(svg.querySelector('circle')).not.toBeNull();

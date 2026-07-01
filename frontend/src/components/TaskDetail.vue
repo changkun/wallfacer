@@ -22,6 +22,7 @@ import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
+import { harnessLabel, supportedHarnesses } from '../lib/harness';
 // Re-imported as a local binding so the template can call renderMarkdown()
 // directly inside the Results tab.
 import { renderMarkdown as renderResultMarkdown } from '../lib/markdown';
@@ -696,11 +697,16 @@ const editPromptPreview = ref(false);
 const editTimeout = ref<number | null>(null);
 const editModel = ref('');
 const editSandbox = ref('');
-const EDIT_SANDBOX_OPTIONS = [
+// Harness options for the edit picker, driven by the server's registered
+// harness list (falling back to the known set before config loads) so every
+// harness — including Topos — is selectable, not just claude/codex.
+const EDIT_SANDBOX_OPTIONS = computed(() => [
   { value: '', label: 'Default (agent)' },
-  { value: 'claude', label: 'Claude' },
-  { value: 'codex', label: 'Codex' },
-];
+  ...supportedHarnesses(taskStore.config?.sandboxes).map((id) => ({
+    value: id,
+    label: harnessLabel(id),
+  })),
+]);
 const editTags = ref('');
 const editDeps = ref<string[]>([]);
 const editScheduledAt = ref('');
