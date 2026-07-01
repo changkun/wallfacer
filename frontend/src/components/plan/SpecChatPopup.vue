@@ -91,6 +91,22 @@ const launcherStyle = computed(() => ({ left: geom.lx + 'px', top: geom.ly + 'px
 function toggle() { geom.open = !geom.open; persist(); }
 function open() { if (!geom.open) { geom.open = true; persist(); } }
 
+// openAtLauncher opens the popup anchored to the launcher's current position,
+// so it appears next to where the launcher sits rather than at the popup's last
+// free-floating spot. The popup grows toward the screen center (its corner
+// nearest the launcher is pinned to the launcher) and is kept fully on-screen.
+function openAtLauncher() {
+  const cx = geom.lx + LAUNCHER_SIZE / 2;
+  const cy = geom.ly + LAUNCHER_SIZE / 2;
+  const x = cx <= vw() / 2 ? geom.lx : geom.lx + LAUNCHER_SIZE - geom.w;
+  const y = cy <= vh() / 2 ? geom.ly : geom.ly + LAUNCHER_SIZE - geom.h;
+  const m = 8; // keep a small margin from the viewport edges
+  geom.x = clampNum(x, m, Math.max(m, vw() - geom.w - m));
+  geom.y = clampNum(y, m, Math.max(m, vh() - geom.h - m));
+  geom.open = true;
+  persist();
+}
+
 // ── Drag ───────────────────────────────────────────────────────────
 let dragStart: { px: number; py: number; ox: number; oy: number } | null = null;
 function onDragDown(ev: PointerEvent) {
@@ -139,7 +155,7 @@ function onLauncherUp() {
   window.removeEventListener('pointermove', onLauncherMove);
   window.removeEventListener('pointerup', onLauncherUp);
   if (moved) persist();
-  else toggle();
+  else openAtLauncher();
 }
 
 // ── Resize (any edge or corner) ────────────────────────────────────
