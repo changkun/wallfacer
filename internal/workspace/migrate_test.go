@@ -49,8 +49,10 @@ func TestMigrateToWorkspaces(t *testing.T) {
 	dirA := t.TempDir()
 	liveKey := prompts.WorkspaceDataKey([]string{dirA})
 	writeTaskDir(t, dataDir, liveKey, "task-live", []string{dirA})
-	legacy := `[{"name":"Live","workspaces":["` + dirA + `"]}]`
-	if err := os.WriteFile(legacyGroupsFilePath(configDir), []byte(legacy), 0o644); err != nil {
+	// Marshal rather than concatenate: on Windows dirA holds backslashes
+	// (C:\Users\...) that would otherwise form invalid JSON string escapes.
+	legacy, _ := json.Marshal([]map[string]any{{"name": "Live", "workspaces": []string{dirA}}})
+	if err := os.WriteFile(legacyGroupsFilePath(configDir), legacy, 0o644); err != nil {
 		t.Fatalf("write legacy file: %v", err)
 	}
 
@@ -147,5 +149,30 @@ func TestMigrateToWorkspaces(t *testing.T) {
 	again, _ := findByDataKey(groups2, liveKey)
 	if again.ID != live.ID {
 		t.Errorf("workspace id changed across idempotent re-run: %q -> %q", live.ID, again.ID)
+	}
+}
+
+// TestLoadGroupsLegacyBackslashPath guards the cross-platform invariant that a
+// legacy workspace-groups.json holding a Windows-style folder path (backslash
+// separators) round-trips through LoadGroups. Real Windows temp dirs contain
+// backslashes; a fixture built by string concatenation instead of json.Marshal
+// turns those into invalid JSON escapes (\U, \A, ...) and fails to load — the
+// defect that broke TestMigrateToWorkspaces on the Windows CI runner.
+func TestLoadGroupsLegacyBackslashPath(t *testing.T) {
+	configDir := t.TempDir()
+	const winPath = `C:\Users\runner\proj`
+	legacy, err := json.Marshal([]map[string]any{{"name": "Live", "workspaces": []string{winPath}}})
+	if err != nil {
+		t.Fatalf("marshal legacy: %v", err)
+	}
+	if err := os.WriteFile(legacyGroupsFilePath(configDir), legacy, 0o644); err != nil {
+		t.Fatalf("write legacy file: %v", err)
+	}
+	groups, err := LoadGroups(configDir)
+	if err != nil {
+		t.Fatalf("LoadGroups on backslash path: %v", err)
+	}
+	if len(groups) != 1 || len(groups[0].Folders) != 1 || groups[0].Folders[0] != winPath {
+		t.Fatalf("backslash folder not recovered: %+v", groups)
 	}
 }
