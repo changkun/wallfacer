@@ -93,6 +93,19 @@ func TestDeviceAuth_Lifecycle(t *testing.T) {
 		t.Fatal("device flow never reached done within timeout")
 	}
 
+	// The poll that observes completion must mint the session cookie so
+	// /api/me reflects the sign-in (the token also lands in the file store,
+	// but /api/me reads the cookie session, not the store).
+	var sessionCookie *http.Cookie
+	for _, ck := range rec.Result().Cookies() {
+		if strings.Contains(ck.Name, "latere-session") {
+			sessionCookie = ck
+		}
+	}
+	if sessionCookie == nil || sessionCookie.Value == "" {
+		t.Fatalf("done poll did not set a session cookie; cookies=%v", rec.Result().Cookies())
+	}
+
 	tok, err := store.Load()
 	if err != nil {
 		t.Fatalf("load: %v", err)
@@ -122,6 +135,36 @@ func TestDeviceAuth_NilMountsUnavailable(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("nil mount = %d", rec.Code)
 	}
+}
+
+// TestHandler_SetDeviceAuth_Wires confirms the handler-level gate: with no
+// driver installed the device endpoints answer 503 (so the SPA can detect
+// "device sign-in unavailable"), and after SetDeviceAuth they go live.
+func TestHandler_SetDeviceAuth_Wires(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+
+	// Nil driver (default): 503.
+	rec := httptest.NewRecorder()
+	h.AuthDeviceStart(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/start", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unwired start = %d; want 503", rec.Code)
+	}
+
+	// Wired driver: the start endpoint drives the device flow and returns 200.
+	c, srv := newDeviceServer(t,
+		`{"device_code":"dc","user_code":"UC-9","verification_uri":"https://verify.example/","expires_in":300,"interval":1}`,
+		`{"error":"authorization_pending"}`, http.StatusBadRequest)
+	defer srv.Close()
+	store, _ := authkit.NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
+	h.SetDeviceAuth(&DeviceAuth{OIDC: c, Store: store})
+
+	rec = httptest.NewRecorder()
+	h.AuthDeviceStart(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/start", bytes.NewReader([]byte(`{}`))))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("wired start = %d body=%s; want 200", rec.Code, rec.Body.String())
+	}
+	// Cancel the in-flight flow so its polling goroutine doesn't outlive the test.
+	h.AuthDeviceCancel(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/auth/device/cancel", nil))
 }
 
 // TestDeviceAuth_Cancel clears an in-flight flow so the next start does not

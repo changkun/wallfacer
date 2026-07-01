@@ -36,6 +36,14 @@ func (h *Handler) SetAuth(p AuthProvider) {
 	}
 }
 
+// SetDeviceAuth installs the local-mode RFC 8628 device-code driver that backs
+// /api/auth/device/{start,poll,cancel}. Pass nil (the default) to leave the
+// endpoints answering 503. Called from the local-mode CLI boot path; cloud
+// deployments use the /login + authorization-code flow instead.
+func (h *Handler) SetDeviceAuth(d *DeviceAuth) {
+	h.deviceAuth = d
+}
+
 // SetCloudMode marks the handler as serving a multi-tenant cloud deployment
 // (WALLFACER_CLOUD). It gates org/personal workspace isolation: only cloud
 // deployments hide workspaces a principal can't see. A local single-user run
