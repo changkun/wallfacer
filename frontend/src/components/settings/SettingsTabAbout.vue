@@ -132,9 +132,9 @@ onMounted(async () => {
           border-radius: 7px;
           background: linear-gradient(
             135deg,
-            #d97757 0%,
-            #c4623f 60%,
-            #a84e2e 100%
+            #5b5bd6 0%,
+            #6c63e8 55%,
+            #7c6cf0 100%
           );
           display: flex;
           align-items: center;
@@ -164,9 +164,9 @@ onMounted(async () => {
             font-family: var(--font-display);
             background: linear-gradient(
               135deg,
-              #d97757 0%,
-              #c4623f 60%,
-              #a84e2e 100%
+              #5b5bd6 0%,
+              #6c63e8 55%,
+              #7c6cf0 100%
             );
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;

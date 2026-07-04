@@ -139,7 +139,7 @@ function drawDailyChart() {
   const barW = daily.length ? W / daily.length : 0;
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const barColor = isDark ? '#475569' : '#94a3b8';
-  const todayColor = '#3b82f6';
+  const todayColor = isDark ? '#7c6cf0' : '#5b5bd6';
   const labelColor = isDark ? '#64748b' : '#94a3b8';
 
   ctx.clearRect(0, 0, W, H);
