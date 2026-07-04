@@ -17,13 +17,13 @@ withDefaults(defineProps<{ size?: number }>(), { size: 16 });
   >
     <rect x="0" y="0" width="6" height="3" fill="var(--accent)" />
     <rect x="7" y="0" width="9" height="3" fill="var(--accent-2)" />
-    <rect x="0" y="4" width="4" height="3" fill="#8a3e21" />
+    <rect x="0" y="4" width="4" height="3" fill="#3a3aa0" />
     <rect x="5" y="4" width="6" height="3" fill="var(--accent)" />
     <rect x="12" y="4" width="4" height="3" fill="var(--accent-2)" />
     <rect x="0" y="8" width="7" height="3" fill="var(--accent-2)" />
-    <rect x="8" y="8" width="8" height="3" fill="#8a3e21" />
+    <rect x="8" y="8" width="8" height="3" fill="#3a3aa0" />
     <rect x="0" y="12" width="3" height="4" fill="var(--accent)" />
-    <rect x="4" y="12" width="6" height="4" fill="#8a3e21" />
+    <rect x="4" y="12" width="6" height="4" fill="#3a3aa0" />
     <rect x="11" y="12" width="5" height="4" fill="var(--accent)" />
   </svg>
 </template>
