@@ -2,7 +2,8 @@
 
 /* =======================================================================
    Wallfacer — Design Tokens
-   Paper-ink palette with clay accent. Ported from the redesign mock.
+   Indigo-on-zinc palette: cool neutral surfaces, electric indigo accent.
+   See specs/shared/visual-identity/design-tokens.md.
    Existing CSS reads legacy aliases (--text, --border, --accent-hover, ...)
    which are defined alongside the new canonical tokens.
    ======================================================================= */
@@ -48,14 +49,14 @@
   --sb-w: 240px;
   --sb-w-icon: 56px;
 
-  /* Surfaces (paper-ink) */
-  --bg: #f4f1ea; /* canvas */
-  --bg-sunk: #ebe7de; /* recessed (inputs, empty zones) */
-  --bg-elevated: #faf8f3; /* slightly raised */
+  /* Surfaces (zinc) */
+  --bg: #fafafa; /* canvas */
+  --bg-sunk: #f0f0f2; /* recessed (inputs, empty zones) */
+  --bg-elevated: #ffffff; /* slightly raised */
   --bg-card: #ffffff; /* cards / popovers */
-  --bg-sidebar: #ece8de; /* sidebar chrome */
-  --bg-hover: rgba(31, 29, 26, 0.045);
-  --bg-active: rgba(31, 29, 26, 0.08);
+  --bg-sidebar: #f4f4f6; /* sidebar chrome */
+  --bg-hover: rgba(24, 24, 27, 0.045);
+  --bg-active: rgba(24, 24, 27, 0.08);
 
   /* Legacy --bg-raised held "recessed" semantics in existing CSS;
      keep that meaning so badges/buttons/mentions don't invert. */
@@ -63,74 +64,74 @@
   --bg-input: var(--bg-sunk);
 
   /* Ink */
-  --ink: #1b1916;
-  --ink-2: #4c4842;
+  --ink: #18181b;
+  --ink-2: #47474f;
   /* --ink-3 is the "muted" role used for labels, metadata and secondary
-     content. Kept dark enough to clear WCAG AA (~5:1) on both the paper
-     canvas (--bg) and white cards; the previous #7a766e dipped to ~4:1
-     on the paper surface. */
-  --ink-3: #6b6760;
-  --ink-4: #97928a;
+     content. Kept dark enough to clear WCAG AA (~5:1) on both the canvas
+     (--bg) and white cards. */
+  --ink-3: #62626c;
+  --ink-4: #93939e;
 
   /* Rules */
-  --rule: #d9d3c5;
-  --rule-2: #c7c0af;
+  --rule: #e3e3e8;
+  --rule-2: #cfcfd7;
 
-  /* Accent — clay */
-  --accent: #c45a33;
-  --accent-2: #a84e2e;
-  --accent-soft: #f3dccf;
-  --accent-tint: rgba(196, 90, 51, 0.08);
+  /* Accent — electric indigo */
+  --accent: #5b5bd6;
+  --accent-2: #4747c2;
+  --accent-soft: #e5e5fb;
+  --accent-tint: rgba(91, 91, 214, 0.08);
+  --accent-gradient: linear-gradient(135deg, #5b5bd6 0%, #6c63e8 55%, #7c6cf0 100%);
 
   /* Semantic */
-  --ok: #3f7a4a;
-  --warn: #a56a12;
+  --ok: #1f8a55;
+  --warn: #a16a08;
   --info: #3a6db3;
-  --err: #a32d2d;
-  --purple: #6a4aa3;
+  --err: #c23a3a;
+  --purple: #7a5bd6;
 
   /* Status column chips */
-  --col-backlog: #8e8a80;
-  --col-progress: #3a6db3;
-  --col-waiting: #a56a12;
-  --col-done: #3f7a4a;
+  --col-backlog: #8b8b94;
+  --col-progress: #4477d4;
+  --col-waiting: #b07a10;
+  --col-done: #279561;
 
-  /* Elevation ladder — layered ambient + key light, warm-tinted from the
-     paper-ink shadow color. Each rung adds a softer, wider penumbra so
-     surfaces read as physically stacked rather than outlined. */
-  --sh-1: 0 1px 1px rgba(27, 25, 22, 0.04), 0 1px 2px rgba(27, 25, 22, 0.05);
+  /* Elevation ladder — layered ambient + key light, cool-tinted from the
+     zinc shadow color. Each rung adds a softer, wider penumbra so surfaces
+     read as physically stacked rather than outlined. */
+  --sh-1: 0 1px 1px rgba(16, 16, 26, 0.04), 0 1px 2px rgba(16, 16, 26, 0.05);
   --sh-2:
-    0 1px 2px rgba(27, 25, 22, 0.05), 0 3px 8px -1px rgba(27, 25, 22, 0.09);
+    0 1px 2px rgba(16, 16, 26, 0.05), 0 3px 8px -1px rgba(16, 16, 26, 0.09);
   --sh-3:
-    0 2px 4px rgba(27, 25, 22, 0.05), 0 10px 24px -6px rgba(27, 25, 22, 0.14);
+    0 2px 4px rgba(16, 16, 26, 0.05), 0 10px 24px -6px rgba(16, 16, 26, 0.14);
   --sh-pop:
-    0 4px 10px rgba(27, 25, 22, 0.07), 0 22px 50px -12px rgba(27, 25, 22, 0.24);
+    0 4px 10px rgba(16, 16, 26, 0.07), 0 22px 50px -12px rgba(16, 16, 26, 0.24);
 
   /* Inset well — recessed trays/inputs read as carved into the surface. */
-  --sh-inset: inset 0 1px 2px rgba(27, 25, 22, 0.05);
+  --sh-inset: inset 0 1px 2px rgba(16, 16, 26, 0.05);
   /* Top-edge highlight — the macOS "light from above" bevel on raised chrome. */
   --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 
   /* Translucent chrome — frosted material over scrolling content. Needs the
      blur filter to read; falls back to a near-opaque tint without it. */
-  --glass-bg: rgba(244, 241, 234, 0.72);
-  --glass-sidebar: rgba(236, 232, 222, 0.7);
-  --glass-elevated: rgba(250, 248, 243, 0.78);
+  --glass-bg: rgba(250, 250, 250, 0.72);
+  --glass-sidebar: rgba(244, 244, 246, 0.7);
+  --glass-elevated: rgba(255, 255, 255, 0.78);
   --glass-blur: saturate(180%) blur(20px);
 
   /* Chart / badge tints */
-  --tint-blue: #e4eaf4;
-  --tint-blue-ink: #2d538a;
-  --tint-amber: #f1e7cf;
-  --tint-amber-ink: #7a5418;
-  --tint-green: #d9e6d6;
-  --tint-green-ink: #2d5a36;
-  --tint-plum: #e6dde9;
-  --tint-plum-ink: #573f77;
-  --tint-red: #f0d9d5;
-  --tint-red-ink: #822020;
-  --tint-neutral: #e7e2d4;
-  --tint-neutral-ink: #5c574d;
+  --tint-blue: #e0e9f8;
+  --tint-blue-ink: #2b55a8;
+  --tint-amber: #f5ead1;
+  --tint-amber-ink: #7d5709;
+  --tint-green: #dcefe4;
+  --tint-green-ink: #1d6b42;
+  --tint-plum: #e6e5fb;
+  --tint-plum-ink: #4747b8;
+  --tint-red: #f9e0e0;
+  --tint-red-ink: #a12626;
+  --tint-neutral: #ebebee;
+  --tint-neutral-ink: #55555e;
 
   /* Legacy aliases consumed by existing CSS */
   --text: var(--ink);
@@ -146,12 +147,12 @@
   --bg-surface: var(--bg-elevated);
   --bg-sunken: var(--bg-sunk);
   --accent-subtle: var(--accent-tint);
-  --accent-glow: rgba(196, 90, 51, 0.15);
-  --accent-glow-strong: rgba(196, 90, 51, 0.3);
+  --accent-glow: rgba(91, 91, 214, 0.15);
+  --accent-glow-strong: rgba(91, 91, 214, 0.3);
   --accent-deep: var(--accent-2);
   --border-strong: var(--rule-2);
   --border-emphasis: var(--rule-2);
-  --grid-color: rgba(0, 0, 0, 0.035);
+  --grid-color: rgba(9, 9, 18, 0.035);
 
   /* Sandbox-aligned typography helpers */
   --fs-eyebrow: 11px;
@@ -165,49 +166,50 @@
   --tracking-label: 0.06em;
 
   /* Terminal surface — follows the active theme (light values here). */
-  --terminal-bg: #faf8f3;
-  --terminal-fg: #2a2720;
-  --terminal-rule: #d9d3c5;
-  --terminal-ink-muted: rgba(27, 25, 22, 0.55);
-  --terminal-ink-dim: rgba(27, 25, 22, 0.45);
-  --terminal-tab-hover: #ece8de;
-  --terminal-tab-active: #ffffff;
+  --terminal-bg: #ffffff;
+  --terminal-fg: #26262c;
+  --terminal-rule: #e3e3e8;
+  --terminal-ink-muted: rgba(24, 24, 27, 0.55);
+  --terminal-ink-dim: rgba(24, 24, 27, 0.45);
+  --terminal-tab-hover: #f0f0f2;
+  --terminal-tab-active: #fafafa;
 }
 
 [data-theme="dark"] {
-  --bg: #15140f;
-  --bg-sunk: #100f0c;
-  --bg-elevated: #1c1a15;
-  --bg-card: #1e1c17;
-  --bg-sidebar: #100f0c;
-  --bg-hover: rgba(244, 241, 234, 0.04);
-  --bg-active: rgba(244, 241, 234, 0.08);
+  --bg: #0b0b0f;
+  --bg-sunk: #08080b;
+  --bg-elevated: #131318;
+  --bg-card: #16161d;
+  --bg-sidebar: #0e0e13;
+  --bg-hover: rgba(228, 228, 234, 0.05);
+  --bg-active: rgba(228, 228, 234, 0.09);
   --bg-raised: var(--bg-sunk);
-  --bg-input: #191712;
+  --bg-input: #101016;
 
-  --ink: #ece6d6;
-  --ink-2: #b9b2a0;
-  --ink-3: #857f6f;
-  --ink-4: #5a5449;
+  --ink: #e4e4ea;
+  --ink-2: #b3b3bf;
+  --ink-3: #85858f;
+  --ink-4: #55555f;
 
-  --rule: #2a2720;
-  --rule-2: #3a362c;
+  --rule: #232330;
+  --rule-2: #32323f;
 
-  --accent: #e07a51;
-  --accent-2: #f08961;
-  --accent-soft: #3a1f14;
-  --accent-tint: rgba(224, 122, 81, 0.12);
+  --accent: #7c6cf0;
+  --accent-2: #928af5;
+  --accent-soft: #232052;
+  --accent-tint: rgba(124, 108, 240, 0.14);
+  --accent-gradient: linear-gradient(135deg, #7c6cf0 0%, #8f7ff5 55%, #a49af8 100%);
 
-  --ok: #6fb37f;
-  --warn: #d4a050;
-  --info: #7aa3d9;
-  --err: #dc7878;
-  --purple: #a389d4;
+  --ok: #52c58a;
+  --warn: #d9a23d;
+  --info: #6f9fe8;
+  --err: #e06c6c;
+  --purple: #a78bfa;
 
-  --col-backlog: #858070;
-  --col-progress: #7aa3d9;
-  --col-waiting: #d4a050;
-  --col-done: #6fb37f;
+  --col-backlog: #6f6f7a;
+  --col-progress: #6f9fe8;
+  --col-waiting: #d9a23d;
+  --col-done: #52c58a;
 
   /* Dark elevation: shadows nearly vanish on near-black, so depth leans on
      the top-edge highlight + lighter elevated surfaces. Shadows still anchor
@@ -220,23 +222,23 @@
   --sh-inset: inset 0 1px 2px rgba(0, 0, 0, 0.35);
   --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
-  --glass-bg: rgba(21, 20, 15, 0.7);
-  --glass-sidebar: rgba(16, 15, 12, 0.72);
-  --glass-elevated: rgba(30, 28, 23, 0.8);
+  --glass-bg: rgba(11, 11, 15, 0.7);
+  --glass-sidebar: rgba(14, 14, 19, 0.72);
+  --glass-elevated: rgba(22, 22, 29, 0.8);
   --glass-blur: saturate(160%) blur(20px);
 
-  --tint-blue: #1a2638;
-  --tint-blue-ink: #9bbce8;
-  --tint-amber: #2e2412;
-  --tint-amber-ink: #d9a868;
-  --tint-green: #1a2a1e;
-  --tint-green-ink: #8bc78f;
-  --tint-plum: #261e33;
-  --tint-plum-ink: #b49de0;
-  --tint-red: #2e1818;
-  --tint-red-ink: #e09090;
-  --tint-neutral: #2a2620;
-  --tint-neutral-ink: #a39e90;
+  --tint-blue: #17233d;
+  --tint-blue-ink: #9ab8f0;
+  --tint-amber: #2c2310;
+  --tint-amber-ink: #dfb26a;
+  --tint-green: #12291c;
+  --tint-green-ink: #7fd6a4;
+  --tint-plum: #1f1d45;
+  --tint-plum-ink: #a89df5;
+  --tint-red: #321818;
+  --tint-red-ink: #ea9d9d;
+  --tint-neutral: #24242c;
+  --tint-neutral-ink: #a0a0ab;
 
   --text: var(--ink);
   --text-secondary: var(--ink-2);
@@ -250,21 +252,21 @@
   --bg-surface: var(--bg-elevated);
   --bg-sunken: var(--bg-sunk);
   --accent-subtle: var(--accent-tint);
-  --accent-glow: rgba(224, 122, 81, 0.10);
-  --accent-glow-strong: rgba(224, 122, 81, 0.20);
+  --accent-glow: rgba(124, 108, 240, 0.12);
+  --accent-glow-strong: rgba(124, 108, 240, 0.25);
   --accent-deep: var(--accent-2);
   --border-strong: var(--rule-2);
   --border-emphasis: var(--rule-2);
   --grid-color: rgba(255, 255, 255, 0.025);
 
   /* Terminal surface — dark values for the dark theme. */
-  --terminal-bg: #1b1916;
-  --terminal-fg: #f4f1ea;
-  --terminal-rule: #2a2720;
-  --terminal-ink-muted: rgba(244, 241, 234, 0.55);
-  --terminal-ink-dim: rgba(244, 241, 234, 0.45);
-  --terminal-tab-hover: #24221d;
-  --terminal-tab-active: #2a2823;
+  --terminal-bg: #0e0e13;
+  --terminal-fg: #dcdce4;
+  --terminal-rule: #232330;
+  --terminal-ink-muted: rgba(228, 228, 234, 0.55);
+  --terminal-ink-dim: rgba(228, 228, 234, 0.45);
+  --terminal-tab-hover: #16161d;
+  --terminal-tab-active: #1c1c25;
 }
 
 .mono {

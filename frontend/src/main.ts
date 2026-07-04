@@ -32,6 +32,7 @@ import './styles/agents.css';
 import './styles/syntax.css';
 import './styles/utilities.css';
 import './styles/app.css';
+import './styles/brand-override.css';
 
 export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) => {
   app.use(createPinia());

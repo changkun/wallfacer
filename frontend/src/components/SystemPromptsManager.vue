@@ -289,8 +289,8 @@ watch(
                     height: '6px',
                     borderRadius: '50%',
                     flexShrink: 0,
-                    background: tmpl.has_override ? 'var(--accent, #d97757)' : 'transparent',
-                    border: '1px solid ' + (tmpl.has_override ? 'var(--accent, #d97757)' : 'var(--border, #ccc)'),
+                    background: tmpl.has_override ? 'var(--accent, #5b5bd6)' : 'transparent',
+                    border: '1px solid ' + (tmpl.has_override ? 'var(--accent, #5b5bd6)' : 'var(--border, #ccc)'),
                   }"
                 ></span>
                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ decorateName(tmpl.name) }}</span>

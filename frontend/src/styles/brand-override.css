@@ -1,0 +1,21 @@
+/* Wallfacer's identity is indigo-on-zinc (specs/shared/visual-identity.md),
+   while the pinned latere-ui package still paints every product wordmark as
+   serif-italic with wallfacer in the coral gradient (brand.css/footer.css,
+   both !important). This file loads last (see main.ts) so the wallfacer
+   wordmark follows the new identity everywhere latere-ui renders it; the
+   sibling product wordmarks (cella/topos/lux/...) keep their own gradients
+   but inherit the display face since Instrument Serif no longer ships. */
+.cella-brand,
+.wallfacer-brand,
+.lux-brand,
+.topos-brand,
+.agon-brand,
+.lectio-brand {
+  font-family: var(--font-display) !important;
+  font-style: normal !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+}
+.wallfacer-brand {
+  background-image: var(--accent-gradient) !important;
+}

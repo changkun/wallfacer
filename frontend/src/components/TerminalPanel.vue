@@ -53,8 +53,8 @@ const darkAnsi = {
 const lightAnsi = {
   black: '#000000', red: '#cd3131', green: '#00a000', yellow: '#949800',
   blue: '#0451a5', magenta: '#bc05bc', cyan: '#0598bc', white: '#555555',
-  brightBlack: '#7a766e', brightRed: '#cd3131', brightGreen: '#14ce14', brightYellow: '#b5ba00',
-  brightBlue: '#0451a5', brightMagenta: '#bc05bc', brightCyan: '#0598bc', brightWhite: '#2a2720',
+  brightBlack: '#71717a', brightRed: '#cd3131', brightGreen: '#14ce14', brightYellow: '#b5ba00',
+  brightBlue: '#0451a5', brightMagenta: '#bc05bc', brightCyan: '#0598bc', brightWhite: '#26262c',
 };
 
 function getCssVar(name: string): string {
@@ -69,9 +69,9 @@ function isDarkTheme(): boolean {
 function buildTermTheme() {
   const dark = isDarkTheme();
   return {
-    background: getCssVar('--terminal-bg') || (dark ? '#1b1916' : '#faf8f3'),
-    foreground: getCssVar('--terminal-fg') || (dark ? '#f4f1ea' : '#2a2720'),
-    cursor: getCssVar('--accent') || '#c45a33',
+    background: getCssVar('--terminal-bg') || (dark ? '#0e0e13' : '#ffffff'),
+    foreground: getCssVar('--terminal-fg') || (dark ? '#dcdce4' : '#26262c'),
+    cursor: getCssVar('--accent') || '#5b5bd6',
     selectionBackground: dark ? 'rgba(244, 241, 234, 0.18)' : 'rgba(27, 25, 22, 0.16)',
     ...(dark ? darkAnsi : lightAnsi),
   };

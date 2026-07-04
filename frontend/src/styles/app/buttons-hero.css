@@ -127,7 +127,7 @@
 .wallfacer-brand {
     font-family: var(--font-display) !important;
     font-weight: 600 !important;
-    background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%);
+    background: var(--accent-gradient);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;

@@ -33,7 +33,7 @@ onMounted(() => {
     <nav class="nav-container">
       <!-- Logo -->
       <router-link to="/" class="logo-link">
-        <svg class="logo-icon" width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;"><rect x="0" y="0" width="6" height="3" fill="#d97757"/><rect x="7" y="0" width="9" height="3" fill="#c4623f"/><rect x="0" y="4" width="4" height="3" fill="#a84e2e"/><rect x="5" y="4" width="6" height="3" fill="#d97757"/><rect x="12" y="4" width="4" height="3" fill="#c4623f"/><rect x="0" y="8" width="7" height="3" fill="#c4623f"/><rect x="8" y="8" width="8" height="3" fill="#a84e2e"/><rect x="0" y="12" width="3" height="4" fill="#d97757"/><rect x="4" y="12" width="6" height="4" fill="#a84e2e"/><rect x="11" y="12" width="5" height="4" fill="#d97757"/></svg>
+        <svg class="logo-icon" width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;"><rect x="0" y="0" width="6" height="3" fill="#7c6cf0"/><rect x="7" y="0" width="9" height="3" fill="#5b5bd6"/><rect x="0" y="4" width="4" height="3" fill="#4747c2"/><rect x="5" y="4" width="6" height="3" fill="#7c6cf0"/><rect x="12" y="4" width="4" height="3" fill="#5b5bd6"/><rect x="0" y="8" width="7" height="3" fill="#5b5bd6"/><rect x="8" y="8" width="8" height="3" fill="#4747c2"/><rect x="0" y="12" width="3" height="4" fill="#7c6cf0"/><rect x="4" y="12" width="6" height="4" fill="#4747c2"/><rect x="11" y="12" width="5" height="4" fill="#7c6cf0"/></svg>
         <span class="logo-text wallfacer-brand">Wallfacer</span>
       </router-link>
 
