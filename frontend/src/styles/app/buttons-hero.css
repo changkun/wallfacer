@@ -125,9 +125,8 @@
 
 /* ===== Wallfacer Brand ===== */
 .wallfacer-brand {
-    font-family: 'Instrument Serif', Georgia, serif !important;
-    font-style: italic !important;
-    font-weight: 400 !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
     background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -145,9 +144,8 @@
 
 /* ===== Cella Brand ===== */
 .cella-brand {
-    font-family: 'Instrument Serif', Georgia, serif !important;
-    font-style: italic !important;
-    font-weight: 400 !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
     background: linear-gradient(135deg, #8fb894 0%, #6b9e7c 60%, #4a7558 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -160,9 +158,8 @@
    matches the .topos-brand wordmark in the agents/topos surfaces so the
    identity is consistent across products. */
 .topos-brand {
-    font-family: 'Instrument Serif', Georgia, serif !important;
-    font-style: italic !important;
-    font-weight: 400 !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
     background: linear-gradient(135deg, #55707a 0%, #6f8a56 58%, #a07045 100%);
     -webkit-background-clip: text;
     background-clip: text;

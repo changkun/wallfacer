@@ -377,9 +377,8 @@ onUnmounted(() => teardownToc());
   margin-bottom: 0.5rem;
 }
 .local-docs-article-head h1 {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: 42px;
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -410,8 +409,7 @@ onUnmounted(() => teardownToc());
   max-width: 620px;
 }
 .local-docs-body :deep(> p:first-of-type::first-letter) {
-  font-family: var(--font-serif);
-  font-style: italic;
+  font-family: var(--font-display);
   font-size: 3em;
   line-height: 0.9;
   float: left;

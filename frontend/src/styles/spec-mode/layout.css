@@ -147,9 +147,8 @@
 
 .spec-focused-view__title {
   display: block;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: 36px;
   line-height: 1.1;
   letter-spacing: -0.015em;

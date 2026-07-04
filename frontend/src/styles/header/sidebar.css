@@ -39,9 +39,8 @@
   display: block;
 }
 .sb-brand-name {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-2xl);
   color: var(--ink);
   letter-spacing: -0.01em;
