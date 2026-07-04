@@ -11,8 +11,8 @@
 [data-theme="light"] {
   /* Typography */
   --font-sans:
-    "Hanken Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk", "Inter", -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, monospace;
 
   --fs-9: 10px;
@@ -267,12 +267,6 @@
   --terminal-tab-active: #2a2823;
 }
 
-.serif {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: 0.005em;
-}
 .mono {
   font-family: var(--font-mono);
 }

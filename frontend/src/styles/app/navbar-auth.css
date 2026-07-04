@@ -25,10 +25,9 @@
 }
 .logo-link:hover { color: var(--text); }
 .logo-text {
-    font-family: 'Instrument Serif', serif;
-    font-style: italic;
+    font-family: var(--font-display);
     font-size: 18px;
-    font-weight: 400;
+    font-weight: 600;
     color: var(--text);
 }
 .logo-icon { flex-shrink: 0; }

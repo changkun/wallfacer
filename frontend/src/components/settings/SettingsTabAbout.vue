@@ -146,9 +146,8 @@ onMounted(async () => {
           style="
             color: white;
             font-size: 15px;
-            font-family: 'Instrument Serif', Georgia, serif;
-            font-style: italic;
-            font-weight: 400;
+            font-family: var(--font-display);
+            font-weight: 600;
             line-height: 1;
           "
           >W</span
@@ -162,8 +161,7 @@ onMounted(async () => {
           style="
             font-size: 13px;
             font-weight: 400;
-            font-family: 'Instrument Serif', Georgia, serif;
-            font-style: italic;
+            font-family: var(--font-display);
             background: linear-gradient(
               135deg,
               #d97757 0%,

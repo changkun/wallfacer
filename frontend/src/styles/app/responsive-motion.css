@@ -1,13 +1,11 @@
 /* ===== Latere wordmark ===== */
 .latere-wordmark {
-    font-family: 'Instrument Serif', serif !important;
-    font-style: italic !important;
-    font-weight: 400 !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
 }
 .logo-text {
-    font-family: 'Instrument Serif', serif !important;
-    font-style: italic !important;
-    font-weight: 400 !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
 }
 
 /* ===== Chinese Typography ===== */

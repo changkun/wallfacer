@@ -549,9 +549,8 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
 }
 .board-empty__dismiss:hover { color: var(--ink); background: var(--bg-hover); }
 .board-empty__title {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-3xl, 28px);
   color: var(--ink);
   margin: 0;

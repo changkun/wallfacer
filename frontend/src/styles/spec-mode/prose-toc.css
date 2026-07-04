@@ -137,26 +137,13 @@
   line-height: 1.7;
 }
 
-/* Mockup's drop cap: first letter of the first paragraph rendered as a
-   large italic serif in the clay accent colour. Only applied to the spec
-   body — docs and chat retain flat paragraph starts. */
-.spec-focused-view__body-inner.prose-content > p:first-of-type::first-letter {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 3em;
-  line-height: 0.9;
-  float: left;
-  padding: 4px 10px 0 0;
-  color: var(--accent);
-}
-
 .spec-focused-view__body-inner.prose-content > p:first-of-type {
   font-size: 15px;
   line-height: 1.72;
 }
 
-/* Section headings inside the spec body — sans for legibility. Serif
-   italic is reserved for the display title above so long-form reading
+/* Section headings inside the spec body — body sans for legibility. The
+   display face is reserved for the title above so long-form reading
    stays comfortable. */
 .spec-focused-view__body-inner.prose-content h2 {
   font-family: var(--font-sans);

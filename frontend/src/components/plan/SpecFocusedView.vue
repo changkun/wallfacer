@@ -849,9 +849,8 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
 .sf-title {
   display: block;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: 36px;
   line-height: 1.1;
   letter-spacing: -0.015em;
@@ -1037,17 +1036,6 @@ defineExpose({ dispatchFocused, breakdownFocused });
   font-size: 15px;
   color: var(--ink);
   margin: 22px 0 8px;
-}
-/* Direct-child combinator so the drop cap only hits the lead paragraph, not
-   the first <p> nested inside every <li> of a loose list. */
-.sf-content--spec.prose-content :deep(> p:first-of-type::first-letter) {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 3em;
-  line-height: 0.9;
-  float: left;
-  padding: 4px 10px 0 0;
-  color: var(--accent);
 }
 .sf-content--spec.prose-content :deep(> p:first-of-type) {
   font-size: 15px;

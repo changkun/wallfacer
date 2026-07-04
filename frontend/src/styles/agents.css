@@ -42,10 +42,9 @@
 
 .agents-mode__title {
   margin: 0 0 var(--sp-1);
-  font-family: var(--font-serif);
-  font-style: italic;
+  font-family: var(--font-display);
   font-size: var(--fs-2xl);
-  font-weight: 400;
+  font-weight: 600;
   color: var(--ink);
   letter-spacing: 0.005em;
 }
@@ -294,10 +293,9 @@
 }
 .agents-detail__title {
   margin: 0 0 var(--sp-1);
-  font-family: var(--font-serif);
-  font-style: italic;
+  font-family: var(--font-display);
   font-size: var(--fs-xl);
-  font-weight: 400;
+  font-weight: 600;
   color: var(--ink);
 }
 .agents-detail__subtitle {
