@@ -19,3 +19,14 @@
 .wallfacer-brand {
   background-image: var(--accent-gradient) !important;
 }
+
+/* latere-ui console sidebar renders its own serif-italic brand row
+   (console.css .lu-cs-*); the [data-theme] prefix outranks it no matter
+   which order Vite emits the two stylesheets in. */
+[data-theme] .lu-cs-brand-name,
+[data-theme] .lu-cs-brand-mark {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
