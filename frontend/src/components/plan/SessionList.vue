@@ -78,7 +78,7 @@ onUnmounted(() => {
       <span>New chat</span>
     </button>
 
-    <div class="chat-session-scroll">
+    <div v-scrollfade class="chat-session-scroll">
       <template v-for="group in sessionGroups" :key="group.key">
         <div class="chat-sessions-head" :class="'chat-sessions-head--' + group.key">
           <span class="chat-sessions-title">{{ group.label }}</span>

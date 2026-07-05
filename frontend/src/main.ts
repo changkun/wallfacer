@@ -32,11 +32,14 @@ import './styles/docs.css';
 import './styles/agents.css';
 import './styles/syntax.css';
 import './styles/utilities.css';
+import './styles/scroll-fade.css';
 import './styles/app.css';
 import './styles/brand-override.css';
+import { vScrollFade } from './directives/scrollFade';
 
 export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) => {
   app.use(createPinia());
+  app.directive('scrollfade', vScrollFade);
 
   // Remember where the user left off (local mode only — cloud `/` is the
   // marketing page). Persist each navigation, then on a cold launch that

@@ -27,6 +27,7 @@ function turnModelLabel(model?: string): string {
 <template>
   <div class="pcp-stream">
     <div
+      v-scrollfade
       :ref="el => (s.messagesEl.value = el as HTMLElement | null)"
       class="pcp-messages"
     >
