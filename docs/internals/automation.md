@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer runs six background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, and **AutoSubmitter**. Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests, submitting results, retrying failures, syncing worktrees, firing scheduled routines, and generating oversight summaries without manual intervention.
+Wallfacer runs seven background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, **AutoSubmitter**, and **AutoAgon** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests or agon verification, submitting results, retrying failures, syncing worktrees, firing scheduled routines, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
 
 ## Background Goroutine Model
 
@@ -49,10 +49,11 @@ flowchart TD
         C4["h.StartWaitingSyncWatcher(ctx)"]
         C5["h.StartAutoTester(ctx)"]
         C6["h.StartAutoSubmitter(ctx)"]
+        C7["h.StartAutoAgon(ctx)"]
     end
 
     A1 --> A2 --> B1 --> B2 --> B3 --> B4
-    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6
+    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7
 ```
 
 ### Recovery Scans
@@ -66,7 +67,7 @@ Before watchers begin, two recovery operations run synchronously:
 
 All handler-level watchers follow one of two patterns:
 
-**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, and auto-submitter call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
+**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, auto-submitter, and auto-agon call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
 
 ```go
 // Auto-promoter pattern
@@ -126,9 +127,9 @@ flowchart TD
     Deps -->|yes| Promote["Promote to in_progress<br/>launch runner.Run"]
 ```
 
-`WALLFACER_MAX_PARALLEL` defaults to 5. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit. Autoimplement state is toggled via `PUT /api/config {"autoimplement": true/false}` and does not persist across restarts.
+`WALLFACER_MAX_PARALLEL` defaults to 5; a workspace's `MaxParallel` field (workspaces.json) overrides it for that workspace only. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit.
 
-Concurrency limit is read from `WALLFACER_MAX_PARALLEL` in the env file (default: 5). Autoimplement is off by default and does not persist across server restarts.
+Autoimplement is off by default and is toggled via `PUT /api/config {"autoimplement": true/false}`. The autoimplement/autotest/autosubmit/autosync toggles are persisted per workspace (`persistCurrentGroupToggles` writes them to the viewed workspace's record), so switching away and back does not reset them, and a different workspace on the same server stays manual unless automation is turned on for it explicitly. The autopush toggle persists to the `.env` file instead, since push credentials are global.
 
 Tasks whose `DependsOn` list contains any task not yet in `done` status are skipped by the auto-promoter even when the in-progress count is below `WALLFACER_MAX_PARALLEL`.
 
@@ -185,9 +186,24 @@ After reviewing the verdict, the user can:
 
 ## Auto-Submit
 
-Auto-submit is part of the autoimplement pipeline. When enabled via `PUT /api/config {"autosubmit": true}`, the `StartAutoSubmitter` watcher monitors tasks that reach `waiting` state with a passing test verdict. It automatically marks them as done, triggering the commit-and-push pipeline without manual intervention.
+Auto-submit is part of the autoimplement pipeline. When enabled via `PUT /api/config {"autosubmit": true}`, the `StartAutoSubmitter` watcher monitors tasks that reach `waiting` state and marks eligible ones as done, triggering the commit-and-push pipeline without manual intervention.
 
-This completes the autonomous loop: autoimplement promotes → agent executes → auto-tester verifies → auto-submit commits.
+The submit gate depends on which verifier owns the task (`internal/handler/tasks_autoimplement.go`):
+
+- **Test gate (default)**: the task's `LastTestResult` is `"pass"`, or the task completed naturally (`stop_reason = "end_turn"`, never tested) while auto-test is off. Tasks that failed testing are never auto-submitted.
+- **Agon gate**: when agon supersedes the test agent for the task (`agonSupersedesTest`: the agon toggle is on and the task has a `SessionID` to fork from), the gate is a clean agon verdict (`AgonUnresolved == 0`). The test-pass and natural-complete shortcuts do not apply; agon must clear the task first.
+
+This completes the autonomous loop: autoimplement promotes → agent executes → auto-tester (or auto-agon) verifies → auto-submit commits.
+
+## Auto-Agon
+
+`StartAutoAgon` is the seventh watcher. When the `agon` runtime toggle is on (`PUT /api/config {"agon": true}`; off by default), it picks up untested `waiting` tasks and launches adversarial agon verification runs (`internal/adversarial`) instead of the plain test agent. At most `maxConcurrentAgon` (2) agon runs execute at once, with an in-flight set deduplicating repeated wake signals.
+
+Agon supersedes the test agent only for tasks that have a `SessionID` the verifier can fork from; session-less tasks fall back to the ordinary test agent. When agon owns a task, the auto-tester skips it (so the two verifiers never both run) and the auto-submitter gates on the agon verdict as described above. Run depth is tuned via `WALLFACER_AGON_FORKS`, `WALLFACER_AGON_ROUNDS`, and `WALLFACER_AGON_COST_CAP`.
+
+## Auto-Push
+
+Auto-push is not a watcher. After a successful commit pipeline, `Runner.maybeAutoPush` (`internal/runner/commit.go`) pushes each affected repo that is at least `WALLFACER_AUTO_PUSH_THRESHOLD` commits ahead of its upstream, when `WALLFACER_AUTO_PUSH` is enabled. `MaybeAutoPushWorkspace` applies the same policy to a single workspace outside the commit path.
 
 ## Auto-Retry
 
@@ -220,7 +236,7 @@ See [Task Lifecycle](task-lifecycle.md#auto-retry) for retry history and data mo
 
 The `StartWaitingSyncWatcher` monitors tasks in `waiting` or `failed` state and rebases their worktrees onto the latest default branch when upstream changes are detected. This keeps task branches up-to-date without merging, reducing conflict risk when the commit pipeline eventually runs.
 
-Multiple workspace paths can be passed at startup or switched at runtime via `PUT /api/workspaces`. For each workspace:
+Multiple workspace paths can be passed at startup (`WALLFACER_WORKSPACES`) or switched at runtime via `POST /api/workspaces/{id}/activate`. For each workspace folder:
 
 - Git status is polled independently and shown in the UI header
 - A separate worktree is created per task per workspace
@@ -265,7 +281,7 @@ The generator reads the task's trace events, passes them to the Claude API with 
 
 ## Recurring idea generation
 
-There is no dedicated ideation watcher. Recurring idea generation is an ordinary [RoutineEngine](#routineengine) routine: a routine card on the `implement` flow whose prompt asks the agent to scan the repository and create tasks. Each fire spawns a normal task through the standard task-and-flow dispatch path. Legacy records written before the idea-agent subsystem was removed carry `Kind = "idea-agent"` or `FlowID = "brainstorm"`; both resolve to the default `implement` flow (the registry falls back when a pinned slug no longer names a registered flow), so existing routines keep firing.
+There is no dedicated ideation watcher and no separate ideation engine. Recurring idea generation is an ordinary [RoutineEngine](#routineengine) routine tagged `system:ideation`: a routine card on the `implement` flow whose prompt asks the agent to scan the repository and create tasks. Each fire spawns a normal task through the standard task-and-flow dispatch path. Legacy records written before the idea-agent subsystem was removed carry `Kind = "idea-agent"` or `FlowID = "brainstorm"`; both resolve to the default `implement` flow (`internal/flow/registry.go` falls back to `implement` when a pinned slug no longer names a registered flow), so existing routines keep firing.
 
 ## Conflict Resolution
 
@@ -288,7 +304,7 @@ Using the same session ID means the agent has full context of the original task 
 
 ## Circuit Breakers
 
-Agent launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when agent launches are persistently failing.
+Agent launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when agent launches are persistently failing. The `CONTAINER` in the env var names (and the `wallfacer_circuit_breaker_open` gauge's container-era comments) is legacy vocabulary; the breaker guards host-process launches.
 
 The circuit breaker lifecycle:
 
@@ -296,7 +312,7 @@ The circuit breaker lifecycle:
 2. **Open** (tripped): After the threshold is exceeded, all launches are rejected for the open duration (`WALLFACER_CONTAINER_CB_OPEN_SECONDS`, default: 30 seconds).
 3. **Half-open** (probing): After the open duration expires, a single probe launch is allowed. Success resets the breaker to closed; failure re-opens it.
 
-See [Circuit Breakers](../guide/circuit-breakers.md) for full details.
+See the circuit-breaker section of the [Automation](../guide/automation.md) guide for full details.
 
 ## See Also
 

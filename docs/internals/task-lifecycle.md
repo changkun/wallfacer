@@ -191,9 +191,11 @@ After reviewing the verdict, the user can:
 - Provide feedback to fix issues, then re-test
 - Cancel the task
 
+**Agon supersedes the test agent** when the `agon` runtime toggle is on and the task has a `SessionID` to fork from (`agonSupersedesTest`, `internal/handler/tasks_autoimplement.go`). For such tasks the auto-tester skips the task and the auto-submitter gates on a clean agon verdict (`AgonUnresolved == 0`) instead of `LastTestResult`. Session-less tasks always fall back to the test agent.
+
 ## Autoimplement
 
-See [Automation](automation.md).
+Seven background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, routine engine, waiting-sync, auto-tester, auto-submitter, and auto-agon. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
 
 ## Board Context
 
@@ -269,7 +271,7 @@ Tasks can declare dependencies on other tasks via `DependsOn []string` (a list o
 
 2. **Prompt validation**: Every task must have a non-empty prompt.
 
-3. **Flow validation**: Each task's `flow` field is optional on input but normalises to `implement` when omitted; unknown flow slugs are rejected at dispatch time by the runner. The deprecated `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400; see the [Agents & Flows](../guide/agents-and-flows.md) guide for the migration path.
+3. **Flow validation**: Each task's `flow` field is optional on input but normalises to `implement` when omitted; unknown flow slugs are rejected at dispatch time by the runner. The deprecated `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400; see the [Agent Graph](../guide/agent-graph.md) guide for the migration path.
 
 4. **Dependency reference resolution**: Each `depends_on_refs` entry must be either a known batch ref or a syntactically valid UUID.
 

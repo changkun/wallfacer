@@ -1,238 +1,113 @@
-# Workspaces & Git
+# Workspaces and Git
 
-Workspaces are the directories containing your source code that Wallfacer runs tasks against. Each workspace is an independent project directory on your host machine. Wallfacer supports using multiple workspaces simultaneously, organising them into switchable groups, and providing full git integration -- branch management, sync, push, worktree isolation, and automatic conflict resolution -- all from the web UI.
+A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board, chat sessions, the whiteboard, and analytics are all scoped per workspace. This guide covers the workspace model, day-to-day workspace management, the git machinery underneath task execution, and the GitHub integration.
 
----
+## The workspace model
 
-## Essentials
+Each workspace has a stable identity (a UUID assigned once) and a mutable folder set. The identity, not the folder list, owns the task history: renaming a workspace or re-pointing it at different folders keeps every task, session, and whiteboard scene attached to it. Workspaces are persisted in `~/.wallfacer/workspaces.json` (older `workspace-groups.json` installations are migrated automatically on startup).
 
-### Key Concepts
+Per-workspace settings:
 
-| Concept | Description |
-|---|---|
-| **Workspace** | An absolute host directory a task runs against. Each task gets its own git worktree of the workspace as its working directory. Can be a git repository or a plain directory. |
-| **Workspace group** | A saved combination of one or more workspaces. Groups are listed in the sidebar workspace switcher (the **W** button near the top of the left sidebar). Switching groups switches the entire task board. |
-| **Default branch** | The branch currently checked out in a workspace (e.g. `main`, `develop`). Task branches are created from the default branch HEAD and merged back into it when the task completes. |
+- **Parallel caps**: a maximum number of concurrently running tasks and test runs for the workspace. Leave a cap empty to inherit the global default (`WALLFACER_MAX_PARALLEL`); see [Configuration](configuration.md).
+- **Name**: an optional display name; unnamed workspaces show their folder basenames.
 
-### Setting Up Workspaces
+Folders can be git repositories or plain directories; both work (see non-git folders below).
 
-#### From the command line
+### Dormant workspaces
 
-On startup, Wallfacer restores the most recently used workspace group from your previous session. If no saved group exists, it starts with no active workspaces, select them from the UI workspace picker.
+When the startup migration finds task history on disk that no longer matches any live workspace, it adopts that history as a dormant workspace, with the original folders recovered on a best-effort basis. A dormant workspace keeps its recovered history but is excluded from activation until it is pointed at folders again; editing its folder set reactivates it.
 
-#### Workspace browser
+## Managing workspaces
 
-The workspace browser is a modal dialog for selecting workspace directories from the UI. Open it from the header **+** tab or **Settings > Workspace**.
+### Switching
 
-Features:
+The switcher at the top of the sidebar lists every workspace. The active one is marked; rows show running and waiting task badges so workspaces with live work stand out. Click a row to switch: the board, streams, and stores swap over within a few seconds. Tasks in the previous workspace keep running in the background.
 
-- **Breadcrumb navigation** -- click any segment of the current path to jump to that directory
-- **Path input** -- type or paste an absolute path and press Enter to navigate directly
-- **Directory listing** -- shows all subdirectories with a **git** badge on those that are git repositories
-- **Hidden files toggle** -- show or hide dotfiles (directories starting with `.`)
-- **Filter** -- type in the filter field to narrow the directory list by name
-- **Add button** -- click **+ Add** next to any directory to add it to the selection, or click **Add current folder** to add the directory you are currently browsing
-- **Selection summary** -- the left panel shows all selected directories with remove buttons
+### Creating
 
-Click **Apply** to switch to the selected workspaces. The server validates every path and creates the necessary data directories.
+Click **Add workspace** in the switcher to open the picker, a two-step wizard:
 
-### Git Status and Basic Operations
+1. **Choose folders**: browse the filesystem with breadcrumb navigation, a direct path input, a name filter, and a hidden-folders toggle. Git repositories carry a badge. Add one or more folders to the selection.
+2. **Name and activate**: give the workspace an optional name, review the folder list, and activate.
 
-#### Git status display
+### Editing
 
-When workspaces are git repositories, the header bar shows compact status chips for each workspace:
+Open the edit control on a workspace row (in the switcher or the picker list) to open the workspace settings popup. It edits the name, the folder set (via the same folder browser), and the parallel caps, and offers deletion. Name changes save on confirm; folder and cap changes persist immediately.
 
-- **Repository name** -- links to the remote URL (GitHub, GitLab, etc.) when a remote is configured
-- **Branch name** -- a clickable dropdown for switching branches
-- **Ahead badge** (e.g. `3 up-arrow`) -- the number of local commits not yet pushed
-- **Behind badge** (e.g. `2 down-arrow`) -- the number of upstream commits not yet pulled
+### Deleting
 
-Status updates are streamed via Server-Sent Events (SSE) and refresh every 5 seconds, so the display stays current without manual polling.
+Deleting a workspace permanently removes it and wipes its session data; tasks and history do not survive. Deleting the active workspace switches the board to the next usable workspace (or the empty state).
 
-#### Push
+### Environment variable
 
-When a workspace has commits ahead of the upstream, a **Push** button appears next to the ahead badge. Clicking it runs `git push` on the workspace. If the push fails due to non-fast-forward, the UI suggests syncing first.
+`WALLFACER_WORKSPACES` in `~/.wallfacer/.env` records the active folder set (OS path-list separated) and is updated automatically on switch, so the same workspace comes back after a restart.
 
-#### Sync
+## Git integration
 
-When a workspace is behind the upstream, a **Sync** button appears. Clicking it runs `git fetch` followed by `git rebase @{u}` on the workspace. If a rebase conflict occurs, the operation is aborted and you are asked to resolve it manually.
+### Per-task worktrees
 
-Sync is blocked while tasks with worktrees in that workspace are in progress, waiting, committing, or failed (with worktrees still on disk).
+Every task on a git workspace runs in an isolated git worktree so parallel tasks never interfere:
 
-#### Branch switching
+- When a task starts, Wallfacer creates a branch named `task/<id>` (the first 8 characters of the task id) from the current HEAD of each repository.
+- The worktree lives under `~/.wallfacer/worktrees/<task-id>/<repo-name>/` and is the agent's working directory, with no path translation.
+- When the task completes, its changes are committed, rebased onto the default branch, and fast-forward merged; the worktree and branch are then removed. Cancelled tasks release their worktrees immediately.
 
-Click the branch name in a workspace chip to open the branch dropdown. Select a branch from the list to switch, or type in the search field to filter. Branch switching is blocked while tasks are in progress, waiting, committing, or failed with worktrees still on disk.
+See [Git Worktrees](../internals/git-worktrees.md) for the commit pipeline and conflict-resolution internals.
 
-#### Open folder
+### Status, sync, and push
 
-Click a workspace name (when no remote URL is configured) or use the context menu to open the workspace directory in your OS file manager (Finder on macOS, `xdg-open` on Linux).
+For git workspaces, the header shows a status chip per repository: name, current branch, and ahead/behind counts, refreshed by a server-sent stream every few seconds.
 
-### Reviewing Task Changes
+- **Push** appears when local commits are ahead of the upstream and runs `git push`.
+- **Sync** appears when the workspace is behind and runs a fetch plus rebase onto the upstream.
+- **Rebase on main** appears on feature branches and rebases the current branch onto the remote default branch.
 
-Each task works on an isolated branch named `task/<id>`, created from the default branch HEAD. The task's agent makes changes on this branch inside a dedicated git worktree. When a task reaches **Done**, its changes are automatically committed, rebased onto the default branch, and merged via fast-forward. You can view the diff of any task's changes against the default branch from the task detail panel.
+Sync, rebase, branch switching, and branch creation are refused (with the list of blocking tasks) while active tasks still hold worktrees in the workspace, since rewriting the base under a running task would corrupt its rebase later. A rebase that hits conflicts is aborted and reported for manual resolution.
 
----
+### Branches
 
-## Advanced Topics
+Click the branch name in a workspace chip to open the branch dropdown: switch to an existing branch, filter by name, or type a new name and confirm to create a branch.
 
-### Workspace Groups
+### Open folder
 
-Workspace groups let you save and switch between different combinations of workspaces without restarting the server.
+Use the workspace chip's open action to reveal the folder in the OS file manager (Finder on macOS, Explorer on Windows, `xdg-open` on Linux).
 
-#### Workspace switcher
+### Worktree housekeeping
 
-The **W** button near the top of the left sidebar opens the workspace switcher popover, which lists every saved group. The active group is marked with a check. Click a group to switch to it. Wallfacer stops any active SSE streams, resets the board, loads the new group's task store, and reconnects the streams -- all within a few seconds.
+Two background mechanisms keep the worktree directory healthy:
 
-#### Naming groups
+- A garbage collector (daily by default; tune with `WALLFACER_WORKTREE_GC_INTERVAL`) removes worktrees whose tasks are done, cancelled, or archived.
+- A health watcher scans every two minutes and restores missing worktrees for active tasks, recording a restore event on the task timeline.
 
-By default, the switcher shows the basename(s) of the workspace directories (e.g. `repo-a + repo-b`). You can assign a short, readable name to any group:
+### Non-git folders
 
-- Open the sidebar workspace switcher and click the **pencil** (rename) button on a group row to set a name in the prompt dialog.
+Folders that are not git repositories still get change tracking: the task works on a snapshot copy backed by a local git repository, the diff is captured from the snapshot, and changes are extracted back to the original folder on completion. The Changes tab works the same way as for git repositories.
 
-Named groups display the custom name in the switcher. Hover over a group row to see the full workspace paths. To clear a custom name, rename it to an empty string -- the row reverts to the basename fallback.
+## GitHub integration
 
-#### Managing groups
+Wallfacer does not run its own GitHub OAuth flow. It borrows the GitHub connection from the signed-in latere.ai account, where connections are managed centrally.
 
-All group actions live in the sidebar workspace switcher popover (the **W** button), except where Settings is noted.
+Gate: GitHub features require both a signed-in latere.ai account and a GitHub connection on that account. Without either, the GitHub surface stays disabled.
 
-| Action | How |
-|---|---|
-| Switch to a group | Open the switcher and click the group row |
-| Rename a group | Click the **pencil** button on the group row |
-| Delete a group | Click the **×** button on the group row and confirm. Tasks under it stay on disk but are unreachable until the group is recreated |
-| Add a new group | Click **Add workspace…** to open the workspace picker, choose directories, and **Activate** |
-| Set per-group parallel limits | Open **Settings > Workspace** and edit the group's parallel fields |
+### Settings > GitHub
 
-Groups are saved automatically to `~/.wallfacer/workspace-groups.json` whenever a group becomes active. The most recently used group is promoted to the front of the list.
+The GitHub tab in Settings reflects the borrowed connection:
 
-#### Concurrent workspace groups
+- Not signed in: a prompt to sign in via latere.ai.
+- Signed in, not connected: a link to connect GitHub on the latere.ai account page.
+- Signed in and connected: the connected GitHub login and a link to manage connections at latere.ai.
 
-You can switch workspace groups at any time, even while tasks are running. Tasks in the previous group continue executing in the background -- their stores and worktrees are kept alive until all tasks complete. The switcher popover shows per-group task count badges (**N running**, **N waiting**) so you can see at a glance which groups have active work.
+The API mirrors this: `GET /api/github/auth/status` reports availability, connection state, login, permissions, and expiry; `POST /api/github/auth/connect` returns the install URL for the latere.ai GitHub App flow; `POST /api/github/auth/disconnect` clears the borrowed token.
 
-### Branch Management
+### What it enables
 
-Click the branch name in a workspace chip to open the branch dropdown:
+With a connection in place, the task detail modal shows a PR panel for tasks whose branch was pushed to a github.com repository:
 
-| Action | How |
-|---|---|
-| Switch branch | Select a branch from the list |
-| Filter branches | Type in the search field |
-| Create a new branch | Type a name that does not match any existing branch, then click "Create branch" or press Enter |
+- **Create PR** opens a pull request for the task branch; the title defaults from the task and the body from its commit message.
+- The panel shows the PR's link and state, and posts comments to the PR from the task view.
 
-Branch switching and creation are blocked while tasks are in progress, waiting, committing, or failed with worktrees still on disk.
+Repository-level endpoints for creating pulls and comments exist for automation (`POST /api/github/pulls`, `POST /api/github/comments`).
 
-#### Rebase on Main
+## See also
 
-When you are on a feature branch, a **Rebase on main** button appears. It fetches the remote default branch (e.g. `origin/main`) and rebases your current branch on top of it. This is useful when you want to incorporate upstream changes from the main branch into a feature branch. The button shows the behind-main count when your branch is behind.
-
-Like Sync, this operation is blocked while tasks depend on the workspace's git state.
-
-### Git Worktrees
-
-Every task runs on an isolated git branch and worktree, so multiple tasks can work on the same repository simultaneously without conflicts.
-
-#### How worktrees are created
-
-```mermaid
-flowchart LR
-    main["main branch"]
-    main --> a["task-abc worktree (isolated)"]
-    main --> b["task-def worktree (isolated)"]
-    main --> c["task-ghi worktree (isolated)"]
-```
-
-When a task moves to **In Progress**:
-
-1. Wallfacer creates a new branch named `task/<first-8-chars-of-task-id>` from the current HEAD of each workspace
-2. A git worktree is created at `~/.wallfacer/data/<workspace-key>/worktrees/<task-id>/<repo-name>/`
-3. The agent runs as a host process with that worktree as its working directory (CWD)
-
-The worktree path on disk is the path the agent sees, with no path translation, so the diffs and file paths the agent produces map directly back to your repository.
-
-For non-git workspaces, a snapshot copy is created instead, with a local git repository initialised for change tracking. When the task completes, the diff is captured from the snapshot before changes are extracted back to the original directory, so the diff view works for non-git workspaces too.
-
-#### Worktree lifecycle
-
-- **In Progress / Waiting / Failed** -- the worktree exists on disk and can be inspected
-- **Done** -- after the commit pipeline completes, the worktree and branch are deleted
-- **Cancelled** -- the worktree and branch are deleted immediately
-
-If the server restarts while tasks are in progress, it recovers worktrees by reattaching to existing branches.
-
-### The Commit Pipeline
-
-When a task reaches **Done** (either by the agent finishing its work or by the user clicking "Mark Done"), Wallfacer runs a three-phase commit pipeline:
-
-#### Phase 1: Stage and commit
-
-1. All uncommitted changes in every worktree are staged (`git add -A`)
-2. A commit message is generated by a lightweight agent (the `commit-msg` builtin) that analyses the diff stats, the task prompt, and the repository's recent commit style
-3. Changes are committed on the task branch in each worktree
-
-If commit message generation fails, a fallback message is constructed from the task prompt.
-
-#### Phase 2: Rebase and merge
-
-For each workspace (serialised per repository to avoid races):
-
-1. The task branch is rebased onto the default branch
-2. If the rebase succeeds, the default branch is fast-forward merged to the task branch tip
-3. Commit hashes are recorded for later reference
-
-If a rebase conflict occurs, Wallfacer invokes a conflict-resolution agent (see below). Up to 3 rebase attempts are made.
-
-#### Phase 3: Cleanup
-
-1. The git worktree is removed
-2. The task branch is deleted
-3. The task's worktree directory is removed from disk
-
-### Conflict Resolution
-
-When the rebase in Phase 2 encounters a merge conflict, Wallfacer handles it automatically:
-
-1. The failed rebase is aborted, leaving the worktree in a clean state on the task branch
-2. A conflict-resolution agent is launched as a host process with the conflicted worktree as its working directory
-3. The agent is given a specialised conflict-resolution prompt instructing it to start the rebase, resolve all conflicts, and complete the rebase with `git rebase --continue`
-4. If the agent succeeds, the commit pipeline retries the rebase
-
-This process repeats for up to 3 attempts. If all attempts fail, the task is marked **Failed**. You can then inspect the task's event timeline to see what went wrong.
-
-Conflict resolution is triggered in two contexts:
-
-- **Commit pipeline** -- when a completed task's branch conflicts with the default branch during the final merge
-- **Task sync** -- when rebasing a waiting or failed task's worktree onto the latest default branch (see below)
-
-### Syncing Tasks
-
-While a task is in the **Waiting** or **Failed** state, you can sync its worktrees to incorporate changes that other tasks have merged into the default branch since this task started. Click **Sync** in the task detail panel.
-
-Syncing runs `git rebase` on the task's worktree against the default branch. If conflicts are encountered, the same agent-driven conflict resolution described above is used (up to 3 attempts).
-
-The **Catch up** automation toggle (in Settings > Execution) can automatically rebase waiting tasks onto the latest branch whenever it advances, preventing merge conflicts.
-
-### Auto-Push
-
-After the commit pipeline completes, Wallfacer can optionally push each workspace to its remote. Auto-push is controlled by the `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD` environment variables; see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference) for defaults. It can also be toggled from the **Automation** menu in the header.
-
-### Repository Instructions (AGENTS.md / CLAUDE.md)
-
-Each task runs with its git worktree as the working directory, so agents read each repository's own `AGENTS.md` or `CLAUDE.md` natively. Add those files to your repos to give agents per-repo guidance; Wallfacer does not generate or inject a separate workspace-level instructions file.
-
-### Environment Variable
-
-Set `WALLFACER_WORKSPACES` in `~/.wallfacer/.env` to persist workspaces across restarts. Paths are separated by the OS path-list separator (`:` on macOS/Linux, `;` on Windows):
-
-```
-WALLFACER_WORKSPACES=/Users/you/project-a:/Users/you/project-b
-```
-
-When you switch workspaces in the UI, this variable is updated automatically.
-
-For the full HTTP API reference (workspace and git endpoints), see [API & Transport](../internals/api-and-transport.md). For the `WALLFACER_WORKSPACES`, `WALLFACER_AUTO_PUSH`, and `WALLFACER_AUTO_PUSH_THRESHOLD` env vars, see [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
-
----
-
-## See Also
-
-[Board & Tasks](board-and-tasks.md) for task lifecycle details, [Automation](automation.md) for autoimplement and auto-sync settings, [Configuration](configuration.md) for the full environment variable reference.
+[Getting Started](getting-started.md) for first-run setup, [Concepts](concepts.md) for how workspaces relate to tasks and specs, [Board](board.md) for the task lifecycle, [Configuration](configuration.md) for parallelism and push settings, and [Workspaces & Config internals](../internals/workspaces-and-config.md) for the storage layout.

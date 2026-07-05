@@ -4,7 +4,7 @@ These documents are for maintainers and contributors who need to understand how 
 
 Agents run as host processes: the runner execs the selected CLI directly with the task's git worktree as the working directory (`internal/executor/host.go`). There is no container daemon, image pull, or bind-mount at runtime.
 
-For the cloud control plane (identity, tenancy, deployment topology), see [Cloud Mode](../cloud/README.md).
+For the cloud control plane (identity, tenancy, deployment topology), see [Auth & Identity](auth-and-identity.md).
 
 ## Reading Order
 
@@ -12,9 +12,9 @@ For the cloud control plane (identity, tenancy, deployment topology), see [Cloud
 
 [Architecture](architecture.md)
 
-System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop and the engine). Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
+System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop, the engine, and the agentic topos path). Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
 
-For a user-facing treatment of the same primitives (how to clone an agent, what the Harness pin does, recipes), see the [Agents & Flows](../guide/agents-and-flows.md) guide.
+For a user-facing treatment of the same primitives (how to clone an agent, what the Harness pin does, recipes), see the [Agent Graph](../guide/agent-graph.md) guide.
 
 ### 2. Data & Storage
 
@@ -40,25 +40,37 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, agent session, spec tree, explorer, image, and OAuth endpoints.
 
-### 6. Automation
+### 6. Auth & Identity
+
+[Auth & Identity](auth-and-identity.md)
+
+Identity end to end: OIDC browser login and the session cookie, the RFC 8628 device flow (in-UI modal, `wallfacer auth` CLI, shared token store), the middleware chain, principal context and actor attribution, what sign-in enables (coordination connector, GitHub broker, org switching), and cloud mode (forced login, org isolation, superadmin gates, the sandbox trust-plane proxy, wallfacerd).
+
+### 7. Automation
 
 [Automation](automation.md)
 
-Background watchers, the autoimplement promotion loop, auto-test, auto-submit, auto-retry, circuit breakers, routine scheduling, and startup sequence.
+Background watchers, the autoimplement promotion loop, auto-test, auto-agon, auto-submit, auto-retry, circuit breakers, routine scheduling, and startup sequence.
 
-### 7. Plan Mode
+### 8. Agent Graph Runtime
+
+[Agent Graph Runtime](agent-graph-runtime.md)
+
+The embedded topos runtime: the `internal/agentgraph` import seam and its boundary test, model resolution (fake / Lux gateway / direct key), the two execution paths (agentic flows and the native in-process `topos` harness), lineage persistence and the live trace mapping onto the task timeline, and the agent/flow CRUD surface behind `/agent-graph`.
+
+### 9. Plan Mode
 
 [Plan Mode](plan-mode.md)
 
 Spec document model, spec tree building, agent-session sandbox, slash commands, dispatch pipeline, archive/unarchive, planning undo via git revert, and the SSE spec tree stream.
 
-### 8. Workspaces & Configuration
+### 10. Workspaces & Configuration
 
 [Workspaces & Configuration](workspaces-and-config.md)
 
 Workspace manager, harness routing, system prompt templates, environment configuration, runtime workspace switching, and AGENTS.md instructions.
 
-### 9. Development Setup
+### 11. Development Setup
 
 [Development Setup](development.md)
 

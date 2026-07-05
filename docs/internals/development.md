@@ -6,7 +6,7 @@ This guide is for contributors who want to build Wallfacer from source, run test
 
 - **Go 1.26+**, [go.dev](https://go.dev/)
 - **`golangci-lint` 2.11.3**, pinned to match CI and local `make lint-go`
-- **`claude` CLI** (and optionally `codex` and `cursor-agent`) on your `PATH`, tasks exec the selected CLI directly as a host process
+- **`claude` CLI** (and optionally `codex`, `cursor-agent`, `opencode`, and `pi`) on your `PATH`, tasks exec the selected CLI directly as a host process
 - **Bun**, for frontend install, build, typecheck, and tests
 - **A Claude credential**, OAuth token (`claude setup-token`) or API key from [console.anthropic.com](https://console.anthropic.com/)
 
@@ -21,7 +21,7 @@ cd wallfacer
 go build -o wallfacer .
 ```
 
-`make build` runs the full gate (fmt + lint + frontend build + binary). At runtime the server execs the selected CLI directly as a host process, with the task's git worktree as the working directory; the binary per task is set via the `WALLFACER_AGENT` env var (`claude`, `codex`, or `cursor`).
+`make build` runs the full gate (fmt + lint + frontend build + binary). At runtime the server execs the selected CLI directly as a host process, with the task's git worktree as the working directory; the binary per task is set via the `WALLFACER_AGENT` env var (`claude`, `codex`, `cursor`, `opencode`, or `pi`).
 
 ## Configure Credentials
 
