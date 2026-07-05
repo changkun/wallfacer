@@ -1,0 +1,51 @@
+/* Scroll-fade — the visual half of the v-scrollfade directive. A container that
+   opts in gets a thin, initially-invisible scrollbar that fades in while it is
+   scrolled (.is-scrolling, toggled by the directive) or hovered, then fades out
+   again. Styling the scrollbar opts the element out of native overlay bars, so
+   this behaviour is applied only where explicitly requested, never globally. */
+
+.scrollfade {
+  /* Firefox: a thin bar that is transparent until the class/hover flips it. No
+     transition (Firefox does not animate scrollbar-color), but it hides/shows. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.scrollfade.is-scrolling,
+.scrollfade:hover {
+  scrollbar-color: var(--scrollfade-thumb, color-mix(in oklab, var(--ink) 22%, transparent)) transparent;
+}
+
+/* WebKit/Blink: the thumb is present but transparent; background-color animates
+   (opacity on the thumb pseudo-element does not), so fading it is the reveal. */
+.scrollfade::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollfade::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollfade::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  transition: background-color 240ms ease;
+}
+
+.scrollfade.is-scrolling::-webkit-scrollbar-thumb,
+.scrollfade:hover::-webkit-scrollbar-thumb {
+  background-color: var(--scrollfade-thumb, color-mix(in oklab, var(--ink) 22%, transparent));
+}
+
+.scrollfade:hover::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollfade-thumb-hover, color-mix(in oklab, var(--ink) 36%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrollfade::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
