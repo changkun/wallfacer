@@ -2,10 +2,37 @@ package handler
 
 import (
 	"os/exec"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"latere.ai/x/wallfacer/internal/store"
 )
+
+// TestPRTitleForTask_MultibyteTruncation guards against slicing a multi-byte
+// (CJK) prompt at a raw byte boundary, which would cut a rune in half and yield
+// an invalid-UTF-8 PR title. The leading "a" shifts the 72-byte boundary into
+// the middle of a 3-byte rune; without rune-aware truncation the result is not
+// valid UTF-8.
+func TestPRTitleForTask_MultibyteTruncation(t *testing.T) {
+	task := &store.Task{Prompt: "a" + strings.Repeat("世", 100)}
+	got := prTitleForTask(task)
+	if !utf8.ValidString(got) {
+		t.Fatalf("PR title is not valid UTF-8: %q", got)
+	}
+	if n := utf8.RuneCountInString(got); n != 72 {
+		t.Errorf("title rune count = %d, want 72", n)
+	}
+}
+
+// TestPRTitleForTask_ShortPromptUnchanged confirms sub-limit prompts pass
+// through untouched (first line only).
+func TestPRTitleForTask_ShortPromptUnchanged(t *testing.T) {
+	task := &store.Task{Prompt: "  fix the parser\nmore detail  "}
+	if got := prTitleForTask(task); got != "fix the parser" {
+		t.Errorf("title = %q, want %q", got, "fix the parser")
+	}
+}
 
 // gitRepoWithOrigin creates a temp git repo with the given origin remote and a
 // committed default branch, returning its path.
