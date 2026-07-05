@@ -279,6 +279,19 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		})
 	}
 
+	// Wire the RFC 8628 device-code sign-in driver behind /api/auth/device/*.
+	// It reuses authClient (same OIDC client, so the session cookie it mints on
+	// completion is encrypted with the same key the browser /callback uses) and
+	// the shared file token store (so a device login also lights up the
+	// coordination connector and GitHub broker, and carries over to the `latere`
+	// CLI). Local mode only: cloud deployments force the /login browser flow
+	// (ForceLogin) and have no writable per-user token store, so the endpoints
+	// stay 503 there — which is also the signal the SPA uses to fall back to the
+	// /login redirect instead of showing the device modal.
+	if !cloudMode && authClient != nil && coordTokenStore != nil {
+		h.SetDeviceAuth(&handler.DeviceAuth{OIDC: authClient, Store: coordTokenStore})
+	}
+
 	// Wire the live GitHub broker: wallfacer fetches the principal's GitHub
 	// token from the ../auth self endpoint using the signed-in user's OIDC
 	// token (the same token the coordination connector reads). With it set,
