@@ -2,6 +2,8 @@
 import { useHead } from '@unhead/vue';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
 import HarnessLogo from '../components/HarnessLogo.vue';
+import HeroSim from '../components/site/HeroSim.vue';
+import AutonomySpectrum from '../components/site/AutonomySpectrum.vue';
 import { harnessLabel } from '../lib/harness';
 import { useT } from '../i18n';
 import { useReveal } from '../composables/useReveal';
@@ -22,13 +24,15 @@ function copyInstall() {
   <DefaultLayout>
     <div class="wallfacer-page">
       <section class="product-hero">
+        <div class="hero-aura" aria-hidden="true" />
+        <div class="hero-grid" aria-hidden="true" />
         <div class="section-container">
           <div class="product-hero-text">
+            <span class="hero-eyebrow">{{ t('wf.hero.eyebrow') }}</span>
             <h1 v-html="t('wf.hero.title')"></h1>
             <p v-html="t('wf.hero.sub')"></p>
           </div>
-          <img src="/static/overview-kanban.png" alt="Wallfacer task board" class="product-hero-img shot--light">
-          <img src="/static/overview-kanban-dark.png" alt="Wallfacer task board" class="product-hero-img shot--dark">
+          <HeroSim class="product-hero-sim" />
           <div class="download-row">
             <div class="download-icons">
               <a href="https://github.com/changkun/wallfacer/releases/latest" class="download-icon-btn" target="_blank" rel="noopener" title="macOS">
@@ -43,6 +47,12 @@ function copyInstall() {
             </div>
             <span class="download-or" v-html="t('wf.download.or')"></span>
             <div class="install-block" style="margin:0;"><code>curl -fsSL https://latere.ai/wallfacer/install.sh | sh</code><button class="copy-btn" @click="copyInstall" title="Copy"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div>
+          </div>
+          <div class="hero-harness-strip">
+            <span class="hero-harness-label">{{ t('wf.harness.label') }}</span>
+            <span v-for="h in harnesses" :key="h" class="hero-harness-item" :title="harnessLabel(h)">
+              <HarnessLogo :harness="h" :size="18" />
+            </span>
           </div>
         </div>
       </section>
@@ -79,6 +89,15 @@ function copyInstall() {
               <p v-html="t('wf.feat.6.desc')"></p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="section section--spectrum">
+        <div class="section-container">
+          <span class="section-label" v-html="t('wf.spectrum.label')"></span>
+          <h2 class="spectrum-heading">{{ t('wf.spectrum.title') }}</h2>
+          <p class="spectrum-subline">{{ t('wf.spectrum.sub') }}</p>
+          <AutonomySpectrum />
         </div>
       </section>
 
@@ -214,43 +233,122 @@ function copyInstall() {
 </template>
 
 <style scoped>
-/* Free-form, Apple-leaning landing: airy rhythm, big type, frameless
-   imagery, and harness logos that float as a row instead of sitting in
-   bordered cards. Scoped to .wallfacer-page so other pages keep the
-   shared section/hero styles. */
+/* Indigo-on-zinc landing: airy rhythm, big display type, one animated
+   product simulation as the hero visual, glow auras instead of borders.
+   Scoped to .wallfacer-page so other pages keep the shared styles. */
 
-/* Generous vertical rhythm */
 .section {
   padding: 80px 0;
 }
 .product-hero {
-  padding: 72px 0 28px;
+  position: relative;
+  padding: 84px 0 36px;
+  overflow: hidden;
 }
 
-/* Bigger, calmer hero headline */
+/* Hero backdrop: radial indigo aura + fading dot grid. */
+.hero-aura {
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 75%;
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 12%, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-grid {
+  position: absolute;
+  inset: 0 0 30%;
+  background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 85%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 85%);
+  pointer-events: none;
+}
+.product-hero .section-container { position: relative; }
+
+.hero-eyebrow {
+  display: inline-block;
+  margin-bottom: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .product-hero-text {
   margin-bottom: 44px;
 }
 .product-hero-text :deep(h1) {
-  font-size: clamp(2.2rem, 5.5vw, 3.6rem);
-  letter-spacing: -0.045em;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5.5vw, 3.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
   line-height: 1.04;
 }
 .product-hero-text :deep(p) {
   font-size: clamp(1rem, 2.2vw, 1.2rem);
   color: var(--text-secondary);
   max-width: 42ch;
-  margin: 16px auto 0;
+  margin: 18px auto 0;
   line-height: 1.5;
 }
 
+.product-hero-sim {
+  max-width: 860px;
+  margin: 0 auto 40px;
+}
+
+/* Harness mini-strip under the install row. */
+.hero-harness-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 34px;
+  opacity: 0.75;
+}
+.hero-harness-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-right: 6px;
+}
+.hero-harness-item { display: inline-flex; color: var(--ink-3); }
+
+/* Autonomy spectrum section */
+.section--spectrum {
+  background:
+    radial-gradient(ellipse 50% 60% at 50% 100%, var(--accent-glow) 0%, transparent 70%),
+    var(--bg-surface);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.spectrum-heading {
+  margin: 12px 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.5vw, 2.6rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.spectrum-subline {
+  margin: 0 auto 44px;
+  max-width: 52ch;
+  text-align: center;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
 /* Frameless, floating product imagery (no border) */
-.product-hero-img,
 .tour-screenshot :deep(img) {
   border: none;
   border-radius: 16px;
   box-shadow: 0 40px 90px -28px var(--accent-glow-strong, rgba(0, 0, 0, 0.28)),
-    0 10px 28px rgba(0, 0, 0, 0.08);
+    0 10px 28px rgba(9, 9, 18, 0.08);
 }
 
 /* Borderless install line */
@@ -263,9 +361,10 @@ function copyInstall() {
 /* Larger section headlines */
 .harness-heading {
   margin: 12px 0 8px;
+  font-family: var(--font-display);
   font-size: clamp(1.9rem, 3.5vw, 2.6rem);
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   text-align: center;
 }
 .harness-sub {
@@ -302,5 +401,25 @@ function copyInstall() {
   font-weight: 500;
   color: var(--text-secondary);
   letter-spacing: 0.01em;
+}
+
+/* Capability cards get a hover lift + glow. */
+.cap-grid :deep(.cap-item),
+.cap-grid .cap-item {
+  border-radius: 12px;
+  padding: 18px 18px 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.cap-grid .cap-item:hover {
+  background: var(--bg-card);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -12px var(--accent-glow-strong), var(--sh-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .harness-card,
+  .cap-grid .cap-item {
+    transition: none;
+  }
 }
 </style>
