@@ -15,6 +15,22 @@ import ChatModelBadge from '../components/plan/ChatModelBadge.vue';
 
 const chat = useChatSession();
 
+// Fold the session sub-sidebar to a thin rail, mirroring the Board's file
+// explorer and the Plan spec tree: collapsed, a left-edge strip advertises that
+// the list can be reopened. Persisted so the choice survives reloads.
+const SESSIONS_COLLAPSED_KEY = 'wallfacer-chat-sessions-collapsed';
+const sessionsCollapsed = ref<boolean>(
+  typeof localStorage !== 'undefined' && localStorage.getItem(SESSIONS_COLLAPSED_KEY) === '1',
+);
+function collapseSessions() {
+  sessionsCollapsed.value = true;
+  if (typeof localStorage !== 'undefined') localStorage.setItem(SESSIONS_COLLAPSED_KEY, '1');
+}
+function expandSessions() {
+  sessionsCollapsed.value = false;
+  if (typeof localStorage !== 'undefined') localStorage.setItem(SESSIONS_COLLAPSED_KEY, '0');
+}
+
 // Entry screen while the active session has no messages; the first user bubble
 // flips this to the conversation view, producing the centered→docked morph.
 const showEntry = computed(() => chat.renderedMessages.value.length === 0);
@@ -48,7 +64,40 @@ function applyQuick(insert: string) {
 
 <template>
   <div class="chat-page">
-    <SessionList :session="chat" />
+    <SessionList v-if="!sessionsCollapsed" :session="chat" @collapse="collapseSessions" />
+    <!-- Collapsed rail: a persistent left-edge affordance to reopen the session
+         list, occupying the same slot the list would. Mirrors the Board explorer
+         and Plan spec-tree rails. -->
+    <button
+      v-else
+      type="button"
+      class="chat-sessions-rail"
+      title="Show sessions"
+      aria-label="Show sessions"
+      @click="expandSessions"
+    >
+      <svg
+        class="chat-sessions-rail__icon"
+        width="18" height="18" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"
+      >
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+      <svg
+        class="chat-sessions-rail__chevron"
+        width="13" height="13" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"
+      >
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
 
     <div class="chat-main">
       <Transition name="chat-morph" mode="out-in">
@@ -125,6 +174,32 @@ function applyQuick(insert: string) {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* Collapsed rail: persistent left-edge strip that reopens the session list,
+   matching the Board explorer and Plan spec-tree rails. */
+.chat-sessions-rail {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 0;
+  border: none;
+  border-right: 1px solid var(--rule);
+  background: var(--bg-card);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.chat-sessions-rail:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.chat-sessions-rail__chevron {
+  opacity: 0.55;
 }
 
 /* ── Entry screen ──────────────────────────────────────────────────── */

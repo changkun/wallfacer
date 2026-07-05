@@ -12,6 +12,9 @@ import { bucketForUpdated, SESSION_BUCKETS } from './sessionBuckets';
 import type { ChatSession } from '../../composables/useChatSession';
 
 const props = defineProps<{ session: ChatSession }>();
+// Folding the list to a rail is owned by the parent (ChatPage), which controls
+// the layout slot; this panel only asks to be collapsed. Mirrors SpecTreePanel.
+const emit = defineEmits<{ collapse: [] }>();
 const s = props.session;
 
 const agentStore = useAgentStore();
@@ -68,6 +71,21 @@ onUnmounted(() => {
 
 <template>
   <aside class="chat-sessions">
+    <div class="chat-sessions-bar">
+      <span class="chat-sessions-bar-title">Chats</span>
+      <button
+        type="button"
+        class="chat-sessions-collapse"
+        title="Collapse sessions"
+        aria-label="Collapse sessions"
+        @click="emit('collapse')"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+    </div>
+
     <button
       type="button"
       class="chat-session-new"
@@ -184,6 +202,41 @@ onUnmounted(() => {
   border-right: 1px solid var(--rule);
   background: var(--bg-card);
   padding: 8px;
+}
+
+/* Top bar: a section label plus the collapse chevron that folds the list to a
+   rail (the rail itself lives in ChatPage). Mirrors SpecTreePanel's collapse. */
+.chat-sessions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 6px 10px;
+}
+
+.chat-sessions-bar-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-4);
+}
+
+.chat-sessions-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.chat-sessions-collapse:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 /* New chat — a clean, borderless row aligned with the session list, with a
