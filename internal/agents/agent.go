@@ -72,7 +72,7 @@ type Registry struct {
 	byKey map[string]Role
 }
 
-// NewBuiltinRegistry returns the registry populated with the seven
+// NewBuiltinRegistry returns the registry populated with the five
 // built-in agent roles in registration order.
 func NewBuiltinRegistry() *Registry {
 	return NewRegistry(BuiltinAgents...)
