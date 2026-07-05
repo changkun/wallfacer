@@ -36,7 +36,9 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  run          start the task board server\n")
 	fmt.Fprintf(os.Stderr, "  status       print running board state to terminal\n")
-	fmt.Fprintf(os.Stderr, "  spec         spec document tools (validate, ...)\n")
+	fmt.Fprintf(os.Stderr, "  spec         spec document tools (new, validate)\n")
+	fmt.Fprintf(os.Stderr, "  auth         sign in to latere.ai (login, logout, whoami)\n")
+	fmt.Fprintf(os.Stderr, "  web          start the cloud web server (wallfacerd)\n")
 	fmt.Fprintf(os.Stderr, "  doctor       check prerequisites and configuration\n")
 	fmt.Fprintf(os.Stderr, "\nRun 'wallfacer <command> -help' for more information on a command.\n")
 }

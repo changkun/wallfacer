@@ -194,8 +194,9 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	// GitHub integration: a principal-scoped token store under the config dir
 	// backs /api/github/*. The live broker (the "Latere AI" GitHub App via the
-	// ../auth service) is left nil until that capability ships; status and
-	// disconnect work against the store, and connect reports unavailable.
+	// ../auth service) is wired further down whenever an auth URL is
+	// configured; it activates once the signed-in account has a GitHub
+	// connection. Status and disconnect work against the store either way.
 	if ghStore, gerr := github.NewFileStore(filepath.Join(configDir, "github")); gerr != nil {
 		logger.Main.Warn("github: token store unavailable", "error", gerr)
 	} else {
