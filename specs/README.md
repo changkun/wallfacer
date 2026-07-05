@@ -54,13 +54,13 @@ Local Product - 21 shipped, rest pending (※ = stale, needs refresh)
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback (old), Spatial Canvas
 
-Shared Design - 4 complete
+Shared Design - 5 complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
   ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
   ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
   ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
   ○ Topos as Native Harness (Topos = default; decouple Claude Code default)
-  ○ Visual Identity Rebrand (indigo-on-zinc tokens ○ · animated site ○ · docs rewrite ○)
+  ✅ Visual Identity Rebrand (indigo-on-zinc tokens · animated site · docs rewrite)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -237,10 +237,10 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [agent-session-vocabulary.md](shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
 | [topos-native-harness.md](shared/topos-native-harness.md) | Not started | Both | Make Topos the first-class native harness and default; decouple Claude Code from being the hardcoded default while keeping all harnesses selectable. In-process local (offline) vs logged-in Topos cloud + Cella remote workspaces; auth-gated sandbox swap; brand surfacing. |
-| [visual-identity.md](shared/visual-identity.md) | Drafted | Both | Umbrella: replace the Anthropic/Claude-like identity (cream `#f4f1ea`, terracotta `#c45a33`/`#d97757`, Instrument Serif) with an indigo-on-zinc system, rebuild the marketing site with animation/interactive graphics, and tear down + rewrite the drifted docs. Token names stay stable; three children below. |
-| ↳ [visual-identity/design-tokens.md](shared/visual-identity/design-tokens.md) | Drafted | Both | New palette + all-sans/mono type system in `tokens.css` (values only, names stable), base.css token-block reconciliation, Space Grotesk + bundled JetBrains Mono, in-repo `.wallfacer-brand` override, retheme of the four `data-theme`-observing components, full ui-shots light+dark sweep. |
-| ↳ [visual-identity/marketing-site.md](shared/visual-identity/marketing-site.md) | Drafted | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
-| ↳ [visual-identity/docs-rewrite.md](shared/visual-identity/docs-rewrite.md) | Drafted | Both | Docs teardown + re-architecture from the shipped surface: new 13-guide IA (agent-graph, mission control, whiteboard, GitHub, device sign-in documented; brainstorm/ideation/Agents+Flows drift removed), internals refresh + 2 new files, single-source nav (generator emits `data/docs.ts` from `usage.md` reading order), CLI usage fix, theme-refreshed screenshots. |
+| [visual-identity.md](shared/visual-identity.md) | **Complete** | Both | Umbrella: replace the Anthropic/Claude-like identity (cream `#f4f1ea`, terracotta `#c45a33`/`#d97757`, Instrument Serif) with an indigo-on-zinc system, rebuild the marketing site with animation/interactive graphics, and tear down + rewrite the drifted docs. Token names stay stable; three children below. |
+| ↳ [visual-identity/design-tokens.md](shared/visual-identity/design-tokens.md) | **Complete** | Both | New palette + all-sans/mono type system in `tokens.css` (values only, names stable), base.css token-block reconciliation, Space Grotesk + bundled JetBrains Mono, in-repo `.wallfacer-brand` override, retheme of the four `data-theme`-observing components, full ui-shots light+dark sweep. |
+| ↳ [visual-identity/marketing-site.md](shared/visual-identity/marketing-site.md) | **Complete** | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
+| ↳ [visual-identity/docs-rewrite.md](shared/visual-identity/docs-rewrite.md) | **Complete** | Both | Docs teardown + re-architecture from the shipped surface: new 13-guide IA (agent-graph, mission control, whiteboard, GitHub, device sign-in documented; brainstorm/ideation/Agents+Flows drift removed), internals refresh + 2 new files, single-source nav (generator emits `data/docs.ts` from `usage.md` reading order), CLI usage fix, theme-refreshed screenshots. |
 
 ### Why these are shared
 

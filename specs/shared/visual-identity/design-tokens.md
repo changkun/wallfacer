@@ -1,6 +1,6 @@
 ---
 title: Indigo-on-Zinc Design Tokens & Type System
-status: drafted
+status: complete
 depends_on: []
 affects:
   - frontend/src/styles/tokens.css
@@ -118,3 +118,23 @@ marketing screenshots are re-captured by the docs child, not here.
 - Manual WCAG spot checks: `--ink-3` on `--bg`, accent-on-card, status badge
   pairs (target ≥ 4.5:1 body, ≥ 3:1 large/UI).
 - `make build` green (vue-tsc, vite-ssg, golangci-lint).
+
+## Outcome
+
+Shipped 2026-07-05 (commits 501d2c24, e500d7fa, 52499469, a5b319b0,
+9550ee51). Deviations from the plan:
+
+- The stale duplicate token block lived in `board-tokens.css`, not
+  `base.css` (base.css holds the tag palette and reset). board-tokens.css
+  was deleted outright; tokens.css is the single definition site.
+- Body type consolidated on the already-bundled Inter instead of keeping
+  Hanken Grotesk; Hanken and Instrument Serif woff2 files were removed.
+  Space Grotesk (display) and JetBrains Mono ship as variable fonts.
+- The latere-ui override needed a `[data-theme]` specificity prefix because
+  component-imported CSS can emit after entry CSS; it also re-skins the
+  console sidebar brand row (`.lu-cs-*`).
+- The editorial drop caps were removed rather than restyled.
+- The brick logo SVGs (Sidebar, BrandMark, SiteNav, InstallPage) and the
+  1024px raster app icon were recolored to the indigo trio.
+- Verified: full ui-shots sweep light+dark, `make ui-test` geometry checks,
+  vitest, vue-tsc, `make build`, and GOWORK=off build.
