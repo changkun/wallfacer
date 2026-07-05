@@ -104,6 +104,7 @@ function stpWidth(host: HTMLElement): string {
 describe('PlanPage sidebar resize', () => {
   beforeEach(() => {
     localStorage.removeItem('wallfacer-spec-sidebar-width');
+    localStorage.removeItem('wallfacer-spec-tree-collapsed');
   });
   afterEach(() => {
     document.body.innerHTML = '';
@@ -128,12 +129,26 @@ describe('PlanPage sidebar resize', () => {
     app.unmount();
   });
 
-  it('clamps the width to the 200px minimum', async () => {
+  it('clamps to the 200px minimum for a small leftward drag', async () => {
     const { host, app } = await mountPage();
-    // Drag far left; 280 - 1000 → clamps to 200.
-    drag(host, 1000, 0);
+    // 280 - 100 = 180 → above the 150 fold threshold, clamps up to 200.
+    drag(host, 100, 0);
     await nextTick();
     expect(stpWidth(host)).toBe('200px');
+    // Still expanded (not folded to the rail).
+    expect(host.querySelector('.spec-tree-panel-stub')).toBeTruthy();
+    expect(host.querySelector('.spec-tree-rail')).toBeFalsy();
+    app.unmount();
+  });
+
+  it('auto-folds to the rail when dragged past the fold threshold', async () => {
+    const { host, app } = await mountPage();
+    // 280 - 200 = 80 → below the 150 threshold: collapse to the rail.
+    drag(host, 200, 0);
+    await nextTick();
+    expect(host.querySelector('.spec-tree-panel-stub')).toBeFalsy();
+    expect(host.querySelector('.spec-tree-rail')).toBeTruthy();
+    expect(localStorage.getItem('wallfacer-spec-tree-collapsed')).toBe('1');
     app.unmount();
   });
 });

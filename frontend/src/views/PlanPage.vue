@@ -63,6 +63,9 @@ const chatVisible = computed(() => !!popupRef.value?.isOpen);
 const SIDEBAR_WIDTH_KEY = 'wallfacer-spec-sidebar-width';
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 520;
+// Dragging narrower than this folds the tree to the rail rather than bottoming
+// out at the min width, so one gesture can both size and collapse the tree.
+const SIDEBAR_FOLD = 150;
 
 const sidebarWidth = ref<number>(parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '280', 10));
 
@@ -88,8 +91,15 @@ function startSidebarResize(ev: MouseEvent) {
   document.body.style.userSelect = 'none';
   document.body.style.cursor = 'col-resize';
   function onMove(mv: MouseEvent) {
-    const delta = mv.clientX - startX;
-    sidebarWidth.value = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, startW + delta));
+    const raw = startW + (mv.clientX - startX);
+    if (raw < SIDEBAR_FOLD) {
+      // Dragged past the fold threshold: collapse and end the gesture so the
+      // tree snaps to the rail instead of sticking at the min width.
+      onUp();
+      collapseSidebar();
+      return;
+    }
+    sidebarWidth.value = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, raw));
   }
   function onUp() {
     document.removeEventListener('mousemove', onMove);
