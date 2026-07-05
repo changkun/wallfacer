@@ -4,6 +4,7 @@ import App from './App.vue';
 import { routes } from './router';
 import { rememberRoute, routeToRestore, storedRoute } from './lib/lastRoute';
 import './styles/tokens.css';
+import './styles/palettes.css';
 import './styles/base.css';
 import './styles/animations.css';
 import './styles/header.css';

@@ -177,7 +177,7 @@ export function watchThemeReinit() {
   });
   themeObserver.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['data-theme'],
+    attributeFilter: ['data-theme', 'data-palette'],
   });
 }
 
