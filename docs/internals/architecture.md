@@ -4,11 +4,11 @@ Wallfacer is a host-native Go service that coordinates autonomous coding agents,
 
 ## Host-Process Execution (the core decision)
 
-Each agent turn runs as a host `os/exec` of the selected CLI (`claude`, `codex`, or `cursor`) with the task's git worktree as the working directory. Isolation comes from the worktree, not a container: there is no daemon, no image pull, and no `/workspace` bind-mount in the shipping runtime.
+Each agent turn runs as a host `os/exec` of the selected CLI (`claude`, `codex`, `cursor`, `opencode`, or `pi`) with the task's git worktree as the working directory. Isolation comes from the worktree, not a container: there is no daemon, no image pull, and no `/workspace` bind-mount in the shipping runtime. A sixth harness, `topos`, is not a subprocess at all; it runs in-process through `internal/agentgraph` (see the dispatch layer below).
 
 The runner unconditionally selects `executor.HostBackend` (the only `executor.Backend` implementation) and sets `hostMode = true` (`internal/runner/runner.go:491-498`). The backend execs the CLI directly (`internal/executor/host.go`). Cancellation is `SIGTERM` then `SIGKILL` on the host process (`internal/executor/host.go`), not a runtime kill command.
 
-Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `ContainerSpec`, `ContainerInfo`, `ContainerLister`, `buildContainerSpecForSandbox`. These name code, not behaviour. The behaviour is a host process.
+Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `ContainerSpec`, `ContainerInfo`, `ContainerLister`, `buildContainerSpecForSandbox`, and the launch circuit breaker's `WALLFACER_CONTAINER_CB_*` env vars. These name code, not behaviour. The behaviour is a host process.
 
 ## System Overview
 
@@ -22,7 +22,7 @@ graph TB
         Handler["Handler<br/>REST API + SSE"]
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
-        Automation["Automation Loops<br/>promote / test / submit<br/>sync / retry / routines"]
+        Automation["Automation Loops<br/>promote / test / agon / submit<br/>sync / retry / routines"]
         Plan["Plan Mode<br/>spec tree + agent session<br/>dispatch + undo"]
 
         Handler --> Runner
@@ -34,7 +34,7 @@ graph TB
     end
 
     subgraph Infra["Host"]
-        Agents["Agent CLIs (host os/exec)<br/>claude / codex / cursor<br/>CWD = task worktree"]
+        Agents["Agent CLIs (host os/exec)<br/>claude / codex / cursor / opencode / pi<br/>CWD = task worktree"]
         Worktrees["Per-task Git Worktrees<br/>~/.wallfacer/worktrees/<br/>task/ID branches"]
         SpecsFS["specs/ (markdown + frontmatter)<br/>agent sessions<br/>~/.wallfacer/agent-sessions/&lt;fp&gt;/"]
         Agents --- Worktrees
@@ -52,7 +52,7 @@ graph TB
 
 **Worktree isolation, not container isolation.** Every agent turn is a host process whose CWD is the task's git worktree. Tasks isolate from each other through separate worktrees and `task/<id>` branches, not through a sandboxed runtime. Tasks work in parallel without merge conflicts during execution; rebase and merge happen at commit time.
 
-**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
+**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`, or in-process `topos`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
 
 **Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds). Scheduled work runs through the routine engine.
 
@@ -60,7 +60,7 @@ graph TB
 
 The codebase moved off three older designs. The docs and symbols below reflect the current state:
 
-- `sandbox.Type` -> `harness.ID`. The `internal/sandbox` package is deleted; harness identities now live in `internal/harness` (`claude`, `codex`, `cursor`).
+- `sandbox.Type` -> `harness.ID`. The `internal/sandbox` package is deleted; harness identities now live in `internal/harness` (`claude`, `codex`, `cursor`, `opencode`, `pi`, plus the in-process `topos`).
 - Container -> host process. Execution is a host `os/exec`; the `Container*` Go names are kept as legacy vocabulary.
 - Refine retired. There is no `refine` agent or `refine-only` flow. Prompt refinement is the Plan task-mode chat (`POST /api/agent/tool/update_task_prompt`).
 
@@ -123,7 +123,7 @@ flowchart TD
 
 ## Background Automation
 
-Six long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go:252-259`). Scheduled work, including recurring idea generation, is not a watcher; it is a routine fired by the routine engine.
+Seven long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go`). Scheduled work, including recurring idea generation, is not a watcher; it is a routine fired by the routine engine (recurring ideation is an ordinary routine tagged `system:ideation`, not a distinct engine).
 
 ```mermaid
 flowchart LR
@@ -134,26 +134,30 @@ flowchart LR
     PubSub --> Submitter["Auto-submitter<br/>waiting to done<br/>when test passed<br/>+ conflict-free"]
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
+    PubSub --> Agon["Auto-agon<br/>adversarial verification<br/>on waiting session tasks<br/>(supersedes auto-test when on)"]
     PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn tasks against a flow"]
 ```
 
-The six entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`. There is no auto-refiner.
+The seven entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoAgon`. There is no auto-refiner.
 
 ### Agents, flows, and the dispatch layer
 
 At task execution time the runner consults two registries before it execs any CLI:
 
-- `internal/agents/` holds the **Role** descriptors. Five built-ins ship (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`), plus any user-authored clones loaded from `~/.wallfacer/agents/`. A role pins a harness (`claude`, `codex`, or `cursor`), declares capabilities, and optionally carries a system-prompt preamble.
-- `internal/flow/` holds **Flow** definitions: ordered step chains that reference roles by slug. One built-in ships (`implement`; `internal/flow/builtins.go`); user flows live under `~/.wallfacer/flows/`. The `implement` flow runs `impl -> test -> parallel(commit-msg, title, oversight)`.
+- `internal/agents/` holds the **Role** descriptors. Exactly five built-ins ship (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`), plus any user-authored clones loaded from `~/.wallfacer/agents/`. A role pins a harness, declares capabilities, and optionally carries a system-prompt preamble.
+- `internal/flow/` holds **Flow** definitions: ordered step chains that reference roles by slug. One built-in ships (`implement`; `internal/flow/builtins.go`); user flows live under `~/.wallfacer/flows/`. The `implement` flow runs `impl -> test -> parallel(commit-msg, title, oversight)`. Tasks pinned to a since-removed slug (e.g. the retired `brainstorm`) resolve to `implement` (`registry.go`).
 
 Both directories are fsnotify-watched; edits reload the merged registry without restarting the server.
 
-Task execution picks one of two dispatch paths:
+Task execution picks one of three dispatch paths (`internal/runner/execute.go`):
 
+- a flow marked `Agentic` -> the in-process topos agent-graph runtime. `internal/agentgraph` is the single seam onto the embedded topos runtime: it compiles the flow plus agents registry into a `topos.Region` and `runAgenticFlow` executes it, persisting the resulting lineage graph on the task. The built-in `implement` flow does not set `Agentic`; this path is experimental/opt-in. A task whose resolved harness is `topos` similarly runs through `runNativeTopos` instead of a subprocess.
 - `flow == "implement"` -> the turn-loop path in `execute.go` (impl -> test -> commit pipeline with full session-recovery semantics).
 - any other flow slug -> the flow engine in `internal/flow/engine.go`. It walks steps linearly, fans parallel-sibling groups through an `errgroup`, and launches each role via `Runner.RunAgent`.
 
-See [Agents & Flows](../guide/agents-and-flows.md) for the full user-facing model.
+In the UI, agent definition and flow composition share a single surface: the Agent Graph page (`/agent-graph`). The former Agents and Flows pages are gone; `/agents`, `/workflows`, and `/flows` redirect to `/agent-graph` (`frontend/src/router.ts`).
+
+See [Agent Graph](../guide/agent-graph.md) for the full user-facing model.
 
 ## Component Responsibilities
 
@@ -165,13 +169,13 @@ See [Agents & Flows](../guide/agents-and-flows.md) for the full user-facing mode
 
 **Executor** (`internal/executor/`), The `Backend` seam (`Launch`/cancellation) plus `HostBackend`, the single shipping implementation that execs the CLI as a host process and relays its stream-json stdout.
 
-**Harness** (`internal/harness/`), Harness identities and stream parsers (`claude`, `codex`, `cursor`). `harness.Default()` returns Claude. The `cursor` harness adapts the `cursor-agent` CLI and emits Claude-style stream-json.
+**Harness** (`internal/harness/`), Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus the in-process `topos` harness. `harness.Default()` returns Claude. The `cursor` harness adapts the `cursor-agent` CLI and emits Claude-style stream-json.
 
 **Webserver** (`internal/webserver/`), Serves the embedded SPA from `internal/webserver/spa` (`MountSPA`); falls through to `index.html` for client-side routes.
 
 **Frontend** (`frontend/`), Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia). Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
-**Workspace Manager** (`internal/workspace/`), Manages workspace configuration, workspace groups, and hot-swapping between workspace sets without server restart.
+**Workspace Manager** (`internal/workspace/`), Manages workspace records (stable UUID identity + mutable folder set, persisted in `workspaces.json`), DataKey-scoped stores, and hot-swapping between workspaces without server restart.
 
 ### Two storage seams
 
@@ -180,7 +184,7 @@ See [Agents & Flows](../guide/agents-and-flows.md) for the full user-facing mode
 
 ### Cloud-mode middleware
 
-Cloud Identity is wired in `RunServer` (`internal/cli/server.go:394-401`). The request handler chain wraps the mux outside-in, so requests flow CSRF -> CookieAuth -> OptionalAuth -> BearerAuth -> (ForceLogin in cloud mode) -> mux:
+Cloud Identity is wired in `RunServer` (`internal/cli/server.go`). The request handler chain wraps the mux outside-in, so requests flow CSRF -> CookieAuth -> OptionalAuth -> BearerAuth -> (ForceLogin in cloud mode) -> mux:
 
 - `handler.CSRFMiddleware(hostPort)`, unconditional CSRF protection (no skip flag).
 - `auth.CookieAuth(authClient, next)`, two args; resolves an `Identity` from the session cookie. There is no separate jwt validator argument and no CSRF skip.
@@ -297,7 +301,7 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedWg`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
-The six automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
+The seven automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoAgon`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
 
 ### Pub/sub channels
 
@@ -344,7 +348,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `internal/gitutil/ops.go` |
 | Add a new automation watcher | `internal/handler/tasks_autoimplement.go` (follow `SubscribeWake` pattern) |
 | Change the agent launch spec | `internal/runner/container.go` (`buildContainerSpecForSandbox()`) + `internal/executor/host.go` |
-| Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `registry.go`) |
+| Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `opencode.go`, `pi.go`, `topos.go`, `registry.go`) |
 | Add a new env config variable | `internal/envconfig/envconfig.go` |
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
 | Debug a failing rebase | `internal/gitutil/ops.go` + `internal/gitutil/stash.go` |
@@ -361,34 +365,34 @@ Every `internal/` package and its role in the system:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload | `Registry`, `Role`, `BuiltinAgents`, `NewRegistry()`, `Load()` |
+| `adversarial` | Agon adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `AgonVerifier` |
+| `agentgraph` | The single seam onto the embedded topos runtime: compiles a flow + agents registry into a `topos.Region`, executes it, returns final text plus a lineage graph | `FromFlow()`, `RunFlow()`, `Runner`, `Lineage` |
+| `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload. Five built-in roles: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Registry`, `Role`, `BuiltinAgents`, `NewRegistry()`, `Load()` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec, auth, web) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `RunAuth()`, `RunWeb()`, `BuildMux()`, `ConfigDir()` |
+| `coordinator` | Cloud coordination plane: the wallfacerd role signed-in local instances connect to over one outbound WebSocket (presence, spec comments, metadata projection) | `Registry`, `CommentStore` (memory + Postgres) |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
-| `eval` | Offline evaluation trajectories for agent-session regression checks | `Trajectory`, `Run()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
-| `flow` | Merged built-in + user-authored flow registry; composes agents into ordered step chains | `Registry`, `Flow`, `Step`, `NewBuiltinRegistry()` |
+| `flow` | Merged built-in + user-authored flow registry; composes agents into ordered step chains. One built-in flow: `implement`; unregistered slugs resolve to it | `Registry`, `Flow`, `Step`, `NewBuiltinRegistry()` |
+| `github` | GitHub integration: principal-scoped token store for the brokered "Latere AI" GitHub App credential, API client, PR/comment read-write surfaces | `Store`, `HTTPBroker`, `Client` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
+| `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
 | `handler` | HTTP API handlers organised by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
-| `harness` | Harness identities and stream parsers (`claude`, `codex`, `cursor`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `Harness`, `Register()`, `Lookup()`, `Default()` |
+| `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus in-process `topos`; replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Topos`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `SequencedDelta`, `StorageBackend` |
 | `webserver` | Serves the embedded SPA frontend from `internal/webserver/spa` | `MountSPA()` |
-| `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support; persistent workspace group configurations | `Manager`, `Snapshot`, `Group`, `NewManager()`, `NewStatic()`, `LoadGroups()`, `SaveGroups()` |
+| `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
-| `oauth` | OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `StartFlow()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
+| `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `StartFlow()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
 | `routine` | Routine scheduler engine that fires routine-kind tasks (user-defined) on their configured cadence | `Engine`, `Start()`, `Trigger()` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; six-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
-
-Top-level packages:
-
-| Package | Purpose | Key exported types / functions |
-|---|---|---|
-| `prompts` | System prompt templates (title, commit, oversight, test, conflict) and the workspace key helper used to scope the per-workspace data directory | `Manager`, `NewManager()`, `InstructionsKey()` |
+| `speccomment` | Domain types for inline spec comments (the coordinator-authoritative collaboration artifact of the coordination plane) | `Comment`, `Thread`, `Anchor`, `NewID()` |
+| `prompts` | System prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Manager`, `NewManager()`, `WorkspaceDataKey()`, `NewDataKey()` |
 
 Shared utility packages under `internal/pkg/`:
 
@@ -441,7 +445,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
-| `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, etc. |
+| `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-agon, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoAgon()`, etc. |
 | `stream.go` | SSE streaming for live task updates and agent logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |
 | `config.go` | Server configuration (autoimplement flags, harness list, watcher health) | `GET /api/config`, `PUT /api/config` |
 | `env.go` | Environment configuration (API tokens, model settings, harness routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |
@@ -459,6 +463,12 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/transition` |
 | `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
 | `terminal.go` | WebSocket terminal relay for the host shell | `GET /api/terminal/ws` |
+| `device_auth.go` | Local device-code sign-in (RFC 8628) against the latere.ai auth service; the done-poll mints the session cookie | `POST /api/auth/device/start`, `GET /api/auth/device/poll`, `POST /api/auth/device/cancel` |
+| `github.go` / `github_auth.go` / `github_write.go` | GitHub connection status and brokered write surfaces | `GET /api/github/auth/status`, `POST /api/github/auth/connect`, `POST /api/github/pulls`, `POST /api/github/comments` |
+| `tasks_pr.go` | Task-level pull-request panel operations | `GET/POST /api/tasks/{id}/pr`, `POST /api/tasks/{id}/pr/comment` |
+| `whiteboard.go` | Per-workspace whiteboard document persistence | `GET /api/whiteboard`, `PUT /api/whiteboard` |
+| `graph.go` | Unified spec+task dependency graph for Mission Control | `GET /api/graph` |
+| `speccomments.go` / `commentrelay.go` | Inline spec comments and the coordination relay | `GET/POST /api/spec-comments`, `GET /api/spec-comments/stream`, `GET /api/coordination/status`, `POST /api/coordination/opt-in` |
 
 There is no `refine.go` (prompt refinement is the agent session tool above) and no `containers.go` / `GET /api/containers` endpoint.
 
@@ -490,7 +500,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Security**, API key + cookie/JWT auth, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits, superadmin gating for admin routes.
 
-**Circuit breakers**, Per-watcher exponential backoff suppresses individual automation loops on failure; an agent-launch circuit breaker blocks launches when a CLI is unavailable. See [Circuit Breakers](../guide/circuit-breakers.md).
+**Circuit breakers**, Per-watcher exponential backoff suppresses individual automation loops on failure; an agent-launch circuit breaker blocks launches when a CLI is unavailable. See [Automation](../guide/automation.md).
 
 **Observability**, SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics. See [API & Transport](api-and-transport.md) for the metrics reference.
 

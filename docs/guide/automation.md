@@ -1,426 +1,130 @@
-# Automation Pipeline
-
-Wallfacer can operate anywhere on the spectrum from fully manual to fully
-hands-off. At one extreme, you drag individual cards between columns and
-review every result before committing. At the other, you load the
-backlog, enable every automation toggle, and let Wallfacer
-execute, test, submit, and push without intervention. The automation
-pipeline is the set of toggles and background watchers that make
-hands-off operation possible.
-
----
-
-## Essentials
-
-### What is Automation?
-
-Automation is a set of toggles that control background watchers. Each
-toggle enables a specific stage of the pipeline -- from promoting tasks
-out of the backlog, through testing and submission, to pushing changes
-upstream. You can enable any combination to match your workflow, anywhere
-on the spectrum from fully manual to fully hands-off.
-
-### The Automation Toggles
-
-Click the lightning bolt icon in the header bar to open the **Automation**
-menu, a popover that lists the toggles inline so they are one click away
-from the board. A clay dot on the icon marks that at least one watcher is
-armed. The same switches, plus the numeric execution knobs (parallelism,
-oversight interval, auto-push threshold), also live on the Execution
-settings page, reachable from the popover's "All execution settings" link
-or directly at `/settings?tab=execution`. The toggles are:
-
-| Toggle | Label in menu | What it controls |
-|--------|---------------|------------------|
-| Autoimplement | **Implement** | Automatic promotion of backlog tasks to In Progress |
-| Catch Up | **Catch Up** | Automatic rebase of waiting tasks onto latest branch |
-| Auto-test | **Test** | Automatic test verification of waiting tasks |
-| Auto-submit | **Submit** | Automatic completion of verified waiting tasks |
-| Auto-push | **Push** | Automatic git push after task completion |
-
-Toggles (except Auto-push) are **persisted per workspace group**
-in `workspace-groups.json`: enabling Autoimplement in group A does not
-follow you to group B, and switching back to A restores A's choices.
-A freshly created group starts with every toggle off. Auto-push stays
-global and continues to persist via the env file.
-
-> **Scope:** automation acts only on the **currently viewed workspace
-> group**, and parallel limits are budgeted **per group** rather than
-> globally. Tasks already running in other groups keep executing to
-> completion, but no new auto-promote / auto-test / auto-submit /
-> auto-sync / auto-retry actions fire against them, and
-> their in-flight count does not consume the current group's
-> concurrency budget. Switch groups via the workspace selector to
-> direct automation at a different backlog.
->
-> **Per-group override.** Each workspace group can set its own
-> `max_parallel` (and `max_test_parallel`) that overrides
-> `WALLFACER_MAX_PARALLEL` / `WALLFACER_MAX_TEST_PARALLEL` for that
-> group only. Edit a group's limit in Settings -> Workspace via the
-> per-group **Max parallel** and **Max test parallel** number inputs:
-> enter a positive integer to cap, or leave the field empty (or `0`) to
-> clear the override and fall back to the server default. The In-Progress
-> column shows the active limit as a read-only `max N` tag. Values
-> persist in `workspace-groups.json`.
-
-### Enabling Autoimplement
-
-Autoimplement (the **Implement** toggle) automatically promotes the
-highest-priority eligible backlog task to In Progress whenever there is
-available capacity. The number of tasks that can run simultaneously is
-controlled by `WALLFACER_MAX_PARALLEL`. In host mode the default is 1;
-the claude/codex CLIs share state across concurrent runs, so raise the
-limit only after verifying your CLI tolerates parallel invocations.
-Enable it from Settings -> Execution or via `PUT /api/config` with
-`autoimplement: true`.
-
-### Enabling Auto-Test
-
-Auto-test (the **Test** toggle) automatically launches the test
-verification agent on waiting tasks that have no test result yet and
-whose worktrees are up to date with the default branch. Enable it from
-Settings -> Execution or via `PUT /api/config` with `autotest: true`.
-
-### Enabling Auto-Submit
-
-Auto-submit (the **Submit** toggle) automatically moves waiting tasks to
-Done when they meet all of the following criteria:
-
-- **Verified:** the task has a passing test result, **or** the task
-  completed naturally and Auto-test is disabled.
-- **Up to date:** no worktree is behind the default branch.
-- **Conflict-free:** no worktree has unresolved merge conflicts.
-
-Enable it from Settings -> Execution or via `PUT /api/config` with
-`autosubmit: true`. Use it together with Auto-test for a fully automated
-test-and-submit cycle.
-
-### The Pipeline at a Glance
-
-The automation stages form a left-to-right pipeline. Each stage hands
-off to the next when its work is complete:
-
-```mermaid
-flowchart LR
-    subgraph Backlog
-        Implement
-    end
-    Implement -->|agent runs| Waiting
-    subgraph Waiting
-        CatchUp[Catch Up] --> Test --> Submit
-    end
-    Submit --> Done
-    Done --> Push
-    Test -->|fail| Failed
-    Failed -->|auto-retry| Implement
-```
-
-<!-- In-app animated illustration: a pulse flowing through the autoimplement pipeline.
-     Renders in the in-app docs viewer; GitHub shows the diagram above. -->
-<svg viewBox="0 0 720 96" role="img" aria-label="A pulse moving through the autoimplement pipeline: Implement, Catch Up, Test, Submit, Push" style="display:block;width:100%;max-width:520px;height:auto;margin:1.25rem auto;font-family:inherit">
-  <line x1="72" y1="40" x2="648" y2="40" stroke="var(--border,#e2e4e8)" stroke-width="2"/>
-  <g fill="var(--bg-card,#f6f7f9)" stroke="var(--border,#e2e4e8)" stroke-width="1.5">
-    <circle cx="72"  cy="40" r="18"/>
-    <circle cx="216" cy="40" r="18"/>
-    <circle cx="360" cy="40" r="18"/>
-    <circle cx="504" cy="40" r="18"/>
-    <circle cx="648" cy="40" r="18"/>
-  </g>
-  <g font-size="12" text-anchor="middle" fill="var(--text-muted,#8a8f98)">
-    <text x="72"  y="80">Implement</text>
-    <text x="216" y="80">Catch Up</text>
-    <text x="360" y="80">Test</text>
-    <text x="504" y="80">Submit</text>
-    <text x="648" y="80">Push</text>
-  </g>
-  <circle r="13" fill="var(--accent,#6366f1)" opacity="0.18">
-    <animate attributeName="cx" values="72;72;216;216;360;360;504;504;648;648;72" keyTimes="0;0.06;0.20;0.26;0.40;0.46;0.60;0.66;0.80;0.92;1" dur="9s" repeatCount="indefinite"/>
-    <animate attributeName="cy" values="40" dur="9s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.18;0.18;0;0.18" keyTimes="0;0.9;0.94;1" dur="9s" repeatCount="indefinite"/>
-  </circle>
-  <circle r="6" fill="var(--accent,#6366f1)">
-    <animate attributeName="cx" values="72;72;216;216;360;360;504;504;648;648;72" keyTimes="0;0.06;0.20;0.26;0.40;0.46;0.60;0.66;0.80;0.92;1" dur="9s" repeatCount="indefinite"/>
-    <animate attributeName="cy" values="40" dur="9s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="1;1;0;1" keyTimes="0;0.9;0.94;1" dur="9s" repeatCount="indefinite"/>
-  </circle>
-</svg>
-
-1. 🤖 **Implement** (Autoimplement) -- promote backlog tasks to In Progress.
-2. 🔗 **Catch Up** -- rebase waiting tasks onto the latest branch to prevent merge conflicts.
-3. 🧪 **Test** -- run the verification agent on waiting tasks.
-4. ✅ **Submit** -- move verified, conflict-free tasks to Done.
-5. 📤 **Push** -- push committed changes to the remote repository.
-
-Auto-retry sits alongside the pipeline: when a task fails with a
-transient error, it is automatically returned to the backlog for another
-attempt.
-
----
-
-## Advanced Topics
-
-### Stage Reference (Deep Dive)
-
-#### Implement (Autoimplement)
-
-When enabled, the auto-promoter watches for available capacity and
-promotes the highest-priority eligible backlog task to In Progress.
-
-**Concurrency limit.** The number of tasks that can run simultaneously
-is controlled by `WALLFACER_MAX_PARALLEL`. In host mode the default is
-1, because the claude/codex CLIs share `~/.claude` and `~/.codex` state
-across concurrent invocations. The auto-promoter will not promote a new
-task if the current count of regular in-progress tasks meets or exceeds
-this limit.
-
-**Priority ordering.** Candidates are ranked by:
-
-1. Critical-path score (tasks with more downstream dependents are
-   promoted first).
-2. Board position (lower position = higher priority).
-3. Creation time (older tasks first, as a tiebreaker).
-
-**Dependency enforcement.** A task is only eligible for promotion when
-all of its dependencies have reached Done. Tasks with unsatisfied
-dependencies are skipped regardless of their position.
-
-**Scheduled execution.** Tasks with a `ScheduledAt` timestamp are
-skipped until the scheduled time arrives. A supplementary 60-second
-ticker ensures scheduled tasks are promoted promptly even when no other
-board activity triggers a scan.
-
-**Test-fail auto-resume.** When a waiting task has failed a test (up to
-3 consecutive failures), the auto-promoter automatically resumes it with
-the test failure feedback so the agent can fix the issue. After 3
-consecutive test failures, auto-resume halts and the task stays in
-Waiting for manual intervention.
-
-**Agent-launch breaker.** Promotion is suppressed when the agent-launch
-circuit breaker is open. After repeated launch failures the breaker
-trips, preventing cascading failures where every newly opened slot
-fires a promotion that immediately fails again.
-
-#### Catch Up (Auto-sync)
-
-When enabled, the catch-up watcher polls every 30 seconds for waiting
-tasks whose worktrees have fallen behind the latest branch. For each
-such task, it:
-
-1. Fetches the latest remote refs.
-2. Checks how many commits the worktree is behind.
-3. Transitions the task to In Progress and triggers a rebase.
-
-Sync operations are lightweight host-side git rebases -- they do not
-launch an agent process and therefore bypass the regular task capacity
-check. This ensures waiting tasks stay current even when the board is at
-full capacity.
-
-**When to use:** Enable this when running many tasks in parallel. As
-completed tasks merge into the default branch, waiting tasks
-automatically pick up those changes, reducing merge conflicts at submit
-time.
-
-#### Test (Auto-test)
-
-When enabled, the auto-tester scans for waiting tasks that:
-
-- Have no test result yet (`LastTestResult` is empty).
-- Are not currently being tested.
-- Have existing worktrees on disk.
-- Are up to date with the default branch (not behind).
-
-For each eligible task, it launches the test verification agent.
-
-**Concurrency limit.** Test runs have their own independent limit
-controlled by `WALLFACER_MAX_TEST_PARALLEL` (default: 2). Only test-run
-in-progress tasks count against this limit; regular implementation tasks
-are unaffected.
-
-**Test failure cap.** After 3 consecutive test failures on the same
-task without a passing test or manual feedback, the auto-resume cycle
-halts. The task remains in Waiting until you intervene.
-
-**Interaction with Catch Up.** If Catch Up is also enabled, the
-auto-tester waits until the task's worktrees are fully up to date before
-triggering a test. This prevents testing against stale code.
-
-#### Submit (Auto-submit)
-
-When enabled, the auto-submitter scans for waiting tasks that meet all
-of the following criteria:
-
-- **Verified:** the task has a passing test result (`LastTestResult` is
-  "pass"), **or** the task completed naturally (stop reason is
-  `end_turn`) and Auto-test is disabled.
-- **Up to date:** no worktree is behind the default branch.
-- **Conflict-free:** no worktree has unresolved merge conflicts.
-- **Not currently being tested:** the test agent is not running.
-
-When all conditions are met, the task is moved through the commit
-pipeline (committing state) and then to Done.
-
-**When to use:** Enable this together with Auto-test for a fully
-automated test-and-submit cycle. If you want to review diffs before
-committing, leave this toggle off.
-
-#### Push (Auto-push)
-
-When enabled, completed tasks are automatically pushed to the remote
-repository after their changes are committed to the default branch.
-
-**Threshold.** `WALLFACER_AUTO_PUSH_THRESHOLD` sets the minimum number
-of completed tasks before a push is triggered (default: 1). This lets
-you batch multiple task completions into a single push.
-
-**Persistence.** Unlike other toggles, Auto-push is persisted in the
-env file (`WALLFACER_AUTO_PUSH=true`). It survives server restarts.
-
-**When to use:** Enable this when you want changes to appear on the
-remote automatically. Disable it if you prefer to review the local
-branch before pushing.
-
-### Auto-Retry
-
-Auto-retry operates alongside the main pipeline. When a task fails, the
-runner classifies the failure into one of seven categories:
-
-| Category | Value | Retryable | Default budget |
-|----------|-------|-----------|----------------|
-| Container crash | `container_crash` | Yes | 2 |
-| Worktree setup | `worktree_setup` | Yes | 1 |
-| Sync error | `sync_error` | Yes | 2 |
-| Timeout | `timeout` | No | -- |
-| Budget exceeded | `budget_exceeded` | No | -- |
-| Agent error | `agent_error` | No | -- |
-| Unknown | `unknown` | No | -- |
-
-**How it works.** Each task is created with a per-category retry budget
-(`AutoRetryBudget`). When a task fails with a retryable category, the
-auto-retrier checks:
-
-1. Is the category retryable (container_crash, worktree_setup, or
-   sync_error)?
-2. Does the task still have budget remaining for that category?
-3. Has the task not exceeded the global retry cap (3 total retries
-   across all categories)?
-4. For container crashes: is the agent-launch breaker closed?
-
-If all checks pass, the task is reset to Backlog and the retry count
-is incremented. The auto-promoter will then pick it up again in the
-normal priority order.
-
-Non-retryable categories (timeout, budget_exceeded, agent_error,
-unknown) always require manual review. These represent issues that are
-unlikely to resolve by simply re-running the task.
-
-**Recovery scan.** On server startup, the auto-retrier scans for any
-failed tasks that were missed while the server was down and retries
-eligible ones immediately.
-
-### Task Dependencies and Automation
-
-Tasks can declare dependencies on other tasks via the `DependsOn` field.
-Dependencies form a directed acyclic graph (DAG) that the auto-promoter
-respects:
-
-- A task is only promoted when **all** of its dependencies have reached
-  Done.
-- Dependencies are checked during Phase 1 of the two-phase promotion
-  protocol, allowing the potentially slow dependency check to run
-  without blocking other watchers.
-- Cycle detection prevents creating circular dependencies.
-
-**Map view.** Click **Map** in the sidebar (Workspace section, next to
-Plan) to open a full-pane visualization of the workspace's coordination
-graph. When the workspace has specs under
-`specs/`, the view shows a unified graph of both specs and tasks:
-
-- **Specs** (rounded nodes) form a containment tree via the file layout
-  and may depend on other specs (`depends_on` in frontmatter).
-- **Tasks** (card nodes) hang off leaf specs via `dispatched_task_id`, or
-  appear as standalone nodes when no spec dispatched them.
-- Nodes are laid out by topological level so prerequisites sit to the
-  left of their dependents. Edge styles distinguish containment,
-  dispatch, spec-level deps, and task-level deps (see the legend).
-
-Clicking a task node opens its modal; clicking a spec node switches to
-Plan mode and focuses that spec. Archived specs are filtered out by
-default. When the workspace has no specs, the view falls back to the
-task-only DAG.
-
-Map navigation is tuned for exploring large graphs:
-
-- **Hover** a node to emphasise its 1-hop neighbourhood (non-neighbours dim).
-- **Click** to focus -- the 1-hop lens becomes sticky and the mount scrolls
-  the node into view. Click empty canvas to clear.
-- **Shift+click** opens the node (task modal or Plan-mode focus).
-- **Drag** a node to pin it; **double-click** a pinned node to unpin.
-- **Search** via the top-bar search (press <kbd>/</kbd> to focus) filters
-  nodes by label or spec path substring; non-matching nodes dim alongside
-  their incident edges. The same input filters tasks on the board and
-  specs in Plan mode -- the active mode decides what the query targets.
-- **Ctrl / ⌘ + scroll** zooms in or out around the cursor position.
-  Plain scroll still pans as usual.
-- **Hold Space + drag** pans the whole canvas like Figma / Miro.
-- **Reset layout** clears pinned positions, focus, zoom, and search.
-
-**Batch creation with dependencies.** Use `POST /api/tasks/batch` to
-create multiple tasks atomically with symbolic dependency wiring. Tasks
-in the batch can reference each other by position, and the dependency
-edges are resolved as part of the same atomic operation.
-
-### Scheduled Execution
-
-Set the `ScheduledAt` field on a task to delay its execution until a
-specific time. The auto-promoter checks this field and skips tasks whose
-scheduled time has not yet arrived. A 60-second polling ticker ensures
-scheduled tasks are picked up promptly once their time arrives.
-
-![Scheduled routines listed with their cron timing and next run](images/routines.png)
-
-Scheduled execution works with dependencies: a task must satisfy both
-its schedule and its dependency requirements before it is eligible for
-promotion.
-
-### Circuit Breakers
-
-Each automation watcher has its own circuit breaker that provides fault
-isolation. When a watcher encounters an error, its breaker opens with
-exponential backoff:
-
-| Failure | Cooldown |
-|---------|----------|
-| 1st | 30 seconds |
-| 2nd | 1 minute |
-| 3rd | 2 minutes |
-| 4th | 4 minutes |
-| 5th+ | 5 minutes (cap) |
-
-A single success resets the breaker completely. Breakers only affect
-automated actions; manual operations always work regardless of breaker
-state.
-
-**Watcher health.** The current health status of all watchers is
-included in the `GET /api/config` response (`watcher_health` field) and
-displayed in the header when any breaker is tripped.
-
-**Agent-launch breaker.** A separate circuit breaker protects against
-repeated agent-launch failures. It opens after 5 consecutive launch
-failures and uses a closed/open/half-open three-state model. See
-[Circuit Breakers](circuit-breakers.md) for full details.
-
-### Configuration Reference
-
-Automation-related environment variables (`WALLFACER_MAX_PARALLEL`, `WALLFACER_MAX_TEST_PARALLEL`, `WALLFACER_AUTO_PUSH`, `WALLFACER_AUTO_PUSH_THRESHOLD`, `WALLFACER_CONTAINER_CB_THRESHOLD`, `WALLFACER_CONTAINER_CB_OPEN_SECONDS`) are documented, with defaults, in [Configuration → Full Environment Variables Reference](configuration.md#full-environment-variables-reference).
-
-All automation toggles (except Auto-push) are also available via `PUT /api/config` with the fields `autoimplement`, `autotest`, `autosubmit`, and `autosync`.
-
-For the full HTTP API reference, see [API & Transport](../internals/api-and-transport.md).
-
----
-
-## See Also
-
-- [Board & Tasks](board-and-tasks.md) for task lifecycle and manual operations
-- [Circuit Breakers](circuit-breakers.md) for breaker internals
-- [Getting Started](getting-started.md) for initial setup and configuration
+# Automation
+
+Wallfacer operates anywhere on the spectrum from fully manual to fully hands-off. At one end, every card is dragged by hand and every result reviewed before commit. At the other, the backlog is loaded, every toggle is on, and tasks execute, verify, submit, and push without intervention. This page covers the toggles, the background watchers behind them, adversarial verification with Agon, and the safety systems that keep hands-off operation from running away.
+
+## The automation toggles
+
+Five switches drive the pipeline. They live in the board's **Automation** popover (the lightning bolt in the header; a dot marks that at least one switch is on) and, together with the numeric execution knobs, on the Execution settings tab (`/settings?tab=execution`). Both surfaces read and write the same server-side state.
+
+| Label | Config key | What it controls |
+|---|---|---|
+| Implement | `autoimplement` | Auto-promote backlog tasks into In Progress |
+| Test | `autotest` | Run verification on waiting tasks automatically |
+| Submit | `autosubmit` | Mark waiting tasks done once verified |
+| Catch up | `autosync` | Rebase waiting tasks onto the default branch |
+| Push | `autopush` | Push completed commits upstream |
+
+A sixth switch, `agon`, enables adversarial verification (below). It is stored in the same runtime configuration but is not part of the board popover; toggle it through the configuration API (`PUT /api/config` with `{"agon": true}`). A manual per-task **Agon** action is also available on the task detail actions rail.
+
+Each toggle arms one server-side watcher. The watchers wake on store changes and on periodic tickers (30 to 60 seconds), scoped to the currently viewed workspace.
+
+## What each watcher does
+
+### Implement: the auto-promoter
+
+When capacity allows, the auto-promoter moves backlog tasks to In Progress and launches their agents. Eligibility and ordering:
+
+- **Parallel cap**: the global limit is `WALLFACER_MAX_PARALLEL`; a workspace can override it with its own `MaxParallel` (0 means unlimited for that workspace).
+- **Dependencies**: a task is promoted only when every task it depends on is done.
+- **Scheduled time**: a task with a future `ScheduledAt` waits; a precise one-shot timer promotes it within milliseconds of the due time.
+- **Ordering**: candidates are ranked by critical-path score (tasks that unblock the most downstream work go first), then board position, then creation time.
+- **Skips**: routine cards (driven by the routine engine, see [Routines](routines.md)) and tasks currently locked by a planning agent are never promoted.
+
+The same watcher also auto-resumes waiting tasks that carry failed-test feedback, feeding the feedback back into the session, up to a cap of 3 consecutive test failures. After the cap, the task parks until manual feedback arrives.
+
+### Auto-retry (always on)
+
+Failed tasks with a transient infrastructure failure category are reset to Backlog for another attempt. This watcher has no toggle; it is bounded by budgets instead:
+
+- **Per-category budgets** per task: `container_crash` 2, `sync_error` 2, `worktree_setup` 1.
+- **Global cap**: at most 3 auto-retries per task across all categories.
+- Container-crash retries are suppressed while the agent-launch circuit breaker is open.
+
+Agent errors, timeouts, budget overruns, and unknown failures are never auto-retried; they wait for human review. A manual retry restores the full budget.
+
+### Test: the auto-tester
+
+Waiting tasks that have not been verified (`LastTestResult` empty), have all worktrees present, and are not behind the default branch get a test agent run. Test runs have their own concurrency limit (`WALLFACER_MAX_TEST_PARALLEL`), independent of the regular cap. When Agon supersedes testing for a task (below), the auto-tester skips it so the two verifiers never double up.
+
+### Submit: the auto-submitter
+
+Verified waiting tasks move to done automatically. The gate depends on the verifier in play:
+
+- **Test gate** (default): the task's last test result is `pass`. As a shortcut, a task that ended naturally (`end_turn` stop reason) and was never tested qualifies, but only while auto-test is off; with auto-test on, testing runs first.
+- **Agon gate**: when Agon supersedes the test agent for a task, the gate is a clean Agon verdict (zero unresolved attacks). The test-pass and natural-completion shortcuts do not apply.
+
+In addition, every worktree must be up to date with the default branch and free of merge conflicts. Tasks with a session go through the commit pipeline (committing state, commit message generation); sessionless tasks move straight to done. Tasks that failed testing are never auto-submitted.
+
+### Catch up: the waiting-sync watcher
+
+Every 30 seconds, waiting tasks whose worktrees have fallen behind the default branch are rebased onto it, exactly as if **Sync** were clicked. Sync is a lightweight host-side git rebase; it does not launch an agent and bypasses the parallel cap, so waiting tasks stay current even at full capacity. A failed `git fetch` is recorded on the task and the sync is skipped until it clears.
+
+### Push: auto-push
+
+After the commit pipeline completes, each workspace repo whose local branch is at least the threshold number of commits ahead of upstream gets a `git push`. Configure with `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD` (default threshold 1), or from the Execution settings tab. Push results land on the task timeline.
+
+## Adversarial verification with Agon
+
+Agon replaces the single test agent with a structured debate about the change. A **proposer** (always Claude, forked from the task's session) defends the work; one or more **critics** (rotating Claude and Codex for perspective diversity) attack it over multiple rounds. Attacks a proposer cannot rebut remain *unresolved*.
+
+Scope and behavior:
+
+- Agon supersedes the test agent **only for tasks with a session** (Agon forks the session to build the proposer). Sessionless tasks fall back to the regular test agent even with Agon on.
+- Eligible waiting tasks are verified automatically when the `agon` toggle is on; at most 2 Agon runs execute concurrently, outside the regular task caps.
+- A clean verdict (zero unresolved attacks) lets auto-submit proceed. Any unresolved attack is a hard barrier: the task stays parked in waiting and is not auto-resumed. Clearing the barrier is a human act, either confirming the work or resuming with steering, which discards the verdict and triggers fresh re-verification.
+- The full debate transcript, verdict, and cost render in the task detail's Adversarial Verification panel; Agon spend is attributed to the task's usage breakdown.
+
+Depth knobs, as environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `WALLFACER_AGON_FORKS` | 1 | Independent critic forks per run |
+| `WALLFACER_AGON_ROUNDS` | 3 | Round cap per fork (attack, rebuttal, re-assessment) |
+| `WALLFACER_AGON_COST_CAP` | 50000 | Soft token budget per run |
+
+The defaults are a minimum-cost floor, not a recommended depth; fewer than 3 rounds would end a debate before the critic sees the rebuttal.
+
+## Circuit breakers and safety valves
+
+Two independent breaker systems pause automation when something goes wrong, and self-heal without intervention.
+
+### Watcher breakers
+
+Each watcher (auto-promote, auto-retry, auto-test, auto-submit, auto-sync, auto-agon) has its own breaker. Repeated errors in one watcher's scan-and-act cycle open its breaker and suppress that watcher alone; all others keep running. Recovery uses exponential backoff: 30 seconds, doubling per failure, capped at 5 minutes. A single success resets the breaker. Per-watcher health (failure count, retry time, last reason) is reported in the config API response (`watcher_health`). Breakers only suppress automated actions; manual board operations keep working, and the toggles themselves are unaffected.
+
+### Agent-launch breaker
+
+The runner tracks consecutive agent-launch failures. After `WALLFACER_CONTAINER_CB_THRESHOLD` consecutive failures (default 5) the breaker opens for `WALLFACER_CONTAINER_CB_OPEN_SECONDS` (default 30). While open, auto-promotion halts and container-crash auto-retries are suppressed, preventing a runtime outage from cascading across the whole backlog. The state is exported as the `wallfacer_circuit_breaker_open` Prometheus gauge.
+
+### Other safety valves
+
+- **Context exhaustion**: if any task stops with the `max_tokens` reason, the Implement toggle is switched off automatically. Continuing blindly would burn budget without progress; re-enable after addressing the oversized task.
+- **Test-fail cap**: auto-resume from failed-test feedback stops after 3 consecutive failures per task.
+- **Turn output truncation**: per-turn agent output is capped by `WALLFACER_MAX_TURN_OUTPUT_BYTES` (default 8 MB); truncated turns are marked on the task record.
+
+## Failure categories and triage
+
+Every failed task carries a failure category, visible on the card and used to decide retry policy:
+
+| Category | Meaning | Auto-retried |
+|---|---|---|
+| `container_crash` | Agent process died unexpectedly | Yes (budget 2) |
+| `sync_error` | Rebase or merge failure during sync | Yes (budget 2) |
+| `worktree_setup` | Worktree creation failed | Yes (budget 1) |
+| `timeout` | Task exceeded its time limit | No |
+| `budget_exceeded` | Token or cost budget exhausted | No |
+| `agent_error` | The agent itself reported failure | No |
+| `unknown` | Unclassified | No |
+
+Triage guidance: transient categories usually clear themselves via auto-retry; recurring `container_crash` suggests a runtime or credential problem (check `wallfacer doctor`); `agent_error` and `timeout` mean the task needs a better prompt, smaller scope, or manual feedback. Failed-task counts per category are exported on `/metrics` as `wallfacer_failed_tasks_by_category`.
+
+## Related pages
+
+- [Board](board.md) for the task lifecycle these watchers drive.
+- [Agent Graph](agent-graph.md) for the fleets tasks execute against.
+- [Routines](routines.md) for scheduled task creation, which automation deliberately ignores.
+- [Plan](plan.md) for dispatching specs into the board tasks automation picks up.
+- [Oversight](oversight.md) for timelines, verdicts, and cost attribution.
+- [Mission Control](mission-control.md) for a pipeline-wide view of specs and tasks in flight.
+- [Configuration](configuration.md) for the full environment variable reference.
+- [Internals: automation](../internals/automation.md) for watcher design and the two-phase protocol.

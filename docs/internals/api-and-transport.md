@@ -25,9 +25,14 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `PUT /api/config` | Update server configuration (autoimplement, autotest, autosubmit, harness assignments) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
+| `POST /api/workspaces/pick-folder` | Open the native OS folder picker and return the chosen path |
 | `POST /api/workspaces/mkdir` | Create a new directory under an absolute host path |
 | `POST /api/workspaces/rename` | Rename a file or directory at an absolute host path |
-| `PUT /api/workspaces` | Replace the active workspace set and switch the scoped task board |
+| `GET /api/workspaces` | List workspace records (stable ID, name, folders, dormant flag, per-workspace limits) |
+| `POST /api/workspaces` | Create a workspace (random DataKey; not activated) |
+| `PUT /api/workspaces/{id}` | Update a workspace's name, folders, or per-workspace settings; identity and DataKey unchanged |
+| `DELETE /api/workspaces/{id}` | Delete a workspace record; 409 for the active workspace |
+| `POST /api/workspaces/{id}/activate` | Switch the scoped task board to this workspace |
 | **Routines** | |
 | `GET /api/routines` | List routine cards with their schedules and next-run times |
 | `POST /api/routines` | Create a routine card that spawns instance tasks on a fixed interval |
@@ -93,11 +98,18 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
+| `POST /api/tasks/{id}/agon` | Trigger an adversarial agon verification run for a waiting task |
+| `GET /api/tasks/{id}/agon/transcript` | Agon run transcript |
+| `GET /api/tasks/{id}/lineage` | Agent lineage graph recorded by an agentic (topos) run |
+| `GET /api/tasks/{id}/pr` | Pull-request status for the task branch |
+| `POST /api/tasks/{id}/pr` | Create a pull request from the task branch (brokered GitHub credential) |
+| `POST /api/tasks/{id}/pr/comment` | Comment on the task's pull request |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |
 | `GET /api/explorer/file` | Read file contents from a workspace |
 | `PUT /api/explorer/file` | Write file contents to a workspace |
+| `GET /api/explorer/file/stream` | SSE stream of change notifications for a single file |
 | `GET /api/explorer/task-prompts` | List backlog (and optionally waiting) tasks as virtual entries for the explorer Task Prompts section |
 | **OAuth authentication** (agent CLI sign-in) | |
 | `POST /api/auth/{provider}/start` | Start OAuth flow; returns `{authorize_url}` |
@@ -105,10 +117,22 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
-| **Spec tree** | |
+| **Spec tree & graph** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
+| `GET /api/graph` | Unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for Mission Control |
+| `GET /api/specs/stale-candidates` | List specs flagged as potentially stale by the drift pipeline |
+| `POST /api/specs/dismiss-stale-candidates` | Dismiss all pending stale-candidate flags |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |
+| **Spec comments & coordination** | |
+| `GET /api/spec-comments` | List inline spec comment threads |
+| `POST /api/spec-comments` | Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection; the coordinator is authoritative and echoes the result over SSE |
+| `GET /api/spec-comments/stream` | SSE: spec comment updates |
+| `GET /api/coordination/status` | Report whether the coordination opt-in is enabled (and available) |
+| `POST /api/coordination/opt-in` | Flip the coordination opt-in (the data-boundary gate). Body `{enabled}` |
+| **Whiteboard** | |
+| `GET /api/whiteboard` | Read the per-workspace whiteboard document |
+| `PUT /api/whiteboard` | Write the per-workspace whiteboard document (dedicated body limit) |
 | **Agent session** | |
 | `GET /api/agent` | Agent session status (running or not) |
 | `POST /api/agent` | Start the agent session (idempotent) |
@@ -125,7 +149,8 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/agent/sessions` | List non-archived sessions; `?includeArchived=true` includes archived ones. Returns `{threads, active_id}`. |
 | `POST /api/agent/sessions` | Create a new session. Body `{name?}`; omitted name auto-generates `Chat N`. |
 | `PATCH /api/agent/sessions/{id}` | Mutate a session. Body `{name}` renames; `{state}` transitions it; `archived` hides it from the tab bar (409 if in-flight), `visible` restores it, `active` records the UI's active session. |
-| **Principal & cloud sign-in** (hosted flow active when `WALLFACER_CLOUD=true`) | |
+| `DELETE /api/agent/sessions/{id}` | Delete a session and its stored conversation |
+| **Principal & sign-in** (available by default against `auth.latere.ai`; `WALLFACER_CLOUD=true` only forces login, anonymous local use stays first-class) | |
 | `GET /login` | Begin the hosted sign-in flow |
 | `GET /callback` | OAuth2 authorization-code callback; sets the session cookie |
 | `GET /logout` | Clear the session cookie and redirect to the sign-in page |
@@ -138,6 +163,12 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/auth/device/start` | Start a device-code flow; returns the user code and verification URI |
 | `GET /api/auth/device/poll` | Poll the in-flight flow; returns `{status: idle\|pending\|done\|denied\|expired}`. The `done` response also sets the session cookie (minted from the issued token via `oidc.SessionFromToken`), so a subsequent `/api/me` reflects the sign-in. |
 | `POST /api/auth/device/cancel` | Cancel the in-flight device-code flow |
+| **GitHub** (brokered through the signed-in latere.ai account's GitHub App connection) | |
+| `GET /api/github/auth/status` | Connection status: available/connected, login, account, permissions, expiry, manage URL |
+| `POST /api/github/auth/connect` | Return the install URL on the auth service to connect GitHub; no wallfacer-side OAuth dance |
+| `POST /api/github/auth/disconnect` | Drop the stored brokered token for the calling principal |
+| `POST /api/github/pulls` | Create a pull request |
+| `POST /api/github/comments` | Create an issue/PR comment |
 
 ### Triggering Task Execution
 
@@ -208,7 +239,8 @@ srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 | **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), OAuth routes (`/login`, `/callback`, `/logout`), and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead. Bypasses its static-key check when an identity (cookie or JWT claims) is already populated, so cookie-only browser requests succeed alongside script clients. No-op when no API key is configured. |
 | **ForceLogin** | `handler/force_login.go` `ForceLogin()` | Cloud-mode only: redirects unauthenticated browser requests for the app shell to `/login`. API routes return 401 instead. Not inserted in local mode. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
-| **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `MkdirWorkspace`, `RenameWorkspace`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`. |
+| **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `PickFolder`, `MkdirWorkspace`, `RenameWorkspace`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`, and the workspace CRUD routes (`ListWorkspaces`, `CreateWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`, `ActivateWorkspace`), which must work before any workspace is open. |
+| **Principal guard** | `handler/handler.go` `RequirePrincipalMiddleware()` | Applied per-route via `requiresPrincipal()`. When auth is configured, `ListSpecComments`, `SubmitSpecComment`, `StreamSpecComments`, and `SubmitFeedback` require a signed-in principal; local mode without auth is a no-op. |
 
 ## SSE Live Updates
 
@@ -355,7 +387,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 
 ## Host Execution
 
-Each task runs as a host process: the runner builds a launch spec and the host backend (`internal/executor`) execs the selected agent CLI (`claude`, `codex`, or `cursor-agent`, chosen by the agent the flow step references) directly, with the task's git worktree as the working directory. There is no container daemon, image pull, or bind-mount; cancellation is `SIGTERM` then `SIGKILL` on the host process.
+Each task runs as a host process: the runner builds a launch spec and the host backend (`internal/executor`) execs the selected agent CLI (`claude`, `codex`, `cursor-agent`, `opencode`, or `pi`, chosen by the agent the flow step references) directly, with the task's git worktree as the working directory. There is no container daemon, image pull, or bind-mount; cancellation is `SIGTERM` then `SIGKILL` on the host process. The `topos` harness is the exception: it runs in-process through `internal/agentgraph`, with no subprocess at all.
 
 ### Process Tracking
 

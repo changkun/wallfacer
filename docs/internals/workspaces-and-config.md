@@ -8,65 +8,68 @@ The workspace manager (`internal/workspace/manager.go`) coordinates workspace sw
 
 ### Data Model
 
+A workspace is an owned, stably-identified set of folder paths (`internal/workspace/groups.go`). Its identity (`ID`) and its storage handle (`DataKey`) are independent of its membership (`Folders`), so the owner may change folders without orphaning history:
+
 ```go
-type Snapshot struct {
-    Workspaces       []string       // sorted, deduplicated absolute paths
-    Store            *store.Store   // scoped store for this workspace set
-    ScopedDataDir    string         // data/<workspace-key>/
-    Key              string         // 16-char hex SHA-256 fingerprint
-    Generation       uint64         // monotonically increasing version
+type Workspace struct {
+    ID      string   // stable UUIDv4, assigned once at creation/migration
+    Name    string   // optional human label
+    Folders []string // mutable; absolute, clean, sorted, deduped
+    DataKey string   // stable storage handle under data/<DataKey>
+
+    MaxParallel     *int  // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit)
+    MaxTestParallel *int  // same for WALLFACER_MAX_TEST_PARALLEL
+    Autoimplement   *bool // per-workspace automation toggles (autopush stays global)
+    Autotest        *bool
+    Autosubmit      *bool
+    Autosync        *bool
+
+    CreatedBy string // principal sub in cloud mode; empty locally
+    OrgID     string // org scope; empty for personal/legacy workspaces
+    Dormant   bool   // history recovered by migration; folders await re-pointing
 }
 ```
 
-### Workspace Key Hashing
+The manager's `Snapshot` (`internal/workspace/manager.go`) captures the active workspace at a point in time: `WorkspaceID` (empty for ad-hoc/legacy path switches pre-migration), `Workspaces` (the active folder set), `Store`, `ScopedDataDir`, `Key` (the active workspace's `DataKey`), and a monotonically increasing `Generation`.
 
-Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `prompts.InstructionsKey()` (`internal/prompts/instructions.go:22`):
+### DataKey: identity decoupled from paths
 
-```go
-func InstructionsKey(workspaces []string) string {
-    sorted := slices.Clone(workspaces)
-    slices.Sort(sorted)
-    h := sha256.Sum256([]byte(strings.Join(sorted, ":")))
-    return fmt.Sprintf("%x", h[:8]) // 16 hex chars
-}
-```
+The workspace's identity is its `ID`; its data directory is `data/<DataKey>/`. Neither is a function of the folder set. Two key sources exist:
 
-Because paths are sorted before hashing, switching to workspaces `~/a` and `~/b` (in any order) produces the same key and shares the same data directory.
+- **Explicit creation** (`Manager.Create`, `POST /api/workspaces`): a random key from `prompts.NewDataKey()`. A new workspace pointing at the same folders as an existing one starts with empty history, the core property of the redesign.
+- **Path-seeded** (`prompts.WorkspaceDataKey(folders)`, `internal/prompts/instructions.go`): a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This hash survives only as the initial `DataKey` of records migrated from the legacy path-keyed model, and for transitional workspaces minted by plain path switches (`resolveWorkspaceForPaths`), where reusing the hash means the existing `data/<hash>/` directory keeps its history.
 
-### Workspace Groups
+`Manager.UpdateFolders` replaces a workspace's folder set without touching `ID` or `DataKey`, so its task store, agent-session transcripts, planning state, and whiteboard stay attached. When the workspace is active, the live snapshot's paths are refreshed in place without reopening the store.
 
-Workspace groups are persisted in `~/.wallfacer/workspace-groups.json` by the `workspace` package (`internal/workspace/groups.go`). Each group is a `Group{Workspaces: []string}` entry. The file is a JSON array of groups, ordered by recency (most recently used first).
+### Persistence and migration
 
-Key operations:
-- **`Load(configDir)`** -- reads and normalizes groups from disk
-- **`Save(configDir, groups)`** -- atomic write via temp file + rename
-- **`Upsert(configDir, workspaces)`** -- adds a new group or promotes an existing one to the front of the list (MRU ordering)
-- **`Normalize(groups)`** -- deduplicates groups, sorts paths within each group, removes empty entries
+Workspace records are persisted in `~/.wallfacer/workspaces.json` as a JSON array ordered by recency (most recently used first). `LoadGroups(configDir)` reads the canonical file and falls back to the legacy `workspace-groups.json`; `SaveGroups` writes atomically (temp file + rename).
 
-On startup, `Manager.startupWorkspaces()` loads the first group from `workspace-groups.json` as the default. If no saved group exists, it starts with no active workspaces.
+`MigrateToWorkspaces` (`internal/workspace/migrate.go`) performs the one-time migration from the legacy path-keyed model. It is idempotent: once `workspaces.json` exists it is a no-op. Live groups become workspaces with `DataKey = WorkspaceDataKey(folders)`, the very hash that already names their data directory, so no data moves. Each `data/<hash>/` directory that holds task history but matches no live group is adopted as a **dormant** workspace (folders best-effort recovered from contained `task.json` worktree paths), so stranded history stays reachable until the owner re-points it.
+
+On startup, `Manager.startupWorkspaces()` restores the most-recent workspace whose folder paths still validate, skipping stale records with a warning; if none are valid it starts with no active workspace so the picker opens instead of crashing.
 
 ### Workspace Scoping
 
-The store is scoped by workspace key. Each unique workspace set gets its own data directory at `data/<workspace-key>/`, containing all task records, events, and outputs for that workspace combination. When workspaces change, a new `store.Store` is opened for the new data directory.
+The store is scoped by `DataKey`. Each workspace gets its own data directory at `data/<data-key>/`, containing all task records, events, and outputs. When the active workspace changes, a new `store.Store` is opened for (or reused from) the target data directory.
 
-### Hot-Swap via `PUT /api/workspaces`
+### Activation and hot-swap
 
-`Manager.Switch(paths)` handles runtime workspace switching:
+The SPA manages workspaces through the CRUD endpoints (`GET/POST /api/workspaces`, `PUT/DELETE /api/workspaces/{id}`) and switches boards via `POST /api/workspaces/{id}/activate`. Activation resolves the record by ID (`Manager.SwitchByID`) and runs `Manager.activate(ws)`, which opens or reuses the store keyed by `ws.DataKey` (not by the folder paths). `Manager.Switch(paths)` remains for path-based switches (startup, `WALLFACER_WORKSPACES`); it resolves or transitionally creates the workspace record backing those folders before delegating to the same activation path:
 
 ```mermaid
 flowchart TD
     Validate["Validate & normalize paths<br/>(absolute, clean, exist, deduplicated, sorted)"] --> Same{"Same set as<br/>current?"}
     Same -->|yes| NoOp["Return current snapshot"]
-    Same -->|no| Build["Build candidate snapshot"]
-    Build --> OpenStore["Open new scoped store<br/>(data/<key>/)"]
-    OpenStore --> Groups["Upsert workspace group<br/>(workspace-groups.json)"]
-    Groups --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
+    Same -->|no| Resolve["Resolve or create the Workspace record<br/>(stable ID + DataKey; workspaces.json, MRU)"]
+    Resolve --> OpenStore["Open or reuse scoped store<br/>(data/<DataKey>/)"]
+    OpenStore --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
     Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
     Swap --> Publish["Notify subscribers via channels"]
-    Publish --> Close["Close previous store"]
+    Publish --> Close["Close previous store<br/>(unless it still has active tasks)"]
 ```
 
-All external side effects (store creation, workspace groups, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate.
+All external side effects (store creation, workspace record upsert, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate. Deleting the active workspace returns 409.
 
 #### Multi-store lifecycle
 
@@ -95,13 +98,16 @@ Wallfacer does not generate or inject a workspace-level instructions file. Each 
 
 ### Registered harnesses
 
-The `internal/harness` package defines harness identities as `ID` constants and keeps a package-level registry (`internal/harness/registry.go`). Three harnesses register at init time:
+The `internal/harness` package defines harness identities as `ID` constants and keeps a package-level registry (`internal/harness/registry.go`). Five subprocess harnesses register at init time, plus one in-process harness:
 
 - **`Claude`** (`"claude"`): execs the Claude Code CLI. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`. `harness.Default()` returns Claude.
 - **`Codex`** (`"codex"`): execs the OpenAI Codex CLI. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
-- **`Cursor`** (`"cursor"`): adapts the `cursor-agent` CLI and emits Claude-style stream-json so the runner parses it on the same path.
+- **`Cursor`** (`"cursor"`): adapts the `cursor-agent` CLI and emits Claude-style stream-json so the runner parses it on the same path. Authenticates via `CURSOR_API_KEY`.
+- **`OpenCode`** (`"opencode"`): execs the opencode CLI; provider auth is managed by `opencode auth login` on the host.
+- **`Pi`** (`"pi"`): execs the pi CLI; no credential fields.
+- **`Topos`** (`"topos"`): in-process, not a subprocess. Runs through the embedded topos runtime (`internal/agentgraph`); supports system prompts and usage reporting but not resume or MCP. Experimental/opt-in.
 
-Execution is host-process. The runner execs the selected CLI as a host process with the task's git worktree as CWD (`internal/runner/runner.go`, `HostBackend` in `internal/executor/host.go`); there is no container start, image pull, or bind-mount. The `WALLFACER_AGENT` env var the runner injects records which CLI was selected.
+Execution for the subprocess harnesses is host-process. The runner execs the selected CLI as a host process with the task's git worktree as CWD (`internal/runner/runner.go`, `HostBackend` in `internal/executor/host.go`); there is no container start, image pull, or bind-mount. The `WALLFACER_AGENT` env var the runner injects records which CLI was selected.
 
 `harness.DefaultFrom(value)` returns the parsed identity or falls back to `Claude` for unknown values.
 
@@ -132,12 +138,9 @@ The `SandboxActivity` constant set in `internal/store/models.go` also includes `
 
 ### Host CLI resolution
 
-There is no `--image` flag and no container start. The host backend selects the CLI by `WALLFACER_AGENT` and resolves its path from the env file:
+There is no `--image` flag and no container start. The host backend selects the CLI by `WALLFACER_AGENT` and resolves its path from the env file via `WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`: an explicit path when set, otherwise the harness's default binary name resolved via `$PATH`.
 
-- `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`): explicit path to the Claude Code CLI; empty resolves `claude` via `$PATH`.
-- `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`): explicit path to the Codex CLI; empty resolves `codex` via `$PATH`.
-
-`wallfacer doctor` probes readiness via `checkHostBackend` (`internal/cli/doctor.go:147`): it resolves the `claude` (required) and `codex` (optional) binaries and runs `--version` on each, printing the same hint the runner would surface at startup if a binary is missing. A claude-only host is valid; codex-typed tasks fail if the codex CLI is absent.
+`wallfacer doctor` probes readiness via `checkHostBackend` (`internal/cli/doctor.go`): it resolves the `claude` (required) plus `codex` and `cursor-agent` (optional) binaries and runs `--version` on each, printing the same hint the runner would surface at startup if a binary is missing. A claude-only host is valid; tasks typed to an absent optional CLI fail.
 
 ### Model selection
 
@@ -167,9 +170,10 @@ The `Config` struct covers all known keys. Key categories:
 | **Authentication** | `OAuthToken` (`CLAUDE_CODE_OAUTH_TOKEN`), `APIKey` (`ANTHROPIC_API_KEY`), `AuthToken` (`ANTHROPIC_AUTH_TOKEN`), `ServerAPIKey` (`WALLFACER_SERVER_API_KEY`) |
 | **Claude model** | `BaseURL`, `DefaultModel`, `TitleModel` |
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
+| **Cursor/OpenCode** | `CursorAPIKey` (`CURSOR_API_KEY`), `OpenCodeServerPassword` (`OPENCODE_SERVER_PASSWORD`) |
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
-| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox` (all typed `harness.ID`) |
-| **Host backend** | `HostClaudeBinary` (`WALLFACER_HOST_CLAUDE_BINARY`), `HostCodexBinary` (`WALLFACER_HOST_CODEX_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
+| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
+| **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 | **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
@@ -192,7 +196,7 @@ This design means that `PUT /api/env` can safely omit token fields, they are pre
 
 The env file is re-read on every agent process launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new tasks without a server restart. Already-running tasks are unaffected, they received their environment when the process was spawned.
 
-The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque podman `--env-file … no such file` exit 125. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. Host mode is independently resilient, `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
+The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque `--env-file ... no such file` launch error (a failure mode inherited from the container-era backend). The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. The host backend is independently resilient, `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
 
 Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env file changes. They read configuration values from in-memory state on the `Handler` or `Runner` structs, which are populated from the env file at startup. Some values (like `MaxParallelTasks`) are re-read from the env file whenever they are needed by the promoter logic.
 

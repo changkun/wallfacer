@@ -91,9 +91,9 @@ graph LR
     Task --> Code[Code<br/>surgical edits]
 ```
 
-Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one. Specs move through a six-state lifecycle (`vague` to `drafted` to `validated` to `complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
+Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one. Specs move through a seven-state lifecycle (`vague` to `drafted` to `validated` to `testing` to `complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
 
-Read more: [The Autonomy Spectrum](docs/guide/autonomy-spectrum.md), [Designing Specs](docs/guide/designing-specs.md), and [Exploring Ideas](docs/guide/exploring-ideas.md).
+Read more: [Concepts](docs/guide/concepts.md), [Plan](docs/guide/plan.md), and [Chat](docs/guide/chat.md).
 
 ## How execution is structured
 
@@ -104,9 +104,9 @@ Wallfacer runs every task through a small, composable set of primitives:
 - **Tasks** pick a flow; the runner walks the flow's step chain.
 - **Routines** spawn tasks against a flow on a schedule. A scheduled routine running an ordinary prompt covers recurring idea generation.
 
-User-authored agents and flows live as YAML under `~/.wallfacer/{agents,flows}/` and are edited through the sidebar **Agents** and **Flows** tabs. Clone a built-in to pin it to a harness, override its system prompt, or insert a review step, without restarting the server. Prompt refinement happens in the Plan task-mode chat (see [Prompt Refinement](docs/guide/refinement-and-ideation.md)).
+User-authored agents and fleets live as YAML under `~/.wallfacer/{agents,flows}/` and are edited on the unified **Agent Graph** surface (the old Agents and Flows pages merged into it). Clone a built-in to pin it to a harness, override its system prompt, or insert a review step, without restarting the server. Task prompts are refined in place from Plan mode.
 
-Read more: [Agents & Flows](docs/guide/agents-and-flows.md).
+Read more: [Agent Graph](docs/guide/agent-graph.md).
 
 ## Product Tour
 
@@ -159,28 +159,29 @@ Development is organized into three parallel tracks with shared foundations. See
 
 | Guide | Topics |
 |-------|--------|
-| [Getting Started](docs/guide/getting-started.md) | Installation, credentials, first run |
-| [The Autonomy Spectrum](docs/guide/autonomy-spectrum.md) | Mental model: chat, spec, task, code |
+| [Getting Started](docs/guide/getting-started.md) | Installation, credentials, sign-in, first task |
+| [Concepts](docs/guide/concepts.md) | Mental model: workspaces, tasks, specs, agents, autonomy |
 
 **Use Wallfacer**
 
 | Guide | Topics |
 |-------|--------|
-| [Exploring Ideas](docs/guide/exploring-ideas.md) | Planning chat, slash commands, @mentions |
-| [Designing Specs](docs/guide/designing-specs.md) | Spec mode, focused view, dependency minimap |
-| [Agents & Flows](docs/guide/agents-and-flows.md) | Agents, flows, cloning, harness pinning, recipes |
-| [Board & Tasks](docs/guide/board-and-tasks.md) | Task board, lifecycle, dependencies, search |
-| [Prompt Refinement](docs/guide/refinement-and-ideation.md) | Prompt refinement in the Plan task-mode chat |
+| [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
+| [Chat](docs/guide/chat.md) | Chat sessions, slash commands, @mentions |
+| [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
+| [Agent Graph](docs/guide/agent-graph.md) | Agents, fleets, harness pinning, live traces |
+| [Routines](docs/guide/routines.md) | Scheduled cards that spawn tasks on an interval |
+| [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
 
 **Operate**
 
 | Guide | Topics |
 |-------|--------|
-| [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry |
-| [Oversight & Analytics](docs/guide/oversight-and-analytics.md) | Oversight summaries, costs, timeline, logs |
-| [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |
+| [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers |
+| [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, analytics |
+| [Mission Control](docs/guide/mission-control.md) | Unified spec and task graph, acting on the pipeline |
+| [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches, GitHub |
 | [Configuration](docs/guide/configuration.md) | Settings, env vars, harnesses, CLI, shortcuts |
-| [Circuit Breakers](docs/guide/circuit-breakers.md) | Fault isolation, self-healing automation |
 
 **Build On (Internals)** is the deep reference for how the system works. Start at **[Technical Internals](docs/internals/internals.md)**.
 
@@ -191,7 +192,10 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
-| [Automation](docs/internals/automation.md) | Background watchers, autoimplement, circuit breakers, routines |
+| [Auth & Identity](docs/internals/auth-and-identity.md) | OIDC, device sign-in, principal context, cloud mode |
+| [Automation](docs/internals/automation.md) | Background watchers, autoimplement, agon, circuit breakers, routines |
+| [Agent Graph Runtime](docs/internals/agent-graph-runtime.md) | Embedded topos runtime, agentic execution, live traces |
+| [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
 

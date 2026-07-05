@@ -6,12 +6,12 @@ The store implementation lives in `internal/store/`.
 
 ## Directory Layout
 
-Task data is scoped by workspace key. Each unique combination of workspace directories produces a SHA-256 fingerprint that becomes the workspace key. The data root is `~/.wallfacer/data/<workspace-key>/`.
+Task data is scoped by workspace. Each workspace record in `~/.wallfacer/workspaces.json` carries a stable `DataKey` (a 16-hex-character storage handle, decoupled from the folder set), and the data root is `~/.wallfacer/data/<data-key>/`. Workspaces migrated from the legacy `workspace-groups.json` keep the SHA-256 path-set hash that already named their directory as their initial `DataKey`; workspaces created explicitly get a random key. Editing a workspace's folders does not change its `DataKey`, so task history stays attached. See [Workspaces & Configuration](workspaces-and-config.md).
 
 Within the scoped data directory, each task gets its own UUID-named directory:
 
 ```
-data/<workspace-key>/
+data/<data-key>/
 ├── <uuid-1>/
 │   ├── task.json              # Core task state (Task struct)
 │   ├── traces/                # Event sourcing audit trail
@@ -45,8 +45,8 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
 | `Title` | `string` | `title` | Display title (auto-generated or user-set) |
-| `Kind` | `TaskKind` | `kind` | Legacy execution mode. `""` for a standard task, `"routine"` for routine cards, `"planning"` for the planning task mode. A historical `"idea-agent"` value may persist on old rows; with the idea-agent subsystem removed it resolves to the default flow. Resolves to a flow slug via the legacy mapper when `FlowID` is empty. |
-| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. New tasks always set this; legacy records fall through to the `Kind` mapper. Built-in slug: `implement`. See [Agents & Flows](../guide/agents-and-flows.md). |
+| `Kind` | `TaskKind` | `kind` | Execution mode. `""` for a standard task, `"routine"` for routine cards, `"planning"` for the planning task mode. A historical `"idea-agent"` value may persist on old rows; with the idea-agent subsystem removed it plays no role in flow resolution. |
+| `FlowID` | `string` | `flow_id` | Flow slug the runner dispatches this task against. Resolution (`flow.Registry.ResolveForTask`) uses `FlowID` when it names a registered flow and falls back to `implement` otherwise (empty, or pinned to a since-removed slug like `brainstorm`). The only built-in slug is `implement`. See [Agent Graph](../guide/agent-graph.md). |
 | `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"priority:1"`) |
 
 ### State and Lifecycle
@@ -84,7 +84,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `StopReason` | `*string` | `stop_reason` | Why the agent stopped (`end_turn`, `max_tokens`, etc.) |
 | `Turns` | `int` | `turns` | Number of agent turns completed |
 | `Timeout` | `int` | `timeout` | Timeout in minutes (clamped to 1-1440, default 60) |
-| `Sandbox` | `harness.ID` | `sandbox` | Workspace-level harness hint (e.g. `"claude"`, `"codex"`, `"cursor"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's resolver reads it below the agent's Harness pin. |
+| `Sandbox` | `harness.ID` | `sandbox` | Workspace-level harness hint (e.g. `"claude"`, `"codex"`, `"cursor"`, `"opencode"`, `"pi"`, `"topos"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's resolver reads it below the agent's Harness pin. |
 | `SandboxByActivity` | `map[SandboxActivity]harness.ID` | `sandbox_by_activity` | **Deprecated.** Per-activity harness overrides. New tasks don't populate this; harness routing lives on the agent definition now. The runner still reads it if present for back-compat. |
 | `ModelOverride` | `*string` | `model_override` | Per-task model override; nil = global default |
 | `Environment` | `*ExecutionEnvironment` | `environment` | Runtime environment snapshot for reproducibility |
@@ -205,6 +205,8 @@ Event types:
 | `system` | System message | Internal system events |
 | `span_start` | `SpanData{Phase, Label}` | Start of a timed execution phase |
 | `span_end` | `SpanData{Phase, Label}` | End of a timed execution phase |
+| `prompt_round` | `PromptRoundData` | Agent-session prompt round applied to the task |
+| `prompt_round_revert` | `PromptRoundRevertData` | Revert of a previously applied prompt round |
 
 State change triggers: `user`, `auto_promote`, `auto_retry`, `auto_test`, `auto_submit`, `feedback`, `sync`, `recovery`, `system`.
 
@@ -331,7 +333,7 @@ type Tombstone struct {
 
 ### SandboxActivity
 
-Identifies which phase of a task a host-process run belongs to. Primary use today is **usage attribution**: token and cost totals roll up per activity so the cost dashboard can break spend down by role. The legacy per-activity harness routing tier (env vars like `WALLFACER_SANDBOX_IMPLEMENTATION`) still keys off these values for back-compat, but new installs should pin harness on the agent definition instead. See [Agents & Flows](../guide/agents-and-flows.md).
+Identifies which phase of a task a host-process run belongs to. Primary use today is **usage attribution**: token and cost totals roll up per activity so the cost dashboard can break spend down by role. The legacy per-activity harness routing tier (env vars like `WALLFACER_SANDBOX_IMPLEMENTATION`) still keys off these values for back-compat, but new installs should pin harness on the agent definition instead. See [Agent Graph](../guide/agent-graph.md).
 
 | Constant | Value | Usage |
 |---|---|---|

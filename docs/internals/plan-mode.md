@@ -361,5 +361,5 @@ These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/
 - [Architecture](architecture.md)
 - [Data & Storage](data-and-storage.md)
 - [API & Transport](api-and-transport.md)
-- [Designing Specs](../guide/designing-specs.md)
-- [Exploring Ideas](../guide/exploring-ideas.md)
+- [Plan](../guide/plan.md)
+- [Chat](../guide/chat.md)
