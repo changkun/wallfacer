@@ -97,13 +97,11 @@ func (h *Handler) workspaceVisibleTo(ctx context.Context, workspaces []string) b
 	if len(workspaces) == 0 {
 		return false
 	}
-	// Org/personal isolation only applies to multi-tenant cloud deployments.
-	// A local single-user run must never hide the user's own workspace just
-	// because their session carries a different org label than the one that
-	// first stamped the group.
-	if !h.cloudMode {
-		return true
-	}
+	// Isolation is by principal presence, not deployment mode: an anonymous
+	// caller (no session — the local default, and cloud logged-out) sees every
+	// workspace; a signed-in caller sees only their personal/org scope. This
+	// matches the task filter (store.TasksForPrincipal), so a signed-in local
+	// run isolates projects the same way tasks are isolated.
 	c, ok := auth.PrincipalFromContext(ctx)
 	if !ok || c == nil {
 		return true
@@ -168,12 +166,11 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	workspaces := h.currentWorkspaces()
 
 	groups, _ := workspace.LoadGroups(h.configDir)
-	// Org / personal filtering: cloud-mode callers see only groups their
-	// principal is allowed to see. Local single-user runs (cloudMode=false)
-	// show every group regardless of session org, so switching org labels
-	// never hides the user's own workspaces. We resolve the principal directly
-	// from ctx since buildConfigResponse doesn't take *Request.
-	if c, ok := auth.PrincipalFromContext(ctx); h.cloudMode && ok && c != nil {
+	// Org / personal filtering by principal presence (local and cloud alike):
+	// a signed-in caller sees only groups their principal is allowed to see; an
+	// anonymous caller (no session) sees every group. We resolve the principal
+	// directly from ctx since buildConfigResponse doesn't take *Request.
+	if c, ok := auth.PrincipalFromContext(ctx); ok && c != nil {
 		groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
 		// The active workspace is global server state. After an org switch it
 		// may still point at the previous org's group; if this principal can't

@@ -172,10 +172,10 @@ type Handler struct {
 	// or 204 accordingly. Wired via SetAuth from the CLI boot path.
 	auth AuthProvider
 	// cloudMode is true for a multi-tenant cloud deployment (WALLFACER_CLOUD).
-	// It gates org/personal workspace isolation: a local single-user `run`
-	// (cloudMode=false) must never hide a user's own workspace just because
-	// their session carries a different org label than the one that first
-	// stamped the workspace group. Wired via SetCloudMode from the CLI.
+	// It gates forced login and workspace data-path scoping — NOT project/task
+	// visibility, which is gated on principal presence (a signed-in caller is
+	// isolated to their personal/org scope; anonymous sees everything) in both
+	// local and cloud runs. Wired via SetCloudMode from the CLI.
 	cloudMode bool
 	// authURL caches the auth service base URL for /api/config responses so
 	// handlers don't call back into AuthProvider for every config request.
