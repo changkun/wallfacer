@@ -322,10 +322,11 @@ function applyQuick(insert: string) {
   color: var(--ink);
 }
 
-/* The model badge sits next to the title; margin-right:auto absorbs the free
-   space so the usage rollup still aligns to the right. Empty (renders nothing)
-   until a model is observed, in which case the title and usage flank the head. */
-.chat-head-model { margin-right: auto; }
+/* The model badge sits next to the title; margin-left gives the brand mark room
+   so it does not crowd "Chat", and margin-right:auto absorbs the free space so
+   the usage rollup still aligns to the right. Empty (renders nothing) until a
+   model is observed, in which case the title and usage flank the head. */
+.chat-head-model { margin-left: 10px; margin-right: auto; }
 
 .chat-usage {
   display: flex;
