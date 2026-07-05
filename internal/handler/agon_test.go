@@ -128,15 +128,17 @@ func TestTryAutoAgon_SkipsTaskWithAgonAlreadyRun(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestAgonStateDir_OutsideWorktree(t *testing.T) {
-	wt := "/data/worktrees/abc123/myrepo"
+	// Build paths with filepath.Join so the expectations use the OS separator
+	// (agonStateDir goes through filepath, so a hardcoded "/" fails on Windows).
+	wt := filepath.Join("/data", "worktrees", "abc123", "myrepo")
 	got := agonStateDir(wt)
-	want := "/data/worktrees/abc123/.agon"
+	want := filepath.Join("/data", "worktrees", "abc123", ".agon")
 	if got != want {
 		t.Errorf("agonStateDir = %q, want %q", got, want)
 	}
 	// The state dir must not live inside the worktree, or git add -A would
 	// stage it and generateWorktreeDiff would surface it as task changes.
-	if strings.HasPrefix(got, wt+"/") {
+	if strings.HasPrefix(got, wt+string(filepath.Separator)) {
 		t.Errorf("agonStateDir %q is inside the worktree %q", got, wt)
 	}
 	if agonStateDir("") != "" {
