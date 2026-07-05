@@ -75,21 +75,15 @@ func defaultSandbox(cfg envconfig.Config) harness.ID {
 	return harness.Claude
 }
 
-// activeWorkspaceCrossOrg reports whether the active workspace set is stamped to
-// an org different from the caller's — a cross-org board carried across an org
-// switch, which must not present as active. A legacy (unstamped) or same-org
-// active workspace is NOT cross-org and stays visible: activating a project is
-// an implicit claim, so isolation must never hide the board the caller is
-// currently working in (only the project *list* is filtered strictly). Groups
-// is the unfiltered set; p is a present principal (nil is never cross-org).
-func activeWorkspaceCrossOrg(groups []workspace.Workspace, workspaces []string, p *workspace.Principal) bool {
-	if p == nil || len(workspaces) == 0 {
-		return false
-	}
+// workspaceVisible reports whether the active workspace set (by its group key)
+// is present in the principal-visible group list. Used to drop a cross-org
+// active workspace from the config so an org switch doesn't carry the previous
+// org's board over.
+func workspaceVisible(groups []workspace.Workspace, workspaces []string) bool {
 	key := workspace.GroupKey(workspaces)
 	for _, g := range groups {
 		if workspace.GroupKey(g.Folders) == key {
-			return g.OrgID != "" && g.OrgID != p.OrgID
+			return true
 		}
 	}
 	return false
@@ -112,12 +106,9 @@ func (h *Handler) workspaceVisibleTo(ctx context.Context, workspaces []string) b
 	if !ok || c == nil {
 		return true
 	}
-	// The active workspace stays readable/mutable unless it is a different org's
-	// board (cross-org carry-over); legacy/own/same-org active workspaces are
-	// visible, matching buildConfigResponse so config and the read/mutation
-	// guards agree on what "active" means for this caller.
 	groups, _ := workspace.LoadGroups(h.configDir)
-	return !activeWorkspaceCrossOrg(groups, workspaces, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+	groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+	return workspaceVisible(groups, workspaces)
 }
 
 // visibleWorkspaces returns the active workspaces, or nil when the active
@@ -180,16 +171,15 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	// anonymous caller (no session) sees every group. We resolve the principal
 	// directly from ctx since buildConfigResponse doesn't take *Request.
 	if c, ok := auth.PrincipalFromContext(ctx); ok && c != nil {
-		p := &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID}
-		// Drop the active workspace only on a genuine cross-org carry-over (it is
-		// stamped to a different org than the caller). Compute this against the
-		// unfiltered groups, before scoping the project list below, so a legacy
-		// or same-org active workspace stays presented — the caller keeps the
-		// board they are working in even when the list is filtered around it.
-		if activeWorkspaceCrossOrg(groups, workspaces, p) {
+		groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
+		// The active workspace is global server state. After an org switch it
+		// may still point at the previous org's group; if this principal can't
+		// see that group, don't present it as active. They get their org's
+		// groups (or the picker), a clean per-org view rather than the prior
+		// org's board carried across the switch.
+		if len(workspaces) > 0 && !workspaceVisible(groups, workspaces) {
 			workspaces = nil
 		}
-		groups = workspace.WorkspacesForPrincipal(groups, p)
 	}
 
 	workspaceBrowserPath := ""

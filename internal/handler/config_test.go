@@ -295,26 +295,45 @@ func TestUpdateWorkspaces_RoundTripsToConfig(t *testing.T) {
 	}
 }
 
-// TestUpdateWorkspaces_RoundTripsForOrgPrincipal pins the same Activate flow
-// for an authenticated org caller: a freshly activated group must be claimed
-// for the caller's org so the very next GET /api/config does not hide it as
-// cross-org (which would drop the board back to "Pick a workspace").
+// TestUpdateWorkspaces_RoundTripsForOrgPrincipal pins the real create+activate
+// flow (what WorkspacePicker uses) for an org caller: creating a workspace
+// stamps it for the caller's org (ownerPrincipal), so activating it and the
+// very next GET /api/config keep it visible rather than dropping the board to
+// "Pick a workspace". Ownership is claimed at create, not activate — a raw
+// path-switch to an unowned folder is intentionally out-of-scope under strict
+// isolation.
 func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
 	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
 	pick := t.TempDir()
-
 	id := &auth.Identity{Sub: "user-1", OrgID: "org-a"}
-	body, _ := json.Marshal(map[string]any{"workspaces": []string{pick}})
-	req := httptest.NewRequest(http.MethodPut, "/api/workspaces", bytes.NewReader(body))
-	req = req.WithContext(auth.WithIdentity(req.Context(), id))
-	w := httptest.NewRecorder()
-	switchWorkspacesViaConfig(h, w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("PUT /api/workspaces: expected 200, got %d: %s", w.Code, w.Body.String())
+	ctx := auth.WithIdentity(context.Background(), id)
+
+	// Create (stamps CreatedBy=user-1, OrgID=org-a).
+	createBody, _ := json.Marshal(map[string]any{"name": "w", "folders": []string{pick}})
+	createReq := httptest.NewRequest(http.MethodPost, "/api/workspaces", bytes.NewReader(createBody)).WithContext(ctx)
+	createW := httptest.NewRecorder()
+	h.CreateWorkspace(createW, createReq)
+	if createW.Code != http.StatusCreated {
+		t.Fatalf("create: %d %s", createW.Code, createW.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(createW.Body.Bytes(), &created); err != nil || created.ID == "" {
+		t.Fatalf("decode create: %v (%s)", err, createW.Body.String())
 	}
 
-	cfgReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	cfgReq = cfgReq.WithContext(auth.WithIdentity(cfgReq.Context(), id))
+	// Activate by id.
+	actReq := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+created.ID+"/activate", nil).WithContext(ctx)
+	actReq.SetPathValue("id", created.ID)
+	actW := httptest.NewRecorder()
+	h.ActivateWorkspace(actW, actReq)
+	if actW.Code != http.StatusOK {
+		t.Fatalf("activate: %d %s", actW.Code, actW.Body.String())
+	}
+
+	// GET /api/config as the org principal: the activated org-owned workspace stays visible.
+	cfgReq := httptest.NewRequest(http.MethodGet, "/api/config", nil).WithContext(ctx)
 	cfgW := httptest.NewRecorder()
 	h.GetConfig(cfgW, cfgReq)
 	var resp map[string]any
@@ -323,7 +342,7 @@ func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
 	}
 	workspaces, ok := resp["workspaces"].([]any)
 	if !ok || len(workspaces) == 0 {
-		t.Fatalf("expected activated workspace visible to org principal, got %#v", resp["workspaces"])
+		t.Fatalf("expected activated org-owned workspace visible to org principal, got %#v", resp["workspaces"])
 	}
 	if workspaces[0].(string) != pick {
 		t.Errorf("expected workspace %q, got %q", pick, workspaces[0])
@@ -362,6 +381,50 @@ func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T
 	ctxB := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-b"})
 	if got := h.visibleWorkspaces(ctxB); len(got) != 0 {
 		t.Errorf("org-b visibleWorkspaces = %v, want empty", got)
+	}
+}
+
+// configActiveWorkspaces GETs /api/config as ctx and returns the reported
+// active workspace folders.
+func configActiveWorkspaces(t *testing.T, h *Handler, ctx context.Context) []string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode /api/config: %v", err)
+	}
+	raw, _ := resp["workspaces"].([]any)
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		out = append(out, v.(string))
+	}
+	return out
+}
+
+// TestConfig_OrgViewDropsLegacyActiveWorkspace is the reproducer for "can still
+// see the active workspace after switch": a legacy (unowned) active workspace —
+// the state of every project before per-account isolation — stays visible in
+// personal view but must NOT carry across into an org view. Switching to an org
+// gives a clean slate, not the previous personal board.
+func TestConfig_OrgViewDropsLegacyActiveWorkspace(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	// Active workspace is legacy: no CreatedBy, no OrgID.
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{ws}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	personal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
+	if got := configActiveWorkspaces(t, h, personal); len(got) != 1 || got[0] != ws {
+		t.Errorf("personal view: active workspaces = %v, want [%s]", got, ws)
+	}
+
+	org := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
+	if got := configActiveWorkspaces(t, h, org); len(got) != 0 {
+		t.Errorf("org view after switch: active workspaces = %v, want [] (clean slate)", got)
 	}
 }
 
