@@ -190,10 +190,10 @@ personal space.
 
 **Summary.** Shipped much smaller than specced after verifying two facts against reality: the
 migration and coercion the spec centered on are unnecessary. The fix is the gate unification
-plus re-enabling sign-in, with one refinement (the active workspace is scoped differently from
-the project list). Commits: `bccd81bc` (unify), `85e6ce6e` (re-enable device sign-in),
-`6ed87396` (active-workspace split). Drift: Moderate — the goal (signed-in local isolates per
-account/org) is met, but via a smaller mechanism than the spec's design.
+plus re-enabling sign-in. Commits: `bccd81bc` (unify), `85e6ce6e` (re-enable device sign-in),
+`e2f3e7f5` (active workspace strict / clean slate on switch). Drift: Moderate — the goal
+(signed-in local isolates per account/org) is met, but via a smaller mechanism than the spec's
+design.
 
 **What the implementation actually needed (and the spec over-scoped).**
 - **No owner-adoption migration.** Verified from source that personal view already includes
@@ -218,12 +218,16 @@ account/org) is met, but via a smaller mechanism than the spec's design.
   signed-in → personal/org scope (local and cloud alike). `handler.go` `cloudMode` doc updated
   (it no longer gates visibility; still gates forced login + data-path scoping).
 - `server.go`: device-code sign-in re-enabled (reverted revert).
-- **List vs active split** (`6ed87396`): the project *list* filters strictly
-  (`WorkspacesForPrincipal`); the *active* workspace is dropped only on a genuine cross-org
-  carry-over (stamped to a different org than the caller), via the shared
-  `activeWorkspaceCrossOrg` helper used by both `buildConfigResponse` and `workspaceVisibleTo`.
-  Without this, an org caller who activated a legacy/unowned project lost their board. Legacy
-  and same-org active workspaces stay usable — activating a project implicitly claims it.
+- **Active workspace: strict / clean slate on switch** (`e2f3e7f5`): the active workspace is
+  presented only if it is in the caller's scope, so switching to an org drops a legacy/personal
+  board rather than carrying it across (`config.go` `buildConfigResponse` + `workspaceVisibleTo`
+  via `workspaceVisible`). A first attempt softened this to "keep unless a different org," but
+  that left the previous board visible after a switch (the reported "can still see the active
+  workspace after switch") and was reverted. Ownership is claimed at **create**
+  (`ownerPrincipal` stamps `CreatedBy`+`OrgID`), which is what the frontend create+activate flow
+  uses, so a real workspace passes the strict filter with no activate-time mutation. A raw
+  path-switch to an unowned folder is intentionally out-of-scope. Reproducer:
+  `TestConfig_OrgViewDropsLegacyActiveWorkspace`.
 - Test: `workspace_visibility_test.go` rewritten into the reproducer — a signed-in local
   personal/other-org caller no longer sees an org-stamped workspace (403 on mutation);
   anonymous still sees everything; the owning org sees it. `TestArchiveSpec_ForbiddenForHiddenWorkspace`
