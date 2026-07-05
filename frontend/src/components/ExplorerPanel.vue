@@ -63,6 +63,9 @@ const errorMsg = ref('');
 // the min and 50vw; explorer.css owns the matching min/max.
 const EXPLORER_DEFAULT_WIDTH = 260;
 const EXPLORER_MIN_WIDTH = 200;
+// Dragging narrower than this folds the panel to the rail rather than bottoming
+// out at the min width, so one gesture can both size and close the explorer.
+const EXPLORER_FOLD_WIDTH = 150;
 const EXPLORER_WIDTH_KEY = 'wallfacer-explorer-width';
 const panelWidth = ref(EXPLORER_DEFAULT_WIDTH);
 let resizeStartX = 0;
@@ -74,8 +77,16 @@ function maxPanelWidth(): number {
 }
 
 function onResizeMove(e: PointerEvent) {
-  const delta = e.clientX - resizeStartX;
-  panelWidth.value = Math.min(maxPanelWidth(), Math.max(EXPLORER_MIN_WIDTH, resizeStartW + delta));
+  const raw = resizeStartW + (e.clientX - resizeStartX);
+  if (raw < EXPLORER_FOLD_WIDTH) {
+    // Dragged past the fold threshold: close and end the gesture so the panel
+    // snaps to the rail instead of sticking at the min width. The last valid
+    // width stays persisted, so reopening restores the previous size.
+    onResizeEnd();
+    emit('close');
+    return;
+  }
+  panelWidth.value = Math.min(maxPanelWidth(), Math.max(EXPLORER_MIN_WIDTH, raw));
 }
 
 function onResizeEnd() {
