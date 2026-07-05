@@ -106,9 +106,43 @@
   margin-left: auto;
 }
 
+.pcp-send-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .pcp-send-hint {
   font-size: 10px;
   color: var(--ink-4);
+}
+
+/* Send affordance spring: scales in from the right edge when a draft appears and
+   collapses back out when the field empties. */
+.pcp-send-pop-enter-active {
+  transition: opacity 160ms ease, transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.pcp-send-pop-leave-active {
+  transition: opacity 120ms ease, transform 140ms ease;
+}
+.pcp-send-pop-enter-from,
+.pcp-send-pop-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+.pcp-send-wrap {
+  transform-origin: right center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pcp-send-pop-enter-active,
+  .pcp-send-pop-leave-active {
+    transition: opacity 120ms ease;
+  }
+  .pcp-send-pop-enter-from,
+  .pcp-send-pop-leave-to {
+    transform: none;
+  }
 }
 
 .pcp-send-group {
