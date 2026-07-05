@@ -9,8 +9,8 @@ const fontsCss = readFileSync(resolve(root, 'src/styles/fonts.css'), 'utf8');
 describe('font loading', () => {
   it('preloads the critical Latin fonts so first paint avoids a FOUT swap', () => {
     for (const href of [
-      '/fonts/inter-400.woff2',
-      '/fonts/inter-600.woff2',
+      '/fonts/lato-400.woff2',
+      '/fonts/lato-700.woff2',
       '/fonts/space-grotesk-var.woff2',
       '/fonts/jetbrains-mono-var.woff2',
     ]) {

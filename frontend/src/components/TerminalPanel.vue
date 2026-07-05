@@ -69,9 +69,9 @@ function isDarkTheme(): boolean {
 function buildTermTheme() {
   const dark = isDarkTheme();
   return {
-    background: getCssVar('--terminal-bg') || (dark ? '#0e0e13' : '#ffffff'),
-    foreground: getCssVar('--terminal-fg') || (dark ? '#dcdce4' : '#26262c'),
-    cursor: getCssVar('--accent') || '#5b5bd6',
+    background: getCssVar('--terminal-bg') || (dark ? '#1b1916' : '#faf8f3'),
+    foreground: getCssVar('--terminal-fg') || (dark ? '#f4f1ea' : '#2a2720'),
+    cursor: getCssVar('--accent') || '#c45a33',
     selectionBackground: dark ? 'rgba(244, 241, 234, 0.18)' : 'rgba(27, 25, 22, 0.16)',
     ...(dark ? darkAnsi : lightAnsi),
   };
@@ -145,7 +145,7 @@ async function init() {
   themeObserver = new MutationObserver(() => {
     if (term) term.options.theme = buildTermTheme();
   });
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-palette'] });
 
   connect();
 }

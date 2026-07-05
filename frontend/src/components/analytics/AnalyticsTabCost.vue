@@ -139,7 +139,10 @@ function drawDailyChart() {
   const barW = daily.length ? W / daily.length : 0;
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const barColor = isDark ? '#475569' : '#94a3b8';
-  const todayColor = isDark ? '#7c6cf0' : '#5b5bd6';
+  const accentVar = typeof getComputedStyle !== 'undefined'
+    ? getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+    : '';
+  const todayColor = accentVar || (isDark ? '#e07a51' : '#c45a33');
   const labelColor = isDark ? '#64748b' : '#94a3b8';
 
   ctx.clearRect(0, 0, W, H);

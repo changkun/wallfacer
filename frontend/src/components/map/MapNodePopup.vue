@@ -120,8 +120,8 @@ function onDragUp() {
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px 8px 14px;
-  background: var(--bg-elevated, #ffffff);
-  border-bottom: 1px solid var(--rule, #e3e3e8);
+  background: var(--bg-elevated, #faf8f3);
+  border-bottom: 1px solid var(--rule, #d9d3c5);
   cursor: grab;
   user-select: none;
   flex: 0 0 auto;
@@ -129,7 +129,7 @@ function onDragUp() {
 .map-popup__title {
   font-weight: 600;
   font-size: var(--fs-md, 13px);
-  color: var(--ink, #18181b);
+  color: var(--ink, #1b1916);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -141,7 +141,7 @@ function onDragUp() {
   flex: 0 0 auto;
 }
 .map-popup__btn {
-  border: 1px solid var(--rule, #e3e3e8);
+  border: 1px solid var(--rule, #d9d3c5);
   background: var(--bg-card, #fff);
   color: var(--ink-2, #4c4842);
   cursor: pointer;
@@ -163,7 +163,7 @@ function onDragUp() {
 }
 .map-popup__close:hover {
   background: var(--bg-hover, rgba(31, 29, 26, 0.045));
-  color: var(--ink, #18181b);
+  color: var(--ink, #1b1916);
 }
 .map-popup__body {
   flex: 1 1 auto;

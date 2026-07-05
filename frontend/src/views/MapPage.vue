@@ -394,7 +394,7 @@ watch(showArchived, () => void loadGraph());
 /* --- inspector readability: real buttons, dots, chips, grouping --- */
 /* Divider lines group the sections so the panel reads as blocks, not a wall. */
 .depgraph-inspector__section + .depgraph-inspector__section {
-  border-top: 1px solid var(--rule, #e3e3e8);
+  border-top: 1px solid var(--rule, #d9d3c5);
   padding-top: 16px;
 }
 .depgraph-inspector__heading {
@@ -415,7 +415,7 @@ watch(showArchived, () => void loadGraph());
   gap: 7px;
   margin: 0 0 3px;
   font-size: var(--fs-md, 13px);
-  color: var(--ink, #18181b);
+  color: var(--ink, #1b1916);
   line-height: 1.3;
 }
 .mc-sel__meta {
@@ -446,13 +446,13 @@ watch(showArchived, () => void loadGraph());
   border-color: var(--ink-4, #97928a);
 }
 .mc-btn--primary {
-  background: var(--accent, #5b5bd6);
-  border-color: var(--accent, #5b5bd6);
+  background: var(--accent, #c45a33);
+  border-color: var(--accent, #c45a33);
   color: #fff;
 }
 .mc-btn--primary:hover {
-  background: var(--accent-2, #4747c2);
-  border-color: var(--accent-2, #4747c2);
+  background: var(--accent-2, #a84e2e);
+  border-color: var(--accent-2, #a84e2e);
 }
 .mc-btn:disabled {
   opacity: 0.5;
@@ -463,7 +463,7 @@ watch(showArchived, () => void loadGraph());
   font-size: 10px;
   font-weight: 600;
   color: var(--ink-3, #6b6760);
-  background: var(--bg-sunk, #f0f0f2);
+  background: var(--bg-sunk, #ebe7de);
   border-radius: 999px;
   padding: 0 6px;
   margin-left: 4px;
@@ -524,6 +524,6 @@ watch(showArchived, () => void loadGraph());
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--accent-soft, #f3dccf);
-  color: var(--accent-2, #4747c2);
+  color: var(--accent-2, #a84e2e);
 }
 </style>
