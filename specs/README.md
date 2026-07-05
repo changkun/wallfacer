@@ -14,7 +14,8 @@ Identity - the live edge (auth + platform convergence)
   ✅ Authentication                ◐ Auth by Default + Console
   ○ Multi-User Collaboration       ○ Third-Party OIDC
   ◐ Remote Control (→ cloud plane) ○ Agent Token Exchange
-  ✅ Local Device-Code Sign-In (UI re-home)
+  ◐ Local Device-Code Sign-In (UI re-home; wiring reverted)
+  ○ Local Per-Account/Org Isolation (re-enables sign-in)
 
 Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
@@ -99,7 +100,8 @@ Everything about principals, sessions, delegation, and what data crosses the mac
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [local-device-signin.md](identity/local-device-signin.md) | **Complete** | Re-homed the built-but-unwired RFC 8628 device-code flow onto the Vue account menu for local `wallfacer run`: wired `DeviceAuth` (local-mode only), mint the session cookie on the poll `done` branch so `/api/me` reflects the sign-in, and a user-code modal (`useDeviceSignIn` + `DeviceSignInModal`) that falls back to the `/login` redirect on 503. Reuses `authClient` + the shared `latere/token.json`, so a device login also lights up the coordination connector, GitHub broker, and `latere` CLI. |
+| [local-account-isolation.md](identity/local-account-isolation.md) | Drafted | Make a signed-in local `wallfacer run` scope projects (workspaces) and tasks to the active personal account / org, reversing the cloud-only-isolation design for signed-in local sessions. Unifies the Layer-1 (workspace, `config.go`/`workspace_crud.go`) and Layer-2 (task, `principalSeesTask`) gates on principal-presence instead of `cloudMode`, adds an idempotent legacy owner-adoption migration so existing owner-less projects survive the switch, and re-enables device sign-in (reverted in `794602ef`) as one coherent change. |
+| [local-device-signin.md](identity/local-device-signin.md) | **Complete** (wiring reverted) | Re-homed the built-but-unwired RFC 8628 device-code flow onto the Vue account menu for local `wallfacer run`: `DeviceAuth` wiring, session-cookie mint on the poll `done` branch, and a user-code modal (`useDeviceSignIn` + `DeviceSignInModal`) that falls back to `/login` on 503. The boot wiring was reverted (`794602ef`) because enabling local sign-in without per-account isolation broke the board; it is re-enabled by [local-account-isolation](identity/local-account-isolation.md). |
 | [authentication.md](identity/authentication.md) | **Complete** | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Follow-up auth-unification (authkit.Identity, HTTP device-code login) shipped and is archived under `identity/authentication/`. |
 | [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Drafted | Umbrella: org-scoped collaboration on the shipped identity plumbing (actor fields, org scoping). Adds RBAC, presence/focus, optimistic concurrency, private planning threads. Steps 1-2 (actor fields, migration) already shipped; breakdown started. Gate for cloud team hosting. |
 | ↳ [rbac-matrix.md](identity/multi-user-collaboration/rbac-matrix.md) | Drafted | Lead child: the canonical scope-to-permission matrix (admin/editor/viewer mapped onto `Identity.Scopes`, since there is no role claim), wiring `RequireScope`/`RequireSuperadmin` onto mutating routes. Anonymous mode unchanged. |
