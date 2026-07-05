@@ -14,8 +14,8 @@ Identity - the live edge (auth + platform convergence)
   ✅ Authentication                ◐ Auth by Default + Console
   ○ Multi-User Collaboration       ○ Third-Party OIDC
   ◐ Remote Control (→ cloud plane) ○ Agent Token Exchange
-  ◐ Local Device-Code Sign-In (UI re-home; wiring reverted)
-  ○ Local Per-Account/Org Isolation (re-enables sign-in)
+  ✅ Local Device-Code Sign-In (UI re-home)
+  ✅ Local Per-Account/Org Isolation (signed-in scopes projects/tasks)
 
 Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
