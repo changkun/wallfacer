@@ -1,12 +1,29 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useHead } from '@unhead/vue';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
+import { docIndex } from '../data/docs';
 import { useT } from '../i18n';
 import { useReveal } from '../composables/useReveal';
 
 const t = useT();
 useReveal();
 useHead({ title: 'Wallfacer Docs', meta: [{ name: 'description', content: 'Everything you need to get started and go deep with Wallfacer.' }] });
+
+// Cards derive from the generated docIndex (single source: the Reading
+// Order in docs/guide/usage.md), grouped by section in reading order.
+const sections = computed(() => {
+  const order: string[] = [];
+  const bySection = new Map<string, typeof docIndex>();
+  for (const entry of docIndex) {
+    if (!bySection.has(entry.section)) {
+      order.push(entry.section);
+      bySection.set(entry.section, []);
+    }
+    bySection.get(entry.section)!.push(entry);
+  }
+  return order.map((name) => ({ name, entries: bySection.get(name)! }));
+});
 </script>
 
 <template>
@@ -19,77 +36,18 @@ useHead({ title: 'Wallfacer Docs', meta: [{ name: 'description', content: 'Every
         </div>
       </section>
 
-      <section class="section">
+      <section v-for="section in sections" :key="section.name" class="section">
         <div class="section-container">
-          <span class="section-label">Get Started</span>
+          <span class="section-label">{{ section.name }}</span>
           <div class="cap-grid">
-            <router-link to="/docs/usage" class="cap-item cap-link">
-              <h3>Usage Guide</h3>
-              <p>Day-to-day workflows, keyboard shortcuts, and tips.</p>
-            </router-link>
-            <router-link to="/docs/getting-started" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.getting-started')"></h3>
-              <p v-html="t('wf.docs.getting-started.desc')"></p>
-            </router-link>
-            <router-link to="/docs/autonomy-spectrum" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.autonomy')"></h3>
-              <p v-html="t('wf.docs.autonomy.desc')"></p>
-            </router-link>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-container">
-          <span class="section-label">Use Wallfacer</span>
-          <div class="cap-grid">
-            <router-link to="/docs/exploring-ideas" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.exploring')"></h3>
-              <p v-html="t('wf.docs.exploring.desc')"></p>
-            </router-link>
-            <router-link to="/docs/designing-specs" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.specs')"></h3>
-              <p v-html="t('wf.docs.specs.desc')"></p>
-            </router-link>
-            <router-link to="/docs/agents-and-flows" class="cap-item cap-link">
-              <h3>Agents &amp; Flows</h3>
-              <p>Configure agent backends and multi-step execution flows.</p>
-            </router-link>
-            <router-link to="/docs/board-and-tasks" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.board')"></h3>
-              <p v-html="t('wf.docs.board.desc')"></p>
-            </router-link>
-            <router-link to="/docs/refinement-and-ideation" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.refinement')"></h3>
-              <p v-html="t('wf.docs.refinement.desc')"></p>
-            </router-link>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-container">
-          <span class="section-label">Operate</span>
-          <div class="cap-grid">
-            <router-link to="/docs/automation" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.automation')"></h3>
-              <p v-html="t('wf.docs.automation.desc')"></p>
-            </router-link>
-            <router-link to="/docs/oversight-and-analytics" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.oversight')"></h3>
-              <p v-html="t('wf.docs.oversight.desc')"></p>
-            </router-link>
-            <router-link to="/docs/workspaces" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.workspaces')"></h3>
-              <p v-html="t('wf.docs.workspaces.desc')"></p>
-            </router-link>
-            <router-link to="/docs/configuration" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.config')"></h3>
-              <p v-html="t('wf.docs.config.desc')"></p>
-            </router-link>
-            <router-link to="/docs/circuit-breakers" class="cap-item cap-link">
-              <h3 v-html="t('wf.docs.circuit')"></h3>
-              <p v-html="t('wf.docs.circuit.desc')"></p>
+            <router-link
+              v-for="entry in section.entries"
+              :key="entry.slug"
+              :to="`/docs/${entry.slug}`"
+              class="cap-item cap-link"
+            >
+              <h3>{{ entry.title }}</h3>
+              <p>{{ entry.desc }}</p>
             </router-link>
           </div>
         </div>
