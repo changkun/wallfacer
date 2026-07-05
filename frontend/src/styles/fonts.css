@@ -19,7 +19,24 @@
     src: url('/fonts/space-grotesk-var.woff2') format('woff2');
 }
 
-/* Inter — primary UI sans */
+/* Lato — primary UI sans (weights 500/600 resolve to the 400/700 files
+   per CSS font matching; Lato ships no intermediate weights) */
+@font-face {
+    font-family: 'Lato';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('/fonts/lato-400.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Lato';
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+    src: url('/fonts/lato-700.woff2') format('woff2');
+}
+
+/* Inter — fallback sans */
 @font-face {
     font-family: 'Inter';
     font-style: normal;

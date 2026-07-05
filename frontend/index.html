@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/lato-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/lato-700.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/space-grotesk-var.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin />
     <title>Wallfacer</title>
@@ -17,6 +17,12 @@
         var t = localStorage.getItem('wallfacer-theme') || 'auto';
         if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', t);
+        // Color palette axis (see stores/prefs.ts); default clay carries no
+        // attribute. Keep the list in sync with PALETTES.
+        var p = localStorage.getItem('wallfacer-palette');
+        if (p === 'indigo' || p === 'amber' || p === 'rose' || p === 'copper') {
+          document.documentElement.setAttribute('data-palette', p);
+        }
       })();
     </script>
   </head>

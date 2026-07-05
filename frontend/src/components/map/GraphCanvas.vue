@@ -264,8 +264,8 @@ defineExpose({ resetView });
   user-select: none;
   -webkit-user-select: none;
   background:
-    radial-gradient(circle, var(--rule, #e3e3e8) 1px, transparent 1px) 0 0 / 24px 24px;
-  background-color: var(--bg, #fafafa);
+    radial-gradient(circle, var(--rule, #d9d3c5) 1px, transparent 1px) 0 0 / 24px 24px;
+  background-color: var(--bg, #f4f1ea);
 }
 .gc-canvas--panning {
   cursor: grab;
@@ -278,23 +278,23 @@ defineExpose({ resetView });
 }
 /* Network-style node: a state-colored disc with the title below it. */
 .gc-dot {
-  stroke: var(--bg, #fafafa);
+  stroke: var(--bg, #f4f1ea);
   stroke-width: 2;
   transition: r 80ms ease;
 }
 .gc-node__label {
   font-size: 11px;
   font-weight: 600;
-  fill: var(--ink, #18181b);
+  fill: var(--ink, #1b1916);
   /* Halo so the label stays legible over edges and the dot grid. */
   paint-order: stroke;
-  stroke: var(--bg, #fafafa);
+  stroke: var(--bg, #f4f1ea);
   stroke-width: 3px;
   stroke-linejoin: round;
 }
 
 .gc-node--selected .gc-dot {
-  stroke: var(--accent, #5b5bd6);
+  stroke: var(--accent, #c45a33);
   stroke-width: 3;
   filter: drop-shadow(0 0 5px var(--accent-soft, #f3dccf));
 }
@@ -304,7 +304,7 @@ defineExpose({ resetView });
 /* "Actionable now": a node the backend marked with an available action gets an
    accent ring so the operator can spot what's ready to dispatch/start. */
 .gc-node--ready .gc-dot {
-  stroke: var(--accent, #5b5bd6);
+  stroke: var(--accent, #c45a33);
   stroke-width: 3;
 }
 
@@ -344,7 +344,7 @@ defineExpose({ resetView });
 /* "You are here": the running node on the critical path gets a bold accent ring
    plus the breathing disc, so the eye lands on where the pipeline is now. */
 .gc-node--here .gc-dot {
-  stroke: var(--accent, #5b5bd6);
+  stroke: var(--accent, #c45a33);
   stroke-width: 3;
 }
 
@@ -370,7 +370,7 @@ defineExpose({ resetView });
 .gc-edge--task_dep { stroke: var(--ink-4, #97928a); }
 .gc-edge--critical {
   stroke-width: 2.5;
-  stroke: var(--accent, #5b5bd6);
+  stroke: var(--accent, #c45a33);
 }
 .gc-arrowhead { fill: var(--border-strong, #c7c0af); }
 .gc-arrowhead--dispatch { fill: var(--col-progress, #3a6db3); }
