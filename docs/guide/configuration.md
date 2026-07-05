@@ -4,7 +4,7 @@ Wallfacer is configured through the Settings page, environment variables in `~/.
 
 ## Settings page
 
-Open Settings from the sidebar gear icon or press `Cmd+,` (or `Ctrl+,`). The page has four tabs.
+Open Settings from the sidebar gear icon or press `Cmd+,` (or `Ctrl+,`). The page has five tabs.
 
 ### Execution tab
 
@@ -14,6 +14,11 @@ Open Settings from the sidebar gear icon or press `Cmd+,` (or `Ctrl+,`). The pag
 - **Oversight interval**: minutes between periodic oversight summaries while a task runs (0 to 120; 0 generates summaries only at completion). Maps to `WALLFACER_OVERSIGHT_INTERVAL`.
 - **Auto push**: enable automatic `git push` after commits, with a threshold field (push only when the workspace is at least N commits ahead of upstream). Maps to `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD`.
 - **Task titles** and **Trace oversight**: batch backfill buttons that generate missing titles or oversight summaries for existing tasks, with a selectable batch limit.
+
+### Appearance tab
+
+- **Mode**: Light, Dark, or Auto (follow the operating system). Also cycled from the account menu; stored at `wallfacer-theme` in browser storage.
+- **Color theme**: named palettes applied to the whole workspace in both light and dark mode. `Clay` is the default; `Indigo`, `Amber`, `Rose`, and `Copper` are alternatives. Stored at `wallfacer-palette`; the choice is per browser.
 
 ### Harness tab
 
