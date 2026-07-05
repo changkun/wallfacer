@@ -5,18 +5,21 @@
    wordmark follows the new identity everywhere latere-ui renders it; the
    sibling product wordmarks (cella/topos/lux/...) keep their own gradients
    but inherit the display face since Instrument Serif no longer ships. */
-.cella-brand,
-.wallfacer-brand,
-.lux-brand,
-.topos-brand,
-.agon-brand,
-.lectio-brand {
+/* [data-theme] outranks latere-ui's single-class !important rules no matter
+   which order Vite emits the stylesheets in (component-imported CSS can land
+   after this entry-imported file). */
+[data-theme] .cella-brand,
+[data-theme] .wallfacer-brand,
+[data-theme] .lux-brand,
+[data-theme] .topos-brand,
+[data-theme] .agon-brand,
+[data-theme] .lectio-brand {
   font-family: var(--font-display) !important;
   font-style: normal !important;
   font-weight: 600 !important;
   letter-spacing: -0.01em;
 }
-.wallfacer-brand {
+[data-theme] .wallfacer-brand {
   background-image: var(--accent-gradient) !important;
 }
 
