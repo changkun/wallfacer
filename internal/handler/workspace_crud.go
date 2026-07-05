@@ -63,12 +63,11 @@ func (h *Handler) activeWorkspaceID() string {
 }
 
 // visibilityPrincipal returns the principal used to scope which workspaces a
-// caller may see. Local single-user runs (cloudMode=false) see everything, so
-// they return nil; only cloud deployments enforce org/personal isolation.
+// caller may see. Scoping is by principal presence, not deployment mode: an
+// anonymous caller (no session) returns nil and sees everything; a signed-in
+// caller (local or cloud) is scoped to their personal/org view, matching the
+// task filter.
 func (h *Handler) visibilityPrincipal(r *http.Request) *workspace.Principal {
-	if !h.cloudMode {
-		return nil
-	}
 	if p := principalFromRequest(r); p != nil {
 		return &workspace.Principal{Sub: p.Sub, OrgID: p.OrgID}
 	}

@@ -18,7 +18,8 @@ import (
 // rather than mutating a workspace /api/config reports as absent.
 func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	h.SetCloudMode(true) // org isolation only applies to cloud deployments
+	// cloudMode left false: isolation is by principal presence, not deployment
+	// mode, so a signed-in local caller is scoped the same as in the cloud.
 	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
 		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
 	}); err != nil {
@@ -47,12 +48,13 @@ func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 	}
 }
 
-// TestVisibleWorkspaces_LocalModeShowsOrgStampedWorkspace is the regression
-// guard for the org-switch lockout: on a local single-user run (cloudMode
-// false, the default), an org-stamped workspace stays visible to every
-// principal — personal or any org — so switching org labels never hides the
-// user's own workspace. Only a cloud deployment isolates.
-func TestVisibleWorkspaces_LocalModeShowsOrgStampedWorkspace(t *testing.T) {
+// TestVisibleWorkspaces_LocalIsolatesByPrincipal is the reproducer for the
+// per-account/org isolation fix: on a local run (cloudMode false, the default),
+// an org-stamped workspace is hidden from a personal or different-org signed-in
+// caller and visible only to the owning org. An anonymous caller (no session,
+// the local default) still sees everything. Before the fix, local mode showed
+// the workspace to every principal.
+func TestVisibleWorkspaces_LocalIsolatesByPrincipal(t *testing.T) {
 	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
 	// cloudMode left at its default (false) — this is a local run.
 	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
@@ -61,21 +63,34 @@ func TestVisibleWorkspaces_LocalModeShowsOrgStampedWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Personal caller and a different org both still see the workspace locally.
+	// Anonymous (no principal in context): sees everything, mutation allowed.
+	anon := context.Background()
+	if got := h.visibleWorkspaces(anon); len(got) != 1 || got[0] != ws {
+		t.Errorf("anonymous: visibleWorkspaces = %v, want [%s]", got, ws)
+	}
+
+	// Signed-in but not the owning org: the org workspace is hidden and a
+	// workspace-scoped mutation is refused.
 	for _, id := range []*auth.Identity{
-		{Sub: "u", OrgID: ""},      // personal
+		{Sub: "u", OrgID: ""},      // personal view
 		{Sub: "u", OrgID: "org-b"}, // different org
 	} {
 		ctx := auth.WithIdentity(context.Background(), id)
-		if got := h.visibleWorkspaces(ctx); len(got) != 1 || got[0] != ws {
-			t.Errorf("local mode, principal %+v: visibleWorkspaces = %v, want [%s]", id, got, ws)
+		if got := h.visibleWorkspaces(ctx); len(got) != 0 {
+			t.Errorf("signed-in %+v: visibleWorkspaces = %v, want [] (isolated)", id, got)
 		}
 		req := httptest.NewRequest(http.MethodPost, "/api/specs/archive", bytes.NewReader([]byte("{}")))
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		h.ArchiveSpec(w, req)
-		if w.Code == http.StatusForbidden {
-			t.Errorf("local mode, principal %+v: mutation forbidden, want allowed", id)
+		if w.Code != http.StatusForbidden {
+			t.Errorf("signed-in %+v: mutation code %d, want 403 (isolated)", id, w.Code)
 		}
+	}
+
+	// The owning org sees it and passes the visibility guard.
+	ownerCtx := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "owner", OrgID: "org-a"})
+	if got := h.visibleWorkspaces(ownerCtx); len(got) != 1 || got[0] != ws {
+		t.Errorf("owning org: visibleWorkspaces = %v, want [%s]", got, ws)
 	}
 }
