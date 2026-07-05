@@ -1,6 +1,6 @@
 ---
 title: Docs Teardown & Rewrite
-status: drafted
+status: complete
 depends_on: []
 affects:
   - docs/
@@ -154,3 +154,31 @@ to prevent rule drift.
   test over the embedded FS.
 - Manual: local `/docs` nav + cloud `/docs` cards render the same structure;
   docs search returns new content.
+
+## Outcome
+
+Shipped 2026-07-05 (commits 31ac0ff4, 7d3ef1e4, eba868d8, dbcadb00).
+Executed via a code-truth feature inventory (Explore agent over the whole
+surface) followed by six parallel writer agents. Deviations and notes:
+
+- New 13-guide IA landed as specced; old guides deleted
+  (autonomy-spectrum, exploring-ideas, designing-specs, board-and-tasks,
+  refinement-and-ideation, agents-and-flows, circuit-breakers,
+  oversight-and-analytics). docs/cloud/ was absorbed into the new
+  internals/auth-and-identity.md and deleted (no separate cloud.md guide).
+- Internals gained agent-graph-runtime.md and auth-and-identity.md plus a
+  drift pass across six existing files (seven watchers incl. auto-agon,
+  five agent roles, stable-identity workspace model, expanded route
+  groups).
+- Nav single source: gen-docs-index.mjs derives data/docs.ts from the
+  usage.md reading order; DocsIndex renders from it; a vitest guards sync
+  and orphan slugs. The Go-side fixture test was not duplicated (the
+  existing internal/cli docs tests already cover the parser).
+- Code fixes folded in: PrintUsage lists auth/web, runner package doc no
+  longer claims container execution, agents registry comment says five,
+  GitHub broker comment matches the wiring, CONTRIBUTING internals table
+  lists all 11 references.
+- All screenshots regenerated in the new theme (guide image pairs incl.
+  new mission/whiteboard surfaces, marketing statics, README assets).
+- User-facing style enforced and grep-verified: no first/second person,
+  no em dashes.

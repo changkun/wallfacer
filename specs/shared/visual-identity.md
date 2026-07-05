@@ -1,6 +1,6 @@
 ---
 title: Visual Identity Rebrand & Docs Rewrite
-status: drafted
+status: complete
 depends_on: []
 affects:
   - frontend/src/styles/
@@ -186,3 +186,11 @@ See child specs. Boundaries:
   `DocsIndex.vue`, and `docs/guide/`).
 - Reduced-motion: marketing pages verified with `prefers-reduced-motion:
   reduce` emulation (no scroll-jacking, content readable without JS motion).
+
+## Outcome
+
+All three children shipped on 2026-07-05, implemented directly on main (not
+dispatched). The workspace app, marketing site, and docs now carry the
+indigo-on-zinc identity; the drifted docs tree was torn down and rewritten
+from a code-truth feature inventory. See the child Outcome sections for
+per-track detail and deviations.

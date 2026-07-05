@@ -1,6 +1,6 @@
 ---
 title: Animated Marketing Site Rebuild
-status: drafted
+status: complete
 depends_on:
   - specs/shared/visual-identity/design-tokens.md
 affects:
@@ -106,3 +106,23 @@ framing (rounded card, cool shadow, thin rule).
   visible without motion, no horizontal scroll at 375px/768px/1440px.
 - Console-error-free load on all four routes (snap.mjs already surfaces page
   errors).
+
+## Outcome
+
+Shipped 2026-07-05 (commit 8625df01). Deviations from the plan:
+
+- The hero simulation (`components/site/HeroSim.vue`) is pure CSS
+  keyframes on a shared 20s cycle rather than a JS/rAF canvas: the markup
+  is static, so vite-ssg prerenders a complete scene and reduced-motion
+  freezes it with zero JS. The animated-stats requirement landed as the
+  sim's cost ticker (CSS steps tape) instead of a separate stats band.
+- The interactive capability demo is `AutonomySpectrum.vue`, a
+  keyboard-accessible four-stop slider (chat/plan/board/autopilot) with
+  new en+zh copy.
+- Scroll reveals reuse the existing `useReveal` composable; the hero adds
+  an indigo aura + dot grid and a harness logo strip.
+- InstallPage, DocsIndex, and the 404 page were carried by the token
+  retheme plus the DocsIndex card rebuild (docs-rewrite child); no bespoke
+  motion was added to them.
+- Component tests cover the static-scene contract and slider semantics;
+  SSG output verified to contain the sim and spectrum markup.
