@@ -1,6 +1,6 @@
 ---
 title: Local Per-Account / Per-Org Project & Task Isolation
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/handler/config.go
@@ -185,3 +185,53 @@ personal space.
 - **End-to-end**: sign in locally → existing projects still visible (personal) → switch to org
   → only org projects → switch back → personal projects return. Re-run the
   [local-device-signin](local-device-signin.md) suite to confirm re-enabled sign-in.
+
+## Outcome
+
+**Summary.** Shipped much smaller than specced after verifying two facts against reality: the
+migration and coercion the spec centered on are unnecessary. The fix is the gate unification
+plus re-enabling sign-in, with one refinement (the active workspace is scoped differently from
+the project list). Commits: `bccd81bc` (unify), `85e6ce6e` (re-enable device sign-in),
+`6ed87396` (active-workspace split). Drift: Moderate — the goal (signed-in local isolates per
+account/org) is met, but via a smaller mechanism than the spec's design.
+
+**What the implementation actually needed (and the spec over-scoped).**
+- **No owner-adoption migration.** Verified from source that personal view already includes
+  legacy no-owner records: `WorkspacesForPrincipal` (`groups.go:221`) and `principalSeesTask`
+  (`store/principal.go:87`) both return legacy (`CreatedBy==""`, `OrgID==""`) entries for a
+  personal (`OrgID==""`) caller. So existing projects/tasks stay visible in personal view with
+  no data mutation; org view correctly excludes them. The "existing projects vanish" landmine
+  only fires if the session defaults to an *org* view — which it does not (next point). The
+  adoption migration is therefore deferred; it is only needed to separate legacy data across
+  *multiple* local accounts on one machine, which is not the reported need.
+- **No personal-coercion.** Decoded the user's real persisted device token
+  (`~/.config/latere/token.json`): it carries **no org claim** (`OrgID==""`), so a bare local
+  sign-in is already personal. No mint-time coercion needed.
+- **No `scopedPrincipal` helper / Layer-2 change.** Layer 2 (tasks) already gated on
+  principal-presence (`principalFromRequest`, no `cloudMode`). Only Layer 1 (workspaces) was
+  cloud-gated. The fix was to drop the three Layer-1 `cloudMode` short-circuits so both layers
+  share one rule; no new helper was warranted.
+
+**What shipped.**
+- `config.go` `workspaceVisibleTo` + `buildConfigResponse` and `workspace_crud.go`
+  `visibilityPrincipal`: filter by principal presence, not `cloudMode`. Anonymous → see all;
+  signed-in → personal/org scope (local and cloud alike). `handler.go` `cloudMode` doc updated
+  (it no longer gates visibility; still gates forced login + data-path scoping).
+- `server.go`: device-code sign-in re-enabled (reverted revert).
+- **List vs active split** (`6ed87396`): the project *list* filters strictly
+  (`WorkspacesForPrincipal`); the *active* workspace is dropped only on a genuine cross-org
+  carry-over (stamped to a different org than the caller), via the shared
+  `activeWorkspaceCrossOrg` helper used by both `buildConfigResponse` and `workspaceVisibleTo`.
+  Without this, an org caller who activated a legacy/unowned project lost their board. Legacy
+  and same-org active workspaces stay usable — activating a project implicitly claims it.
+- Test: `workspace_visibility_test.go` rewritten into the reproducer — a signed-in local
+  personal/other-org caller no longer sees an org-stamped workspace (403 on mutation);
+  anonymous still sees everything; the owning org sees it. `TestArchiveSpec_ForbiddenForHiddenWorkspace`
+  now asserts isolation *without* `cloudMode`.
+
+**Known caveat / follow-up.** Org switching still uses the browser `/login?org_id=` redirect
+(`orgs.go:158` `doOrgSwitch`), not the device flow. After a device sign-in the browser holds
+an auth-service SSO session, so the switch is silent when the local callback `redirect_uri` is
+registered (default port). If a follow-up wants fully redirect-free org switching (and
+multi-account legacy separation), that is the deferred adoption + a device-code switch path —
+tracked here, not built.
