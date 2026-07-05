@@ -102,10 +102,15 @@ func TestSessionTokenBridgeSync(t *testing.T) {
 // outbound connection without a separate `wallfacer auth login`.
 func TestSessionTokenBridgeCapturesCookie(t *testing.T) {
 	client := oidc.New(oidc.Config{
-		AuthURL:    "https://auth.latere.ai",
-		ClientID:   "wallfacer",
-		CookieKey:  "0123456789abcdef0123456789abcdef",
-		CookieName: "test-session", // avoid the __Host- Secure/HTTPS requirement
+		AuthURL:  "https://auth.latere.ai",
+		ClientID: "wallfacer",
+		// A RedirectURL puts the client in browser mode so the cookie helpers
+		// derive a key from CookieKey; without it the newer oidc package leaves
+		// the key zero and SetSession/session decryption fail closed (matching
+		// how the real UI client is built with a callback URL).
+		RedirectURL: "https://app.latere.ai/callback",
+		CookieKey:   "0123456789abcdef0123456789abcdef",
+		CookieName:  "test-session", // avoid the __Host- Secure/HTTPS requirement
 	})
 	if client == nil {
 		t.Skip("oidc client unavailable")
