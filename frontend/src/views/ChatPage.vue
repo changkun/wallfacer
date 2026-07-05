@@ -31,6 +31,48 @@ function expandSessions() {
   if (typeof localStorage !== 'undefined') localStorage.setItem(SESSIONS_COLLAPSED_KEY, '0');
 }
 
+// Drag-resize the session list. Dragging narrower than SESSIONS_FOLD collapses
+// it to the rail rather than bottoming out at the min width, so a single gesture
+// can both size and fold the list. Width is persisted; only valid (unfolded)
+// widths are stored so expanding restores the last real size.
+const SESSIONS_WIDTH_KEY = 'wallfacer-chat-sessions-width';
+const SESSIONS_MIN = 200;
+const SESSIONS_MAX = 480;
+const SESSIONS_FOLD = 150; // raw drag width below this auto-folds
+const sessionsWidth = ref<number>(
+  parseInt((typeof localStorage !== 'undefined' && localStorage.getItem(SESSIONS_WIDTH_KEY)) || '248', 10),
+);
+
+function startSessionsResize(ev: MouseEvent) {
+  ev.preventDefault();
+  const startX = ev.clientX;
+  const startW = sessionsWidth.value;
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+  function onMove(mv: MouseEvent) {
+    const raw = startW + (mv.clientX - startX);
+    if (raw < SESSIONS_FOLD) {
+      // Dragged past the fold threshold: collapse and end the gesture so the
+      // list snaps to the rail instead of sticking at the min width.
+      onUp();
+      collapseSessions();
+      return;
+    }
+    sessionsWidth.value = Math.min(SESSIONS_MAX, Math.max(SESSIONS_MIN, raw));
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SESSIONS_WIDTH_KEY, String(sessionsWidth.value));
+    }
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
 // Entry screen while the active session has no messages; the first user bubble
 // flips this to the conversation view, producing the centered→docked morph.
 const showEntry = computed(() => chat.renderedMessages.value.length === 0);
@@ -64,7 +106,20 @@ function applyQuick(insert: string) {
 
 <template>
   <div class="chat-page">
-    <SessionList v-if="!sessionsCollapsed" :session="chat" @collapse="collapseSessions" />
+    <template v-if="!sessionsCollapsed">
+      <SessionList
+        :session="chat"
+        :style="{ '--chat-sessions-width': sessionsWidth + 'px' }"
+        @collapse="collapseSessions"
+      />
+      <div
+        class="chat-sessions-resize"
+        role="separator"
+        aria-orientation="vertical"
+        title="Drag to resize · drag left to fold"
+        @mousedown="startSessionsResize"
+      />
+    </template>
     <!-- Collapsed rail: a persistent left-edge affordance to reopen the session
          list, occupying the same slot the list would. Mirrors the Board explorer
          and Plan spec-tree rails. -->
@@ -174,6 +229,19 @@ function applyQuick(insert: string) {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* Drag handle between the session list and the conversation; matches the Plan
+   spec-tree resize handle. */
+.chat-sessions-resize {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+
+.chat-sessions-resize:hover {
+  background: var(--rule);
 }
 
 /* Collapsed rail: persistent left-edge strip that reopens the session list,

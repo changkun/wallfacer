@@ -195,7 +195,7 @@ onUnmounted(() => {
 
 <style scoped>
 .chat-sessions {
-  width: 248px;
+  width: var(--chat-sessions-width, 248px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
