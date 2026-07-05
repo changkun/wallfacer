@@ -84,13 +84,15 @@ type spanStatsResponse struct {
 // percentileIndex returns the slice index for the given percentile (0–100)
 // using the nearest-rank method, clamped to a valid range.
 // With N=1, all percentiles resolve to index 0 (the only element).
+// With N<=0 the result is 0: the upper clamp is applied before the lower
+// clamp so an empty input never yields a negative index (n-1 == -1).
 func percentileIndex(n, pct int) int {
 	idx := int(math.Ceil(float64(pct)/100.0*float64(n))) - 1
-	if idx < 0 {
-		idx = 0
-	}
 	if idx >= n {
 		idx = n - 1
+	}
+	if idx < 0 {
+		idx = 0
 	}
 	return idx
 }

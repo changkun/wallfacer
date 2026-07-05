@@ -269,6 +269,19 @@ func TestGetSpanStats_PercentileIndexSingleElement(t *testing.T) {
 	}
 }
 
+// TestPercentileIndex_EmptyInputClampsToZero guards the empty-input contract:
+// with N=0 the nearest-rank formula yields -1, and the doc promises a value
+// "clamped to a valid range". Before the clamp order was fixed the lower-bound
+// clamp ran first and the trailing `idx = n - 1` reset it back to -1, so any
+// future caller that skipped the len>0 guard would panic on a negative index.
+func TestPercentileIndex_EmptyInputClampsToZero(t *testing.T) {
+	for _, pct := range []int{0, 50, 95, 99, 100} {
+		if idx := percentileIndex(0, pct); idx != 0 {
+			t.Errorf("percentileIndex(0, %d) = %d; want 0 (never negative)", pct, idx)
+		}
+	}
+}
+
 // TestHealth_RunningContainersEmpty verifies running_containers has count=0 and
 // an empty items list when the runner has no container runtime configured (test env).
 func TestHealth_RunningContainersEmpty(t *testing.T) {
