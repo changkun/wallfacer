@@ -169,8 +169,10 @@ func prTitleForTask(task *store.Task) string {
 		return t
 	}
 	if p := strings.TrimSpace(task.Prompt); p != "" {
-		if len(p) > 72 {
-			p = p[:72]
+		// Truncate by rune, not byte, so a multi-byte (e.g. CJK) prompt is not
+		// cut mid-rune into an invalid-UTF-8 title. Mirrors stats.go's TopTasks.
+		if r := []rune(p); len(r) > 72 {
+			p = string(r[:72])
 		}
 		return strings.SplitN(p, "\n", 2)[0]
 	}
