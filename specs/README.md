@@ -60,7 +60,8 @@ Shared Design - 5 complete
   ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
   ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
   ○ Topos as Native Harness (Topos = default; decouple Claude Code default)
-  ✅ Visual Identity Rebrand (indigo-on-zinc tokens · animated site · docs rewrite)
+  ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
+  ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -240,6 +241,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [visual-identity.md](shared/visual-identity.md) | **Complete** | Both | Umbrella: replace the Anthropic/Claude-like identity (cream `#f4f1ea`, terracotta `#c45a33`/`#d97757`, Instrument Serif) with an indigo-on-zinc system, rebuild the marketing site with animation/interactive graphics, and tear down + rewrite the drifted docs. Token names stay stable; three children below. |
 | ↳ [visual-identity/design-tokens.md](shared/visual-identity/design-tokens.md) | **Complete** | Both | New palette + all-sans/mono type system in `tokens.css` (values only, names stable), base.css token-block reconciliation, Space Grotesk + bundled JetBrains Mono, in-repo `.wallfacer-brand` override, retheme of the four `data-theme`-observing components, full ui-shots light+dark sweep. |
 | ↳ [visual-identity/marketing-site.md](shared/visual-identity/marketing-site.md) | **Complete** | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
+| ↳ [visual-identity/theme-system.md](shared/visual-identity/theme-system.md) | **Complete** | Both | Slack-style user-selectable color themes: clay (the original palette) restored as default, indigo/amber/rose/copper as presets in palettes.css via a data-palette axis, typed PaletteName roster in the prefs store, Settings > Appearance picker, Lato as the UI sans. |
 | ↳ [visual-identity/docs-rewrite.md](shared/visual-identity/docs-rewrite.md) | **Complete** | Both | Docs teardown + re-architecture from the shipped surface: new 13-guide IA (agent-graph, mission control, whiteboard, GitHub, device sign-in documented; brainstorm/ideation/Agents+Flows drift removed), internals refresh + 2 new files, single-source nav (generator emits `data/docs.ts` from `usage.md` reading order), CLI usage fix, theme-refreshed screenshots. |
 
 ### Why these are shared
