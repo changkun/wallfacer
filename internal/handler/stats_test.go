@@ -163,6 +163,20 @@ func TestAggregateStats(t *testing.T) {
 		t.Errorf("ByStatus[done].CacheCreationTokens = %d, want 100 (regression — used to drop cache fields)", doneStat.CacheCreationTokens)
 	}
 
+	// Regression: ByStatus buckets must report a per-task Count, like
+	// ByWorkspace and ByFailureCategory. It used to stay 0 because only
+	// addUsage was called, so GET /api/stats served by_status[*].count == 0
+	// and the frontend's statusCount() could only ever read 0.
+	if doneStat.Count != 2 {
+		t.Errorf("ByStatus[done].Count = %d, want 2 (tasks 1 and 3)", doneStat.Count)
+	}
+	if failedStat.Count != 1 {
+		t.Errorf("ByStatus[failed].Count = %d, want 1", failedStat.Count)
+	}
+	if cancelledStat.Count != 1 {
+		t.Errorf("ByStatus[cancelled].Count = %d, want 1", cancelledStat.Count)
+	}
+
 	// --- ByActivity ---
 	// implementation total: 0.08 + 0.04 + 0.15 + 0.005 = 0.275
 	implStat, ok := resp.ByActivity["implementation"]
@@ -176,6 +190,11 @@ func TestAggregateStats(t *testing.T) {
 	wantImplInput := 800 + 500 + 1500 + 150
 	if implStat.InputTokens != wantImplInput {
 		t.Errorf("ByActivity[implementation].InputTokens = %d, want %d", implStat.InputTokens, wantImplInput)
+	}
+	// Regression: ByActivity buckets must also report a Count (one per task
+	// that exercised the activity). tasks 1, 2, 3 and 5 all did implementation.
+	if implStat.Count != 4 {
+		t.Errorf("ByActivity[implementation].Count = %d, want 4 (tasks 1, 2, 3, 5)", implStat.Count)
 	}
 
 	testStat, ok := resp.ByActivity["test"]
