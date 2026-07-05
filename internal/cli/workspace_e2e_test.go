@@ -69,6 +69,19 @@ func wsReq(t *testing.T, method, url, body string) *http.Response {
 	return resp
 }
 
+// mustJSON marshals v to a JSON string through the encoder rather than string
+// concatenation. Request/fixture bodies embed t.TempDir() paths, and a Windows
+// temp path (e.g. C:\Users\...) pasted raw into a JSON literal produces an
+// invalid "\U..." escape that fails to parse. Marshaling escapes it correctly.
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal json: %v", err)
+	}
+	return string(b)
+}
+
 func decodeWS(t *testing.T, resp *http.Response) map[string]any {
 	t.Helper()
 	defer func() { _ = resp.Body.Close() }()
@@ -103,7 +116,7 @@ func TestWorkspaceLifecycleE2E(t *testing.T) {
 
 	// Create workspace A.
 	createA := decodeWS(t, wsReq(t, http.MethodPost, srv.URL+"/api/workspaces",
-		`{"name":"A","folders":["`+dirA+`"]}`))
+		mustJSON(t, map[string]any{"name": "A", "folders": []string{dirA}})))
 	idA, _ := createA["id"].(string)
 	if idA == "" {
 		t.Fatalf("create A returned no id: %v", createA)
@@ -131,7 +144,7 @@ func TestWorkspaceLifecycleE2E(t *testing.T) {
 
 	// Edit A's folders (add dirB). The task must survive.
 	editResp := wsReq(t, http.MethodPut, srv.URL+"/api/workspaces/"+idA,
-		`{"folders":["`+dirA+`","`+dirB+`"]}`)
+		mustJSON(t, map[string]any{"folders": []string{dirA, dirB}}))
 	if editResp.StatusCode != http.StatusOK {
 		t.Fatalf("edit folders: status %d", editResp.StatusCode)
 	}
@@ -151,7 +164,7 @@ func TestWorkspaceLifecycleE2E(t *testing.T) {
 
 	// Create workspace B over the SAME folder; activate it; its board is empty.
 	createB := decodeWS(t, wsReq(t, http.MethodPost, srv.URL+"/api/workspaces",
-		`{"name":"B","folders":["`+dirA+`"]}`))
+		mustJSON(t, map[string]any{"name": "B", "folders": []string{dirA}})))
 	idB, _ := createB["id"].(string)
 	if idB == "" || idB == idA {
 		t.Fatalf("create B returned bad id %q (== A %q?)", idB, idA)
@@ -194,7 +207,7 @@ func TestWorkspaceMigrationE2E(t *testing.T) {
 	dirLive := t.TempDir()
 
 	// Legacy file with one live group.
-	legacy := `[{"name":"Live","workspaces":["` + dirLive + `"]}]`
+	legacy := mustJSON(t, []map[string]any{{"name": "Live", "workspaces": []string{dirLive}}})
 	if err := os.WriteFile(filepath.Join(configDir, "workspace-groups.json"), []byte(legacy), 0o644); err != nil {
 		t.Fatalf("write legacy: %v", err)
 	}
