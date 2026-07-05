@@ -124,15 +124,21 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		resp.TotalOutputTokens += u.OutputTokens
 		resp.TotalCacheTokens += u.CacheReadInputTokens + u.CacheCreationTokens
 
-		// ByStatus bucket.
+		// ByStatus bucket. Count is per-task, so bump it once per task —
+		// addUsage only folds in token/cost fields, mirroring the ByWorkspace
+		// and ByFailureCategory buckets below.
 		s := resp.ByStatus[t.Status]
 		s.addUsage(u)
+		s.Count++
 		resp.ByStatus[t.Status] = s
 
-		// ByActivity buckets from per-task breakdown.
+		// ByActivity buckets from per-task breakdown. Each activity appears at
+		// most once per task (breakdown is a map), so Count is the number of
+		// tasks that exercised the activity.
 		for activity, au := range breakdown {
 			a := resp.ByActivity[activity]
 			a.addUsage(au)
+			a.Count++
 			resp.ByActivity[activity] = a
 		}
 
