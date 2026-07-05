@@ -142,29 +142,35 @@ defineExpose({
         >@</button>
       </div>
       <div class="pcp-composer-right">
-        <span class="pcp-send-hint">{{ sendHint }}</span>
-        <div class="pcp-send-group">
-          <button
-            v-if="streaming"
-            type="button"
-            class="pcp-send pcp-interrupt"
-            title="Interrupt"
-            @click="emit('interrupt')"
-          >■</button>
-          <button
-            v-else
-            type="button"
-            class="pcp-send"
-            :disabled="!inputText.trim()"
-            @click="doSend"
-          >➤</button>
-          <button
-            type="button"
-            class="pcp-send-toggle"
-            title="Toggle send shortcut"
-            @click="toggleSendMode"
-          >▾</button>
-        </div>
+        <!-- The send affordance is hidden on an empty draft and springs in once
+             there is something to send (Slack-style). Interrupt is exempt: while
+             streaming it must always be reachable regardless of draft text. -->
+        <Transition name="pcp-send-pop">
+          <div v-if="streaming || inputText.trim()" class="pcp-send-wrap">
+            <span class="pcp-send-hint">{{ sendHint }}</span>
+            <div class="pcp-send-group">
+              <button
+                v-if="streaming"
+                type="button"
+                class="pcp-send pcp-interrupt"
+                title="Interrupt"
+                @click="emit('interrupt')"
+              >■</button>
+              <button
+                v-else
+                type="button"
+                class="pcp-send"
+                @click="doSend"
+              >➤</button>
+              <button
+                type="button"
+                class="pcp-send-toggle"
+                title="Toggle send shortcut"
+                @click="toggleSendMode"
+              >▾</button>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
   </div>
