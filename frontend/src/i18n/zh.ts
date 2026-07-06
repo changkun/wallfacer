@@ -2,7 +2,6 @@ export const zh: Record<string, string> = {
   // Header nav
   'nav.home': '首页',
   'nav.download': '下载',
-  'nav.docs': '文档',
   'nav.login': '登录',
   'nav.logout': '退出',
   'nav.me': '个人页面',
@@ -125,15 +124,6 @@ export const zh: Record<string, string> = {
   'wf.dl.step4.desc': '点击 <strong>+ 新建任务</strong>，输入提示词，将卡片拖到<strong>进行中</strong>。任务作为主机进程在自己的 git 工作树中运行，实时日志显示在详情面板中。',
   'wf.dl.cli.ref.title': 'CLI 参考',
   'wf.dl.cli.ref.flags': '<code>wallfacer run</code> 的常用参数：',
-
-  // Docs index page
-  'wf.docs.title': '<span class="wallfacer-brand">文档</span>',
-  'wf.docs.sub': '从入门到深入，Wallfacer 所需的一切。',
-  'wf.docs.github': 'GitHub',
-  'wf.docs.github.desc': '源代码、问题和发布。',
-
-  // Doc page sidebar
-  'wf.docs.back': '&larr; Wallfacer',
 
   // Footer
   'footer.products': '产品',
