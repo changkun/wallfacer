@@ -1,28 +1,37 @@
-/* ===== Navbar ===== */
+/* ===== Navbar — v2 floating capsule =====
+   Matches the Latere platform nav: a transparent, full-bleed sticky wrapper
+   detaches the capsule from the top edge, and the glass material lives on
+   .nav-container so it reads as a centered thin-glass pill. Consumes the shared
+   latere-ui glass ladder (--glass-bg-thin / --glass-blur-thin / --glass-
+       saturate / --glass-border / --glass-edge-top) so wallfacer's navbar
+   matches every Latere site; glass.css flattens these tokens under
+   reduce-transparency / increase-contrast / no-backdrop-filter. */
 .site-header {
     position: sticky;
     top: 0;
     z-index: 100;
-    /* Liquid Glass v2 — thin-tier floating nav chrome. Consumes the shared
-       latere-ui glass ladder (--glass-bg-thin / --glass-blur-thin / --glass-
-       saturate / --glass-border / --glass-edge-top) so wallfacer's navbar
-       matches every Latere site; glass.css flattens these tokens under
-       reduce-transparency / increase-contrast / no-backdrop-filter. Chrome
-       only — the marketing page scrolls beneath, never frosted content. */
-    background: var(--glass-bg-thin);
-    border-bottom: 1px solid var(--glass-border);
-    backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
-    -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
-    box-shadow: var(--glass-edge-top);
+    padding: 12px 20px 0;
+    background: transparent;
+    border: none;
 }
 .nav-container {
+    position: relative;
     max-width: 1080px;
     margin: 0 auto;
-    padding: 0 32px;
-    height: 48px;
+    padding: 0 12px 0 20px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background: var(--glass-bg-thin);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill);
+    backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+    box-shadow:
+        var(--glass-edge-top),
+        0 8px 32px rgba(0, 0, 0, 0.10),
+        0 2px 8px rgba(0, 0, 0, 0.05);
 }
 .logo-link {
     display: flex;
@@ -32,9 +41,10 @@
 }
 .logo-link:hover { color: var(--text); }
 .logo-text {
-    font-family: var(--font-display);
+    font-family: var(--font-serif);
+    font-style: italic;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 400;
     color: var(--text);
 }
 .logo-icon { flex-shrink: 0; }
