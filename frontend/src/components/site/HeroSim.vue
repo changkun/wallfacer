@@ -51,19 +51,24 @@
 
       <!-- Agent pipeline -->
       <div class="hs-graph">
-        <svg class="hs-edges" viewBox="0 0 300 220" fill="none" aria-hidden="true">
-          <path class="hs-edge hs-edge-1" d="M42 110 C 70 110, 78 110, 106 110" />
-          <path class="hs-edge hs-edge-2" d="M150 110 C 178 110, 186 110, 214 110" />
-          <path class="hs-edge hs-edge-3" d="M244 102 C 262 84, 268 62, 276 44" />
-          <path class="hs-edge hs-edge-3" d="M252 110 C 264 110, 268 110, 276 110" />
-          <path class="hs-edge hs-edge-3" d="M244 118 C 262 136, 268 158, 276 176" />
+        <!-- Edges live in the same coordinate space as the nodes: a 0-100 grid
+             stretched to fill the panel (preserveAspectRatio="none"), so an
+             endpoint at x/y matches a node positioned at left/top x%/y%.
+             vector-effect keeps stroke + dash constant in screen px regardless
+             of the non-uniform scale, so the connectors stay hairline. -->
+        <svg class="hs-edges" viewBox="0 0 100 100" preserveAspectRatio="none" fill="none" aria-hidden="true">
+          <path class="hs-edge hs-edge-1" d="M15 44 H35" />
+          <path class="hs-edge hs-edge-2" d="M54 44 H70" />
+          <path class="hs-edge hs-edge-3" d="M82 44 C 82 30, 83 20, 83 12" />
+          <path class="hs-edge hs-edge-3" d="M82 44 H84" />
+          <path class="hs-edge hs-edge-3" d="M82 44 C 82 58, 83 68, 83 76" />
         </svg>
         <div class="hs-node hs-node--task" style="left: 4%; top: 44%">task</div>
         <div class="hs-node hs-node--impl" style="left: 36%; top: 44%">implement</div>
         <div class="hs-node hs-node--test" style="left: 72%; top: 44%">test</div>
-        <div class="hs-node hs-node--fan hs-node--fan1" style="right: 3%; top: 10%">commit</div>
+        <div class="hs-node hs-node--fan hs-node--fan1" style="right: 3%; top: 12%">commit</div>
         <div class="hs-node hs-node--fan hs-node--fan2" style="right: 3%; top: 44%">title</div>
-        <div class="hs-node hs-node--fan hs-node--fan3" style="right: 3%; top: 78%">oversight</div>
+        <div class="hs-node hs-node--fan hs-node--fan3" style="right: 3%; top: 76%">oversight</div>
 
         <!-- Cost ticker: a CSS steps() tape, no JS -->
         <div class="hs-ticker" aria-hidden="true">
@@ -226,6 +231,7 @@
   stroke: var(--rule-2);
   stroke-width: 1.5;
   stroke-dasharray: 4 6;
+  vector-effect: non-scaling-stroke;
   animation: hs-flow 1.6s linear infinite;
 }
 .hs-edge-2 { animation-delay: 0.4s; }
