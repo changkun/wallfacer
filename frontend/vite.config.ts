@@ -3,13 +3,6 @@ import vue from '@vitejs/plugin-vue';
 
 const wfProxy = process.env.WF_PROXY || 'http://localhost:8080';
 
-const docSlugs = [
-  'getting-started', 'autonomy-spectrum', 'exploring-ideas', 'designing-specs',
-  'board-and-tasks', 'automation', 'oversight-and-analytics', 'workspaces',
-  'refinement-and-ideation', 'configuration', 'circuit-breakers',
-  'usage', 'agents-and-flows',
-];
-
 export default defineConfig({
   plugins: [vue()],
   // latere-ui ships source SFCs; compile them for the SSG build and keep one Vue copy.
@@ -22,10 +15,7 @@ export default defineConfig({
   ssr: { noExternal: ['latere-ui'] },
   ssgOptions: {
     includedRoutes(paths: string[]) {
-      return [
-        ...paths.filter(p => !p.includes(':') && !p.includes('*')),
-        ...docSlugs.map(s => `/docs/${s}`),
-      ];
+      return paths.filter(p => !p.includes(':') && !p.includes('*'));
     },
   },
   server: {
