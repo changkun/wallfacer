@@ -103,7 +103,7 @@ async function init() {
   term = new Terminal({
     cursorBlink: true,
     fontSize: 12,
-    fontFamily: '"JetBrains Mono", "SF Mono", Menlo, Monaco, "Courier New", monospace',
+    fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace',
     theme: buildTermTheme(),
     macOptionIsMeta: true,
   });

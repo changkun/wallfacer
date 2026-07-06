@@ -39,8 +39,9 @@ h1 { font-size: 2.5rem; }
 h2 { font-size: 1.5rem; }
 h3 { font-size: 1.15rem; }
 h1 em, h2 em {
-    font-family: var(--font-display);
-    font-weight: 600;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
 }
 
 /* ===== Layout ===== */

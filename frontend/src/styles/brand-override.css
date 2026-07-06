@@ -1,23 +1,21 @@
-/* Wallfacer's identity is indigo-on-zinc (specs/shared/visual-identity.md),
-   while the pinned latere-ui package still paints every product wordmark as
-   serif-italic with wallfacer in the coral gradient (brand.css/footer.css,
-   both !important). This file loads last (see main.ts) so the wallfacer
-   wordmark follows the new identity everywhere latere-ui renders it; the
-   sibling product wordmarks (cella/topos/lux/...) keep their own gradients
-   but inherit the display face since Instrument Serif no longer ships. */
-/* [data-theme] outranks latere-ui's single-class !important rules no matter
-   which order Vite emits the stylesheets in (component-imported CSS can land
-   after this entry-imported file). */
+/* Wallfacer follows the shared Latere identity: every product wordmark is
+   Instrument Serif italic, with wallfacer painted in the coral gradient. The
+   pinned latere-ui package already renders this (brand.css/footer.css,
+   console.css, all !important); this file restates it under a [data-theme]
+   prefix so the serif-italic wordmark wins regardless of the order Vite emits
+   the stylesheets in (component-imported CSS can land after this entry-imported
+   file). The coral wallfacer gradient is pinned to --accent-gradient so it
+   tracks the active palette. */
 [data-theme] .cella-brand,
 [data-theme] .wallfacer-brand,
 [data-theme] .lux-brand,
 [data-theme] .topos-brand,
 [data-theme] .agon-brand,
 [data-theme] .lectio-brand {
-  font-family: var(--font-display) !important;
-  font-style: normal !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.01em;
+  font-family: var(--font-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  letter-spacing: 0;
 }
 [data-theme] .wallfacer-brand {
   background-image: var(--accent-gradient) !important;
@@ -28,8 +26,8 @@
    which order Vite emits the two stylesheets in. */
 [data-theme] .lu-cs-brand-name,
 [data-theme] .lu-cs-brand-mark {
-  font-family: var(--font-display);
-  font-style: normal;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
 }
