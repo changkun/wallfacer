@@ -10,8 +10,8 @@
   /* Frosted toolbar: translucent over the board canvas, blurred like a
      native macOS title/toolbar band. Hairline highlight catches the top edge. */
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   box-shadow: var(--hairline-top);
 }
 
@@ -61,8 +61,8 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--glass-elevated);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   box-shadow: var(--hairline-top), var(--sh-pop);
   z-index: 30;
 }

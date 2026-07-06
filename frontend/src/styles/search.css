@@ -84,8 +84,8 @@ mark.search-highlight {
   min-width: 360px;
   max-width: 520px;
   background: var(--glass-elevated, #fff);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--hairline-top), var(--sh-3);

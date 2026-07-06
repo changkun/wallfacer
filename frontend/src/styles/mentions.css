@@ -3,8 +3,8 @@
   position: fixed;
   z-index: 1000;
   background: var(--glass-elevated);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--hairline-top), var(--shadow-lg);
