@@ -27,7 +27,7 @@
         "@xterm/xterm": "^6.0.0",
         "codemirror": "^6.0.1",
         "highlight.js": "^11.11.1",
-        "latere-ui": "github:latere-ai/latere-ui#v1.21.0",
+        "latere-ui": "github:latere-ai/latere-ui#v1.22.0",
         "markdown-it": "^14.1.0",
         "markdown-it-anchor": "^9.2.0",
         "mermaid": "^11.14.0",
@@ -822,7 +822,7 @@
 
     "langium": ["langium@4.2.3", "", { "dependencies": { "@chevrotain/regexp-to-ast": "~12.0.0", "chevrotain": "~12.0.0", "chevrotain-allstar": "~0.4.3", "vscode-languageserver": "~9.0.1", "vscode-languageserver-textdocument": "~1.0.11", "vscode-uri": "~3.1.0" } }, ""],
 
-    "latere-ui": ["latere-ui@github:latere-ai/latere-ui#d67352e", { "peerDependencies": { "pinia": "^2.2.0 || ^3.0.0", "vue": "^3.5.0" } }, "latere-ai-latere-ui-d67352e", "sha512-SvNo+FgoWTD+9RICc1LY8twNkIhrDISJvl/QGCNbt+xoCxqhWHVR2vzxbzm8FcervtvHWUGs/evuSbc/kqPUXQ=="],
+    "latere-ui": ["latere-ui@github:latere-ai/latere-ui#e0460da", { "peerDependencies": { "pinia": "^2.2.0 || ^3.0.0", "vue": "^3.5.0" } }, "latere-ai-latere-ui-e0460da", "sha512-6ht9UuLMWfEJHQmXI10S4FK5Zjxj0eTvRxsh5ILBd9/2Xn6Vp9sxkjs3I2zoXnyjM1iz+LBmUq3b+gCId5LzCw=="],
 
     "layout-base": ["layout-base@1.0.2", "", {}, ""],
 

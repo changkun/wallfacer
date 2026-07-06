@@ -13,8 +13,8 @@
      wallfacer's tuned --glass-bg fill for legibility over the busy board.
      Chrome only — the board content scrolls beneath, never frosted. */
   background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
+  backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
   box-shadow: var(--glass-edge-top);
 }
 
