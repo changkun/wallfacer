@@ -3,10 +3,17 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: color-mix(in srgb, var(--bg) 85%, transparent);
-    border-bottom: 1px solid var(--border);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    /* Liquid Glass v2 — thin-tier floating nav chrome. Consumes the shared
+       latere-ui glass ladder (--glass-bg-thin / --glass-blur-thin / --glass-
+       saturate / --glass-border / --glass-edge-top) so wallfacer's navbar
+       matches every Latere site; glass.css flattens these tokens under
+       reduce-transparency / increase-contrast / no-backdrop-filter. Chrome
+       only — the marketing page scrolls beneath, never frosted content. */
+    background: var(--glass-bg-thin);
+    border-bottom: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+    box-shadow: var(--glass-edge-top);
 }
 .nav-container {
     max-width: 1080px;
@@ -58,11 +65,21 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--text-muted);
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: color 0.15s;
+    padding: 5px 12px;
+    /* v2 capsule nav pill: hover + active fill from the shared --glass-pill-fill,
+       specular top edge on the active pill from --glass-edge-top. */
+    border-radius: var(--radius-pill);
+    transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.nav-link:hover { color: var(--text); }
+.nav-link:hover {
+    color: var(--text);
+    background: var(--glass-pill-fill);
+}
+.nav-link.router-link-exact-active {
+    color: var(--text);
+    background: var(--glass-pill-fill);
+    box-shadow: var(--glass-edge-top);
+}
 .nav-mobile-toggle {
     display: none;
     background: none;

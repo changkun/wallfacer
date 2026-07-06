@@ -53,10 +53,13 @@
         top: 48px;
         left: 0;
         right: 0;
-        background: color-mix(in srgb, var(--bg) 95%, transparent);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-bottom: 1px solid var(--border);
+        /* v2 thick-tier overlay: the open mobile menu floats over page
+           content, so it takes the near-opaque overlay fill from the shared
+           glass ladder (occludes rather than reveals). */
+        background: var(--glass-bg-thick);
+        backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate));
+        -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate));
+        border-bottom: 1px solid var(--glass-border);
         padding: 16px 20px;
         gap: 12px;
     }
