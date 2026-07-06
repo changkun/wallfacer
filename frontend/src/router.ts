@@ -2,8 +2,6 @@ import type { RouteRecordRaw } from 'vue-router';
 
 const cloudRoutes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/ProductPage.vue') },
-  { path: '/docs', component: () => import('./views/DocsIndex.vue') },
-  { path: '/docs/:slug', component: () => import('./views/DocPage.vue'), props: true },
   { path: '/install', component: () => import('./views/InstallPage.vue') },
   { path: '/dashboard', component: () => import('./views/BoardPage.vue') },
   { path: '/:pathMatch(.*)*', component: () => import('./views/NotFoundPage.vue') },

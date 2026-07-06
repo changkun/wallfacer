@@ -2,7 +2,6 @@ export const en: Record<string, string> = {
   // Header nav
   'nav.home': 'Home',
   'nav.download': 'Download',
-  'nav.docs': 'Docs',
   'nav.login': 'Log in',
   'nav.logout': 'Log out',
   'nav.me': 'My Page',
@@ -125,15 +124,6 @@ export const en: Record<string, string> = {
   'wf.dl.step4.desc': 'Click <strong>+ New Task</strong>, type a prompt, drag the card to <strong>In Progress</strong>. The task runs as a host process in its own git worktree, and live logs appear in the detail pane.',
   'wf.dl.cli.ref.title': 'CLI reference',
   'wf.dl.cli.ref.flags': 'Common flags for <code>wallfacer run</code>:',
-
-  // Docs index page
-  'wf.docs.title': '<span class="wallfacer-brand">Docs</span>',
-  'wf.docs.sub': 'Everything you need to work with Wallfacer, from getting started to going deep.',
-  'wf.docs.github': 'GitHub',
-  'wf.docs.github.desc': 'Source code, issues, and releases.',
-
-  // Doc page sidebar
-  'wf.docs.back': '&larr; Wallfacer',
 
   // Footer
   'footer.products': 'Products',
