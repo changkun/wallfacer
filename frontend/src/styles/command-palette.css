@@ -22,8 +22,8 @@
   max-width: 940px;
   /* Frosted command panel floating over the blurred app behind it. */
   background: var(--glass-elevated);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--hairline-top), var(--shadow-lg);

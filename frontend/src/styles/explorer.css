@@ -51,8 +51,8 @@
   /* Frosted source-list chrome, matching the app sidebar; the board to its
      right reads as the raised content surface. */
   background: var(--glass-sidebar, var(--bg-sunk));
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   flex-shrink: 0;
   overflow: hidden;
 }

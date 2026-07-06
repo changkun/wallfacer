@@ -378,6 +378,16 @@ onUnmounted(removeWsOutsideHandler);
 .wf-cs.collapsed {
   width: var(--sb-w-icon) !important;
 }
+/* Liquid Glass v2 renders the rail as a FLOATING rounded capsule (border +
+ * radius + drop shadow on all four sides). wallfacer mounts it flush at the
+ * window edge, so inset it a touch: the warm canvas shows in the gap and the
+ * capsule reads as detached rather than butting its rounded corners against the
+ * edge. Height drops from the package's `height:100%` to auto so the flex
+ * stretch fills the shell minus these vertical margins (no overflow). */
+.wf-cs {
+  height: auto;
+  margin: var(--sp-3);
+}
 /* Match the workspace switcher to the search bar below it: full width + the
  * same height/radius, so they read as one consistent stack. */
 .wf-cs :deep(.sb-ws-switch) {

@@ -8,8 +8,8 @@
   /* Frosted sidebar chrome — translucent + blurred, a touch of inner
      highlight on the right edge so it reads as a raised rail beside the board. */
   background: var(--glass-sidebar);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
   padding: var(--sp-3) 0;
   transition:
@@ -135,8 +135,8 @@
   max-height: 50vh;
   overflow-y: auto;
   background: var(--glass-elevated);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
   box-shadow: var(--hairline-top), var(--sh-pop);

@@ -32,6 +32,17 @@
   --r-lg: 10px;
   --r-xl: 14px;
 
+  /* Liquid Glass v2 geometry ladder — the concentric radii the shared
+     latere-ui glass chrome (floating rail, palette, cards) consumes via
+     var(--radius-*). Theme-independent, so declared once in the root scope. */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+  --radius-pill: 999px;
+
   /* Space */
   --sp-1: 4px;
   --sp-2: 6px;
@@ -52,6 +63,7 @@
 
   /* Surfaces (paper-ink) */
   --bg: #f4f1ea; /* canvas */
+  --bg-deep: #e6e1d5; /* deepest layer behind floating glass chrome */
   --bg-sunk: #ebe7de; /* recessed (inputs, empty zones) */
   --bg-elevated: #faf8f3; /* slightly raised */
   --bg-card: #ffffff; /* cards / popovers */
@@ -119,7 +131,10 @@
   --glass-bg: rgba(244, 241, 234, 0.72);
   --glass-sidebar: rgba(236, 232, 222, 0.7);
   --glass-elevated: rgba(250, 248, 243, 0.78);
-  --glass-blur: saturate(180%) blur(20px);
+  /* Full backdrop-filter shorthand for wallfacer's own frosted surfaces.
+     Renamed off --glass-blur: latere-ui/glass v2 owns --glass-blur as a bare
+     length (blur(var(--glass-blur))), so the two grammars must not collide. */
+  --glass-filter: saturate(180%) blur(20px);
 
   /* Chart / badge tints */
   --tint-blue: #e4eaf4;
@@ -179,6 +194,7 @@
 
 [data-theme="dark"] {
   --bg: #15140f;
+  --bg-deep: #0c0b08; /* deepest layer behind floating glass chrome */
   --bg-sunk: #100f0c;
   --bg-elevated: #1c1a15;
   --bg-card: #1e1c17;
@@ -227,7 +243,7 @@
   --glass-bg: rgba(21, 20, 15, 0.7);
   --glass-sidebar: rgba(16, 15, 12, 0.72);
   --glass-elevated: rgba(30, 28, 23, 0.8);
-  --glass-blur: saturate(160%) blur(20px);
+  --glass-filter: saturate(160%) blur(20px);
 
   --tint-blue: #1a2638;
   --tint-blue-ink: #9bbce8;

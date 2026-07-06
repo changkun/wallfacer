@@ -35,6 +35,11 @@ import './styles/utilities.css';
 import './styles/scroll-fade.css';
 import './styles/app.css';
 import './styles/brand-override.css';
+// Liquid Glass v2 material for the shared latere-ui chrome (floating rail,
+// palette, footer, account). Imported after the product's own token CSS so its
+// glass tokens (--glass-bg/-blur/-border, --shadow-glass, radii consumption)
+// win; wallfacer keeps its terracotta --accent, which glass.css never sets.
+import 'latere-ui/glass';
 import { vScrollFade } from './directives/scrollFade';
 
 export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) => {
