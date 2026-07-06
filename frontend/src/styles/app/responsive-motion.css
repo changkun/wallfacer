@@ -57,8 +57,8 @@
            capsule over page content, so it takes the near-opaque overlay fill
            from the shared glass ladder (occludes rather than reveals). */
         background: var(--glass-bg-thick);
-        backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate));
-        -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate));
+        backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
+        -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
         border: 1px solid var(--glass-border);
         border-radius: var(--radius-lg);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);

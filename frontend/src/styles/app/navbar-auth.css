@@ -26,8 +26,8 @@
     background: var(--glass-bg-thin);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-pill);
-    backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
-    -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
+    -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
     box-shadow:
         var(--glass-edge-top),
         0 8px 32px rgba(0, 0, 0, 0.10),
