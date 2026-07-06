@@ -386,7 +386,7 @@ func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T
 
 // configActiveWorkspaces GETs /api/config as ctx and returns the reported
 // active workspace folders.
-func configActiveWorkspaces(t *testing.T, h *Handler, ctx context.Context) []string {
+func configActiveWorkspaces(t *testing.T, ctx context.Context, h *Handler) []string { //nolint:revive // testing.T conventionally precedes context in test helpers
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil).WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -418,12 +418,12 @@ func TestConfig_OrgViewDropsLegacyActiveWorkspace(t *testing.T) {
 	}
 
 	personal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
-	if got := configActiveWorkspaces(t, h, personal); len(got) != 1 || got[0] != ws {
+	if got := configActiveWorkspaces(t, personal, h); len(got) != 1 || got[0] != ws {
 		t.Errorf("personal view: active workspaces = %v, want [%s]", got, ws)
 	}
 
 	org := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
-	if got := configActiveWorkspaces(t, h, org); len(got) != 0 {
+	if got := configActiveWorkspaces(t, org, h); len(got) != 0 {
 		t.Errorf("org view after switch: active workspaces = %v, want [] (clean slate)", got)
 	}
 }
