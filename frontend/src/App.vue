@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { RouterView, useRouter } from 'vue-router';
+import { useLiquidGlass } from 'latere-ui';
 import AppLayout from './layouts/AppLayout.vue';
 import WorkspaceRequired from './components/WorkspaceRequired.vue';
 import { hashToRoute } from './lib/hashRoute';
 import { useWorkspaceGate } from './composables/useWorkspaceGate';
 
 const router = useRouter();
+
+// v2 Liquid Glass lensing: SVG refraction + cursor sheen on glass chrome,
+// re-scanned on navigation. Progressive enhancement (Chromium-only, honors
+// reduced-motion / reduced-transparency).
+useLiquidGlass({ watchSource: () => router.currentRoute.value.fullPath });
 
 // Workspace-scoped routes fall back to the WorkspaceRequired prompt when no
 // workspace is visible to this session, matching the board's empty state.
