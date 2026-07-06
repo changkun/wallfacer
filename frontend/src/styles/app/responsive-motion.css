@@ -50,16 +50,18 @@
         display: flex;
         flex-direction: column;
         position: absolute;
-        top: 48px;
+        top: calc(100% + 8px);
         left: 0;
         right: 0;
-        /* v2 thick-tier overlay: the open mobile menu floats over page
-           content, so it takes the near-opaque overlay fill from the shared
-           glass ladder (occludes rather than reveals). */
+        /* v2 thick-tier overlay: the open mobile menu floats below the nav
+           capsule over page content, so it takes the near-opaque overlay fill
+           from the shared glass ladder (occludes rather than reveals). */
         background: var(--glass-bg-thick);
         backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate));
         -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate));
-        border-bottom: 1px solid var(--glass-border);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
         padding: 16px 20px;
         gap: 12px;
     }
