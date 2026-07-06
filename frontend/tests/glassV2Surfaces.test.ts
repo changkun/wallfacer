@@ -16,11 +16,14 @@ const root = process.cwd();
 const read = (rel: string) => readFileSync(resolve(root, rel), 'utf8');
 
 describe('Liquid Glass v2 — shared-token chrome surfaces', () => {
-  it('landing navbar is a thin-glass bar with capsule pill links', () => {
+  it('landing navbar is a floating thin-glass capsule with pill links', () => {
     const css = read('src/styles/app/navbar-auth.css');
-    // Thin-tier material from the shared ladder, not hand-rolled blur().
-    expect(css).toMatch(/\.site-header[^}]*var\(--glass-bg-thin\)/s);
-    expect(css).toMatch(/\.site-header[^}]*blur\(var\(--glass-blur-thin\)\)/s);
+    // The capsule material lives on .nav-container (the .site-header wrapper
+    // stays transparent to detach the pill from the top edge). Thin-tier
+    // material from the shared ladder, not hand-rolled blur().
+    expect(css).toMatch(/\.nav-container[^}]*var\(--glass-bg-thin\)/s);
+    expect(css).toMatch(/\.nav-container[^}]*blur\(var\(--glass-blur-thin\)\)/s);
+    expect(css).toMatch(/\.nav-container[^}]*var\(--radius-pill\)/s);
     expect(css).not.toMatch(/\.site-header[^}]*saturate\(180%\) blur\(20px\)/s);
     // Nav links are capsules whose active/hover fill comes from --glass-pill-fill.
     expect(css).toMatch(/\.nav-link[^}]*var\(--radius-pill\)/s);
