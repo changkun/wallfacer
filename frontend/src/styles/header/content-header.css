@@ -7,12 +7,15 @@
      editor tab strip reads compact rather than full-height. */
   padding: 3px 16px;
   border-bottom: 1px solid var(--border);
-  /* Frosted toolbar: translucent over the board canvas, blurred like a
-     native macOS title/toolbar band. Hairline highlight catches the top edge. */
+  /* Frosted toolbar chrome floating over the board canvas. Consumes the shared
+     latere-ui glass ladder (thin-tier blur + saturate + --glass-edge-top
+     specular rim) so the material matches every Latere console; keeps
+     wallfacer's tuned --glass-bg fill for legibility over the busy board.
+     Chrome only — the board content scrolls beneath, never frosted. */
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-  box-shadow: var(--hairline-top);
+  -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-edge-top);
 }
 
 /* Spacer holds the editor tab strip (and keeps the search + action buttons

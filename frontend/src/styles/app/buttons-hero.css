@@ -35,6 +35,26 @@
 /* .btn-sm intentionally undefined to match old UI — inline font-size on call sites controls the look */
 .btn-lg { padding: 9px 18px; font-size: 14px; font-weight: 500; }
 
+/* Liquid Glass v2 — landing CTA is a smoked-ink glass capsule, matching the
+   reference (lux-glass.css makes the primary button --glass-smoke-strong /
+   --glass-smoke-ink, not the chromatic accent). Scoped to the marketing shell
+   (.wallfacer-page) so the global .btn / .btn-accent shared with the console
+   stay untouched; here it overrides the terracotta .btn-accent fill. Wallfacer's
+   terracotta survives where the DS keeps product color — the wordmark, nav
+   accent, hero, links, focus rings — not on chrome button fills. Smoke is
+   near-solid by design, so it needs no reduce-transparency fallback. */
+.wallfacer-page .btn-lg {
+    border-radius: var(--radius-pill);
+    background: var(--glass-smoke-strong);
+    color: var(--glass-smoke-ink);
+    box-shadow: var(--glass-edge-top), var(--shadow-glass);
+}
+.wallfacer-page .btn-lg:hover {
+    background: var(--glass-smoke-strong);
+    color: var(--glass-smoke-ink);
+    box-shadow: var(--glass-edge-top), var(--shadow-glass-hover);
+}
+
 /* ===== Hero ===== */
 .hero {
     position: relative;
