@@ -1,42 +1,35 @@
 /* Wallfacer — Font Faces.
 
+   The type system mirrors the Latere platform (latere.ai): Inter for body
+   and headings, Instrument Serif (italic) for the wordmark and display
+   emphasis, and the system monospace stack for data and code. This keeps
+   every Latere surface — the marketing site and each product console —
+   rendering the same identity.
+
    WOFF2 + `font-display: block` for the Latin faces, paired with the
    <link rel="preload"> tags in index.html: they download in parallel
    with the app bundle so first paint already uses the right font
    instead of flashing a system fallback (FOUT). The CJK face stays
    `swap` (it is large and lazy-loaded only for zh, so a fallback is
-   better than blocking on a multi-MB download).
+   better than blocking on a multi-MB download). */
 
-   Space Grotesk and JetBrains Mono ship as variable fonts (one file
-   covers the declared weight range), instanced from Google Fonts. */
-
-/* Space Grotesk — display face (headings, wordmark, hero) */
+/* Instrument Serif — display / wordmark face (headline emphasis, brand marks) */
 @font-face {
-    font-family: 'Space Grotesk';
-    font-style: normal;
-    font-weight: 300 700;
-    font-display: block;
-    src: url('/fonts/space-grotesk-var.woff2') format('woff2');
-}
-
-/* Lato — primary UI sans (weights 500/600 resolve to the 400/700 files
-   per CSS font matching; Lato ships no intermediate weights) */
-@font-face {
-    font-family: 'Lato';
+    font-family: 'Instrument Serif';
     font-style: normal;
     font-weight: 400;
     font-display: block;
-    src: url('/fonts/lato-400.woff2') format('woff2');
+    src: url('/fonts/instrument-serif-regular.woff2') format('woff2');
 }
 @font-face {
-    font-family: 'Lato';
-    font-style: normal;
-    font-weight: 700;
+    font-family: 'Instrument Serif';
+    font-style: italic;
+    font-weight: 400;
     font-display: block;
-    src: url('/fonts/lato-700.woff2') format('woff2');
+    src: url('/fonts/instrument-serif-italic.woff2') format('woff2');
 }
 
-/* Inter — fallback sans */
+/* Inter — primary UI sans (body + headings) */
 @font-face {
     font-family: 'Inter';
     font-style: normal;
@@ -64,15 +57,6 @@
     font-weight: 700;
     font-display: block;
     src: url('/fonts/inter-700.woff2') format('woff2');
-}
-
-/* JetBrains Mono — data, labels, code */
-@font-face {
-    font-family: 'JetBrains Mono';
-    font-style: normal;
-    font-weight: 100 800;
-    font-display: block;
-    src: url('/fonts/jetbrains-mono-var.woff2') format('woff2');
 }
 
 /* LXGW WenKai TC (Chinese) */
