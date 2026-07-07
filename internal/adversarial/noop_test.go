@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"latere.ai/x/agon/pkg/adversarial"
+	"latere.ai/x/topos/adversarial"
 	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 )
 

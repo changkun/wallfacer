@@ -1,8 +1,8 @@
 package adversarial
 
 import (
-	"latere.ai/x/agon/pkg/adversarial"
-	agonClaude "latere.ai/x/agon/pkg/adversarial/claude"
+	"latere.ai/x/topos/adversarial"
+	agonClaude "latere.ai/x/topos/adversarial/claude"
 )
 
 // NewSessionProposer returns a Proposer backed by the claude fork-session path.

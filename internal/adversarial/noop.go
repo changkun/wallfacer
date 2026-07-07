@@ -11,7 +11,7 @@ package adversarial
 import (
 	"context"
 
-	"latere.ai/x/agon/pkg/adversarial"
+	"latere.ai/x/topos/adversarial"
 )
 
 // NoopVerifier satisfies [adversarial.Verifier] and returns (nil, nil)

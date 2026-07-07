@@ -147,10 +147,7 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EV
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-latere.ai/x/agon v0.1.2 h1:3W/c/mnqwW/OU2sktpJ4JvS6lXOAzUIZwJrvlV521Tw=
-latere.ai/x/agon v0.1.2/go.mod h1:lOAk/m2o0cFMKUW9SpWTSCSKfLRbbajzTfSfo2qiU20=
 latere.ai/x/pkg v0.23.0 h1:VxDasbWD+iie0JkWy1U1KlpgsXddjtoEEIeoFF9AV0M=
 latere.ai/x/pkg v0.23.0/go.mod h1:ucgMG9lzz5IwQ986hCp3sutOu9Hg2nSbj9u8wZDHFjc=
-latere.ai/x/topos v0.0.5/go.mod h1:e1d7tVV96+Gse4JwHGkZ8MC2XDswnImwB/H7CqCGjWs=
-latere.ai/x/topos v0.0.9 h1:q+tGobfi7hUOswAZ09oeG++lXqfr5CsaZaySwikZlbk=
-latere.ai/x/topos v0.0.9/go.mod h1:e1d7tVV96+Gse4JwHGkZ8MC2XDswnImwB/H7CqCGjWs=
+latere.ai/x/topos v0.1.0 h1:cvATYswwLwRwXMrqDVE/xSY0SSOL97eJRIddD0szCPM=
+latere.ai/x/topos v0.1.0/go.mod h1:e1d7tVV96+Gse4JwHGkZ8MC2XDswnImwB/H7CqCGjWs=
