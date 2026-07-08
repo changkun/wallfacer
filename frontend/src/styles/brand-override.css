@@ -10,7 +10,6 @@
 [data-theme] .wallfacer-brand,
 [data-theme] .lux-brand,
 [data-theme] .topos-brand,
-[data-theme] .review-brand,
 [data-theme] .lectio-brand {
   font-family: var(--font-serif) !important;
   font-style: italic !important;
