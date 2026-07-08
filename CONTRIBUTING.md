@@ -27,7 +27,7 @@ implementation detail, architecture, and the APIs that connect everything.
 | 4 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
 | 6 | [Auth & Identity](docs/internals/auth-and-identity.md) | OIDC, device sign-in, principal context, cloud mode |
-| 7 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, agon, circuit breakers, routines |
+| 7 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers, routines |
 | 8 | [Agent Graph Runtime](docs/internals/agent-graph-runtime.md) | Embedded topos runtime, agentic execution, live traces |
 | 9 | [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | 10 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |

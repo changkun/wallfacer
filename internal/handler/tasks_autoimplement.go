@@ -739,9 +739,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 					if t.LastTestResult != "" || t.IsTestRun {
 						continue
 					}
-					// When agon supersedes the test agent for this task, skip it
+					// When review supersedes the test agent for this task, skip it
 					// here so the two don't both verify.
-					if h.agonSupersedesTest(t) {
+					if h.reviewSupersedesTest(t) {
 						continue
 					}
 					if len(t.WorktreePaths) == 0 {
@@ -932,14 +932,14 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				if t.Status != store.TaskStatusWaiting {
 					continue
 				}
-				// Determine eligibility. When agon supersedes the test agent
-				// (agon enabled + the task has a session), the gate is a clean
-				// agon verdict; the test-pass and natural-complete shortcuts do
-				// not apply — agon must clear the task first.
-				agonGate := h.agonSupersedesTest(t)
+				// Determine eligibility. When review supersedes the test agent
+				// (review enabled + the task has a session), the gate is a clean
+				// review verdict; the test-pass and natural-complete shortcuts do
+				// not apply — review must clear the task first.
+				reviewGate := h.reviewSupersedesTest(t)
 				var tested, naturallyComplete bool
-				if agonGate {
-					tested = t.AgonUnresolved != nil && *t.AgonUnresolved == 0
+				if reviewGate {
+					tested = t.ReviewUnresolved != nil && *t.ReviewUnresolved == 0
 				} else {
 					// (a) Passed verification ("pass").
 					// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
@@ -1086,161 +1086,161 @@ func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCan
 	return true
 }
 
-// StartAutoAgon subscribes to store change notifications and fires tryAutoAgon
-// each tick so agon verification runs automatically for waiting tasks when the
+// StartAutoReview subscribes to store change notifications and fires tryAutoReview
+// each tick so review verification runs automatically for waiting tasks when the
 // toggle is enabled.
-func (h *Handler) StartAutoAgon(ctx context.Context) {
+func (h *Handler) StartAutoReview(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:        h.newResubscribingWakeSource(),
 		Interval:    constants.AutoTestInterval, // same cadence as the auto-tester
 		SettleDelay: constants.WatcherSettleDelay,
-		Action:      h.tryAutoAgon,
+		Action:      h.tryAutoReview,
 	})
 }
 
-// maxConcurrentAgon caps how many agon verification runs may execute at once
-// across all tasks. Agon runs are multi-round, multi-agent, and untracked by
+// maxConcurrentReview caps how many review verification runs may execute at once
+// across all tasks. Review runs are multi-round, multi-agent, and untracked by
 // the regular task concurrency limits, so they get their own conservative cap.
-const maxConcurrentAgon = 2
+const maxConcurrentReview = 2
 
-// beginAgon reserves an in-flight slot for an agon run on the given task. It
+// beginReview reserves an in-flight slot for an review run on the given task. It
 // returns false when the task already has a run in flight or the global
-// maxConcurrentAgon cap is reached. The dedup is essential: AgonUnresolved is
+// maxConcurrentReview cap is reached. The dedup is essential: ReviewUnresolved is
 // only written when a run finishes, so without this guard a multi-minute run
 // would be re-launched on every watcher tick. Callers that get true MUST call
-// endAgon when the run completes.
-func (h *Handler) beginAgon(id uuid.UUID) bool {
-	h.agonMu.Lock()
-	defer h.agonMu.Unlock()
-	if _, running := h.agonInFlight[id]; running {
+// endReview when the run completes.
+func (h *Handler) beginReview(id uuid.UUID) bool {
+	h.reviewMu.Lock()
+	defer h.reviewMu.Unlock()
+	if _, running := h.reviewInFlight[id]; running {
 		return false
 	}
-	if len(h.agonInFlight) >= maxConcurrentAgon {
+	if len(h.reviewInFlight) >= maxConcurrentReview {
 		return false
 	}
-	h.agonInFlight[id] = struct{}{}
+	h.reviewInFlight[id] = struct{}{}
 	return true
 }
 
-// endAgon releases the in-flight slot reserved by beginAgon.
-func (h *Handler) endAgon(id uuid.UUID) {
-	h.agonMu.Lock()
-	delete(h.agonInFlight, id)
-	h.agonMu.Unlock()
+// endReview releases the in-flight slot reserved by beginReview.
+func (h *Handler) endReview(id uuid.UUID) {
+	h.reviewMu.Lock()
+	delete(h.reviewInFlight, id)
+	h.reviewMu.Unlock()
 }
 
-// agonSupersedesTest reports whether agon replaces the test agent for this task:
-// agon is enabled and the task has a session agon can fork from. Used to skip
-// auto-test for the task and to gate auto-submit on the agon verdict instead of
+// reviewSupersedesTest reports whether review replaces the test agent for this task:
+// review is enabled and the task has a session review can fork from. Used to skip
+// auto-test for the task and to gate auto-submit on the review verdict instead of
 // the test verdict. Non-session tasks fall back to the test agent.
-func (h *Handler) agonSupersedesTest(t *store.Task) bool {
-	return h.AgonEnabled() && t.SessionID != nil && *t.SessionID != ""
+func (h *Handler) reviewSupersedesTest(t *store.Task) bool {
+	return h.ReviewEnabled() && t.SessionID != nil && *t.SessionID != ""
 }
 
-// isAgonRunning reports whether an agon verification run is currently executing
+// isReviewRunning reports whether an review verification run is currently executing
 // for the task. This is the authoritative "running" signal (the real-time
 // in-flight set), independent of on-disk artifacts.
-func (h *Handler) isAgonRunning(id uuid.UUID) bool {
-	h.agonMu.Lock()
-	defer h.agonMu.Unlock()
-	_, ok := h.agonInFlight[id]
+func (h *Handler) isReviewRunning(id uuid.UUID) bool {
+	h.reviewMu.Lock()
+	defer h.reviewMu.Unlock()
+	_, ok := h.reviewInFlight[id]
 	return ok
 }
 
-// agonCandidate pairs a waiting task with the store that owns it, captured at
+// reviewCandidate pairs a waiting task with the store that owns it, captured at
 // scan time. The owning store is threaded through to the completion write so a
 // workspace-group switch during the multi-minute run cannot redirect the
 // result to a different store (which would silently drop it).
-type agonCandidate struct {
+type reviewCandidate struct {
 	task  store.Task
 	store *store.Store
 }
 
-// tryAutoAgon scans all waiting tasks that have a SessionID and have not yet
-// been verified by agon (AgonUnresolved == nil), then fires a goroutine for
-// each that is not already running and fits within maxConcurrentAgon. Does
-// nothing when agon is disabled or its circuit breaker is open.
-func (h *Handler) tryAutoAgon(ctx context.Context) {
-	if !h.AgonEnabled() {
+// tryAutoReview scans all waiting tasks that have a SessionID and have not yet
+// been verified by review (ReviewUnresolved == nil), then fires a goroutine for
+// each that is not already running and fits within maxConcurrentReview. Does
+// nothing when review is disabled or its circuit breaker is open.
+func (h *Handler) tryAutoReview(ctx context.Context) {
+	if !h.ReviewEnabled() {
 		return
 	}
-	if h.breakers["auto-agon"].isOpen() {
+	if h.breakers["auto-review"].isOpen() {
 		return
 	}
 
-	var candidates []agonCandidate
+	var candidates []reviewCandidate
 	h.forCurrentStore(func(s *store.Store, _ []string) {
 		for _, t := range s.ListWaitingTasksWithSession(ctx) {
-			candidates = append(candidates, agonCandidate{task: t, store: s})
+			candidates = append(candidates, reviewCandidate{task: t, store: s})
 		}
 	})
 
 	for _, c := range candidates {
-		if !h.beginAgon(c.task.ID) {
+		if !h.beginReview(c.task.ID) {
 			continue
 		}
 		c := c // capture loop variable
 		go func() {
-			defer h.endAgon(c.task.ID)
-			if err := h.runAgon(ctx, c.store, c.task); err != nil {
-				logger.Handler.Warn("agon: verification run failed",
+			defer h.endReview(c.task.ID)
+			if err := h.runReview(ctx, c.store, c.task); err != nil {
+				logger.Handler.Warn("review: verification run failed",
 					"task", c.task.ID, "error", err)
 			}
 		}()
 	}
 }
 
-// agonForkCount is the number of independent critic forks per run.
-// agonMaxRounds is the per-fork round cap. agonCostCap is the soft token budget.
+// reviewForkCount is the number of independent critic forks per run.
+// reviewMaxRounds is the per-fork round cap. reviewCostCap is the soft token budget.
 // These are the minimum-cost floor, not a recommended depth: one fork (a single
 // actor/critic pair, Claude-only — the second {Claude, Codex} fork is opt-in) and
-// the shortest meaningful debate. Agon alternates roles by round parity (odd =
+// the shortest meaningful debate. Review alternates roles by round parity (odd =
 // critic, even = proposer), so 3 rounds is one full cycle: attack, rebuttal,
 // re-assessment. Fewer would never let the critic see the rebuttal, leaving a
 // fixed attack spuriously "unresolved" — which the supersede-test barrier then
-// parks for human review. Users expand depth via env (WALLFACER_AGON_FORKS /
+// parks for human review. Users expand depth via env (WALLFACER_REVIEW_FORKS /
 // _ROUNDS / _COST_CAP) or the Execution settings tab.
 const (
-	agonForkCount = 1
-	agonMaxRounds = 3
-	agonCostCap   = 50000
+	reviewForkCount = 1
+	reviewMaxRounds = 3
+	reviewCostCap   = 50000
 )
 
-// agonProposerHarness and agonCriticHarnessIDs are the single source of truth
-// for which harnesses drive agon's roles. NewHandler builds the verifier from
+// reviewProposerHarness and reviewCriticHarnessIDs are the single source of truth
+// for which harnesses drive review's roles. NewHandler builds the verifier from
 // them and the transcript endpoint reports them as the run config, so the two
 // never drift. The proposer is always Claude (fork-session is Claude-native);
 // critics rotate the listed harnesses by fork index for perspective diversity.
-const agonProposerHarness = harness.Claude
+const reviewProposerHarness = harness.Claude
 
-var agonCriticHarnessIDs = []harness.ID{harness.Claude, harness.Codex}
+var reviewCriticHarnessIDs = []harness.ID{harness.Claude, harness.Codex}
 
-// agonCriticHarnessNames returns the critic rotation as display strings.
-func agonCriticHarnessNames() []string {
-	out := make([]string, len(agonCriticHarnessIDs))
-	for i, id := range agonCriticHarnessIDs {
+// reviewCriticHarnessNames returns the critic rotation as display strings.
+func reviewCriticHarnessNames() []string {
+	out := make([]string, len(reviewCriticHarnessIDs))
+	for i, id := range reviewCriticHarnessIDs {
 		out[i] = string(id)
 	}
 	return out
 }
 
-// agonTuning returns the fork count, max rounds, and token cost cap for an agon
+// reviewTuning returns the fork count, max rounds, and token cost cap for an review
 // run, applying env overrides over the conservative defaults. A missing or
 // non-positive env value keeps the default.
-func (h *Handler) agonTuning() (forks, rounds, costCap int) {
-	forks, rounds, costCap = agonForkCount, agonMaxRounds, agonCostCap
+func (h *Handler) reviewTuning() (forks, rounds, costCap int) {
+	forks, rounds, costCap = reviewForkCount, reviewMaxRounds, reviewCostCap
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil {
 		return forks, rounds, costCap
 	}
-	if cfg.AgonForkCount > 0 {
-		forks = cfg.AgonForkCount
+	if cfg.ReviewForkCount > 0 {
+		forks = cfg.ReviewForkCount
 	}
-	if cfg.AgonMaxRounds > 0 {
-		rounds = cfg.AgonMaxRounds
+	if cfg.ReviewMaxRounds > 0 {
+		rounds = cfg.ReviewMaxRounds
 	}
-	if cfg.AgonCostCap > 0 {
-		costCap = cfg.AgonCostCap
+	if cfg.ReviewCostCap > 0 {
+		costCap = cfg.ReviewCostCap
 	}
 	return forks, rounds, costCap
 }
@@ -1260,10 +1260,10 @@ func primaryWorktree(worktreePaths map[string]string) string {
 	return paths[0]
 }
 
-// agonEndFile is the minimal subset of agon's session end.json that carries
-// the aggregate token usage (over proposer + critics). Mirrors agon's
+// reviewEndFile is the minimal subset of review's session end.json that carries
+// the aggregate token usage (over proposer + critics). Mirrors review's
 // state.EndFile.Stats schema; only the fields we attribute are decoded.
-type agonEndFile struct {
+type reviewEndFile struct {
 	Stats struct {
 		TokenUsage *struct {
 			Input       int `json:"input_tokens"`
@@ -1274,11 +1274,11 @@ type agonEndFile struct {
 	} `json:"stats"`
 }
 
-// readAgonUsage reads the token breakdown from <sessionDir>/end.json, the
-// artifact agon writes at the end of a run. Returns a zero TaskUsage (no tokens)
+// readReviewUsage reads the token breakdown from <sessionDir>/end.json, the
+// artifact review writes at the end of a run. Returns a zero TaskUsage (no tokens)
 // when the file is missing or unparseable — cost is attributed separately by
 // the caller, so a missing end.json degrades to cost-only attribution.
-func readAgonUsage(sessionDir string) store.TaskUsage {
+func readReviewUsage(sessionDir string) store.TaskUsage {
 	if sessionDir == "" {
 		return store.TaskUsage{}
 	}
@@ -1286,7 +1286,7 @@ func readAgonUsage(sessionDir string) store.TaskUsage {
 	if err != nil {
 		return store.TaskUsage{}
 	}
-	var ef agonEndFile
+	var ef reviewEndFile
 	if err := json.Unmarshal(b, &ef); err != nil || ef.Stats.TokenUsage == nil {
 		return store.TaskUsage{}
 	}
@@ -1298,29 +1298,29 @@ func readAgonUsage(sessionDir string) store.TaskUsage {
 	}
 }
 
-// agonUsageNonZero reports whether a TaskUsage carries any spend worth recording.
-func agonUsageNonZero(u store.TaskUsage) bool {
+// reviewUsageNonZero reports whether a TaskUsage carries any spend worth recording.
+func reviewUsageNonZero(u store.TaskUsage) bool {
 	return u.InputTokens > 0 || u.OutputTokens > 0 || u.CacheReadInputTokens > 0 ||
 		u.CacheCreationTokens > 0 || u.CostUSD > 0
 }
 
-// agonStateDir returns the .agon state directory for a run. It lives beside the
-// worktree in the shared per-task dir (<worktreesDir>/<taskID>/.agon), not
+// reviewStateDir returns the .review state directory for a run. It lives beside the
+// worktree in the shared per-task dir (<worktreesDir>/<taskID>/.review), not
 // inside it, so debate scratch is never staged by `git add -A`, never appears
 // in generateWorktreeDiff, and is cleaned up with the task's worktree dir.
-func agonStateDir(worktreePath string) string {
+func reviewStateDir(worktreePath string) string {
 	if worktreePath == "" {
 		return ""
 	}
-	return filepath.Join(filepath.Dir(worktreePath), ".agon")
+	return filepath.Join(filepath.Dir(worktreePath), ".review")
 }
 
-// runAgon executes one agon adversarial verification run for a task and
+// runReview executes one review adversarial verification run for a task and
 // persists the result onto the given store (captured at scan time so a group
 // switch mid-run cannot redirect the write). The task must have a non-nil
 // SessionID and at least one worktree path. Returns nil on success; on error
-// the AgonUnresolved field is left nil so the next tick retries.
-func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) error {
+// the ReviewUnresolved field is left nil so the next tick retries.
+func (h *Handler) runReview(ctx context.Context, s *store.Store, t store.Task) error {
 	if t.SessionID == nil || *t.SessionID == "" {
 		return nil
 	}
@@ -1331,7 +1331,7 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	cwd := primaryWorktree(t.WorktreePaths)
 	diff := generateWorktreeDiff(t.WorktreePaths)
 
-	forks, rounds, costCap := h.agonTuning()
+	forks, rounds, costCap := h.reviewTuning()
 
 	input := adversarial.VerifyInput{
 		TaskPrompt:    t.Prompt,
@@ -1339,7 +1339,7 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 		SessionID:     *t.SessionID,
 		DiffPatch:     diff,
 		Cwd:           cwd,
-		StateDir:      agonStateDir(cwd),
+		StateDir:      reviewStateDir(cwd),
 		ForkCount:     forks,
 		MaxRounds:     rounds,
 		CostCapTokens: costCap,
@@ -1349,33 +1349,33 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	// immediate, visible feedback (the run itself takes minutes in the
 	// background; without this the UI looks inert until it finishes).
 	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-		"result": fmt.Sprintf("Agon: adversarial verification started (%d critics, up to %d rounds).", forks, rounds),
+		"result": fmt.Sprintf("Review: adversarial verification started (%d critics, up to %d rounds).", forks, rounds),
 	})
 
 	result, err := h.verifier.Verify(ctx, input)
 	if err != nil {
-		h.breakers["auto-agon"].recordFailure(&t.ID, err.Error())
+		h.breakers["auto-review"].recordFailure(&t.ID, err.Error())
 		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": "Agon: verification failed: " + err.Error(),
+			"result": "Review: verification failed: " + err.Error(),
 		})
 		return err
 	}
-	h.breakers["auto-agon"].recordSuccess()
+	h.breakers["auto-review"].recordSuccess()
 	if result == nil {
 		// Verifier skipped (e.g., no session). Do not mark as run.
 		return nil
 	}
 
-	// Attribute the run's complete usage to the task so agon spend shows in the
-	// usage breakdown instead of being untracked. Tokens come from agon's
+	// Attribute the run's complete usage to the task so review spend shows in the
+	// usage breakdown instead of being untracked. Tokens come from review's
 	// session end.json (the aggregate over proposer + critics); cost is the USD
-	// agon reports. This runs before the still-waiting guard because the spend
+	// review reports. This runs before the still-waiting guard because the spend
 	// happened regardless of whether the result is persisted below.
-	usage := readAgonUsage(result.SessionDir)
+	usage := readReviewUsage(result.SessionDir)
 	usage.CostUSD = result.USD
-	if agonUsageNonZero(usage) {
-		if uErr := s.AccumulateSubAgentUsage(ctx, t.ID, store.SandboxActivityAgon, usage); uErr != nil {
-			logger.Handler.Warn("agon: accumulate usage", "task", t.ID, "error", uErr)
+	if reviewUsageNonZero(usage) {
+		if uErr := s.AccumulateSubAgentUsage(ctx, t.ID, store.SandboxActivityReview, usage); uErr != nil {
+			logger.Handler.Warn("review: accumulate usage", "task", t.ID, "error", uErr)
 		}
 	}
 
@@ -1386,24 +1386,24 @@ func (h *Handler) runAgon(ctx context.Context, s *store.Store, t store.Task) err
 	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting {
 		return nil
 	}
-	if err := s.UpdateTaskAgon(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir); err != nil {
+	if err := s.UpdateTaskReview(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir); err != nil {
 		return err
 	}
 
 	// Verdict gate. A clean verdict lets autoimplement proceed (auto-submit checks
-	// AgonUnresolved == 0); any unresolved attack is a hard barrier — the task
+	// ReviewUnresolved == 0); any unresolved attack is a hard barrier — the task
 	// stays parked in waiting and autoimplement does not auto-resume it. Clearing the
 	// barrier is a human act: confirm the work, or resume with steering, which
-	// calls ClearAgonResult and triggers fresh re-verification. (Autoimplement used
-	// to auto-resume with the attacks as feedback up to MaxAgonRetries; that loop
+	// calls ClearReviewResult and triggers fresh re-verification. (Autoimplement used
+	// to auto-resume with the attacks as feedback up to MaxReviewRetries; that loop
 	// was removed in favor of explicit human confirmation.)
 	if result.Unresolved == 0 {
 		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": "Agon: verification clean — no unresolved attacks.",
+			"result": "Review: verification clean — no unresolved attacks.",
 		})
 	} else {
 		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": fmt.Sprintf("Agon: %d unresolved attack(s); task halted for review — confirm or resume with steering to re-verify.", result.Unresolved),
+			"result": fmt.Sprintf("Review: %d unresolved attack(s); task halted for review — confirm or resume with steering to re-verify.", result.Unresolved),
 		})
 	}
 	return nil

@@ -3,7 +3,7 @@ title: Unified Transcript Rendering (Raw ↔ Rendered, all harnesses)
 status: archived
 depends_on:
   - harness-abstraction
-  - agon-trajectory-streaming
+  - review-trajectory-streaming
 affects:
   - internal/harness/harness.go
   - internal/harness/codex.go
@@ -153,11 +153,11 @@ box**:
 view + Claude rendering) and, for non-claude harnesses, an `activity` + `answer`
 derived from the normalized stream.
 
-### 6. Agon transcript → raw ↔ rendered toggle only (no refactor)
+### 6. Review transcript → raw ↔ rendered toggle only (no refactor)
 
-Agon already renders well (critic/proposer fork/round accordion, markdown bodies;
-`agon-trajectory-streaming`) and is a genuinely different shape (already
-normalized server-side to `AgonTranscript` JSON). **Do not** refactor it into
+Review already renders well (critic/proposer fork/round accordion, markdown bodies;
+`review-trajectory-streaming`) and is a genuinely different shape (already
+normalized server-side to `ReviewTranscript` JSON). **Do not** refactor it into
 `ActivityRow`. The only add for consistency: a `Raw ↔ Rendered` toggle in the
 Verification tab where Raw shows the underlying `transcript.jsonl` (+ round
 bodies) and Rendered is the existing accordion. (Optional / lowest priority; can
@@ -194,9 +194,9 @@ with its fixture as the saved turn output): the Claude greeting renders prose
 (was the raw-JSON dump), codex/cursor/opencode/pi render trajectories + answer,
 and the Raw toggle shows the native stream — no console errors.
 
-Phase 4: agon kept its existing rendered fork/round accordion and gained a
+Phase 4: review kept its existing rendered fork/round accordion and gained a
 `Raw ↔ Rendered` toggle in the Verification tab; raw shows the assembled
-transcript payload (fork/round records + bodies) pretty-printed — no agon
+transcript payload (fork/round records + bodies) pretty-printed — no review
 refactor, no backend change (the payload is already normalized server-side and
 is more complete than the raw `transcript.jsonl`, which only carries pointers).
 
@@ -214,7 +214,7 @@ summarisers are a later pass.
   expandable `detail`; `Output`/`Error` into detail/error rows. Claude keeps its
   rich `summariseToolInput`/`toolPreview`. Richer per-harness summarizers are a
   later pass.
-- Refactoring agon into the `ActivityRow` trajectory model.
+- Refactoring review into the `ActivityRow` trajectory model.
 - Token-by-token / sub-event streaming changes (the per-line event granularity is
   the unit).
 - Reconstructing user-prompt bubbles from the agent log (the log is agent output;
@@ -243,8 +243,8 @@ trajectory **and** answer prose in the Activity tab; `Raw ↔ Rendered` toggle
 untouched. Unit tests for the normalized→`ActivityRow` mapper (using fixtures
 mirrored from the Go testdata); `vue-tsc` clean.
 
-**Phase 4 — agon raw toggle (optional).** Raw ↔ Rendered toggle in the
-Verification tab for the agon transcript.
+**Phase 4 — review raw toggle (optional).** Raw ↔ Rendered toggle in the
+Verification tab for the review transcript.
 
 **Acceptance (UI verification, required by the user).** Run the app and confirm
 the Activity tab renders properly for each harness using the testdata fixtures

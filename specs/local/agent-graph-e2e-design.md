@@ -97,12 +97,12 @@ redesign, not a port.** The agentic/topos path (`runAgenticFlow` ->
 - creates **no git worktrees** (the worktree<->topos-sandbox adapter is explicitly
   deferred, `agentgraph/model.go`), so code changes never reach the host repo;
 - runs **no commit pipeline**, **no test verification**, **no oversight**, **no
-  agon** -- and persists an **empty SessionID** (`runner/agentic.go`) that
-  structurally breaks the handler's agon / auto-submit / commit machinery;
+  review** -- and persists an **empty SessionID** (`runner/agentic.go`) that
+  structurally breaks the handler's review / auto-submit / commit machinery;
 - **races to `done`** via hollow state writes, bypassing the handler verification
   the legacy path relies on.
 
-Worktrees, the commit pipeline, oversight, and agon are all wallfacer-specific
+Worktrees, the commit pipeline, oversight, and review are all wallfacer-specific
 runner/handler code (`runner/worktree.go`, `runner/commit.go`,
 `runner/oversight.go`, `handler/tasks_autoimplement.go`), orthogonal to topos's
 generic multi-agent-graph orchestration. Moving them in is foundational work
@@ -138,7 +138,7 @@ to and that works the task to an outcome. The honest tension is execution:
 
 - The **delegation fleet** (topos) is what the user wants conceptually, but the
   proven coding workhorse (`implement`) is the legacy multi-turn loop, which also
-  owns worktrees, the commit pipeline, agon verification, and oversight. Topos
+  owns worktrees, the commit pipeline, review verification, and oversight. Topos
   runs agents but has not been shown to replicate that wallfacer-specific
   machinery.
 - The **deterministic DAG** (steps + parallel) is clear and proven for ordered
@@ -169,7 +169,7 @@ that runs through topos, tearing out the flow engine and the special multi-turn
 loop) is the biggest cleanup payoff and matches the "one engine" ideal, but the
 author did not ask for it directly and it is the riskiest thing here. It is
 gated by a feasibility spike (S) that asks whether topos can carry the
-`implement` loop's duties (worktree, commit pipeline, agon, oversight, multi-turn
+`implement` loop's duties (worktree, commit pipeline, review, oversight, multi-turn
 coding). **If S returns yes**, A4 converges execution and tears the legacy
 engines out. **If S returns no, that is not a failure**: the honest end state is
 two clean coordination semantics (deterministic DAG + delegating fleet) under one
@@ -266,7 +266,7 @@ One model for the canvas, applied in every coordination mode — no special-casi
   is ever stranded.
 - **Lead is explicit and movable** (already have promote-to-lead); the lead is
   the task entry in every mode.
-- **Agon is not a graph node.** Agon is the Testing agent's internal verification
+- **Review is not a graph node.** Review is the Testing agent's internal verification
   (critic/proposer rounds), surfaced as a detail of the test node (a badge /
   drill-in), not a box on the graph. Document this in the node detail so it stops
   reading as a missing concept.
@@ -325,7 +325,7 @@ Each teardown step ships with a regression test proving the capability survives
   presets + per-edge enable). Run before A1 promises free edge editing.
 - **A1: editing model fix (no execution change).** Parallel-as-parallel,
   free-form everywhere, editable edges (scope set by spike E), add/remove/undo,
-  agon-as-detail. Makes the editor correct and operable. **Highest user value,
+  review-as-detail. Makes the editor correct and operable. **Highest user value,
   lowest risk — do first.**
 - **A2: surface + terminology unification.** Fold agent CRUD into the graph
   library; retire FlowsPage; one nav entry; "agent graph" everywhere (UI first,
@@ -334,7 +334,7 @@ Each teardown step ships with a regression test proving the capability survives
   coordination); task shows + links its run on the graph; default `implement`.
 - **S: execution feasibility spike (gates A4). DONE -> NO-GO** (2026-06-29).
   Topos cannot carry the `implement` job without a redesign (no worktrees, no
-  commit pipeline, no agon/oversight; races to done). See "Spike S outcome".
+  commit pipeline, no review/oversight; races to done). See "Spike S outcome".
 - **A4: RULED OUT.** The flow engine and the `implement` loop stay (the working
   substrate). End state = two clean coordination semantics under one surface.
 - **A4': delegating-mode honesty (replaces A4).** The delegating/agentic path

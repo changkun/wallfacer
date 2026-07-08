@@ -36,7 +36,7 @@ describe('workspaceLabel', () => {
   it('falls back to folder basenames joined with " + " when unnamed', () => {
     // Regression: nameless workspaces used to render blank in the sidebar,
     // picker, settings, and status bar.
-    expect(workspaceLabel('', ['/dev/agon', '/dev/wallfacer'])).toBe('agon + wallfacer');
+    expect(workspaceLabel('', ['/dev/review', '/dev/wallfacer'])).toBe('review + wallfacer');
     expect(workspaceLabel(undefined, ['/dev/wallfacer/'])).toBe('wallfacer');
   });
   it('never renders blank: placeholder when name and folders are empty', () => {

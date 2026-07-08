@@ -2,7 +2,7 @@ package adversarial
 
 import (
 	"latere.ai/x/topos/adversarial"
-	agonClaude "latere.ai/x/topos/adversarial/claude"
+	reviewClaude "latere.ai/x/topos/adversarial/claude"
 )
 
 // NewSessionProposer returns a Proposer backed by the claude fork-session path.
@@ -11,7 +11,7 @@ import (
 //
 // The proposer runs in the task's real worktree (fork-session is cwd-scoped, so
 // it cannot run elsewhere) and is restricted to read-only tools
-// (agonClaude.WithProposerReadOnly, agon spec 38): it can read the code to
+// (reviewClaude.WithProposerReadOnly, review spec 38): it can read the code to
 // rebut and concede but cannot edit the tree wallfacer's commit pipeline would
 // then stage. This is an explicit guarantee on top of claude's headless
 // default-deny.
@@ -19,5 +19,5 @@ func NewSessionProposer(sessionID, cwd string) adversarial.Proposer {
 	if sessionID == "" {
 		return nil
 	}
-	return agonClaude.NewProposer(sessionID, cwd, agonClaude.WithProposerReadOnly())
+	return reviewClaude.NewProposer(sessionID, cwd, reviewClaude.WithProposerReadOnly())
 }

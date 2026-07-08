@@ -191,10 +191,10 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	if err := s.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
 		return err
 	}
-	// Clear the agon verdict: it was computed against the pre-resume diff and is
+	// Clear the review verdict: it was computed against the pre-resume diff and is
 	// stale once this resumed run lands new commits, so the task should be
 	// re-verified after it returns to waiting.
-	if err := s.ClearAgonResult(ctx, task.ID); err != nil {
+	if err := s.ClearReviewResult(ctx, task.ID); err != nil {
 		return err
 	}
 	// Reset the consecutive test failure counter so the auto-resume cycle
@@ -592,10 +592,10 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 	promoteMu.Unlock()
 
-	// Clear any stale agon verdict so the resumed task is re-verified once it
+	// Clear any stale review verdict so the resumed task is re-verified once it
 	// returns to waiting (no-op for a failed task, which never had one set).
-	if err := s.ClearAgonResult(r.Context(), id); err != nil {
-		logger.Handler.Warn("resume: clear agon result", "task", id, "error", err)
+	if err := s.ClearReviewResult(r.Context(), id); err != nil {
+		logger.Handler.Warn("resume: clear review result", "task", id, "error", err)
 	}
 
 	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
@@ -752,11 +752,11 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
-// AgonTask triggers adversarial agon verification for a waiting task.
+// ReviewTask triggers adversarial review verification for a waiting task.
 // The task must be in waiting status and have a non-nil SessionID.
 // The run happens asynchronously; 202 Accepted is returned immediately with
-// the planned state directory path so callers can poll or watch .agon/.
-func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+// the planned state directory path so callers can poll or watch .review/.
+func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	s, ok := h.requireStore(w)
 	if !ok {
 		return
@@ -768,7 +768,7 @@ func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 	if task.Status != store.TaskStatusWaiting {
-		http.Error(w, "only waiting tasks can be verified by agon", http.StatusConflict)
+		http.Error(w, "only waiting tasks can be verified by review", http.StatusConflict)
 		return
 	}
 	if task.SessionID == nil || *task.SessionID == "" {
@@ -777,22 +777,22 @@ func (h *Handler) AgonTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 
 	// Reserve the in-flight slot so a manual trigger neither double-fires on a
-	// double-click nor stacks on top of an auto-agon run for the same task.
-	if !h.beginAgon(id) {
-		http.Error(w, "agon verification already running for this task", http.StatusConflict)
+	// double-click nor stacks on top of an auto-review run for the same task.
+	if !h.beginReview(id) {
+		http.Error(w, "review verification already running for this task", http.StatusConflict)
 		return
 	}
 
 	// Compute the planned state directory for the response. The engine will
 	// create a session subdirectory inside it; the exact path is set on the
-	// task after the run completes via UpdateTaskAgon. It lives beside the
-	// worktree (not inside it) so it is never committed — see agonStateDir.
-	stateDir := agonStateDir(primaryWorktree(task.WorktreePaths))
+	// task after the run completes via UpdateTaskReview. It lives beside the
+	// worktree (not inside it) so it is never committed — see reviewStateDir.
+	stateDir := reviewStateDir(primaryWorktree(task.WorktreePaths))
 
 	go func() {
-		defer h.endAgon(id)
-		if err := h.runAgon(context.Background(), s, *task); err != nil {
-			logger.Handler.Warn("agon: manual verification run failed",
+		defer h.endReview(id)
+		if err := h.runReview(context.Background(), s, *task); err != nil {
+			logger.Handler.Warn("review: manual verification run failed",
 				"task", id, "error", err)
 		}
 	}()

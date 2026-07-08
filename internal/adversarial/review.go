@@ -10,29 +10,29 @@ import (
 	"latere.ai/x/wallfacer/internal/runner"
 )
 
-// AgonVerifier implements adversarial.Verifier using agon's Engine.
+// ReviewVerifier implements adversarial.Verifier using review's Engine.
 // It wires a Claude SessionProposer (fork-session) and a HarnessCritic
 // (wallfacer runner one-shot) into adversarial.Engine and calls Run.
-type AgonVerifier struct {
+type ReviewVerifier struct {
 	runner          runner.Interface
 	criticHarnesses []harness.ID // rotated per fork for perspective diversity
 }
 
-// NewAgonVerifier creates a verifier whose critics rotate across the given
+// NewReviewVerifier creates a verifier whose critics rotate across the given
 // harnesses by fork index (e.g. Claude on fork 1, Codex on fork 2) for genuine
 // perspective diversity — different models with different blind spots, which is
 // the point of adversarial debate. Defaults to Claude-only when none are given.
 // The proposer is always Claude (fork-session is Claude-native).
-func NewAgonVerifier(r runner.Interface, criticHarnesses ...harness.ID) adversarial.Verifier {
+func NewReviewVerifier(r runner.Interface, criticHarnesses ...harness.ID) adversarial.Verifier {
 	if len(criticHarnesses) == 0 {
 		criticHarnesses = []harness.ID{harness.Claude}
 	}
-	return &AgonVerifier{runner: r, criticHarnesses: criticHarnesses}
+	return &ReviewVerifier{runner: r, criticHarnesses: criticHarnesses}
 }
 
 // criticHarnessForFork maps a 1-based fork index onto the configured critic
 // harness rotation.
-func (v *AgonVerifier) criticHarnessForFork(forkIdx int) harness.ID {
+func (v *ReviewVerifier) criticHarnessForFork(forkIdx int) harness.ID {
 	n := len(v.criticHarnesses)
 	if n == 0 {
 		return harness.Claude
@@ -45,7 +45,7 @@ func (v *AgonVerifier) criticHarnessForFork(forkIdx int) harness.ID {
 
 // Verify runs adversarial verification on a completed task's implementation.
 // Returns nil result when SessionID is empty (no fork-session available).
-func (v *AgonVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
+func (v *ReviewVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
 	if in.SessionID == "" {
 		return nil, nil
 	}
@@ -58,7 +58,7 @@ func (v *AgonVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (
 	// rather than fall back to the unsafe real-tree path.
 	criticCwd, cleanup, err := newCriticWorktree(in.Cwd)
 	if err != nil {
-		return nil, fmt.Errorf("agon: create critic worktree: %w", err)
+		return nil, fmt.Errorf("review: create critic worktree: %w", err)
 	}
 	defer cleanup()
 
@@ -89,7 +89,7 @@ func (v *AgonVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (
 }
 
 // buildTaskContext combines the task prompt and acceptance criteria into
-// the TaskContext field agon critics see.
+// the TaskContext field review critics see.
 func buildTaskContext(prompt, criteria string) string {
 	if criteria == "" {
 		return prompt

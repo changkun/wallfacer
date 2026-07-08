@@ -61,7 +61,7 @@ type MockRunner struct {
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
-	// RunCriticRoundFn lets tests stub agon critic invocations and assert the
+	// RunCriticRoundFn lets tests stub review critic invocations and assert the
 	// working directory the critic is run in.
 	RunCriticRoundFn func(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 

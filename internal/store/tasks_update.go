@@ -216,14 +216,14 @@ func (s *Store) UpdateTaskLineage(_ context.Context, id uuid.UUID, lineageJSON s
 	})
 }
 
-// UpdateTaskAgon persists agon adversarial-verification results onto a task.
+// UpdateTaskReview persists review adversarial-verification results onto a task.
 // unresolved is 0 for a clean run; headline holds the highest-contention claim.
-// sessionDir is the absolute path to the .agon/sessions/<id>/ folder.
-func (s *Store) UpdateTaskAgon(_ context.Context, id uuid.UUID, unresolved int, headline, sessionDir string) error {
+// sessionDir is the absolute path to the .review/sessions/<id>/ folder.
+func (s *Store) UpdateTaskReview(_ context.Context, id uuid.UUID, unresolved int, headline, sessionDir string) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.AgonUnresolved = &unresolved
-		t.AgonHeadline = headline
-		t.AgonSessionDir = sessionDir
+		t.ReviewUnresolved = &unresolved
+		t.ReviewHeadline = headline
+		t.ReviewSessionDir = sessionDir
 		return nil
 	})
 }
@@ -238,15 +238,15 @@ func (s *Store) UpdateTaskCriteria(_ context.Context, id uuid.UUID, criteria str
 	})
 }
 
-// ClearAgonResult clears a task's agon verdict (AgonUnresolved back to nil) so
+// ClearReviewResult clears a task's review verdict (ReviewUnresolved back to nil) so
 // the task is eligible for re-verification. Called when a task is resumed for
 // more work: the prior verdict was computed against an earlier diff and is stale
 // once new commits land. A no-op when nothing was set.
-func (s *Store) ClearAgonResult(_ context.Context, id uuid.UUID) error {
+func (s *Store) ClearReviewResult(_ context.Context, id uuid.UUID) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.AgonUnresolved = nil
-		t.AgonHeadline = ""
-		t.AgonSessionDir = ""
+		t.ReviewUnresolved = nil
+		t.ReviewHeadline = ""
+		t.ReviewSessionDir = ""
 		return nil
 	})
 }

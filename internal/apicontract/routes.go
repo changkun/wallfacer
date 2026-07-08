@@ -637,13 +637,13 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/agon", Name: "AgonTask",
-		Description: "Trigger adversarial agon verification for a task.",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/review", Name: "ReviewTask",
+		Description: "Trigger adversarial review verification for a task.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/agon/transcript", Name: "AgonTranscript",
-		Description: "Read the agon verification trajectory (per-fork, per-round transcripts).",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/review/transcript", Name: "ReviewTranscript",
+		Description: "Read the review verification trajectory (per-fork, per-round transcripts).",
 		Tags:        []string{"tasks"},
 	},
 	{

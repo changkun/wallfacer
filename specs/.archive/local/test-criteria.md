@@ -124,8 +124,8 @@ Implemented across three commits, all phases done.
   threaded through `TaskCreateOptions` / `CreateTaskWithOptions`.
 - **Phase 2 (handlers + resolution):** create / batch / PATCH carry the field;
   `TestTask` resolves `req.Criteria > task.Criteria > ""`; `tryAutoTest` passes
-  `t.Criteria`; **`runAgon` passes `t.Criteria`** — this unblocked
-  [[agon-adversarial-verification]] goal #7 (the primary motivation for landing
+  `t.Criteria`; **`runReview` passes `t.Criteria`** — this unblocked
+  [[review-adversarial-verification]] goal #7 (the primary motivation for landing
   this now).
 - **Phase 3 (frontend):** `types.ts` field; composer "Test criteria" input;
   `TaskDetail` backlog-edit field; `vue-tsc` clean.

@@ -10,9 +10,9 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 )
 
-// CriticRoundResult is the output of one agon critic round: the markdown text
+// CriticRoundResult is the output of one review critic round: the markdown text
 // plus the token usage and cost the agent reported, so callers can report it
-// back to agon (which records it in the session's end.json) and attribute the
+// back to review (which records it in the session's end.json) and attribute the
 // spend to the task.
 type CriticRoundResult struct {
 	Text              string
@@ -27,7 +27,7 @@ type CriticRoundResult struct {
 // prompt and returns the raw markdown text plus the agent's reported usage. It
 // is the runner-side entry point for HarnessCritic.Round calls: no task
 // context, no session resumption, no span events. The usage is surfaced (not
-// dropped) so agon's accounting includes the critic rather than undercounting
+// dropped) so review's accounting includes the critic rather than undercounting
 // it — wallfacer runs the critics, so it is the only place that sees their
 // token spend.
 //
@@ -42,22 +42,22 @@ func (r *Runner) RunCriticRound(ctx context.Context, prompt string, sb harness.I
 		defer cancel()
 	}
 
-	containerName := "wallfacer-agon-critic-" + uuid.NewString()[:8]
-	labels := map[string]string{"wallfacer.task.activity": "agon_critic"}
+	containerName := "wallfacer-review-critic-" + uuid.NewString()[:8]
+	labels := map[string]string{"wallfacer.task.activity": "review_critic"}
 
 	output, err := r.runOneShotContainer(ctx, containerName, prompt, sb, cwd, labels)
 	if err != nil {
-		return CriticRoundResult{}, fmt.Errorf("agon critic: %w", err)
+		return CriticRoundResult{}, fmt.Errorf("review critic: %w", err)
 	}
 	if output == nil {
-		return CriticRoundResult{}, fmt.Errorf("agon critic: nil output")
+		return CriticRoundResult{}, fmt.Errorf("review critic: nil output")
 	}
 	if output.IsError {
 		msg := strings.TrimSpace(output.Result)
 		if msg == "" {
 			msg = "agent returned an error result"
 		}
-		return CriticRoundResult{}, fmt.Errorf("agon critic: %s", msg)
+		return CriticRoundResult{}, fmt.Errorf("review critic: %s", msg)
 	}
 	return CriticRoundResult{
 		Text:              output.Result,

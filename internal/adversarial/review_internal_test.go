@@ -29,7 +29,7 @@ func TestHarnessCritic_RunsInThrowawayCwd(t *testing.T) {
 			}, nil
 		},
 	}
-	c := NewHarnessCritic(mock, harness.Codex, "/wt/task/.agon-critic-abcd1234")
+	c := NewHarnessCritic(mock, harness.Codex, "/wt/task/.review-critic-abcd1234")
 	res, err := c.Round(context.Background(), adversarial.CriticInput{
 		Cwd:       "/wt/task/repo", // the real worktree — must NOT be used
 		DiffPatch: "+x := 1",
@@ -37,7 +37,7 @@ func TestHarnessCritic_RunsInThrowawayCwd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Round: %v", err)
 	}
-	if gotCwd != "/wt/task/.agon-critic-abcd1234" {
+	if gotCwd != "/wt/task/.review-critic-abcd1234" {
 		t.Errorf("critic cwd = %q, want the throwaway worktree (not the real tree)", gotCwd)
 	}
 	if gotSb != harness.Codex {
@@ -46,7 +46,7 @@ func TestHarnessCritic_RunsInThrowawayCwd(t *testing.T) {
 	if res == nil || res.Markdown == "" {
 		t.Error("expected critic markdown in the result")
 	}
-	// Usage must be reported back to agon, not dropped.
+	// Usage must be reported back to review, not dropped.
 	if res.Usage.Input != 100 || res.Usage.Output != 20 || res.USD != 0.03 {
 		t.Errorf("critic usage not reported: usage=%+v usd=%v", res.Usage, res.USD)
 	}
@@ -74,7 +74,7 @@ func TestHarnessCritic_FallsBackToInputCwd(t *testing.T) {
 // TestCriticHarnessForFork_Rotates proves forks get diverse harnesses rather
 // than the same model sampled twice.
 func TestCriticHarnessForFork_Rotates(t *testing.T) {
-	v := &AgonVerifier{criticHarnesses: []harness.ID{harness.Claude, harness.Codex}}
+	v := &ReviewVerifier{criticHarnesses: []harness.ID{harness.Claude, harness.Codex}}
 	want := map[int]harness.ID{1: harness.Claude, 2: harness.Codex, 3: harness.Claude, 4: harness.Codex}
 	for fork, w := range want {
 		if got := v.criticHarnessForFork(fork); got != w {
@@ -82,7 +82,7 @@ func TestCriticHarnessForFork_Rotates(t *testing.T) {
 		}
 	}
 	// Empty rotation falls back to Claude rather than panicking on modulo-by-zero.
-	if got := (&AgonVerifier{}).criticHarnessForFork(1); got != harness.Claude {
+	if got := (&ReviewVerifier{}).criticHarnessForFork(1); got != harness.Claude {
 		t.Errorf("empty rotation fork 1 -> %q, want claude", got)
 	}
 }
@@ -127,12 +127,12 @@ func TestNewCriticWorktree_CreatesAndCleansUp(t *testing.T) {
 	}
 }
 
-// TestNewAgonVerifier_DefaultsToClaude proves the variadic constructor degrades
+// TestNewReviewVerifier_DefaultsToClaude proves the variadic constructor degrades
 // to a single Claude critic when no harnesses are supplied.
-func TestNewAgonVerifier_DefaultsToClaude(t *testing.T) {
-	v, ok := NewAgonVerifier(&runner.MockRunner{}).(*AgonVerifier)
+func TestNewReviewVerifier_DefaultsToClaude(t *testing.T) {
+	v, ok := NewReviewVerifier(&runner.MockRunner{}).(*ReviewVerifier)
 	if !ok {
-		t.Fatal("NewAgonVerifier did not return *AgonVerifier")
+		t.Fatal("NewReviewVerifier did not return *ReviewVerifier")
 	}
 	if got := v.criticHarnessForFork(2); got != harness.Claude {
 		t.Errorf("default rotation -> %q, want claude", got)

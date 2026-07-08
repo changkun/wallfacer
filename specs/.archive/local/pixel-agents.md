@@ -179,7 +179,7 @@ Performance targets:
 
 ### Pathfinding
 
-BFS on 4-connected grid (no diagonals). Walls, furniture, and occupied chairs are impassable. Each character's own chair is always passable for that character.
+BFS on 4-connected grid (no direviewals). Walls, furniture, and occupied chairs are impassable. Each character's own chair is always passable for that character.
 
 Walk speed: ~2 tiles/second. Linear interpolation between tile centers for smooth movement.
 

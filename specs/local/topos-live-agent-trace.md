@@ -29,7 +29,7 @@ the whole run finishes (`topos/topos.go:191`); `internal/agentgraph` exposes no
 progress hook. So during a multi-agent run the user sees nothing live — the
 lineage graph (and `AgentLineage.vue`) materializes only after completion.
 
-Single-agent task runs stream live (harness stdout → Activity tab) and agon
+Single-agent task runs stream live (harness stdout → Activity tab) and review
 streams live (per-round session-dir files → transcript endpoint). The new,
 multi-agent runtime is the one surface with no live trace.
 
@@ -49,8 +49,8 @@ the trace is a readable transcription (not just lifecycle/tool events), and in
 wallfacer forward it to a live per-task trace that an SSE endpoint streams and the
 task UI renders — with the lineage nodes lighting up live from the same events.
 
-This is also the convergence the [[topos-runtime-integration]] / agon discussion
-pointed at: agon already solved live multi-agent tracing via session-dir files;
+This is also the convergence the [[topos-runtime-integration]] / review discussion
+pointed at: review already solved live multi-agent tracing via session-dir files;
 topos should grow the same capability as the shared runtime, through a clean event
 seam rather than file tailing.
 
@@ -106,7 +106,7 @@ event so the trace reads as a transcript:
   seam: only `internal/agentgraph` names topos types) and hands it to a per-run
   sink passed in by the runner.
 - The sink is non-blocking: it appends to an in-memory ring buffer and fans out
-  to live subscribers (mirror the agon in-flight pattern in `tasks_autoimplement.go`,
+  to live subscribers (mirror the review in-flight pattern in `tasks_autoimplement.go`,
   but event-driven, not polled).
 
 ### D. wallfacer — persist + serve
@@ -115,7 +115,7 @@ event so the trace reads as a transcript:
   trace log (a sidecar file under the task's state dir, JSONL — cheaper than
   growing a `Task` field unbounded). The final `Lineage` persistence is unchanged.
 - Endpoint `GET /api/tasks/{id}/agentgraph/trace`:
-  - live run → **SSE** stream of events (do not reuse agon's 2.5s poll; that
+  - live run → **SSE** stream of events (do not reuse review's 2.5s poll; that
     polling + unmemoized render was the CPU sink found in the resource-governance
     work — SSE avoids it).
   - completed run → replay the persisted JSONL then close.
@@ -179,7 +179,7 @@ hub + JSONL + dedicated SSE endpoint, `AgentLineage.vue` builds the live trace
 from the run's agentgraph-tagged timeline events (3a enriched them with
 `source`/`kind`/`node`/`agent`/`text`), refetched on `task.updated_at` via the
 existing live task-update path. It renders a per-agent transcript (assistant text
-as **memoized markdown** — the agon CPU lesson), shows during the run (provisional
+as **memoized markdown** — the review CPU lesson), shows during the run (provisional
 running nodes synthesized from the trace before the lineage persists), and renders
 nothing for non-agentgraph tasks. Mounted for `in_progress` agentic tasks. Tests
 cover graph, transcript (markdown rendered, non-agentgraph filtered, provisional
@@ -193,7 +193,7 @@ this refetch already show the trace live.
 ## Non-Goals
 
 - Token-level delta streaming (per-turn message text is enough for v1; OQ-1).
-- Live trace for non-topos paths (single-agent already streams; agon already has
+- Live trace for non-topos paths (single-agent already streams; review already has
   its trajectory view).
 - Rendering the trace inside the Map's `GraphCanvas` (coordinate with the
   in-progress mission-control map work; task-detail `AgentLineage.vue` first).
@@ -210,4 +210,4 @@ this refetch already show the trace live.
   decision hooks are a separate capability.
 - **OQ-3 — persistence shape.** Sidecar JSONL under the task state dir (proposed)
   vs a capped `Task` field. JSONL avoids unbounded growth in the task record and
-  matches how agon persists its session artifacts.
+  matches how review persists its session artifacts.

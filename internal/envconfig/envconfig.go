@@ -31,9 +31,9 @@ type Config struct {
 	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
 	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
-	AgonForkCount          int    // WALLFACER_AGON_FORKS (0 means use default)
-	AgonMaxRounds          int    // WALLFACER_AGON_ROUNDS (0 means use default)
-	AgonCostCap            int    // WALLFACER_AGON_COST_CAP in tokens (0 means use default)
+	ReviewForkCount        int    // WALLFACER_REVIEW_FORKS (0 means use default)
+	ReviewMaxRounds        int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
+	ReviewCostCap          int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
 	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
@@ -98,9 +98,9 @@ var knownKeys = []string{
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
-	"WALLFACER_AGON_FORKS",
-	"WALLFACER_AGON_ROUNDS",
-	"WALLFACER_AGON_COST_CAP",
+	"WALLFACER_REVIEW_FORKS",
+	"WALLFACER_REVIEW_ROUNDS",
+	"WALLFACER_REVIEW_COST_CAP",
 	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
 	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
@@ -189,17 +189,17 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.AutoPushThreshold = n
 			}
-		case "WALLFACER_AGON_FORKS":
+		case "WALLFACER_REVIEW_FORKS":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.AgonForkCount = n
+				cfg.ReviewForkCount = n
 			}
-		case "WALLFACER_AGON_ROUNDS":
+		case "WALLFACER_REVIEW_ROUNDS":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.AgonMaxRounds = n
+				cfg.ReviewMaxRounds = n
 			}
-		case "WALLFACER_AGON_COST_CAP":
+		case "WALLFACER_REVIEW_COST_CAP":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.AgonCostCap = n
+				cfg.ReviewCostCap = n
 			}
 		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
 			// 0 means "all time"; negative values are rejected silently (keeps
@@ -441,9 +441,9 @@ type Updates struct {
 	MaxTestParallel      *string
 	MaxAgents            *string
 	AgentNice            *string
-	AgonForks            *string
-	AgonRounds           *string
-	AgonCostCap          *string
+	ReviewForks          *string
+	ReviewRounds         *string
+	ReviewCostCap        *string
 	OversightInterval    *string
 	ArchivedTasksPerPage *string
 	AutoPush             *string
@@ -472,9 +472,9 @@ func Update(path string, u Updates) error {
 		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
 		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
 		"WALLFACER_AGENT_NICE":              u.AgentNice,
-		"WALLFACER_AGON_FORKS":              u.AgonForks,
-		"WALLFACER_AGON_ROUNDS":             u.AgonRounds,
-		"WALLFACER_AGON_COST_CAP":           u.AgonCostCap,
+		"WALLFACER_REVIEW_FORKS":            u.ReviewForks,
+		"WALLFACER_REVIEW_ROUNDS":           u.ReviewRounds,
+		"WALLFACER_REVIEW_COST_CAP":         u.ReviewCostCap,
 		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,

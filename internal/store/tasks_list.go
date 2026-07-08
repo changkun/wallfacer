@@ -192,8 +192,8 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 }
 
 // ListWaitingTasksWithSession returns all waiting tasks that have a non-nil
-// SessionID and have not yet been run through agon (AgonUnresolved == nil).
-// Used by tryAutoAgon to find tasks eligible for adversarial verification.
+// SessionID and have not yet been run through review (ReviewUnresolved == nil).
+// Used by tryAutoReview to find tasks eligible for adversarial verification.
 func (s *Store) ListWaitingTasksWithSession(_ context.Context) []Task {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -204,7 +204,7 @@ func (s *Store) ListWaitingTasksWithSession(_ context.Context) []Task {
 		if t == nil || t.SessionID == nil || *t.SessionID == "" {
 			continue
 		}
-		if t.AgonUnresolved != nil {
+		if t.ReviewUnresolved != nil {
 			continue
 		}
 		result = append(result, cloneTask(t))

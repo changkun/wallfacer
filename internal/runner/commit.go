@@ -428,7 +428,7 @@ func (r *Runner) runCommitContainer(
 
 // runOneShotContainer is runCommitContainer with an explicit working directory.
 // cwd sets the agent process's WorkDir (empty = the server's cwd, the
-// commit-message default); the agon critic passes the task worktree so the
+// commit-message default); the review critic passes the task worktree so the
 // critic can read the codebase, not just the diff patch.
 func (r *Runner) runOneShotContainer(
 	ctx context.Context,

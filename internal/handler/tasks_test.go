@@ -4037,7 +4037,7 @@ func TestGetConfig_IncludesWatcherHealth(t *testing.T) {
 		t.Fatalf("expected watcher_health to be an array, got %T", healthRaw)
 	}
 
-	wantNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-agon"}
+	wantNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-review"}
 	if len(health) != len(wantNames) {
 		t.Fatalf("expected %d watcher health entries, got %d", len(wantNames), len(health))
 	}

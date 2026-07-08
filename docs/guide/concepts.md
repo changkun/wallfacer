@@ -88,7 +88,7 @@ Automation is not a single switch but a set of composable toggles, reachable fro
 - **Autosync** rebases waiting tasks onto the default branch as it moves.
 - **Autopush** pushes accepted commits to the remote.
 
-A sixth, separate toggle enables **Agon**, an adversarial verification mode where critic forks debate the change before it is accepted. Enable any subset: autotest without autosubmit means automatic verification with manual acceptance; everything on means the board runs itself. Details and guard rails (retry budgets, circuit breakers, parallelism caps) are in [Automation](automation.md).
+A sixth, separate toggle enables **Review**, an adversarial verification mode where critic forks debate the change before it is accepted. Enable any subset: autotest without autosubmit means automatic verification with manual acceptance; everything on means the board runs itself. Details and guard rails (retry budgets, circuit breakers, parallelism caps) are in [Automation](automation.md).
 
 ## Moving between levels
 

@@ -163,9 +163,9 @@ export interface Task {
   parent_task_id?: string | null;
   spec_source_path?: string;
   environment?: ExecutionEnvironment | null;
-  // Agon adversarial-verification results. Absent = not yet run.
-  agon_unresolved?: number;
-  agon_headline?: string;
+  // Review adversarial-verification results. Absent = not yet run.
+  review_unresolved?: number;
+  review_headline?: string;
   // Present (non-empty string) only for tasks run via the agentic flow kind;
   // the opaque JSON of the run's agent-graph lineage. The thin parsed shape is
   // served by GET /api/tasks/{id}/lineage (see AgentLineage).
@@ -194,37 +194,37 @@ export interface TaskLineage {
   edges: LineageEdge[];
 }
 
-// Agon verification trajectory (GET /api/tasks/{id}/agon/transcript).
-export interface AgonRound {
+// Review verification trajectory (GET /api/tasks/{id}/review/transcript).
+export interface ReviewRound {
   round: number;
   role: 'critic' | 'proposer' | string;
   body: string;
   ts: string;
 }
-export interface AgonFork {
+export interface ReviewFork {
   index: number;
-  rounds: AgonRound[];
+  rounds: ReviewRound[];
 }
-export interface AgonRunConfig {
+export interface ReviewRunConfig {
   forks: number;
   max_rounds: number;
   cost_cap: number;
   proposer_model: string;
   critic_models: string[];
 }
-export interface AgonOutcome {
+export interface ReviewOutcome {
   termination: string;
   total_attacks: number;
   by_status: Record<string, number>;
   wall_seconds: number;
   tokens: number;
 }
-export interface AgonTranscript {
+export interface ReviewTranscript {
   session_id: string;
   running: boolean;
-  config?: AgonRunConfig;
-  outcome?: AgonOutcome;
-  forks: AgonFork[];
+  config?: ReviewRunConfig;
+  outcome?: ReviewOutcome;
+  forks: ReviewFork[];
 }
 
 // Runtime environment captured at the start of a task run (reproducibility
@@ -319,9 +319,9 @@ export interface EnvConfig {
   max_test_parallel_tasks: number;
   max_agents: number;
   agent_nice: number;
-  agon_forks: number;
-  agon_rounds: number;
-  agon_cost_cap: number;
+  review_forks: number;
+  review_rounds: number;
+  review_cost_cap: number;
   oversight_interval: number;
   archived_tasks_per_page: number;
   auto_push_enabled: boolean;
@@ -345,9 +345,9 @@ export interface EnvUpdatePayload {
   max_test_parallel_tasks?: number;
   max_agents?: number;
   agent_nice?: number;
-  agon_forks?: number;
-  agon_rounds?: number;
-  agon_cost_cap?: number;
+  review_forks?: number;
+  review_rounds?: number;
+  review_cost_cap?: number;
   oversight_interval?: number;
   archived_tasks_per_page?: number;
   auto_push_enabled?: boolean;

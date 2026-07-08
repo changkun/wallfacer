@@ -61,7 +61,7 @@ type HostBackendConfig struct {
 	// a negative value disables throttling. See applyAgentPriority.
 	AgentNice int
 	// MaxAgents caps the number of agent processes that may run concurrently
-	// across all callers (regular tasks, test runs, agon). 0 ⇒ unlimited. This is
+	// across all callers (regular tasks, test runs, review). 0 ⇒ unlimited. This is
 	// the hard ceiling beneath the per-kind admission gates: Launch blocks until a
 	// slot frees (honoring the caller's context).
 	MaxAgents int

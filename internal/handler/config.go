@@ -251,7 +251,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		})
 	}
 
-	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-agon"}
+	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-review"}
 	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
 	for _, name := range watcherNames {
 		if wb, ok := h.breakers[name]; ok {
@@ -276,7 +276,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"autosubmit":                h.AutosubmitEnabled(),
 		"autosync":                  h.AutosyncEnabled(),
 		"autopush":                  h.AutopushEnabled(),
-		"agon":                      h.AgonEnabled(),
+		"review":                    h.ReviewEnabled(),
 		"default_model":             "",
 		"payload_limits":            payloadLimits,
 		"watcher_health":            watcherHealth,
@@ -339,7 +339,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Autosubmit       *bool                 `json:"autosubmit"`
 		Autosync         *bool                 `json:"autosync"`
 		Autopush         *bool                 `json:"autopush"`
-		Agon             *bool                 `json:"agon"`
+		Review           *bool                 `json:"review"`
 		Ideation         *bool                 `json:"ideation"`          // retired; accepted for old clients but ignored
 		IdeationInterval *int                  `json:"ideation_interval"` // retired; accepted for old clients but ignored
 		WorkspaceGroups  []workspace.Workspace `json:"workspace_groups"`
@@ -361,7 +361,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	applyBoolToggle(context.Background(), req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	applyBoolToggle(context.Background(), req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
-	applyBoolToggle(context.Background(), req.Agon, h.SetAgon, h.AgonEnabled, h.tryAutoAgon)
+	applyBoolToggle(context.Background(), req.Review, h.SetReview, h.ReviewEnabled, h.tryAutoReview)
 	// Persist any toggle changes to the viewed group so switching away
 	// and back does not reset the user's automation choices, and a
 	// different group on this server stays manual unless the user turns
@@ -390,7 +390,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		"autosubmit":    h.AutosubmitEnabled(),
 		"autosync":      h.AutosyncEnabled(),
 		"autopush":      h.AutopushEnabled(),
-		"agon":          h.AgonEnabled(),
+		"review":        h.ReviewEnabled(),
 	}
 	httpjson.Write(w, http.StatusOK, resp)
 }

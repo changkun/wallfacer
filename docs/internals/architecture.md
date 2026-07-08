@@ -22,7 +22,7 @@ graph TB
         Handler["Handler<br/>REST API + SSE"]
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
-        Automation["Automation Loops<br/>promote / test / agon / submit<br/>sync / retry / routines"]
+        Automation["Automation Loops<br/>promote / test / review / submit<br/>sync / retry / routines"]
         Plan["Plan Mode<br/>spec tree + agent session<br/>dispatch + undo"]
 
         Handler --> Runner
@@ -134,11 +134,11 @@ flowchart LR
     PubSub --> Submitter["Auto-submitter<br/>waiting to done<br/>when test passed<br/>+ conflict-free"]
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
-    PubSub --> Agon["Auto-agon<br/>adversarial verification<br/>on waiting session tasks<br/>(supersedes auto-test when on)"]
+    PubSub --> Review["Auto-review<br/>adversarial verification<br/>on waiting session tasks<br/>(supersedes auto-test when on)"]
     PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn tasks against a flow"]
 ```
 
-The seven entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoAgon`. There is no auto-refiner.
+The seven entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`. There is no auto-refiner.
 
 ### Agents, flows, and the dispatch layer
 
@@ -301,7 +301,7 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedWg`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
-The seven automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoAgon`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
+The seven automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
 
 ### Pub/sub channels
 
@@ -365,7 +365,7 @@ Every `internal/` package and its role in the system:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `adversarial` | Agon adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `AgonVerifier` |
+| `adversarial` | Review adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `ReviewVerifier` |
 | `agentgraph` | The single seam onto the embedded topos runtime: compiles a flow + agents registry into a `topos.Region`, executes it, returns final text plus a lineage graph | `FromFlow()`, `RunFlow()`, `Runner`, `Lineage` |
 | `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload. Five built-in roles: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Registry`, `Role`, `BuiltinAgents`, `NewRegistry()`, `Load()` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
@@ -445,7 +445,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
-| `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-agon, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoAgon()`, etc. |
+| `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-review, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoReview()`, etc. |
 | `stream.go` | SSE streaming for live task updates and agent logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |
 | `config.go` | Server configuration (autoimplement flags, harness list, watcher health) | `GET /api/config`, `PUT /api/config` |
 | `env.go` | Environment configuration (API tokens, model settings, harness routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |

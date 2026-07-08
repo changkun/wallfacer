@@ -50,7 +50,7 @@ Identity end to end: OIDC browser login and the session cookie, the RFC 8628 dev
 
 [Automation](automation.md)
 
-Background watchers, the autoimplement promotion loop, auto-test, auto-agon, auto-submit, auto-retry, circuit breakers, routine scheduling, and startup sequence.
+Background watchers, the autoimplement promotion loop, auto-test, auto-review, auto-submit, auto-retry, circuit breakers, routine scheduling, and startup sequence.
 
 ### 8. Agent Graph Runtime
 

@@ -33,7 +33,7 @@ produces a lineage graph, and the Map renders it live.
 ## Why now
 
 The runtime is extracted, public, and stable (`latere.ai/x/topos` v0.0.4: pure SDK,
-linted, covered). wallfacer already consumes sibling latere modules (`agon`, `pkg`),
+linted, covered). wallfacer already consumes sibling latere modules (`review`, `pkg`),
 so the dependency pattern exists. The current Agents and Flows pages are two disjoint
 surfaces; topos gives one model (agents, regions, topology, delegation, lineage) that
 unifies them and powers an actual multi-agent run, not just a static pipeline.

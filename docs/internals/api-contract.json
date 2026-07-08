@@ -866,18 +866,18 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/tasks/{id}/agon",
-      "name": "AgonTask",
-      "description": "Trigger adversarial agon verification for a task.",
+      "pattern": "/api/tasks/{id}/review",
+      "name": "ReviewTask",
+      "description": "Trigger adversarial review verification for a task.",
       "tags": [
         "tasks"
       ]
     },
     {
       "method": "GET",
-      "pattern": "/api/tasks/{id}/agon/transcript",
-      "name": "AgonTranscript",
-      "description": "Read the agon verification trajectory (per-fork, per-round transcripts).",
+      "pattern": "/api/tasks/{id}/review/transcript",
+      "name": "ReviewTranscript",
+      "description": "Read the review verification trajectory (per-fork, per-round transcripts).",
       "tags": [
         "tasks"
       ]

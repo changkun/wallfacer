@@ -62,11 +62,11 @@ type Interface interface {
 	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
-	// RunCriticRound runs a one-shot stateless agent invocation for an agon
+	// RunCriticRound runs a one-shot stateless agent invocation for an review
 	// critic turn in the given working directory (cwd), so the critic can read
 	// the full codebase rather than only the diff patch. cwd may be empty for a
 	// patch-only critic. Returns the markdown text plus the agent's reported
-	// token usage and cost, so the caller can report it back to agon and
+	// token usage and cost, so the caller can report it back to review and
 	// attribute the spend to the task.
 	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 

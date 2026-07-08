@@ -507,7 +507,7 @@ defineExpose({
 .scp-rz-s { bottom: 0; left: 0; right: 0; height: 6px; cursor: ns-resize; }
 .scp-rz-e { top: 0; bottom: 0; right: 0; width: 6px; cursor: ew-resize; }
 .scp-rz-w { top: 0; bottom: 0; left: 0; width: 6px; cursor: ew-resize; }
-/* Corners sit above the edges so their diagonal cursor wins on overlap. */
+/* Corners sit above the edges so their direviewal cursor wins on overlap. */
 .scp-rz-c { width: 14px; height: 14px; z-index: 3; }
 .scp-rz-ne { top: 0; right: 0; cursor: nesw-resize; }
 .scp-rz-nw { top: 0; left: 0; cursor: nwse-resize; }

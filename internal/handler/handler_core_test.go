@@ -203,7 +203,7 @@ func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
 }
 
 // TestEnvConfig_ResourceGovernanceRoundTrip proves the new resource knobs
-// (max_agents, agent_nice, agon forks/rounds/cost-cap) report their defaults on
+// (max_agents, agent_nice, review forks/rounds/cost-cap) report their defaults on
 // GET and persist through PUT.
 func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
@@ -218,10 +218,10 @@ func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 		return resp
 	}
 
-	// Defaults: minimum agon floor, backend default nice, unlimited budget.
+	// Defaults: minimum review floor, backend default nice, unlimited budget.
 	d := get()
-	if d.AgonForks != 1 || d.AgonRounds != 3 || d.AgonCostCap != 50000 {
-		t.Errorf("agon defaults = forks %d rounds %d cap %d; want 1/3/50000", d.AgonForks, d.AgonRounds, d.AgonCostCap)
+	if d.ReviewForks != 1 || d.ReviewRounds != 3 || d.ReviewCostCap != 50000 {
+		t.Errorf("review defaults = forks %d rounds %d cap %d; want 1/3/50000", d.ReviewForks, d.ReviewRounds, d.ReviewCostCap)
 	}
 	if d.AgentNice != executor.DefaultAgentNice {
 		t.Errorf("agent_nice default = %d, want %d", d.AgentNice, executor.DefaultAgentNice)
@@ -231,7 +231,7 @@ func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 	}
 
 	// Persist new values via PUT.
-	body := `{"max_agents":4,"agent_nice":15,"agon_forks":2,"agon_rounds":5,"agon_cost_cap":80000}`
+	body := `{"max_agents":4,"agent_nice":15,"review_forks":2,"review_rounds":5,"review_cost_cap":80000}`
 	w := httptest.NewRecorder()
 	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body)))
 	if w.Code != http.StatusNoContent {
@@ -240,9 +240,9 @@ func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 
 	// GET reflects the persisted values.
 	g := get()
-	if g.MaxAgents != 4 || g.AgentNice != 15 || g.AgonForks != 2 || g.AgonRounds != 5 || g.AgonCostCap != 80000 {
+	if g.MaxAgents != 4 || g.AgentNice != 15 || g.ReviewForks != 2 || g.ReviewRounds != 5 || g.ReviewCostCap != 80000 {
 		t.Errorf("after PUT = max_agents %d nice %d forks %d rounds %d cap %d; want 4/15/2/5/80000",
-			g.MaxAgents, g.AgentNice, g.AgonForks, g.AgonRounds, g.AgonCostCap)
+			g.MaxAgents, g.AgentNice, g.ReviewForks, g.ReviewRounds, g.ReviewCostCap)
 	}
 }
 

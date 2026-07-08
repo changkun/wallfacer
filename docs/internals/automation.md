@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer runs seven background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, **AutoSubmitter**, and **AutoAgon** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests or agon verification, submitting results, retrying failures, syncing worktrees, firing scheduled routines, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
+Wallfacer runs seven background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, **AutoSubmitter**, and **AutoReview** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests or review verification, submitting results, retrying failures, syncing worktrees, firing scheduled routines, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
 
 ## Background Goroutine Model
 
@@ -49,7 +49,7 @@ flowchart TD
         C4["h.StartWaitingSyncWatcher(ctx)"]
         C5["h.StartAutoTester(ctx)"]
         C6["h.StartAutoSubmitter(ctx)"]
-        C7["h.StartAutoAgon(ctx)"]
+        C7["h.StartAutoReview(ctx)"]
     end
 
     A1 --> A2 --> B1 --> B2 --> B3 --> B4
@@ -67,7 +67,7 @@ Before watchers begin, two recovery operations run synchronously:
 
 All handler-level watchers follow one of two patterns:
 
-**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, auto-submitter, and auto-agon call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
+**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, auto-submitter, and auto-review call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
 
 ```go
 // Auto-promoter pattern
@@ -191,15 +191,15 @@ Auto-submit is part of the autoimplement pipeline. When enabled via `PUT /api/co
 The submit gate depends on which verifier owns the task (`internal/handler/tasks_autoimplement.go`):
 
 - **Test gate (default)**: the task's `LastTestResult` is `"pass"`, or the task completed naturally (`stop_reason = "end_turn"`, never tested) while auto-test is off. Tasks that failed testing are never auto-submitted.
-- **Agon gate**: when agon supersedes the test agent for the task (`agonSupersedesTest`: the agon toggle is on and the task has a `SessionID` to fork from), the gate is a clean agon verdict (`AgonUnresolved == 0`). The test-pass and natural-complete shortcuts do not apply; agon must clear the task first.
+- **Review gate**: when review supersedes the test agent for the task (`reviewSupersedesTest`: the review toggle is on and the task has a `SessionID` to fork from), the gate is a clean review verdict (`ReviewUnresolved == 0`). The test-pass and natural-complete shortcuts do not apply; review must clear the task first.
 
-This completes the autonomous loop: autoimplement promotes → agent executes → auto-tester (or auto-agon) verifies → auto-submit commits.
+This completes the autonomous loop: autoimplement promotes → agent executes → auto-tester (or auto-review) verifies → auto-submit commits.
 
-## Auto-Agon
+## Auto-Review
 
-`StartAutoAgon` is the seventh watcher. When the `agon` runtime toggle is on (`PUT /api/config {"agon": true}`; off by default), it picks up untested `waiting` tasks and launches adversarial agon verification runs (`internal/adversarial`) instead of the plain test agent. At most `maxConcurrentAgon` (2) agon runs execute at once, with an in-flight set deduplicating repeated wake signals.
+`StartAutoReview` is the seventh watcher. When the `review` runtime toggle is on (`PUT /api/config {"review": true}`; off by default), it picks up untested `waiting` tasks and launches adversarial review verification runs (`internal/adversarial`) instead of the plain test agent. At most `maxConcurrentReview` (2) review runs execute at once, with an in-flight set deduplicating repeated wake signals.
 
-Agon supersedes the test agent only for tasks that have a `SessionID` the verifier can fork from; session-less tasks fall back to the ordinary test agent. When agon owns a task, the auto-tester skips it (so the two verifiers never both run) and the auto-submitter gates on the agon verdict as described above. Run depth is tuned via `WALLFACER_AGON_FORKS`, `WALLFACER_AGON_ROUNDS`, and `WALLFACER_AGON_COST_CAP`.
+Review supersedes the test agent only for tasks that have a `SessionID` the verifier can fork from; session-less tasks fall back to the ordinary test agent. When review owns a task, the auto-tester skips it (so the two verifiers never both run) and the auto-submitter gates on the review verdict as described above. Run depth is tuned via `WALLFACER_REVIEW_FORKS`, `WALLFACER_REVIEW_ROUNDS`, and `WALLFACER_REVIEW_COST_CAP`.
 
 ## Auto-Push
 

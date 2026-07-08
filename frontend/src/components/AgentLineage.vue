@@ -99,7 +99,7 @@ function statusKind(node: LineageNode): 'running' | 'done' | 'failed' | 'other' 
 
 // Memoize markdown by content: the transcript re-renders whenever the task
 // updates, and re-parsing every assistant turn on each tick is what pegged the
-// browser in the agon verification view. Cache so each turn parses once.
+// browser in the review verification view. Cache so each turn parses once.
 const mdCache = new Map<string, string>();
 function renderTurn(text: string): string {
   let html = mdCache.get(text);

@@ -193,7 +193,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
 | [Auth & Identity](docs/internals/auth-and-identity.md) | OIDC, device sign-in, principal context, cloud mode |
-| [Automation](docs/internals/automation.md) | Background watchers, autoimplement, agon, circuit breakers, routines |
+| [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers, routines |
 | [Agent Graph Runtime](docs/internals/agent-graph-runtime.md) | Embedded topos runtime, agentic execution, live traces |
 | [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |

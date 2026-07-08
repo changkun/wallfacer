@@ -113,9 +113,9 @@ type envConfigResponse struct {
 	MaxTestParallelTasks int                                  `json:"max_test_parallel_tasks"`
 	MaxAgents            int                                  `json:"max_agents"`
 	AgentNice            int                                  `json:"agent_nice"`
-	AgonForks            int                                  `json:"agon_forks"`
-	AgonRounds           int                                  `json:"agon_rounds"`
-	AgonCostCap          int                                  `json:"agon_cost_cap"`
+	ReviewForks          int                                  `json:"review_forks"`
+	ReviewRounds         int                                  `json:"review_rounds"`
+	ReviewCostCap        int                                  `json:"review_cost_cap"`
 	OversightInterval    int                                  `json:"oversight_interval"`
 	ArchivedTasksPerPage int                                  `json:"archived_tasks_per_page"`
 	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
@@ -177,20 +177,20 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = constants.DefaultArchivedTasksPerPage
 	}
-	// Agon depth: report the effective value (env override, else the minimum
+	// Review depth: report the effective value (env override, else the minimum
 	// floor defaults). agentNice 0 reports the backend default; negative means
 	// throttling is disabled. maxAgents 0 means unlimited.
-	agonForks := cfg.AgonForkCount
-	if agonForks <= 0 {
-		agonForks = agonForkCount
+	reviewForks := cfg.ReviewForkCount
+	if reviewForks <= 0 {
+		reviewForks = reviewForkCount
 	}
-	agonRounds := cfg.AgonMaxRounds
-	if agonRounds <= 0 {
-		agonRounds = agonMaxRounds
+	reviewRounds := cfg.ReviewMaxRounds
+	if reviewRounds <= 0 {
+		reviewRounds = reviewMaxRounds
 	}
-	agonCap := cfg.AgonCostCap
-	if agonCap <= 0 {
-		agonCap = agonCostCap
+	reviewCap := cfg.ReviewCostCap
+	if reviewCap <= 0 {
+		reviewCap = reviewCostCap
 	}
 	agentNice := cfg.AgentNice
 	if agentNice == 0 {
@@ -213,9 +213,9 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		MaxTestParallelTasks: maxTestParallel,
 		MaxAgents:            cfg.MaxAgents,
 		AgentNice:            agentNice,
-		AgonForks:            agonForks,
-		AgonRounds:           agonRounds,
-		AgonCostCap:          agonCap,
+		ReviewForks:          reviewForks,
+		ReviewRounds:         reviewRounds,
+		ReviewCostCap:        reviewCap,
 		OversightInterval:    cfg.OversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPushEnabled:      cfg.AutoPushEnabled,
@@ -450,9 +450,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		MaxTestParallelTasks *int                                 `json:"max_test_parallel_tasks"`
 		MaxAgents            *int                                 `json:"max_agents"`
 		AgentNice            *int                                 `json:"agent_nice"`
-		AgonForks            *int                                 `json:"agon_forks"`
-		AgonRounds           *int                                 `json:"agon_rounds"`
-		AgonCostCap          *int                                 `json:"agon_cost_cap"`
+		ReviewForks          *int                                 `json:"review_forks"`
+		ReviewRounds         *int                                 `json:"review_rounds"`
+		ReviewCostCap        *int                                 `json:"review_cost_cap"`
 		OversightInterval    *int                                 `json:"oversight_interval"`
 		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
 		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
@@ -524,34 +524,34 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		agentNice = &s
 	}
 
-	// Convert agon forks/rounds/cost-cap. Forks/rounds clamp to [1, ∞);
-	// cost cap to [1, ∞). These apply live (agonTuning re-reads on each run).
-	var agonForks *string
-	if req.AgonForks != nil {
-		v := *req.AgonForks
+	// Convert review forks/rounds/cost-cap. Forks/rounds clamp to [1, ∞);
+	// cost cap to [1, ∞). These apply live (reviewTuning re-reads on each run).
+	var reviewForks *string
+	if req.ReviewForks != nil {
+		v := *req.ReviewForks
 		if v < 1 {
 			v = 1
 		}
 		s := fmt.Sprintf("%d", v)
-		agonForks = &s
+		reviewForks = &s
 	}
-	var agonRounds *string
-	if req.AgonRounds != nil {
-		v := *req.AgonRounds
+	var reviewRounds *string
+	if req.ReviewRounds != nil {
+		v := *req.ReviewRounds
 		if v < 1 {
 			v = 1
 		}
 		s := fmt.Sprintf("%d", v)
-		agonRounds = &s
+		reviewRounds = &s
 	}
-	var agonCostCap *string
-	if req.AgonCostCap != nil {
-		v := *req.AgonCostCap
+	var reviewCostCap *string
+	if req.ReviewCostCap != nil {
+		v := *req.ReviewCostCap
 		if v < 1 {
 			v = 1
 		}
 		s := fmt.Sprintf("%d", v)
-		agonCostCap = &s
+		reviewCostCap = &s
 	}
 
 	// Convert oversight_interval int to string for the env file.
@@ -641,9 +641,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		MaxTestParallel:      maxTestParallel,
 		MaxAgents:            maxAgents,
 		AgentNice:            agentNice,
-		AgonForks:            agonForks,
-		AgonRounds:           agonRounds,
-		AgonCostCap:          agonCostCap,
+		ReviewForks:          reviewForks,
+		ReviewRounds:         reviewRounds,
+		ReviewCostCap:        reviewCostCap,
 		OversightInterval:    oversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPush:             autoPush,

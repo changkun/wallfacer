@@ -98,8 +98,8 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
-| `POST /api/tasks/{id}/agon` | Trigger an adversarial agon verification run for a waiting task |
-| `GET /api/tasks/{id}/agon/transcript` | Agon run transcript |
+| `POST /api/tasks/{id}/review` | Trigger an adversarial review verification run for a waiting task |
+| `GET /api/tasks/{id}/review/transcript` | Review run transcript |
 | `GET /api/tasks/{id}/lineage` | Agent lineage graph recorded by an agentic (topos) run |
 | `GET /api/tasks/{id}/pr` | Pull-request status for the task branch |
 | `POST /api/tasks/{id}/pr` | Create a pull request from the task branch (brokered GitHub credential) |

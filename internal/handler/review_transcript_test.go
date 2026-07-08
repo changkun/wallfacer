@@ -12,11 +12,11 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// writeAgonSession lays down a synthetic agon session dir under the task's
-// worktree .agon, mirroring what agon writes incrementally during a run.
-func writeAgonSession(t *testing.T, worktree, sessionID string, withEnd bool) {
+// writeReviewSession lays down a synthetic review session dir under the task's
+// worktree .review, mirroring what review writes incrementally during a run.
+func writeReviewSession(t *testing.T, worktree, sessionID string, withEnd bool) {
 	t.Helper()
-	stateDir := agonStateDir(worktree) // <parent>/.agon
+	stateDir := reviewStateDir(worktree) // <parent>/.review
 	rounds := filepath.Join(stateDir, "sessions", sessionID, "forks", "critic-1", "rounds")
 	if err := os.MkdirAll(rounds, 0o755); err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func writeAgonSession(t *testing.T, worktree, sessionID string, withEnd bool) {
 	}
 }
 
-func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
+func TestReviewTranscript_ReturnsForkRounds(t *testing.T) {
 	h := newTestHandler(t)
 	s, ok := h.currentStore()
 	if !ok {
@@ -57,28 +57,28 @@ func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{filepath.Dir(worktree): worktree}, "branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
-	writeAgonSession(t, worktree, "sess-01", false /* no end.json yet */)
+	writeReviewSession(t, worktree, "sess-01", false /* no end.json yet */)
 
 	// While the run is in flight (reserved slot), running=true.
-	if !h.beginAgon(task.ID) {
-		t.Fatal("beginAgon should reserve the slot")
+	if !h.beginReview(task.ID) {
+		t.Fatal("beginReview should reserve the slot")
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/agon/transcript", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/review/transcript", nil)
 	w := httptest.NewRecorder()
-	h.AgonTranscript(w, req, task.ID)
+	h.ReviewTranscript(w, req, task.ID)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp agonTranscriptResp
+	var resp reviewTranscriptResp
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if !resp.Running {
 		t.Error("expected running=true while the in-flight slot is held")
 	}
-	if resp.Config == nil || resp.Config.Forks != agonForkCount || resp.Config.MaxRounds != agonMaxRounds {
-		t.Errorf("config = %+v, want forks=%d rounds=%d", resp.Config, agonForkCount, agonMaxRounds)
+	if resp.Config == nil || resp.Config.Forks != reviewForkCount || resp.Config.MaxRounds != reviewMaxRounds {
+		t.Errorf("config = %+v, want forks=%d rounds=%d", resp.Config, reviewForkCount, reviewMaxRounds)
 	}
 	if len(resp.Config.CriticModels) == 0 || resp.Config.ProposerModel == "" {
 		t.Errorf("config models missing: %+v", resp.Config)
@@ -95,11 +95,11 @@ func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
 	}
 
 	// Run finishes: release the slot and write end.json → running=false + outcome.
-	h.endAgon(task.ID)
-	writeAgonSession(t, worktree, "sess-01", true)
+	h.endReview(task.ID)
+	writeReviewSession(t, worktree, "sess-01", true)
 	w2 := httptest.NewRecorder()
-	h.AgonTranscript(w2, httptest.NewRequest(http.MethodGet, "/x", nil), task.ID)
-	var resp2 agonTranscriptResp
+	h.ReviewTranscript(w2, httptest.NewRequest(http.MethodGet, "/x", nil), task.ID)
+	var resp2 reviewTranscriptResp
 	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
 		t.Fatalf("decode 2: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestAgonTranscript_ReturnsForkRounds(t *testing.T) {
 	}
 }
 
-func TestAgonTranscript_404WhenNoSession(t *testing.T) {
+func TestReviewTranscript_404WhenNoSession(t *testing.T) {
 	h := newTestHandler(t)
 	s, _ := h.currentStore()
 	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "p", Timeout: 15})
@@ -123,8 +123,8 @@ func TestAgonTranscript_404WhenNoSession(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	w := httptest.NewRecorder()
-	h.AgonTranscript(w, req, task.ID)
+	h.ReviewTranscript(w, req, task.ID)
 	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 with no agon session, got %d", w.Code)
+		t.Errorf("expected 404 with no review session, got %d", w.Code)
 	}
 }

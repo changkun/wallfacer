@@ -81,7 +81,7 @@ When the agent pauses or finishes, the task lands in **Waiting**. From there:
 | **Submit feedback** | Send a message (with `@` file mentions); the agent resumes in the same session. |
 | **Mark as Done** | Trigger the commit pipeline and merge the changes. |
 | **Test** | Launch a verification agent, optionally with acceptance criteria. |
-| **Agon** | Run adversarial verification (experimental, see below). |
+| **Review** | Run adversarial verification (experimental, see below). |
 | **Sync** | Rebase the task's worktree onto the latest default branch without merging. |
 | **Raise budget** | Shown when a cost or token limit was hit; adjust the limit and continue. |
 | **Cancel** | Discard the worktree and move to Cancelled; history and logs are preserved. |
@@ -94,7 +94,7 @@ Full per-state action availability in the detail view:
 |---|---|
 | `backlog` | Start task, Edit task, Delete |
 | `in_progress` / `committing` | Cancel, Delete |
-| `waiting` | Mark as Done, Test, Agon (with session), Raise budget (when budget-hit), Sync, Cancel, Delete |
+| `waiting` | Mark as Done, Test, Review (with session), Raise budget (when budget-hit), Sync, Cancel, Delete |
 | `failed` | Resume (with session), Test, Raise budget, Sync, Retry, Delete |
 | `done` | Test, Archive, Delete |
 | `cancelled` | Retry, Archive, Delete |
@@ -135,7 +135,7 @@ Click any card to open the detail view. A left rail carries the header (status, 
 | **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy), the agent lineage graph, and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
 | **Changes** | Per-file git diff of the worktree against the default branch, with a commits-behind warning. |
-| **Verification** | The Agon panel and the test agent's per-turn results. |
+| **Verification** | The Review panel and the test agent's per-turn results. |
 | **Events** | The event audit trail grouped by type, usage statistics, per-agent usage, retry history, and prompt history. |
 | **Timeline** | Execution spans rendered as a flamegraph with a time axis, an optional cumulative-cost overlay, and a span table sorted by duration. |
 
@@ -143,11 +143,11 @@ Click any card to open the detail view. A left rail carries the header (status, 
 
 While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box (Cmd+Enter saves). Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. When sign-in is enabled, reviewing requires a signed-in principal.
 
-### Verification and Agon
+### Verification and Review
 
 The **Test** action launches a separate verification agent against the task's worktree; it runs the relevant checks and reports a pass or fail verdict shown as a badge on the card. Acceptance criteria can be supplied when starting the run, and repeated runs overwrite the previous verdict.
 
-**Agon** is an experimental adversarial verification layer, off by default and enabled as a runtime toggle. It forks proposer/critic debates over the change (fork count, rounds, and cost cap are configured via `WALLFACER_AGON_FORKS`, `WALLFACER_AGON_ROUNDS`, and `WALLFACER_AGON_COST_CAP`). The Verification tab shows its status, configuration, verdict headline, and the per-fork debate threads. When Agon is enabled and the task has an agent session, its verdict supersedes the plain test verdict as the auto-submit gate; see [Automation](automation.md).
+**Review** is an experimental adversarial verification layer, off by default and enabled as a runtime toggle. It forks proposer/critic debates over the change (fork count, rounds, and cost cap are configured via `WALLFACER_REVIEW_FORKS`, `WALLFACER_REVIEW_ROUNDS`, and `WALLFACER_REVIEW_COST_CAP`). The Verification tab shows its status, configuration, verdict headline, and the per-fork debate threads. When Review is enabled and the task has an agent session, its verdict supersedes the plain test verdict as the auto-submit gate; see [Automation](automation.md).
 
 ### Timeline
 
@@ -169,7 +169,7 @@ The lightning-bolt menu in the board header exposes five runtime toggles:
 | **Catch up** | Rebase waiting tasks onto the default branch as it advances. |
 | **Push** | Push completed commits to the remote automatically. |
 
-Numeric knobs (parallelism, thresholds, intervals) live on the Execution settings tab. Auto-retry budgets, circuit breakers, and the Agon toggle are covered in [Automation](automation.md).
+Numeric knobs (parallelism, thresholds, intervals) live on the Execution settings tab. Auto-retry budgets, circuit breakers, and the Review toggle are covered in [Automation](automation.md).
 
 ## Backlog sort
 

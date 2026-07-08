@@ -184,9 +184,9 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
 | `WALLFACER_AUTO_PUSH` | `false` | Automatic `git push` after commits |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push fires |
-| `WALLFACER_AGON_FORKS` | `2` | Independent critic forks per Agon verification run |
-| `WALLFACER_AGON_ROUNDS` | `4` | Per-fork debate round cap |
-| `WALLFACER_AGON_COST_CAP` | `50000` | Soft token budget per Agon run |
+| `WALLFACER_REVIEW_FORKS` | `2` | Independent critic forks per Review verification run |
+| `WALLFACER_REVIEW_ROUNDS` | `4` | Per-fork debate round cap |
+| `WALLFACER_REVIEW_COST_CAP` | `50000` | Soft token budget per Review run |
 | `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window for session cost analytics; 0 = all time. `WALLFACER_PLANNING_WINDOW_DAYS` is a deprecated alias |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |

@@ -5,7 +5,7 @@ import { useTaskActivity } from '../composables/useTaskActivity';
 import { parseDiffFiles, type DiffFile } from '../lib/diff';
 import { highlightDiffFile, type HighlightedDiffLine } from '../lib/diffHighlight';
 import type { ActivityRow } from '../lib/prettyNdjson';
-import type { Task, AgonTranscript } from '../api/types';
+import type { Task, ReviewTranscript } from '../api/types';
 import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
@@ -16,7 +16,7 @@ import { formatBatchFeedback } from '../lib/diffComments';
 import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
-import AgonVerification from './AgonVerification.vue';
+import ReviewVerification from './ReviewVerification.vue';
 import AgentLineage from './AgentLineage.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
@@ -154,50 +154,50 @@ const resultsLoading = ref(false);
 const resultsError = ref('');
 const resultsFetched = ref(false);
 
-// Agon verification trajectory — the live proposer/critic debate, polled while
+// Review verification trajectory — the live proposer/critic debate, polled while
 // a run is in flight and rendered alongside the test-agent results.
-const agonTranscript = ref<AgonTranscript | null>(null);
-// Agon transcript view: the rendered fork/round debate (default) ↔ the raw
+const reviewTranscript = ref<ReviewTranscript | null>(null);
+// Review transcript view: the rendered fork/round debate (default) ↔ the raw
 // transcript payload (the fork/round records + bodies the server assembled).
-let agonPollTimer: ReturnType<typeof setTimeout> | null = null;
+let reviewPollTimer: ReturnType<typeof setTimeout> | null = null;
 // After triggering a run, keep polling until this time even before the session
 // appears, so a just-started run's first rounds show up live.
-let agonWatchUntil = 0;
+let reviewWatchUntil = 0;
 
-function stopAgonPoll() {
-  if (agonPollTimer !== null) {
-    clearTimeout(agonPollTimer);
-    agonPollTimer = null;
+function stopReviewPoll() {
+  if (reviewPollTimer !== null) {
+    clearTimeout(reviewPollTimer);
+    reviewPollTimer = null;
   }
 }
 
-async function fetchAgonTranscript() {
+async function fetchReviewTranscript() {
   if (!props.task || !props.task.session_id) {
-    agonTranscript.value = null;
+    reviewTranscript.value = null;
     return;
   }
   try {
-    agonTranscript.value = await api<AgonTranscript>(
+    reviewTranscript.value = await api<ReviewTranscript>(
       'GET',
-      `/api/tasks/${props.task.id}/agon/transcript`,
+      `/api/tasks/${props.task.id}/review/transcript`,
     );
   } catch {
     // 404 (no run yet) is the common case — show the empty state, not an error.
-    agonTranscript.value = null;
+    reviewTranscript.value = null;
   }
   // Keep polling while the run is in flight (or within the post-trigger watch
   // window, to catch a just-started run's session appearing) and the tab is open.
-  stopAgonPoll();
-  const keepPolling = agonTranscript.value?.running || Date.now() < agonWatchUntil;
+  stopReviewPoll();
+  const keepPolling = reviewTranscript.value?.running || Date.now() < reviewWatchUntil;
   if (mainTab.value === 'verification' && keepPolling) {
-    agonPollTimer = setTimeout(fetchAgonTranscript, 2500);
+    reviewPollTimer = setTimeout(fetchReviewTranscript, 2500);
   }
 }
 
 async function fetchResults() {
   if (!props.task) return;
-  // Kick off the agon trajectory fetch alongside the test-agent results.
-  void fetchAgonTranscript();
+  // Kick off the review trajectory fetch alongside the test-agent results.
+  void fetchReviewTranscript();
   resultsLoading.value = true;
   resultsError.value = '';
   try {
@@ -369,7 +369,7 @@ const retryHistory = computed(() => props.task.retry_history ?? []);
 const promptHistory = computed(() => props.task.prompt_history ?? []);
 
 function fetchForTab(t: MainTab) {
-  if (t !== 'verification') stopAgonPoll();
+  if (t !== 'verification') stopReviewPoll();
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
   if (t === 'verification' && !resultsFetched.value) fetchResults();
@@ -388,7 +388,7 @@ watch(
   () => {
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
     resultsFetched.value = false; testResults.value = [];
-    stopAgonPoll(); agonTranscript.value = null;
+    stopReviewPoll(); reviewTranscript.value = null;
     eventsFetched.value = false; events.value = [];
     diffFetched.value = false; diffFiles.value = []; behindCounts.value = {};
     if (mainTab.value === 'timeline') fetchSpans();
@@ -664,23 +664,23 @@ async function testTask() {
   const body = criteria.trim() ? { criteria: criteria.trim() } : undefined;
   await api('POST', `/api/tasks/${props.task.id}/test`, body);
 }
-async function agonTask() {
+async function reviewTask() {
   // The run is asynchronous and takes minutes; acknowledge the trigger so the
   // click isn't silent, and surface failures (shared runAction only logs them).
   // Progress and the verdict appear in the task timeline.
   try {
-    await api('POST', `/api/tasks/${props.task.id}/agon`);
-    toast.push('Agon verification started — this runs in the background (minutes).', {
+    await api('POST', `/api/tasks/${props.task.id}/review`);
+    toast.push('Review verification started — this runs in the background (minutes).', {
       kind: 'success',
       timeout: 4000,
     });
     // Surface the live trajectory: jump to the verification tab and watch for
     // the session to appear (it is created a moment after the trigger).
-    agonWatchUntil = Date.now() + 90_000;
+    reviewWatchUntil = Date.now() + 90_000;
     mainTab.value = 'verification';
-    void fetchAgonTranscript();
+    void fetchReviewTranscript();
   } catch (e) {
-    toast.push(`Agon failed to start: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
+    toast.push(`Review failed to start: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
   }
 }
 async function syncTask() {
@@ -863,7 +863,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
   stopOversightPolling();
-  stopAgonPoll();
+  stopReviewPoll();
 });
 
 const status = computed(() => props.task.status);
@@ -978,8 +978,8 @@ async function submitReview() {
           <div class="flex items-center gap-3">
             <span class="badge" :class="'badge-' + status">{{ status }}</span>
             <span v-if="task.sandbox" class="badge badge-priority">{{ task.sandbox }}</span>
-            <span v-if="task.agon_unresolved === 0" class="badge badge-pass" title="Agon: no unresolved attacks">Agon: clean</span>
-            <span v-else-if="task.agon_unresolved !== undefined" class="badge badge-fail" :title="task.agon_headline || ''" style="cursor: default;">Agon: {{ task.agon_unresolved }} unresolved</span>
+            <span v-if="task.review_unresolved === 0" class="badge badge-pass" title="Review: no unresolved attacks">Review: clean</span>
+            <span v-else-if="task.review_unresolved !== undefined" class="badge badge-fail" :title="task.review_headline || ''" style="cursor: default;">Review: {{ task.review_unresolved }} unresolved</span>
             <span class="text-xs text-v-muted">{{ relativeTime(task.updated_at) }}</span>
             <span class="text-xs text-v-muted font-mono" title="Task ID">{{ task.id.slice(0, 8) }}</span>
           </div>
@@ -1439,8 +1439,8 @@ async function submitReview() {
                      the latest result shows in Spec, so they're not repeated
                      here. -->
                 <div data-main-tab-section="verification">
-                  <!-- Adversarial verification (agon): config, outcome, live trajectory -->
-                  <AgonVerification :task="task" :transcript="agonTranscript" />
+                  <!-- Adversarial verification (review): config, outcome, live trajectory -->
+                  <ReviewVerification :task="task" :transcript="reviewTranscript" />
 
                   <!-- Test-agent verification (separate phase, its own empty state) -->
                   <section class="ta-verify-sec">
@@ -1539,7 +1539,7 @@ async function submitReview() {
                     </div>
                     <label class="backlog-edit__field">
                       <span>Test criteria</span>
-                      <textarea v-model="editCriteria" class="backlog-edit__prompt" rows="3" placeholder="What the test agent and agon critics should verify (optional)"></textarea>
+                      <textarea v-model="editCriteria" class="backlog-edit__prompt" rows="3" placeholder="What the test agent and review critics should verify (optional)"></textarea>
                     </label>
                     <label class="backlog-edit__field">
                       <span>Timeout (min)</span>
@@ -1611,10 +1611,10 @@ async function submitReview() {
                 </div>
 
                 <div v-if="isWaiting && task.session_id" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'agon' }" :disabled="busy" @click="runAction('agon', agonTask)">
+                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" @click="runAction('review', reviewTask)">
                     <span class="aside-action__icon" aria-hidden="true">&#9878;</span>
                     <span class="aside-action__body">
-                      <span class="aside-action__label">Agon</span>
+                      <span class="aside-action__label">Review</span>
                       <span class="aside-action__hint">adversarial verification</span>
                     </span>
                   </button>

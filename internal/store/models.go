@@ -158,10 +158,10 @@ const (
 	SandboxActivityTest SandboxActivity = "test"
 	// SandboxActivityOversightTest is a usage-attribution-only activity for test oversight generation.
 	SandboxActivityOversightTest SandboxActivity = "oversight-test"
-	// SandboxActivityAgon is a usage-attribution-only activity for agon
+	// SandboxActivityReview is a usage-attribution-only activity for review
 	// adversarial verification (proposer + critics), so its cost is visible in
 	// the task's usage breakdown rather than untracked.
-	SandboxActivityAgon SandboxActivity = "agon"
+	SandboxActivityReview SandboxActivity = "review"
 )
 
 // SandboxActivities lists activities that support per-activity sandbox routing.
@@ -262,7 +262,7 @@ type Task struct {
 	Title         string    `json:"title,omitempty"`
 	Prompt        string    `json:"prompt"`
 	// Criteria is user-defined free-form acceptance criteria for the test
-	// verification agent (and agon critics). When non-empty it renders into the
+	// verification agent (and review critics). When non-empty it renders into the
 	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
 	// a hard gate. omitempty keeps existing task.json files deserializing clean.
 	Criteria          string              `json:"criteria,omitempty"`
@@ -432,14 +432,14 @@ type Task struct {
 	// cycle).
 	RoutineSpawnFlow string `json:"routine_spawn_flow,omitempty"`
 
-	// Agon adversarial-verification fields. Set by tryAutoAdon / the
-	// manual /api/tasks/{id}/agon trigger after a run completes.
-	// nil AgonUnresolved means agon has not run for this task.
+	// Review adversarial-verification fields. Set by tryAutoAdon / the
+	// manual /api/tasks/{id}/review trigger after a run completes.
+	// nil ReviewUnresolved means review has not run for this task.
 	// 0 means it ran and found no unresolved attacks (clean).
-	// >0 means open disputes remain; AgonHeadline holds the claim text.
-	AgonUnresolved *int   `json:"agon_unresolved,omitempty"`
-	AgonHeadline   string `json:"agon_headline,omitempty"`
-	AgonSessionDir string `json:"agon_session_dir,omitempty"`
+	// >0 means open disputes remain; ReviewHeadline holds the claim text.
+	ReviewUnresolved *int   `json:"review_unresolved,omitempty"`
+	ReviewHeadline   string `json:"review_headline,omitempty"`
+	ReviewSessionDir string `json:"review_session_dir,omitempty"`
 }
 
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry

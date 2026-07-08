@@ -23,7 +23,7 @@ between their desk and wander destinations.
 
 1. Create `ui/js/office/pathfinding.js` with:
    - `findPath(tileMap, startX, startY, goalX, goalY, extraPassable)`:
-     - BFS on 4-connected grid (up, down, left, right — no diagonals)
+     - BFS on 4-connected grid (up, down, left, right — no direviewals)
      - `extraPassable` is an optional `Set` of `"x,y"` strings that should
        be treated as passable even if blocked (used for character's own chair)
      - Returns array of `{x, y}` from start to goal (inclusive), or `null`
@@ -41,7 +41,7 @@ between their desk and wander destinations.
   - No path exists (fully blocked): returns null
   - `extraPassable` allows routing through a normally blocked tile
   - Path includes both start and goal positions
-  - Path has no diagonal moves (each step differs by exactly 1 in x or y)
+  - Path has no direviewal moves (each step differs by exactly 1 in x or y)
   - `randomPassableTile` returns a tile where `isPassable` is true
 
 ## Boundaries

@@ -345,7 +345,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	h.StartWaitingSyncWatcher(ctx)
 	h.StartAutoTester(ctx)
 	h.StartAutoSubmitter(ctx)
-	h.StartAutoAgon(ctx)
+	h.StartAutoReview(ctx)
 
 	reg.Gauge(
 		"wallfacer_tasks_total",
@@ -1176,17 +1176,17 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ListDeletedTasks":         h.ListDeletedTasks,
 
 		// Task instance operations (UUID extracted via withID).
-		"UpdateTask":     withID(h.UpdateTask),
-		"DeleteTask":     withID(h.DeleteTask),
-		"GetEvents":      withID(h.GetEvents),
-		"SubmitFeedback": withID(h.SubmitFeedback),
-		"CompleteTask":   withID(h.CompleteTask),
-		"ResumeTask":     withID(h.ResumeTask),
-		"SyncTask":       withID(h.SyncTask),
-		"TestTask":       withID(h.TestTask),
-		"AgonTask":       withID(h.AgonTask),
-		"AgonTranscript": withID(h.AgonTranscript),
-		"TaskLineage":    withID(h.TaskLineage),
+		"UpdateTask":       withID(h.UpdateTask),
+		"DeleteTask":       withID(h.DeleteTask),
+		"GetEvents":        withID(h.GetEvents),
+		"SubmitFeedback":   withID(h.SubmitFeedback),
+		"CompleteTask":     withID(h.CompleteTask),
+		"ResumeTask":       withID(h.ResumeTask),
+		"SyncTask":         withID(h.SyncTask),
+		"TestTask":         withID(h.TestTask),
+		"ReviewTask":       withID(h.ReviewTask),
+		"ReviewTranscript": withID(h.ReviewTranscript),
+		"TaskLineage":      withID(h.TaskLineage),
 
 		"TaskDiff":      withID(h.TaskDiff),
 		"TaskPRStatus":  withID(h.TaskPRStatus),
@@ -1305,7 +1305,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
 		"TestTask":       handler.BodyLimitDefault,
-		"AgonTask":       handler.BodyLimitDefault,
+		"ReviewTask":     handler.BodyLimitDefault,
 	}
 
 	// Register all routes from the contract. A missing handler entry panics at

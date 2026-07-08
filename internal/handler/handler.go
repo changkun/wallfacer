@@ -147,18 +147,18 @@ type Handler struct {
 	autosubmit    atomic.Bool
 	autosync      atomic.Bool
 	autopush      atomic.Bool
-	agonEnabled   atomic.Bool
+	reviewEnabled atomic.Bool
 
-	// verifier drives adversarial post-run verification (agon). It is set
-	// once in NewHandler and never mutated; AgonEnabled() is the runtime gate.
+	// verifier drives adversarial post-run verification (review). It is set
+	// once in NewHandler and never mutated; ReviewEnabled() is the runtime gate.
 	verifier adversarial.Verifier
 
-	// agonInFlight tracks tasks with an agon run currently executing, so a
+	// reviewInFlight tracks tasks with an review run currently executing, so a
 	// task that takes minutes to verify is not re-launched on every watcher
-	// tick (AgonUnresolved is only written when the run finishes). Guarded by
-	// agonMu, which also enforces the maxConcurrentAgon cap atomically.
-	agonMu       sync.Mutex
-	agonInFlight map[uuid.UUID]struct{}
+	// tick (ReviewUnresolved is only written when the run finishes). Guarded by
+	// reviewMu, which also enforces the maxConcurrentReview cap atomically.
+	reviewMu       sync.Mutex
+	reviewInFlight map[uuid.UUID]struct{}
 
 	// breakers holds per-watcher circuit breakers. Keyed by watcher name
 	// (e.g. "auto-promote"). These are transient and auto-heal; they do not
@@ -269,9 +269,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			"auto-test":    newWatcherBreaker(),
 			"auto-submit":  newWatcherBreaker(),
 			"auto-sync":    newWatcherBreaker(),
-			"auto-agon":    newWatcherBreaker(),
+			"auto-review":  newWatcherBreaker(),
 		},
-		agonInFlight: make(map[uuid.UUID]struct{}),
+		reviewInFlight: make(map[uuid.UUID]struct{}),
 	}
 	oauthMgr := oauth.NewManager()
 	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)
@@ -301,9 +301,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		}
 		return cfg.MaxTestParallelTasks
 	})
-	// Initialize the agon verifier once; AgonEnabled() is the runtime gate.
+	// Initialize the review verifier once; ReviewEnabled() is the runtime gate.
 	// Critics rotate the configured harnesses per fork for perspective diversity.
-	h.verifier = wadversarial.NewAgonVerifier(r, agonCriticHarnessIDs...)
+	h.verifier = wadversarial.NewReviewVerifier(r, reviewCriticHarnessIDs...)
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)
@@ -733,11 +733,11 @@ func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }
 // SetAutotest enables or disables auto-test mode.
 func (h *Handler) SetAutotest(enabled bool) { h.autotest.Store(enabled) }
 
-// AgonEnabled returns whether adversarial verification (agon) is active.
-func (h *Handler) AgonEnabled() bool { return h.agonEnabled.Load() }
+// ReviewEnabled returns whether adversarial verification (review) is active.
+func (h *Handler) ReviewEnabled() bool { return h.reviewEnabled.Load() }
 
-// SetAgon enables or disables adversarial verification (agon).
-func (h *Handler) SetAgon(enabled bool) { h.agonEnabled.Store(enabled) }
+// SetReview enables or disables adversarial verification (review).
+func (h *Handler) SetReview(enabled bool) { h.reviewEnabled.Store(enabled) }
 
 // AutosubmitEnabled returns whether auto-submit mode is active.
 func (h *Handler) AutosubmitEnabled() bool { return h.autosubmit.Load() }

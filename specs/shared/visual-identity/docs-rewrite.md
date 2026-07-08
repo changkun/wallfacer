@@ -167,7 +167,7 @@ surface) followed by six parallel writer agents. Deviations and notes:
   oversight-and-analytics). docs/cloud/ was absorbed into the new
   internals/auth-and-identity.md and deleted (no separate cloud.md guide).
 - Internals gained agent-graph-runtime.md and auth-and-identity.md plus a
-  drift pass across six existing files (seven watchers incl. auto-agon,
+  drift pass across six existing files (seven watchers incl. auto-review,
   five agent roles, stable-identity workspace model, expanded route
   groups).
 - Nav single source: gen-docs-index.mjs derives data/docs.ts from the

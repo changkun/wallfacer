@@ -23,7 +23,7 @@ dispatched_task_id: null
 ## Problem
 
 Starting a single task on the board is comfortable, but the moment a user hits
-**Test** or **Agon** the whole machine becomes unresponsive. Diagnosis (confirmed
+**Test** or **Review** the whole machine becomes unresponsive. Diagnosis (confirmed
 by the reporter: Activity Monitor shows many `claude`/`codex` processes, and the
 slowdown persists regardless of which UI tab is open, so it is not the frontend):
 
@@ -35,15 +35,15 @@ slowdown persists regardless of which UI tab is open, so it is not the frontend)
    user's editor/browser starve.
 
 2. **Concurrency caps are siloed, not global.** `maxConcurrentTasks` (default 5),
-   `maxTestConcurrentTasks` (default 2), and `maxConcurrentAgon` (default 2) are
+   `maxTestConcurrentTasks` (default 2), and `maxConcurrentReview` (default 2) are
    independent admission gates. Their worst case sums — there is no envelope on
-   the *total* number of live agent CLIs, so Test/Agon stack on top of running
+   the *total* number of live agent CLIs, so Test/Review stack on top of running
    tasks.
 
-3. **Verification depth is high by default and hidden.** Agon defaults to
-   `agonForkCount = 2`, `agonMaxRounds = 4` (`tasks_autoimplement.go:1199-1203`); a
+3. **Verification depth is high by default and hidden.** Review defaults to
+   `reviewForkCount = 2`, `reviewMaxRounds = 4` (`tasks_autoimplement.go:1199-1203`); a
    2-fork run also pulls in a second agent family (the Codex critic, fork 2 of the
-   `{Claude, Codex}` rotation). These are env-only (`WALLFACER_AGON_*`) with no
+   `{Claude, Codex}` rotation). These are env-only (`WALLFACER_REVIEW_*`) with no
    settings UI, so the expensive default is invisible and effectively unchangeable
    for most users.
 
@@ -57,9 +57,9 @@ Govern agent execution along three axes, and surface the knobs in settings with 
    yield CPU to the foreground (the wallfacer server and the user's apps). This
    restores interactive responsiveness without changing what work runs.
 2. **Global budget.** Add a single ceiling on the number of concurrently running
-   agent processes across regular tasks, test runs, and agon, enforced at the
+   agent processes across regular tasks, test runs, and review, enforced at the
    executor so it holds no matter which caller launches.
-3. **Tunable, minimal-by-default verification.** Default agon to the floor — **1
+3. **Tunable, minimal-by-default verification.** Default review to the floor — **1
    fork, 1 critic** (one actor/critic pair, Claude-only) — and expose forks,
    rounds, cost cap, the nice level, and the global budget in the Execution
    settings tab via the existing `/api/env` path.
@@ -134,25 +134,25 @@ self-deadlock.
   `0`-means-unlimited sentinel convention).
 
 Lock-ordering note: self-nesting is safe (no held slot launches another agent —
-agon critic one-shots are launched by the agon run goroutine, which holds no
+review critic one-shots are launched by the review run goroutine, which holds no
 executor slot). The real hazard is **stalling the autoimplement**: a blocking
 semaphore acquire must never happen under `promoteMu`, a store lock, or inside a
 synchronous watcher `Action`. Phase 4 acquires *outside* any lock and launches in
 a goroutine, so a full budget delays a launch without serializing the gates.
 
-### C. Minimal agon default (`tasks_autoimplement.go`, `constants.go`)
+### C. Minimal review default (`tasks_autoimplement.go`, `constants.go`)
 
-- `agonForkCount` default `2 → 1`. One fork = one actor/critic pair, Claude-only
+- `reviewForkCount` default `2 → 1`. One fork = one actor/critic pair, Claude-only
   (fork 2, the Codex critic, is opt-in). This halves run count and drops the
   second agent family from the default path.
-- `agonMaxRounds` default `4 → 3` — the meaningful floor (OQ-2, resolved). Agon
+- `reviewMaxRounds` default `4 → 3` — the meaningful floor (OQ-2, resolved). Review
   alternates roles by round parity: odd = critic, even = proposer. So 3 rounds is
   one full cycle — critic attacks (R1, declares topic), proposer rebuts (R2),
   critic re-assesses and can resolve/withdraw (R3). With only 2 rounds the critic
   never sees the rebuttal, so a valid fix still ends "unresolved" and the hard
-  barrier ([[agon-supersede-test]]) would block spuriously. 3 is the floor;
+  barrier ([[review-supersede-test]]) would block spuriously. 3 is the floor;
   deeper debate is opt-in.
-- `agonCostCap` unchanged.
+- `reviewCostCap` unchanged.
 
 These are already env-tunable; this changes the compile-time floor and makes it
 the settings default.
@@ -162,11 +162,11 @@ the settings default.
 Reuse the existing env-backed settings path end to end (no new routes):
 
 - **Backend** (`internal/handler/config.go`, `internal/envconfig/envconfig.go`):
-  add `agon_forks`, `agon_rounds`, `agon_cost_cap`, `agent_nice`, `max_agents`
+  add `review_forks`, `review_rounds`, `review_cost_cap`, `agent_nice`, `max_agents`
   to `envConfigResponse` (GET, with defaults applied) and to the
   `EnvUpdatePayload` + `envconfig.Updates` / `Update()` write path (PUT persists
   to `.env`). Validate bounds server-side (forks ≥ 1, rounds ≥ 1, nice 0–19,
-  max_agents ≥ 0). Invalidate the relevant caches on PUT (agon is already
+  max_agents ≥ 0). Invalidate the relevant caches on PUT (review is already
   re-read live; `agent_nice` / `max_agents` need a cache or live read).
 - **Frontend** (`SettingsTabExecution.vue`, `api/types.ts`): add numeric inputs
   under a "Verification & Resources" group, defaulting to the minimum, saved via
@@ -178,8 +178,8 @@ Reuse the existing env-backed settings path end to end (no new routes):
 Independently shippable, ordered by leverage-per-risk. One small commit per phase
 (or per sub-step).
 
-**Phase 1 — minimal agon default (C).** Flip `agonForkCount` 2→1 and
-`agonMaxRounds` to the confirmed floor. Test: default tuning yields 1 fork / N
+**Phase 1 — minimal review default (C).** Flip `reviewForkCount` 2→1 and
+`reviewMaxRounds` to the confirmed floor. Test: default tuning yields 1 fork / N
 rounds; env override still wins. Smallest diff, immediate cost drop.
 
 **Phase 2 — process priority (A).** `Setpgid` + `applyAgentPriority`, platform
@@ -188,22 +188,22 @@ its own process group at the configured niceness (`Getpriority` on the pgid
 returns the set value); nice `0` leaves it unchanged; a `Setpriority` error does
 not fail the launch.
 
-**Phase 3 — settings exposure (D).** Wire agon params + `agent_nice` through GET/
+**Phase 3 — settings exposure (D).** Wire review params + `agent_nice` through GET/
 PUT `/api/env` and the Execution tab. Test: PUT persists to `.env` and GET round-
 trips; bounds rejected; a changed value takes effect on the next run without
 restart. Frontend: control renders and saves.
 
 **Phase 4 — global budget (B).** Executor semaphore + `WALLFACER_MAX_AGENTS` +
 admission integration. Test: with budget N, at most N agent processes run
-concurrently across mixed task/test/agon load; release on exit re-opens a slot;
+concurrently across mixed task/test/review load; release on exit re-opens a slot;
 `0` = unlimited; no nested-launch deadlock.
 
 ## Outcome (2026-06-28)
 
 All four phases shipped (directly implemented, not dispatched).
 
-- **Phase 1** — agon defaults dropped to the floor (1 fork / 3 rounds);
-  `TestAgonTuning_MinimalDefaultsAndOverride` guards the floor + the dial.
+- **Phase 1** — review defaults dropped to the floor (1 fork / 3 rounds);
+  `TestReviewTuning_MinimalDefaultsAndOverride` guards the floor + the dial.
 - **Phase 2** (load-bearing) — `HostBackend` launches every agent in its own
   process group (`Setpgid`) and throttles it: macOS `PRIO_DARWIN_BG` (CPU+I/O,
   inherited by tool children), Linux `PRIO_PGRP` nice, no-op elsewhere; teardown
@@ -215,9 +215,9 @@ All four phases shipped (directly implemented, not dispatched).
   (`WALLFACER_MAX_AGENTS`), acquired in `Launch` outside any handler lock, freed
   on `Wait`. Default 0 = unlimited (OQ-1 resolved: opt-in, no silent throughput
   cap). Test covers cap / release / double-release / unlimited.
-- **Phase 3** — all knobs (agon forks/rounds/cost-cap, `agent_nice`,
+- **Phase 3** — all knobs (review forks/rounds/cost-cap, `agent_nice`,
   `max_agents`) surfaced through GET/PUT `/api/env` and the Execution settings
-  tab. Agon dials apply live (`agonTuning` re-reads); `agent_nice` / `max_agents`
+  tab. Review dials apply live (`reviewTuning` re-reads); `agent_nice` / `max_agents`
   apply on restart (read at backend construction), labelled as such in the UI.
   Backend round-trip test + frontend `vue-tsc` green.
 
@@ -232,11 +232,11 @@ whether `PRIO_DARWIN_BG` on a child pid is permitted on `Darwin 25.x` or hits
 - Hard CPU/memory *caps* per agent. macOS has no cgroup-style per-process CPU cap;
   `nice` (reprioritization) is the portable lever and addresses the reported
   symptom (responsiveness). Linux cgroup enforcement can be a later spec.
-- Per-workspace-group agon overrides (the group model already carries parallel
-  limits; agon-per-group can follow if needed).
-- Frontend transcript-render cost. A separate, smaller cleanup: the agon
+- Per-workspace-group review overrides (the group model already carries parallel
+  limits; review-per-group can follow if needed).
+- Frontend transcript-render cost. A separate, smaller cleanup: the review
   verification tab re-parses every round's markdown on each 2.5 s poll
-  (`AgonVerification.vue:117` `v-html="renderMarkdown(r.body)"` inside the
+  (`ReviewVerification.vue:117` `v-html="renderMarkdown(r.body)"` inside the
   fork/round `v-for`). Real but secondary (tab-only, browser-bound); memoize by
   round body if it becomes a complaint. Tracked here so it is not lost.
 
@@ -247,11 +247,11 @@ whether `PRIO_DARWIN_BG` on a child pid is permitted on `Darwin 25.x` or hits
   until a user sets a budget. The Phase 2 throttle already addresses the
   responsiveness symptom; a default cap would silently change throughput. Users
   dial a budget in settings when they want a hard ceiling.
-- **OQ-2 — agon rounds floor. RESOLVED: 3.** Agon alternates by round parity
+- **OQ-2 — review rounds floor. RESOLVED: 3.** Review alternates by round parity
   (odd = critic, even = proposer rebuttal), so 3 rounds is the minimum full cycle
   (attack → rebut → re-assess). 2 would never let the critic see the rebuttal, so
   a fixed attack still ends "unresolved" and the hard barrier
-  ([[agon-supersede-test]]) — which now *parks the task for human review* rather
+  ([[review-supersede-test]]) — which now *parks the task for human review* rather
   than auto-retrying — would block spuriously. Phase 1 uses `rounds = 3`.
 - **OQ-3 — darwin child backgrounding.** Can the parent set `PRIO_DARWIN_BG` on a
   child pid on the target macOS, or only on itself? If only self, the darwin path
@@ -259,5 +259,5 @@ whether `PRIO_DARWIN_BG` on a child pid is permitted on `Darwin 25.x` or hits
   the parent doing it post-`Start`. Verify on `Darwin 25.x` before Phase 2; the
   `EPERM` → nice fallback keeps it safe meanwhile.
 - **OQ-4 — priority scope.** Apply the throttle to *all* host agents (simplest;
-  the server is the only foreground) or only to verification (test/agon)
+  the server is the only foreground) or only to verification (test/review)
   processes? Default to all; revisit if interactive task runs feel starved.

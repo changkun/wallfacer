@@ -1,11 +1,11 @@
 ---
-title: Agon Verification Trajectory Streaming
+title: Review Verification Trajectory Streaming
 status: archived
 depends_on:
-  - agon-adversarial-verification
+  - review-adversarial-verification
 affects:
   - internal/handler/execute.go
-  - internal/handler/agon_transcript.go
+  - internal/handler/review_transcript.go
   - internal/apicontract/routes.go
   - internal/cli/server.go
   - frontend/src/api/types.ts
@@ -17,20 +17,20 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# Agon Verification Trajectory Streaming
+# Review Verification Trajectory Streaming
 
 ## Problem
 
-Triggering agon verification gives only a toast and coarse timeline events
+Triggering review verification gives only a toast and coarse timeline events
 (`started`, the final verdict). Unlike a regular task — which streams its
-agent trajectory turn-by-turn into the UI — an agon run is a black box while it
+agent trajectory turn-by-turn into the UI — an review run is a black box while it
 executes: the user cannot watch the proposer/critic debate unfold across forks
 and rounds. They asked for the live fork trajectory in the Verification tab.
 
-## What agon already persists (the source)
+## What review already persists (the source)
 
-agon writes the debate **incrementally** to its session dir during the run
-(no agon change needed):
+review writes the debate **incrementally** to its session dir during the run
+(no review change needed):
 
 - `<stateDir>/sessions/<id>/` — one dir per run; `<id>` is timestamp-prefixed, so
   the newest dir under `<stateDir>/sessions/` is the current/most-recent run.
@@ -41,17 +41,17 @@ agon writes the debate **incrementally** to its session dir during the run
   is `{ts, fork, round, role, path}` pointing at the round file.
 - `start.json` / `end.json` / `summary.md` — run-level.
 
-`<stateDir>` is `agonStateDir(primaryWorktree(task))` =
-`<worktreesDir>/<taskID>/.agon`, which wallfacer computes deterministically.
+`<stateDir>` is `reviewStateDir(primaryWorktree(task))` =
+`<worktreesDir>/<taskID>/.review`, which wallfacer computes deterministically.
 
 ## Design
 
 ### Backend: a transcript-read endpoint (polled)
 
-`GET /api/tasks/{id}/agon/transcript` (new handler `AgonTranscript`):
+`GET /api/tasks/{id}/review/transcript` (new handler `ReviewTranscript`):
 
-1. Resolve the session dir: newest child of `<agonStateDir>/sessions/`. 404 with
-   a clear "no agon run" body when none exists.
+1. Resolve the session dir: newest child of `<reviewStateDir>/sessions/`. 404 with
+   a clear "no review run" body when none exists.
 2. Parse `transcript.jsonl` for the ordered (fork, round, role, path) records;
    read each referenced `r<n>-<role>.md` body.
 3. Return a structured response:
@@ -75,33 +75,33 @@ once more on completion. Tailing/SSE is a possible later optimization; polling a
 per-round-updated file is "real-time enough" for a multi-minute, per-round
 (~30 s–2 min) debate.
 
-Read-only file access stays within the task's `.agon` dir (path-join the fork/
+Read-only file access stays within the task's `.review` dir (path-join the fork/
 round from parsed records; never honor absolute paths from the jsonl).
 
 ### Frontend: live trajectory in the Verification tab
 
 `TaskDetail.vue`, `data-main-tab-section="verification"` (today shows only the
-test-agent `testResults`): add an **Agon trajectory** block above/below it.
+test-agent `testResults`): add an **Review trajectory** block above/below it.
 
-- Fetch `GET /api/tasks/{id}/agon/transcript` when the verification tab is shown
+- Fetch `GET /api/tasks/{id}/review/transcript` when the verification tab is shown
   and `task.session_id` is present.
 - Render forks as columns/sections; within each, rounds in order, each a
   collapsible entry labelled `Critic R1` / `Proposer R2` with the markdown body
   (reusing `renderResultMarkdown`).
 - Poll every ~2.5 s while `running` (and stop on completion / tab blur / unmount).
-- Empty/!running/no-session → a muted "No agon run yet" line; never error loudly.
+- Empty/!running/no-session → a muted "No review run yet" line; never error loudly.
 
-`types.ts`: add `AgonTranscript` / `AgonFork` / `AgonRound` interfaces.
+`types.ts`: add `ReviewTranscript` / `ReviewFork` / `ReviewRound` interfaces.
 
 ## Outcome (2026-06-27)
 
-Both phases implemented. Backend: `AgonTranscript` reads the newest session under
-the task's `.agon`, parses `transcript.jsonl`, reads each round markdown (with
+Both phases implemented. Backend: `ReviewTranscript` reads the newest session under
+the task's `.review`, parses `transcript.jsonl`, reads each round markdown (with
 `..`/absolute-path guards), returns forks→rounds + a `running` flag from
 `end.json` presence. Frontend: the verification tab renders the fork/round debate
 (latest round auto-open, pulsing "live" badge) and polls every 2.5s while
-running; clicking Agon jumps to the tab and opens a 90s watch window so a
-just-started run streams in. No agon change was needed — it persists the
+running; clicking Review jumps to the tab and opens a 90s watch window so a
+just-started run streams in. No review change was needed — it persists the
 trajectory incrementally during the run.
 
 Deviation: polling (2.5s) rather than SSE tailing — adequate for per-round
@@ -109,18 +109,18 @@ Deviation: polling (2.5s) rather than SSE tailing — adequate for per-round
 
 ## Non-Goals
 
-- Token-by-token streaming of each agent (agon captures round output as a whole;
+- Token-by-token streaming of each agent (review captures round output as a whole;
   per-round granularity is the unit). True SSE tailing is deferred.
 - Surfacing proposer/critic raw tool calls (only the round markdown bodies).
-- An agon change to push events — the read-the-artifacts approach needs none.
+- An review change to push events — the read-the-artifacts approach needs none.
 
 ## Phasing / Acceptance Criteria
 
-Phase 1 — backend. `AgonTranscript` handler + route; resolve newest session,
+Phase 1 — backend. `ReviewTranscript` handler + route; resolve newest session,
 parse `transcript.jsonl`, read round files, return the structured shape.
 Tests: a synthetic session dir yields ordered forks/rounds with bodies;
 `running` reflects `end.json` presence; missing session → 404.
 
 Phase 2 — frontend. Types, fetch + render in the verification tab, poll while
-running. Acceptance: a task with an agon run shows its fork/round trajectory and
+running. Acceptance: a task with an review run shows its fork/round trajectory and
 updates live as rounds land; `vue-tsc` clean.

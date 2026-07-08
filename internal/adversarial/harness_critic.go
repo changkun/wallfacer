@@ -15,7 +15,7 @@ import (
 // passed to the harness, and the stdout is returned as CriticResult.Markdown.
 //
 // The critic harness defaults to harness.Claude; future configuration can
-// specify a different harness without any agon-side driver changes.
+// specify a different harness without any review-side driver changes.
 type HarnessCritic struct {
 	runner runner.Interface
 	sb     harness.ID
@@ -47,7 +47,7 @@ func (c *HarnessCritic) Round(ctx context.Context, in adversarial.CriticInput) (
 	if err != nil {
 		return nil, err
 	}
-	// Report the critic's token usage and cost back to agon so its session
+	// Report the critic's token usage and cost back to review so its session
 	// accounting (end.json, summary USD) includes the critic instead of
 	// undercounting it. wallfacer runs the critics, so this is the only place
 	// the spend is visible.

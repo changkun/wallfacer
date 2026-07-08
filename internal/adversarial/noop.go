@@ -1,10 +1,10 @@
-// Package adversarial wires wallfacer's harnesses into agon's adversarial
+// Package adversarial wires wallfacer's harnesses into review's adversarial
 // debate protocol. It provides implementations of [adversarial.Verifier]
-// — the agon-owned integration interface — backed by wallfacer's runner.
+// — the review-owned integration interface — backed by wallfacer's runner.
 //
 // The no-op path ([NoopVerifier]) is always available and is the default
-// when agon is toggled off. The agon-backed path ([AgonVerifier]) is
-// constructed when the agonEnabled handler flag is set and requires the
+// when review is toggled off. The review-backed path ([ReviewVerifier]) is
+// constructed when the reviewEnabled handler flag is set and requires the
 // task to have a non-nil SessionID.
 package adversarial
 
@@ -15,7 +15,7 @@ import (
 )
 
 // NoopVerifier satisfies [adversarial.Verifier] and returns (nil, nil)
-// immediately. It is the active implementation when agon is disabled.
+// immediately. It is the active implementation when review is disabled.
 type NoopVerifier struct{}
 
 // Verify returns (nil, nil) — the skip path.

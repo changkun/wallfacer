@@ -8,7 +8,7 @@ import (
 )
 
 // newCriticWorktree creates a throwaway git worktree at the current HEAD of
-// srcWorktree so an agon critic can read the codebase and run tests in
+// srcWorktree so an review critic can read the codebase and run tests in
 // isolation. This matters because wallfacer's claude harness runs every agent
 // with --dangerously-skip-permissions: a critic pointed at the real worktree
 // could write to it and run tests that dirty the tree, which the commit
@@ -25,8 +25,8 @@ func newCriticWorktree(srcWorktree string) (path string, cleanup func(), err err
 		return "", noop, err
 	}
 	id := uuid.NewString()[:8]
-	path = filepath.Join(filepath.Dir(srcWorktree), ".agon-critic-"+id)
-	branch := "agon-critic-" + id
+	path = filepath.Join(filepath.Dir(srcWorktree), ".review-critic-"+id)
+	branch := "review-critic-" + id
 	if err := gitutil.CreateWorktreeAt(srcWorktree, path, branch, head); err != nil {
 		return "", noop, err
 	}

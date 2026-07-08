@@ -33,7 +33,7 @@ Retire two built-ins that clutter the agent/flow catalog a fresh user first sees
   replaced by an ordinary scheduled routine plus an example prompt, which the
   routines engine already supports.
 - The **test-only** flow. Test verification already runs inside the `implement`
-  flow (the agon verification step), so a standalone test flow is redundant.
+  flow (the review verification step), so a standalone test flow is redundant.
 
 This is a deliberate simplification of the surface that motivated the unified
 agent-graph work: fewer, clearer built-ins. It is a removal, not a rewrite.

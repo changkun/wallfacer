@@ -53,7 +53,7 @@ func TestListWaitingTasksWithSession_ExcludesAlreadyRun(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	// Task with session ID but AgonUnresolved already set.
+	// Task with session ID but ReviewUnresolved already set.
 	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "already-run", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -64,17 +64,17 @@ func TestListWaitingTasksWithSession_ExcludesAlreadyRun(t *testing.T) {
 	if err := s.UpdateTaskResult(ctx, task.ID, "done", "session-xyz", "end_turn", 1); err != nil {
 		t.Fatalf("UpdateTaskResult: %v", err)
 	}
-	if err := s.UpdateTaskAgon(ctx, task.ID, 0, "", ""); err != nil {
-		t.Fatalf("UpdateTaskAgon: %v", err)
+	if err := s.UpdateTaskReview(ctx, task.ID, 0, "", ""); err != nil {
+		t.Fatalf("UpdateTaskReview: %v", err)
 	}
 
 	got := s.ListWaitingTasksWithSession(ctx)
 	if len(got) != 0 {
-		t.Errorf("expected 0 tasks after agon already run, got %d", len(got))
+		t.Errorf("expected 0 tasks after review already run, got %d", len(got))
 	}
 }
 
-func TestClearAgonResult_MakesTaskReeligible(t *testing.T) {
+func TestClearReviewResult_MakesTaskReeligible(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
@@ -88,78 +88,78 @@ func TestClearAgonResult_MakesTaskReeligible(t *testing.T) {
 	if err := s.UpdateTaskResult(ctx, task.ID, "done", "session-xyz", "end_turn", 1); err != nil {
 		t.Fatalf("UpdateTaskResult: %v", err)
 	}
-	// Agon ran: task is excluded from the eligible set.
-	if err := s.UpdateTaskAgon(ctx, task.ID, 2, "boom", "/sessions/1"); err != nil {
-		t.Fatalf("UpdateTaskAgon: %v", err)
+	// Review ran: task is excluded from the eligible set.
+	if err := s.UpdateTaskReview(ctx, task.ID, 2, "boom", "/sessions/1"); err != nil {
+		t.Fatalf("UpdateTaskReview: %v", err)
 	}
 	if got := s.ListWaitingTasksWithSession(ctx); len(got) != 0 {
 		t.Fatalf("expected 0 eligible while verdict set, got %d", len(got))
 	}
 
 	// On resume the verdict is cleared, making the task eligible again.
-	if err := s.ClearAgonResult(ctx, task.ID); err != nil {
-		t.Fatalf("ClearAgonResult: %v", err)
+	if err := s.ClearReviewResult(ctx, task.ID); err != nil {
+		t.Fatalf("ClearReviewResult: %v", err)
 	}
 	fresh, err := s.GetTask(ctx, task.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if fresh.AgonUnresolved != nil || fresh.AgonHeadline != "" || fresh.AgonSessionDir != "" {
-		t.Errorf("agon fields not cleared: unresolved=%v headline=%q dir=%q",
-			fresh.AgonUnresolved, fresh.AgonHeadline, fresh.AgonSessionDir)
+	if fresh.ReviewUnresolved != nil || fresh.ReviewHeadline != "" || fresh.ReviewSessionDir != "" {
+		t.Errorf("review fields not cleared: unresolved=%v headline=%q dir=%q",
+			fresh.ReviewUnresolved, fresh.ReviewHeadline, fresh.ReviewSessionDir)
 	}
 	if got := s.ListWaitingTasksWithSession(ctx); len(got) != 1 {
 		t.Errorf("expected task re-eligible after clear, got %d", len(got))
 	}
 }
 
-func TestUpdateTaskAgon_PersistsAllFields(t *testing.T) {
+func TestUpdateTaskReview_PersistsAllFields(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "agon-test", Timeout: 15})
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "review-test", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	if err := s.UpdateTaskAgon(ctx, task.ID, 2, "Some attack claim", "/tmp/agon/sessions/abc"); err != nil {
-		t.Fatalf("UpdateTaskAgon: %v", err)
+	if err := s.UpdateTaskReview(ctx, task.ID, 2, "Some attack claim", "/tmp/review/sessions/abc"); err != nil {
+		t.Fatalf("UpdateTaskReview: %v", err)
 	}
 
 	got, err := s.GetTask(ctx, task.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.AgonUnresolved == nil {
-		t.Fatal("AgonUnresolved is nil after UpdateTaskAgon")
+	if got.ReviewUnresolved == nil {
+		t.Fatal("ReviewUnresolved is nil after UpdateTaskReview")
 	}
-	if *got.AgonUnresolved != 2 {
-		t.Errorf("AgonUnresolved = %d, want 2", *got.AgonUnresolved)
+	if *got.ReviewUnresolved != 2 {
+		t.Errorf("ReviewUnresolved = %d, want 2", *got.ReviewUnresolved)
 	}
-	if got.AgonHeadline != "Some attack claim" {
-		t.Errorf("AgonHeadline = %q, want %q", got.AgonHeadline, "Some attack claim")
+	if got.ReviewHeadline != "Some attack claim" {
+		t.Errorf("ReviewHeadline = %q, want %q", got.ReviewHeadline, "Some attack claim")
 	}
-	if got.AgonSessionDir != "/tmp/agon/sessions/abc" {
-		t.Errorf("AgonSessionDir = %q, want %q", got.AgonSessionDir, "/tmp/agon/sessions/abc")
+	if got.ReviewSessionDir != "/tmp/review/sessions/abc" {
+		t.Errorf("ReviewSessionDir = %q, want %q", got.ReviewSessionDir, "/tmp/review/sessions/abc")
 	}
 }
 
-func TestUpdateTaskAgon_ZeroUnresolved_IsClean(t *testing.T) {
+func TestUpdateTaskReview_ZeroUnresolved_IsClean(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "agon-clean", Timeout: 15})
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "review-clean", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
-	if err := s.UpdateTaskAgon(ctx, task.ID, 0, "", "/sess"); err != nil {
-		t.Fatalf("UpdateTaskAgon: %v", err)
+	if err := s.UpdateTaskReview(ctx, task.ID, 0, "", "/sess"); err != nil {
+		t.Fatalf("UpdateTaskReview: %v", err)
 	}
 	got, err := s.GetTask(ctx, task.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.AgonUnresolved == nil || *got.AgonUnresolved != 0 {
-		t.Errorf("expected AgonUnresolved=0 (clean), got %v", got.AgonUnresolved)
+	if got.ReviewUnresolved == nil || *got.ReviewUnresolved != 0 {
+		t.Errorf("expected ReviewUnresolved=0 (clean), got %v", got.ReviewUnresolved)
 	}
 }

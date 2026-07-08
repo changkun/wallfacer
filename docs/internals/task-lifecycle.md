@@ -191,11 +191,11 @@ After reviewing the verdict, the user can:
 - Provide feedback to fix issues, then re-test
 - Cancel the task
 
-**Agon supersedes the test agent** when the `agon` runtime toggle is on and the task has a `SessionID` to fork from (`agonSupersedesTest`, `internal/handler/tasks_autoimplement.go`). For such tasks the auto-tester skips the task and the auto-submitter gates on a clean agon verdict (`AgonUnresolved == 0`) instead of `LastTestResult`. Session-less tasks always fall back to the test agent.
+**Review supersedes the test agent** when the `review` runtime toggle is on and the task has a `SessionID` to fork from (`reviewSupersedesTest`, `internal/handler/tasks_autoimplement.go`). For such tasks the auto-tester skips the task and the auto-submitter gates on a clean review verdict (`ReviewUnresolved == 0`) instead of `LastTestResult`. Session-less tasks always fall back to the test agent.
 
 ## Autoimplement
 
-Seven background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, routine engine, waiting-sync, auto-tester, auto-submitter, and auto-agon. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
+Seven background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, routine engine, waiting-sync, auto-tester, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
 
 ## Board Context
 
