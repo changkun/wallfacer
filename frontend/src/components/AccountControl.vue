@@ -4,10 +4,10 @@
 // navigate back to the store and router, tracks the org being switched for the
 // per-row spinner, and hosts theme + language via the shared AccountPrefs in
 // the menu's #prefs slot. Same pattern as lectio/lux so the chrome matches.
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
-import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem } from 'latere-ui';
+import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem, type Principal } from 'latere-ui';
 
 import { useAuthStore } from '../stores/auth';
 import { usePrefsStore, type Locale } from '../stores/prefs';
@@ -24,6 +24,18 @@ withDefaults(
 );
 
 const auth = useAuthStore();
+
+// Derive the account role so the shared AccountMenu renders the role badge +
+// dropdown descriptor (as in lux). null in anonymous local-run mode.
+// wallfacer's /api/me carries no org-admin signal, so org users are left
+// roleless (the dropdown shows the org name, not a fabricated tier);
+// superadmin and no-org individual are unambiguous.
+const principal = computed<Principal | null>(() => {
+  const m = auth.me;
+  if (!m) return null;
+  const role = m.is_superadmin ? 'platform_admin' : m.org_id ? undefined : 'individual';
+  return { ...m, role };
+});
 const prefs = usePrefsStore();
 const router = useRouter();
 const { theme, locale } = storeToRefs(prefs);
@@ -69,7 +81,7 @@ function onSetLocale(code: string) {
 
 <template>
   <AccountMenu
-    :principal="auth.me"
+    :principal="principal"
     :placement="placement"
     :extra-items="extraItems"
     :labels="{ signIn: 'Sign in via latere.ai' }"
