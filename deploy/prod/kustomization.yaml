@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Production overlay. The base already carries the prod host (wf.latere.ai),
+# AUTH_REDIRECT_URL, and TLS secret, so prod only needs to place everything in
+# the `latere` namespace. The release pipeline applies this dir with
+# `kubectl apply -k deploy/prod/`.
+namespace: latere
+
+resources:
+  - ../base

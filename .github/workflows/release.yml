@@ -137,7 +137,7 @@ jobs:
         run: |
           # docker/metadata-action publishes the semver tag without the leading v.
           TAG="${GITHUB_REF_NAME#v}"
-          kubectl apply -f deploy/prod/
+          kubectl apply -k deploy/prod/
           kubectl -n latere set image deployment/wallfacerd \
             wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
           kubectl -n latere rollout status deployment/wallfacerd --timeout=120s

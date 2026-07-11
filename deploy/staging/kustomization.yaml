@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ── STAGING (STUB — NOT DEPLOYED YET) ────────────────────────────────────────
+# Placeholder overlay so a future staging environment is a small diff, not a
+# new setup. Nothing applies this today; the release pipeline only deploys
+# deploy/prod/. Before using staging, provision the `latere-staging` namespace,
+# the `wallfacerd-cookie`/`wallfacerd-redis`/`wallfacer-db` secrets, and DNS + a
+# cert for wf-staging.latere.ai. The staging host is derived from the prod
+# ingress host wf.latere.ai (wf.latere.ai -> wf-staging.latere.ai).
+namespace: latere-staging
+
+resources:
+  - ../base
+
+# Override the prod values the base carries with their staging equivalents.
+patches:
+  - target:
+      kind: Deployment
+      name: wallfacerd
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: wallfacerd
+      spec:
+        template:
+          spec:
+            containers:
+              - name: wallfacerd
+                env:
+                  - name: AUTH_REDIRECT_URL
+                    value: https://wf-staging.latere.ai/callback
+  - target:
+      kind: Ingress
+      name: wallfacerd
+    patch: |-
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: wallfacerd
+      spec:
+        tls:
+          - hosts:
+              - wf-staging.latere.ai
+            secretName: wallfacerd-staging-tls
+        rules:
+          - host: wf-staging.latere.ai
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: wallfacerd
+                      port:
+                        number: 80

@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Environment-neutral base for the wallfacerd service. Overlays inject the
+# namespace and patch env-specific values (public host, TLS secret, the
+# self-referential AUTH_REDIRECT_URL). The image tag is intentionally NOT
+# pinned here — the release pipeline's `set image` step owns it; the :main
+# placeholder in deployment.yaml is only a default.
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
