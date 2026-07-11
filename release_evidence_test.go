@@ -12,12 +12,14 @@ import (
 	"testing"
 )
 
-// TestReleaseWorkflowWiresEvidence guards that release.yml actually plumbs the
-// release-evidence the smoke script can emit: the deploy job must hand the
-// script OUTPUT_MD/TAG/COMMIT and publish the artifact, and the release job
-// must consume it into the release body. The smoke script has always been able
-// to write the evidence block; the bug this protects against is the workflow
-// generating it nowhere (OUTPUT_MD unset) or never attaching it to the release.
+// TestReleaseWorkflowWiresEvidence guards that release.yml keeps the smoke
+// evidence flowing into the published release. Since the move to the shared
+// latere-ai/ci service-release.yml pipeline, the OUTPUT_MD/TAG/COMMIT plumbing
+// and the notes-file append live centrally in that reusable workflow; what
+// this repo must still guarantee is that release.yml delegates to it with the
+// local smoke script (the generator TestSmokeReleaseEmitsEvidence proves) and
+// the secrets it needs. The bug this protects against is the delegation
+// silently dropping the smoke_script input or the reusable-workflow call.
 func TestReleaseWorkflowWiresEvidence(t *testing.T) {
 	data, err := os.ReadFile(".github/workflows/release.yml")
 	if err != nil {
@@ -26,31 +28,19 @@ func TestReleaseWorkflowWiresEvidence(t *testing.T) {
 	yml := string(data)
 
 	for _, want := range []string{
-		// deploy job feeds the evidence inputs to the smoke script.
-		"OUTPUT_MD: release-evidence.md",
-		"TAG: ${{ github.ref_name }}",
-		"COMMIT: ${{ github.sha }}",
-		// deploy job hands the evidence off to the release job.
-		"name: release-evidence",
-		// release job pulls it back and appends it to the published notes.
-		"name: Download release evidence",
-		"cat evidence/release-evidence.md >> notes.md",
-		"--notes-file notes.md",
-		// release body prefers the hand-written note for the tag, so the
-		// published changelog is not capped at the auto-generated previous-tag
-		// scope. Requires a checkout so the file is on disk.
-		`note="docs/releases/${TAG}.md"`,
-		"uses: actions/checkout",
+		// Tag push triggers the release pipeline.
+		"tags: ['v*']",
+		// The central pipeline owns the evidence wiring (OUTPUT_MD, the
+		// release-evidence artifact, and the notes-file append).
+		"uses: latere-ai/ci/.github/workflows/service-release.yml@",
+		// The pipeline must run this repo's evidence-emitting smoke script.
+		"smoke_script: tools/smoke/release.sh",
+		// Deploy/smoke/publish credentials reach the reusable workflow.
+		"secrets: inherit",
 	} {
 		if !strings.Contains(yml, want) {
 			t.Errorf("release.yml missing evidence wiring: %q", want)
 		}
-	}
-
-	// The bare --generate-notes flag drops the evidence on the floor; the
-	// release must build a notes file that includes it instead.
-	if strings.Contains(yml, "--generate-notes") {
-		t.Error("release.yml still uses --generate-notes; evidence must be appended to a --notes-file body")
 	}
 }
 
