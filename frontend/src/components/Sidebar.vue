@@ -238,6 +238,7 @@ onUnmounted(removeWsOutsideHandler);
     :router-link="RouterLink"
     brand-name="Wallfacer"
     brand-sub="Workspace"
+    product="wallfacer"
     expand-on-brand-click
     search
     search-label="Search or command"
