@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"latere.ai/x/pkg/otel"
 )
 
 // DefaultBaseURL is the GitHub REST API root. Overridable on [Client] so tests
@@ -43,7 +45,7 @@ func (c *Client) httpClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	return &http.Client{Timeout: 30 * time.Second}
+	return &http.Client{Timeout: 30 * time.Second, Transport: otel.Transport(nil)}
 }
 
 // RateLimit is the GitHub rate-limit budget parsed from response headers. It is

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/otel"
+
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
@@ -74,7 +76,7 @@ type SandboxProxy struct {
 func NewSandboxProxy(cfg SandboxProxyConfig, v *auth.Validator) *SandboxProxy {
 	return &SandboxProxy{
 		Cfg:       cfg,
-		Client:    &http.Client{Timeout: 5 * time.Minute},
+		Client:    &http.Client{Timeout: 5 * time.Minute, Transport: otel.Transport(nil)},
 		Validator: v,
 	}
 }

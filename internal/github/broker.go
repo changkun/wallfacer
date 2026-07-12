@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"latere.ai/x/pkg/otel"
 )
 
 // HTTPBroker is the live [Broker]: it obtains the principal's GitHub token from
@@ -28,7 +30,7 @@ func (b *HTTPBroker) httpClient() *http.Client {
 	if b.HTTP != nil {
 		return b.HTTP
 	}
-	return &http.Client{Timeout: 15 * time.Second}
+	return &http.Client{Timeout: 15 * time.Second, Transport: otel.Transport(nil)}
 }
 
 // Token fetches and maps the brokered GitHub credential. A missing/expired user

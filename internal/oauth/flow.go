@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"latere.ai/x/pkg/otel"
+
 	"latere.ai/x/wallfacer/internal/logger"
 )
 
@@ -51,7 +53,16 @@ type Manager struct {
 	mu          sync.Mutex
 	flows       map[string]*Flow
 	TokenWriter TokenWriter
-	HTTPClient  *http.Client // for token exchange; nil uses http.DefaultClient
+	HTTPClient  *http.Client // for token exchange; nil uses an otel-instrumented default
+}
+
+// httpClient returns the configured token-exchange client, defaulting to an
+// otel-instrumented client so the outbound hop records a client span.
+func (m *Manager) httpClient() *http.Client {
+	if m.HTTPClient != nil {
+		return m.HTTPClient
+	}
+	return otel.HTTPClient()
 }
 
 // NewManager creates a new OAuth flow manager.
@@ -184,12 +195,7 @@ func (m *Manager) runFlow(ctx context.Context, flow *Flow, redirectURI string) {
 		return
 	}
 
-	client := m.HTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
-
-	token, err := exchangeToken(ctx, client, flow.provider, result.Code, flow.verifier, redirectURI, flow.state)
+	token, err := exchangeToken(ctx, m.httpClient(), flow.provider, result.Code, flow.verifier, redirectURI, flow.state)
 	if err != nil {
 		flow.mu.Lock()
 		flow.status = FlowStatus{State: FlowError, Error: "token exchange failed: " + err.Error()}

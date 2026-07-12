@@ -22,18 +22,24 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
+
+	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
+// authHTTPClient calls the auth service with the otel transport so the
+// hop joins the caller's trace. The auth service is a same-cluster
+// call so even 10s is liberal.
+var authHTTPClient = &http.Client{Timeout: 10 * time.Second, Transport: otel.Transport(nil)}
+
 // httpGet is a package-level indirection so tests can substitute a
-// fixed response without a full HTTP server stand-up. Defaults to the
-// standard client with a generous timeout; the auth service is a
-// same-cluster call so even 10s is liberal.
+// fixed response without a full HTTP server stand-up.
 var httpGet = func(req *http.Request) (*http.Response, error) {
-	return http.DefaultClient.Do(req)
+	return authHTTPClient.Do(req)
 }
 
 // orgEntry is the subset of the auth service's /me/orgs payload the
