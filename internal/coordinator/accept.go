@@ -145,18 +145,18 @@ func (c *Coordinator) readManifest(ctx context.Context, conn *websocket.Conn) (M
 func (c *Coordinator) dispatch(ctx context.Context, p Principal, instanceID string, data []byte) {
 	env, err := DecodeEnvelope(data)
 	if err != nil {
-		c.log.Warn("coordinator: bad frame", "err", err)
+		c.log.WarnContext(ctx, "coordinator: bad frame", "err", err)
 		return
 	}
 	switch env.Type {
 	case FrameManifest:
 		var m Manifest
 		if err := json.Unmarshal(env.Raw, &m); err != nil {
-			c.log.Warn("coordinator: bad manifest update", "err", err)
+			c.log.WarnContext(ctx, "coordinator: bad manifest update", "err", err)
 			return
 		}
 		if m.InstanceID != instanceID {
-			c.log.Warn("coordinator: manifest instance_id mismatch on live socket",
+			c.log.WarnContext(ctx, "coordinator: manifest instance_id mismatch on live socket",
 				"want", instanceID, "got", m.InstanceID)
 			return
 		}
@@ -170,7 +170,7 @@ func (c *Coordinator) dispatch(ctx context.Context, p Principal, instanceID stri
 	case FrameSpecComment:
 		c.dispatchComment(ctx, p, env.Raw)
 	default:
-		c.log.Debug("coordinator: ignoring frame type", "type", env.Type)
+		c.log.DebugContext(ctx, "coordinator: ignoring frame type", "type", env.Type)
 	}
 }
 
@@ -183,11 +183,11 @@ func (c *Coordinator) dispatchComment(ctx context.Context, p Principal, raw []by
 	}
 	var ev speccomment.Event
 	if err := json.Unmarshal(raw, &ev); err != nil {
-		c.log.Warn("coordinator: bad spec-comment frame", "err", err)
+		c.log.WarnContext(ctx, "coordinator: bad spec-comment frame", "err", err)
 		return
 	}
 	if err := c.comments.Apply(ctx, p, ev); err != nil {
-		c.log.Debug("coordinator: spec-comment op rejected", "op", ev.Op, "err", err)
+		c.log.DebugContext(ctx, "coordinator: spec-comment op rejected", "op", ev.Op, "err", err)
 	}
 }
 

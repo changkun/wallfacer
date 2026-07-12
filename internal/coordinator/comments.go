@@ -85,7 +85,7 @@ func (s *CommentService) create(ctx context.Context, p Principal, ev speccomment
 	if err := s.store.PutThread(ctx, t); err != nil {
 		return err
 	}
-	s.fanout(tenantKey(p), ev.Repo, speccomment.OpCreate, t)
+	s.fanout(ctx, tenantKey(p), ev.Repo, speccomment.OpCreate, t)
 	return nil
 }
 
@@ -112,7 +112,7 @@ func (s *CommentService) reply(ctx context.Context, p Principal, ev speccomment.
 	if err := s.store.PutThread(ctx, t); err != nil {
 		return err
 	}
-	s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpReply, t)
+	s.fanout(ctx, tenantKey(p), t.WorkspaceID, speccomment.OpReply, t)
 	return nil
 }
 
@@ -150,7 +150,7 @@ func (s *CommentService) setResolved(ctx context.Context, p Principal, ev specco
 	if err := s.store.PutThread(ctx, t); err != nil {
 		return err
 	}
-	s.fanout(tenantKey(p), t.WorkspaceID, op, t)
+	s.fanout(ctx, tenantKey(p), t.WorkspaceID, op, t)
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (s *CommentService) setOutdated(ctx context.Context, p Principal, ev specco
 	if err := s.store.PutThread(ctx, t); err != nil {
 		return err
 	}
-	s.fanout(tenantKey(p), t.WorkspaceID, speccomment.OpOutdated, t)
+	s.fanout(ctx, tenantKey(p), t.WorkspaceID, speccomment.OpOutdated, t)
 	return nil
 }
 
@@ -207,7 +207,7 @@ func canResolve(p Principal, t speccomment.Thread) bool {
 // SAME tenant, including the originator (which adopts the coordinator's ids). The
 // tenant filter is the boundary: InstancesForRemote spans tenants, so a thread
 // must never reach an instance outside its tenant. `tenant` is tenantKey(p).
-func (s *CommentService) fanout(tenant, repo, op string, t speccomment.Thread) {
+func (s *CommentService) fanout(ctx context.Context, tenant, repo, op string, t speccomment.Thread) {
 	thread := t
 	ev := speccomment.Event{Type: FrameSpecComment, Op: op, Repo: repo, Thread: &thread}
 	for _, inst := range s.reg.InstancesForRemote(repo) {
@@ -215,7 +215,7 @@ func (s *CommentService) fanout(tenant, repo, op string, t speccomment.Thread) {
 			continue
 		}
 		if err := inst.Conn.Send(ev); err != nil {
-			s.log.Debug("coordinator: comment fan-out send failed", "instance", inst.ID(), "err", err)
+			s.log.DebugContext(ctx, "coordinator: comment fan-out send failed", "instance", inst.ID(), "err", err)
 		}
 	}
 }
@@ -230,12 +230,12 @@ func (s *CommentService) SyncTo(ctx context.Context, inst Instance) {
 	for _, repo := range inst.Manifest.Remotes() {
 		threads, err := s.store.ThreadsForRepo(ctx, tenantKey(inst.Principal), repo)
 		if err != nil {
-			s.log.Warn("coordinator: comment sync query failed", "repo", repo, "err", err)
+			s.log.WarnContext(ctx, "coordinator: comment sync query failed", "repo", repo, "err", err)
 			continue
 		}
 		ev := speccomment.Event{Type: FrameSpecComment, Op: speccomment.OpSync, Repo: repo, Threads: threads}
 		if err := inst.Conn.Send(ev); err != nil {
-			s.log.Debug("coordinator: comment sync send failed", "instance", inst.ID(), "err", err)
+			s.log.DebugContext(ctx, "coordinator: comment sync send failed", "instance", inst.ID(), "err", err)
 		}
 	}
 }
