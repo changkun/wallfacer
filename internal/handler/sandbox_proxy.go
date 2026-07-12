@@ -279,9 +279,13 @@ func delegatorSub(c *auth.Claims) string {
 	if c == nil {
 		return ""
 	}
-	if c.Act != nil && c.Act.Sub != "" {
-		return c.Act.Sub
+	// Delegator() resolves both wire shapes (RFC 8693 act and the flat
+	// grantor_id alias, dr-21). Reading act alone misattributed delegated
+	// calls to the agent's own sub, because auth minted grantor_id-only
+	// tokens.
+	if owner := c.Delegator(); owner != "" {
+		return owner
 	}
-	// Fallback: when act is absent, the principal IS the user.
+	// Non-delegated token: the principal IS the user.
 	return c.Sub
 }
