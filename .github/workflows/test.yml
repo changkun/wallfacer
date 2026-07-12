@@ -33,6 +33,9 @@ jobs:
         with:
           version: v2.11.3
 
+      - name: Lint otel transport guardrail
+        run: make lint-otel
+
       - name: Test
         run: go test -v -race -timeout 20m ./...
         working-directory: .

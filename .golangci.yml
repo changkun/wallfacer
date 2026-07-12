@@ -10,3 +10,21 @@ linters:
     - gocritic
     - misspell
     - revive
+    - sloglint
+  settings:
+    sloglint:
+      # Request-path logs must use the *Context slog variants so the otelslog
+      # bridge stamps TraceId/SpanId onto exported records (observability
+      # spec 02). "scope" flags a plain call only where a context is in scope.
+      context: scope
+  exclusions:
+    rules:
+      # Context enforcement covers the web-mode request path only. CLI-mode
+      # packages keep plain calls: they have no request trace to correlate.
+      - linters:
+          - sloglint
+        path-except: ^internal/(auth|coordinator|webserver)/
+      # The coordinator client is the CLI-side dialer, not the request path.
+      - linters:
+          - sloglint
+        path: ^internal/coordinator/client/

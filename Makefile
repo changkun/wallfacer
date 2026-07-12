@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js lint-otel test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once
 
 # Full build gate: fmt + frontend assets + lint + binary.
 build: fmt frontend-build lint build-binary
@@ -46,7 +46,7 @@ fmt-go:
 	gofmt -w .
 
 # Run all linters (Go + frontend)
-lint: lint-go lint-js
+lint: lint-go lint-js lint-otel
 
 # Run Go linters with the repo-pinned golangci-lint version.
 lint-go: frontend-build
@@ -64,6 +64,17 @@ lint-go: frontend-build
 # Type-check the Vue frontend (vue-tsc --noEmit).
 lint-js:
 	cd frontend && bun run typecheck
+
+# Guardrail from observability spec 01: every outbound HTTP client must carry
+# the otel transport so W3C trace context propagates across service hops.
+# Flags any non-test &http.Client{...} literal that does not set Transport.
+lint-otel:
+	@bare="$$(grep -rn '&http.Client{' --include='*.go' internal/ *.go 2>/dev/null | grep -v _test.go | grep -v Transport || true)"; \
+	if [ -n "$$bare" ]; then \
+		echo "bare &http.Client{} without otel.Transport (observability spec 01):"; \
+		echo "$$bare"; \
+		exit 1; \
+	fi
 
 # Run all checks (fmt + lint + backend tests + frontend tests)
 test: fmt lint test-backend test-frontend
