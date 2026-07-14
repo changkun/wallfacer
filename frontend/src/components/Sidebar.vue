@@ -379,15 +379,22 @@ onUnmounted(removeWsOutsideHandler);
 .wf-cs.collapsed {
   width: var(--sb-w-icon) !important;
 }
-/* Liquid Glass v2 renders the rail as a FLOATING rounded capsule (border +
- * radius + drop shadow on all four sides). wallfacer mounts it flush at the
- * window edge, so inset it a touch: the warm canvas shows in the gap and the
- * capsule reads as detached rather than butting its rounded corners against the
- * edge. Height drops from the package's `height:100%` to auto so the flex
- * stretch fills the shell minus these vertical margins (no overflow). */
+/* macOS 27 "split panel" rail. The stock latere-ui rail is a FLOATING rounded
+ * glass capsule (radius + drop shadow + margin on all four sides, detached from
+ * the content). wallfacer instead splits the window: the frosted rail runs flush
+ * to the top / left / bottom edges and shares one continuous surface with the
+ * content, divided only by a hairline right edge — no gap, no capsule shadow.
+ * Kill the margin / radius / four-side border / drop shadow the package sets and
+ * restore the package's full-height stretch; keep the frosted material (glass
+ * background + backdrop-filter) so the rail still reads as vibrant chrome beside
+ * the opaque content column. */
 .wf-cs {
-  height: auto;
-  margin: var(--sp-3);
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-radius: 0;
+  box-shadow: none;
 }
 /* Match the workspace switcher to the search bar below it: full width + the
  * same height/radius, so they read as one consistent stack. */
