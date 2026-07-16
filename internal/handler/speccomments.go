@@ -200,7 +200,11 @@ func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
 	}
 	repo, root, ok := h.resolveSpecRepo(r, req.Spec)
 	if !ok || repo == "" {
-		http.Error(w, "spec workspace has no git remote", http.StatusBadRequest)
+		// Spec-comment threads are keyed by git remote (the cross-machine join
+		// key), so the spec's workspace folder must have one. Say so plainly:
+		// this is the honest boundary for a local-only checkout, not a transient
+		// failure the user can retry away.
+		http.Error(w, "spec comments need a git remote on the spec's workspace folder; none was found", http.StatusBadRequest)
 		return
 	}
 
