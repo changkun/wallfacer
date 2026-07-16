@@ -2,7 +2,7 @@
 title: Google Antigravity as a Remote Executor
 status: drafted
 depends_on:
-  - specs/shared/harness-abstraction.md
+  - specs/.archive/shared/harness-abstraction.md
 affects:
   - internal/executor/
   - internal/runner/
@@ -34,6 +34,8 @@ This is the third executor category in the harness-abstraction layering:
 |---|---|---|---|
 | Harness-running | host (default), Topos | yes (Claude Code, Codex, Cursor, …) | `Executor` + composes a `Harness` |
 | Self-contained, third-party | Claude Managed Agents, Antigravity | no (fixed) | `Executor`, ignores `Harness` |
+
+**Dependency status:** [harness-abstraction](../.archive/shared/harness-abstraction.md) shipped and archived, but only the harness-running path — `executor.Backend` in `internal/executor/backend.go` currently exposes just `Launch`/`List`, i.e. the argv-based launch used by host, Codex, Cursor, OpenCode, Pi. No self-contained dispatch method (`Dispatch(ctx, req) (Handle, error)` or equivalent, taking a `harness.Request` directly) exists yet. That seam is a prerequisite this spec shares with [claude-managed-agents](claude-managed-agents.md); implementation must add it (extend `Backend` or introduce a parallel interface) before either self-contained executor can land.
 
 ## Selection
 
