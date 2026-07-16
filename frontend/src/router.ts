@@ -28,6 +28,9 @@ export const localRoutes: RouteRecordRaw[] = [
   { path: '/chat', component: () => import('./views/ChatPage.vue'), meta: { needsWorkspace: true } },
   { path: '/plan', component: () => import('./views/PlanPage.vue'), meta: { needsWorkspace: true } },
   { path: '/whiteboard', component: () => import('./views/WhiteboardPage.vue'), meta: { needsWorkspace: true } },
+  // Static artifacts gallery: lists and previews self-contained HTML under
+  // <workspace>/artifacts/, served by the /artifact/<path> route.
+  { path: '/artifacts', component: () => import('./views/ArtifactsView.vue'), meta: { needsWorkspace: true } },
   // The pipeline graph surface, renamed "Mission Control" in the UI; the
   // MapPage.vue component keeps its filename to avoid churn. /map redirects.
   { path: '/mission', component: () => import('./views/MapPage.vue'), meta: { needsWorkspace: true } },

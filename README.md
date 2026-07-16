@@ -172,6 +172,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Agent Graph](docs/guide/agent-graph.md) | Agents, fleets, harness pinning, live traces |
 | [Routines](docs/guide/routines.md) | Scheduled cards that spawn tasks on an interval |
 | [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
+| [Artifacts](docs/guide/artifacts.md) | Serve and open self-contained HTML pages from the workspace |
 
 **Operate**
 
