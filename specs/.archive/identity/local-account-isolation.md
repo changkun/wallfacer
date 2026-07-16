@@ -1,6 +1,6 @@
 ---
 title: Local Per-Account / Per-Org Project & Task Isolation
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/handler/config.go
@@ -13,7 +13,7 @@ affects:
   - internal/handler/device_auth.go
 effort: large
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
