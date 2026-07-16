@@ -48,6 +48,12 @@ function focusRelated(path: string) {
 function shortSpecPath(p: string): string {
   return p.replace(/^specs\//, '').replace(/\.md$/, '');
 }
+// A depends_on target that escapes the workspace specs tree (e.g.
+// ../../agents/specs/...) cannot be opened here; it resolves to no spec and
+// would render an empty view. Mark it as external and non-navigating instead.
+function isExternalDep(p: string): boolean {
+  return p.includes('../') || p.startsWith('/');
+}
 
 const specText = ref<string>('');
 const loading = ref(false);
@@ -604,9 +610,11 @@ defineExpose({ dispatchFocused, breakdownFocused });
           :key="d"
           type="button"
           class="sf-rel-chip sf-rel-chip--dep"
-          :title="'Open ' + d"
-          @click="focusRelated(d)"
-        >{{ shortSpecPath(d) }}</button>
+          :class="{ 'sf-rel-chip--external': isExternalDep(d) }"
+          :disabled="isExternalDep(d)"
+          :title="isExternalDep(d) ? d + ' — outside this workspace, cannot open here' : 'Open ' + d"
+          @click="isExternalDep(d) ? undefined : focusRelated(d)"
+        >{{ shortSpecPath(d) }}<span v-if="isExternalDep(d)" aria-hidden="true"> ↗</span></button>
       </div>
       <div v-if="affects.length" class="sf-rel-group">
         <span class="sf-rel-label">Affects</span>
@@ -903,6 +911,19 @@ defineExpose({ dispatchFocused, breakdownFocused });
   cursor: pointer;
   color: var(--tint-blue-ink);
   border-color: var(--tint-blue-ink);
+}
+/* A cross-repo / out-of-tree dependency cannot be opened here: mute it and
+   disable navigation so it never focuses an empty spec. */
+.sf-rel-chip--external {
+  cursor: default;
+  color: var(--ink-3);
+  border-color: var(--rule);
+  border-style: dashed;
+}
+.sf-rel-chip--external:hover {
+  color: var(--ink-3);
+  border-color: var(--rule);
+  background: transparent;
 }
 
 .sf-rel-chip--dep:hover {
