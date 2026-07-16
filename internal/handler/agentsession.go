@@ -285,6 +285,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		FocusedSpec string `json:"focused_spec"`
 		FocusedTask string `json:"focused_task"`
 		Thread      string `json:"thread"`
+		Harness     string `json:"harness"`
 	}](w, r)
 	if !ok {
 		return
@@ -293,6 +294,9 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "message is required", http.StatusBadRequest)
 		return
 	}
+	// Which harness runs this turn. Empty or unknown falls back to the default;
+	// the frontend only offers installed harnesses.
+	sb := harness.DefaultFrom(req.Harness)
 
 	// Exactly one of focused_spec / focused_task may be set.
 	if req.FocusedSpec != "" && req.FocusedTask != "" {
@@ -467,7 +471,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 
-		handle, err := h.agentSession.Exec(context.Background(), cmd)
+		handle, err := h.agentSession.Exec(context.Background(), cmd, sb)
 		if err != nil {
 			slog.Error("agent exec failed", "error", err)
 			return
@@ -515,7 +519,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			}
 			ll2 := h.agentSession.StartLiveLog()
 			retryCmd := []string{"-p", retryPrompt, "--verbose", "--output-format", "stream-json"}
-			retryHandle, retryErr := h.agentSession.Exec(context.Background(), retryCmd)
+			retryHandle, retryErr := h.agentSession.Exec(context.Background(), retryCmd, sb)
 			if retryErr != nil {
 				slog.Error("agent retry exec failed", "error", retryErr)
 				return

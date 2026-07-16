@@ -65,9 +65,10 @@ function vh() { return typeof window !== 'undefined' ? window.innerHeight : 800;
 function clampNum(v: number, lo: number, hi: number) { return Math.min(Math.max(v, lo), Math.max(lo, hi)); }
 function clampX(x: number, w: number) { return clampNum(x, KEEP_VISIBLE - w, vw() - KEEP_VISIBLE); }
 function clampY(y: number) { return clampNum(y, 0, vh() - KEEP_VISIBLE); }
-// The launcher is a single button, so keep it fully on-screen.
-function clampLX(x: number) { return clampNum(x, 0, vw() - LAUNCHER_SIZE); }
-function clampLY(y: number) { return clampNum(y, 0, vh() - LAUNCHER_SIZE); }
+// The launcher is a single button; keep it fully on-screen AND inset by a
+// margin so its border and drop shadow are never clipped against the edge.
+function clampLX(x: number) { return clampNum(x, LAUNCHER_MARGIN, vw() - LAUNCHER_SIZE - LAUNCHER_MARGIN); }
+function clampLY(y: number) { return clampNum(y, LAUNCHER_MARGIN, vh() - LAUNCHER_SIZE - LAUNCHER_MARGIN); }
 
 function reclamp() {
   geom.w = clampNum(geom.w, MIN_W, vw());
@@ -319,7 +320,7 @@ defineExpose({
       <ChatComposer
         :streaming="chat.streaming.value"
         variant="compact"
-        @send="chat.sendMessage"
+        @send="(t, h) => chat.sendMessage(t, { harness: h })"
         @interrupt="chat.onInterrupt"
       />
 

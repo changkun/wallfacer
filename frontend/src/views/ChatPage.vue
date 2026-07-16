@@ -168,7 +168,7 @@ function applyQuick(insert: string) {
               :streaming="chat.streaming.value"
               variant="hero"
               placeholder="Message the agent…"
-              @send="chat.sendMessage"
+              @send="(t, h) => chat.sendMessage(t, { harness: h })"
               @interrupt="chat.onInterrupt"
             />
             <div class="chat-entry-quick">
@@ -204,7 +204,7 @@ function applyQuick(insert: string) {
               :streaming="chat.streaming.value"
               variant="docked"
               placeholder="Message the agent…"
-              @send="chat.sendMessage"
+              @send="(t, h) => chat.sendMessage(t, { harness: h })"
               @interrupt="chat.onInterrupt"
             />
           </div>

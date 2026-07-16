@@ -46,7 +46,7 @@ export interface ChatSession {
 
   // ── Actions ──
   loadHistory: () => Promise<void>;
-  sendMessage: (text: string, opts?: { threadID?: string }) => Promise<void>;
+  sendMessage: (text: string, opts?: { threadID?: string; harness?: string }) => Promise<void>;
   onInterrupt: () => Promise<void>;
   clearHistory: () => Promise<void>;
   appendSystem: (text: string) => void;
@@ -376,7 +376,7 @@ export function useChatSession(): ChatSession {
     titleTimer = setTimeout(() => void tick(), 1500);
   }
 
-  async function sendMessage(text: string, opts?: { threadID?: string }): Promise<void> {
+  async function sendMessage(text: string, opts?: { threadID?: string; harness?: string }): Promise<void> {
     let targetId = opts?.threadID ?? activeThreadId.value;
     // First message of a "New chat" draft: create the server thread now and
     // send to it. The backend auto-titles it from this message. Queue drains
@@ -410,6 +410,7 @@ export function useChatSession(): ChatSession {
 
     const thread = threads.value[targetId];
     const body: Record<string, string> = { message: text, thread: targetId };
+    if (opts?.harness) body.harness = opts.harness; // per-turn harness override
     if (thread?.mode === 'task') {
       if (thread.task_id) body.focused_task = thread.task_id;
     } else {

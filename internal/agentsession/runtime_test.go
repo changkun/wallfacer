@@ -81,7 +81,7 @@ func TestRuntimeUpdateWorkspaces(t *testing.T) {
 
 func TestRuntimeExecNotStarted(t *testing.T) {
 	p := New(Config{Command: "podman"})
-	_, err := p.Exec(context.Background(), []string{"echo", "hello"})
+	_, err := p.Exec(context.Background(), []string{"echo", "hello"}, harness.Claude)
 	if err == nil {
 		t.Error("Exec should fail when runtime is not started")
 	}
@@ -90,7 +90,7 @@ func TestRuntimeExecNotStarted(t *testing.T) {
 func TestRuntimeExecNoBackend(t *testing.T) {
 	p := New(Config{Command: "podman"})
 	_ = p.Start(context.Background())
-	_, err := p.Exec(context.Background(), []string{"echo", "hello"})
+	_, err := p.Exec(context.Background(), []string{"echo", "hello"}, harness.Claude)
 	if err == nil {
 		t.Error("Exec should fail when no backend is configured")
 	}
@@ -328,7 +328,7 @@ func TestRuntimeExec_Success(t *testing.T) {
 	p.backend = mb
 	_ = p.Start(context.Background())
 
-	h, err := p.Exec(context.Background(), []string{"echo", "hello"})
+	h, err := p.Exec(context.Background(), []string{"echo", "hello"}, harness.Claude)
 	if err != nil {
 		t.Fatalf("Exec: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestRuntimeExec_BackendError(t *testing.T) {
 	p.backend = mb
 	_ = p.Start(context.Background())
 
-	_, err := p.Exec(context.Background(), []string{"echo"})
+	_, err := p.Exec(context.Background(), []string{"echo"}, harness.Claude)
 	if err == nil {
 		t.Error("expected error from backend")
 	}

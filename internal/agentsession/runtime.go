@@ -134,8 +134,11 @@ func (p *Runtime) IsRunning() bool {
 
 // Exec launches a command as a agent process via the execution
 // backend. Each call spawns a fresh process tagged with the stable
-// agentSessionTaskID for monitor and usage attribution.
-func (p *Runtime) Exec(ctx context.Context, cmd []string) (executor.Handle, error) {
+// agentSessionTaskID for monitor and usage attribution. sb selects the harness
+// that runs the turn; an empty or unregistered id falls back to the default.
+// The Claude-shaped cmd is harness-agnostic once the host backend re-decodes it
+// (it keys off WALLFACER_AGENT, which buildSpec sets from sb).
+func (p *Runtime) Exec(ctx context.Context, cmd []string, sb harness.ID) (executor.Handle, error) {
 	p.mu.Lock()
 	if !p.active {
 		p.mu.Unlock()
@@ -148,7 +151,7 @@ func (p *Runtime) Exec(ctx context.Context, cmd []string) (executor.Handle, erro
 	p.mu.Unlock()
 
 	name := "wallfacer-agent-" + truncFingerprint(p.fingerprint)
-	spec := p.buildSpec(name, harness.Claude)
+	spec := p.buildSpec(name, sb.OrDefault())
 	spec.Cmd = cmd
 
 	h, err := p.backend.Launch(ctx, spec)

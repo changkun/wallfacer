@@ -4,8 +4,11 @@
 // `interrupt()` so it stays decoupled from where it's mounted. The `variant`
 // prop sizes it for the entry-screen hero, the docked conversation, the legacy
 // panel, or the compact spec popup.
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
+import { useTaskStore } from '../../stores/tasks';
+import { supportedHarnesses } from '../../lib/harness';
+import HarnessSelect from '../HarnessSelect.vue';
 
 withDefaults(defineProps<{
   streaming: boolean;
@@ -16,7 +19,20 @@ withDefaults(defineProps<{
   placeholder: 'Message…',
 });
 
-const emit = defineEmits<{ send: [text: string]; interrupt: [] }>();
+const emit = defineEmits<{ send: [text: string, harness?: string]; interrupt: [] }>();
+
+// Harness override for this composer. '' means "use the agent default". Only
+// installed harnesses are offered (from /api/config sandboxes), and the choice
+// persists across reloads so it sticks per browser.
+const store = useTaskStore();
+const harnessOptions = computed(() => supportedHarnesses(store.config?.sandboxes));
+const HARNESS_KEY = 'wallfacer-chat-harness';
+const harness = ref<string>(
+  (typeof localStorage !== 'undefined' && localStorage.getItem(HARNESS_KEY)) || '',
+);
+watch(harness, (v) => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(HARNESS_KEY, v);
+});
 
 const inputEl = ref<HTMLTextAreaElement | null>(null);
 const inputText = ref<string>('');
@@ -49,7 +65,7 @@ const {
 function doSend() {
   const text = inputText.value.trim();
   if (!text) return;
-  emit('send', text);
+  emit('send', text, harness.value || undefined);
   // Clear the draft after sending OR queuing. A message queued mid-stream is
   // already committed (it emitted above and shows as a queued chip), so leaving
   // its text in the box reads as "not sent" and invites a duplicate send.
@@ -141,6 +157,13 @@ defineExpose({
         >@</button>
       </div>
       <div class="pcp-composer-right">
+        <HarnessSelect
+          v-model="harness"
+          :options="harnessOptions"
+          default-label="Default"
+          aria-label="Harness for this chat"
+          class="pcp-harness"
+        />
         <!-- The send affordance is hidden on an empty draft and springs in once
              there is something to send (Slack-style). Interrupt is exempt: while
              streaming it must always be reachable regardless of draft text. -->
