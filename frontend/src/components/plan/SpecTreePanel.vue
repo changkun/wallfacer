@@ -484,12 +484,6 @@ onUnmounted(() => {
   <aside class="spec-tree-panel">
     <div class="stp-toolbar">
       <div class="stp-head">
-        <input
-          v-model="textFilter"
-          class="stp-search"
-          type="search"
-          placeholder="Filter specs…"
-        />
         <button
           type="button"
           class="stp-collapse"
@@ -706,6 +700,7 @@ onUnmounted(() => {
 .stp-head {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
 }
 
