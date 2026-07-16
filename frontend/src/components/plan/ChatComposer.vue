@@ -25,7 +25,13 @@ const emit = defineEmits<{ send: [text: string, harness?: string]; interrupt: []
 // installed harnesses are offered (from /api/config sandboxes), and the choice
 // persists across reloads so it sticks per browser.
 const store = useTaskStore();
-const harnessOptions = computed(() => supportedHarnesses(store.config?.sandboxes));
+// Only offer harnesses that are installed AND activated (usable). A missing
+// usable flag is treated as usable so the picker degrades gracefully.
+const harnessOptions = computed(() =>
+  supportedHarnesses(store.config?.sandboxes).filter(
+    (id) => store.config?.sandbox_usable?.[id] !== false,
+  ),
+);
 const HARNESS_KEY = 'wallfacer-chat-harness';
 const harness = ref<string>(
   (typeof localStorage !== 'undefined' && localStorage.getItem(HARNESS_KEY)) || '',
@@ -33,9 +39,13 @@ const harness = ref<string>(
 // Always run an explicit harness — never a vague "Default". If nothing is
 // chosen yet, adopt the server's configured default harness once config loads.
 watchEffect(() => {
-  if (!harness.value) {
-    const def = store.config?.default_sandbox || harnessOptions.value[0];
-    if (def) harness.value = def;
+  const opts = harnessOptions.value;
+  // Adopt a usable harness when nothing is chosen, or when the saved choice is
+  // no longer installed/activated.
+  if (opts.length && (!harness.value || !opts.includes(harness.value))) {
+    harness.value = opts.includes(store.config?.default_sandbox ?? '')
+      ? (store.config?.default_sandbox as string)
+      : opts[0];
   }
 });
 watch(harness, (v) => {

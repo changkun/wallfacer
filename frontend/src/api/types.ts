@@ -295,6 +295,8 @@ export interface ServerConfig {
   autopush: boolean;
   max_parallel: number;
   sandboxes: string[];
+  // Per-harness usability: id -> installed & activated. Absent = treat as usable.
+  sandbox_usable?: Record<string, boolean>;
   default_sandbox: string;
   terminal_enabled: boolean;
   auth_enabled: boolean;
