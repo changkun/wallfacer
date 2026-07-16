@@ -1,6 +1,6 @@
 ---
 title: Topos as Native Harness
-status: drafted
+status: stale
 depends_on:
   - topos-runtime-integration
 affects:
@@ -14,7 +14,7 @@ affects:
   - frontend/src/styles/app/buttons-hero.css
 effort: xlarge
 created: 2026-06-30
-updated: 2026-06-30
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---

@@ -1,6 +1,6 @@
 ---
 title: Workflows Graph UX
-status: drafted
+status: stale
 depends_on:
   - specs/local/agents-and-flows.md
 affects:
@@ -11,7 +11,7 @@ affects:
   - docs/guide/
 effort: large
 created: 2026-06-15
-updated: 2026-06-15
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---

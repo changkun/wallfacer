@@ -1,6 +1,6 @@
 ---
 title: Agent Graph — end-to-end design and teardown of the legacy flow mechanism
-status: drafted
+status: stale
 depends_on:
   - local/unified-agent-graph-ui.md
   - local/topos-runtime-integration.md
@@ -14,7 +14,7 @@ affects:
   - latere.ai/x/topos (possibly)
 effort: xlarge
 created: 2026-06-28
-updated: 2026-06-28
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---

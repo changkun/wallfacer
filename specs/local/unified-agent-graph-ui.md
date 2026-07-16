@@ -1,6 +1,6 @@
 ---
 title: Unified Agent-Graph UI (merge Agents and Flows)
-status: drafted
+status: stale
 depends_on:
   - local/topos-runtime-integration.md
 affects:
@@ -12,7 +12,7 @@ affects:
   - internal/flow/
 effort: xlarge
 created: 2026-06-28
-updated: 2026-06-28
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
