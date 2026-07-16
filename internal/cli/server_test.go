@@ -322,6 +322,63 @@ func TestBuildMux_DocsAsset(t *testing.T) {
 	}
 }
 
+// TestBuildMux_ArtifactRoute verifies that self-contained artifacts under
+// <workspace>/artifacts/ are served through the real mux with the right content
+// type, listed by /api/artifacts, and confined to the artifacts dir (a
+// whitelisted file outside it is unreachable via traversal).
+func TestBuildMux_ArtifactRoute(t *testing.T) {
+	workdir := t.TempDir()
+	for _, d := range []string{"worktrees", "artifacts"} {
+		if err := os.MkdirAll(filepath.Join(workdir, d), 0o755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", d, err)
+		}
+	}
+	deck := "<title>Deck</title><h1>slides</h1>"
+	if err := os.WriteFile(filepath.Join(workdir, "artifacts", "deck.html"), []byte(deck), 0o644); err != nil {
+		t.Fatalf("write deck: %v", err)
+	}
+	// A whitelisted file OUTSIDE artifacts/ — reachable only if containment fails.
+	if err := os.WriteFile(filepath.Join(workdir, "escape.html"), []byte("<p>outside</p>"), 0o644); err != nil {
+		t.Fatalf("write escape: %v", err)
+	}
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command: "true", EnvFile: filepath.Join(workdir, ".env"),
+		WorktreesDir: filepath.Join(workdir, "worktrees"), Workspaces: []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), nil, false)
+
+	get := func(p string) *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, p, nil))
+		return rr
+	}
+
+	rr := get("/artifact/deck.html")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("serve artifact: status %d, want 200", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Fatalf("content type %q, want text/html; charset=utf-8", ct)
+	}
+	if rr.Body.String() != deck {
+		t.Fatalf("artifact bytes mismatch: %q", rr.Body.String())
+	}
+
+	if list := get("/api/artifacts"); list.Code != http.StatusOK || !strings.Contains(list.Body.String(), `"deck.html"`) {
+		t.Fatalf("list artifacts: status %d body %q", list.Code, list.Body.String())
+	}
+
+	// Traversal to the whitelisted file outside artifacts/ must be blocked.
+	if rr := get("/artifact/..%2Fescape.html"); rr.Code != http.StatusNotFound {
+		t.Fatalf("traversal: status %d, want 404", rr.Code)
+	}
+}
+
 // TestBuildMux_WithIDInvalidUUID verifies that routes using withID return 400
 // when the UUID is malformed.
 func TestBuildMux_WithIDInvalidUUID(t *testing.T) {

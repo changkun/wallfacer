@@ -1002,6 +1002,14 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		}
 	})
 
+	// Static artifacts — serve self-contained web files (decks, reports,
+	// visualizations) that agents or the user place under <workspace>/artifacts/.
+	// Same-origin, local-only; see specs/local/static-artifacts.md. The raw
+	// route is singular (/artifact/) so it never collides with the client-side
+	// gallery page at /artifacts served by the SPA catch-all.
+	mux.HandleFunc("GET /api/artifacts", h.ListArtifacts)
+	mux.HandleFunc("GET /artifact/{path...}", h.ServeArtifact)
+
 	// Docs full-text search — scans the embedded markdown body (not just
 	// titles) so the command palette can find docs by content.
 	mux.HandleFunc("GET /api/docs-search", func(w http.ResponseWriter, r *http.Request) {
