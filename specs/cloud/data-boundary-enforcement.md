@@ -1,6 +1,6 @@
 ---
 title: Data Boundary Enforcement
-status: stale
+status: drafted
 depends_on:
   - specs/cloud/latere-integration/coordination-plane.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - internal/cli/web.go
 effort: medium
 created: 2026-04-12
-updated: 2026-06-26
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
