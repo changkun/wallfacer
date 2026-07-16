@@ -304,15 +304,27 @@ func (h *Handler) repoRoots(r *http.Request) map[string]string {
 
 // resolveSpecRepo finds the repo and workspace root for a spec path by locating
 // the visible workspace that contains the spec file (either path convention).
+//
+// When several visible folders contain the same spec (a multi-folder workspace,
+// or a folder nested under a parent that is also a workspace), prefer the one
+// that has a git remote: spec-comment threads are keyed by remote, so the
+// remote-bearing folder is the collaboration identity. Matching the first folder
+// blindly can pick a remote-less checkout and reject every op with "no git
+// remote". Falls back to the first match (empty repo) only when none has one.
 func (h *Handler) resolveSpecRepo(r *http.Request, specPath string) (repo, root string, ok bool) {
 	for _, ws := range h.visibleWorkspaces(r.Context()) {
 		if _, found := specFilePath(ws, specPath); !found {
 			continue
 		}
-		repo = coordinator.NormalizeRemoteURL(gitutil.WorkspaceStatus(ws).RemoteURL)
-		return repo, ws, true
+		remote := coordinator.NormalizeRemoteURL(gitutil.WorkspaceStatus(ws).RemoteURL)
+		if remote != "" {
+			return remote, ws, true
+		}
+		if !ok { // remember the first (remote-less) match as a fallback
+			root, ok = ws, true
+		}
 	}
-	return "", "", false
+	return repo, root, ok
 }
 
 // repositionThread recomputes a thread's anchor against the current spec body
