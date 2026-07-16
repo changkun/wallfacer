@@ -484,6 +484,13 @@ onUnmounted(() => {
   <aside class="spec-tree-panel">
     <div class="stp-toolbar">
       <div class="stp-head">
+        <AppSelect
+          :model-value="statusFilter"
+          :options="statusFilterOptions"
+          class="stp-status"
+          aria-label="Filter by status"
+          @update:model-value="setStatusFilter"
+        />
         <button
           type="button"
           class="stp-collapse"
@@ -496,13 +503,6 @@ onUnmounted(() => {
           </svg>
         </button>
       </div>
-      <AppSelect
-        :model-value="statusFilter"
-        :options="statusFilterOptions"
-        class="stp-status"
-        aria-label="Filter by status"
-        @update:model-value="setStatusFilter"
-      />
       <label class="stp-archived-toggle">
         <input type="checkbox" :checked="showArchived" @change="toggleShowArchived" />
         Show archived
@@ -700,8 +700,15 @@ onUnmounted(() => {
 .stp-head {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
+}
+/* Status filter fills the row; the collapse button sits at the end (same line). */
+.stp-head .stp-status {
+  flex: 1;
+  min-width: 0;
+}
+.stp-head .stp-collapse {
+  flex: none;
 }
 
 .stp-head .stp-search {
