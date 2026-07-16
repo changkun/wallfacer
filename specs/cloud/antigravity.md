@@ -1,6 +1,6 @@
 ---
 title: Google Antigravity as a Remote Executor
-status: stale
+status: drafted
 depends_on:
   - specs/shared/harness-abstraction.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - docs/cloud/
 effort: large
 created: 2026-06-01
-updated: 2026-06-26
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
