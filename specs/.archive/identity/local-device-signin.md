@@ -1,6 +1,6 @@
 ---
 title: Local-Mode Device-Code Sign-In (UI re-home)
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/handler/device_auth.go
@@ -14,7 +14,7 @@ affects:
   - frontend/src/i18n/zh.ts
 effort: medium
 created: 2026-07-01
-updated: 2026-07-01
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
