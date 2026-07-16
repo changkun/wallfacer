@@ -1,6 +1,6 @@
 ---
 title: "Live Serve - Build and Run Developed Software from Wallfacer"
-status: stale
+status: drafted
 depends_on: []
 affects:
   - internal/store/models.go
@@ -11,7 +11,7 @@ affects:
   - frontend/src/components/ServePanel.vue
 effort: large
 created: 2026-03-25
-updated: 2026-06-26
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
