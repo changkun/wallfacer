@@ -4,7 +4,7 @@
 // `interrupt()` so it stays decoupled from where it's mounted. The `variant`
 // prop sizes it for the entry-screen hero, the docked conversation, the legacy
 // panel, or the compact spec popup.
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, watchEffect } from 'vue';
 import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
 import { useTaskStore } from '../../stores/tasks';
 import { supportedHarnesses } from '../../lib/harness';
@@ -30,8 +30,16 @@ const HARNESS_KEY = 'wallfacer-chat-harness';
 const harness = ref<string>(
   (typeof localStorage !== 'undefined' && localStorage.getItem(HARNESS_KEY)) || '',
 );
+// Always run an explicit harness — never a vague "Default". If nothing is
+// chosen yet, adopt the server's configured default harness once config loads.
+watchEffect(() => {
+  if (!harness.value) {
+    const def = store.config?.default_sandbox || harnessOptions.value[0];
+    if (def) harness.value = def;
+  }
+});
 watch(harness, (v) => {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(HARNESS_KEY, v);
+  if (v && typeof localStorage !== 'undefined') localStorage.setItem(HARNESS_KEY, v);
 });
 
 const inputEl = ref<HTMLTextAreaElement | null>(null);
@@ -160,7 +168,7 @@ defineExpose({
         <HarnessSelect
           v-model="harness"
           :options="harnessOptions"
-          default-label="Default"
+          :include-default="false"
           aria-label="Harness for this chat"
           class="pcp-harness"
         />

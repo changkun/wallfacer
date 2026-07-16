@@ -13,8 +13,11 @@ const props = withDefaults(
     // Label for the empty ('') value — the "use the agent's default" choice.
     defaultLabel?: string;
     ariaLabel?: string;
+    // When false, omit the empty ('') default entry so the caller must show an
+    // explicit harness (no vague "Default").
+    includeDefault?: boolean;
   }>(),
-  { defaultLabel: 'Default (agent)', ariaLabel: 'Harness override' },
+  { defaultLabel: 'Default (agent)', ariaLabel: 'Harness override', includeDefault: true },
 );
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 
@@ -22,9 +25,10 @@ const open = ref(false);
 const root = ref<HTMLElement | null>(null);
 const menuRef = ref<HTMLUListElement | null>(null);
 const activeIndex = ref(0);
+const dropUp = ref(false);
 
-// All selectable values: '' (default) followed by each harness id.
-const values = computed(() => ['', ...props.options]);
+// All selectable values: each harness id, optionally prefixed by '' (default).
+const values = computed(() => (props.includeDefault ? ['', ...props.options] : [...props.options]));
 
 function onDocPointer(e: MouseEvent) {
   if (root.value && !root.value.contains(e.target as Node)) close();
@@ -33,9 +37,15 @@ function onDocPointer(e: MouseEvent) {
 function openMenu() {
   open.value = true;
   activeIndex.value = Math.max(0, values.value.indexOf(props.modelValue));
+  // Flip the menu upward when the trigger sits low in the viewport, so it never
+  // spills past the bottom edge (e.g. a composer docked at the bottom).
+  const r = triggerRef.value?.getBoundingClientRect();
+  dropUp.value = !!r && r.bottom > window.innerHeight * 0.55;
   document.addEventListener('mousedown', onDocPointer);
-  // Move focus into the listbox so arrow-key navigation works immediately.
-  nextTick(() => menuRef.value?.focus());
+  // preventScroll is essential: focusing the just-opened listbox must NOT
+  // scroll it into view, which would shove the surrounding (often centered)
+  // layout up. The menu is an absolute overlay; it should never move the page.
+  nextTick(() => menuRef.value?.focus({ preventScroll: true }));
 }
 
 function close() {
@@ -110,6 +120,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
     <ul
       v-if="open"
       class="harness-select__menu"
+      :class="{ 'harness-select__menu--up': dropUp }"
       role="listbox"
       tabindex="-1"
       @keydown="onListKeydown"
@@ -140,15 +151,19 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
 .harness-select__trigger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  min-width: 132px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  transition: background 120ms ease;
+}
+.harness-select__trigger:hover {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.12));
 }
 .harness-select__default {
   font-weight: 600;
 }
 .harness-select__caret {
-  margin-left: auto;
   color: var(--text-muted);
 }
 .harness-select__menu {
@@ -165,6 +180,13 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   outline: none;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+/* Open upward when the trigger is low in the viewport. */
+.harness-select__menu--up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 .harness-select__opt {
   display: flex;
