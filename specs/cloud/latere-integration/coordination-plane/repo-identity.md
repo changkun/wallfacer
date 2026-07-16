@@ -1,6 +1,6 @@
 ---
 title: Workspace and Repo Identity
-status: stale
+status: drafted
 depends_on:
   - specs/cloud/latere-integration/coordination-plane.md
 affects:
@@ -10,7 +10,7 @@ affects:
   - frontend/src/
 effort: large
 created: 2026-06-15
-updated: 2026-06-26
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
