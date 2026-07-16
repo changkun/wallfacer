@@ -7,7 +7,7 @@
 import { ref, computed } from 'vue';
 import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   streaming: boolean;
   variant?: 'panel' | 'hero' | 'docked' | 'compact';
   placeholder?: string;
@@ -50,12 +50,11 @@ function doSend() {
   const text = inputText.value.trim();
   if (!text) return;
   emit('send', text);
-  // Mirror the legacy panel: when a message is queued mid-stream, leave the
-  // draft in place; otherwise clear and collapse the textarea.
-  if (!props.streaming) {
-    inputText.value = '';
-    autoGrow();
-  }
+  // Clear the draft after sending OR queuing. A message queued mid-stream is
+  // already committed (it emitted above and shows as a queued chip), so leaving
+  // its text in the box reads as "not sent" and invites a duplicate send.
+  inputText.value = '';
+  autoGrow();
 }
 
 function onKeydown(ev: KeyboardEvent) {
@@ -155,19 +154,26 @@ defineExpose({
                 class="pcp-send pcp-interrupt"
                 title="Interrupt"
                 @click="emit('interrupt')"
-              >■</button>
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+              </button>
               <button
                 v-else
                 type="button"
                 class="pcp-send"
+                title="Send"
                 @click="doSend"
-              >➤</button>
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="6 11 12 5 18 11"></polyline></svg>
+              </button>
               <button
                 type="button"
                 class="pcp-send-toggle"
                 title="Toggle send shortcut"
                 @click="toggleSendMode"
-              >▾</button>
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
             </div>
           </div>
         </Transition>

@@ -147,28 +147,36 @@
 
 .pcp-send-group {
   display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .pcp-send,
 .pcp-send-toggle {
-  font-size: 13px;
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--accent);
   color: #fff;
   border: none;
   cursor: pointer;
+  transition: background 120ms ease, filter 120ms ease;
 }
+.pcp-send:hover,
+.pcp-send-toggle:hover { background: var(--accent-hover); }
 
 .pcp-send {
-  border-top-left-radius: var(--r-sm);
-  border-bottom-left-radius: var(--r-sm);
+  min-width: 36px;
+  height: 30px;
+  padding: 0 11px;
 }
 
 .pcp-send-toggle {
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 4px 6px;
-  border-top-right-radius: var(--r-sm);
-  border-bottom-right-radius: var(--r-sm);
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  width: 24px;
+  height: 30px;
 }
 
 .pcp-send:disabled {
@@ -176,16 +184,16 @@
   cursor: not-allowed;
 }
 
-.pcp-interrupt {
-  background: var(--warn, #c87b1c);
-}
+.pcp-interrupt { background: var(--warn, #c87b1c); }
+.pcp-interrupt:hover { background: var(--warn, #c87b1c); filter: brightness(1.08); }
 
 /* ── Variants ──────────────────────────────────────────────────────── */
 
-/* Hero (entry screen) and docked (conversation) share a generous, framed
-   composer that reads as the primary surface rather than a side panel. */
+/* Hero (entry screen), docked (conversation), and panel (side/popup) share one
+   generous, framed composer so every chat surface reads identically. */
 .pcp-composer--hero,
-.pcp-composer--docked {
+.pcp-composer--docked,
+.pcp-composer--panel {
   border-top: none;
   padding: 12px 14px 12px;
   border: 1px solid var(--rule);
@@ -198,14 +206,16 @@
 /* Ember focus glow — the composer warms up when active. A soft, diffuse
    shadow rather than a hard accent ring, so the edge stays gentle. */
 .pcp-composer--hero:focus-within,
-.pcp-composer--docked:focus-within {
+.pcp-composer--docked:focus-within,
+.pcp-composer--panel:focus-within {
   border-color: color-mix(in oklab, var(--accent) 25%, var(--rule));
   box-shadow: 0 8px 30px color-mix(in oklab, var(--accent) 15%, transparent),
               0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .pcp-composer--hero .pcp-textarea,
-.pcp-composer--docked .pcp-textarea {
+.pcp-composer--docked .pcp-textarea,
+.pcp-composer--panel .pcp-textarea {
   font-size: 14px;
   border: none;
   background: transparent;
@@ -220,7 +230,8 @@
    the focus glow (.pcp-composer--*:focus-within), so the inner field must drop
    both the focus border and the focus shadow to avoid a boxed-in look. */
 .pcp-composer--hero .pcp-textarea:focus,
-.pcp-composer--docked .pcp-textarea:focus {
+.pcp-composer--docked .pcp-textarea:focus,
+.pcp-composer--panel .pcp-textarea:focus {
   border: none;
   box-shadow: none;
 }
