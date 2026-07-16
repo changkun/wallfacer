@@ -134,9 +134,10 @@
   z-index: 60;
   max-height: 50vh;
   overflow-y: auto;
-  background: var(--glass-elevated);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
+  /* Opaque, not glass: this is a selection menu that can float over bright
+     content (e.g. an artifact preview), where translucency lets background
+     text bleed through and hurts readability. */
+  background: var(--bg-elevated);
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
   box-shadow: var(--hairline-top), var(--sh-pop);
