@@ -1,6 +1,6 @@
 ---
 title: Coordination Presence
-status: stale
+status: drafted
 depends_on:
   - specs/cloud/latere-integration/coordination-plane/connection-and-presence/connection.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - frontend/src/
 effort: large
 created: 2026-06-14
-updated: 2026-06-26
+updated: 2026-07-16
 author: changkun
 dispatched_task_id: null
 ---
