@@ -1,6 +1,6 @@
 ---
 title: Visual Verification for UI Changes
-status: drafted
+status: archived
 depends_on: []
 affects:
   - frontend/scripts/ui-shots/checks.mjs
