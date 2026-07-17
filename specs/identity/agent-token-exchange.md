@@ -126,6 +126,23 @@ Out of scope:
 - `internal/oauth/` (the PKCE OAuth flow for agent *credential* login like
   Claude/Codex, entirely separate from RFC 8693 token exchange).
 
+## Family audience scheme (if-04)
+
+The audience and scope names on wallfacer's trust-plane edges are
+wallfacer's entries in the family audience scheme defined in the auth
+repo's `specs/delegation-claims-contract.md` (identity-fabric if-04):
+
+- `wallfacer-sandbox-proxy`: the audience `requireClaims` enforces on
+  inbound sidecar JWTs.
+- `llm:proxy` and `github:token`: the per-route scopes those JWTs must
+  carry.
+- `github:mint-token`: the scope on wallfacer's outbound service JWT
+  toward auth's installation-token endpoint.
+
+Consumers enforce their declared audience per that contract. This is
+naming alignment only; the values above are already live and no config
+change is implied.
+
 ## JWT Claim Reference
 
 From `identity/authentication.md`'s claim table, the agent-specific fields are
