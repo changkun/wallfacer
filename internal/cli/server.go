@@ -1350,9 +1350,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// unconditionally.
 	//
 	// The JWT validator is built from SANDBOX_PROXY_AUTH_URL (= the
-	// auth service's base URL). If unset, validation is skipped and
-	// the trust-plane endpoints rely solely on the Enabled flag —
-	// acceptable in single-tenant local runs.
+	// auth service's base URL). If unset, the trust-plane endpoints
+	// fail closed: an enabled proxy without a validator rejects every
+	// request, so a deployment that sets the SANDBOX_PROXY_*
+	// credentials must set the auth URL too.
 	var sandboxProxyValidator *auth.Validator
 	if u := os.Getenv("SANDBOX_PROXY_AUTH_URL"); u != "" {
 		sandboxProxyValidator = auth.BuildValidator(

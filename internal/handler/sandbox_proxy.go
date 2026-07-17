@@ -62,17 +62,19 @@ func LoadSandboxProxyConfig() SandboxProxyConfig {
 type SandboxProxy struct {
 	Cfg    SandboxProxyConfig
 	Client *http.Client
-	// validator validates the inbound sandbox JWT. Nil disables
-	// validation (local / test). The JWT is issued by auth with
-	// aud=wallfacer-sandbox-proxy; we additionally require one of
-	// scp=llm:proxy / scp=github:token per route.
+	// Validator validates the inbound sandbox JWT. The JWT is issued
+	// by auth with aud=wallfacer-sandbox-proxy; we additionally
+	// require one of scp=llm:proxy / scp=github:token per route. Nil
+	// means no validator is configured: an enabled proxy then rejects
+	// every request (fail closed).
 	Validator *auth.Validator
 }
 
-// NewSandboxProxy constructs a trust-plane proxy from config and an
-// optional JWT validator. When the validator is nil (local mode) the
-// routes skip JWT checks; callers still rely on cfg.Enabled to 503
-// requests until credentials are configured.
+// NewSandboxProxy constructs a trust-plane proxy from config and a
+// JWT validator. A nil validator does not skip JWT checks: an enabled
+// proxy without a validator rejects every request (fail closed).
+// Local runs without credentials keep cfg.Enabled false and 503
+// before any JWT check.
 func NewSandboxProxy(cfg SandboxProxyConfig, v *auth.Validator) *SandboxProxy {
 	return &SandboxProxy{
 		Cfg:       cfg,
@@ -249,12 +251,13 @@ func (p *SandboxProxy) forwardLLM(
 }
 
 // requireClaims validates the inbound JWT and the required scope.
-// When validator is nil (local / test) it accepts the request as
-// anonymous-but-authorized; handlers still need to check the other
-// side's Enabled flag before doing work.
+// A nil validator fails closed: the proxy cannot establish who is
+// calling, so it rejects instead of accepting the request as
+// anonymous-but-authorized.
 func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, scope string) (*auth.Claims, bool) {
 	if p.Validator == nil {
-		return &auth.Claims{}, true
+		http.Error(w, "sandbox proxy JWT validator not configured", http.StatusServiceUnavailable)
+		return nil, false
 	}
 	tok, ok := auth.BearerToken(r.Header.Get("Authorization"))
 	if !ok {
