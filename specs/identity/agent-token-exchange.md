@@ -1,6 +1,6 @@
 ---
 title: Agent Token Exchange
-status: archived
+status: drafted
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -10,27 +10,23 @@ affects:
   - internal/store/
 effort: medium
 created: 2026-04-19
-updated: 2026-06-26
+updated: 2026-07-17
 author: changkun
 dispatched_task_id: null
 ---
 
 # Agent Token Exchange
 
-> **Dormant (demand-gated).** The trust plane this spec needed already shipped
-> as the `sandbox_proxy.go` server-side proxy, and the one open decision is
-> resolved (extend the proxy). The remaining per-task token-mint path
-> (`ExchangeForAgentToken`, `LATERE_AI_TOKEN` env, `AgentDelegationID`) is not
-> built and not yet needed: it is consumed only once we call latere.ai backend
-> services (fs.latere.ai, telemetry) from inside running tasks, and those
-> services don't exist yet. Kept as the record of the resolved design and the
-> future need; reopen when the first such backend service lands.
->
-> **Reopening condition met (2026-07).** The identity-fabric epic
-> (`latere-ai/specs products/identity-fabric.md`) now provides the backend
-> delegation chain. When reopened, build on
-> `latere-ai/specs products/identity-fabric/if-05-agent-principal-registration.md`
-> (the agent delegation chain) with convergence scope defined in
+> **Reopened 2026-07-17 (drafted).** The reopening condition is met: the
+> identity-fabric epic (`latere-ai/specs products/identity-fabric.md`)
+> provides the backend delegation chain. Per-task agent credentials come from
+> the registered-agent delegation chain (auth agent principal + delegation row
+> + `POST /internal/agent-runner-tokens`; see
+> `latere-ai/specs products/identity-fabric/if-05-agent-principal-registration.md`),
+> not from exchanging the dispatching user's session token as the parked
+> design assumed. Sections marked **historical** below record that parked
+> design and are superseded on the credential-source question. This spec
+> stays drafted until a cloud executor consumes it; the convergence scope is
 > `latere-ai/specs products/identity-fabric/if-09-wallfacer-convergence.md`.
 
 ## Problem
@@ -42,11 +38,21 @@ etc.), those agents need credentials to call those services **on behalf of**
 the user who dispatched the task, not with the user's own refresh-capable
 JWT, and not as anonymous clients.
 
-RFC 8693 token exchange fits: the user's access token is the `subject_token`,
-the auth service mints a scoped `agent_token` tied to a delegation record,
-and that short-lived token reaches the agent (either injected into the agent
-process environment, or held by wallfacer and applied per request, see the
-Reality section and the open decision).
+The credential source is the registered-agent delegation chain (if-05): the
+agent is registered as an auth principal, the owning user's consent is a
+delegation row, and a per-task token is minted via
+`POST /internal/agent-runner-tokens` (RFC 8693 exchange underneath). The
+minted token is short-lived (up to 900s, clamped to the delegation) and
+carries `sub` = agent with `act.sub`/`grantor_id` = the owning user; revoking
+the delegation row kills the chain. That token reaches the agent either
+injected into the agent process environment or held by wallfacer and applied
+per request through the shipped sandbox proxy (see Reality and the resolved
+open decision: extend the proxy).
+
+Historical premise (superseded): the parked design minted the `agent_token`
+by exchanging the dispatching user's session token as the `subject_token`.
+Sections below that describe minting from the user session are kept as the
+record of that design.
 
 This spec was pulled out of `identity/authentication.md` because it is
 **orthogonal** to user login / auth / tenant isolation. It unblocks nothing
@@ -90,9 +96,11 @@ about where that JWT comes from.
 ## Scope
 
 In scope:
-- Wire `POST auth.latere.ai/token` (grant `urn:ietf:params:oauth:grant-type:token-exchange`)
-  into wallfacer's runner so it can mint an `agent_token` from the dispatching
-  user's session token.
+- Wire `POST {AUTH}/internal/agent-runner-tokens` into wallfacer's runner so
+  it can mint a per-task delegated token for the task's registered agent
+  principal (historical variant: exchanging the dispatching user's session
+  token via `POST auth.latere.ai/token`, grant
+  `urn:ietf:params:oauth:grant-type:token-exchange`).
 - Mint an `agent_token` per task execution, scoped to `validation="local"`
   (`ValidationLocal`) for read-only agent work and `validation="strict"`
   (`ValidationStrict`) for agents that perform writes against latere.ai
@@ -109,9 +117,9 @@ In scope:
   logs can trace an agent action back to the delegating user.
 
 Out of scope:
-- Agent-principal registration in the auth service (handled by the auth
-  service admin API; wallfacer assumes delegations are pre-provisioned or
-  created implicitly by the exchange call).
+- Agent-principal registration in the auth service (owned by if-05: the
+  product that creates the agent registers it via `POST {AUTH}/agents` and
+  creates the delegation row; wallfacer consumes existing delegations).
 - Per-service authorization policy (fs.latere.ai decides what an
   `agent_token` with scope X can do, not wallfacer).
 - User-facing delegation UI (view / revoke active agent sessions).
@@ -129,9 +137,11 @@ From `identity/authentication.md`'s claim table, the agent-specific fields are
 | `delegation_id` | `Claims.DelegationID` | Delegation record UUID, for audit + revocation |
 | `act.sub` | `Claims.Act.Sub` | Delegator's principal ID (the user who dispatched the task) |
 
-## Design Sketch
+## Design Sketch (historical)
 
-Env-injection variant (the original sketch, now one of two options):
+Env-injection variant (the parked sketch; superseded on the credential
+source, which is now the runner-token mint from the registered agent's
+delegation, not an exchange of the user's session JWT):
 
 ```
 ┌────────────────────────────────────────────┐
@@ -198,12 +208,13 @@ That is a real point in the proxy's favor.
 
 ## Dependencies
 
-- `identity/authentication.md` Phase 2 must be complete, this spec needs a
-  real user `*jwtauth.Claims` on the task creator and a populated session
-  access token on the request path.
-- The auth service must expose the `token-exchange` grant and accept an
-  `agent_id` parameter (currently documented but not yet end-to-end tested
-  from wallfacer's side).
+- Agent principal registration (if-05): the task's agent must exist as an
+  auth principal with an active delegation row from the dispatching user
+  before wallfacer can mint runner tokens for it.
+- `identity/authentication.md` Phase 2, this spec needs a real user
+  `*jwtauth.Claims` on the task creator so the delegation can be attributed.
+- A cloud executor that consumes the minted credential; until one exists
+  this spec stays drafted (if-09 convergence scope).
 
 ## Open Decisions
 
