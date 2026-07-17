@@ -25,6 +25,13 @@ dispatched_task_id: null
 > services (fs.latere.ai, telemetry) from inside running tasks, and those
 > services don't exist yet. Kept as the record of the resolved design and the
 > future need; reopen when the first such backend service lands.
+>
+> **Reopening condition met (2026-07).** The identity-fabric epic
+> (`latere-ai/specs products/identity-fabric.md`) now provides the backend
+> delegation chain. When reopened, build on
+> `latere-ai/specs products/identity-fabric/if-05-agent-principal-registration.md`
+> (the agent delegation chain) with convergence scope defined in
+> `latere-ai/specs products/identity-fabric/if-09-wallfacer-convergence.md`.
 
 ## Problem
 

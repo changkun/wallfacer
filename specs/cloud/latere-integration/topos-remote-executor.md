@@ -22,6 +22,10 @@ dispatched_task_id: null
 
 # Topos as a Remote Agent Executor
 
+> Identity/auth contracts for this executor are now governed by the
+> identity-fabric epic (`latere-ai/specs products/identity-fabric.md`,
+> Phase 4 / if-09); refresh this spec against it before dispatch.
+
 ## Problem
 
 Wallfacer today executes every task locally — even in cloud mode, the harness runs on the user's machine. [Latere Topos](https://topos.latere.ai) (internal label: `agents`, located at `latere.ai/agents`) is Latere's managed agent-workspace product, exposing a `/v1/agents` control plane that runs coding agents remotely. Wallfacer should be able to dispatch a task to Topos instead of running it locally, so users can offload long-running agents to managed infrastructure without leaving the wallfacer board.

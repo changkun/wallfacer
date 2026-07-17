@@ -16,6 +16,11 @@ dispatched_task_id: null
 
 # Third-Party OIDC
 
+> The family BYOC posture is defined in
+> `latere-ai/specs products/identity-fabric/if-08-byoc-agent-grant.md` and
+> sandbox spec 56 (BYOC IDP portability); align this spec with it when
+> picked up.
+
 ## Problem
 
 Wallfacer's login flow is composed from the platform package

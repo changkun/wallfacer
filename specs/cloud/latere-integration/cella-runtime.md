@@ -19,6 +19,10 @@ dispatched_task_id: null
 
 # Runtime Integration: Cella Backend
 
+> Identity/auth contracts for this executor are now governed by the
+> identity-fabric epic (`latere-ai/specs products/identity-fabric.md`,
+> Phase 4 / if-09); refresh this spec against it before dispatch.
+
 ## Problem
 
 Wallfacer runs agents through one abstraction (`executor.Backend`) with a
