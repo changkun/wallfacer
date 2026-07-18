@@ -147,7 +147,7 @@ Development is organized into three parallel tracks with shared foundations. See
 
 **Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection), agents and flows (composable sub-agent pipelines), routine tasks (scheduled spawns), file and image attachments, host mounts, oversight risk scoring, visual verification, live serve.
 
-**Cloud Platform**: Multi-tenant hosted service. Tenant filesystem, K8s execution backend, cloud infrastructure, multi-tenant control plane, tenant API.
+**Cloud Platform**: Two axes that consume Latere services rather than absorb them. Axis A, the coordination plane (signed-in local instances connect over one outbound connection for presence, spec comments, and metadata projection; local stays the source of truth). Axis B, demand-gated remote execution that dispatches task runtimes to Cella and stages workspace files through FS via the executor seam.
 
 **Shared Design**: Cross-track specs. Authentication, agent abstraction, native sandboxes (Linux, macOS, Windows), overlay snapshots.
 
