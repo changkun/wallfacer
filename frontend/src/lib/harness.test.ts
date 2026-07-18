@@ -21,6 +21,13 @@ describe('modelLabel', () => {
   it('handles single-segment versions', () => {
     expect(modelLabel('claude-fable-5')).toBe('Fable 5');
   });
+  it('drops the dated release snapshot from the version', () => {
+    // The Claude CLI reports the concrete dated model id on per-turn
+    // assistant lines (e.g. Haiku 4.5 resolves to claude-haiku-4-5-20251001).
+    expect(modelLabel('claude-haiku-4-5-20251001')).toBe('Haiku 4.5');
+    expect(modelLabel('claude-sonnet-4-6-20250101[1m]')).toBe('Sonnet 4.6');
+    expect(modelLabel('claude-opus-4-8-20260101')).toBe('Opus 4.8');
+  });
   it('falls back to the raw id (minus variant) for non-claude models', () => {
     expect(modelLabel('openai/gpt-5')).toBe('openai/gpt-5');
   });
