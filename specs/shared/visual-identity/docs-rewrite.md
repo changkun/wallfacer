@@ -1,6 +1,6 @@
 ---
 title: Docs Teardown & Rewrite
-status: stale
+status: complete
 depends_on: []
 affects:
   - docs/
@@ -14,7 +14,7 @@ affects:
   - frontend/scripts/ui-shots/
 effort: xlarge
 created: 2026-07-05
-updated: 2026-07-16
+updated: 2026-07-18
 author: changkun
 dispatched_task_id: null
 ---

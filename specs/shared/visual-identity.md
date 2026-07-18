@@ -1,6 +1,6 @@
 ---
 title: Visual Identity Rebrand & Docs Rewrite
-status: stale
+status: complete
 depends_on: []
 affects:
   - frontend/src/styles/
@@ -18,7 +18,7 @@ affects:
   - README.md
 effort: xlarge
 created: 2026-07-05
-updated: 2026-07-16
+updated: 2026-07-18
 author: changkun
 dispatched_task_id: null
 ---
