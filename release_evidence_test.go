@@ -13,13 +13,13 @@ import (
 )
 
 // TestReleaseWorkflowWiresEvidence guards that release.yml keeps the smoke
-// evidence flowing into the published release. Since the move to the shared
-// latere-ai/ci service-release.yml pipeline, the OUTPUT_MD/TAG/COMMIT plumbing
-// and the notes-file append live centrally in that reusable workflow; what
-// this repo must still guarantee is that release.yml delegates to it with the
-// local smoke script (the generator TestSmokeReleaseEmitsEvidence proves) and
-// the secrets it needs. The bug this protects against is the delegation
-// silently dropping the smoke_script input or the reusable-workflow call.
+// evidence flowing onto the published GitHub release. The deploy job runs this
+// repo's smoke script, which writes release-evidence.md (tag, commit,
+// build/deploy links, served asset, smoke result), and the release job appends
+// that file to the release notes before publishing. The load-bearing link is
+// the append: evidence that is generated but never reaches the published notes
+// would be a silent regression, so this test pins the append line and the
+// publish command, not just the generation.
 func TestReleaseWorkflowWiresEvidence(t *testing.T) {
 	data, err := os.ReadFile(".github/workflows/release.yml")
 	if err != nil {
@@ -30,13 +30,14 @@ func TestReleaseWorkflowWiresEvidence(t *testing.T) {
 	for _, want := range []string{
 		// Tag push triggers the release pipeline.
 		"tags: ['v*']",
-		// The central pipeline owns the evidence wiring (OUTPUT_MD, the
-		// release-evidence artifact, and the notes-file append).
-		"uses: latere-ai/ci/.github/workflows/service-release.yml@",
-		// The pipeline must run this repo's evidence-emitting smoke script.
-		"smoke_script: tools/smoke/release.sh",
-		// Deploy/smoke/publish credentials reach the reusable workflow.
-		"secrets: inherit",
+		// The deploy job runs this repo's evidence-emitting smoke script,
+		// pointing it at release-evidence.md.
+		"OUTPUT_MD: release-evidence.md",
+		"run: tools/smoke/release.sh",
+		// The release job appends that evidence onto the notes it publishes.
+		// This is the guarantee: evidence must land on the published release.
+		"cat evidence/release-evidence.md >> notes.md",
+		`gh release create "$TAG" $prerelease \`,
 	} {
 		if !strings.Contains(yml, want) {
 			t.Errorf("release.yml missing evidence wiring: %q", want)
