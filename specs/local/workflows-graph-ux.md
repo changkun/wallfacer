@@ -16,6 +16,13 @@ author: changkun
 dispatched_task_id: null
 ---
 
+> **Superseded.** The agent-graph consolidation is the decision of record: see
+> `latere-ai/specs: products/agent-graph-consolidation.md`. Topos owns the
+> agent-graph model; wallfacer consumes `latere.ai/x/topos/graph` (via
+> `internal/agentgraph`) and retires its duplicate flow runtime. This
+> workflow/flow UX framing is superseded by the `/agent-graph` surface. Status
+> stays `stale` (the spec vocabulary has no `superseded` state).
+
 # Workflows Graph UX
 
 ## Overview
