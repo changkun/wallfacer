@@ -81,6 +81,20 @@ func TestFromFlowGraph_Errors(t *testing.T) {
 	}
 }
 
+// TestFromFlowGraph_EmptySlugFallback proves a flow that has steps but no slug still
+// yields a stable region ID ("flow") rather than an empty one.
+func TestFromFlowGraph_EmptySlugFallback(t *testing.T) {
+	_, f := twoAgentFixture()
+	f.Slug = ""
+	g, err := agentgraph.FromFlowGraph(f)
+	if err != nil {
+		t.Fatalf("FromFlowGraph: %v", err)
+	}
+	if g.Regions[0].ID != "flow" {
+		t.Errorf("region ID = %q, want the %q fallback for an empty slug", g.Regions[0].ID, "flow")
+	}
+}
+
 // TestFromFlowGraph_ResolveInlinesSpecs proves the resolve seam fills a ref's inline
 // spec from the registry: after FromFlowGraph produces a ref graph, resolving it
 // against the registry replaces each ref with the role's prompt, title, and scopes,
