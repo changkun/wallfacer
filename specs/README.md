@@ -5,7 +5,7 @@ Completed specs live in the [Archive](#archive) section at the bottom.
 
 ## Status Quo
 
-What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started, ⊘ = archived.
+What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started, ◌ = dormant (partly shipped, remainder gated), ⊘ = archived.
 
 ```
 Foundations - 7/7 complete (see Archive)
@@ -13,7 +13,7 @@ Foundations - 7/7 complete (see Archive)
 Identity - the live edge (auth + platform convergence)
   ✅ Authentication                ◐ Auth by Default + Console
   ○ Multi-User Collaboration       ○ Third-Party OIDC
-  ◐ Remote Control (→ cloud plane) ○ Agent Token Exchange
+  ◐ Remote Control (→ cloud plane) ◌ Agent Token Exchange
   ✅ Local Device-Code Sign-In (UI re-home)
   ✅ Local Per-Account/Org Isolation (signed-in scopes projects/tasks)
 
