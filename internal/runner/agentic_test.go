@@ -208,3 +208,54 @@ func TestRun_AgenticFlowReachesDoneWithLineage(t *testing.T) {
 		t.Fatalf("lineage edges = %+v, want one next edge", lin.Edges)
 	}
 }
+
+// TestRun_NativeToposHarnessCommitsWorktreeEdits is the regression guard for the
+// bug where the topos native path walked committing -> done without ever making
+// a git commit: the agent edited the worktree, but the state machine reported
+// success with the work uncommitted. With a real workspace repo and a prompt that
+// writes a file, the run must now produce a durable commit merged onto the repo's
+// default branch (the full commit pipeline stage -> commit -> rebase -> merge ->
+// cleanup, same as the subprocess implement path's auto-submit).
+func TestRun_NativeToposHarnessCommitsWorktreeEdits(t *testing.T) {
+	repo := setupTestRepo(t)
+	s, r := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, r)
+	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
+
+	ctx := context.Background()
+	// The fake model runs the prompt as a shell command in the worktree, so a
+	// redirect writes a file the agent "created" into the real repo checkout.
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "topos change > topos-marker.txt",
+		Timeout: 5,
+		Sandbox: harness.Topos,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	r.Run(task.ID, task.Prompt, "", false)
+	r.WaitBackground()
+	s.WaitCompaction()
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusDone {
+		t.Fatalf("status = %q, want done", updated.Status)
+	}
+
+	// The full pipeline merges the worktree branch onto the default branch, so a
+	// new commit must exist on the repo itself (the worktree is cleaned up).
+	finalHash := gitRun(t, repo, "rev-parse", "HEAD")
+	if finalHash == initialHash {
+		t.Fatal("expected a new commit on the default branch, but HEAD is unchanged (topos run did not commit)")
+	}
+	if _, statErr := os.Stat(filepath.Join(repo, "topos-marker.txt")); statErr != nil {
+		t.Fatalf("agent's file was not committed onto the default branch: %v", statErr)
+	}
+	if len(updated.CommitHashes) == 0 {
+		t.Error("no commit hashes were recorded on the task")
+	}
+}

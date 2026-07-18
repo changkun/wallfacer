@@ -142,9 +142,10 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 // is the path a task resolves to when its harness is Topos (the native default,
 // once harness.Default() is flipped; until then only an explicit topos pin
 // reaches here). Like the agentic-flow path it produces a final text + lineage
-// and walks the state machine, but it does not yet make a durable git commit or
-// run verification — commit/verify parity with the subprocess harnesses is
-// tracked in the topos-native-harness spec.
+// and walks the state machine; driveToposRun then runs the real commit pipeline
+// so the worktree edits land as a durable git commit. Verification (the test
+// step) parity with the subprocess harnesses is tracked in the
+// topos-native-harness spec.
 func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task store.Task, prompt, worktree string) {
 	// worktree is the task's set-up worktree (the real repo) so the agent's tools
 	// edit actual files; an empty worktree falls back to the topos temp-dir sandbox.
@@ -171,8 +172,11 @@ func firstWorktreePath(worktreePaths map[string]string) string {
 // the JSON-marshalled lineage graph, then walks the task through the same
 // in_progress -> waiting -> committing -> done state machine the flow-engine and
 // ideation branches use (the state machine forbids a direct in_progress -> done
-// transition). runFn performs the actual topos run, wired with the supplied
-// non-blocking observer. The caller sets statusSet=true before invoking this.
+// transition). In the committing phase it runs the real commit pipeline
+// (r.Commit) when the run has a worktree, so a native run's edits land as a
+// durable git commit rather than reaching done uncommitted. runFn performs the
+// actual topos run, wired with the supplied non-blocking observer. The caller
+// sets statusSet=true before invoking this.
 func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task store.Task, runFn func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error)) {
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
@@ -245,6 +249,32 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 	_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
 	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
+
+	// Run the real commit pipeline so a native topos run produces a durable git
+	// commit of the agent's worktree edits (stage -> commit -> rebase -> merge
+	// into the default branch), matching the subprocess implement path's
+	// auto-submit. Without this the run edits the worktree but reaches done with
+	// the work uncommitted. r.Commit re-fetches the task, so it sees the worktree
+	// paths execute.go persisted after this snapshot was taken.
+	//
+	// The commit is gated on a worktree being present. The native single-agent
+	// path (runNativeTopos) runs in the task's worktree and commits here; the
+	// multi-agent agentic path (runAgenticFlow) is dispatched before worktree
+	// setup and runs in a topos temp sandbox with no worktree, so there is
+	// nothing in the repo to commit and it walks straight to done as before.
+	// Threading a worktree through the agentic path is deferred (tracked on #17).
+	if cur, gErr := r.taskStore(taskID).GetTask(bgCtx, taskID); gErr == nil && cur != nil && len(cur.WorktreePaths) > 0 {
+		if err := r.Commit(taskID, ""); err != nil {
+			logger.Runner.Error("topos run commit", "task", taskID, "error", err)
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, classifyFailure(err, false, ""))
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusFailed, store.TriggerSystem, nil))
+			return
+		}
+	}
+
 	_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
