@@ -49,6 +49,14 @@ make server         # Build and run the Go server natively
 See [Development Setup](docs/internals/development.md) for the full target list,
 E2E scripts, and the release workflow.
 
+On macOS, `go test ./internal/handler/` can exceed the 10m default timeout:
+the explorer file-stream tests watch files via fsnotify, and under the full
+suite's load kqueue drops change events, so each stream test falls back to the
+3s poll ticker (`explorerFilePollInterval`) and the ~1100-test package overruns.
+Each test passes in isolation, and CI (Linux/inotify, `-timeout 20m`) is green,
+so this is a local-macOS ergonomics issue, not a correctness one. Locally, pass
+`-timeout 20m` or scope to the package under test rather than `./...`.
+
 ## Conventions
 
 - **Every bug fix ships with a regression test** that fails without the fix and
