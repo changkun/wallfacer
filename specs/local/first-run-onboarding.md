@@ -2,7 +2,7 @@
 title: First-Run Onboarding & Agent-Graph Discoverability
 status: vague
 depends_on:
-  - ../../agents/specs/architecture/agent-sdk-mesh-foundation.md
+  - ../../../agents/specs/architecture/agent-sdk-mesh-foundation.md
 affects:
   - frontend/src/views/
   - frontend/src/components/
@@ -24,7 +24,7 @@ dispatched_task_id: null
 A brand-new user can understand what Wallfacer is and get to a first useful action
 without prior knowledge — and can understand the merged **agent graph** (Agents +
 Flows unified per
-[agent-sdk-mesh-foundation](../../agents/specs/architecture/agent-sdk-mesh-foundation.md))
+[agent-sdk-mesh-foundation](../../../agents/specs/architecture/agent-sdk-mesh-foundation.md))
 rather than facing two disjoint, jargon-heavy surfaces.
 
 ## Why this exists (and why it is deferred)

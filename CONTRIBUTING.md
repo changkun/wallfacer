@@ -9,7 +9,7 @@ you only want to *use* Wallfacer, start with the [User Manual](docs/guide/usage.
   the codebase: architecture, package layout, API routes, task lifecycle, and
   storage model. Read it first. The references below are written for maintainers,
   not end users.
-- **[AGENTS.md](AGENTS.md)** (symlinked as `CLAUDE.md`) holds the project's
+- **[CLAUDE.md](CLAUDE.md)** holds the project's
   commit and workflow conventions for both humans and coding agents.
 - **[Specs & Roadmap](specs/README.md)** tracks design work in progress and the
   dependency graph between tracks.
@@ -70,4 +70,4 @@ so this is a local-macOS ergonomics issue, not a correctness one. Locally, pass
   [`docs/guide/`](docs/guide/); internals in [`docs/internals/`](docs/internals/).
 
 The commit and workflow conventions every change must follow are in
-[AGENTS.md](AGENTS.md) (symlinked as `CLAUDE.md`).
+[CLAUDE.md](CLAUDE.md).

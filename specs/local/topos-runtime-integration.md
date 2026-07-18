@@ -2,7 +2,7 @@
 title: Topos Runtime Integration (Embed the Agent-Graph Runtime)
 status: complete
 depends_on:
-  - ../../agents/specs/architecture/agent-sdk-mesh-foundation.md
+  - ../../../agents/specs/architecture/agent-sdk-mesh-foundation.md
 affects:
   - go.mod
   - internal/runner/
@@ -135,6 +135,6 @@ editing the graph edits the underlying agents/flows YAML registries.
 ## Notes
 
 Builds on the embeddable SDK foundation
-([agent-sdk-mesh-foundation](../../agents/specs/architecture/agent-sdk-mesh-foundation.md)).
+([agent-sdk-mesh-foundation](../../../agents/specs/architecture/agent-sdk-mesh-foundation.md)).
 The runtime is consumed only through the root `topos` package; the engine subpackages
 stay an implementation detail behind the import guard.

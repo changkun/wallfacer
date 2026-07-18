@@ -130,7 +130,7 @@ a layered model (default: local credential proof using the user's own git creds;
 fallback: org-admin-registered repos + membership; upgrade: per-user GitHub OAuth),
 with the **org boundary as the security perimeter** (cross-tenant access is
 structurally impossible). The full data model, storage tiers, and verification
-flow are in [repo-identity](latere-integration/coordination-plane/repo-identity.md).
+flow are in [repo-identity](coordination-plane/repo-identity.md).
 
 ### Multiple replicas
 
@@ -143,7 +143,7 @@ single-replica fallback for local dev. Valkey is a cache and holds only ephemera
 coordination state; **durable, authoritative** data (spec comments, the projection
 long-tail rollups) lives in **Postgres** (`latere-pg`, the `wallfacer` database now
 provisioned alongside the cache secret). The full design is in
-[connection](latere-integration/coordination-plane/connection-and-presence/connection.md);
+[connection](coordination-plane/connection-and-presence/connection.md);
 the durable-tier provisioning is an open decision (see Open questions).
 
 ## Capabilities riding the plane
