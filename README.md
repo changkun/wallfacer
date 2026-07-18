@@ -133,7 +133,7 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 ## Capability Stack
 
 - **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
-- **Spec.** Six-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
+- **Spec.** Seven-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
 - **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
