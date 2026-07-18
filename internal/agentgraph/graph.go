@@ -1,10 +1,8 @@
 package agentgraph
 
 import (
-	"context"
 	"fmt"
 
-	"latere.ai/x/topos"
 	"latere.ai/x/topos/graph"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
@@ -82,29 +80,3 @@ func registryResolver(reg *agents.Registry) func(ref string) (graph.Agent, error
 	}
 }
 
-// RunFlowGraph runs a flow through the canonical graph model: it compiles the flow
-// to an authored graph, resolves its ref agents against reg, lowers it to the
-// runtime graph, and runs it. A wallfacer flow is a single region, so it executes
-// via Runner.Run on that region (not RunGraph): RunGraph namespaces node ids
-// <session>/<regionID>/<agent> for multi-region graphs, whereas the single-region
-// Run keeps them <session>/<agent>, preserving the lineage shape the FromFlow path
-// produces.
-func RunFlowGraph(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.Registry, prompt string) (topos.RunResult, error) {
-	authored, err := FromFlowGraph(f)
-	if err != nil {
-		return topos.RunResult{}, err
-	}
-	resolved, err := authored.Resolve(registryResolver(reg))
-	if err != nil {
-		return topos.RunResult{}, err
-	}
-	rt, err := resolved.ToRuntime()
-	if err != nil {
-		return topos.RunResult{}, err
-	}
-	runner, err := NewRunner(opts)
-	if err != nil {
-		return topos.RunResult{}, err
-	}
-	return runner.Run(ctx, rt.Regions[0].Region, prompt)
-}

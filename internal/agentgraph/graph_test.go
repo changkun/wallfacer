@@ -1,11 +1,8 @@
 package agentgraph_test
 
 import (
-	"context"
-	"reflect"
 	"testing"
 
-	"latere.ai/x/topos"
 	"latere.ai/x/topos/graph"
 	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/flow"
@@ -84,69 +81,20 @@ func TestFromFlowGraph_Errors(t *testing.T) {
 	}
 }
 
-// TestRunFlowGraph_MatchesFromFlowPath is the behavior-preserving proof: the same
-// fixture run through the new graph.Graph consume path and the existing FromFlow
-// region path produces an identical Result (final text + lineage), so introducing
-// the graph model changes nothing a consumer observes.
-func TestRunFlowGraph_MatchesFromFlowPath(t *testing.T) {
+// TestFromFlowGraph_ResolveInlinesSpecs proves the resolve seam fills a ref's inline
+// spec from the registry: after FromFlowGraph produces a ref graph, resolving it
+// against the registry replaces each ref with the role's prompt, title, and scopes,
+// and the result no longer holds a ref.
+func TestFromFlowGraph_ResolveInlinesSpecs(t *testing.T) {
 	reg, f := twoAgentFixture()
-	opts := agentgraph.RunOptions("run-eq", agentgraph.ModelConfig{}, f)
-
-	viaRegion, err := agentgraph.RunFlow(context.Background(), opts, f, reg, "do the thing")
+	region, err := agentgraph.FromFlow(f, reg)
 	if err != nil {
-		t.Fatalf("RunFlow: %v", err)
+		t.Fatalf("FromFlow: %v", err)
 	}
-	viaGraph, err := agentgraph.RunFlowGraph(context.Background(), opts, f, reg, "do the thing")
-	if err != nil {
-		t.Fatalf("RunFlowGraph: %v", err)
+	if region.Entry.Name != "planner" || region.Entry.SystemPrompt != "you plan" || region.Entry.Role != "Planner" {
+		t.Errorf("entry = %+v, want planner inlined with prompt/role from the registry", region.Entry)
 	}
-	if viaGraph.Final != viaRegion.Final {
-		t.Errorf("final differs: graph %q vs region %q", viaGraph.Final, viaRegion.Final)
-	}
-	// Sandbox is a fresh per-run resource id (a random sandbox name), not a
-	// behavioral property of the graph; normalize it so the comparison is over the
-	// node identity, roles, statuses, and edges the two paths must share.
-	normalize(&viaGraph.Lineage)
-	normalize(&viaRegion.Lineage)
-	if !reflect.DeepEqual(viaGraph.Lineage, viaRegion.Lineage) {
-		t.Errorf("lineage differs:\n graph  = %+v\n region = %+v", viaGraph.Lineage, viaRegion.Lineage)
-	}
-}
-
-// normalize blanks the ephemeral per-run sandbox id on every node so two lineages
-// can be compared for behavioral equality.
-func normalize(l *topos.Lineage) {
-	for i := range l.Nodes {
-		l.Nodes[i].Sandbox = ""
-	}
-}
-
-// TestRunFlowGraph_UnknownAgent surfaces a ref that the registry cannot resolve as
-// an error, rather than lowering an unresolved graph.
-func TestRunFlowGraph_UnknownAgent(t *testing.T) {
-	reg, _ := twoAgentFixture()
-	bad := flow.Flow{Slug: "bad", Steps: []flow.Step{{AgentSlug: "nope"}}}
-	if _, err := agentgraph.RunFlowGraph(context.Background(), topos.Options{}, bad, reg, "x"); err == nil {
-		t.Error("expected an error resolving an unknown agent slug")
-	}
-}
-
-// TestRunFlowGraph_ResolveInlinesSpecs proves the resolve seam fills a ref's inline
-// spec from the registry: after Resolve the lowered region carries the role's
-// prompt, title, and scopes, not an empty ref.
-func TestRunFlowGraph_ResolveInlinesSpecs(t *testing.T) {
-	reg, f := twoAgentFixture()
-	res, err := agentgraph.RunFlowGraph(context.Background(), agentgraph.RunOptions("run-x", agentgraph.ModelConfig{}, f), f, reg, "go")
-	if err != nil {
-		t.Fatalf("RunFlowGraph: %v", err)
-	}
-	// A resolved two-agent pinned chain produces two done nodes joined by one
-	// next edge, exactly as the region path does.
-	if len(res.Lineage.Nodes) != 2 {
-		t.Fatalf("nodes = %+v, want 2 (planner, builder)", res.Lineage.Nodes)
-	}
-	if res.Lineage.Nodes[0].ID != "run-x/planner" || res.Lineage.Nodes[1].ID != "run-x/builder" {
-		t.Errorf("node ids = %q, %q; want run-x/planner, run-x/builder",
-			res.Lineage.Nodes[0].ID, res.Lineage.Nodes[1].ID)
+	if len(region.Peers) != 1 || region.Peers[0].Name != "builder" || len(region.Peers[0].Scopes) != 1 || region.Peers[0].Scopes[0] != "workspace.write" {
+		t.Errorf("peers = %+v, want builder inlined with its scopes", region.Peers)
 	}
 }

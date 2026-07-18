@@ -3,7 +3,6 @@ package agentgraph
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"latere.ai/x/topos"
@@ -11,63 +10,35 @@ import (
 	"latere.ai/x/wallfacer/internal/flow"
 )
 
-// FromFlow compiles a wallfacer flow + agents registry into a topos.Region.
+// FromFlow compiles a wallfacer flow + agents registry into a topos.Region via the
+// canonical authored graph model: FromFlowGraph builds the ref-form graph.Graph,
+// registryResolver swaps each ref for the inline spec reg holds, and ToRuntime
+// lowers it. A wallfacer flow is a single region, so the lowered graph's one region
+// is returned.
 //
-// The flow's first step becomes the region entry; the remaining steps become
-// the ordered peer chain. Each step's AgentSlug is resolved through reg into an
-// agents.Role, mapped onto a topos.AgentSpec: the slug is the stable identity
-// (so lineage node ids are <session>/<slug>), Title/Description carry the role
-// labels, PromptTmpl becomes the system prompt, and Capabilities become the
-// permission scopes.
-//
-// A pinned flow (the default) compiles to a deterministic chain (Autonomy:
-// Pinned), where Optional / RunInParallelWith hints are ignored. A flow marked
-// flow.Dynamic compiles to Autonomy: Dynamic, exposing the peers as a
-// discoverable directory whose reachability the Topology gates; flow.Topology
-// maps onto the topos topology constants here, the only place that names them.
-// Built-in roles leave PromptTmpl empty (they render through the prompts
-// package); FromFlow tolerates that — an empty system prompt is legal for the
-// fake model and the headless path.
+// The flow's first step becomes the region entry; the remaining steps become the
+// ordered peer chain. The resolver maps each agents.Role onto the spec: the slug is
+// the stable identity (so lineage node ids are <session>/<slug>), Title/Description
+// carry the role labels, PromptTmpl becomes the system prompt, and Capabilities
+// become the permission scopes. A non-dynamic flow lowers to a deterministic pinned
+// chain (Optional / RunInParallelWith hints are not expressed by the graph model); a
+// dynamic flow lowers to Autonomy: Dynamic with the topology its coordination
+// selects. Built-in roles leave PromptTmpl empty (they render through the prompts
+// package); an empty system prompt is legal for the fake model and the headless path.
 func FromFlow(f flow.Flow, reg *agents.Registry) (topos.Region, error) {
-	if len(f.Steps) == 0 {
-		return topos.Region{}, fmt.Errorf("agentgraph: flow %q has no steps", f.Slug)
+	authored, err := FromFlowGraph(f)
+	if err != nil {
+		return topos.Region{}, err
 	}
-	specs := make([]topos.AgentSpec, 0, len(f.Steps))
-	for _, step := range f.Steps {
-		role, ok := reg.Get(step.AgentSlug)
-		if !ok {
-			return topos.Region{}, fmt.Errorf("agentgraph: flow %q references unknown agent %q", f.Slug, step.AgentSlug)
-		}
-		specs = append(specs, topos.AgentSpec{
-			Name:         role.Slug,
-			Role:         role.Title,
-			Description:  role.Description,
-			SystemPrompt: role.PromptTmpl,
-			Scopes:       role.Capabilities,
-		})
+	resolved, err := authored.Resolve(registryResolver(reg))
+	if err != nil {
+		return topos.Region{}, err
 	}
-	region := topos.Region{
-		Entry: specs[0],
-		Peers: specs[1:],
+	rt, err := resolved.ToRuntime()
+	if err != nil {
+		return topos.Region{}, err
 	}
-	if f.Dynamic {
-		region.Autonomy = topos.Dynamic
-		region.Topology = toTopology(f.Topology)
-	} else {
-		region.Autonomy = topos.Pinned
-	}
-	return region, nil
-}
-
-// toTopology maps a wallfacer flow topology onto the topos topology constant.
-// It materializes the orchestrator-worker default for the empty (and any
-// unknown) value so a caller reading the built region sees the resolved
-// topology rather than relying on the topos runner's internal default.
-func toTopology(t flow.Topology) topos.Topology {
-	if t == flow.TopologyMesh {
-		return topos.Mesh
-	}
-	return topos.OrchestratorWorker
+	return rt.Regions[0].Region, nil
 }
 
 // RunFlow builds a topos runner from opts and runs the region compiled from the
