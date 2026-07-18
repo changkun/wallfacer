@@ -4,7 +4,8 @@ name: Release
 # build, produces the CLI binaries, builds and pushes the wallfacerd image,
 # deploys the kustomize deploy/prod/ overlay to the shared `latere` namespace,
 # smokes the live surface, and only then publishes the GitHub release carrying
-# the binaries.
+# the binaries plus their supply-chain attestation (SHA256 checksums, an SPDX
+# SBOM, and keyless cosign signatures over both).
 #
 # Vendored, not the central latere-ai/ci pipeline: this repo lives under a
 # personal account and GitHub cannot call an org-private reusable workflow
@@ -168,6 +169,13 @@ jobs:
   release:
     needs: [binary, deploy]
     runs-on: ubuntu-latest
+    # id-token: write mints the OIDC token cosign exchanges for a short-lived
+    # Fulcio signing certificate (keyless signing — no long-lived key stored in
+    # the repo). Job-level permissions replace the workflow default, so
+    # contents: write is repeated here to keep release-asset upload working.
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v8
@@ -180,6 +188,41 @@ jobs:
         with:
           name: release-evidence
           path: evidence
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        # One manifest over every published binary. Signing this file (below)
+        # transitively attests each binary, since a verified checksum binds the
+        # bytes. Users verify with: sha256sum -c SHA256SUMS
+        run: sha256sum wallfacer-* | tee SHA256SUMS
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          # Scan the checked-out source tree (Go modules, frontend deps) rather
+          # than the opaque binaries, so the SBOM enumerates real dependencies.
+          path: .
+          format: spdx-json
+          output-file: dist/wallfacer.spdx.json
+          # This job publishes the release itself, so let the create step attach
+          # the SBOM alongside the other assets instead of the action doing it.
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign checksums and SBOM (keyless)
+        working-directory: dist
+        env:
+          COSIGN_YES: 'true'
+        # Sigstore bundles carry the signature, signing certificate, and Rekor
+        # transparency-log proof in one file. Verify with:
+        #   cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+        #     --certificate-identity-regexp '^https://github.com/changkun/wallfacer/' \
+        #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+        #     SHA256SUMS
+        run: |
+          set -euo pipefail
+          for f in SHA256SUMS wallfacer.spdx.json; do
+            cosign sign-blob --bundle "${f}.cosign.bundle" "$f"
+          done
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -206,6 +249,8 @@ jobs:
           # shipped before the release published.
           printf '\n\n' >> notes.md
           cat evidence/release-evidence.md >> notes.md
+          # dist/ now also holds SHA256SUMS, the SPDX SBOM, and the two cosign
+          # bundles, so the glob attaches the attestation with the binaries.
           gh release create "$TAG" $prerelease \
             --title "Wallfacer $TAG" \
             --notes-file notes.md \
