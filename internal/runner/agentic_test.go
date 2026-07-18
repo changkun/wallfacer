@@ -58,7 +58,10 @@ func TestAgenticModelConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("key plus base url routes through lux", func(t *testing.T) {
+	t.Run("key plus base url routes through lux at the gateway origin", func(t *testing.T) {
+		// The .env carries the anthropic-wire URL the container harness
+		// dials; the model leg must reduce it to the gateway origin the
+		// lux-native dialect lives under.
 		r := &Runner{envFile: writeEnvFile(t,
 			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai/anthropic\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
 		cfg := r.agenticModelConfig()
@@ -66,11 +69,19 @@ func TestAgenticModelConfig(t *testing.T) {
 			Mode:     agentgraph.ModelModeLux,
 			Provider: "anthropic",
 			Model:    "claude-sonnet-4-6",
-			BaseURL:  "https://lux.latere.ai/anthropic",
+			BaseURL:  "https://lux.latere.ai",
 			APIKey:   "lux_test",
 		}
 		if cfg != want {
 			t.Errorf("config = %+v, want %+v", cfg, want)
+		}
+	})
+
+	t.Run("origin-shaped base url passes through unchanged", func(t *testing.T) {
+		r := &Runner{envFile: writeEnvFile(t,
+			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai\n")}
+		if got := r.agenticModelConfig().BaseURL; got != "https://lux.latere.ai" {
+			t.Errorf("BaseURL = %q, want origin unchanged", got)
 		}
 	})
 }

@@ -12,7 +12,7 @@ import (
 // that does). Kind is compared via its string form for the same reason.
 func TestModelOptions_Mapping(t *testing.T) {
 	const (
-		luxURL = "https://lux.latere.ai/anthropic"
+		luxURL = "https://lux.latere.ai"
 		key    = "lux_test_key"
 		model  = "claude-sonnet-4-6"
 	)

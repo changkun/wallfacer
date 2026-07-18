@@ -38,7 +38,7 @@ type ModelConfig struct {
 	Mode     ModelMode
 	Provider string // "anthropic" (anthropic-wire); empty defaults to anthropic in topos
 	Model    string // model id, e.g. "claude-sonnet-4-6"
-	BaseURL  string // e.g. "https://lux.latere.ai/anthropic"
+	BaseURL  string // gateway origin in Lux mode, e.g. "https://lux.latere.ai"
 	APIKey   string // x-api-key credential (Lux virtual key or a direct provider key)
 }
 

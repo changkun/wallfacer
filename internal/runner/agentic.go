@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,16 +37,32 @@ func (r *Runner) agenticModelConfig() agentgraph.ModelConfig {
 		return agentgraph.ModelConfig{}
 	}
 	mode := agentgraph.ModelModeDirect
+	baseURL := ""
 	if cfg.BaseURL != "" {
 		mode = agentgraph.ModelModeLux
+		baseURL = gatewayOrigin(cfg.BaseURL)
 	}
 	return agentgraph.ModelConfig{
 		Mode:     mode,
 		Provider: "anthropic",
 		Model:    cfg.DefaultModel,
-		BaseURL:  cfg.BaseURL,
+		BaseURL:  baseURL,
 		APIKey:   cfg.APIKey,
 	}
+}
+
+// gatewayOrigin reduces the .env's ANTHROPIC_BASE_URL, which is shaped for the
+// container harness (Claude Code dials the gateway's anthropic-wire surface,
+// e.g. https://lux.latere.ai/anthropic), to the origin the lux-native dialect
+// (POST /lux/v1/generate) lives under. The .env stays harness-shaped; the model
+// leg derives the base it needs. An unparseable value passes through untouched
+// so the resulting request error names the configured URL.
+func gatewayOrigin(harnessBase string) string {
+	u, err := url.Parse(harnessBase)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return harnessBase
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 // flowBySlug looks up a flow by slug, guarding against a nil flow registry
