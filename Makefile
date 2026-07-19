@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go lint lint-go lint-js lint-otel test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go fmt-check hooks lint lint-go lint-js lint-otel test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once
 
 # Full build gate: fmt + frontend assets + lint + binary.
 build: fmt frontend-build lint build-binary
@@ -44,6 +44,13 @@ fmt: fmt-go
 # Format all Go source files
 fmt-go:
 	gofmt -w .
+
+fmt-check:                                                               ## Fail if any Go source is not gofmt-formatted
+	@out=$$(gofmt -l .); if [ -n "$$out" ]; then echo "gofmt: unformatted files:"; echo "$$out"; exit 1; fi
+
+hooks:                                                                   ## Install git hooks (pre-commit gofmt guard)
+	git config core.hooksPath .githooks
+	@echo "installed git hooks (core.hooksPath=.githooks)"
 
 # Run all linters (Go + frontend)
 lint: lint-go lint-js lint-otel

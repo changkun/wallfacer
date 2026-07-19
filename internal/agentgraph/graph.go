@@ -79,4 +79,3 @@ func registryResolver(reg *agents.Registry) func(ref string) (graph.Agent, error
 		}, nil
 	}
 }
-

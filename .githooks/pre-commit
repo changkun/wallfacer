@@ -1,0 +1,14 @@
+#!/bin/sh
+# pre-commit: block commits that introduce gofmt-unformatted Go files.
+# Install with: make hooks    Bypass once with: git commit --no-verify
+
+gofiles=$(git diff --cached --name-only --diff-filter=ACM -- '*.go')
+[ -z "$gofiles" ] && exit 0
+
+unformatted=$(gofmt -l $gofiles)
+[ -z "$unformatted" ] && exit 0
+
+echo "gofmt: staged Go files are not formatted:" >&2
+printf '  %s\n' $unformatted >&2
+echo "fix with: make fmt (then re-stage), or bypass with: git commit --no-verify" >&2
+exit 1
