@@ -466,7 +466,11 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 	}
 }
 
-func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
+// TestCompleteTask_CommitMessageFailureReturnsToWaiting verifies that when
+// commit message generation fails, the task returns to waiting for review and no
+// placeholder commit is merged (rather than silently completing with a
+// fabricated message). A user-triggered completion leaves automation unchanged.
+func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	h := newTestHandler(t)
 	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*executor.HostBackend); ok {
 		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
@@ -499,23 +503,36 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var updated *store.Task
+	// Wait for the commit pipeline to run and the recovery to return the task
+	// to waiting, signalled by the "returned to waiting" system event.
+	returned := false
 	for range 100 {
-		updated, _ = h.store.GetTask(ctx, task.ID)
-		if updated != nil && updated.Status == store.TaskStatusDone {
+		events, _ := h.store.GetEvents(ctx, task.ID)
+		for _, e := range events {
+			var data map[string]string
+			if err := json.Unmarshal(e.Data, &data); err == nil && strings.Contains(data["result"], "returned to waiting") {
+				returned = true
+			}
+		}
+		if returned {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if updated == nil || updated.Status != store.TaskStatusDone {
-		t.Fatalf("expected task to reach done via fallback commit message, got %v", updated.Status)
+	if !returned {
+		t.Fatal("expected a 'returned to waiting' event after commit message generation failed")
 	}
 
-	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "2" {
-		t.Fatalf("expected fallback commit to land on repo, got %s commits", got)
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated == nil || updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected task to return to waiting, got %v", updated.Status)
 	}
+	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "1" {
+		t.Fatalf("expected no placeholder commit to land, got %s commits", got)
+	}
+	// User-triggered completion (TriggerUser) does not pause automation.
 	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
-		t.Fatal("expected fallback commit path to leave automation toggles unchanged")
+		t.Fatal("expected automation toggles to remain unchanged on the user-triggered path")
 	}
 }
 

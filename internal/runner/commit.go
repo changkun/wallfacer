@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -339,12 +340,12 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 	}
 	msg, err := r.generateCommitMessage(ctx, taskID, prompt, allStats.String(), allLogs.String())
 	if err != nil {
-		msg = localFallbackCommitMessage(prompt, allStats.String())
-		logger.Runner.Warn("commit message generation failed, using local fallback", "task", taskID, "error", err, "message", msg)
-		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"result": "Commit message generation failed; using fallback commit message.",
-		})
+		// Do not fabricate a commit message. Surface the failure (already wrapped
+		// with ErrCommitMessageGeneration) so the caller returns the task to
+		// waiting for human review rather than merging a placeholder commit into
+		// the default branch and possibly auto-pushing it.
+		logger.Runner.Warn("commit message generation failed, returning task to waiting", "task", taskID, "error", err)
+		return false, err
 	}
 
 	// Persist the commit message so it can be displayed in the UI.
@@ -377,39 +378,6 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 		return false, fmt.Errorf("commit failed: %s", strings.Join(errs, "; "))
 	}
 	return committed, nil
-}
-
-// localFallbackCommitMessage builds a "wallfacer: <subject>" commit message
-// without invoking a container. Used when the agent-based commit message
-// generation fails. The subject is derived from the first line of the prompt,
-// falling back to the first line of the diff stat, and is capped at
-// MaxCommitSubjectRunes.
-func localFallbackCommitMessage(prompt, diffStat string) string {
-	subject := strings.TrimSpace(prompt)
-	if idx := strings.Index(subject, "\n"); idx >= 0 {
-		subject = subject[:idx]
-	}
-	subject = strings.Join(strings.Fields(subject), " ")
-	subject = strings.Trim(subject, "`")
-	subject = strings.TrimSpace(subject)
-	if subject == "" {
-		subject = strings.TrimSpace(diffStat)
-		if idx := strings.Index(subject, "\n"); idx >= 0 {
-			subject = subject[:idx]
-		}
-		subject = strings.Join(strings.Fields(subject), " ")
-	}
-	if subject == "" {
-		subject = "update task changes"
-	}
-
-	const prefix = "wallfacer: "
-	maxSubjectRunes := constants.MaxCommitSubjectRunes
-	runes := []rune(subject)
-	if len(runes) > maxSubjectRunes {
-		subject = strings.TrimSpace(string(runes[:maxSubjectRunes]))
-	}
-	return prefix + subject
 }
 
 // runCommitContainer launches one commit-message agent container and
@@ -632,6 +600,13 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		RecentLog: recentLog,
 	})
 
+	// A task on the in-process native harness (topos) cannot run the commit-msg
+	// agent through the host subprocess backend, so drive it in-process via the
+	// same agent-graph seam the task itself used.
+	if task != nil && harness.InProcess(r.sandboxForTask(task)) {
+		return r.generateCommitMessageInProcess(ctx, taskID, task.ID.String(), commitPrompt)
+	}
+
 	res, err := r.runAgent(ctx, roleCommitMessage, task, commitPrompt, runAgentOpts{
 		EmitSpanEvents: true,
 		TrackUsage:     true,
@@ -647,6 +622,24 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		return "", newCommitMessageGenerationError("blank result")
 	}
 
+	return msg, nil
+}
+
+// generateCommitMessageInProcess produces a commit message via the in-process
+// topos harness (agentgraph) for tasks whose sandbox the host subprocess backend
+// cannot launch. The run is prompt-only (no worktree tools); sanitizeCommitMessage
+// normalizes the output as on the host path.
+func (r *Runner) generateCommitMessageInProcess(ctx context.Context, taskID uuid.UUID, sessionID, commitPrompt string) (string, error) {
+	res, err := agentgraph.RunAgent(ctx, sessionID, r.agenticModelConfig(), "commit-msg", "", commitPrompt, "", nil)
+	if err != nil {
+		logger.Runner.Warn("commit message generation (in-process) failed", "task", taskID, "error", err)
+		return "", newCommitMessageGenerationError("%v", err)
+	}
+	msg := sanitizeCommitMessage(res.Final)
+	if msg == "" {
+		logger.Runner.Warn("commit message generation (in-process): blank result", "task", taskID)
+		return "", newCommitMessageGenerationError("blank result")
+	}
 	return msg, nil
 }
 

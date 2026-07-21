@@ -304,7 +304,11 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	}
 }
 
-func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
+// TestHostStageAndCommitSurfacesCommitMessageFailure verifies that when commit
+// message generation fails, hostStageAndCommit propagates an
+// ErrCommitMessageGeneration error (so the caller returns the task to waiting)
+// rather than fabricating a placeholder and committing it.
+func TestHostStageAndCommitSurfacesCommitMessageFailure(t *testing.T) {
 	repo := setupTestRepo(t)
 	cmd := fakeCmdScript(t, "", 1) // always fails
 
@@ -341,17 +345,20 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 	}
 
 	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Add new feature")
-	if err != nil {
-		t.Fatalf("expected fallback commit message to succeed, got %v", err)
+	if err == nil {
+		t.Fatal("expected an error when commit message generation fails, got nil")
+	}
+	if !IsCommitMessageGenerationError(err) {
+		t.Fatalf("expected ErrCommitMessageGeneration, got %v", err)
 	}
 	if committed {
-		subject := gitRun(t, wt, "log", "--format=%s", "-1")
-		if !strings.HasPrefix(subject, "wallfacer: ") {
-			t.Fatalf("expected fallback commit subject, got %q", subject)
-		}
-		return
+		t.Fatal("expected committed=false; no placeholder commit should be created")
 	}
-	t.Fatal("expected fallback path to create a commit")
+	// No commit must have landed on the worktree branch.
+	subject := gitRun(t, wt, "log", "--format=%s", "-1")
+	if strings.HasPrefix(subject, "wallfacer: ") {
+		t.Fatalf("a placeholder commit was created: %q", subject)
+	}
 }
 
 // TestHostStageAndCommitErrorsWhenAllWorktreesMissing verifies that
@@ -807,84 +814,6 @@ func TestHostStageAndCommitPreservesTrackedInstructionsFiles(t *testing.T) {
 	p := filepath.Join(wt, "CLAUDE.md")
 	if _, err := os.Stat(p); err != nil {
 		t.Errorf("expected tracked CLAUDE.md to be preserved, but it was removed")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// localFallbackCommitMessage unit tests
-// ---------------------------------------------------------------------------
-
-// TestLocalFallbackCommitMessage_SimplePrompt verifies that a plain single-line
-// prompt is prefixed with "wallfacer: " and returned as-is.
-func TestLocalFallbackCommitMessage_SimplePrompt(t *testing.T) {
-	msg := localFallbackCommitMessage("Fix login bug", "1 file changed")
-	if msg != "wallfacer: Fix login bug" {
-		t.Errorf("got %q", msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_MultilinePrompt verifies that only the first
-// line of a multi-line prompt is used.
-func TestLocalFallbackCommitMessage_MultilinePrompt(t *testing.T) {
-	msg := localFallbackCommitMessage("First line\nSecond line", "diff")
-	if msg != "wallfacer: First line" {
-		t.Errorf("got %q", msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_EmptyPromptUsesDiff verifies that the first
-// line of diffStat is used when prompt is empty.
-func TestLocalFallbackCommitMessage_EmptyPromptUsesDiff(t *testing.T) {
-	msg := localFallbackCommitMessage("", "3 files changed, 10 insertions")
-	if msg != "wallfacer: 3 files changed, 10 insertions" {
-		t.Errorf("got %q", msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_BothEmpty verifies the fallback message when
-// both prompt and diffStat are empty.
-func TestLocalFallbackCommitMessage_BothEmpty(t *testing.T) {
-	msg := localFallbackCommitMessage("", "")
-	if msg != "wallfacer: update task changes" {
-		t.Errorf("got %q", msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_BackticksStripped verifies that wrapping
-// backtick characters are stripped from the prompt subject.
-func TestLocalFallbackCommitMessage_BackticksStripped(t *testing.T) {
-	msg := localFallbackCommitMessage("`fix the thing`", "")
-	if msg != "wallfacer: fix the thing" {
-		t.Errorf("got %q", msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_LongPromptTruncated verifies that the full
-// message stays within 72 runes even when the prompt is very long.
-func TestLocalFallbackCommitMessage_LongPromptTruncated(t *testing.T) {
-	long := strings.Repeat("a", 100)
-	msg := localFallbackCommitMessage(long, "")
-	runes := []rune(msg)
-	if len(runes) > 72 {
-		t.Errorf("message too long: %d runes: %q", len(runes), msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_DiffStatMultiline verifies that only the
-// first line of diffStat is used as the fallback when prompt is empty.
-func TestLocalFallbackCommitMessage_DiffStatMultiline(t *testing.T) {
-	msg := localFallbackCommitMessage("", "1 file changed\n2 lines added")
-	if msg != "wallfacer: 1 file changed" {
-		t.Errorf("got %q", msg)
-	}
-}
-
-// TestLocalFallbackCommitMessage_WhitespaceOnlyPromptUsesDiff verifies that a
-// prompt consisting only of whitespace falls back to diffStat.
-func TestLocalFallbackCommitMessage_WhitespaceOnlyPromptUsesDiff(t *testing.T) {
-	msg := localFallbackCommitMessage("   ", "patch changes")
-	if msg != "wallfacer: patch changes" {
-		t.Errorf("got %q", msg)
 	}
 }
 

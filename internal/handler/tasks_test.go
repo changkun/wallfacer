@@ -2622,12 +2622,13 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 	}
 }
 
-func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
+// TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting verifies that when
+// auto-submit's commit fails at message generation, the task returns to waiting
+// for review with no placeholder commit merged. The board toggles stay enabled
+// (the recovery opens only the transient auto-submit circuit breaker).
+func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	h := newTestHandler(t)
-	// Point Claude at /bin/false so commit-message generation fails and the
-	// runner falls back to the canned "wallfacer:" message. Without this the
-	// test machine's real claude runs and the assertion races against the
-	// real commit pipeline.
+	// Point Claude/Codex at /bin/false so commit-message generation fails.
 	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*executor.HostBackend); ok {
 		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
@@ -2656,23 +2657,34 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 
 	h.tryAutoSubmit(ctx)
 
-	var got *store.Task
+	// Wait for the recovery to return the task to waiting.
+	returned := false
 	for range 100 {
-		got, _ = h.store.GetTask(ctx, task.ID)
-		if got != nil && got.Status == store.TaskStatusDone {
+		events, _ := h.store.GetEvents(ctx, task.ID)
+		for _, e := range events {
+			var data map[string]string
+			if err := json.Unmarshal(e.Data, &data); err == nil && strings.Contains(data["result"], "returned to waiting") {
+				returned = true
+			}
+		}
+		if returned {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if got == nil || got.Status != store.TaskStatusDone {
-		t.Fatalf("expected task to complete via fallback commit message, got %v", got.Status)
+	if !returned {
+		t.Fatal("expected a 'returned to waiting' event after commit message generation failed")
 	}
 
-	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "2" {
-		t.Fatalf("expected fallback commit to land on repo, got %s commits", got)
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got == nil || got.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected task to return to waiting, got %v", got.Status)
+	}
+	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "1" {
+		t.Fatalf("expected no placeholder commit to land, got %s commits", got)
 	}
 	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
-		t.Fatal("expected automation toggles to remain enabled after fallback commit message")
+		t.Fatal("expected board toggles to remain enabled (only the circuit breaker opens)")
 	}
 }
 
