@@ -74,8 +74,8 @@ with the latere CLI; signing in here carries over to %s.
 
 func runAuthLogin(args []string) error {
 	fs := flag.NewFlagSet("auth login", flag.ExitOnError)
-	authURL := fs.String("auth-url", getenvOr("AUTH_URL", "https://auth.latere.ai"), "auth service base URL")
-	clientID := fs.String("client-id", getenvOr("AUTH_CLIENT_ID", "wallfacer-cli"), "OAuth client id")
+	authURL := fs.String("auth-url", envOrDefault("AUTH_URL", "https://auth.latere.ai"), "auth service base URL")
+	clientID := fs.String("client-id", envOrDefault("AUTH_CLIENT_ID", "wallfacer-cli"), "OAuth client id")
 	scopes := fs.String("scopes", "openid email profile offline_access", "space-separated scopes")
 	orgID := fs.String("org", "", "scope login to this org_id (empty string = personal context)")
 	personal := fs.Bool("personal", false, "force personal context (equivalent to --org=\"\" being set)")
@@ -157,13 +157,6 @@ func runAuthWhoami() error {
 	// `latere auth print-token` is the supported way to retrieve it.
 	fmt.Fprintf(os.Stderr, "Signed in. Token expires at %s.\n", tok.Expiry.Format("2006-01-02 15:04:05 MST"))
 	return nil
-}
-
-func getenvOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }
 
 // splitFields splits s on spaces, commas, tabs and newlines, discarding empty
