@@ -36,9 +36,7 @@ func (cursorHarness) ID() ID { return Cursor }
 // matches cursor's default OS sandbox.
 func (cursorHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	prompt := req.Prompt
-	if req.SystemPrompt != "" {
-		prompt = req.SystemPrompt + "\n\n---\n\n" + prompt
-	}
+	prompt = prependSystemPrompt(prompt, req.SystemPrompt)
 
 	argv := []string{
 		"-p", prompt,

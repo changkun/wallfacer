@@ -41,9 +41,7 @@ func (codexHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	}
 
 	prompt := req.Prompt
-	if req.SystemPrompt != "" {
-		prompt = req.SystemPrompt + "\n\n---\n\n" + prompt
-	}
+	prompt = prependSystemPrompt(prompt, req.SystemPrompt)
 	argv = append(argv, prompt)
 	return argv, nil, nil
 }

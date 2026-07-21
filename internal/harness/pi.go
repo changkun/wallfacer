@@ -44,9 +44,7 @@ func (piHarness) ID() ID { return Pi }
 // SupportsSystemPrompt=false); it is prepended into the prompt.
 func (piHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	prompt := req.Prompt
-	if req.SystemPrompt != "" {
-		prompt = req.SystemPrompt + "\n\n---\n\n" + prompt
-	}
+	prompt = prependSystemPrompt(prompt, req.SystemPrompt)
 
 	argv := []string{"-p", "--mode", "json"}
 

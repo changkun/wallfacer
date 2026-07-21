@@ -39,9 +39,7 @@ func (openCodeHarness) ID() ID { return OpenCode }
 // selected via `--agent`. The default (build) agent is used for write modes.
 func (openCodeHarness) BuildArgv(req Request) ([]string, io.Reader, error) {
 	prompt := req.Prompt
-	if req.SystemPrompt != "" {
-		prompt = req.SystemPrompt + "\n\n---\n\n" + prompt
-	}
+	prompt = prependSystemPrompt(prompt, req.SystemPrompt)
 
 	argv := []string{"run", "--format", "json"}
 	if req.Cwd != "" {

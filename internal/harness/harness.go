@@ -155,3 +155,18 @@ type MCPServer struct {
 	Env     map[string]string
 	URL     string
 }
+
+// systemPromptSeparator delimits a prepended system prompt from the user prompt
+// for harnesses whose CLI has no native append-system-prompt flag.
+const systemPromptSeparator = "\n\n---\n\n"
+
+// prependSystemPrompt returns systemPrompt joined ahead of prompt with the
+// canonical separator, or prompt unchanged when systemPrompt is empty. Shared by
+// every harness that reports SupportsSystemPrompt=false so the wire-format
+// separator cannot drift between them.
+func prependSystemPrompt(prompt, systemPrompt string) string {
+	if systemPrompt == "" {
+		return prompt
+	}
+	return systemPrompt + systemPromptSeparator + prompt
+}
