@@ -23,10 +23,6 @@ func MountSPA(mux *http.ServeMux, frontendFS fs.FS) bool {
 	files := http.FS(dist)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if p == "" || p == "/" {
-			serveSPAIndex(w, dist)
-			return
-		}
 		if strings.HasPrefix(p, "/assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			http.FileServer(files).ServeHTTP(w, r)
