@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/topos/adversarial"
 	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -28,6 +27,7 @@ import (
 	"latere.ai/x/wallfacer/internal/routine"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/toposadv"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -151,7 +151,7 @@ type Handler struct {
 
 	// verifier drives adversarial post-run verification (review). It is set
 	// once in NewHandler and never mutated; ReviewEnabled() is the runtime gate.
-	verifier adversarial.Verifier
+	verifier toposadv.Verifier
 
 	// reviewInFlight tracks tasks with an review run currently executing, so a
 	// task that takes minutes to verify is not re-launched on every watcher

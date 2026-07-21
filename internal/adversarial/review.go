@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"latere.ai/x/topos/adversarial"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
+	"latere.ai/x/wallfacer/internal/toposadv"
 )
 
-// ReviewVerifier implements adversarial.Verifier using review's Engine.
+// ReviewVerifier implements toposadv.Verifier using review's Engine.
 // It wires a Claude SessionProposer (fork-session) and a HarnessCritic
-// (wallfacer runner one-shot) into adversarial.Engine and calls Run.
+// (wallfacer runner one-shot) into toposadv.Engine and calls Run.
 type ReviewVerifier struct {
 	runner          runner.Interface
 	criticHarnesses []harness.ID // rotated per fork for perspective diversity
@@ -23,7 +23,7 @@ type ReviewVerifier struct {
 // perspective diversity — different models with different blind spots, which is
 // the point of adversarial debate. Defaults to Claude-only when none are given.
 // The proposer is always Claude (fork-session is Claude-native).
-func NewReviewVerifier(r runner.Interface, criticHarnesses ...harness.ID) adversarial.Verifier {
+func NewReviewVerifier(r runner.Interface, criticHarnesses ...harness.ID) toposadv.Verifier {
 	if len(criticHarnesses) == 0 {
 		criticHarnesses = []harness.ID{harness.Claude}
 	}
@@ -45,7 +45,7 @@ func (v *ReviewVerifier) criticHarnessForFork(forkIdx int) harness.ID {
 
 // Verify runs adversarial verification on a completed task's implementation.
 // Returns nil result when SessionID is empty (no fork-session available).
-func (v *ReviewVerifier) Verify(ctx context.Context, in adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
+func (v *ReviewVerifier) Verify(ctx context.Context, in toposadv.VerifyInput) (*toposadv.VerifyResult, error) {
 	if in.SessionID == "" {
 		return nil, nil
 	}
@@ -62,12 +62,12 @@ func (v *ReviewVerifier) Verify(ctx context.Context, in adversarial.VerifyInput)
 	}
 	defer cleanup()
 
-	engine := &adversarial.Engine{
+	engine := &toposadv.Engine{
 		StateDir:  in.StateDir,
 		Cwd:       in.Cwd,
 		ForkCount: in.ForkCount,
 		Proposer:  proposer,
-		NewCritic: func(forkIdx int) adversarial.Critic {
+		NewCritic: func(forkIdx int) toposadv.Critic {
 			return NewHarnessCritic(v.runner, v.criticHarnessForFork(forkIdx), criticCwd)
 		},
 		MaxRounds:   in.MaxRounds,
@@ -80,7 +80,7 @@ func (v *ReviewVerifier) Verify(ctx context.Context, in adversarial.VerifyInput)
 	if err != nil {
 		return nil, err
 	}
-	return &adversarial.VerifyResult{
+	return &toposadv.VerifyResult{
 		Unresolved: sum.Unresolved,
 		Headline:   sum.Headline,
 		SessionDir: sum.SessionDir,

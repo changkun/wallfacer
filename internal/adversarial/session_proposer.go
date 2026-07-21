@@ -1,8 +1,7 @@
 package adversarial
 
 import (
-	"latere.ai/x/topos/adversarial"
-	reviewClaude "latere.ai/x/topos/adversarial/claude"
+	"latere.ai/x/wallfacer/internal/toposadv"
 )
 
 // NewSessionProposer returns a Proposer backed by the claude fork-session path.
@@ -10,14 +9,13 @@ import (
 // Returns nil if sessionID is empty — callers must check.
 //
 // The proposer runs in the task's real worktree (fork-session is cwd-scoped, so
-// it cannot run elsewhere) and is restricted to read-only tools
-// (reviewClaude.WithProposerReadOnly, review spec 38): it can read the code to
-// rebut and concede but cannot edit the tree wallfacer's commit pipeline would
-// then stage. This is an explicit guarantee on top of claude's headless
-// default-deny.
-func NewSessionProposer(sessionID, cwd string) adversarial.Proposer {
+// it cannot run elsewhere) and is restricted to read-only tools (review spec 38):
+// it can read the code to rebut and concede but cannot edit the tree wallfacer's
+// commit pipeline would then stage. This is an explicit guarantee on top of
+// claude's headless default-deny.
+func NewSessionProposer(sessionID, cwd string) toposadv.Proposer {
 	if sessionID == "" {
 		return nil
 	}
-	return reviewClaude.NewProposer(sessionID, cwd, reviewClaude.WithProposerReadOnly())
+	return toposadv.NewReadOnlyClaudeProposer(sessionID, cwd)
 }

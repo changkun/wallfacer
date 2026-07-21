@@ -1,5 +1,5 @@
 // Package adversarial wires wallfacer's harnesses into review's adversarial
-// debate protocol. It provides implementations of [adversarial.Verifier]
+// debate protocol. It provides implementations of [toposadv.Verifier]
 // — the review-owned integration interface — backed by wallfacer's runner.
 //
 // The no-op path ([NoopVerifier]) is always available and is the default
@@ -11,17 +11,17 @@ package adversarial
 import (
 	"context"
 
-	"latere.ai/x/topos/adversarial"
+	"latere.ai/x/wallfacer/internal/toposadv"
 )
 
-// NoopVerifier satisfies [adversarial.Verifier] and returns (nil, nil)
+// NoopVerifier satisfies [toposadv.Verifier] and returns (nil, nil)
 // immediately. It is the active implementation when review is disabled.
 type NoopVerifier struct{}
 
 // Verify returns (nil, nil) — the skip path.
-func (NoopVerifier) Verify(_ context.Context, _ adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
+func (NoopVerifier) Verify(_ context.Context, _ toposadv.VerifyInput) (*toposadv.VerifyResult, error) {
 	return nil, nil
 }
 
 // compile-time interface check
-var _ adversarial.Verifier = NoopVerifier{}
+var _ toposadv.Verifier = NoopVerifier{}
