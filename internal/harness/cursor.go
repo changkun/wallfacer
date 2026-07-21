@@ -218,8 +218,11 @@ func cursorText(msg *cursorMessage) string {
 }
 
 // cursorToolName returns the tool family name from a tool_call payload.
-// Cursor nests the call under a single typed key (e.g. "shellToolCall");
-// the key is the tool name. Returns "" when the payload has no single key.
+// Cursor nests the typed call under a "<name>ToolCall" key alongside envelope
+// fields (toolCallId, hookAdditionalContexts, description). Map iteration order
+// is randomized, so the name is selected deterministically: the "*ToolCall" key
+// wins, else the lexicographically smallest non-envelope key. Returns "" when no
+// candidate key remains.
 func cursorToolName(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
@@ -228,10 +231,26 @@ func cursorToolName(raw json.RawMessage) string {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return ""
 	}
+	name, fallback := "", ""
 	for k := range m {
-		return k
+		switch k {
+		case "toolCallId", "hookAdditionalContexts", "description":
+			continue
+		}
+		if strings.HasSuffix(k, "ToolCall") {
+			if name == "" || k < name {
+				name = k
+			}
+			continue
+		}
+		if fallback == "" || k < fallback {
+			fallback = k
+		}
 	}
-	return ""
+	if name != "" {
+		return name
+	}
+	return fallback
 }
 
 // AuthEnv populates the env vars cursor-agent reads at startup.

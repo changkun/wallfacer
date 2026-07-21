@@ -2,6 +2,7 @@ package harness
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -334,6 +335,26 @@ func TestCursor_Capabilities(t *testing.T) {
 	}
 	if caps.EmitsCost {
 		t.Error("Cursor does not surface cost")
+	}
+}
+
+func TestCursorToolName_DeterministicWithEnvelopeKeys(t *testing.T) {
+	// Real cursor tool_call payloads carry the typed call alongside envelope
+	// fields; the name must resolve to the "*ToolCall" key every time, not a
+	// random map key. Iterate to defeat Go's randomized map order.
+	raw := json.RawMessage(`{"shellToolCall":{"args":{}},"hookAdditionalContexts":[],"toolCallId":"tool_1"}`)
+	for i := range 200 {
+		if got := cursorToolName(raw); got != "shellToolCall" {
+			t.Fatalf("cursorToolName = %q, want shellToolCall (iteration %d)", got, i)
+		}
+	}
+	if got := cursorToolName(nil); got != "" {
+		t.Errorf("cursorToolName(nil) = %q, want empty", got)
+	}
+	// Fallback: no "*ToolCall" key present, pick the lone non-envelope key.
+	fb := json.RawMessage(`{"readFile":{},"toolCallId":"tool_2"}`)
+	if got := cursorToolName(fb); got != "readFile" {
+		t.Errorf("cursorToolName fallback = %q, want readFile", got)
 	}
 }
 
