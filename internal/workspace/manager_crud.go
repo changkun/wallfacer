@@ -13,6 +13,28 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
+// mutateGroups runs one atomic read-modify-write over workspaces.json under
+// persistMu. apply receives the freshly loaded groups and returns the set to
+// persist; returning a nil slice with a nil error skips the write. Callers must
+// not invoke other persisting manager methods from inside apply (persistMu is
+// not reentrant); do post-persist work after mutateGroups returns.
+func (m *Manager) mutateGroups(apply func(groups []Workspace) ([]Workspace, error)) error {
+	m.persistMu.Lock()
+	defer m.persistMu.Unlock()
+	groups, err := LoadGroups(m.configDir)
+	if err != nil {
+		return err
+	}
+	next, err := apply(groups)
+	if err != nil {
+		return err
+	}
+	if next == nil {
+		return nil
+	}
+	return SaveGroups(m.configDir, next)
+}
+
 // newWorkspaceID mints a fresh stable workspace identity.
 func newWorkspaceID() string { return uuid.NewString() }
 
@@ -35,43 +57,40 @@ func (m *Manager) resolveWorkspaceForPaths(validated []string) (Workspace, error
 	if len(validated) == 0 {
 		return Workspace{DataKey: prompts.WorkspaceDataKey(nil)}, nil
 	}
-	groups, err := LoadGroups(m.configDir)
+	var ws Workspace
+	err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		now := nowStamp()
+		key := GroupKey(validated)
+		for i := range groups {
+			if groups[i].Dormant || GroupKey(groups[i].Folders) != key {
+				continue
+			}
+			ws = groups[i]
+			ws.Folders = validated
+			if ws.ID == "" {
+				ws.ID = newWorkspaceID()
+			}
+			if ws.DataKey == "" {
+				ws.DataKey = prompts.WorkspaceDataKey(validated)
+			}
+			if ws.CreatedAt == "" {
+				ws.CreatedAt = now
+			}
+			ws.UpdatedAt = now
+			reordered := append([]Workspace{ws}, groups[:i]...)
+			reordered = append(reordered, groups[i+1:]...)
+			return reordered, nil
+		}
+		ws = Workspace{
+			ID:        newWorkspaceID(),
+			Folders:   validated,
+			DataKey:   prompts.WorkspaceDataKey(validated),
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		return append([]Workspace{ws}, groups...), nil
+	})
 	if err != nil {
-		return Workspace{}, err
-	}
-	now := nowStamp()
-	key := GroupKey(validated)
-	for i := range groups {
-		if groups[i].Dormant || GroupKey(groups[i].Folders) != key {
-			continue
-		}
-		ws := groups[i]
-		ws.Folders = validated
-		if ws.ID == "" {
-			ws.ID = newWorkspaceID()
-		}
-		if ws.DataKey == "" {
-			ws.DataKey = prompts.WorkspaceDataKey(validated)
-		}
-		if ws.CreatedAt == "" {
-			ws.CreatedAt = now
-		}
-		ws.UpdatedAt = now
-		reordered := append([]Workspace{ws}, groups[:i]...)
-		reordered = append(reordered, groups[i+1:]...)
-		if err := SaveGroups(m.configDir, reordered); err != nil {
-			return Workspace{}, err
-		}
-		return ws, nil
-	}
-	ws := Workspace{
-		ID:        newWorkspaceID(),
-		Folders:   validated,
-		DataKey:   prompts.WorkspaceDataKey(validated),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := SaveGroups(m.configDir, append([]Workspace{ws}, groups...)); err != nil {
 		return Workspace{}, err
 	}
 	return ws, nil
@@ -103,11 +122,9 @@ func (m *Manager) Create(name string, folders []string, p *Principal) (Workspace
 		ws.CreatedBy = p.Sub
 		ws.OrgID = p.OrgID
 	}
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if err := SaveGroups(m.configDir, append([]Workspace{ws}, groups...)); err != nil {
+	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		return append([]Workspace{ws}, groups...), nil
+	}); err != nil {
 		return Workspace{}, err
 	}
 	return ws, nil
@@ -126,25 +143,24 @@ func (m *Manager) UpdateFolders(id string, folders []string) (Workspace, error) 
 	if len(validated) == 0 {
 		return Workspace{}, fmt.Errorf("workspace requires at least one folder; delete it instead")
 	}
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
-		return Workspace{}, err
-	}
-	i := findByID(groups, id)
-	if i < 0 {
-		return Workspace{}, fmt.Errorf("workspace not found: %s", id)
-	}
-	ws := groups[i]
-	// Heal the DataKey from the CURRENT folders before changing them, so a
-	// legacy record's existing data directory stays addressable.
-	if ws.DataKey == "" {
-		ws.DataKey = prompts.WorkspaceDataKey(ws.Folders)
-	}
-	ws.Folders = validated
-	ws.Dormant = false // re-pointing folders activates a recovered workspace
-	ws.UpdatedAt = nowStamp()
-	groups[i] = ws
-	if err := SaveGroups(m.configDir, groups); err != nil {
+	var ws Workspace
+	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		i := findByID(groups, id)
+		if i < 0 {
+			return nil, fmt.Errorf("workspace not found: %s", id)
+		}
+		ws = groups[i]
+		// Heal the DataKey from the CURRENT folders before changing them, so a
+		// legacy record's existing data directory stays addressable.
+		if ws.DataKey == "" {
+			ws.DataKey = prompts.WorkspaceDataKey(ws.Folders)
+		}
+		ws.Folders = validated
+		ws.Dormant = false // re-pointing folders activates a recovered workspace
+		ws.UpdatedAt = nowStamp()
+		groups[i] = ws
+		return groups, nil
+	}); err != nil {
 		return Workspace{}, err
 	}
 
@@ -187,34 +203,32 @@ func (m *Manager) SwitchByID(id string) (Snapshot, error) {
 	if same {
 		return m.Snapshot(), nil
 	}
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
-		return Snapshot{}, err
-	}
-	i := findByID(groups, id)
-	if i < 0 {
-		return Snapshot{}, fmt.Errorf("workspace not found: %s", id)
-	}
-	ws := groups[i]
-	// A non-dormant workspace must point at valid folders; a dormant one may
-	// have none yet (recovered history awaiting re-point) and activates empty.
-	if len(ws.Folders) > 0 {
-		validated, verr := validate(ws.Folders)
-		if verr != nil {
-			return Snapshot{}, verr
+	var ws Workspace
+	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		i := findByID(groups, id)
+		if i < 0 {
+			return nil, fmt.Errorf("workspace not found: %s", id)
 		}
-		ws.Folders = validated
-	}
-	if ws.DataKey == "" {
-		ws.DataKey = prompts.WorkspaceDataKey(ws.Folders)
-	}
-	now := nowStamp()
-	if ws.CreatedAt == "" {
-		ws.CreatedAt = now
-	}
-	ws.UpdatedAt = now
-	reordered := append([]Workspace{ws}, append(groups[:i:i], groups[i+1:]...)...)
-	if err := SaveGroups(m.configDir, reordered); err != nil {
+		ws = groups[i]
+		// A non-dormant workspace must point at valid folders; a dormant one may
+		// have none yet (recovered history awaiting re-point) and activates empty.
+		if len(ws.Folders) > 0 {
+			validated, verr := validate(ws.Folders)
+			if verr != nil {
+				return nil, verr
+			}
+			ws.Folders = validated
+		}
+		if ws.DataKey == "" {
+			ws.DataKey = prompts.WorkspaceDataKey(ws.Folders)
+		}
+		now := nowStamp()
+		if ws.CreatedAt == "" {
+			ws.CreatedAt = now
+		}
+		ws.UpdatedAt = now
+		return append([]Workspace{ws}, append(groups[:i:i], groups[i+1:]...)...), nil
+	}); err != nil {
 		return Snapshot{}, err
 	}
 	return m.activate(ws)
@@ -222,41 +236,41 @@ func (m *Manager) SwitchByID(id string) (Snapshot, error) {
 
 // Rename sets a workspace's display name.
 func (m *Manager) Rename(id, name string) (Workspace, error) {
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
+	var out Workspace
+	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		i := findByID(groups, id)
+		if i < 0 {
+			return nil, fmt.Errorf("workspace not found: %s", id)
+		}
+		groups[i].Name = name
+		groups[i].UpdatedAt = nowStamp()
+		out = groups[i]
+		return groups, nil
+	}); err != nil {
 		return Workspace{}, err
 	}
-	i := findByID(groups, id)
-	if i < 0 {
-		return Workspace{}, fmt.Errorf("workspace not found: %s", id)
-	}
-	groups[i].Name = name
-	groups[i].UpdatedAt = nowStamp()
-	if err := SaveGroups(m.configDir, groups); err != nil {
-		return Workspace{}, err
-	}
-	return groups[i], nil
+	return out, nil
 }
 
 // SetLimits sets (or clears) a workspace's per-workspace concurrency overrides.
 // A nil value clears the override so the workspace inherits the global default;
 // a non-negative value caps it (0 meaning unlimited, per Group semantics).
 func (m *Manager) SetLimits(id string, maxParallel, maxTestParallel *int) (Workspace, error) {
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
+	var out Workspace
+	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		i := findByID(groups, id)
+		if i < 0 {
+			return nil, fmt.Errorf("workspace not found: %s", id)
+		}
+		groups[i].MaxParallel = maxParallel
+		groups[i].MaxTestParallel = maxTestParallel
+		groups[i].UpdatedAt = nowStamp()
+		out = groups[i]
+		return groups, nil
+	}); err != nil {
 		return Workspace{}, err
 	}
-	i := findByID(groups, id)
-	if i < 0 {
-		return Workspace{}, fmt.Errorf("workspace not found: %s", id)
-	}
-	groups[i].MaxParallel = maxParallel
-	groups[i].MaxTestParallel = maxTestParallel
-	groups[i].UpdatedAt = nowStamp()
-	if err := SaveGroups(m.configDir, groups); err != nil {
-		return Workspace{}, err
-	}
-	return groups[i], nil
+	return out, nil
 }
 
 // Delete removes a workspace and permanently wipes its scoped data — the task
@@ -269,27 +283,31 @@ func (m *Manager) Delete(id string) (Snapshot, error) {
 	if id == "" {
 		return m.Snapshot(), nil
 	}
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
+	// Persist the removal first (under persistMu) so the auto-switch below
+	// resolves against the remaining set.
+	var target Workspace
+	var remaining []Workspace
+	found := false
+	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
+		i := findByID(groups, id)
+		if i < 0 {
+			return nil, nil // idempotent: already gone, skip write
+		}
+		found = true
+		target = groups[i]
+		remaining = make([]Workspace, 0, len(groups)-1)
+		remaining = append(remaining, groups[:i]...)
+		remaining = append(remaining, groups[i+1:]...)
+		return remaining, nil
+	}); err != nil {
 		return Snapshot{}, err
 	}
-	i := findByID(groups, id)
-	if i < 0 {
+	if !found {
 		return m.Snapshot(), nil // idempotent: already gone
 	}
-	target := groups[i]
 	m.mu.RLock()
 	wasActive := m.current.WorkspaceID == id
 	m.mu.RUnlock()
-
-	// Persist the removal first so the auto-switch below resolves against the
-	// remaining set.
-	remaining := make([]Workspace, 0, len(groups)-1)
-	remaining = append(remaining, groups[:i]...)
-	remaining = append(remaining, groups[i+1:]...)
-	if err := SaveGroups(m.configDir, remaining); err != nil {
-		return Snapshot{}, err
-	}
 
 	// If the deleted workspace was active, move the board to the next usable
 	// workspace, or to the empty state when none remain.

@@ -3,14 +3,51 @@ package workspace
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
+
+// TestManager_ConcurrentCreate_NoLostRecords asserts that concurrent Create
+// calls do not clobber each other. Each mints a distinct workspace, so all must
+// survive; an unserialized LoadGroups->SaveGroups cycle would lose all but the
+// last writer.
+func TestManager_ConcurrentCreate_NoLostRecords(t *testing.T) {
+	m, _ := newTestManager(t)
+	const n = 20
+	dirs := make([]string, n)
+	for i := range n {
+		dirs[i] = t.TempDir()
+	}
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = m.Create(fmt.Sprintf("ws-%d", i), []string{dirs[i]}, nil)
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Create %d: %v", i, err)
+		}
+	}
+	got, err := m.ListWorkspaces(nil)
+	if err != nil {
+		t.Fatalf("ListWorkspaces: %v", err)
+	}
+	if len(got) != n {
+		t.Fatalf("after %d concurrent Create, got %d workspaces; records lost to unserialized read-modify-write", n, len(got))
+	}
+}
 
 // TestNewManagerWithoutWorkspacesCreatesScopedStore verifies that even with no
 // workspaces, a scoped store and key are still created (for the "empty" workspace set).

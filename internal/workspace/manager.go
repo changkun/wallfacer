@@ -70,6 +70,12 @@ type Manager struct {
 	nextGen      uint64                  // next generation counter to assign
 	activeGroups map[string]*activeGroup // key = Snapshot.Key; groups with open stores
 
+	// persistMu serializes the read-modify-write cycle over workspaces.json so
+	// concurrent CRUD/Switch calls cannot clobber each other's records. It is
+	// always the outermost lock: nested manager calls (Switch, activate) run
+	// after it is released, so it never overlaps with mu.
+	persistMu sync.Mutex
+
 	subsMu    sync.Mutex // guards subs and nextSubID; separate from mu to avoid lock ordering issues
 	subs      map[int]chan Snapshot
 	nextSubID int
