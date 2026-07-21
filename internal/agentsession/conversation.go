@@ -345,7 +345,7 @@ func IsStaleSessionError(raw []byte) bool {
 		}
 		// Check errors array and result text for session-related failures.
 		for _, e := range obj.Errors {
-			if strings.Contains(e, "session ID") || strings.Contains(e, "session") {
+			if strings.Contains(e, "session") {
 				return true
 			}
 		}
