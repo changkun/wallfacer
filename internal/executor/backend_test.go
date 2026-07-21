@@ -7,7 +7,7 @@ import (
 
 // TestStateCreatingIsZeroValue verifies that StateCreating is the zero value
 // of BackendState (and therefore of atomic.Int32). This invariant is relied
-// upon by localHandle: a freshly constructed handle is already in StateCreating
+// upon by hostHandle: a freshly constructed handle is already in StateCreating
 // without an explicit transition call.
 func TestStateCreatingIsZeroValue(t *testing.T) {
 	if StateCreating != 0 {

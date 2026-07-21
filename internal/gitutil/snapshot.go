@@ -8,10 +8,10 @@ import (
 )
 
 // SnapshotDiff computes a unified diff of all changes in a snapshot repository
-// relative to its initial commit (HEAD~1). If the repo has only one commit,
-// it diffs against git's well-known empty-tree hash instead. Untracked files
-// are appended as new-file diffs so the output reflects the full set of
-// agent-made changes.
+// relative to its initial commit (HEAD~1). If HEAD~1 does not exist (only the
+// initial snapshot commit has been made), it falls back to `git diff HEAD`,
+// capturing the uncommitted changes only. Untracked files are appended as
+// new-file diffs so the output reflects the full set of agent-made changes.
 //
 // Intended for repos created by [InitLocalRepo], where the initial commit
 // captures the original workspace and any later commits capture agent changes.

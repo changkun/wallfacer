@@ -13,9 +13,9 @@
 //
 // # Connected packages
 //
-// Depends on [envconfig] (env file path management), [instructions] (AGENTS.md key
-// and path derivation), [store] (creates scoped store per workspace), and utilities
-// [pkg/atomicfile] and [pkg/set].
+// Depends on [envconfig] (env file path management), [prompts] (AGENTS.md key
+// and path derivation), [store] (creates scoped store per workspace), [logger],
+// and utilities [pkg/atomicfile] and [pkg/set].
 // Consumed by [handler] (workspace switching UI), [runner] (workspace paths for
 // container mounts), and [cli] (server startup initialization).
 // Changes to workspace key derivation or group persistence format affect session

@@ -1079,9 +1079,10 @@ func TestSwitch_NilNewStoreFallback(t *testing.T) {
 	}
 }
 
-// TestSwitch_UpsertGroupError verifies that Switch returns an error and
-// cleans up the candidate store when UpsertGroup fails.
-func TestSwitch_UpsertGroupError(t *testing.T) {
+// TestSwitch_LoadGroupsError verifies that Switch returns an error and leaves
+// the manager's generation unchanged when LoadGroups fails while resolving the
+// workspace for the requested paths.
+func TestSwitch_LoadGroupsError(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
 	envFile := filepath.Join(t.TempDir(), ".env")
@@ -1095,7 +1096,7 @@ func TestSwitch_UpsertGroupError(t *testing.T) {
 	}
 	origSnap := m.Snapshot()
 
-	// Block UpsertGroup by making workspace-groups.json unreadable (a directory).
+	// Block LoadGroups by making workspaces.json unreadable (a directory).
 	if err := os.MkdirAll(workspacesFilePath(configDir), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -1103,12 +1104,12 @@ func TestSwitch_UpsertGroupError(t *testing.T) {
 	ws := t.TempDir()
 	_, err = m.Switch([]string{ws})
 	if err == nil {
-		t.Fatal("expected Switch to fail when UpsertGroup fails")
+		t.Fatal("expected Switch to fail when LoadGroups fails")
 	}
 
 	snap := m.Snapshot()
 	if snap.Generation != origSnap.Generation {
-		t.Errorf("generation changed after UpsertGroup failure: before=%d after=%d",
+		t.Errorf("generation changed after LoadGroups failure: before=%d after=%d",
 			origSnap.Generation, snap.Generation)
 	}
 }

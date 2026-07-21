@@ -237,7 +237,7 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 	}
 
 	// Routine instances skip the backlog queue — the user's intent was
-	// "run now". Matches the ideation agent's existing behaviour.
+	// "run now".
 	if err := s.UpdateTaskStatus(ctx, instance.ID, store.TaskStatusInProgress); err != nil {
 		logger.Handler.Warn("routine: promote instance", "routine", routineID, "instance", instance.ID, "error", err)
 		return

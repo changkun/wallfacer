@@ -164,7 +164,7 @@ func TestTTLCache_Invalidate(t *testing.T) {
 }
 
 // TestTTLCache_Invalidate_Permanent verifies that Invalidate removes a permanent
-// entry and also cleans it from the permanentKeys tracking slice, so subsequent
+// entry and also drops its element from the LRU list, so subsequent
 // insertions up to MaxSize do not trigger spurious evictions.
 func TestTTLCache_Invalidate_Permanent(t *testing.T) {
 	c := New[string, int](time.Minute, WithMaxSize[string, int](10))

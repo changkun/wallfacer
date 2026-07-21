@@ -18,14 +18,16 @@ import (
 // can persist the result and avoid redundant writes), and any parse error.
 //
 // Migration steps applied in order:
-//  1. Default missing/zero values: Status → "backlog", Timeout via
+//  1. Migrate the deprecated Model field to ModelOverride (when Model is set
+//     and ModelOverride is unset), then clear Model.
+//  2. Default missing/zero values: Status → "backlog", Timeout via
 //     clampTimeout, missing CreatedAt/UpdatedAt from file mod time.
-//  2. Canonicalize DependsOn: trim whitespace, UUID-validate, deduplicate,
+//  3. Canonicalize DependsOn: trim whitespace, UUID-validate, deduplicate,
 //     stable-sort.
-//  3. Normalize Sandbox (trim) and SandboxByActivity via
+//  4. Normalize Sandbox (trim) and SandboxByActivity via
 //     normalizeSandboxByActivity.
-//  4. Backfill AutoRetryBudget for tasks created before schema version 2.
-//  5. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
+//  5. Backfill AutoRetryBudget for tasks created before schema version 2.
+//  6. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
 func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	var task Task
 	if err := json.Unmarshal(raw, &task); err != nil {

@@ -35,8 +35,8 @@ type activeGroup struct {
 }
 
 // storeHasActiveTasks reports whether the store has any tasks in a non-terminal
-// state (backlog, in_progress, committing, waiting, failed). Used alongside
-// taskCount to decide whether a store can be safely closed.
+// state (in_progress, committing, waiting). Used alongside taskCount to decide
+// whether a store can be safely closed.
 func storeHasActiveTasks(s *store.Store) bool {
 	if s == nil {
 		return false

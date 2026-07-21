@@ -9,6 +9,8 @@
 // The package also exposes a [Registry] for ID-keyed lookup and a
 // [FakeHarness] for tests in dependent packages.
 //
-// This package is a pure type / interface skeleton; no production
-// caller migrates onto it until subsequent spec phases.
+// This package is the canonical agent-CLI abstraction wired throughout
+// production: the runner resolves a [Harness] from the [Registry] to build
+// argv, parse the NDJSON event stream, and project credentials for every
+// sub-agent launch.
 package harness

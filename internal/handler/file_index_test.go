@@ -8,9 +8,9 @@ import (
 
 // TestBuildFiles_BrokenWorkspace verifies that when workspaceMtime fails
 // (non-existent directory), buildFiles returns a non-zero mtime close to
-// time.Now() rather than the zero value. A zero mtime would cause the cache
-// freshness check (entry.rootMTime.After(entry.builtAt)) to permanently return
-// false, silently freezing the file list.
+// time.Now() rather than the zero value. A zero mtime would make the cache
+// freshness check (!mtime.After(entry.rootMTime)) never hold, forcing a
+// rebuild on every read.
 func TestBuildFiles_BrokenWorkspace(t *testing.T) {
 	// Use a path guaranteed not to exist so os.Stat returns an error.
 	ws := filepath.Join(t.TempDir(), "nonexistent")

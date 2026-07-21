@@ -4,8 +4,8 @@
 // The .env file holds authentication tokens, model selection, sandbox routing,
 // container resource limits, workspace paths, and other runtime settings.
 // [Parse] reads the file into a [Config] struct, and [Update] atomically modifies
-// it using a callback, preserving fields that the caller does not touch. This
-// ensures that concurrent reads and writes to the configuration file are safe.
+// it by merging an [Updates] struct, preserving fields whose pointer is left nil.
+// This ensures that concurrent reads and writes to the configuration file are safe.
 //
 // # Connected packages
 //
@@ -20,7 +20,6 @@
 // # Usage
 //
 //	cfg, err := envconfig.Parse("/path/to/.env")
-//	err = envconfig.Update("/path/to/.env", func(c *envconfig.Config) {
-//	    c.DefaultModel = "claude-sonnet-4-6-20250514"
-//	})
+//	model := "claude-sonnet-4-6-20250514"
+//	err = envconfig.Update("/path/to/.env", envconfig.Updates{DefaultModel: &model})
 package envconfig

@@ -585,7 +585,7 @@ func TestRunContainerRegistersHandleForKill(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildContainerArgs extras (paths not covered by runner_test.go)
+// buildContainerSpecForSandbox extras (paths not covered by runner_test.go)
 // ---------------------------------------------------------------------------
 
 // TestBuildContainerArgsWorktreeOverride verifies that worktreeOverrides

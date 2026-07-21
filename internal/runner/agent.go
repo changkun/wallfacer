@@ -133,13 +133,13 @@ type agentResult struct {
 }
 
 // runAgent is the single launch primitive shared by every sub-agent
-// role in the runner. For mountNone roles it handles: sandbox
-// resolution, container spec construction, Launch, stdout/stderr
-// drain, wait, NDJSON parsing, usage accumulation, and token-limit
-// fallback. mountReadOnly and mountReadWrite support land in the
-// sibling inspector-roles and heavyweight-roles tasks; calling
-// runAgent with those modes today returns a "not yet implemented"
-// error so a mis-wired caller fails loudly.
+// role in the runner. It handles: sandbox resolution, container spec
+// construction, Launch, stdout/stderr drain, wait, NDJSON parsing,
+// usage accumulation, and token-limit fallback. Spec construction
+// dispatches on the role's mount mode: mountReadWrite roles get the
+// full heavyweight spec (worktree mounts, board + sibling context,
+// per-task labels), while mountReadOnly and mountNone roles get an
+// inspector spec.
 func (r *Runner) runAgent(
 	ctx context.Context,
 	role AgentRole,

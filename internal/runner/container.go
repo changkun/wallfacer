@@ -54,16 +54,6 @@ const (
 	activityCommitMessage  = store.SandboxActivityCommitMessage
 )
 
-// buildContainerArgs constructs the full argument list for the container run command.
-// It is a pure function of runner configuration and the supplied parameters,
-// which makes it easy to unit-test without actually launching a container.
-//
-// taskID, when non-empty, is used to label the container with wallfacer.task.id
-// so the monitor can correlate containers to tasks even with slug-based names.
-// boardDir, when non-empty, is a host directory containing board.json that
-// will be mounted read-only at /workspace/.tasks/ inside the container.
-// siblingMounts maps shortID → (repoPath → worktreePath) for read-only
-// sibling worktree mounts under /workspace/.tasks/worktrees/.
 // buildContainerSpecForSandbox constructs a ContainerSpec for the given sandbox
 // with all workspace mounts, labels, board context, and agent command configured.
 func (r *Runner) buildContainerSpecForSandbox(

@@ -167,14 +167,7 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 
 // findLatestThreadPlanCommit returns (hash, subject, body) for the most
 // recent commit in ws that matches both the Plan-Round trailer and (when
-// threadID is non-empty) a Plan-Thread trailer with the given ID. Revert
-// commits already carry a thread trailer for the same thread, so this
-// would re-match them; to avoid picking a commit that's already been
-// reverted, we walk the log newest-first and skip any commit whose diff
-// has been net-reverted by a later commit (git represents that naturally:
-// when pair (C, revert(C)) sits in history, the files match neither C
-// nor the tree at the point before C — we detect by checking if `git
-// cherry` would consider it cherry-picked).
+// threadID is non-empty) a Plan-Thread trailer with the given ID.
 //
 // Simplification: because every round commit and every revert carries a
 // distinct Plan-Round number, walking newest-first and picking the first

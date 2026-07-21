@@ -197,7 +197,7 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate verifies that
-// buildContainerArgs always sees the current workspace list, even when
+// buildContainerSpecForSandbox always sees the current workspace list, even when
 // applyWorkspaceSnapshot is called concurrently. Before the fix, the
 // container spec builder read r.workspaces without storeMu, which could
 // produce zero workspace mounts during a workspace switch.

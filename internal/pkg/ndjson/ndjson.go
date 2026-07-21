@@ -86,9 +86,9 @@ func readAll[T any](rc io.ReadCloser, cfg *config) ([]T, error) {
 		results = append(results, v)
 	}
 
-	// Check scanner error before close error: a scan failure (e.g. token
-	// too long) is the more actionable diagnostic. However, close errors
-	// take precedence here because a failed close may mean data was lost.
+	// A failed close takes precedence over a scan error: a close failure
+	// may mean data was lost, the more serious condition. A scan error
+	// (e.g. token too long) is returned only when close succeeds.
 	scanErr := scanner.Err()
 	if err := rc.Close(); err != nil {
 		return nil, err

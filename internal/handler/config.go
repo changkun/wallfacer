@@ -124,9 +124,6 @@ func (h *Handler) visibleWorkspaces(ctx context.Context) []string {
 	return nil
 }
 
-// buildConfigResponse assembles the full configuration payload returned by
-// GET /api/config and reused by UpdateWorkspaces after a workspace switch.
-// When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
 // activeGroupInfo describes a workspace group with open stores,
 // including per-status task counts for the frontend to display.
 type activeGroupInfo struct {
@@ -161,6 +158,9 @@ func (h *Handler) activeGroupInfos(ctx context.Context) []activeGroupInfo {
 	return infos
 }
 
+// buildConfigResponse assembles the full configuration payload returned by
+// GET /api/config and reused by UpdateWorkspaces after a workspace switch.
+// When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
 	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()

@@ -916,8 +916,8 @@ func TestCommitsBehind_RevListError(t *testing.T) {
 	}
 }
 
-// TestDefaultBranchCommitHash_LastErrNil verifies the case where all candidates
-// fail but no error is recorded (shouldn't happen in practice, but exercises the guard).
+// TestDefaultBranchCommitHash_NoCandidatesFound verifies that
+// defaultBranchCommitHash returns an error when no candidate branch resolves.
 func TestDefaultBranchCommitHash_NoCandidatesFound(t *testing.T) {
 	repo := setupRepo(t)
 	// Use a branch name that doesn't exist in any form.
@@ -938,8 +938,9 @@ func TestBranchTipCommit_EmptyBranch(t *testing.T) {
 	}
 }
 
-// TestRecoverRebaseState_ClearConflictedPathsError verifies that when
-// clearConflictedPaths fails, recoverRebaseState returns a wrapped error.
+// TestRecoverRebaseState_NonGitDir verifies that recoverRebaseState returns nil
+// for a non-git directory, where hasRebaseOrMergeState reports no in-progress
+// state and the function early-returns without clearing conflicted paths.
 func TestRecoverRebaseState_NonGitDir(t *testing.T) {
 	// A non-git dir will cause hasRebaseOrMergeState to return false,
 	// so recoverRebaseState returns nil without calling clearConflictedPaths.

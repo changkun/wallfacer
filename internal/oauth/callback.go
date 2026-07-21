@@ -27,13 +27,11 @@ type CallbackServer struct {
 	ctx      context.Context
 }
 
-// NewCallbackServer binds a listener on 127.0.0.1:0 (random port) and
-// starts an HTTP server that accepts exactly one callback request.
-// The caller should wrap ctx with context.WithTimeout to enforce a deadline.
 // NewCallbackServer binds a listener on 127.0.0.1 and starts an HTTP server
 // that accepts exactly one callback request. Use port 0 for a random port,
 // or a specific port (e.g. 1455) when the provider requires a fixed redirect URI.
 // callbackPath sets the handler path (default "/" if empty).
+// The caller should wrap ctx with context.WithTimeout to enforce a deadline.
 func NewCallbackServer(ctx context.Context, port int, callbackPath string) (*CallbackServer, error) {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	ln, err := net.Listen("tcp", addr)
