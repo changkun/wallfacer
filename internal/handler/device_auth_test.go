@@ -14,6 +14,8 @@ import (
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/oidc"
+
+	"golang.org/x/oauth2"
 )
 
 func newDeviceServer(t *testing.T, deviceBody, tokenBody string, tokenStatus int) (*oidc.Client, *httptest.Server) {
@@ -122,6 +124,51 @@ func TestDeviceAuth_Lifecycle(t *testing.T) {
 	_ = json.NewDecoder(rec.Body).Decode(&presp)
 	if presp.Status != "idle" {
 		t.Fatalf("idle poll = %q", presp.Status)
+	}
+}
+
+// failingTokenStore is a TokenStore whose Save always fails, simulating a
+// server-side persistence error after the OAuth exchange succeeds.
+type failingTokenStore struct{}
+
+func (failingTokenStore) Save(*oauth2.Token) error     { return fmt.Errorf("disk full") }
+func (failingTokenStore) Load() (*oauth2.Token, error) { return nil, nil }
+func (failingTokenStore) Clear() error                 { return nil }
+
+// TestDeviceAuth_SaveFailureReportsFailedNotDenied verifies that when the token
+// store cannot persist an otherwise-successful login, poll reports "failed"
+// (a server-side error) rather than "denied" (which the SPA shows as the user
+// rejecting the request).
+func TestDeviceAuth_SaveFailureReportsFailedNotDenied(t *testing.T) {
+	c, srv := newDeviceServer(t,
+		`{"device_code":"dc","user_code":"UC-1234","verification_uri":"https://verify.example/","expires_in":300,"interval":1}`,
+		`{"access_token":"at-x","token_type":"Bearer","expires_in":3600}`, 0)
+	defer srv.Close()
+
+	d := &DeviceAuth{OIDC: c, Store: failingTokenStore{}}
+	mux := http.NewServeMux()
+	d.Mount(mux)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/start", bytes.NewReader([]byte(`{}`))))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var presp pollResponse
+	for i := 0; i < 60; i++ {
+		rec = httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/auth/device/poll", nil))
+		presp = pollResponse{}
+		_ = json.NewDecoder(rec.Body).Decode(&presp)
+		if presp.Status == "pending" {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		break
+	}
+	if presp.Status != "failed" {
+		t.Fatalf("poll status = %q (err=%q), want failed", presp.Status, presp.Error)
 	}
 }
 

@@ -63,7 +63,7 @@ export interface DeviceStartResponse {
 }
 
 export interface DevicePollResponse {
-  status: 'idle' | 'pending' | 'done' | 'denied' | 'expired';
+  status: 'idle' | 'pending' | 'done' | 'denied' | 'expired' | 'failed';
   error?: string;
 }
 

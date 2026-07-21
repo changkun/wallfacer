@@ -230,8 +230,15 @@ func (d *DeviceAuth) poll(w http.ResponseWriter, _ *http.Request) {
 		// Clear the flow now that it's terminal.
 		d.flow = nil
 		d.mu.Unlock()
+		// Release the flow's context timer (the 15-minute WithTimeout created in
+		// start). The poll goroutine has already returned, so this is a pure
+		// resource release, not a cancellation.
+		flow.cancel()
 		if err != nil {
-			status := "denied"
+			// Default to a generic failure. Only an explicit OAuth denial or
+			// expiry maps to those user-facing reasons; a token-store Save error
+			// or any other server-side failure must not be reported as "denied".
+			status := "failed"
 			var rerr *oauth2.RetrieveError
 			if errors.As(err, &rerr) {
 				switch rerr.ErrorCode {

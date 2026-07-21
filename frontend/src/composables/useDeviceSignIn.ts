@@ -88,6 +88,13 @@ export function useDeviceSignIn() {
         error.value = res.status;
         status.value = 'error';
         break;
+      case 'failed':
+        // Server-side failure (e.g. the token store could not persist the
+        // token). Distinct from user denial; surface it as a generic failure.
+        stopPolling();
+        error.value = 'failed';
+        status.value = 'error';
+        break;
       case 'idle':
         // The flow vanished server-side (e.g. a competing start cancelled it).
         stopPolling();
