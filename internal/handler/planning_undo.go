@@ -290,9 +290,11 @@ func buildRevertSubject(originalSummary string, originalRound int) string {
 	if originalSummary != "" {
 		s += " (" + originalSummary + ")"
 	}
-	// Keep subject lines from growing absurdly long.
-	if len(s) > 80 {
-		s = s[:80]
+	// Keep subject lines from growing absurdly long. Truncate by rune, not
+	// byte, so a multi-byte (e.g. CJK) summary is not cut mid-rune into an
+	// invalid-UTF-8 subject.
+	if r := []rune(s); len(r) > 80 {
+		s = string(r[:80])
 	}
 	return s
 }

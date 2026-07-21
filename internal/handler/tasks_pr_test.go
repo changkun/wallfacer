@@ -106,3 +106,42 @@ func TestTaskRepoRef_NoWorktrees(t *testing.T) {
 		t.Error("expected not ok with no worktrees")
 	}
 }
+
+// TestTaskRepoRef_MultiRepoDeterministic verifies that a task spanning two
+// github.com repos always resolves to the same repo (the path-sorted first),
+// rather than a nondeterministic one from map iteration order.
+func TestTaskRepoRef_MultiRepoDeterministic(t *testing.T) {
+	dirA := gitRepoWithOrigin(t, "https://github.com/org/repo-a.git")
+	dirB := gitRepoWithOrigin(t, "https://github.com/org/repo-b.git")
+	task := &store.Task{
+		BranchName:    "task/x",
+		WorktreePaths: map[string]string{dirA: dirA, dirB: dirB},
+	}
+	expectedName := "repo-a"
+	if dirB < dirA {
+		expectedName = "repo-b" // resolution follows sorted worktree path
+	}
+	for i := range 50 {
+		_, name, _, _, ok := taskRepoRef(task)
+		if !ok {
+			t.Fatalf("iteration %d: expected ok", i)
+		}
+		if name != expectedName {
+			t.Fatalf("iteration %d: name = %q, want %q (nondeterministic repo selection)", i, name, expectedName)
+		}
+	}
+}
+
+// TestBuildRevertSubject_MultibyteTruncation guards against slicing a multi-byte
+// summary at a raw byte boundary, which would cut a rune in half.
+func TestBuildRevertSubject_MultibyteTruncation(t *testing.T) {
+	// The leading "a" shifts the 80-byte boundary into the middle of a 3-byte
+	// rune; a raw byte slice would yield invalid UTF-8.
+	got := buildRevertSubject("a"+strings.Repeat("世", 100), 3)
+	if !utf8.ValidString(got) {
+		t.Fatalf("revert subject is not valid UTF-8: %q", got)
+	}
+	if n := utf8.RuneCountInString(got); n > 80 {
+		t.Errorf("subject rune count = %d, want <= 80", n)
+	}
+}

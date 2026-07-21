@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -31,7 +32,15 @@ func taskRepoRef(task *store.Task) (owner, name, base, head string, ok bool) {
 	if head == "" {
 		return "", "", "", "", false
 	}
+	// Iterate worktree paths in a stable order so a multi-repo task resolves to
+	// the same GitHub repo on every call; ranging a map directly would pick a
+	// nondeterministic origin. Mirrors primaryWorktree in tasks_autoimplement.go.
+	repoPaths := make([]string, 0, len(task.WorktreePaths))
 	for repoPath := range task.WorktreePaths {
+		repoPaths = append(repoPaths, repoPath)
+	}
+	sort.Strings(repoPaths)
+	for _, repoPath := range repoPaths {
 		if !gitutil.IsGitRepo(repoPath) {
 			continue
 		}
