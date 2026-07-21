@@ -10,6 +10,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/sortedkeys"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
@@ -218,19 +219,21 @@ func runDriftPipeline(ctx context.Context, task store.Task, absPath string, work
 // repo when the workspace key does not match. Returns empty strings when no
 // range is available.
 func taskCommitRange(task store.Task, ws string) (base, tip string) {
-	pick := func(m map[string]string) string {
-		if m == nil {
-			return ""
+	// Resolve base and tip from the SAME repo so a multi-repo task never pairs
+	// one repo's base commit with another's tip. Prefer the requested workspace
+	// key; otherwise pick a deterministic repo present in both maps (ranging the
+	// maps independently could mismatch repos on Go's randomized iteration).
+	if b, ok := task.BaseCommitHashes[ws]; ok {
+		if t, ok := task.CommitHashes[ws]; ok {
+			return b, t
 		}
-		if v, ok := m[ws]; ok {
-			return v
-		}
-		for _, v := range m {
-			return v // single-repo task: take the only entry
-		}
-		return ""
 	}
-	return pick(task.BaseCommitHashes), pick(task.CommitHashes)
+	for k := range sortedkeys.Of(task.BaseCommitHashes) {
+		if t, ok := task.CommitHashes[k]; ok {
+			return task.BaseCommitHashes[k], t
+		}
+	}
+	return "", ""
 }
 
 func gitDiff(ctx context.Context, ws, base, tip string) string {

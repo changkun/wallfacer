@@ -178,3 +178,24 @@ func revertHead(t *testing.T, ws string) {
 		t.Fatalf("git revert: %v\n%s", err, out)
 	}
 }
+
+// TestTaskCommitRange_MultiRepoSameRepoPairing verifies that when the requested
+// workspace key is absent, base and tip are resolved from the SAME repo rather
+// than paired across repos by nondeterministic map iteration.
+func TestTaskCommitRange_MultiRepoSameRepoPairing(t *testing.T) {
+	task := store.Task{
+		BaseCommitHashes: map[string]string{"/repo/a": "baseA", "/repo/b": "baseB"},
+		CommitHashes:     map[string]string{"/repo/a": "tipA", "/repo/b": "tipB"},
+	}
+	for i := range 50 {
+		base, tip := taskCommitRange(task, "/absent")
+		// Sorted-first key is "/repo/a"; base and tip must both come from it.
+		if base != "baseA" || tip != "tipA" {
+			t.Fatalf("iteration %d: got (%q,%q), want (baseA,tipA); base/tip mismatched across repos", i, base, tip)
+		}
+	}
+	// The requested workspace key wins when present in both maps.
+	if base, tip := taskCommitRange(task, "/repo/b"); base != "baseB" || tip != "tipB" {
+		t.Errorf("ws key present: got (%q,%q), want (baseB,tipB)", base, tip)
+	}
+}
