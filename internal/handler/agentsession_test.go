@@ -764,12 +764,10 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 	cs, _ := tm.Store(threadID)
 	_ = cs.SaveSession(agentsession.ResumeInfo{FocusedTask: created.ID.String()})
 
-	h2 := h
-
 	body := strings.NewReader(`{"task_id":"` + created.ID.String() + `","prompt":"updated prompt","thread_id":"` + threadID + `"}`)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/agent/tool/update_task_prompt", body)
-	h2.UpdateTaskPromptTool(rec, req)
+	h.UpdateTaskPromptTool(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
@@ -786,7 +784,7 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 		t.Errorf("round = %v, want 1", resp["round"])
 	}
 
-	updated, err := h2.store.GetTask(ctx, created.ID)
+	updated, err := h.store.GetTask(ctx, created.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
@@ -794,7 +792,7 @@ func TestUpdateTaskPromptTool_WritesPrompt(t *testing.T) {
 		t.Errorf("task.Prompt = %q, want 'updated prompt'", updated.Prompt)
 	}
 
-	events, err := h2.store.GetEvents(ctx, created.ID)
+	events, err := h.store.GetEvents(ctx, created.ID)
 	if err != nil {
 		t.Fatalf("GetEvents: %v", err)
 	}

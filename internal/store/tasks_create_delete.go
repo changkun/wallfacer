@@ -313,7 +313,7 @@ func (s *Store) removeOrphanedDependents(ctx context.Context, cancelledID uuid.U
 		}); err != nil {
 			logger.Store.Warn("orphan cleanup: remove dep", "dependent", dep.ID, "cancelled", cancelledID, "error", err)
 		} else {
-			logger.Store.Warn("removed orphaned dependency", "dependent", dep.ID, "cancelled_dep", cancelledID)
+			logger.Store.Info("removed orphaned dependency", "dependent", dep.ID, "cancelled_dep", cancelledID)
 		}
 	}
 }

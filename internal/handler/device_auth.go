@@ -46,10 +46,6 @@ type deviceFlowState struct {
 	done      chan struct{}
 	expiresAt time.Time
 
-	// Populated by the device-auth call.
-	verificationURI string
-	userCode        string
-
 	// Populated when the poll loop finishes.
 	finalErr error
 	// token holds the issued token once the poll loop succeeds, so the poll
@@ -160,12 +156,10 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	flow := &deviceFlowState{
-		ctx:             ctx,
-		cancel:          cancel,
-		done:            make(chan struct{}),
-		expiresAt:       da.Expiry,
-		verificationURI: verify,
-		userCode:        da.UserCode,
+		ctx:       ctx,
+		cancel:    cancel,
+		done:      make(chan struct{}),
+		expiresAt: da.Expiry,
 	}
 	if da.Expiry.IsZero() {
 		// oauth2 sometimes omits Expiry; fall back to ExpiresIn semantics.
