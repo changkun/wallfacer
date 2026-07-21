@@ -194,6 +194,53 @@ func TestUndoPlanningRound_WithDirtyWorkingTree(t *testing.T) {
 	}
 }
 
+// TestUndoPlanningRound_DispatchCancelledDespiteStashConflict verifies that a
+// stash-pop conflict after the revert commits does not skip cancelling the
+// tasks the reverted round dispatched. The dirty edit changes the same
+// dispatched_task_id line the revert removes, forcing a modify/delete conflict
+// on stash pop; the task must still be cancelled.
+func TestUndoPlanningRound_DispatchCancelledDespiteStashConflict(t *testing.T) {
+	ws := initGitTestRepo(t)
+	h := newStaticWorkspaceHandler(t, []string{ws})
+
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
+		Prompt:  "dispatched-by-planning",
+		Timeout: 60,
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+
+	// Baseline (no dispatched_task_id), committed.
+	writeSpec(t, ws, "foo.md", "---\ntitle: foo\n---\n")
+	runGit(t, ws, "add", "specs/")
+	runGit(t, ws, "commit", "-m", "seed foo spec")
+
+	// Planning round adds the dispatched_task_id line.
+	writeSpec(t, ws, "foo.md", "---\ntitle: foo\ndispatched_task_id: "+task.ID.String()+"\n---\n")
+	seedPlanningCommit(t, ws, 1, "dispatch foo")
+
+	// Uncommitted dirty edit that MODIFIES the dispatched_task_id line. The
+	// revert deletes that line, so the stash pop is a modify/delete conflict.
+	writeSpec(t, ws, "foo.md", "---\ntitle: foo\ndispatched_task_id: "+task.ID.String()+"-DIRTY\n---\n")
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/undo", nil)
+	h.UndoPlanningRound(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (stash pop conflict)\nbody: %s", rec.Code, rec.Body.String())
+	}
+
+	got, err := h.store.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after undo: %v", err)
+	}
+	if got.Status != store.TaskStatusCancelled {
+		t.Errorf("task status = %q, want %q; dispatched task not cancelled on stash-pop-conflict path", got.Status, store.TaskStatusCancelled)
+	}
+}
+
 func TestUndoPlanningRound_DispatchAware(t *testing.T) {
 	ws := initGitTestRepo(t)
 

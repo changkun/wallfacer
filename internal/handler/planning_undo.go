@@ -132,6 +132,14 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// The revert is now in history, so any tasks it dispatched must be
+		// cancelled regardless of what happens to the stash below. Do this
+		// before the stash pop so a pop conflict cannot leave the reverted round
+		// with its dispatched tasks still live.
+		for _, id := range extractDispatchedTaskIDs(diff) {
+			h.cancelDispatchedTask(ctx, id)
+		}
+
 		if stashed {
 			if err := gitutil.StashPop(ws); err != nil {
 				httpjson.Write(w, http.StatusConflict, map[string]any{
@@ -141,10 +149,6 @@ func (h *Handler) UndoPlanningRound(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-		}
-
-		for _, id := range extractDispatchedTaskIDs(diff) {
-			h.cancelDispatchedTask(ctx, id)
 		}
 
 		var filesReverted []string
