@@ -439,19 +439,12 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 7. Verify every external UUID dep actually exists in the store.
-	//    Self-deps via symbolic ref are already caught by Kahn's above (self-loop
-	//    leaves inDegree > 0). We also explicitly guard against a task listing its
-	//    own pre-assigned UUID, though callers cannot know it in practice.
+	//    Batch-internal refs (including a task referencing its own ref) are
+	//    already validated by Kahn's topo sort in step 5: a self-loop leaves
+	//    inDegree > 0, so the batch fails with 422 there before reaching here.
 	for i, t := range req.Tasks {
 		for _, dep := range t.DependsOnRefs {
 			if _, ok := refToIdx[dep]; ok {
-				// Batch-internal ref — already validated by Kahn's.
-				if refToIdx[dep] == i {
-					// Self-dep through batch ref (redundant guard; Kahn's catches it).
-					ref := batchRefLabel(t.Ref, i)
-					http.Error(w, fmt.Sprintf("ref %q: task cannot depend on itself", ref), http.StatusBadRequest)
-					return
-				}
 				continue
 			}
 			// External UUID — verify it exists.

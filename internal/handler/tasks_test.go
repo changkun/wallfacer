@@ -3023,6 +3023,32 @@ func TestBatchCreateTasks_CycleDetection(t *testing.T) {
 	}
 }
 
+// TestBatchCreateTasks_SelfRefRejected verifies that a task depending on its own
+// ref is rejected with 422 by the topo sort (the self-loop leaves inDegree > 0),
+// not by a separate self-dependency guard.
+func TestBatchCreateTasks_SelfRefRejected(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := batchBody(t, map[string]any{
+		"tasks": []map[string]any{
+			{"ref": "a", "prompt": "task A", "depends_on_refs": []string{"a"}},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for self-ref, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	if resp["error"] != "cycle detected" {
+		t.Errorf("expected 'cycle detected' error, got %v", resp["error"])
+	}
+}
+
 // TestBatchCreateTasks_DuplicateRef verifies 400 when two tasks share the same ref.
 func TestBatchCreateTasks_DuplicateRef(t *testing.T) {
 	h := newTestHandler(t)
