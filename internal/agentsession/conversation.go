@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 )
 
 // Message is a single entry in the agent-session conversation log.
@@ -241,10 +242,7 @@ func (s *ConversationStore) BuildHistoryContext() string {
 		} else {
 			b.WriteString("Assistant: ")
 		}
-		content := m.Content
-		if len(content) > 500 {
-			content = content[:500] + "..."
-		}
+		content := sanitize.Truncate(m.Content, 500)
 		b.WriteString(content)
 		b.WriteString("\n\n")
 	}

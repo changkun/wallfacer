@@ -140,7 +140,7 @@ func printBoard(addr string, tasks []taskSummary) {
 
 			idShort := t.ID
 			if len(idShort) > 8 {
-				idShort = idShort[:8]
+				idShort = idShort[:8] // utf8-safe: UUID text is ASCII
 			}
 
 			fmt.Printf("  %s  %-56s  turns=%-3d  %s\n",

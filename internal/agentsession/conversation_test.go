@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func newTestStore(t *testing.T) *ConversationStore {
@@ -469,12 +470,29 @@ func TestBuildHistoryContext_TruncatesLongContent(t *testing.T) {
 	_ = cs.AppendMessage(Message{Role: "user", Content: longContent, Timestamp: time.Now()})
 
 	got := cs.BuildHistoryContext()
-	// Content should be truncated to 500 chars + "..."
-	if !strings.Contains(got, "...") {
-		t.Errorf("expected truncated content with '...', got len=%d", len(got))
+	// Content is truncated to 500 runes with a trailing ellipsis.
+	if !strings.Contains(got, "\u2026") {
+		t.Errorf("expected truncated content with an ellipsis, got len=%d", len(got))
 	}
 	if strings.Contains(got, strings.Repeat("x", 501)) {
 		t.Error("content should be truncated to 500 chars")
+	}
+}
+
+// TestBuildHistoryContext_TruncationPreservesUTF8 verifies message content is
+// cut on a rune boundary. Byte-index truncation of CJK content emits a partial
+// UTF-8 sequence into the history block handed to the agent.
+func TestBuildHistoryContext_TruncationPreservesUTF8(t *testing.T) {
+	cs := newTestStore(t)
+	// 600 x U+6C49 is 1800 bytes; a 500-byte cut falls inside the 167th rune.
+	_ = cs.AppendMessage(Message{Role: "user", Content: strings.Repeat("\u6c49", 600), Timestamp: time.Now()})
+
+	got := cs.BuildHistoryContext()
+	if !utf8.ValidString(got) {
+		t.Fatalf("history context is not valid UTF-8: %q", got)
+	}
+	if want := strings.Repeat("\u6c49", 500) + "\u2026"; !strings.Contains(got, want) {
+		t.Errorf("expected content truncated to 500 runes plus ellipsis, got %q", got)
 	}
 }
 

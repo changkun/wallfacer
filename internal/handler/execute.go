@@ -844,7 +844,7 @@ func generateWorktreeDiff(worktreePaths map[string]string) string {
 	}
 	combined := strings.Join(parts, "\n")
 	if len(combined) > constants.MaxDiffBytes {
-		combined = combined[:constants.MaxDiffBytes] + "\n... (diff truncated)"
+		combined = strings.ToValidUTF8(combined[:constants.MaxDiffBytes], "") + "\n... (diff truncated)"
 	}
 	return combined
 }

@@ -317,7 +317,7 @@ func (p *Runtime) UpdateWorkspaces(workspaces []string, fingerprint string) {
 // or the full string if shorter.
 func truncFingerprint(fp string) string {
 	if len(fp) > 12 {
-		return fp[:12]
+		return fp[:12] // utf8-safe: fingerprints are hex
 	}
 	return fp
 }

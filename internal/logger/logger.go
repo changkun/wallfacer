@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/pkg/uuidutil"
 )
 
@@ -268,9 +269,7 @@ func prettyValue(v slog.Value) string {
 	if uuidutil.IsValid(s) {
 		return s[:8]
 	}
-	if len(s) > constants.LogValueMaxLen {
-		s = s[:constants.LogValueMaxLen] + "…"
-	}
+	s = sanitize.Truncate(s, constants.LogValueMaxLen)
 	if needsQuoting(s) {
 		return fmt.Sprintf("%q", s)
 	}

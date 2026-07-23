@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 )
 
 // UpdateTaskStatus transitions the task identified by id to the given status.
@@ -503,13 +504,10 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 
 	// Snapshot the current run's outcome into a RetryRecord before resetting
 	// fields. This preserves a condensed audit trail of each lifecycle.
-	// Result is truncated to 2000 chars to keep the RetryHistory entries bounded.
+	// Result is truncated to 2000 runes to keep the RetryHistory entries bounded.
 	result := ""
 	if t.Result != nil {
-		result = *t.Result
-		if len(result) > 2000 {
-			result = result[:2000] + "..."
-		}
+		result = sanitize.Truncate(*t.Result, 2000)
 	}
 	sessionID := ""
 	if t.SessionID != nil {

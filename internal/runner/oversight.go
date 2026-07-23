@@ -348,16 +348,12 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 			switch item.Type {
 			case "agent_message":
 				if t := strings.TrimSpace(item.Text); t != "" {
-					if len(t) > 200 {
-						t = t[:200] + "…"
-					}
+					t = truncate(t, 200)
 					act.TextNotes = append(act.TextNotes, t)
 				}
 			case "command_execution", "bash":
 				command := normalizeCodexCommand(item.Command)
-				if len(command) > 120 {
-					command = command[:120] + "…"
-				}
+				command = truncate(command, 120)
 				if command != "" {
 					if msg.Type == "item.started" {
 						if item.ID != "" && seenCodexCommands[item.ID] {
@@ -379,9 +375,7 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 				if tool == "" {
 					continue
 				}
-				if len(input) > 120 {
-					input = input[:120] + "…"
-				}
+				input = truncate(input, 120)
 				call := tool
 				if input != "" {
 					call += "(" + input + ")"
@@ -414,9 +408,7 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 			switch block.Type {
 			case "text":
 				if t := strings.TrimSpace(block.Text); t != "" {
-					if len(t) > 200 {
-						t = t[:200] + "…"
-					}
+					t = truncate(t, 200)
 					act.TextNotes = append(act.TextNotes, t)
 				}
 			case "tool_use", "tool_call":
@@ -428,9 +420,7 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 					continue
 				}
 				input := extractToolInputGo(name, parseRawInput(block.Input))
-				if len(input) > 120 {
-					input = input[:120] + "…"
-				}
+				input = truncate(input, 120)
 				entry := name
 				if input != "" {
 					entry += "(" + input + ")"
@@ -583,10 +573,7 @@ func extractToolInputGo(name string, input map[string]interface{}) string {
 		return str("query")
 	case "Task":
 		if p := str("prompt"); p != "" {
-			if len(p) > 120 {
-				return p[:120]
-			}
-			return p
+			return truncate(p, 120)
 		}
 		return ""
 	default:
@@ -708,7 +695,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 	// Cap total log size to avoid exceeding prompt limits.
 	if len(log) > constants.MaxOversightLogBytes {
-		log = log[:constants.MaxOversightLogBytes] + "\n[...truncated...]"
+		log = strings.ToValidUTF8(log[:constants.MaxOversightLogBytes], "") + "\n[...truncated...]"
 	}
 
 	prompt := r.promptsMgr.Oversight(log)

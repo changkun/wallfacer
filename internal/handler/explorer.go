@@ -19,6 +19,7 @@ import (
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
@@ -688,10 +689,7 @@ func (h *Handler) ExplorerTaskPrompts(w http.ResponseWriter, r *http.Request) {
 			seenID[id] = true
 			title := t.Title
 			if title == "" {
-				title = t.Prompt
-				if len(title) > 80 {
-					title = title[:80] + "..."
-				}
+				title = sanitize.Truncate(t.Prompt, 80)
 			}
 			entries = append(entries, taskPromptEntry{
 				TaskID:    id,

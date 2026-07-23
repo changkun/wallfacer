@@ -10,6 +10,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
+
+	"latere.ai/x/wallfacer/internal/constants"
 )
 
 // TestInit verifies that Init populates all named loggers for both formats.
@@ -430,6 +433,17 @@ func TestPrettyValue(t *testing.T) {
 		got := prettyValue(slog.StringValue(s))
 		if strings.Contains(got, "…") {
 			t.Errorf("200-char string should not be truncated, got: %q", got)
+		}
+	})
+
+	t.Run("multi-byte string truncates on a rune boundary", func(t *testing.T) {
+		// 300 x U+6C49 is 900 bytes; a 200-byte cut falls inside the 67th rune.
+		got := prettyValue(slog.StringValue(strings.Repeat("\u6c49", 300)))
+		if !utf8.ValidString(got) {
+			t.Errorf("truncated log value is not valid UTF-8: %q", got)
+		}
+		if want := strings.Repeat("\u6c49", constants.LogValueMaxLen) + "\u2026"; got != want {
+			t.Errorf("log value not rune-truncated: %q", got)
 		}
 	})
 

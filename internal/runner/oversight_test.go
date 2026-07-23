@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/store"
@@ -1251,8 +1253,9 @@ func TestExtractToolInputGo(t *testing.T) {
 		{name: "websearch query", tool: "WebSearch", input: map[string]interface{}{"query": "golang channels"}, want: "golang channels"},
 		// Task short prompt
 		{name: "task short prompt", tool: "Task", input: map[string]interface{}{"prompt": "do something"}, want: "do something"},
-		// Task long prompt truncated at 120
-		{name: "task long prompt truncated", tool: "Task", input: map[string]interface{}{"prompt": string(make([]byte, 200))}, want: string(make([]byte, 120))},
+		// Task long prompt truncated at 120 runes with a trailing ellipsis,
+		// matching the other tool-input branches.
+		{name: "task long prompt truncated", tool: "Task", input: map[string]interface{}{"prompt": string(make([]byte, 200))}, want: string(make([]byte, 120)) + "…"},
 		// Task empty prompt
 		{name: "task empty prompt", tool: "Task", input: map[string]interface{}{"prompt": ""}, want: ""},
 		// Default fallback keys
@@ -1673,5 +1676,62 @@ func TestPeriodicOversightWorker_EnvFileMissing(t *testing.T) {
 		// Good — missing file → parse error → interval=0 → returns immediately.
 	case <-time.After(2 * time.Second):
 		t.Error("periodicOversightWorker did not return when env file is missing")
+	}
+}
+
+// TestParseTurnActivityTruncationPreservesUTF8 verifies turn-activity notes and
+// tool-call arguments are cut on rune boundaries. Byte-index truncation of CJK
+// agent output leaves a partial UTF-8 sequence in the oversight record.
+func TestParseTurnActivityTruncationPreservesUTF8(t *testing.T) {
+	// 300 x U+6C49 is 900 bytes; a 200-byte cut falls inside the 67th rune,
+	// and a 120-byte cut inside the 41st.
+	long := strings.Repeat("汉", 300)
+
+	t.Run("claude text note and tool input", func(t *testing.T) {
+		ndjson := fmt.Sprintf(
+			`{"type":"assistant","message":{"content":[{"type":"text","text":"%s"},{"type":"tool_use","name":"Read","input":{"file_path":"%s"}}]}}`,
+			long, long)
+		act := parseTurnActivity([]byte(ndjson), 1)
+		if len(act.TextNotes) != 1 || len(act.ToolCalls) != 1 {
+			t.Fatalf("expected 1 note and 1 tool call, got %d/%d", len(act.TextNotes), len(act.ToolCalls))
+		}
+		if want := strings.Repeat("汉", 200) + "…"; act.TextNotes[0] != want {
+			t.Errorf("text note not rune-truncated: %q", act.TextNotes[0])
+		}
+		if !utf8.ValidString(act.ToolCalls[0]) {
+			t.Errorf("tool call is not valid UTF-8: %q", act.ToolCalls[0])
+		}
+		if want := "Read(" + strings.Repeat("汉", 120) + "…)"; act.ToolCalls[0] != want {
+			t.Errorf("tool input not rune-truncated: %q", act.ToolCalls[0])
+		}
+	})
+
+	t.Run("codex text note and command", func(t *testing.T) {
+		ndjson := fmt.Sprintf(
+			`{"type":"item.completed","item":{"type":"agent_message","text":"%s"}}`+"\n"+
+				`{"type":"item.completed","item":{"type":"command_execution","command":"%s"}}`,
+			long, long)
+		act := parseTurnActivity([]byte(ndjson), 1)
+		if len(act.TextNotes) != 1 || len(act.ToolCalls) != 1 {
+			t.Fatalf("expected 1 note and 1 tool call, got %d/%d", len(act.TextNotes), len(act.ToolCalls))
+		}
+		if want := strings.Repeat("汉", 200) + "…"; act.TextNotes[0] != want {
+			t.Errorf("text note not rune-truncated: %q", act.TextNotes[0])
+		}
+		if !utf8.ValidString(act.ToolCalls[0]) {
+			t.Errorf("command is not valid UTF-8: %q", act.ToolCalls[0])
+		}
+	})
+}
+
+// TestExtractToolInputTaskPromptTruncationPreservesUTF8 covers the Task-prompt
+// branch of extractToolInputGo, which truncated without an ellipsis.
+func TestExtractToolInputTaskPromptTruncationPreservesUTF8(t *testing.T) {
+	got := extractToolInputGo("Task", map[string]any{"prompt": strings.Repeat("汉", 300)})
+	if !utf8.ValidString(got) {
+		t.Fatalf("task prompt is not valid UTF-8: %q", got)
+	}
+	if want := strings.Repeat("汉", 120) + "…"; got != want {
+		t.Errorf("task prompt not rune-truncated: %q", got)
 	}
 }

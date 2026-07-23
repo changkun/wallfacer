@@ -53,7 +53,7 @@ hooks:                                                                   ## Inst
 	@echo "installed git hooks (core.hooksPath=.githooks)"
 
 # Run all linters (Go + frontend)
-lint: lint-go lint-js lint-otel
+lint: lint-go lint-js lint-otel lint-truncate
 
 # Run Go linters with the repo-pinned golangci-lint version.
 lint-go: frontend-build
@@ -82,6 +82,11 @@ lint-otel:
 		echo "$$bare"; \
 		exit 1; \
 	fi
+
+# Guardrail against byte-index truncation of strings, which can cut inside a
+# multi-byte UTF-8 sequence and surface as U+FFFD in API responses and logs.
+lint-truncate:
+	@./scripts/lint-truncate.sh
 
 # Run all checks (fmt + lint + backend tests + frontend tests)
 test: fmt lint test-backend test-frontend

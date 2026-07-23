@@ -290,7 +290,7 @@ func logBoardManifestSizeWarning(sizes []struct {
 
 	top := sizes
 	if len(top) > 5 {
-		top = top[:5]
+		top = top[:5] // utf8-safe: element slice, not a string
 	}
 
 	args := []any{"total_bytes", totalBytes}

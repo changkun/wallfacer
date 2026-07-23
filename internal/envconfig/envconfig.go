@@ -651,5 +651,5 @@ func MaskToken(v string) string {
 	if len(v) <= 8 {
 		return strings.Repeat("*", len(v))
 	}
-	return v[:4] + "..." + v[len(v)-4:]
+	return v[:4] + "..." + v[len(v)-4:] // utf8-safe: secret values are ASCII
 }

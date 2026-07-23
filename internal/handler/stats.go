@@ -190,7 +190,7 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		if title == "" {
 			runes := []rune(t.Prompt)
 			if len(runes) > 60 {
-				runes = runes[:60]
+				runes = runes[:60] // utf8-safe: rune slice
 			}
 			title = string(runes)
 		}

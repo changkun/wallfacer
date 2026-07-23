@@ -1212,3 +1212,75 @@ func TestExplorerFileStream_EmitsChangedOnWrite(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// TestTaskPromptsEndpoint_TitleTruncationPreservesUTF8 verifies the prompt
+// fallback title is cut on a rune boundary. Byte-index truncation of a CJK
+// prompt lands mid-sequence, and json.Marshal replaces the broken tail with
+// U+FFFD before it reaches the client.
+func TestTaskPromptsEndpoint_TitleTruncationPreservesUTF8(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	ctx := t.Context()
+
+	// 30 x U+6C49 is 90 bytes; an 80-byte cut falls inside the 27th rune.
+	prompt := strings.Repeat("汉", 30)
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 15}); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/task-prompts", nil)
+	w := httptest.NewRecorder()
+	h.ExplorerTaskPrompts(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var entries []taskPromptEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	title := entries[0].Title
+	if strings.ContainsRune(title, '�') {
+		t.Fatalf("title contains replacement char, byte truncation split a rune: %q", title)
+	}
+	// 30 runes is within the 80-rune budget, so nothing is trimmed.
+	if title != prompt {
+		t.Errorf("expected untouched title, got %q", title)
+	}
+}
+
+// TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget verifies the fallback
+// title is capped at 80 runes plus the ellipsis, not 80 bytes.
+func TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	ctx := t.Context()
+
+	prompt := strings.Repeat("汉", 200)
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 15}); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/task-prompts", nil)
+	w := httptest.NewRecorder()
+	h.ExplorerTaskPrompts(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var entries []taskPromptEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	title := entries[0].Title
+	if strings.ContainsRune(title, '\uFFFD') {
+		t.Fatalf("title contains replacement char: %q", title)
+	}
+	if want := strings.Repeat("汉", 80) + "…"; title != want {
+		t.Errorf("expected 80 runes plus ellipsis, got %q", title)
+	}
+}

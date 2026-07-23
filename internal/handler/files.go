@@ -38,7 +38,7 @@ func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 		wsFiles := h.fileIndex.Files(ws)
 		remaining := constants.MaxFileListSize - len(files)
 		if len(wsFiles) > remaining {
-			wsFiles = wsFiles[:remaining]
+			wsFiles = wsFiles[:remaining] // utf8-safe: element slice, not a string
 		}
 		files = append(files, wsFiles...)
 	}

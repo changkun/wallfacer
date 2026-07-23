@@ -229,7 +229,7 @@ func readRoundBody(sessionDir, rel string) string {
 		return ""
 	}
 	if len(b) > maxReviewRoundBytes {
-		b = append(b[:maxReviewRoundBytes], "\n… (truncated)"...)
+		return strings.ToValidUTF8(string(b[:maxReviewRoundBytes]), "") + "\n… (truncated)"
 	}
 	return string(b)
 }

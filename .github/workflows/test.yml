@@ -36,6 +36,9 @@ jobs:
       - name: Lint otel transport guardrail
         run: make lint-otel
 
+      - name: Lint UTF-8 truncation guardrail
+        run: make lint-truncate
+
       - name: Test
         run: go test -v -race -timeout 20m ./...
         working-directory: .

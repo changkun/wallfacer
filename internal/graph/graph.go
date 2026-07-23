@@ -269,7 +269,7 @@ func taskLabel(t store.Task) string {
 	}
 	id := t.ID.String()
 	if len(id) >= 8 {
-		return id[:8]
+		return id[:8] // utf8-safe: UUID text is ASCII
 	}
 	return id
 }

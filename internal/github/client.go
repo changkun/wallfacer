@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/otel"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 )
 
 // DefaultBaseURL is the GitHub REST API root. Overridable on [Client] so tests
@@ -170,10 +171,7 @@ func apiMessage(data []byte) string {
 	if err := json.Unmarshal(data, &payload); err == nil && payload.Message != "" {
 		return payload.Message
 	}
-	s := strings.TrimSpace(string(data))
-	if len(s) > 200 {
-		s = s[:200]
-	}
+	s := sanitize.Truncate(strings.TrimSpace(string(data)), 200)
 	if s == "" {
 		return "(no body)"
 	}

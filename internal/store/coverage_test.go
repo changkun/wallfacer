@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -2332,5 +2333,29 @@ func TestStore_IsClosedCoverage(t *testing.T) {
 	s.Close()
 	if !s.IsClosed() {
 		t.Error("should be closed")
+	}
+}
+
+// TestResetTaskForRetry_TruncationPreservesUTF8 verifies the archived result is
+// cut on a rune boundary. Byte-index truncation of CJK agent output persists a
+// partial UTF-8 sequence into RetryHistory, which is served over the API.
+func TestResetTaskForRetry_TruncationPreservesUTF8(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "utf8", Timeout: 5})
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed) //nolint:errcheck
+	// 3000 x U+6C49 is 9000 bytes; a 2000-byte cut falls inside the 667th rune.
+	s.UpdateTaskResult(bg(), task.ID, strings.Repeat("汉", 3000), "s", "r", 1) //nolint:errcheck
+	s.ResetTaskForRetry(bg(), task.ID, "new", true)                           //nolint:errcheck
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if len(got.RetryHistory) != 1 {
+		t.Fatalf("RetryHistory len = %d, want 1", len(got.RetryHistory))
+	}
+	result := got.RetryHistory[0].Result
+	if !utf8.ValidString(result) {
+		t.Fatalf("retry history result is not valid UTF-8")
+	}
+	if want := strings.Repeat("汉", 2000) + "…"; result != want {
+		t.Errorf("result not rune-truncated: %d runes", len([]rune(result)))
 	}
 }
