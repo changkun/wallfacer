@@ -323,8 +323,19 @@ func FetchOrigin(repoPath string) error {
 }
 
 // IsConflictOutput reports whether git output text indicates a merge conflict.
+//
+// Classification keys off git's machine-stable "CONFLICT (<kind>):" marker,
+// which prefixes every conflict git reports (content, modify/delete,
+// rename/delete, add/add). A bare case-insensitive search for the word
+// "conflict" is not usable: it also matches failures that merely name a path
+// containing that word, such as "The following untracked working tree files
+// would be overwritten by checkout: internal/gitutil/conflict.go", which is a
+// dirty-worktree error with no unmerged index entries.
+//
+// Where the worktree is reachable, HasConflicts is the stronger check: it reads
+// unmerged status codes straight out of the index instead of parsing prose.
 func IsConflictOutput(s string) bool {
-	return strings.Contains(s, "CONFLICT") || strings.Contains(s, "conflict")
+	return strings.Contains(s, "CONFLICT (")
 }
 
 // HasConflicts reports whether the worktree at worktreePath has any unresolved

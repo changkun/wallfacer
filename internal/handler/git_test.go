@@ -1413,3 +1413,123 @@ func TestTaskBlocksWorkspaceMutation_FailedTaskWithExistingWorktree(t *testing.T
 		t.Errorf("expected 409 when failed task has existing worktree, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// setupRepoWithOrigin creates a bare origin plus a clone tracking "main", and
+// advances origin/main by one commit that adds pathOnMain. The returned clone
+// is one commit behind origin/main, so a rebase-on-main has work to do.
+func setupRepoWithOrigin(t *testing.T, pathOnMain string) string {
+	t.Helper()
+	root := t.TempDir()
+	originDir := filepath.Join(root, "origin.git")
+	gitRun(t, root, "init", "--bare", "-b", "main", originDir)
+
+	initClone := func(dir string) {
+		gitRun(t, dir, "config", "user.email", "test@example.com")
+		gitRun(t, dir, "config", "user.name", "Test")
+		gitRun(t, dir, "config", "core.autocrlf", "false")
+	}
+
+	repo := filepath.Join(root, "repo")
+	gitRun(t, root, "clone", originDir, repo)
+	initClone(repo)
+	if err := os.WriteFile(filepath.Join(repo, "file.txt"), []byte("initial\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", "file.txt")
+	gitRun(t, repo, "commit", "-m", "initial commit")
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
+	other := filepath.Join(root, "other")
+	gitRun(t, root, "clone", originDir, other)
+	initClone(other)
+	target := filepath.Join(other, pathOnMain)
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("upstream\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, other, "add", pathOnMain)
+	gitRun(t, other, "commit", "-m", "add helper")
+	gitRun(t, other, "push", "origin", "main")
+
+	return repo
+}
+
+// TestGitRebaseOnMain_DirtyWorktreeFailureIsNotConflict verifies that a rebase
+// blocked by an untracked file whose path merely contains the word "conflict"
+// is reported as a server error, not as a merge conflict. Git's failure text
+// here is "would be overwritten by checkout ... Aborting" with no unmerged
+// entries in the index, so 409 would misdirect the client to conflict
+// resolution for a state that has no conflict to resolve.
+func TestGitRebaseOnMain_DirtyWorktreeFailureIsNotConflict(t *testing.T) {
+	const helperPath = "internal/gitutil/conflict.go"
+	repo := setupRepoWithOrigin(t, helperPath)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	// An untracked file at the same path git must materialize during rebase.
+	local := filepath.Join(repo, helperPath)
+	if err := os.MkdirAll(filepath.Dir(local), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(local, []byte("local\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	body := jsonObj("workspace", repo)
+	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitRebaseOnMain(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 for non-conflict rebase failure, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGitSyncWorkspace_DirtyWorktreeFailureIsNotConflict is the sync-endpoint
+// peer of TestGitRebaseOnMain_DirtyWorktreeFailureIsNotConflict.
+func TestGitSyncWorkspace_DirtyWorktreeFailureIsNotConflict(t *testing.T) {
+	const helperPath = "internal/gitutil/conflict.go"
+	repo := setupRepoWithOrigin(t, helperPath)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	local := filepath.Join(repo, helperPath)
+	if err := os.MkdirAll(filepath.Dir(local), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(local, []byte("local\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	body := jsonObj("workspace", repo)
+	req := httptest.NewRequest(http.MethodPost, "/api/git/sync", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitSyncWorkspace(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 for non-conflict sync failure, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGitRebaseOnMain_RealConflictReturns409 guards the opposite direction: an
+// actual content conflict must still be surfaced as 409.
+func TestGitRebaseOnMain_RealConflictReturns409(t *testing.T) {
+	repo := setupRepoWithOrigin(t, "shared.txt")
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	// Commit a divergent version of the same file locally.
+	if err := os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("local\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", "shared.txt")
+	gitRun(t, repo, "commit", "-m", "local version")
+
+	body := jsonObj("workspace", repo)
+	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitRebaseOnMain(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for a real rebase conflict, got %d: %s", w.Code, w.Body.String())
+	}
+}

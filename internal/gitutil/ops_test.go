@@ -17,8 +17,9 @@ func TestIsConflictOutput(t *testing.T) {
 		want bool
 	}{
 		{"CONFLICT (content): Merge conflict in file.txt", true},
-		{"Merge conflict detected", true},
-		{"auto-merging file; conflict detected", true},
+		{"Auto-merging file.txt\nCONFLICT (content): Merge conflict in file.txt\nerror: could not apply 1a2b3c4... change file", true},
+		{"CONFLICT (modify/delete): file.txt deleted in HEAD and modified in 1a2b3c4.", true},
+		{"CONFLICT (rename/delete): file.txt renamed to other.txt in HEAD but deleted in 1a2b3c4.", true},
 		{"Already up to date.", false},
 		{"Fast-forward\n file.txt | 1 +", false},
 		{"", false},
@@ -27,6 +28,24 @@ func TestIsConflictOutput(t *testing.T) {
 		if got := IsConflictOutput(c.in); got != c.want {
 			t.Errorf("IsConflictOutput(%q) = %v, want %v", c.in, got, c.want)
 		}
+	}
+}
+
+// TestIsConflictOutput_NonConflictWithConflictSubstring pins the classifier to
+// git's machine-stable "CONFLICT (" marker. A checkout-abort failure that names
+// a path containing the word "conflict" is not a merge conflict, and no other
+// classifier absorbs it, so misclassifying it turns a 500 into a 409.
+func TestIsConflictOutput_NonConflictWithConflictSubstring(t *testing.T) {
+	out := "error: The following untracked working tree files would be overwritten by checkout:\n" +
+		"\tinternal/gitutil/conflict.go\n" +
+		"Please move or remove them before you switch branches.\n" +
+		"Aborting\n" +
+		"error: could not detach HEAD"
+	if IsConflictOutput(out) {
+		t.Errorf("IsConflictOutput(%q) = true, want false", out)
+	}
+	if IsRebaseNeedsMergeOutput(out) {
+		t.Errorf("IsRebaseNeedsMergeOutput(%q) = true, want false", out)
 	}
 }
 

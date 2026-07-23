@@ -267,11 +267,12 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	out, err := cmdexec.Git(req.Workspace, "rebase", "@{u}").WithContext(r.Context()).Combined()
 	if err != nil {
+		conflicted := rebaseLeftConflicts(req.Workspace, out)
 		if abortErr := cmdexec.Git(req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
 			logger.Git.Warn("rebase abort failed", "workspace", req.Workspace, "error", abortErr)
 		}
 		logger.Git.Error("sync rebase failed", "workspace", req.Workspace, "error", err)
-		if gitutil.IsConflictOutput(out) {
+		if conflicted {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
 			return
 		}
@@ -280,6 +281,22 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpjson.Write(w, http.StatusOK, map[string]string{"output": out})
+}
+
+// rebaseLeftConflicts reports whether a failed rebase stopped on a merge
+// conflict, as opposed to failing for any other reason (dirty worktree,
+// untracked files in the way, bad ref). It must be called before
+// `rebase --abort`, which clears the unmerged index entries it inspects.
+//
+// The index is authoritative; git's output text is only a fallback for the case
+// where the status read itself fails.
+func rebaseLeftConflicts(workspace, out string) bool {
+	hasConflicts, err := gitutil.HasConflicts(workspace)
+	if err != nil {
+		logger.Git.Warn("conflict status check failed", "workspace", workspace, "error", err)
+		return gitutil.IsConflictOutput(out)
+	}
+	return hasConflicts
 }
 
 // GitRebaseOnMain fetches the remote default branch and rebases the current branch onto it.
@@ -315,11 +332,12 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 	// Rebase onto origin/<main>.
 	out, err := cmdexec.Git(req.Workspace, "rebase", "origin/"+mainBranch).WithContext(r.Context()).Combined()
 	if err != nil {
+		conflicted := rebaseLeftConflicts(req.Workspace, out)
 		if abortErr := cmdexec.Git(req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
 			logger.Git.Warn("rebase abort failed", "workspace", req.Workspace, "error", abortErr)
 		}
 		logger.Git.Error("rebase-on-main failed", "workspace", req.Workspace, "error", err)
-		if gitutil.IsConflictOutput(out) {
+		if conflicted {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
 			return
 		}
