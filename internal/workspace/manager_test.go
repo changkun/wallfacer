@@ -1013,13 +1013,31 @@ func TestStoreHasActiveTasks_NilStore(t *testing.T) {
 	}
 }
 
-// TestValidate_NotCleanPath verifies that unclean paths are rejected.
-func TestValidate_NotCleanPath(t *testing.T) {
+// TestValidate_NormalizesUncleanPath verifies that unclean paths (redundant
+// "/." segments) are normalized to their clean form rather than rejected.
+func TestValidate_NormalizesUncleanPath(t *testing.T) {
 	ws := t.TempDir()
 	unclean := ws + "/."
-	_, err := validate([]string{unclean})
-	if err == nil {
-		t.Fatal("expected error for unclean path")
+	result, err := validate([]string{unclean})
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if len(result) != 1 || result[0] != ws {
+		t.Fatalf("expected [%q], got %v", ws, result)
+	}
+}
+
+// TestValidate_NormalizesTrailingSlash verifies that a directory path with a
+// trailing slash (as produced by a UI folder picker) is accepted and
+// normalized, rather than rejected as "must be clean".
+func TestValidate_NormalizesTrailingSlash(t *testing.T) {
+	ws := t.TempDir()
+	result, err := validate([]string{ws + "/"})
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if len(result) != 1 || result[0] != ws {
+		t.Fatalf("expected [%q], got %v", ws, result)
 	}
 }
 

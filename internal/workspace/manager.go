@@ -452,9 +452,9 @@ func (m *Manager) publish(snapshot Snapshot) {
 	}
 }
 
-// validate checks that all workspace paths are absolute, clean, existing
-// directories and returns a deduplicated, sorted slice. Returns an error
-// for any invalid path.
+// validate checks that all workspace paths are absolute, existing directories,
+// normalizes each to its lexically clean form, and returns a deduplicated,
+// sorted slice. Returns an error for any invalid path.
 func validate(paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
@@ -469,10 +469,9 @@ func validate(paths []string) ([]string, error) {
 		if !filepath.IsAbs(path) {
 			return nil, fmt.Errorf("workspace path must be absolute: %s", path)
 		}
-		clean := filepath.Clean(path)
-		if clean != path {
-			return nil, fmt.Errorf("workspace path must be clean: %s", path)
-		}
+		// Normalize to the lexically clean form so callers may pass paths with a
+		// trailing slash or redundant separators (e.g. from a UI folder picker).
+		path = filepath.Clean(path)
 		info, err := os.Stat(path)
 		if err != nil {
 			return nil, fmt.Errorf("workspace path invalid: %w", err)

@@ -122,13 +122,12 @@ func (p *SandboxProxy) GitHubToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find the caller's installation that covers this repo. The
-	// claims carry the delegating user sub in act.sub (RFC 8693); v1
-	// always asks auth to resolve by principal+repo so we don't need
-	// to maintain our own installation table.
-	userSub := delegatorSub(claims)
+	// Find the caller's installation that covers this repo. v1 always asks
+	// auth to resolve by principal+repo so we don't need to maintain our own
+	// installation table.
+	userSub := callerSub(claims)
 	if userSub == "" {
-		http.Error(w, "token lacks act.sub", http.StatusForbidden)
+		http.Error(w, "token lacks sub", http.StatusForbidden)
 		return
 	}
 
@@ -280,17 +279,13 @@ func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, sco
 	return claims, true
 }
 
-func delegatorSub(c *auth.Claims) string {
+// callerSub is the user a proxied call acts for. It used to resolve an RFC
+// 8693 delegator first, so a delegated agent's call attributed to its grantor;
+// auth removed agent delegation (its spec 068) and no longer mints a token
+// carrying a delegator, so the principal IS the user.
+func callerSub(c *auth.Claims) string {
 	if c == nil {
 		return ""
 	}
-	// Delegator() resolves both wire shapes (RFC 8693 act and the flat
-	// grantor_id alias, dr-21). Reading act alone misattributed delegated
-	// calls to the agent's own sub, because auth minted grantor_id-only
-	// tokens.
-	if owner := c.Delegator(); owner != "" {
-		return owner
-	}
-	// Non-delegated token: the principal IS the user.
 	return c.Sub
 }
