@@ -5,9 +5,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"latere.ai/x/pkg/scopes"
-
 	"latere.ai/x/wallfacer/internal/auth"
+)
+
+// RequireScope is generic over the scope string, so these tests name their own
+// rather than coupling to whatever the shared registry happens to define.
+const (
+	testScope  = "admin:tasks"
+	otherScope = "read:projects"
 )
 
 // ok200 is a trivial terminal handler that records invocation and
@@ -77,12 +82,12 @@ func TestRequireSuperadmin_NoClaims_Unauthorized(t *testing.T) {
 
 func TestRequireScope_WithScope_Passes(t *testing.T) {
 	inner, reached := ok200()
-	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
+	h := auth.RequireScope(testScope)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
 	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{
 		Sub:    "alice",
-		Scopes: []string{scopes.ProjectsRead.Name, scopes.TasksAdmin.Name},
+		Scopes: []string{otherScope, testScope},
 	}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -97,12 +102,12 @@ func TestRequireScope_WithScope_Passes(t *testing.T) {
 
 func TestRequireScope_WithoutScope_Forbidden(t *testing.T) {
 	inner, reached := ok200()
-	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
+	h := auth.RequireScope(testScope)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
 	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{
 		Sub:    "alice",
-		Scopes: []string{scopes.ProjectsRead.Name},
+		Scopes: []string{otherScope},
 	}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -117,7 +122,7 @@ func TestRequireScope_WithoutScope_Forbidden(t *testing.T) {
 
 func TestRequireScope_NoClaims_Unauthorized(t *testing.T) {
 	inner, reached := ok200()
-	h := auth.RequireScope(scopes.TasksAdmin.Name)(inner)
+	h := auth.RequireScope(testScope)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
 	w := httptest.NewRecorder()
