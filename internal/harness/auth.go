@@ -10,15 +10,13 @@ type AuthConfig struct {
 	ClaudeOAuthToken string
 
 	// OpenAI — used by Codex.
-	OpenAIAPIKey  string
-	CodexAuthFile string
+	OpenAIAPIKey string
 
 	// Cursor.
 	CursorAPIKey string
 
 	// OpenCode — server-mode for warm-start; provider auth is managed
 	// by the opencode CLI itself.
-	OpenCodeServerURL      string
 	OpenCodeServerPassword string
 
 	// Pi — reserved for a future Pi-specific subscription provider;

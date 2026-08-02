@@ -176,13 +176,6 @@ func (m *Manager) Workspaces() []string {
 	return cloneStrings(m.current.Workspaces)
 }
 
-// HasStore reports whether a scoped store is currently available.
-func (m *Manager) HasStore() bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.current.Store != nil
-}
-
 // Subscribe returns a channel that receives snapshots on workspace changes.
 // The channel is buffered (capacity 8) so slow consumers do not block the
 // manager; if the buffer is full, the snapshot is silently dropped.

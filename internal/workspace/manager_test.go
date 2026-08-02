@@ -302,7 +302,7 @@ func TestSwitch_IncrementsGeneration(t *testing.T) {
 	}
 }
 
-// --- Store / HasStore tests ---
+// --- Store tests ---
 
 func TestStore_ReturnsCurrentStore(t *testing.T) {
 	m, _ := newTestManager(t)
@@ -313,21 +313,6 @@ func TestStore_ReturnsCurrentStore(t *testing.T) {
 	}
 	if s == nil {
 		t.Fatal("expected non-nil store")
-	}
-}
-
-func TestHasStore_TrueWhenStorePresent(t *testing.T) {
-	m, _ := newTestManager(t)
-	if !m.HasStore() {
-		t.Fatal("expected HasStore()=true")
-	}
-}
-
-func TestHasStore_FalseForNilStore(t *testing.T) {
-	// NewStatic with nil store should have HasStore()=false.
-	m := NewStatic(nil, nil)
-	if m.HasStore() {
-		t.Fatal("expected HasStore()=false for nil store")
 	}
 }
 

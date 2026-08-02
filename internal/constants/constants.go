@@ -149,10 +149,6 @@ const MaxSearchResults = 50
 // search match in task search results.
 const SnippetPadding = 60
 
-// MaxCommitSubjectRunes is the maximum number of runes allowed in the commit
-// message subject line (after the "wallfacer: " prefix).
-const MaxCommitSubjectRunes = 72 - len("wallfacer: ")
-
 // MaxTailLines is the number of tail lines checked for test verdict detection.
 const MaxTailLines = 15
 
