@@ -152,7 +152,7 @@ func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 
 // oversightIntervalFromEnv reads WALLFACER_OVERSIGHT_INTERVAL from the env file
 // and returns it as a time.Duration. Returns 0 if the file is missing, unset,
-// or set to 0 (disabled). Mirrors the pattern used by titleModelFromEnv.
+// or set to 0 (disabled). Mirrors the pattern used by titleModelFromEnvForSandbox.
 func (r *Runner) oversightIntervalFromEnv() time.Duration {
 	if r.envFile == "" {
 		return 0

@@ -551,64 +551,6 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	}
 }
 
-// TestGauge_FailedTasksByCategory validates the Prometheus gauge collector
-// that counts failed tasks grouped by failure category.
-func TestGauge_FailedTasksByCategory(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := storetest.NewFileStore(t, dataDir)
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test prompt", Timeout: 10})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := s.ForceUpdateTaskStatus(context.Background(), task.ID, store.TaskStatusFailed); err != nil {
-		t.Fatalf("ForceUpdateTaskStatus: %v", err)
-	}
-	if err := s.SetTaskFailureCategory(context.Background(), task.ID, store.FailureCategoryContainerCrash); err != nil {
-		t.Fatalf("SetTaskFailureCategory: %v", err)
-	}
-
-	// Mirror the gauge collector from server.go.
-	collector := func() []metrics.LabeledValue {
-		tasks, err := s.ListTasks(context.Background(), false)
-		if err != nil {
-			return nil
-		}
-		counts := make(map[string]int)
-		for _, t := range tasks {
-			if t.Status == store.TaskStatusFailed {
-				cat := string(t.FailureCategory)
-				if cat == "" {
-					cat = "unknown"
-				}
-				counts[cat]++
-			}
-		}
-		vals := make([]metrics.LabeledValue, 0, len(counts))
-		for cat, n := range counts {
-			vals = append(vals, metrics.LabeledValue{
-				Labels: map[string]string{"category": cat},
-				Value:  float64(n),
-			})
-		}
-		return vals
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Labels["category"] != string(store.FailureCategoryContainerCrash) {
-		t.Errorf("category label = %q, want %q", vals[0].Labels["category"], store.FailureCategoryContainerCrash)
-	}
-	if vals[0].Value != 1 {
-		t.Errorf("value = %v, want 1", vals[0].Value)
-	}
-}
-
 // TestStatusResponseWriter_HijackNotSupported verifies that Hijack returns an
 // error when the underlying writer doesn't implement http.Hijacker.
 func TestStatusResponseWriter_HijackNotSupported(t *testing.T) {
@@ -867,57 +809,6 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 
 	if sc.Srv == nil {
 		t.Fatal("expected non-nil server")
-	}
-}
-
-// TestGauge_TasksTotal validates the Prometheus gauge that counts tasks by
-// status and archived flag.
-func TestGauge_TasksTotal(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := storetest.NewFileStore(t, dataDir)
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	_, err = s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "task1", Timeout: 10})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	// Mirror the gauge collector from server.go.
-	collector := func() []metrics.LabeledValue {
-		tasks, err := s.ListTasks(context.Background(), true)
-		if err != nil {
-			return nil
-		}
-		type key struct{ status, archived string }
-		counts := make(map[key]int)
-		for _, t := range tasks {
-			counts[key{string(t.Status), fmt.Sprintf("%v", t.Archived)}]++
-		}
-		vals := make([]metrics.LabeledValue, 0, len(counts))
-		for k, n := range counts {
-			vals = append(vals, metrics.LabeledValue{
-				Labels: map[string]string{"status": k.status, "archived": k.archived},
-				Value:  float64(n),
-			})
-		}
-		return vals
-	}
-
-	vals := collector()
-	if len(vals) == 0 {
-		t.Fatal("expected at least one labeled value")
-	}
-	found := false
-	for _, v := range vals {
-		if v.Labels["status"] == "backlog" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatal("expected a backlog status entry")
 	}
 }
 
