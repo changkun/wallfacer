@@ -246,7 +246,7 @@ func TestCommitPlanningRound_SubjectTruncation(t *testing.T) {
 		t.Fatalf("unexpected subject: %q", top)
 	}
 	subject := strings.TrimPrefix(top, prefix)
-	// truncateRunes appends a single "…" rune on overflow.
+	// The shared sanitizer appends a single "…" rune on overflow.
 	if !strings.HasSuffix(subject, "…") {
 		t.Errorf("subject = %q, expected truncation ellipsis", subject)
 	}

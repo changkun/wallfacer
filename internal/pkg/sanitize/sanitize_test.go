@@ -29,6 +29,27 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
+func TestTruncateTrimRight(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		n     int
+		want  string
+	}{
+		{"short string unchanged", "hello-", 10, "hello-"},
+		{"trims punctuation at boundary", "hello- world", 6, "hello…"},
+		{"trims unicode safely", "你好，世界", 3, "你好…"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := TruncateTrimRight(tc.input, tc.n, " \t,，;:-")
+			if got != tc.want {
+				t.Errorf("TruncateTrimRight(%q, %d) = %q, want %q", tc.input, tc.n, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSlug(t *testing.T) {
 	cases := []struct {
 		name   string

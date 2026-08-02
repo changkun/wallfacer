@@ -14,6 +14,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
 )
@@ -453,10 +454,10 @@ func planCommitSubjectBody(raw, primary string) (subject, body string) {
 	if subject == "" {
 		subject = fallbackPlanSubject(primary)
 	}
-	subject = truncateRunes(subject, commitPlanningRoundSubjectMax)
+	subject = sanitize.TruncateTrimRight(subject, commitPlanningRoundSubjectMax, " \t,;:-")
 
 	body = wrapParagraphs(raw, commitPlanningRoundBodyWrap)
-	body = truncateRunes(body, commitPlanningRoundBodyMax)
+	body = sanitize.TruncateTrimRight(body, commitPlanningRoundBodyMax, " \t,;:-")
 	return subject, body
 }
 
@@ -531,15 +532,6 @@ func fallbackPlanSubject(primary string) string {
 		return "update spec files"
 	}
 	return "update " + base
-}
-
-// truncateRunes trims s to at most max runes, appending "…" when truncated.
-func truncateRunes(s string, maxLen int) string {
-	r := []rune(s)
-	if len(r) <= maxLen {
-		return s
-	}
-	return strings.TrimRight(string(r[:maxLen]), " \t,;:-") + "…"
 }
 
 // wrapParagraphs word-wraps each paragraph in s at the given column width.

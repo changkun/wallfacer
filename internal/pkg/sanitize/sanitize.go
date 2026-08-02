@@ -15,6 +15,16 @@ func Truncate(s string, n int) string {
 	return string(runes[:n]) + "…"
 }
 
+// TruncateTrimRight returns s truncated to at most n runes, removes trailing
+// runes in cutset from the shortened text, and appends "…" when truncated.
+func TruncateTrimRight(s string, n int, cutset string) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return strings.TrimRight(string(runes[:n]), cutset) + "…"
+}
+
 // Slug creates a container-name-safe slug from s.
 // The result is lowercase, contains only [a-z0-9-], is at most maxLen chars,
 // and collapses consecutive non-alphanumeric characters into a single dash.
