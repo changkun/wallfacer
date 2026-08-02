@@ -16,15 +16,11 @@ import (
 
 func TestRuntimeNew(t *testing.T) {
 	cfg := Config{
-		Command:     "/usr/bin/podman",
 		Workspaces:  []string{"/home/user/repo"},
 		EnvFile:     "/home/user/.env",
 		Fingerprint: "abc123def456",
 	}
 	p := New(cfg)
-	if p.command != cfg.Command {
-		t.Errorf("command = %q, want %q", p.command, cfg.Command)
-	}
 	if len(p.workspaces) != 1 || p.workspaces[0] != "/home/user/repo" {
 		t.Errorf("workspaces = %v, want [/home/user/repo]", p.workspaces)
 	}
@@ -34,14 +30,14 @@ func TestRuntimeNew(t *testing.T) {
 }
 
 func TestRuntimeIsRunningWhenNotStarted(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	if p.IsRunning() {
 		t.Error("IsRunning() = true, want false for a new runtime")
 	}
 }
 
 func TestRuntimeStartStop(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 
 	if err := p.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
@@ -58,7 +54,6 @@ func TestRuntimeStartStop(t *testing.T) {
 
 func TestRuntimeUpdateWorkspaces(t *testing.T) {
 	p := New(Config{
-		Command:     "podman",
 		Workspaces:  []string{"/old/path"},
 		Fingerprint: "old",
 	})
@@ -80,7 +75,7 @@ func TestRuntimeUpdateWorkspaces(t *testing.T) {
 }
 
 func TestRuntimeExecNotStarted(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	_, err := p.Exec(context.Background(), []string{"echo", "hello"}, harness.Claude)
 	if err == nil {
 		t.Error("Exec should fail when runtime is not started")
@@ -88,7 +83,7 @@ func TestRuntimeExecNotStarted(t *testing.T) {
 }
 
 func TestRuntimeExecNoBackend(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	_ = p.Start(context.Background())
 	_, err := p.Exec(context.Background(), []string{"echo", "hello"}, harness.Claude)
 	if err == nil {
@@ -119,7 +114,6 @@ func TestBuildContainerSpec_HostBackend(t *testing.T) {
 
 	p := New(Config{
 		Backend:    hb,
-		Command:    "/usr/bin/podman",
 		Workspaces: []string{tmpDir},
 	})
 	spec := p.buildSpec("wallfacer-agent-test", harness.Claude)
@@ -141,7 +135,6 @@ func TestBuildContainerSpec(t *testing.T) {
 	}
 
 	p := New(Config{
-		Command:     "/usr/bin/podman",
 		Workspaces:  []string{tmpDir},
 		EnvFile:     "/tmp/test.env",
 		Fingerprint: "abc123",
@@ -216,7 +209,7 @@ func (b *mockBackend) List(_ context.Context) ([]executor.ContainerInfo, error) 
 // --- StartLiveLog / CloseLiveLog / LogReader ---
 
 func TestRuntimeStartLiveLog(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	l := p.StartLiveLog()
 	if l == nil {
 		t.Fatal("StartLiveLog returned nil")
@@ -241,7 +234,7 @@ func TestRuntimeStartLiveLog(t *testing.T) {
 // path starts a second live log without closing the first; without sealing, a
 // reader of the first turn would hang until the client disconnects.
 func TestRuntimeStartLiveLog_SealsPrevious(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	first := p.StartLiveLog()
 	_, _ = first.Write([]byte("turn one"))
 	r := first.NewReader()
@@ -264,14 +257,14 @@ func TestRuntimeStartLiveLog_SealsPrevious(t *testing.T) {
 }
 
 func TestRuntimeLogReader_NoLiveLog(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	if p.LogReader("") != nil {
 		t.Error("LogReader should return nil when no live log")
 	}
 }
 
 func TestRuntimeCloseLiveLog_NoOp(_ *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	// Should not panic.
 	p.CloseLiveLog()
 }
@@ -279,7 +272,7 @@ func TestRuntimeCloseLiveLog_NoOp(_ *testing.T) {
 // --- Interrupt ---
 
 func TestRuntimeInterrupt_NotBusy(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	err := p.Interrupt()
 	if err == nil {
 		t.Error("expected error when interrupting non-busy runtime")
@@ -287,7 +280,7 @@ func TestRuntimeInterrupt_NotBusy(t *testing.T) {
 }
 
 func TestRuntimeInterrupt_Busy(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	p.SetBusy(true, "")
 	p.handle = &mockHandle{}
 	l := p.StartLiveLog()
@@ -308,7 +301,7 @@ func TestRuntimeInterrupt_Busy(t *testing.T) {
 // --- Stop with handle ---
 
 func TestRuntimeStop_WithHandle(t *testing.T) {
-	p := New(Config{Command: "podman"})
+	p := New(Config{})
 	_ = p.Start(context.Background())
 	p.handle = &mockHandle{}
 	p.Stop()
@@ -324,7 +317,7 @@ func TestRuntimeStop_WithHandle(t *testing.T) {
 
 func TestRuntimeExec_Success(t *testing.T) {
 	mb := &mockBackend{}
-	p := New(Config{Command: "podman", Fingerprint: "abc123def456789"})
+	p := New(Config{Fingerprint: "abc123def456789"})
 	p.backend = mb
 	_ = p.Start(context.Background())
 
@@ -339,7 +332,7 @@ func TestRuntimeExec_Success(t *testing.T) {
 
 func TestRuntimeExec_BackendError(t *testing.T) {
 	mb := &mockBackend{launchErr: fmt.Errorf("container failed")}
-	p := New(Config{Command: "podman", Fingerprint: "abc"})
+	p := New(Config{Fingerprint: "abc"})
 	p.backend = mb
 	_ = p.Start(context.Background())
 
@@ -358,7 +351,6 @@ func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
 	first := t.TempDir()
 	second := t.TempDir()
 	p := New(Config{
-		Command:     "podman",
 		Workspaces:  []string{first, second},
 		Fingerprint: "multi",
 	})
@@ -371,7 +363,6 @@ func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
 
 func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 	p := New(Config{
-		Command:     "podman",
 		Workspaces:  []string{"", "  "},
 		Fingerprint: "fp",
 	})
@@ -385,7 +376,6 @@ func TestBuildContainerSpec_EmptyWorkspace(t *testing.T) {
 
 func TestBuildContainerSpec_NoEnvFile(t *testing.T) {
 	p := New(Config{
-		Command:     "podman",
 		Workspaces:  []string{t.TempDir()},
 		Fingerprint: "fp",
 	})

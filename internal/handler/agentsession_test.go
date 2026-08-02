@@ -39,7 +39,7 @@ func TestGetAgentSessionStatus_NilAgentSession(t *testing.T) {
 
 func TestGetAgentSessionStatus_WithAgentSession(t *testing.T) {
 	h := newTestHandler(t)
-	h.agentSession = agentsession.New(agentsession.Config{Command: "podman"})
+	h.agentSession = agentsession.New(agentsession.Config{})
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/agent", nil)
@@ -93,7 +93,7 @@ func TestStopAgentSession_NilAgentSession(t *testing.T) {
 
 func TestStopAgentSession_WithAgentSession(t *testing.T) {
 	h := newTestHandler(t)
-	h.agentSession = agentsession.New(agentsession.Config{Command: "podman"})
+	h.agentSession = agentsession.New(agentsession.Config{})
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodDelete, "/api/agent", nil)
@@ -118,7 +118,7 @@ func TestSetAgentSession(t *testing.T) {
 		t.Fatal("expected nil agent session by default")
 	}
 
-	p := agentsession.New(agentsession.Config{Command: "podman"})
+	p := agentsession.New(agentsession.Config{})
 	h.SetAgentSession(p)
 
 	if h.agentSession != p {
@@ -131,7 +131,6 @@ func TestSetAgentSession(t *testing.T) {
 func newAgentSessionWithStore(t *testing.T) *agentsession.Runtime {
 	t.Helper()
 	return agentsession.New(agentsession.Config{
-		Command:     "podman",
 		Fingerprint: "test-fp",
 		ConfigDir:   t.TempDir(),
 	})

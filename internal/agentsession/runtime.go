@@ -31,7 +31,6 @@ const sessionsDirName = "agent-sessions"
 // Config holds the configuration for a Runtime.
 type Config struct {
 	Backend     executor.Backend // execution backend (host; cloud later)
-	Command     string           // legacy runtime binary path; unused on the host backend
 	Workspaces  []string         // workspace directory paths
 	EnvFile     string           // path to .env file for the agent process
 	Fingerprint string           // workspace fingerprint for keying the agent-session workspace
@@ -42,7 +41,6 @@ type Config struct {
 type Runtime struct {
 	mu          sync.Mutex
 	backend     executor.Backend
-	command     string
 	workspaces  []string
 	envFile     string
 	fingerprint string
@@ -64,7 +62,6 @@ type Runtime struct {
 func New(cfg Config) *Runtime {
 	p := &Runtime{
 		backend:     cfg.Backend,
-		command:     cfg.Command,
 		workspaces:  cfg.Workspaces,
 		envFile:     cfg.EnvFile,
 		fingerprint: cfg.Fingerprint,
