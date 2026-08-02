@@ -240,52 +240,6 @@ func TestSearchTasks_Cap(t *testing.T) {
 	}
 }
 
-func TestLoadOversightText_Missing(t *testing.T) {
-	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	text, err := s.LoadOversightText(task.ID)
-	if err != nil {
-		t.Fatalf("LoadOversightText: unexpected error: %v", err)
-	}
-	if text != "" {
-		t.Errorf("expected empty string for missing oversight, got %q", text)
-	}
-}
-
-func TestLoadOversightText_Content(t *testing.T) {
-	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	oversight := TaskOversight{
-		Status:      OversightStatusReady,
-		GeneratedAt: time.Now(),
-		Phases: []OversightPhase{
-			{Title: "Phase One Title", Summary: "Phase one summary text"},
-			{Title: "Phase Two Title", Summary: "Phase two summary text"},
-		},
-	}
-	if err := s.SaveOversight(task.ID, oversight); err != nil {
-		t.Fatalf("SaveOversight: %v", err)
-	}
-
-	text, err := s.LoadOversightText(task.ID)
-	if err != nil {
-		t.Fatalf("LoadOversightText: %v", err)
-	}
-	for _, want := range []string{"Phase One Title", "Phase one summary text", "Phase Two Title", "Phase two summary text"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("expected %q in oversight text, got: %q", want, text)
-		}
-	}
-}
-
 func TestLoadOversightText_InvalidJSON(t *testing.T) {
 	s := newTestStore(t)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})

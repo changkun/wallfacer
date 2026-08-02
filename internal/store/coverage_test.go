@@ -1187,28 +1187,6 @@ func TestListSummaries_SkipsInvalidJSON(t *testing.T) {
 
 // --- SaveOversight edge cases ---
 
-func TestSaveOversight_UpdatesSearchIndexCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "oversight search", Timeout: 5})
-
-	oversight := TaskOversight{
-		Status: OversightStatusReady,
-		Phases: []OversightPhase{{Title: "Phase1", Summary: "Did stuff"}},
-	}
-	if err := s.SaveOversight(task.ID, oversight); err != nil {
-		t.Fatalf("SaveOversight: %v", err)
-	}
-
-	// Verify it was saved and is retrievable.
-	got, err := s.GetOversight(task.ID)
-	if err != nil {
-		t.Fatalf("GetOversight: %v", err)
-	}
-	if got.Status != OversightStatusReady {
-		t.Errorf("Status = %q, want ready", got.Status)
-	}
-}
-
 func TestGetOversight_ReturnsError(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad oversight", Timeout: 5})
@@ -1222,40 +1200,6 @@ func TestGetOversight_ReturnsError(t *testing.T) {
 
 // --- SaveTestOversight / GetTestOversight ---
 
-func TestSaveTestOversight_RoundTrip(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test oversight", Timeout: 5})
-
-	oversight := TaskOversight{
-		Status: OversightStatusReady,
-		Phases: []OversightPhase{{Title: "TestPhase", Summary: "Tests ran"}},
-	}
-	if err := s.SaveTestOversight(task.ID, oversight); err != nil {
-		t.Fatalf("SaveTestOversight: %v", err)
-	}
-
-	got, err := s.GetTestOversight(task.ID)
-	if err != nil {
-		t.Fatalf("GetTestOversight: %v", err)
-	}
-	if got.Status != OversightStatusReady {
-		t.Errorf("Status = %q, want ready", got.Status)
-	}
-}
-
-func TestGetTestOversight_Pending(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no oversight", Timeout: 5})
-
-	got, err := s.GetTestOversight(task.ID)
-	if err != nil {
-		t.Fatalf("GetTestOversight: %v", err)
-	}
-	if got.Status != OversightStatusPending {
-		t.Errorf("Status = %q, want pending", got.Status)
-	}
-}
-
 func TestGetTestOversight_InvalidJSON(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad json", Timeout: 5})
@@ -1264,19 +1208,6 @@ func TestGetTestOversight_InvalidJSON(t *testing.T) {
 	_, err := s.GetTestOversight(task.ID)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
-	}
-}
-
-// --- LoadOversightText ---
-
-func TestLoadOversightText_InvalidJSONCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad text", Timeout: 5})
-	s.backend.SaveBlob(task.ID, "oversight.json", []byte("bad")) //nolint:errcheck
-
-	_, err := s.LoadOversightText(task.ID)
-	if err == nil {
-		t.Error("expected error for invalid JSON oversight text")
 	}
 }
 
@@ -1324,22 +1255,6 @@ func TestGetEventsPage_LazyLoadFromTerminalState(t *testing.T) {
 }
 
 // --- StartRefinementJobIfIdle: race guard ---
-
-func TestStartRefinementJobIfIdle_AlreadyRunning(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "refine", Timeout: 5})
-
-	job1 := &RefinementJob{ID: "job1", Status: RefinementJobStatusRunning}
-	if err := s.UpdateRefinementJob(bg(), task.ID, job1); err != nil {
-		t.Fatalf("UpdateRefinementJob: %v", err)
-	}
-
-	job2 := &RefinementJob{ID: "job2", Status: RefinementJobStatusRunning}
-	err := s.StartRefinementJobIfIdle(bg(), task.ID, job2)
-	if err != ErrRefinementAlreadyRunning {
-		t.Errorf("expected ErrRefinementAlreadyRunning, got %v", err)
-	}
-}
 
 func TestStartRefinementJobIfIdle_RecentRunnerCompletion(t *testing.T) {
 	s := newTestStore(t)
@@ -1571,24 +1486,6 @@ func TestListTasksAndSeq_ExcludesArchived(t *testing.T) {
 
 // --- ResumeTask ---
 
-func TestResumeTask_WithTimeoutCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "resume", Timeout: 5})
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed) //nolint:errcheck
-
-	newTimeout := 30
-	if err := s.ResumeTask(bg(), task.ID, &newTimeout); err != nil {
-		t.Fatalf("ResumeTask: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.Status != TaskStatusInProgress {
-		t.Errorf("Status = %q, want in_progress", got.Status)
-	}
-	if got.Timeout != 30 {
-		t.Errorf("Timeout = %d, want 30", got.Timeout)
-	}
-}
-
 func TestResumeTask_NilTimeoutCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "resume", Timeout: 15})
@@ -1600,13 +1497,6 @@ func TestResumeTask_NilTimeoutCoverage(t *testing.T) {
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 15 {
 		t.Errorf("Timeout = %d, want 15 (unchanged)", got.Timeout)
-	}
-}
-
-func TestResumeTask_UnknownIDCoverage(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.ResumeTask(bg(), uuid.New(), nil); err == nil {
-		t.Error("expected error for unknown task ID")
 	}
 }
 
@@ -1729,67 +1619,6 @@ func TestDeleteTask_UnknownID(t *testing.T) {
 	}
 }
 
-// --- ListBlobOwners ---
-
-func TestListBlobOwners_FindsOwners(t *testing.T) {
-	s := newTestStore(t)
-	task1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "owner1", Timeout: 5})
-	task2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "owner2", Timeout: 5})
-	s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no blob", Timeout: 5}) //nolint:errcheck
-
-	s.backend.SaveBlob(task1.ID, "test-key.txt", []byte("a")) //nolint:errcheck
-	s.backend.SaveBlob(task2.ID, "test-key.txt", []byte("b")) //nolint:errcheck
-
-	owners, err := s.backend.ListBlobOwners("test-key.txt")
-	if err != nil {
-		t.Fatalf("ListBlobOwners: %v", err)
-	}
-	if len(owners) != 2 {
-		t.Errorf("len(owners) = %d, want 2", len(owners))
-	}
-}
-
-// --- CompactEvents ---
-
-func TestCompactEvents_RemovesNumberedFiles(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "compact", Timeout: 5})
-
-	// Insert several events.
-	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, json.RawMessage(`{"data":"x"}`)) //nolint:errcheck
-	}
-
-	// Get events.
-	events, err := s.GetEvents(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("GetEvents: %v", err)
-	}
-	if len(events) != 5 {
-		t.Fatalf("expected 5 events, got %d", len(events))
-	}
-
-	// Compact.
-	if err := s.backend.CompactEvents(task.ID, events); err != nil {
-		t.Fatalf("CompactEvents: %v", err)
-	}
-
-	// Verify compact file exists.
-	tracesDir := filepath.Join(s.DataDir(), task.ID.String(), "traces")
-	_, err = os.Stat(filepath.Join(tracesDir, "compact.ndjson"))
-	if err != nil {
-		t.Errorf("compact.ndjson should exist: %v", err)
-	}
-
-	// Verify individual trace files are removed.
-	entries, _ := os.ReadDir(tracesDir)
-	for _, e := range entries {
-		if f, ok := parseNumberedTraceFile(e.Name()); ok && int64(f.seq) <= 5 {
-			t.Errorf("numbered trace %s should have been removed", e.Name())
-		}
-	}
-}
-
 // --- SaveEvent: traces dir auto-create ---
 
 func TestSaveEvent_CreatesTracesDir(t *testing.T) {
@@ -1801,26 +1630,6 @@ func TestSaveEvent_CreatesTracesDir(t *testing.T) {
 	if err := backend.SaveEvent(taskID, 1, evt); err != nil {
 		t.Fatalf("SaveEvent: %v", err)
 	}
-}
-
-// --- RebuildSearchIndex: context cancellation ---
-
-func TestRebuildSearchIndex_RespectsContextCancel(t *testing.T) {
-	s := newTestStore(t)
-	for i := 0; i < 5; i++ {
-		s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "rebuild", Timeout: 5}) //nolint:errcheck
-	}
-
-	ctx, cancel := bg(), func() {}
-	_, _ = ctx, cancel
-
-	// Normal rebuild should work.
-	repaired, err := s.RebuildSearchIndex(bg())
-	if err != nil {
-		t.Fatalf("RebuildSearchIndex: %v", err)
-	}
-	// On first rebuild, entries should already match (0 repaired).
-	_ = repaired
 }
 
 // --- ResetTaskForRetry ---
@@ -1967,57 +1776,11 @@ func TestListDeletedTasks_SortsByUpdatedAtDesc(t *testing.T) {
 	}
 }
 
-// --- loadAll: skips non-UUID directories ---
-
-func TestLoadAll_SkipsInvalidDirectories(t *testing.T) {
-	dir := t.TempDir()
-	// Create a non-UUID directory that should be skipped.
-	os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755)                             //nolint:errcheck
-	os.WriteFile(filepath.Join(dir, "not-a-uuid", "task.json"), []byte("{}"), 0644) //nolint:errcheck
-
-	s, err := newTestFileStore(t, dir)
-	if err != nil {
-		t.Fatalf("NewFileStore: %v", err)
-	}
-	tasks, _ := s.ListTasks(bg(), true)
-	if len(tasks) != 0 {
-		t.Errorf("expected 0 tasks (invalid dirs skipped), got %d", len(tasks))
-	}
-}
-
 // Unique tests not covered elsewhere — these target remaining uncovered branches.
 
 func TestLoadAll_SkipsNonDirEntries(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "stray-file.txt"), []byte("x"), 0644) //nolint:errcheck
-	s, err := newTestFileStore(t, dir)
-	if err != nil {
-		t.Fatalf("NewFileStore: %v", err)
-	}
-	tasks, _ := s.ListTasks(bg(), true)
-	if len(tasks) != 0 {
-		t.Errorf("expected 0 tasks, got %d", len(tasks))
-	}
-}
-
-func TestLoadAll_SkipsMissingTaskJSON(t *testing.T) {
-	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, uuid.New().String()), 0755) //nolint:errcheck
-	s, err := newTestFileStore(t, dir)
-	if err != nil {
-		t.Fatalf("NewFileStore: %v", err)
-	}
-	tasks, _ := s.ListTasks(bg(), true)
-	if len(tasks) != 0 {
-		t.Errorf("expected 0 tasks, got %d", len(tasks))
-	}
-}
-
-func TestLoadAll_SkipsInvalidTaskJSON(t *testing.T) {
-	dir := t.TempDir()
-	taskDir := filepath.Join(dir, uuid.New().String())
-	os.MkdirAll(taskDir, 0755)                                             //nolint:errcheck
-	os.WriteFile(filepath.Join(taskDir, "task.json"), []byte("bad"), 0644) //nolint:errcheck
 	s, err := newTestFileStore(t, dir)
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
@@ -2131,16 +1894,6 @@ func TestInsertEvent_UnmarshalableDataCoverage(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "event", Timeout: 5})
 	if err := s.InsertEvent(bg(), task.ID, EventTypeOutput, func() {}); err == nil {
 		t.Error("expected error for unmarshalable data")
-	}
-}
-
-func TestComputeSpans_UnclosedSpanCoverage(t *testing.T) {
-	events := []TaskEvent{
-		{EventType: EventTypeSpanStart, Data: json.RawMessage(`{"phase":"exec","label":"run"}`), CreatedAt: time.Now()},
-	}
-	spans, _ := ComputeSpans(events)
-	if len(spans) != 1 || spans[0].DurationMS != 0 {
-		t.Error("expected 1 unclosed span with DurationMS=0")
 	}
 }
 
@@ -2322,17 +2075,6 @@ func TestRestoreTask_WithOversightCoverage(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected restored task in search")
-	}
-}
-
-func TestStore_IsClosedCoverage(t *testing.T) {
-	s := newTestStore(t)
-	if s.IsClosed() {
-		t.Error("should not be closed")
-	}
-	s.Close()
-	if !s.IsClosed() {
-		t.Error("should be closed")
 	}
 }
 
