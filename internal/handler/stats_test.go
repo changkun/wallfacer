@@ -166,7 +166,7 @@ func TestAggregateStats(t *testing.T) {
 	// Regression: ByStatus buckets must report a per-task Count, like
 	// ByWorkspace and ByFailureCategory. It used to stay 0 because only
 	// addUsage was called, so GET /api/stats served by_status[*].count == 0
-	// and the frontend's statusCount() could only ever read 0.
+	// and the frontend could only ever render 0.
 	if doneStat.Count != 2 {
 		t.Errorf("ByStatus[done].Count = %d, want 2 (tasks 1 and 3)", doneStat.Count)
 	}
