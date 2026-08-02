@@ -422,6 +422,20 @@ func TestBranchTipCommit(t *testing.T) {
 		}
 	})
 
+	t.Run("preserves pipes in commit subject", func(t *testing.T) {
+		repo := setupRepo(t)
+		want := "fix: handle a | b in parser"
+		gitRun(t, repo, "commit", "--allow-empty", "-m", want)
+
+		_, subject, _, err := BranchTipCommit(repo, "main")
+		if err != nil {
+			t.Fatalf("BranchTipCommit: %v", err)
+		}
+		if subject != want {
+			t.Fatalf("subject = %q, want %q", subject, want)
+		}
+	})
+
 	t.Run("returns error for nonexistent branch", func(t *testing.T) {
 		repo := setupRepo(t)
 		_, _, _, err := BranchTipCommit(repo, "nonexistent-branch")
@@ -901,25 +915,6 @@ func TestBranchTipCommit_NoCommits(t *testing.T) {
 	_, _, _, err := BranchTipCommit(repo, "nocommits")
 	if err == nil {
 		t.Fatal("expected error for orphan branch")
-	}
-}
-
-// TestBranchTipCommit_BadTimestamp verifies the timestamp parse error path
-// when the commit date format is unexpected (covers lines 266-268).
-// This is triggered when the subject contains a pipe, causing the third field
-// to not be a valid RFC3339 timestamp.
-func TestBranchTipCommit_BadTimestamp(t *testing.T) {
-	repo := setupRepo(t)
-	// A commit message containing "|" will corrupt the pipe-delimited
-	// parsing so the third field is not a valid timestamp.
-	commitCmd := exec.Command("git", "-C", repo, "commit", "--allow-empty", "-m", "a|bad-ts")
-	if out, err := commitCmd.CombinedOutput(); err != nil {
-		t.Fatalf("git commit: %v\n%s", err, out)
-	}
-
-	_, _, _, err := BranchTipCommit(repo, "main")
-	if err == nil {
-		t.Fatal("expected error for malformed timestamp field")
 	}
 }
 

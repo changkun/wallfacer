@@ -281,11 +281,11 @@ func MergeBase(repoPath, ref1, ref2 string) (string, error) {
 // BranchTipCommit returns the hash, subject, and author timestamp of the most
 // recent commit on branch in repoPath. It runs:
 //
-//	git -C <repoPath> log -1 --format=%H|%s|%aI <branch>
+//	git -C <repoPath> log -1 --format=%H|%aI|%s <branch>
 //
 // Returns an error if the branch does not exist or the path is not a git repo.
 func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Time, err error) {
-	line, cmdErr := cmdexec.Git(repoPath, "log", "-1", "--format=%H|%s|%aI", branch).Output()
+	line, cmdErr := cmdexec.Git(repoPath, "log", "-1", "--format=%H|%aI|%s", branch).Output()
 	if cmdErr != nil {
 		err = fmt.Errorf("git log in %s for branch %s: %w", repoPath, branch, cmdErr)
 		return
@@ -294,19 +294,20 @@ func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Tim
 		err = fmt.Errorf("branch %s not found or has no commits in %s", branch, repoPath)
 		return
 	}
-	// Parse the pipe-delimited format: "<hash>|<subject>|<ISO8601 timestamp>".
-	// SplitN with limit 3 ensures subjects containing "|" are not mangled.
+	// Parse the pipe-delimited format: "<hash>|<ISO8601 timestamp>|<subject>".
+	// The free-form subject is last, so SplitN preserves any pipes it contains.
 	parts := strings.SplitN(line, "|", 3)
 	if len(parts) != 3 {
 		err = fmt.Errorf("unexpected git log output %q in %s", line, repoPath)
 		return
 	}
 	hash = parts[0]
-	subject = parts[1]
-	ts, err = time.Parse(time.RFC3339, parts[2])
+	ts, err = time.Parse(time.RFC3339, parts[1])
 	if err != nil {
-		err = fmt.Errorf("parse commit timestamp %q: %w", parts[2], err)
+		err = fmt.Errorf("parse commit timestamp %q: %w", parts[1], err)
+		return
 	}
+	subject = parts[2]
 	return
 }
 
