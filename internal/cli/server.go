@@ -1237,7 +1237,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// drives the flow over these three routes; the resulting token is
 		// stored at <UserConfigDir>/latere/token.json so it is shared with
 		// the `latere` CLI and the `wallfacer auth login` terminal command.
-		// h.DeviceAuth nil-safe: Mount falls back to 503 stubs.
+		// Nil-safe: each proxy answers 503 when device auth is unconfigured,
+		// so the SPA sees "not available" rather than a 404.
 		"AuthDeviceStart":  http.HandlerFunc(h.AuthDeviceStart),
 		"AuthDevicePoll":   http.HandlerFunc(h.AuthDevicePoll),
 		"AuthDeviceCancel": http.HandlerFunc(h.AuthDeviceCancel),

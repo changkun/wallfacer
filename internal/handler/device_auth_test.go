@@ -55,8 +55,7 @@ func TestDeviceAuth_Lifecycle(t *testing.T) {
 	store, _ := authkit.NewFileTokenStore(tmpStore)
 	d := &DeviceAuth{OIDC: c, Store: store}
 
-	mux := http.NewServeMux()
-	d.Mount(mux)
+	mux := deviceMux(d)
 
 	// Start.
 	rec := httptest.NewRecorder()
@@ -146,8 +145,7 @@ func TestDeviceAuth_SaveFailureReportsFailedNotDenied(t *testing.T) {
 	defer srv.Close()
 
 	d := &DeviceAuth{OIDC: c, Store: failingTokenStore{}}
-	mux := http.NewServeMux()
-	d.Mount(mux)
+	mux := deviceMux(d)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/start", bytes.NewReader([]byte(`{}`))))
@@ -172,17 +170,32 @@ func TestDeviceAuth_SaveFailureReportsFailedNotDenied(t *testing.T) {
 	}
 }
 
-// TestDeviceAuth_NilMountsUnavailable verifies the nil-mount fallback so the
-// SPA can rely on a 503 instead of a 404 for unconfigured deployments.
-func TestDeviceAuth_NilMountsUnavailable(t *testing.T) {
-	mux := http.NewServeMux()
-	var d *DeviceAuth
-	d.Mount(mux)
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/start", nil))
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("nil mount = %d", rec.Code)
+// TestDeviceAuth_NilRespondsUnavailable verifies the unconfigured-deployment
+// fallback so the SPA can rely on a 503 instead of a 404.
+func TestDeviceAuth_NilRespondsUnavailable(t *testing.T) {
+	h := &Handler{}
+	for name, fn := range map[string]http.HandlerFunc{
+		"start":  h.AuthDeviceStart,
+		"poll":   h.AuthDevicePoll,
+		"cancel": h.AuthDeviceCancel,
+	} {
+		rec := httptest.NewRecorder()
+		fn(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/"+name, nil))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s with nil deviceAuth = %d, want 503", name, rec.Code)
+		}
 	}
+}
+
+// deviceMux wires the device-code endpoints the way the apicontract-driven
+// registry in internal/cli/server.go does, so these tests drive the same
+// handlers production serves.
+func deviceMux(d *DeviceAuth) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/auth/device/start", d.start)
+	mux.HandleFunc("GET /api/auth/device/poll", d.poll)
+	mux.HandleFunc("POST /api/auth/device/cancel", d.cancel)
+	return mux
 }
 
 // fakeJWT builds an unsigned but well-formed JWT (header.payload.sig). The
@@ -333,8 +346,7 @@ func TestDeviceAuth_Cancel(t *testing.T) {
 	store, _ := authkit.NewFileTokenStore(tmpStore)
 	d := &DeviceAuth{OIDC: c, Store: store}
 
-	mux := http.NewServeMux()
-	d.Mount(mux)
+	mux := deviceMux(d)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/auth/device/start", bytes.NewReader([]byte(`{}`))))

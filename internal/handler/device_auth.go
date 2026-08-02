@@ -54,21 +54,6 @@ type deviceFlowState struct {
 	token *oauth2.Token
 }
 
-// Mount registers the device-auth routes on mux. Safe to call when DeviceAuth
-// is nil; the endpoints answer 503 in that case so the SPA can detect "auth
-// not available" without distinguishing 404 / 503.
-func (d *DeviceAuth) Mount(mux *http.ServeMux) {
-	if d == nil {
-		mux.HandleFunc("POST /api/auth/device/start", deviceUnavailable)
-		mux.HandleFunc("GET /api/auth/device/poll", deviceUnavailable)
-		mux.HandleFunc("POST /api/auth/device/cancel", deviceUnavailable)
-		return
-	}
-	mux.HandleFunc("POST /api/auth/device/start", d.start)
-	mux.HandleFunc("GET /api/auth/device/poll", d.poll)
-	mux.HandleFunc("POST /api/auth/device/cancel", d.cancel)
-}
-
 // AuthDeviceStart is exposed as a *Handler method so the apicontract-driven
 // route registry in internal/cli/server.go can map it like any other endpoint.
 // AuthDevicePoll and AuthDeviceCancel below mirror the same pattern.
