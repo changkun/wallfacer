@@ -85,6 +85,23 @@ func TestPaginate_WithFilter(t *testing.T) {
 	}
 }
 
+func TestPaginate_TotalFilteredStableAcrossPages(t *testing.T) {
+	even := func(i item) bool { return i.ID%2 == 0 }
+
+	page1 := Paginate(testItems, cursor, 0, 2, 100, 1000, even)
+	page2 := Paginate(testItems, cursor, page1.NextCursor, 2, 100, 1000, even)
+	page3 := Paginate(testItems, cursor, page2.NextCursor, 2, 100, 1000, even)
+
+	for i, page := range []Page[item]{page1, page2, page3} {
+		if page.TotalFiltered != 5 {
+			t.Errorf("page %d TotalFiltered = %d, want stable grand total 5", i+1, page.TotalFiltered)
+		}
+	}
+	if page3.HasMore {
+		t.Fatal("last filtered page HasMore = true, want false")
+	}
+}
+
 // TestPaginate_DefaultLimit verifies that limit=0 falls back to the defaultLimit.
 func TestPaginate_DefaultLimit(t *testing.T) {
 	p := Paginate(testItems, cursor, 0, 0, 3, 1000, nil)

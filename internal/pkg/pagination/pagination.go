@@ -36,19 +36,20 @@ func Paginate[T any](
 
 	var result []T // lazily allocated on first match; nil-checked below for JSON
 	totalFiltered := 0
+	remainingFiltered := 0
 
-	// Single pass: skip items at or before the cursor, apply filter, then
-	// collect up to limit items. Continue counting totalFiltered past the
-	// limit to determine HasMore.
+	// Count every filtered item for the stable grand total, while separately
+	// counting post-cursor matches to determine whether another page exists.
 	for _, item := range items {
-		c := cursor(item)
-		if afterCursor > 0 && c <= afterCursor {
-			continue
-		}
 		if filter != nil && !filter(item) {
 			continue
 		}
 		totalFiltered++
+		c := cursor(item)
+		if afterCursor > 0 && c <= afterCursor {
+			continue
+		}
+		remainingFiltered++
 		if len(result) < limit {
 			result = append(result, item)
 		}
@@ -62,7 +63,7 @@ func Paginate[T any](
 	var page Page[T]
 	page.Items = result
 	page.TotalFiltered = totalFiltered
-	page.HasMore = totalFiltered > len(result)
+	page.HasMore = remainingFiltered > len(result)
 	if len(result) > 0 {
 		page.NextCursor = cursor(result[len(result)-1])
 	}
