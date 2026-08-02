@@ -178,30 +178,6 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 	}
 }
 
-// TestContainerArgsCLAUDEMDMountPosition verifies that the CLAUDE.md mount
-// appears before the image name in the args list, matching the expected
-// container launch order.
-
-// ---------------------------------------------------------------------------
-// Board context mounts
-// ---------------------------------------------------------------------------
-
-// TestBuildContainerArgs_BoardMount verifies that a non-empty boardDir adds
-// a read-only mount at /workspace/.tasks.
-
-// TestBuildContainerArgs_SiblingMounts verifies that sibling worktree mounts
-// are added as read-only volumes under /workspace/.tasks/worktrees/.
-
-// ---------------------------------------------------------------------------
-// Data race regression: workspace mounts survive concurrent snapshot updates
-// ---------------------------------------------------------------------------
-
-// TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate verifies that
-// buildContainerSpecForSandbox always sees the current workspace list, even when
-// applyWorkspaceSnapshot is called concurrently. Before the fix, the
-// container spec builder read r.workspaces without storeMu, which could
-// produce zero workspace mounts during a workspace switch.
-
 // ---------------------------------------------------------------------------
 // Worktree management
 // ---------------------------------------------------------------------------

@@ -585,18 +585,6 @@ func TestRunContainerRegistersHandleForKill(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildContainerSpecForSandbox extras (paths not covered by runner_test.go)
-// ---------------------------------------------------------------------------
-
-// TestBuildContainerArgsWorktreeOverride verifies that worktreeOverrides
-// replaces the workspace host path in the volume mount.
-
-// TestBuildContainerArgsWorktreeGitDirMount verifies that when a workspace has
-// a worktree override and the original workspace is a git repo, the main repo's
-// .git directory is mounted at its host path so the worktree's .git file
-// reference resolves correctly inside the container.
-
-// ---------------------------------------------------------------------------
 // GenerateTitle
 // ---------------------------------------------------------------------------
 
