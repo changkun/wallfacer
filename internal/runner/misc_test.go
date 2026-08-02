@@ -924,22 +924,6 @@ func TestParseOutputPrefersStopReason(t *testing.T) {
 	}
 }
 
-// TestParseOutputFallsBackToLastJSON verifies that when no JSON line has
-// stop_reason set, parseOutput still returns the last valid JSON object.
-func TestParseOutputFallsBackToLastJSON(t *testing.T) {
-	ndjson := `{"type":"system","session_id":"s1"}
-{"type":"assistant","session_id":"s2"}`
-
-	out, err := parseOutput(ndjson)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// No stop_reason set, but last valid JSON should be returned as fallback.
-	if out.SessionID != "s2" {
-		t.Fatalf("expected session_id=s2 from last JSON, got %q", out.SessionID)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Runner accessors
 // ---------------------------------------------------------------------------

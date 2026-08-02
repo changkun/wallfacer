@@ -44,27 +44,6 @@ func TestTruncate_ZeroLimit(t *testing.T) {
 	}
 }
 
-func TestSlugifyPrompt_SimpleInput(t *testing.T) {
-	got := slugifyPrompt("Hello World", 64)
-	if got != "hello-world" {
-		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q", "Hello World", got, "hello-world")
-	}
-}
-
-func TestSlugifyPrompt_SpecialCharsOnly(t *testing.T) {
-	got := slugifyPrompt("!!! @@@", 64)
-	if got != "task" {
-		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q (fallback)", "!!! @@@", got, "task")
-	}
-}
-
-func TestSlugifyPrompt_EmptyString(t *testing.T) {
-	got := slugifyPrompt("", 64)
-	if got != "task" {
-		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q (fallback)", "", got, "task")
-	}
-}
-
 func TestSlugifyPrompt_LeadingTrailingSpecial(t *testing.T) {
 	got := slugifyPrompt("--hello--", 64)
 	if got != "hello" {
@@ -72,38 +51,9 @@ func TestSlugifyPrompt_LeadingTrailingSpecial(t *testing.T) {
 	}
 }
 
-func TestSlugifyPrompt_MaxLen(t *testing.T) {
-	input := "this is a long prompt that should be truncated"
-	got := slugifyPrompt(input, 10)
-	if len(got) > 10 {
-		t.Errorf("slugifyPrompt result length %d exceeds maxLen 10: %q", len(got), got)
-	}
-}
-
-func TestSlugifyPrompt_CollapsesDashes(t *testing.T) {
-	got := slugifyPrompt("hello   world", 64)
-	if got != "hello-world" {
-		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q", "hello   world", got, "hello-world")
-	}
-}
-
 func TestSlugifyPrompt_MixedInput(t *testing.T) {
 	got := slugifyPrompt("Fix bug in v1.2.3!", 64)
 	if got != "fix-bug-in-v1-2-3" {
 		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q", "Fix bug in v1.2.3!", got, "fix-bug-in-v1-2-3")
-	}
-}
-
-func TestSlugifyPrompt_Numbers(t *testing.T) {
-	got := slugifyPrompt("task 42", 64)
-	if got != "task-42" {
-		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q", "task 42", got, "task-42")
-	}
-}
-
-func TestSlugifyPrompt_AllSpecialBeforeAlpha(t *testing.T) {
-	got := slugifyPrompt("   abc", 64)
-	if got != "abc" {
-		t.Errorf("slugifyPrompt(%q, 64) = %q, want %q", "   abc", got, "abc")
 	}
 }

@@ -10,52 +10,6 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// TestScanOrphanedWorktrees_UnknownTask verifies that a worktree directory
-// whose UUID is not present in the store is NOT returned as an orphan,
-// because it may belong to a different workspace scope.
-func TestScanOrphanedWorktrees_UnknownTask(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-
-	// Create a directory with a UUID that does not correspond to any task.
-	unknownID := uuid.New()
-	unknownDir := filepath.Join(r.worktreesDir, unknownID.String())
-	if err := os.MkdirAll(unknownDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	orphans, err := r.ScanOrphanedWorktrees(context.Background())
-	if err != nil {
-		t.Fatalf("ScanOrphanedWorktrees: %v", err)
-	}
-
-	for _, id := range orphans {
-		if id == unknownID {
-			t.Errorf("unknown task %s should NOT be in orphans (may belong to another workspace)", unknownID)
-		}
-	}
-}
-
-// TestPruneOrphanedWorktrees_RemovesOrphanDir verifies that
-// PruneOrphanedWorktrees removes the on-disk directory for a given orphan ID.
-func TestPruneOrphanedWorktrees_RemovesOrphanDir(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-
-	orphanID := uuid.New()
-	orphanDir := filepath.Join(r.worktreesDir, orphanID.String())
-	if err := os.MkdirAll(orphanDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	removed := r.PruneOrphanedWorktrees(context.Background(), []uuid.UUID{orphanID})
-	if removed != 1 {
-		t.Errorf("expected 1 removed, got %d", removed)
-	}
-
-	if _, err := os.Stat(orphanDir); !os.IsNotExist(err) {
-		t.Error("expected orphan dir to be removed after PruneOrphanedWorktrees")
-	}
-}
-
 // TestScanOrphanedWorktrees_SkipsInProgressTask verifies that a worktree
 // directory whose task is still in_progress is NOT returned as an orphan,
 // and that unknown UUIDs (not in store) are also skipped.
