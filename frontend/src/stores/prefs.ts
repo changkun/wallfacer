@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 
 export type Theme = 'light' | 'dark' | 'auto';
 export type Locale = 'en' | 'zh';
@@ -128,7 +128,5 @@ export const usePrefsStore = defineStore('prefs', () => {
   function setPalette(p: PaletteName) { palette.value = p; }
   function setLocale(l: Locale) { locale.value = l; }
 
-  const themeIcon = computed(() => theme.value === 'light' ? '☀' : theme.value === 'dark' ? '☾' : '◐');
-
-  return { theme, palette, locale, themeIcon, toggleTheme, setTheme, setPalette, setLocale };
+  return { theme, palette, locale, toggleTheme, setTheme, setPalette, setLocale };
 });

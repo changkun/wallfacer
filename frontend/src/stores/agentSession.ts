@@ -262,14 +262,6 @@ export const useAgentStore = defineStore('agentSession', () => {
     focusedTaskPrompt.value = '';
   }
 
-  function clearFocus() {
-    focusedSpecPath.value = '';
-    focusedIsIndex.value = false;
-    focusedTaskId.value = '';
-    focusedTaskTitle.value = '';
-    focusedTaskPrompt.value = '';
-  }
-
   // openPlanForTask pins the Plan view to a specific task: focused-view
   // shows the task prompt, chat thread is activated (or created) for the
   // task. Mirrors ui/js/spec-mode.js openPlanForTask.
@@ -421,7 +413,7 @@ export const useAgentStore = defineStore('agentSession', () => {
     threads, threadOrder, archivedThreads, activeThreadId,
     streaming, streamingThreadId, busyThreadId,
     sortedNodes, nodesByPath, focusedNode,
-    applyTree, fetchTree, fetchStaleCandidates, dismissAllStaleCandidates, focusSpec, focusIndex, clearFocus,
+    applyTree, fetchTree, fetchStaleCandidates, dismissAllStaleCandidates, focusSpec, focusIndex,
     openPlanForTask,
     loadThreads, refreshBusy,
   };

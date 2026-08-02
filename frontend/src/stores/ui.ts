@@ -12,7 +12,6 @@ function readShowArchived(): boolean {
 }
 
 export const useUiStore = defineStore('ui', () => {
-  const showSettings = ref(false);
   const showWorkspaces = ref(false);
   // Id of the workspace whose settings popup (WorkspaceEditModal) is open, or
   // null when closed. Opened from the sidebar switcher and the picker's per-row
@@ -32,8 +31,6 @@ export const useUiStore = defineStore('ui', () => {
   // blocking overlay (above every modal) so the user never sees the new active
   // state painted over stale old content mid-switch.
   const switchingWorkspace = ref(false);
-  function beginSwitch() { switchingWorkspace.value = true; }
-  function endSwitch() { switchingWorkspace.value = false; }
 
   // Task ids freshly dispatched from Plan mode; a TaskCard consumes its own id
   // on mount to play a one-shot "just created" pulse, even after navigating to
@@ -58,18 +55,11 @@ export const useUiStore = defineStore('ui', () => {
     catch { /* ignore */ }
   }
 
-  function openSettings() { showSettings.value = true; }
-  function closeSettings() { showSettings.value = false; }
   function openWorkspaces() { showWorkspaces.value = true; }
-  function closeWorkspaces() { showWorkspaces.value = false; }
   function openWorkspaceEdit(id: string) { editWorkspaceId.value = id; }
   function closeWorkspaceEdit() { editWorkspaceId.value = null; }
   const paletteSeed = ref('');
-  function openPalette() { showPalette.value = true; }
   function openPaletteWith(seed: string) { paletteSeed.value = seed; showPalette.value = true; }
-  function closePalette() { showPalette.value = false; }
-  function openSystemPrompts() { showSettings.value = false; showSystemPrompts.value = true; }
-  function closeSystemPrompts() { showSystemPrompts.value = false; }
   function openTerminal() { useDockStore().openTerminal(); }
   function closeTerminal() { useDockStore().closeTerminal(); }
   function toggleTerminal() { useDockStore().toggleTerminal(); }
@@ -77,26 +67,21 @@ export const useUiStore = defineStore('ui', () => {
   function closeExplorer() { showExplorer.value = false; }
   function toggleExplorer() { showExplorer.value = !showExplorer.value; }
   function openTrash() { showTrash.value = true; }
-  function closeTrash() { showTrash.value = false; }
   function openShortcuts() { showShortcuts.value = true; }
-  function closeShortcuts() { showShortcuts.value = false; }
 
   return {
-    showSettings, showWorkspaces, editWorkspaceId, showPalette,
+    showWorkspaces, editWorkspaceId, showPalette,
     showSystemPrompts, showTerminal,
     showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
-    switchingWorkspace, beginSwitch, endSwitch,
+    switchingWorkspace,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
-    openSettings, closeSettings,
-    openWorkspaces, closeWorkspaces,
+    openWorkspaces,
     openWorkspaceEdit, closeWorkspaceEdit,
-    openPalette, openPaletteWith, closePalette,
-
-    openSystemPrompts, closeSystemPrompts,
+    openPaletteWith,
     openTerminal, closeTerminal, toggleTerminal,
     openExplorer, closeExplorer, toggleExplorer,
-    openTrash, closeTrash,
-    openShortcuts, closeShortcuts,
+    openTrash,
+    openShortcuts,
   };
 });
