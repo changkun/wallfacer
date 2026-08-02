@@ -2,7 +2,7 @@
 
 Wallfacer embeds the topos runtime SDK (`latere.ai/x/topos`) as an in-process multi-agent execution engine. A topos run compiles a set of agents into a `topos.Region`, executes it inside the wallfacer server process, and returns a final text plus a lineage graph of which agent did what and who delegated to whom. This is the execution substrate behind the Agent Graph page (`/agent-graph`), agentic flows, and the native `topos` harness.
 
-The integration is deliberately experimental and opt-in. The built-in `implement` flow does **not** run through it: an ordinary task keeps the multi-turn subprocess turn loop documented in [Task Lifecycle](task-lifecycle.md). Only a flow explicitly marked agentic, or a task explicitly pinned to the `topos` harness, reaches this runtime. Current constraints: static API-key credentials only (Bearer/OAuth deferred), transparent fallback to a deterministic fake model when no credential is configured, no session resume, no MCP, and no commit/verification parity with the subprocess harnesses on the native path. The milestone history lives in `specs/local/topos-runtime-integration.md`.
+The integration is deliberately experimental and opt-in. The built-in `implement` flow does **not** run through it: an ordinary task keeps the multi-turn subprocess turn loop documented in [Task Lifecycle](task-lifecycle.md). Only a flow explicitly marked agentic, or a task explicitly pinned to the `topos` harness, reaches this runtime. Current constraints: static API-key credentials only (Bearer/OAuth deferred), transparent fallback to a deterministic fake model when no credential is configured, no session resume, no MCP, and no verification pass after the in-process run. The milestone history lives in `specs/local/topos-runtime-integration.md`.
 
 ## The Single Import Seam
 
@@ -54,12 +54,12 @@ Three flow fields shape the region's autonomy (`internal/flow/flow.go`):
 
 `Runner.Run` (`internal/runner/execute.go`) dispatches a task in priority order:
 
-1. **Agentic flow.** After resolving the task's flow slug, if `r.flowBySlug(flowSlug)` returns a flow with `Agentic == true`, the task runs through `runAgenticFlow` (`internal/runner/agentic.go`), which calls `agentgraph.RunFlowWithModel` with the compiled region. This branch runs **before** the flow-engine branch: an agentic flow has a non-`implement` slug and would otherwise be swallowed by the legacy engine path.
+1. **Agentic flow.** After resolving the task's flow slug, if `r.flowBySlug(flowSlug)` returns a flow with `Agentic == true`, the runner excludes it from the legacy flow engine, sets up the task worktree, and calls `runAgenticFlow` (`internal/runner/agentic.go`). `agentgraph.RunFlowWithModel` receives that worktree as `topos.Options.Workdir`, so every tool call operates on the task branch.
 2. **Legacy flow engine.** Non-`implement`, non-agentic flows walk the linear flow engine (subprocess agents). Unrelated to topos.
 3. **Native topos harness.** An `implement`-path task whose resolved harness is in-process (`harness.InProcess(r.sandboxForTask(task))`, true only for `topos`) runs through `runNativeTopos`: a single agent as a one-node pinned region via `agentgraph.RunAgent`. Test runs (`task.IsTestRun`) are excluded and keep the subprocess verification path. The dispatch happens **after** worktree setup so `topos.Options.Workdir` can point at the task's real worktree (`firstWorktreePath`); an empty worktree falls back to the topos temp-dir sandbox. The periodic oversight worker is skipped for native runs, which produce their own live trace and never enter the turn loop.
 4. **Turn loop.** Everything else, including the built-in `implement` flow, stays on the subprocess turn loop.
 
-Because `flow/builtins.go` does not set `Agentic` on `implement`, and `harness.Default()` is still `Claude` (`internal/harness/registry.go`), the runtime today only executes user-authored agentic flows and tasks explicitly pinned to the `topos` harness. Flipping the default harness to topos is the direction tracked in the topos-native-harness spec; commit and verification parity are the prerequisites, since `runNativeTopos` does not yet make a durable git commit or run a verification pass.
+Because `flow/builtins.go` does not set `Agentic` on `implement`, and `harness.Default()` is still `Claude` (`internal/harness/registry.go`), the runtime today only executes user-authored agentic flows and tasks explicitly pinned to the `topos` harness. Both paths now make durable commits through the standard pipeline; a post-run verification pass is the remaining parity gap before flipping the default harness to topos.
 
 ### driveToposRun
 
@@ -69,7 +69,7 @@ Both paths converge on `driveToposRun` (`internal/runner/agentic.go`), which:
 - forwards live trace events onto the task timeline. The topos observer is called synchronously on the run's goroutines, so it must not block: events are pushed into a 256-slot buffered channel and drained into the store by a separate goroutine, dropping on overflow rather than backpressuring the run;
 - on error, respects an already-cancelled task, classifies the failure (`classifyFailure`), attempts `tryAutoRetry`, and otherwise fails the task with an error event;
 - on success, persists the final text (`UpdateTaskResult` with stop reason `end_turn`) and the JSON-marshalled lineage (`UpdateTaskLineage`) **before** transitioning, so the durable record is complete the moment the task reaches done;
-- walks `in_progress -> waiting -> committing -> done` with a state-change event per hop. The state machine forbids a direct `in_progress -> done` transition, so this mirrors the flow-engine path.
+- walks `in_progress -> waiting -> committing`, runs `Runner.Commit` to stage, commit, rebase, merge, and clean up the task worktrees, then transitions to `done`. A commit failure transitions from `committing` to `failed`; the state machine forbids a direct `in_progress -> done` transition.
 
 ## Task.Lineage and the Graph Endpoint
 

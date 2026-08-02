@@ -259,3 +259,51 @@ func TestRun_NativeToposHarnessCommitsWorktreeEdits(t *testing.T) {
 		t.Error("no commit hashes were recorded on the task")
 	}
 }
+
+func TestRun_AgenticFlowCommitsWorktreeEdits(t *testing.T) {
+	repo := setupTestRepo(t)
+	s, r := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, r)
+	r.agentsReg = agents.NewRegistry(
+		agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
+		agents.Role{Slug: "ag-builder", Title: "Builder", PromptTmpl: "you build"},
+	)
+	r.flows = flow.NewRegistry(flow.Flow{
+		Slug:    "agentic-pair",
+		Name:    "Agentic Pair",
+		Agentic: true,
+		Steps:   []flow.Step{{AgentSlug: "ag-planner"}, {AgentSlug: "ag-builder"}},
+	})
+	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
+
+	ctx := context.Background()
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  "agentic change > agentic-marker.txt",
+		Timeout: 5,
+		FlowID:  "agentic-pair",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	r.Run(task.ID, task.Prompt, "", false)
+	r.WaitBackground()
+	s.WaitCompaction()
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusDone {
+		t.Fatalf("status = %q, want done", updated.Status)
+	}
+	if finalHash := gitRun(t, repo, "rev-parse", "HEAD"); finalHash == initialHash {
+		t.Fatal("expected a new commit on the default branch, but HEAD is unchanged")
+	}
+	if _, statErr := os.Stat(filepath.Join(repo, "agentic-marker.txt")); statErr != nil {
+		t.Fatalf("agentic flow file was not committed onto the default branch: %v", statErr)
+	}
+	if len(updated.CommitHashes) == 0 {
+		t.Error("no commit hashes were recorded on the task")
+	}
+}

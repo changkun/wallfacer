@@ -131,9 +131,9 @@ func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]st
 // agent-graph runtime (internal/agentgraph): it compiles the flow into a
 // multi-agent topos.Region and drives the resulting run onto the task via
 // driveToposRun. The caller sets statusSet=true before invoking this.
-func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt string) {
+func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt, worktree string) {
 	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error) {
-		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, onEvent)
+		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, worktree, onEvent)
 	})
 }
 
@@ -257,12 +257,9 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 	// the work uncommitted. r.Commit re-fetches the task, so it sees the worktree
 	// paths execute.go persisted after this snapshot was taken.
 	//
-	// The commit is gated on a worktree being present. The native single-agent
-	// path (runNativeTopos) runs in the task's worktree and commits here; the
-	// multi-agent agentic path (runAgenticFlow) is dispatched before worktree
-	// setup and runs in a topos temp sandbox with no worktree, so there is
-	// nothing in the repo to commit and it walks straight to done as before.
-	// Threading a worktree through the agentic path is deferred (tracked on #17).
+	// The commit is gated on a worktree being present. Both the native
+	// single-agent and multi-agent flow paths run in the task worktree and commit
+	// here; tests without a configured workspace keep using a temporary sandbox.
 	if cur, gErr := r.taskStore(taskID).GetTask(bgCtx, taskID); gErr == nil && cur != nil && len(cur.WorktreePaths) > 0 {
 		if err := r.Commit(taskID, ""); err != nil {
 			logger.Runner.Error("topos run commit", "task", taskID, "error", err)

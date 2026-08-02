@@ -134,7 +134,7 @@ func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 	reg, f := twoAgentFixture()
 	var got []agentgraph.TraceEvent
 	res, err := agentgraph.RunFlowWithModel(
-		context.Background(), "run-obs", agentgraph.ModelConfig{}, f, reg, "do the thing",
+		context.Background(), "run-obs", agentgraph.ModelConfig{}, f, reg, "do the thing", "",
 		func(ev agentgraph.TraceEvent) { got = append(got, ev) },
 	)
 	if err != nil {
@@ -230,6 +230,25 @@ func TestRunAgent_WithWorktreeExecutesInRepo(t *testing.T) {
 	}
 	if !strings.Contains(string(got), "hi") {
 		t.Errorf("marker.txt = %q, want it to contain the echoed prompt", got)
+	}
+}
+
+func TestRunFlowWithModel_WithWorktreeExecutesInRepo(t *testing.T) {
+	worktree := t.TempDir()
+	reg, f := twoAgentFixture()
+	_, err := agentgraph.RunFlowWithModel(
+		context.Background(), "run-flow-wt", agentgraph.ModelConfig{}, f, reg,
+		"flow change > marker.txt", worktree, nil,
+	)
+	if err != nil {
+		t.Fatalf("RunFlowWithModel with worktree: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(worktree, "marker.txt"))
+	if err != nil {
+		t.Fatalf("marker.txt not created in the worktree: %v", err)
+	}
+	if !strings.Contains(string(got), "flow change") {
+		t.Errorf("marker.txt = %q, want it to contain the prompt", got)
 	}
 }
 

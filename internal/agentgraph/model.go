@@ -112,11 +112,14 @@ func RunOptions(sessionID string, c ModelConfig, f flow.Flow) topos.Options {
 // no-credential dev keep working. sessionID seeds the run id so lineage node ids
 // (<session>/<agent>) are stable.
 //
-// OQ-1 (sandbox) is resolved minimally for M4: Options.Sandbox is left nil, so a
-// run uses the topos local sandbox. Sharing wallfacer's executor.Backend through
-// a topos.Sandbox adapter is future work.
-func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt string, onEvent func(TraceEvent)) (Result, error) {
+// When worktree is non-empty, the local sandbox runs tools in that directory.
+// Options.Sandbox remains nil; sharing wallfacer's executor.Backend through a
+// topos.Sandbox adapter is future work.
+func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt, worktree string, onEvent func(TraceEvent)) (Result, error) {
 	opts := runOptions(sessionID, c, f)
+	if worktree != "" {
+		opts.Workdir = worktree
+	}
 	if onEvent != nil {
 		// Bridge topos's observer to a topos-free TraceEvent so only this seam
 		// names a topos type. The callback runs synchronously on the run's

@@ -147,7 +147,7 @@ type TraceEvent struct {
 // run id so lineage node ids (<session>/<agent>) are stable. It is the explicit
 // fake entrypoint, equivalent to RunFlowWithModel with an unconfigured config.
 func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents.Registry, prompt string) (Result, error) {
-	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt, nil)
+	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt, "", nil)
 }
 
 // toResult converts a topos.RunResult into the topos-free host Result.
