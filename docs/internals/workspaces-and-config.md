@@ -211,7 +211,6 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 | `title.tmpl` | `title` | Auto-generating task titles from prompts |
 | `commit.tmpl` | `commit_message` | Generating commit messages during the commit pipeline |
 | `test.tmpl` | `test_verification` | Test verification agent prompt |
-| `refinement.tmpl` | `refinement` | Prompt refinement agent |
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
 | `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
 

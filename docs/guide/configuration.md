@@ -168,7 +168,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint |
 | `CODEX_DEFAULT_MODEL` | Default model for Codex tasks |
 | `CODEX_TITLE_MODEL` | Codex title model; falls back to `CODEX_DEFAULT_MODEL` |
-| `CODEX_ARGS` | Extra arguments appended to Codex invocations |
 | `CURSOR_API_KEY` | Headless credential for `cursor-agent` |
 | `OPENCODE_SERVER_PASSWORD` | Reserved for a future OpenCode server-attach path |
 

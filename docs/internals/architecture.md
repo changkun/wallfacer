@@ -408,7 +408,6 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `Decode()`, `Respond()`, `Error()` |
 | `pkg/keyedmu` | Per-key mutex map for fine-grained locking | `Map[K]` |
 | `pkg/lazyval` | Lazily-computed cached value with invalidation | `Value[T]`, `New()` |
-| `pkg/logpipe` | Streaming log pipe for agent output | `Pipe` |
 | `pkg/ndjson` | Newline-delimited JSON reader | `Reader` |
 | `pkg/pagination` | Cursor-based pagination helpers | `Paginate()` |
 | `pkg/pty` | PTY relay for the WebSocket terminal integration | `PTY`, `Start()` |
@@ -417,7 +416,6 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/set` | Generic set type | `Set[T]` |
 | `pkg/sortedkeys` | Sorted map key iteration | `Of()` |
 | `pkg/syncmap` | Type-safe generic wrapper around `sync.Map` | `Map[K,V]` |
-| `pkg/systray` | Optional system-tray integration for the desktop build | `Start()` |
 | `pkg/tail` | Tail-follow for log files | `Follow()` |
 | `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
 | `pkg/uuidutil` | UUID parsing/generation helpers | `New()`, `Parse()` |

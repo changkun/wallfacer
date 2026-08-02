@@ -2,19 +2,19 @@
 // with optional per-user overrides, and manages workspace-level AGENTS.md
 // instruction files that are mounted into every task container.
 //
-// Seven built-in prompt templates (title, commit, refinement, oversight, test,
-// conflict resolution, instructions) are embedded in the binary. The
-// [Manager] checks for user overrides in ~/.wallfacer/prompts/ before falling
+// The built-in prompt templates are embedded in the binary; knownNames is the
+// authoritative list. The [Manager] checks for user overrides in
+// ~/.wallfacer/prompts/ before falling
 // back to the embedded defaults. Templates use Go text/template syntax with
 // custom arithmetic and ratio functions. This allows users to customize agent
 // behavior without modifying the wallfacer binary.
 //
-// The instructions template generates the workspace AGENTS.md content. Each
-// unique combination of workspace directories gets its own AGENTS.md file,
-// identified by a SHA-256 fingerprint of the sorted workspace paths. On first
-// run, the file is assembled from the instructions template plus references to
-// per-repo AGENTS.md or CLAUDE.md files found in the workspaces. Users can
-// edit the file in the UI or regenerate it at any time.
+// The workspace AGENTS.md content is generated in instructions.go, not from a
+// .tmpl file. Each unique combination of workspace directories gets its own
+// AGENTS.md file, identified by a SHA-256 fingerprint of the sorted workspace
+// paths. On first run, the file is assembled from the built-in preamble plus
+// references to per-repo AGENTS.md or CLAUDE.md files found in the workspaces.
+// Users can edit the file in the UI or regenerate it at any time.
 //
 // # Connected packages
 //
