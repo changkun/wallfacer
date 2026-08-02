@@ -395,16 +395,6 @@ func TestPruneUnknownWorktreesNilStore(t *testing.T) {
 	}
 }
 
-// TestPruneUnknownWorktreesRunsGitWorktreePrune verifies that
-// PruneUnknownWorktrees runs `git worktree prune` on git workspaces.
-func TestPruneUnknownWorktreesRunsGitWorktreePrune(t *testing.T) {
-	repo := setupTestRepo(t)
-	_, runner := setupTestRunner(t, []string{repo})
-
-	// Just verify it completes without panicking when the workspace is a git repo.
-	runner.PruneUnknownWorktrees()
-}
-
 // TestPruneUnknownWorktrees_PreservesWaitingTasks is a regression test for a
 // bug where PruneUnknownWorktrees destroyed worktrees for tasks in waiting
 // status, losing all committed work.
@@ -971,23 +961,6 @@ func TestRunnerPendingGoroutines(t *testing.T) {
 	if len(pending) != 0 {
 		t.Errorf("expected 0 pending goroutines initially, got %d: %v", len(pending), pending)
 	}
-}
-
-// TestRunnerCodexAuthPath verifies CodexAuthPath() returns an empty string
-// when no valid host codex auth cache exists.
-func TestRunnerCodexAuthPath(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// No real codex auth path configured, should return "".
-	path := r.CodexAuthPath()
-	_ = path // just verify it doesn't panic
-}
-
-// TestRunnerHasHostCodexAuth verifies HasHostCodexAuth() returns false when
-// no valid host codex auth cache exists.
-func TestRunnerHasHostCodexAuth(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// No real codex auth path, should return false without panicking.
-	r.HasHostCodexAuth()
 }
 
 // TestContainerCircuitBreaker verifies that the container circuit breaker

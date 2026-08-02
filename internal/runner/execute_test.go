@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -1324,9 +1323,6 @@ func TestFinalizeTestRunEventOrder(t *testing.T) {
 		t.Fatalf("StateChange event (id=%d) must come before SpanStart event (id=%d)", stateChangeID, spanStartID)
 	}
 }
-
-// Ensure time is imported to avoid unused import warnings.
-var _ = time.Second
 
 // TestSyncWorktreesBehindMainDirtyWorktree verifies that uncommitted changes in
 // a worktree are stashed before the rebase and restored afterward (stash pop).

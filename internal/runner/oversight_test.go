@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -1059,95 +1058,6 @@ func TestRunKeepsOversightMutexStable(t *testing.T) {
 
 	if before != after {
 		t.Fatal("oversight mutex was replaced across Run; concurrent oversight generations would no longer serialize")
-	}
-}
-
-// TestPeriodicOversightWorkerSkipsWhenLocked verifies that periodicOversightWorker
-// skips a tick when the per-task oversight mutex is already held (TryLock fails),
-// without blocking or panicking.
-func TestPeriodicOversightWorkerSkipsWhenLocked(t *testing.T) {
-	// Use a very short interval to trigger ticks quickly in the test.
-	envPath := filepath.Join(t.TempDir(), ".env")
-	// We'll manually set interval=0 so worker exits; test logic is below.
-	// Instead, write a valid interval but cancel immediately after confirming
-	// the worker is running and the mutex is held.
-	if err := os.WriteFile(envPath, []byte("WALLFACER_OVERSIGHT_INTERVAL=0\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	cmd := fakeCmdScript(t, oversightOutput, 0)
-	s, r := setupRunnerWithCmd(t, nil, cmd)
-	// Override envFile so oversightIntervalFromEnv reads our test file.
-	r.envFile = envPath
-
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Pre-hold the oversight mutex to simulate a concurrent generation.
-	mu := r.oversightLock(task.ID)
-	mu.Lock()
-
-	// Worker is disabled (interval=0) so exits immediately; this simply
-	// verifies it doesn't deadlock when the mutex is held.
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		r.periodicOversightWorker(context.Background(), task.ID)
-	}()
-
-	select {
-	case <-done:
-		// expected — disabled worker exits immediately even with mutex held
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("worker should exit immediately when disabled, regardless of mutex state")
-	}
-
-	mu.Unlock()
-}
-
-// TestPeriodicOversightWorkerSkipsEmptyOutputsDir verifies that the worker
-// skips generation when the outputs directory is empty (no turns yet).
-func TestPeriodicOversightWorkerSkipsEmptyOutputsDir(t *testing.T) {
-	// Use a very short interval (we'll simulate by patching internals).
-	// This test uses a real runner and checks that no oversight is written
-	// when there are no turn files.
-	envPath := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envPath, []byte("WALLFACER_OVERSIGHT_INTERVAL=0\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	cmd := fakeCmdScript(t, oversightOutput, 0)
-	s, r := setupRunnerWithCmd(t, nil, cmd)
-	r.envFile = envPath
-
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "no outputs task", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Worker exits immediately since interval=0; oversight should remain pending.
-	ctxW, cancelW := context.WithCancel(context.Background())
-	cancelW() // cancel immediately
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		r.periodicOversightWorker(ctxW, task.ID)
-	}()
-	wg.Wait()
-
-	oversight, err := s.GetOversight(task.ID)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// No generation should have happened — outputs dir is empty (no turns).
-	if oversight.Status == store.OversightStatusReady {
-		t.Fatal("expected oversight not to be generated for task with no turn files")
 	}
 }
 

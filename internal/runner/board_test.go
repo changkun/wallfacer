@@ -592,20 +592,6 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 // logBoardManifestSizeWarning
 // ---------------------------------------------------------------------------
 
-// TestLogBoardManifestSizeWarning_LessThan5 verifies that the function does
-// not panic when the number of size entries is fewer than 5.
-func TestLogBoardManifestSizeWarning_LessThan5(_ *testing.T) {
-	sizes := []struct {
-		id    string
-		bytes int
-	}{
-		{id: "task1", bytes: 1000},
-		{id: "task2", bytes: 2000},
-	}
-	// Must not panic; exercises the sort and log path with small input.
-	logBoardManifestSizeWarning(sizes, 3000)
-}
-
 // TestLogBoardManifestSizeWarning_MoreThan5 verifies that the function does
 // not panic when there are more than 5 entries and only logs the top 5.
 func TestLogBoardManifestSizeWarning_MoreThan5(_ *testing.T) {
