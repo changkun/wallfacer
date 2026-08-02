@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 )
 
@@ -638,58 +637,6 @@ func TestAccumulateTaskUsage_NotFound(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.AccumulateSubAgentUsage(bg(), uuid.New(), SandboxActivityImplementation, TaskUsage{}); err == nil {
 		t.Error("expected error for unknown task")
-	}
-}
-
-func TestUpdateTaskExecutionPrompt(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	if err := s.UpdateTaskExecutionPrompt(bg(), task.ID, "implementation prompt"); err != nil {
-		t.Fatalf("UpdateTaskExecutionPrompt: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.ExecutionPrompt != "implementation prompt" {
-		t.Errorf("ExecutionPrompt = %q, want %q", got.ExecutionPrompt, "implementation prompt")
-	}
-}
-
-func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	updates := map[SandboxActivity]harness.ID{
-		"implementation": harness.ID("CLAUDE"),
-		"Testing":        harness.ID("Codex "),
-		"invalid":        "x",
-		"oversight":      "",
-	}
-
-	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, updates); err != nil {
-		t.Fatalf("UpdateTaskSandboxByActivity: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.SandboxByActivity[SandboxActivityImplementation] != "claude" {
-		t.Fatalf("expected implementation sandbox 'claude', got %#v", got.SandboxByActivity)
-	}
-	if got.SandboxByActivity[SandboxActivityTesting] != "codex" {
-		t.Fatalf("expected testing sandbox 'codex', got %#v", got.SandboxByActivity)
-	}
-	if _, ok := got.SandboxByActivity[SandboxActivityOversight]; ok {
-		t.Fatalf("expected empty oversight value to be dropped, got %#v", got.SandboxByActivity)
-	}
-	if _, ok := got.SandboxByActivity["invalid"]; ok {
-		t.Fatalf("expected invalid activity key to be ignored, got %#v", got.SandboxByActivity)
-	}
-
-	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, map[SandboxActivity]harness.ID{}); err != nil {
-		t.Fatalf("UpdateTaskSandboxByActivity empty: %v", err)
-	}
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.SandboxByActivity != nil {
-		t.Fatalf("expected empty map to clear sandbox overrides, got %#v", got.SandboxByActivity)
 	}
 }
 

@@ -176,16 +176,6 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 	})
 }
 
-// UpdateTaskExecutionPrompt sets the full execution prompt used at runtime.
-// When non-empty, the runner passes ExecutionPrompt to the sandbox instead of
-// Prompt, so Prompt can be kept as a short human-readable card label.
-func (s *Store) UpdateTaskExecutionPrompt(_ context.Context, id uuid.UUID, executionPrompt string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.ExecutionPrompt = executionPrompt
-		return nil
-	})
-}
-
 // UpdateTaskTurns updates only the turn counter for a task, leaving all other
 // fields (Result, SessionID, StopReason) unchanged. Used during test runs so
 // that the implementation agent's output is not overwritten.
@@ -417,15 +407,6 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 			}
 			t.MaxInputTokens = v
 		}
-		return nil
-	})
-}
-
-// UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
-// Passing an empty map clears the override map.
-func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[SandboxActivity]harness.ID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
 		return nil
 	})
 }
