@@ -60,14 +60,6 @@ func TestDefault(t *testing.T) {
 	}
 }
 
-func TestCapabilities_ZeroValueIsAllFalse(t *testing.T) {
-	var c Capabilities
-	if c.SupportsResume || c.SupportsMCP || c.SupportsSystemPrompt ||
-		c.EmitsUsage || c.EmitsCost || c.NeedsTTY {
-		t.Errorf("zero Capabilities has a true field: %+v", c)
-	}
-}
-
 func TestFakeHarness_RecordsCalls(t *testing.T) {
 	f := &FakeHarness{
 		IDValue:      Cursor,

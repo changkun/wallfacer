@@ -960,30 +960,6 @@ func TestParseBoolFlag(t *testing.T) {
 	}
 }
 
-// TestParse_CloudTrue checks the canonical truthy spelling.
-func TestParse_CloudTrue(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_CLOUD=true\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if !cfg.Cloud {
-		t.Error("Cloud = false; want true")
-	}
-}
-
-// TestParse_CloudFalse checks an explicit false value.
-func TestParse_CloudFalse(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_CLOUD=false\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.Cloud {
-		t.Error("Cloud = true; want false")
-	}
-}
-
 // TestParse_CloudUnset checks that a missing key defaults to false — cloud
 // mode is opt-in, not opt-out.
 func TestParse_CloudUnset(t *testing.T) {

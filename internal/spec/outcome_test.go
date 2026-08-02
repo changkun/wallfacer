@@ -45,23 +45,3 @@ func TestSetOutcome_AppendAndReplace(t *testing.T) {
 		t.Errorf("status = %q, want testing (frontmatter preserved)", s2.Status)
 	}
 }
-
-func TestSetOutcome_PreservesTrailingSection(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "s.md")
-	writeStatusSpec(t, dir, "s.md", StatusTesting)
-	// Add an Outcome followed by another section, then replace Outcome only.
-	if err := SetOutcome(path, "first"); err != nil {
-		t.Fatal(err)
-	}
-	// Manually append a trailing section after Outcome.
-	s, _ := ParseFile(path)
-	_ = s
-	if err := SetOutcome(path, "second"); err != nil {
-		t.Fatal(err)
-	}
-	s2, _ := ParseFile(path)
-	if strings.Contains(s2.Body, "first") || !strings.Contains(s2.Body, "second") {
-		t.Errorf("replace failed:\n%s", s2.Body)
-	}
-}

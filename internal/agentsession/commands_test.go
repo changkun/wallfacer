@@ -97,18 +97,6 @@ func TestCommandRegistry_Expand_BreakDown(t *testing.T) {
 	}
 }
 
-func TestCommandRegistry_Expand_Create(t *testing.T) {
-	r := NewCommandRegistry()
-
-	expanded, ok := r.Expand("/create My New Spec", "")
-	if !ok {
-		t.Fatal("expected create to be recognized")
-	}
-	if !strings.Contains(expanded, "My New Spec") {
-		t.Errorf("expanded prompt missing title: %q", expanded)
-	}
-}
-
 // TestSlashCreate_ExpandsToDirective covers the create-command-expansion
 // contract: `/create <title>` produces a prompt whose first line is a
 // server-readable /spec-new directive pointing at the slugged filename.

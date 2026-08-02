@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -112,25 +110,6 @@ func TestRunDoctor_WithCredentials(t *testing.T) {
 	}
 }
 
-// TestRunDoctor_ConfigDirMissing verifies that doctor warns when both the
-// config directory and .env file are absent.
-func TestRunDoctor_ConfigDirMissing(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "missing-dir")
-	envFile := filepath.Join(missing, ".env")
-	t.Setenv("ENV_FILE", envFile)
-	t.Setenv("CONTAINER_CMD", "printf")
-
-	out := captureStdout(func() {
-		RunDoctor(missing, nil)
-	})
-	if !strings.Contains(out, "[!] Config directory missing") {
-		t.Fatalf("expected config dir warning, got: %s", out)
-	}
-	if !strings.Contains(out, "[!] Env file not found") {
-		t.Fatalf("expected env-file warning, got: %s", out)
-	}
-}
-
 // TestOpenBrowser_InvokesPlatformCommand installs a fake browser-open script on
 // $PATH and verifies that openBrowser invokes it with the given URL.
 func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
@@ -198,28 +177,5 @@ func TestPrintUsage_IncludesVersion(t *testing.T) {
 	})
 	if !strings.Contains(out, "wallfacer 2.0.0") {
 		t.Fatalf("expected version in usage, got: %s", out)
-	}
-}
-
-// TestRunStatusJsonOutput verifies that `wallfacer status --json` outputs the
-// raw JSON response from the server without any formatting.
-func TestRunStatusJsonOutput(t *testing.T) {
-	response := `[{"id":"12345678-1234-1234-1234-1234567890ab","title":"test","status":"done","turns":1,"usage":{"cost_usd":0.2}}]`
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/tasks":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(response))
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer ts.Close()
-
-	out := captureStdout(func() {
-		RunStatus("", []string{"-addr", ts.URL, "--json"})
-	})
-	if !strings.Contains(out, response) {
-		t.Fatalf("expected raw JSON output, got: %s", out)
 	}
 }

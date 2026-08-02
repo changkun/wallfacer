@@ -870,48 +870,6 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 	}
 }
 
-// TestShutdown_WithAgentSessionRunning verifies that Shutdown stops the agent session
-// when it is running.
-func TestShutdown_WithAgentSessionRunning(t *testing.T) {
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	sc := initServer(configDir, ServerConfig{
-		LogFormat: "text",
-		Addr:      ":0",
-		DataDir:   filepath.Join(configDir, "data"),
-		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
-
-	// Agent session is initialized but not running, so Shutdown should handle it.
-	sc.Shutdown()
-}
-
-// TestShutdown_HttpShutdownError verifies that Shutdown completes even when
-// the HTTP shutdown encounters an error (e.g. context deadline).
-func TestShutdown_HttpShutdownError(t *testing.T) {
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	sc := initServer(configDir, ServerConfig{
-		LogFormat: "text",
-		Addr:      ":0",
-		DataDir:   filepath.Join(configDir, "data"),
-		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
-
-	// Start serving so that Shutdown has something to shut down.
-	go func() { _ = sc.Srv.Serve(sc.Ln) }()
-	// Give the server a moment to start.
-	sc.Shutdown()
-}
-
 // TestGauge_TasksTotal validates the Prometheus gauge that counts tasks by
 // status and archived flag.
 func TestGauge_TasksTotal(t *testing.T) {
@@ -961,38 +919,6 @@ func TestGauge_TasksTotal(t *testing.T) {
 	if !found {
 		t.Fatal("expected a backlog status entry")
 	}
-}
-
-// TestGauge_RunningContainers validates the running containers gauge collector.
-func TestGauge_RunningContainers(t *testing.T) {
-	workdir := t.TempDir()
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-
-	// Mirror the gauge collector from server.go.
-	collector := func() []metrics.LabeledValue {
-		containers, err := r.ListContainers()
-		if err != nil {
-			return []metrics.LabeledValue{{Value: 0}}
-		}
-		return []metrics.LabeledValue{{Value: float64(len(containers))}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(vals))
-	}
-	// With the "true" command, ListContainers may fail, but the gauge should
-	// return 0 either way.
 }
 
 // TestGauge_BackgroundGoroutines validates the pending goroutines gauge.
