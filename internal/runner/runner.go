@@ -683,12 +683,6 @@ func (r *Runner) SandboxBackend() executor.Backend {
 	return r.backend
 }
 
-// HasHostCodexAuth reports whether a usable host Codex auth cache exists.
-func (r *Runner) HasHostCodexAuth() bool {
-	ok, _ := r.HostCodexAuthStatus(time.Now())
-	return ok
-}
-
 // CodexAuthPath returns the validated host path used for codex auth cache
 // mounts, or an empty string when unavailable.
 func (r *Runner) CodexAuthPath() string {

@@ -1020,7 +1020,7 @@ func TestContainerCircuitOpen_DoesNotConsumeProbe(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// sandboxForTask / modelFromEnv / titleModelFromEnv
+// sandboxForTask / modelFromEnvForSandbox / titleModelFromEnvForSandbox
 // ---------------------------------------------------------------------------
 
 // TestSandboxForTask_NilTask_DefaultsToDefaultHarness verifies that
@@ -1059,18 +1059,18 @@ func TestSandboxForTask_EmptyTask_DefaultsToDefaultHarness(t *testing.T) {
 	}
 }
 
-// TestModelFromEnv_NoEnvFile verifies that modelFromEnv returns an empty
+// TestModelFromEnv_NoEnvFile verifies that modelFromEnvForSandbox returns an empty
 // string when no env file is configured.
 func TestModelFromEnv_NoEnvFile(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	// setupRunnerWithCmd leaves envFile empty.
-	result := r.modelFromEnv()
+	result := r.modelFromEnvForSandbox(harness.Claude)
 	if result != "" {
-		t.Errorf("modelFromEnv with no env file = %q, want %q", result, "")
+		t.Errorf("modelFromEnvForSandbox with no env file = %q, want %q", result, "")
 	}
 }
 
-// TestModelFromEnv_WithEnvFile verifies that modelFromEnv reads the model
+// TestModelFromEnv_WithEnvFile verifies that modelFromEnvForSandbox reads the model
 // from a populated env file.
 func TestModelFromEnv_WithEnvFile(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), ".env")
@@ -1088,13 +1088,13 @@ func TestModelFromEnv_WithEnvFile(t *testing.T) {
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
-	result := r.modelFromEnv()
+	result := r.modelFromEnvForSandbox(harness.Claude)
 	if result != "claude-opus-4-5" {
-		t.Errorf("modelFromEnv = %q, want %q", result, "claude-opus-4-5")
+		t.Errorf("modelFromEnvForSandbox = %q, want %q", result, "claude-opus-4-5")
 	}
 }
 
-// TestModelFromEnv_BadEnvFile verifies that modelFromEnv returns empty string
+// TestModelFromEnv_BadEnvFile verifies that modelFromEnvForSandbox returns empty string
 // when the env file cannot be parsed.
 func TestModelFromEnv_BadEnvFile(t *testing.T) {
 	// Point to a non-existent file.
@@ -1109,23 +1109,23 @@ func TestModelFromEnv_BadEnvFile(t *testing.T) {
 		EnvFile: "/nonexistent/path/.env",
 	})
 	t.Cleanup(func() { r.Shutdown() })
-	result := r.modelFromEnv()
+	result := r.modelFromEnvForSandbox(harness.Claude)
 	if result != "" {
-		t.Errorf("modelFromEnv with bad env file = %q, want %q", result, "")
+		t.Errorf("modelFromEnvForSandbox with bad env file = %q, want %q", result, "")
 	}
 }
 
-// TestTitleModelFromEnv_NoEnvFile verifies that titleModelFromEnv returns an
+// TestTitleModelFromEnv_NoEnvFile verifies that titleModelFromEnvForSandbox returns an
 // empty string when no env file is configured.
 func TestTitleModelFromEnv_NoEnvFile(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
-	result := r.titleModelFromEnv()
+	result := r.titleModelFromEnvForSandbox(harness.Claude)
 	if result != "" {
-		t.Errorf("titleModelFromEnv with no env file = %q, want %q", result, "")
+		t.Errorf("titleModelFromEnvForSandbox with no env file = %q, want %q", result, "")
 	}
 }
 
-// TestTitleModelFromEnv_WithTitleModel verifies that titleModelFromEnv returns
+// TestTitleModelFromEnv_WithTitleModel verifies that titleModelFromEnvForSandbox returns
 // the title-specific model when set.
 func TestTitleModelFromEnv_WithTitleModel(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), ".env")
@@ -1144,13 +1144,13 @@ func TestTitleModelFromEnv_WithTitleModel(t *testing.T) {
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
-	result := r.titleModelFromEnv()
+	result := r.titleModelFromEnvForSandbox(harness.Claude)
 	if result != "claude-haiku-4-5" {
-		t.Errorf("titleModelFromEnv = %q, want %q", result, "claude-haiku-4-5")
+		t.Errorf("titleModelFromEnvForSandbox = %q, want %q", result, "claude-haiku-4-5")
 	}
 }
 
-// TestTitleModelFromEnv_FallsBackToDefaultModel verifies that titleModelFromEnv
+// TestTitleModelFromEnv_FallsBackToDefaultModel verifies that titleModelFromEnvForSandbox
 // returns the default model when no title-specific model is set.
 func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), ".env")
@@ -1168,8 +1168,8 @@ func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
-	result := r.titleModelFromEnv()
+	result := r.titleModelFromEnvForSandbox(harness.Claude)
 	if result != "claude-opus-4-5" {
-		t.Errorf("titleModelFromEnv fallback = %q, want %q", result, "claude-opus-4-5")
+		t.Errorf("titleModelFromEnvForSandbox fallback = %q, want %q", result, "claude-opus-4-5")
 	}
 }

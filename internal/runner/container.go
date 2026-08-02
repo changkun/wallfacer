@@ -296,12 +296,6 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) harne
 	return cfg.DefaultSandbox
 }
 
-// modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file.
-// Returns an empty string when the file is absent or the key is unset.
-func (r *Runner) modelFromEnv() string {
-	return r.modelFromEnvForSandbox(harness.Claude)
-}
-
 // modelFromEnvForSandbox reads the default model for the given sandbox.
 // Supports "claude" and "codex" values.
 func (r *Runner) modelFromEnvForSandbox(sb harness.ID) string {
@@ -318,12 +312,6 @@ func (r *Runner) modelFromEnvForSandbox(sb harness.ID) string {
 	default:
 		return cfg.DefaultModel
 	}
-}
-
-// titleModelFromEnv reads CLAUDE_TITLE_MODEL from the env file,
-// falling back to CLAUDE_DEFAULT_MODEL if the title model is not set.
-func (r *Runner) titleModelFromEnv() string {
-	return r.titleModelFromEnvForSandbox(harness.Claude)
 }
 
 // titleModelFromEnvForSandbox returns the sandbox-specific title model.
