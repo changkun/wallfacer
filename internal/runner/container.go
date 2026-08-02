@@ -424,7 +424,7 @@ func (r *Runner) runContainer(
 		// KillContainer can actually signal the running agent when the
 		// user cancels the task mid-run.
 		OnLaunch: func(_ string, handle executor.Handle) {
-			r.taskContainers.SetHandle(taskID, handle, nil)
+			r.taskContainers.SetHandle(taskID, handle)
 		},
 		// Heavyweight turn invocations rebind the activity bucket
 		// for each turn's usage ledger — implementation or testing.
@@ -510,7 +510,7 @@ func (r *Runner) runContainerOnSandbox(
 		// Register the fallback launch's handle too, so a cancel during
 		// the codex-fallback turn can still kill the running agent.
 		OnLaunch: func(_ string, handle executor.Handle) {
-			r.taskContainers.SetHandle(taskID, handle, nil)
+			r.taskContainers.SetHandle(taskID, handle)
 		},
 	})
 	if res == nil {

@@ -87,57 +87,6 @@ func TestContainerRegistry_RangeEarlyStop(t *testing.T) {
 	}
 }
 
-func TestContainerRegistry_Singleton(t *testing.T) {
-	r := &containerRegistry{}
-	name := "wallfacer-ideate-1234"
-
-	r.SetSingleton(name)
-
-	got, ok := r.GetSingleton()
-	if !ok {
-		t.Fatal("expected to find singleton entry after SetSingleton, got ok=false")
-	}
-	if got != name {
-		t.Fatalf("expected %q, got %q", name, got)
-	}
-
-	r.DeleteSingleton()
-
-	got, ok = r.GetSingleton()
-	if ok {
-		t.Fatalf("expected singleton to be deleted, got %q", got)
-	}
-}
-
-func TestContainerRegistry_SingletonGetMissing(t *testing.T) {
-	r := &containerRegistry{}
-
-	got, ok := r.GetSingleton()
-	if ok {
-		t.Fatalf("expected ok=false for missing singleton, got %q", got)
-	}
-	if got != "" {
-		t.Fatalf("expected empty string for missing singleton, got %q", got)
-	}
-}
-
-func TestContainerRegistry_SingletonKeyDoesNotConflictWithRealUUID(t *testing.T) {
-	r := &containerRegistry{}
-	realID := uuid.New()
-
-	r.Set(realID, "real-container")
-	r.SetSingleton("singleton-container")
-
-	got, ok := r.Get(realID)
-	if !ok || got != "real-container" {
-		t.Fatalf("real UUID entry corrupted: ok=%v, got=%q", ok, got)
-	}
-	gotSingleton, ok := r.GetSingleton()
-	if !ok || gotSingleton != "singleton-container" {
-		t.Fatalf("singleton entry corrupted: ok=%v, got=%q", ok, gotSingleton)
-	}
-}
-
 func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 	r := &containerRegistry{}
 	const goroutines = 50
@@ -198,7 +147,7 @@ func TestContainerRegistry_SetHandleGetHandle(t *testing.T) {
 	id := uuid.New()
 	h := &stubHandle{name: "wallfacer-handle-test"}
 
-	r.SetHandle(id, h, nil)
+	r.SetHandle(id, h)
 
 	// Get returns the name from the handle.
 	name, ok := r.Get(id)
@@ -228,28 +177,6 @@ func TestContainerRegistry_SetNameGetHandleNil(t *testing.T) {
 	// GetHandle returns nil for name-only entries.
 	if h := r.GetHandle(id); h != nil {
 		t.Fatalf("expected nil handle for name-only entry, got %v", h)
-	}
-}
-
-func TestContainerRegistry_SingletonHandle(t *testing.T) {
-	r := &containerRegistry{}
-	h := &stubHandle{name: "wallfacer-ideate-handle"}
-
-	r.SetSingletonHandle(h, nil)
-
-	name, ok := r.GetSingleton()
-	if !ok || name != "wallfacer-ideate-handle" {
-		t.Fatalf("GetSingleton after SetSingletonHandle: ok=%v, name=%q", ok, name)
-	}
-
-	got := r.GetSingletonHandle()
-	if got != h {
-		t.Fatal("GetSingletonHandle returned different handle")
-	}
-
-	r.DeleteSingleton()
-	if got := r.GetSingletonHandle(); got != nil {
-		t.Fatal("expected nil after DeleteSingleton")
 	}
 }
 
