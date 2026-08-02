@@ -1,3 +1,11 @@
+// Package adversarial wires wallfacer's harnesses into review's adversarial
+// debate protocol. It provides implementations of [toposadv.Verifier]
+// — the review-owned integration interface — backed by wallfacer's runner.
+//
+// [ReviewVerifier] is the only implementation. It is constructed once at
+// handler startup; the reviewEnabled runtime flag is checked per call rather
+// than by swapping the implementation, and verification additionally requires
+// the task to have a non-nil SessionID.
 package adversarial
 
 import (
