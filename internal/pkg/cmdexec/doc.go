@@ -21,5 +21,5 @@
 //	tx.Add(cmdexec.Git(dir, "checkout", "-b", branch))
 //	tx.AddWithRollback(cmd, rollbackCmd)
 //	tx.Defer(cleanupCmd)
-//	err = tx.RunContext(ctx)
+//	err = tx.Run()
 package cmdexec

@@ -32,13 +32,6 @@ func (m *Map[K, V]) Delete(key K) {
 	m.m.Delete(key)
 }
 
-// Range calls fn for each entry. Iteration stops if fn returns false.
-func (m *Map[K, V]) Range(fn func(K, V) bool) {
-	m.m.Range(func(k, v any) bool {
-		return fn(k.(K), v.(V))
-	})
-}
-
 // All returns an iterator over all key-value pairs.
 func (m *Map[K, V]) All() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {

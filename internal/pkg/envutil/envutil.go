@@ -39,13 +39,3 @@ func Duration(key string, defaultVal time.Duration) time.Duration {
 	}
 	return defaultVal
 }
-
-// DurationMin reads a time.Duration with a minimum bound.
-// Returns defaultVal if absent, empty, unparseable, or below min.
-func DurationMin(key string, defaultVal, minVal time.Duration) time.Duration {
-	d := Duration(key, defaultVal)
-	if d < minVal {
-		return defaultVal
-	}
-	return d
-}

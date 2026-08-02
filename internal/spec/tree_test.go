@@ -283,30 +283,6 @@ func TestBuildTree_AllIndex(t *testing.T) {
 	}
 }
 
-func TestBuildTree_Leaves(t *testing.T) {
-	specsDir := filepath.Join(t.TempDir(), "specs")
-	writeTestSpec(t, specsDir, "local/parent.md", makeSpec("Parent", "local"))
-	writeTestSpec(t, specsDir, "local/parent/a.md", makeSpec("A", "local"))
-	writeTestSpec(t, specsDir, "local/parent/b.md", makeSpec("B", "local"))
-	writeTestSpec(t, specsDir, "local/solo.md", makeSpec("Solo", "local"))
-
-	tree, err := BuildTree(specsDir)
-	if err != nil {
-		t.Fatalf("BuildTree: %v", err)
-	}
-
-	count := 0
-	for l := range tree.Leaves() {
-		if !l.IsLeaf {
-			t.Errorf("Leaves() returned non-leaf: %s", l.Key)
-		}
-		count++
-	}
-	if count != 3 {
-		t.Fatalf("Leaves() = %d, want 3", count)
-	}
-}
-
 func TestBuildTree_OrphanDirectory(t *testing.T) {
 	specsDir := filepath.Join(t.TempDir(), "specs")
 	// Create orphan directory (no matching .md file for "orphan/")

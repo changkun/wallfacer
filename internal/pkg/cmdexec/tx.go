@@ -92,12 +92,6 @@ func (tx *Tx) Run() error {
 	return tx.run(context.Background())
 }
 
-// RunContext is like Run but propagates ctx to all commands that don't
-// already have their own context.
-func (tx *Tx) RunContext(ctx context.Context) error {
-	return tx.run(ctx)
-}
-
 func (tx *Tx) run(ctx context.Context) error {
 	var stepErr *StepError
 	failedAt := -1 // -1 means no failure; set to the failing step index to trigger rollback

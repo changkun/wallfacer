@@ -58,35 +58,6 @@ func TestNew_Combined(t *testing.T) {
 	}
 }
 
-// TestNew_OutputBytes verifies that OutputBytes returns raw bytes without trimming.
-func TestNew_OutputBytes(t *testing.T) {
-	raw, err := New("echo", "raw").OutputBytes()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// OutputBytes does NOT trim
-	if string(raw) != "raw\n" {
-		t.Fatalf("expected 'raw\\n', got %q", string(raw))
-	}
-}
-
-// TestNew_Capture verifies that Capture returns stdout and stderr as separate byte slices.
-func TestNew_Capture(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("bash not available on windows")
-	}
-	stdout, stderr, err := New("bash", "-c", "echo out; echo err >&2").Capture()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if string(stdout) != "out\n" {
-		t.Fatalf("stdout: expected 'out\\n', got %q", string(stdout))
-	}
-	if string(stderr) != "err\n" {
-		t.Fatalf("stderr: expected 'err\\n', got %q", string(stderr))
-	}
-}
-
 // TestWithContext_Cancellation verifies that a pre-cancelled context causes Run to fail.
 func TestWithContext_Cancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())

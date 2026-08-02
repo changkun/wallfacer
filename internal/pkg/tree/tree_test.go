@@ -92,44 +92,6 @@ func TestNodeAt(t *testing.T) {
 	}
 }
 
-func TestLeaves(t *testing.T) {
-	tr := New[string, int]()
-	tr.Add("parent", 1, nil)
-	parentKey := "parent"
-	tr.Add("child1", 2, &parentKey)
-	tr.Add("child2", 3, &parentKey)
-	tr.Add("solo", 4, nil)
-
-	count := 0
-	for n := range tr.Leaves() {
-		if !n.IsLeaf {
-			t.Errorf("Leaves() yielded non-leaf: %v", n.Key)
-		}
-		count++
-	}
-	if count != 3 {
-		t.Fatalf("Leaves() yielded %d, want 3", count)
-	}
-}
-
-func TestLeaves_EarlyBreak(t *testing.T) {
-	tr := New[string, int]()
-	tr.Add("a", 1, nil)
-	tr.Add("b", 2, nil)
-	tr.Add("c", 3, nil)
-
-	count := 0
-	for range tr.Leaves() {
-		count++
-		if count == 1 {
-			break
-		}
-	}
-	if count != 1 {
-		t.Errorf("early break: got %d, want 1", count)
-	}
-}
-
 func TestWalk(t *testing.T) {
 	tr := New[string, int]()
 	tr.Add("a", 1, nil)

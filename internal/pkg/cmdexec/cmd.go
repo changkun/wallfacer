@@ -3,7 +3,6 @@
 package cmdexec
 
 import (
-	"bytes"
 	"context"
 	"os/exec"
 	"strings"
@@ -56,24 +55,8 @@ func (c *Cmd) Output() (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// OutputBytes executes the command and returns raw stdout bytes.
-func (c *Cmd) OutputBytes() ([]byte, error) {
-	return c.build().Output()
-}
-
 // Combined executes the command and returns trimmed stdout+stderr combined.
 func (c *Cmd) Combined() (string, error) {
 	out, err := c.build().CombinedOutput()
 	return strings.TrimSpace(string(out)), err
-}
-
-// Capture executes the command and returns stdout and stderr as separate
-// byte slices.
-func (c *Cmd) Capture() (stdout, stderr []byte, err error) {
-	cmd := c.build()
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	err = cmd.Run()
-	return outBuf.Bytes(), errBuf.Bytes(), err
 }

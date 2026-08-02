@@ -44,43 +44,6 @@ func TestMap_Delete(t *testing.T) {
 	}
 }
 
-// TestMap_Range verifies that Range visits all stored entries.
-func TestMap_Range(t *testing.T) {
-	var m Map[int, string]
-
-	m.Store(1, "one")
-	m.Store(2, "two")
-	m.Store(3, "three")
-
-	seen := map[int]string{}
-	m.Range(func(k int, v string) bool {
-		seen[k] = v
-		return true
-	})
-
-	if len(seen) != 3 {
-		t.Fatalf("expected 3 entries, got %d", len(seen))
-	}
-}
-
-// TestMap_RangeEarlyStop verifies that Range stops iterating when the callback
-// returns false.
-func TestMap_RangeEarlyStop(t *testing.T) {
-	var m Map[int, int]
-	for i := range 5 {
-		m.Store(i, i)
-	}
-
-	count := 0
-	m.Range(func(_, _ int) bool {
-		count++
-		return false
-	})
-	if count != 1 {
-		t.Fatalf("expected Range to stop after 1, got %d", count)
-	}
-}
-
 // TestMap_All verifies that the All iterator yields all stored key-value pairs.
 func TestMap_All(t *testing.T) {
 	var m Map[int, string]

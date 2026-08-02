@@ -31,19 +31,6 @@ func (t *Tree[K, V]) NodeAt(key K) (*Node[K, V], bool) {
 	return n, ok
 }
 
-// Leaves returns an iterator over all leaf nodes in the tree.
-func (t *Tree[K, V]) Leaves() iter.Seq[*Node[K, V]] {
-	return func(yield func(*Node[K, V]) bool) {
-		for _, n := range t.All {
-			if n.IsLeaf {
-				if !yield(n) {
-					return
-				}
-			}
-		}
-	}
-}
-
 // Walk returns an iterator over every node in depth-first pre-order.
 func (t *Tree[K, V]) Walk() iter.Seq[*Node[K, V]] {
 	return func(yield func(*Node[K, V]) bool) {

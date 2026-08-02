@@ -123,64 +123,6 @@ func TestReadFile_CustomBufferSize(t *testing.T) {
 	}
 }
 
-// TestReadFileFunc_Filter verifies that ReadFileFunc iterates all records and
-// the callback can selectively collect a subset.
-func TestReadFileFunc_Filter(t *testing.T) {
-	path := writeTempFile(t, `{"name":"a","value":1}
-{"name":"b","value":2}
-{"name":"c","value":3}
-`)
-	var filtered []record
-	err := ReadFileFunc[record](path, func(r record) bool {
-		if r.Value >= 2 {
-			filtered = append(filtered, r)
-		}
-		return true
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(filtered) != 2 {
-		t.Fatalf("got %d records, want 2", len(filtered))
-	}
-}
-
-// TestReadFileFunc_EarlyStop verifies that returning false from the callback
-// stops iteration -- only records up to and including the stop are seen.
-func TestReadFileFunc_EarlyStop(t *testing.T) {
-	path := writeTempFile(t, `{"name":"a","value":1}
-{"name":"b","value":2}
-{"name":"c","value":3}
-`)
-	var collected []record
-	err := ReadFileFunc[record](path, func(r record) bool {
-		collected = append(collected, r)
-		return r.Name != "b" // stop after "b"
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(collected) != 2 {
-		t.Fatalf("got %d records, want 2 (a and b)", len(collected))
-	}
-}
-
-// TestReadFileFunc_MissingFile verifies that a nonexistent file returns
-// nil error and the callback is never invoked.
-func TestReadFileFunc_MissingFile(t *testing.T) {
-	called := false
-	err := ReadFileFunc[record](filepath.Join(t.TempDir(), "nope.jsonl"), func(_ record) bool {
-		called = true
-		return true
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if called {
-		t.Fatal("callback should not have been called for missing file")
-	}
-}
-
 // TestAppendFile_CreatesAndAppends verifies that AppendFile creates the file
 // on first call and subsequent calls append records that can be read back.
 func TestAppendFile_CreatesAndAppends(t *testing.T) {
@@ -229,88 +171,6 @@ func TestReadFile_OpenError(t *testing.T) {
 	}
 }
 
-// TestReadFileFunc_OpenError verifies that ReadFileFunc returns an error
-// when the file exists but is not readable (permission denied).
-func TestReadFileFunc_OpenError(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod 0000 does not restrict reads on Windows")
-	}
-	dir := t.TempDir()
-	path := filepath.Join(dir, "noread.jsonl")
-	if err := os.WriteFile(path, []byte(`{"name":"a","value":1}`+"\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(path, 0000); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(path, 0644) })
-
-	err := ReadFileFunc[record](path, func(_ record) bool { return true })
-	if err == nil {
-		t.Fatal("expected permission error")
-	}
-}
-
-// TestReadFileFunc_SkipsEmptyLines verifies that blank lines between
-// records are silently ignored when using the callback-based reader.
-func TestReadFileFunc_SkipsEmptyLines(t *testing.T) {
-	path := writeTempFile(t, `{"name":"a","value":1}
-
-{"name":"b","value":2}
-`)
-	var got []record
-	err := ReadFileFunc[record](path, func(r record) bool {
-		got = append(got, r)
-		return true
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("got %d records, want 2", len(got))
-	}
-}
-
-// TestReadFileFunc_OnErrorCallback verifies that WithOnError receives the
-// correct line number for malformed lines when using ReadFileFunc.
-func TestReadFileFunc_OnErrorCallback(t *testing.T) {
-	path := writeTempFile(t, `{"name":"a","value":1}
-BAD LINE
-{"name":"b","value":2}
-`)
-	var errLines []int
-	err := ReadFileFunc[record](path, func(_ record) bool {
-		return true
-	}, WithOnError(func(lineNum int, _ error) {
-		errLines = append(errLines, lineNum)
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(errLines) != 1 || errLines[0] != 2 {
-		t.Fatalf("expected error on line 2, got %v", errLines)
-	}
-}
-
-// TestReadFileFunc_CustomBufferSize verifies that WithBufferSize allows
-// ReadFileFunc to handle lines exceeding the default scanner buffer.
-func TestReadFileFunc_CustomBufferSize(t *testing.T) {
-	longVal := strings.Repeat("x", 100_000)
-	path := writeTempFile(t, `{"name":"`+longVal+`","value":1}`+"\n")
-
-	var got []record
-	err := ReadFileFunc[record](path, func(r record) bool {
-		got = append(got, r)
-		return true
-	}, WithBufferSize(64*1024, 1024*1024))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 || got[0].Name != longVal {
-		t.Fatal("expected long record")
-	}
-}
-
 // TestAppendFile_MarshalError verifies that AppendFile returns an error
 // for unmarshalable types (channels) without creating a file.
 func TestAppendFile_MarshalError(t *testing.T) {
@@ -341,18 +201,6 @@ func TestReadFile_ScannerError(t *testing.T) {
 	path := writeTempFile(t, longLine+"\n")
 
 	_, err := ReadFile[record](path)
-	if err == nil {
-		t.Fatal("expected scanner error for line exceeding buffer")
-	}
-}
-
-// TestReadFileFunc_ScannerError verifies that ReadFileFunc surfaces a scanner
-// error when a line exceeds the default buffer size.
-func TestReadFileFunc_ScannerError(t *testing.T) {
-	longLine := `{"name":"` + strings.Repeat("x", 70_000) + `","value":1}`
-	path := writeTempFile(t, longLine+"\n")
-
-	err := ReadFileFunc[record](path, func(_ record) bool { return true })
 	if err == nil {
 		t.Fatal("expected scanner error for line exceeding buffer")
 	}
@@ -396,20 +244,6 @@ func TestReadAll_CloseError(t *testing.T) {
 		closeErr: errors.New("close failed"),
 	}
 	_, err := readAll[record](rc, &config{})
-	if err == nil || err.Error() != "close failed" {
-		t.Fatalf("expected close error, got %v", err)
-	}
-}
-
-// TestReadFunc_CloseError verifies that readFunc propagates errors from
-// the underlying ReadCloser's Close method.
-func TestReadFunc_CloseError(t *testing.T) {
-	data := `{"name":"a","value":1}` + "\n"
-	rc := &errCloser{
-		Reader:   strings.NewReader(data),
-		closeErr: errors.New("close failed"),
-	}
-	err := readFunc[record](rc, func(_ record) bool { return true }, config{})
 	if err == nil || err.Error() != "close failed" {
 		t.Fatalf("expected close error, got %v", err)
 	}

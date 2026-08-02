@@ -1,13 +1,11 @@
 package cmdexec
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 // TestTx_AllSucceed verifies that a transaction with all passing steps returns nil.
@@ -202,19 +200,6 @@ func TestTx_UnwrapReturnsStepErr(t *testing.T) {
 	unwrapped := txErr.Unwrap()
 	if unwrapped == nil {
 		t.Fatal("Unwrap should return underlying error")
-	}
-}
-
-// TestTx_RunContext verifies that RunContext propagates the context timeout to steps.
-func TestTx_RunContext(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
-	defer cancel()
-
-	tx := NewTx()
-	tx.Add(New("sleep", "10"))
-	err := tx.RunContext(ctx)
-	if err == nil {
-		t.Fatal("expected timeout error")
 	}
 }
 

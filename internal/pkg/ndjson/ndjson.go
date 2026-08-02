@@ -104,61 +104,6 @@ func readAll[T any](rc io.ReadCloser, cfg *config) ([]T, error) {
 	return results, nil
 }
 
-// ReadFileFunc opens path and decodes each JSON line into T, calling fn
-// for every successfully decoded record. Return false from fn to stop
-// iteration early. Empty and whitespace-only lines are skipped.
-//
-// If path does not exist, ReadFileFunc returns nil (no error).
-func ReadFileFunc[T any](path string, fn func(T) bool, opts ...Option) error {
-	var cfg config
-	for _, o := range opts {
-		o(&cfg)
-	}
-
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	return readFunc[T](f, fn, cfg)
-}
-
-// readFunc decodes JSON lines from rc, calling fn for each, then closes rc.
-func readFunc[T any](rc io.ReadCloser, fn func(T) bool, cfg config) error {
-	scanner := bufio.NewScanner(rc)
-	if cfg.bufMax > 0 {
-		scanner.Buffer(make([]byte, 0, cfg.bufInitial), cfg.bufMax)
-	}
-
-	lineNum := 0
-	for scanner.Scan() {
-		lineNum++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var v T
-		if err := json.Unmarshal([]byte(line), &v); err != nil {
-			if cfg.onError != nil {
-				cfg.onError(lineNum, err)
-			}
-			continue
-		}
-		if !fn(v) {
-			break
-		}
-	}
-
-	scanErr := scanner.Err()
-	if err := rc.Close(); err != nil {
-		return err
-	}
-	return scanErr
-}
-
 // AppendFile atomically appends a single JSON-encoded record followed by
 // a newline to path. The file is created if it does not exist. The write
 // uses O_APPEND so concurrent appends of complete records are atomic on

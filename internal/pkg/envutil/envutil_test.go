@@ -100,31 +100,3 @@ func TestDuration(t *testing.T) {
 		}
 	})
 }
-
-func TestDurationMin(t *testing.T) {
-	const key = "TEST_ENVUTIL_DURMIN"
-
-	t.Run("default when unset", func(t *testing.T) {
-		if got := DurationMin(key, time.Hour, time.Minute); got != time.Hour {
-			t.Errorf("DurationMin() = %v, want 1h", got)
-		}
-	})
-	t.Run("parsed value above min", func(t *testing.T) {
-		t.Setenv(key, "2h")
-		if got := DurationMin(key, time.Hour, time.Minute); got != 2*time.Hour {
-			t.Errorf("DurationMin() = %v, want 2h", got)
-		}
-	})
-	t.Run("falls back when below min", func(t *testing.T) {
-		t.Setenv(key, "30s")
-		if got := DurationMin(key, time.Hour, time.Minute); got != time.Hour {
-			t.Errorf("DurationMin() = %v, want 1h (fallback)", got)
-		}
-	})
-	t.Run("exact min is accepted", func(t *testing.T) {
-		t.Setenv(key, "1m")
-		if got := DurationMin(key, time.Hour, time.Minute); got != time.Minute {
-			t.Errorf("DurationMin() = %v, want 1m", got)
-		}
-	})
-}

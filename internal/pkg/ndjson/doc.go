@@ -4,8 +4,8 @@
 // Wallfacer uses NDJSON for event sourcing trace files and turn-usage records
 // where each line is a self-contained JSON object. This package consolidates the
 // repeated pattern of opening a file, scanning lines, and unmarshaling JSON into
-// generic [ReadFile] and [ReadFileFunc] functions, plus an atomic [AppendFile] for
-// concurrent-safe record appending. Missing files are treated as empty (not errors).
+// a generic [ReadFile] function, plus an atomic [AppendFile] for concurrent-safe
+// record appending. Missing files are treated as empty (not errors).
 //
 // # Connected packages
 //
@@ -17,7 +17,4 @@
 //
 //	events, err := ndjson.ReadFile[Event](tracePath)
 //	err = ndjson.AppendFile(tracePath, newEvent)
-//	err = ndjson.ReadFileFunc(path, func(e Event) bool {
-//	    return e.Type == "state_change" // stop iteration on false
-//	})
 package ndjson
