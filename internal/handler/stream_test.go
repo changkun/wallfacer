@@ -66,28 +66,6 @@ func TestParseTurnNumber_Invalid(t *testing.T) {
 
 // --- serveStoredLogs (via StreamLogs for non-running tasks) ---
 
-func TestStreamLogs_TaskNotFound(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	// Immediately cancel — non-running task with no logs.
-	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
-	w := httptest.NewRecorder()
-
-	// serveStoredLogs is called for done/cancelled tasks (no live container).
-	// When there are no outputs saved, it returns 200 with a "no output" message.
-	h.serveStoredLogs(w, req, task.ID)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200 when no logs, got %d", w.Code)
-	}
-	if !strings.Contains(w.Body.String(), "no output saved") {
-		t.Errorf("expected 'no output saved' message, got: %s", w.Body.String())
-	}
-}
-
 func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()

@@ -497,46 +497,6 @@ func TestRelayDispatcher_SessionExit(t *testing.T) {
 	}
 }
 
-func TestRelayDispatcher_LastSessionExit(t *testing.T) {
-	// This is a behavioral duplicate of TestTerminalWS_ShellExit,
-	// confirming backward compatibility with the new dispatcher.
-	srv, _ := newTerminalTestServer(t, "", true)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-
-	input := base64.StdEncoding.EncodeToString([]byte("exit\n"))
-	msg := `{"type":"input","data":"` + input + `"}`
-	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	deadline := time.After(5 * time.Second)
-	for {
-		select {
-		case <-deadline:
-			t.Fatal("timed out waiting for WebSocket close")
-		default:
-		}
-		readCtx, readCancel := context.WithTimeout(ctx, time.Second)
-		_, _, err := conn.Read(readCtx)
-		readCancel()
-		if err != nil {
-			status := websocket.CloseStatus(err)
-			if status == websocket.StatusNormalClosure {
-				return
-			}
-			return
-		}
-	}
-}
-
 // readTextMessage reads WebSocket messages until a text message matching the
 // given type is found, or the deadline expires.
 func readTextMessage(t *testing.T, ctx context.Context, conn *websocket.Conn, msgType string, timeout time.Duration) json.RawMessage { //nolint:revive // testing.T conventionally precedes context in test helpers

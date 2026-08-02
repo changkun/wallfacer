@@ -311,24 +311,6 @@ func TestTryAutoPromote_NoPromotionWhenAutoimplementOff(t *testing.T) {
 	// No panic and no tasks should be promoted.
 }
 
-// TestTryAutoPromote_PromotesWhenCapacityAvailable verifies task promotion.
-func TestTryAutoPromote_PromotesWhenCapacityAvailable(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	_ = envPath
-	h.SetAutoimplement(true)
-
-	// Set max parallel to 1 so we know the limit.
-	body := `{"max_parallel_tasks": 1}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	_ = w
-
-	// The UpdateEnvConfig call above triggers tryAutoPromote in a goroutine.
-	// Create a backlog task that can be promoted.
-	// (The test in env_test.go already covers this pattern; we check the state machine here.)
-}
-
 // TestTryAutoPromote_PromotesIdeaAgentTaggedTasks verifies that tasks tagged
 // "idea-agent" (created by the brainstorm agent) ARE auto-promoted like normal tasks.
 func TestTryAutoPromote_PromotesIdeaAgentTaggedTasks(t *testing.T) {

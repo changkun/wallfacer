@@ -644,22 +644,6 @@ func TestStartWaitingSyncWatcher_ExitsOnCancel(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 }
 
-func TestStartAutoTester_ExitsOnCancel(t *testing.T) {
-	h := newTestHandler(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	h.StartAutoTester(ctx)
-	time.Sleep(10 * time.Millisecond)
-}
-
-func TestStartAutoSubmitter_ExitsOnCancel(t *testing.T) {
-	h := newTestHandler(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	h.StartAutoSubmitter(ctx)
-	time.Sleep(10 * time.Millisecond)
-}
-
 // TestAutoTester_SettleDelayDefersTrigger verifies that the auto-tester pauses
 // for constants.WatcherSettleDelay after receiving a wake signal before acting. This
 // ensures the SSE event for the intermediate "waiting" state reaches the

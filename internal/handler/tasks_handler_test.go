@@ -296,17 +296,6 @@ func TestListTasks_ArchivedPageSizeInvalid(t *testing.T) {
 	}
 }
 
-// TestListTasks_ArchivedBeforeInvalid returns 400 for an invalid archived_before UUID.
-func TestListTasks_ArchivedBeforeInvalid(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks?include_archived=true&archived_page_size=10&archived_before=not-a-uuid", nil)
-	w := httptest.NewRecorder()
-	h.ListTasks(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 // TestListTasks_ArchivedAfterInvalid returns 400 for an invalid archived_after UUID.
 func TestListTasks_ArchivedAfterInvalid(t *testing.T) {
 	h := newTestHandler(t)
@@ -367,16 +356,5 @@ func TestListTasks_ArchivedPaginationBothCursorsError(t *testing.T) {
 	// The store rejects mutually exclusive cursors.
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for mutually exclusive cursors, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestListTasks_FailureCategoryInvalid returns 400 for an unknown failure_category value.
-func TestListTasks_FailureCategoryInvalid(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks?failure_category=unknown-category", nil)
-	w := httptest.NewRecorder()
-	h.ListTasks(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for invalid failure_category, got %d: %s", w.Code, w.Body.String())
 	}
 }

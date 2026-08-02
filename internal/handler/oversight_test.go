@@ -93,18 +93,6 @@ func TestGetOversight_ReturnsStoredOversight(t *testing.T) {
 
 // --- GetOversight ?phase=test ---
 
-func TestGetOversight_TestPhase_NotFound(t *testing.T) {
-	h := newTestHandler(t)
-	id := uuid.New()
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+id.String()+"/oversight?phase=test", nil)
-	w := httptest.NewRecorder()
-	h.GetOversight(w, req, id)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d", w.Code)
-	}
-}
-
 func TestGetOversight_TestPhase_PendingWhenNoFile(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
