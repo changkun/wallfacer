@@ -2,8 +2,6 @@ export const zh: Record<string, string> = {
   // Header nav
   'nav.home': '首页',
   'nav.download': '下载',
-  'nav.login': '登录',
-  'nav.logout': '退出',
   'nav.me': '个人页面',
   'nav.admin': '管理面板',
 
@@ -93,10 +91,8 @@ export const zh: Record<string, string> = {
   // Download page
   'wf.dl.title': '<span class="wallfacer-brand">下载</span>',
   'wf.dl.sub': 'Wallfacer 是单个二进制文件，支持 macOS、Windows 和 Linux。',
-  'wf.dl.detecting': '正在检测你的平台…',
   'wf.dl.rec.eyebrow': '为 {os} 推荐',
   'wf.dl.rec.generic': '安装 Wallfacer',
-  'wf.dl.cli.title': '命令行安装',
   'wf.dl.cli.desc': '自动检测操作系统和架构，将最新二进制文件放入 <code>/usr/local/bin</code>（或 <code>~/.local/bin</code>）。设置 <code>WALLFACER_INSTALL_DIR</code> 更改路径，或用 <code>WALLFACER_VERSION</code> 指定版本。',
   'wf.dl.copy': '复制',
   'wf.dl.copied': '已复制',
@@ -124,20 +120,4 @@ export const zh: Record<string, string> = {
   'wf.dl.step4.desc': '点击 <strong>+ 新建任务</strong>，输入提示词，将卡片拖到<strong>进行中</strong>。任务作为主机进程在自己的 git 工作树中运行，实时日志显示在详情面板中。',
   'wf.dl.cli.ref.title': 'CLI 参考',
   'wf.dl.cli.ref.flags': '<code>wallfacer run</code> 的常用参数：',
-
-  // Footer
-  'footer.products': '产品',
-  'footer.company': '公司',
-  'footer.blog': '博客',
-  'footer.podcast': '播客',
-  'footer.team': '团队',
-  'footer.contact': '联系',
-  'footer.legal': '法律',
-  'footer.privacy': '隐私政策',
-  'footer.terms': '服务条款',
-  'footer.tagline': '人类智慧在回路中。',
-  'footer.rights': '&copy; 2026 Latere. 保留所有权利。',
-
-  // Contact
-  'contact.text': '联系我们：',
 };

@@ -2,8 +2,6 @@ export const en: Record<string, string> = {
   // Header nav
   'nav.home': 'Home',
   'nav.download': 'Download',
-  'nav.login': 'Log in',
-  'nav.logout': 'Log out',
   'nav.me': 'My Page',
   'nav.admin': 'Admin Panel',
 
@@ -93,10 +91,8 @@ export const en: Record<string, string> = {
   // Download page
   'wf.dl.title': '<span class="wallfacer-brand">Download</span>',
   'wf.dl.sub': 'Wallfacer is a single binary for macOS, Windows, and Linux.',
-  'wf.dl.detecting': 'Detecting your platform…',
   'wf.dl.rec.eyebrow': 'Recommended for {os}',
   'wf.dl.rec.generic': 'Install Wallfacer',
-  'wf.dl.cli.title': 'Install via CLI',
   'wf.dl.cli.desc': 'Auto-detects your OS and architecture and drops the latest binary into <code>/usr/local/bin</code> (or <code>~/.local/bin</code>). Set <code>WALLFACER_INSTALL_DIR</code> to change the location, or <code>WALLFACER_VERSION</code> to pin a release.',
   'wf.dl.copy': 'Copy',
   'wf.dl.copied': 'Copied',
@@ -124,20 +120,4 @@ export const en: Record<string, string> = {
   'wf.dl.step4.desc': 'Click <strong>+ New Task</strong>, type a prompt, drag the card to <strong>In Progress</strong>. The task runs as a host process in its own git worktree, and live logs appear in the detail pane.',
   'wf.dl.cli.ref.title': 'CLI reference',
   'wf.dl.cli.ref.flags': 'Common flags for <code>wallfacer run</code>:',
-
-  // Footer
-  'footer.products': 'Products',
-  'footer.company': 'Company',
-  'footer.blog': 'Blog',
-  'footer.podcast': 'Podcast',
-  'footer.team': 'Team',
-  'footer.contact': 'Contact',
-  'footer.legal': 'Legal',
-  'footer.privacy': 'Privacy',
-  'footer.terms': 'Terms',
-  'footer.tagline': 'Human intelligence in the loop.',
-  'footer.rights': '&copy; 2026 Latere. All rights reserved.',
-
-  // Contact
-  'contact.text': 'Get in touch:',
 };
