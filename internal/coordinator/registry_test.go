@@ -65,19 +65,6 @@ func TestRegistryStaleLeaveDoesNotRemoveReplacement(t *testing.T) {
 	}
 }
 
-func TestRegistryPrincipalsInOrgDedup(t *testing.T) {
-	// One person on two machines is one principal in the org.
-	r := NewRegistry()
-	r.Join(inst("laptop", "alice", "org1"))
-	r.Join(inst("desktop", "alice", "org1"))
-	r.Join(inst("i3", "bob", "org1"))
-
-	ps := r.PrincipalsInOrg("org1")
-	if len(ps) != 2 {
-		t.Fatalf("PrincipalsInOrg = %d distinct, want 2 (alice, bob)", len(ps))
-	}
-}
-
 func TestRegistryInstancesForRemote(t *testing.T) {
 	r := NewRegistry()
 	r.Join(inst("i1", "alice", "org1", "github.com/a/b"))

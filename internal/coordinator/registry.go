@@ -64,7 +64,7 @@ type Registration struct {
 // remotes, capabilities), never task or content data.
 //
 // Scope: this is the SINGLE-REPLICA view plus this replica's local socket table.
-// Its queries (Snapshot, PrincipalsInOrg, InstancesForRemote) cover only the
+// Its queries (Snapshot, InstancesForRemote) cover only the
 // instances THIS replica terminates. wallfacerd runs multiple replicas, so under
 // horizontal scaling these whole-org queries must go through a Redis-backed
 // Directory (Valkey index + pub/sub) instead; see
@@ -168,25 +168,6 @@ func (r *Registry) Snapshot(org string) []Instance {
 		if inst.Principal.OrgID == org {
 			out = append(out, inst)
 		}
-	}
-	return out
-}
-
-// PrincipalsInOrg returns the distinct principals present in the org (the
-// org -> set<principal> index, derived). One person on many machines collapses
-// to one principal.
-func (r *Registry) PrincipalsInOrg(org string) []Principal {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	seen := make(map[string]Principal)
-	for _, inst := range r.byInstance {
-		if inst.Principal.OrgID == org {
-			seen[inst.Principal.Sub] = inst.Principal
-		}
-	}
-	out := make([]Principal, 0, len(seen))
-	for _, p := range seen {
-		out = append(out, p)
 	}
 	return out
 }

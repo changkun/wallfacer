@@ -12,7 +12,6 @@ package coordinator
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 )
 
 // Frame type discriminators. Every frame on the connection is a JSON object
@@ -104,9 +103,4 @@ func (m Manifest) Remotes() []string {
 		}
 	}
 	return out
-}
-
-// HasCapability reports whether the instance advertised the given capability.
-func (m Manifest) HasCapability(c string) bool {
-	return slices.Contains(m.Capabilities, c)
 }

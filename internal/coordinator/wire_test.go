@@ -100,11 +100,4 @@ func TestManifestHelpers(t *testing.T) {
 			t.Fatalf("Remotes()[%d] = %q, want %q", i, got[i], want[i])
 		}
 	}
-
-	if !m.HasCapability("presence") {
-		t.Error("HasCapability(presence) = false")
-	}
-	if m.HasCapability("comments") {
-		t.Error("HasCapability(comments) = true, want false")
-	}
 }
