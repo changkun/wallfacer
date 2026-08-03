@@ -19,12 +19,6 @@ func TestArchivePathRoundTrip(t *testing.T) {
 		if got := LogicalPath(tc.physical); got != tc.logical {
 			t.Errorf("LogicalPath(%q) = %q, want %q", tc.physical, got, tc.logical)
 		}
-		if !IsArchivedPath(tc.physical) {
-			t.Errorf("IsArchivedPath(%q) = false, want true", tc.physical)
-		}
-		if IsArchivedPath(tc.logical) {
-			t.Errorf("IsArchivedPath(%q) = true, want false", tc.logical)
-		}
 	}
 }
 

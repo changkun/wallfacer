@@ -38,8 +38,3 @@ func LogicalPath(physical string) string {
 	}
 	return specsPrefix + rest
 }
-
-// IsArchivedPath reports whether a path lives under the specs/.archive/ tree.
-func IsArchivedPath(p string) bool {
-	return strings.HasPrefix(p, archivePrefix)
-}
