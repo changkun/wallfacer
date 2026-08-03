@@ -19,13 +19,7 @@ type routeJSON struct {
 func GenerateContractJSON() ([]byte, error) {
 	rs := make([]routeJSON, len(Routes))
 	for i, r := range Routes {
-		rs[i] = routeJSON{
-			Method:      r.Method,
-			Pattern:     r.Pattern,
-			Name:        r.Name,
-			Description: r.Description,
-			Tags:        r.Tags,
-		}
+		rs[i] = routeJSON(r)
 	}
 	type contract struct {
 		GeneratedFrom string      `json:"generated_from"`
