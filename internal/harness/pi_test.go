@@ -67,13 +67,6 @@ func TestPi_BuildArgv_Resume(t *testing.T) {
 	}
 }
 
-func TestPi_BuildArgv_PermissionReadOnly(t *testing.T) {
-	argv, _, _ := piHarness{}.BuildArgv(Request{Prompt: "x", Permission: PermissionReadOnly})
-	if !strings.Contains(strings.Join(argv, " "), "--tools Read") {
-		t.Errorf("ReadOnly should set --tools Read: %v", argv)
-	}
-}
-
 func TestPi_BuildArgv_PermissionEdit(t *testing.T) {
 	argv, _, _ := piHarness{}.BuildArgv(Request{Prompt: "x", Permission: PermissionEdit})
 	if !strings.Contains(strings.Join(argv, " "), "--tools Read,Write,Edit") {

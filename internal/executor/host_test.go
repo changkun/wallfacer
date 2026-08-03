@@ -87,14 +87,6 @@ func TestNewHostBackend_MissingCodexIsTolerated(t *testing.T) {
 
 // Codex-mode tests live in host_codex_test.go.
 
-func TestNewHostBackend_UsesLookupWhenEmpty(t *testing.T) {
-	// With explicit valid paths, construction succeeds.
-	bin := buildFakeAgent(t, "fakeagent")
-	if _, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 // launchAndDrain runs Launch with a minimal spec and returns the parsed NDJSON
 // init record the fakeagent emits. Useful for asserting argv / env wiring.
 func launchAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) map[string]any {

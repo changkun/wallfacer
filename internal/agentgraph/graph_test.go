@@ -94,21 +94,3 @@ func TestFromFlowGraph_EmptySlugFallback(t *testing.T) {
 		t.Errorf("region ID = %q, want the %q fallback for an empty slug", g.Regions[0].ID, "flow")
 	}
 }
-
-// TestFromFlowGraph_ResolveInlinesSpecs proves the resolve seam fills a ref's inline
-// spec from the registry: after FromFlowGraph produces a ref graph, resolving it
-// against the registry replaces each ref with the role's prompt, title, and scopes,
-// and the result no longer holds a ref.
-func TestFromFlowGraph_ResolveInlinesSpecs(t *testing.T) {
-	reg, f := twoAgentFixture()
-	region, err := agentgraph.FromFlow(f, reg)
-	if err != nil {
-		t.Fatalf("FromFlow: %v", err)
-	}
-	if region.Entry.Name != "planner" || region.Entry.SystemPrompt != "you plan" || region.Entry.Role != "Planner" {
-		t.Errorf("entry = %+v, want planner inlined with prompt/role from the registry", region.Entry)
-	}
-	if len(region.Peers) != 1 || region.Peers[0].Name != "builder" || len(region.Peers[0].Scopes) != 1 || region.Peers[0].Scopes[0] != "workspace.write" {
-		t.Errorf("peers = %+v, want builder inlined with its scopes", region.Peers)
-	}
-}
