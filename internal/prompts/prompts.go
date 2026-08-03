@@ -381,32 +381,13 @@ func (m *Manager) SpecSystemNonempty() string {
 	return m.render("spec_system_nonempty.tmpl", nil)
 }
 
-// --- Package-level functions (delegate to Default for backward compatibility) ---
+// --- Package-level functions (delegate to Default) ---
 
 // TaskPromptRefine renders the task-mode spec-mode agent system prompt.
 func TaskPromptRefine(d RefinementData) string { return Default.TaskPromptRefine(d) }
 
-// Oversight renders the oversight summarization prompt for the given
-// pre-formatted activity log text.
-func Oversight(activityLog string) string { return Default.Oversight(activityLog) }
-
-// Title renders the title-generation prompt for the given task prompt.
-func Title(taskPrompt string) string { return Default.Title(taskPrompt) }
-
-// CommitMessage renders the commit message generation prompt.
-func CommitMessage(d CommitData) string { return Default.CommitMessage(d) }
-
-// DriftAssessment renders the task-done drift-assessment prompt.
-func DriftAssessment(d DriftData) string { return Default.DriftAssessment(d) }
-
-// ConflictResolution renders the rebase conflict resolution prompt.
-func ConflictResolution(d ConflictData) string { return Default.ConflictResolution(d) }
-
 // TestVerification renders the test verification agent prompt.
 func TestVerification(d TestData) string { return Default.TestVerification(d) }
-
-// Spec renders the spec-mode agent system prompt.
-func Spec() string { return Default.Spec() }
 
 // SpecSystemEmpty renders the spec-mode prompt prefix used
 // when the workspace spec tree is empty.

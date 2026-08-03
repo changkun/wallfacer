@@ -364,38 +364,10 @@ func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
 // Package-level delegation functions — each verifies that the package-level
 // convenience function delegates to Default and produces non-empty output.
 
-func TestPackageLevelOversight_NonEmpty(t *testing.T) {
-	got := prompts.Oversight("some activity log")
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.Oversight() returned empty string")
-	}
-}
-
-func TestPackageLevelCommitMessage_NonEmpty(t *testing.T) {
-	got := prompts.CommitMessage(prompts.CommitData{Prompt: "fix bug"})
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.CommitMessage() returned empty string")
-	}
-}
-
-func TestPackageLevelConflictResolution_NonEmpty(t *testing.T) {
-	got := prompts.ConflictResolution(prompts.ConflictData{ContainerPath: "/workspace/repo", DefaultBranch: "main"})
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.ConflictResolution() returned empty string")
-	}
-}
-
 func TestPackageLevelTestVerification_NonEmpty(t *testing.T) {
 	got := prompts.TestVerification(prompts.TestData{OriginalPrompt: "build widget"})
 	if strings.TrimSpace(got) == "" {
 		t.Error("prompts.TestVerification() returned empty string")
-	}
-}
-
-func TestPackageLevelTitle_NonEmpty(t *testing.T) {
-	got := prompts.Title("my task prompt")
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.Title() returned empty string")
 	}
 }
 
@@ -425,13 +397,6 @@ func TestRenderSpec(t *testing.T) {
 		if !strings.Contains(strings.ToLower(got), phrase) {
 			t.Errorf("Spec output missing expected phrase %q", phrase)
 		}
-	}
-}
-
-func TestPackageLevelSpec_NonEmpty(t *testing.T) {
-	got := prompts.Spec()
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.Spec() returned empty string")
 	}
 }
 
