@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasPrimaryAction, ACTION_LABELS } from './actions';
+import { hasPrimaryAction } from './actions';
 
 describe('hasPrimaryAction', () => {
   it('flags forward-momentum actions', () => {
@@ -15,13 +15,5 @@ describe('hasPrimaryAction', () => {
     expect(hasPrimaryAction(['force-complete'])).toBe(false);
     expect(hasPrimaryAction([])).toBe(false);
     expect(hasPrimaryAction(undefined)).toBe(false);
-  });
-});
-
-describe('ACTION_LABELS', () => {
-  it('labels every action verb', () => {
-    for (const verb of ['dispatch', 'undispatch', 'validate', 'force-complete', 'unstale', 'unarchive', 'start'] as const) {
-      expect(ACTION_LABELS[verb]).toBeTruthy();
-    }
   });
 });

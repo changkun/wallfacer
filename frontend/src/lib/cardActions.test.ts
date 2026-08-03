@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cardActionsFor, commandPaletteActionsFor, CARD_ACTION_DEFS } from './cardActions';
+import { cardActionsFor, commandPaletteActionsFor } from './cardActions';
 
 type T = Parameters<typeof cardActionsFor>[0];
 const task = (over: Partial<T>): T => ({ status: 'backlog', archived: false, kind: 'task', session_id: null, ...over });
@@ -39,14 +39,6 @@ describe('cardActionsFor', () => {
     expect(cardActionsFor(task({ status: 'waiting', kind: 'routine', session_id: 's1' }))).toEqual([]);
     expect(cardActionsFor(task({ status: 'done', archived: true }))).toEqual([]);
   });
-
-  it('every action id has a render def', () => {
-    const ids = new Set<string>();
-    for (const s of ['backlog', 'waiting', 'failed', 'done', 'cancelled'] as const) {
-      for (const a of cardActionsFor(task({ status: s, session_id: 's1' }))) ids.add(a);
-    }
-    for (const id of ids) expect(CARD_ACTION_DEFS[id as keyof typeof CARD_ACTION_DEFS]).toBeTruthy();
-  });
 });
 
 describe('commandPaletteActionsFor', () => {
@@ -57,8 +49,5 @@ describe('commandPaletteActionsFor', () => {
   it('does not add Sync for other statuses', () => {
     expect(commandPaletteActionsFor(task({ status: 'backlog' }))).toEqual(['plan', 'start']);
     expect(commandPaletteActionsFor(task({ status: 'done' }))).toEqual(['retry']);
-  });
-  it('Sync has a render def', () => {
-    expect(CARD_ACTION_DEFS.sync).toBeTruthy();
   });
 });

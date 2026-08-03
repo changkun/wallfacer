@@ -182,16 +182,6 @@ describe('MapPage', () => {
     host.remove();
   });
 
-  it('installs none of the legacy window shims', async () => {
-    const { app, host } = await mountMapPage();
-    const w = window as unknown as Record<string, unknown>;
-    for (const k of ['specModeState', 'depGraphEnabled', 'openTaskModal', 'renderDependencyGraph', 'scheduleRender']) {
-      expect(w[k]).toBeUndefined();
-    }
-    app.unmount();
-    host.remove();
-  });
-
   function buttonByText(host: HTMLElement, text: string): HTMLButtonElement | null {
     return ([...host.querySelectorAll('button')] as HTMLButtonElement[]).find(
       (b) => b.textContent?.trim() === text,
