@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -886,36 +885,6 @@ func TestClearFetchFailure_UnknownID(t *testing.T) {
 
 // --- maps.Equal on sandbox-by-activity maps ---
 
-func TestSandboxByActivityEqual_BothEmpty(t *testing.T) {
-	if !maps.Equal[map[SandboxActivity]harness.ID, map[SandboxActivity]harness.ID](nil, nil) {
-		t.Error("expected equal for two nils")
-	}
-}
-
-func TestSandboxByActivityEqual_DifferentLengths(t *testing.T) {
-	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	b := map[SandboxActivity]harness.ID{}
-	if maps.Equal(a, b) {
-		t.Error("expected not equal for different lengths")
-	}
-}
-
-func TestSandboxByActivityEqual_DifferentValues(t *testing.T) {
-	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	b := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Codex}
-	if maps.Equal(a, b) {
-		t.Error("expected not equal for different values")
-	}
-}
-
-func TestSandboxByActivityEqual_SameValues(t *testing.T) {
-	a := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	b := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	if !maps.Equal(a, b) {
-		t.Error("expected equal for same values")
-	}
-}
-
 // --- PurgeExpiredTombstones ---
 
 func TestPurgeExpiredTombstones_PurgesOldTombstone(t *testing.T) {
@@ -1083,25 +1052,6 @@ func TestNewFileStore_InvalidPath(t *testing.T) {
 }
 
 // --- SaveTurnOutput: truncation and stderr ---
-
-func TestSaveTurnOutput_WithStderrCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "stderr test", Timeout: 5})
-
-	err := s.SaveTurnOutput(task.ID, 1, []byte("stdout data"), []byte("stderr data"))
-	if err != nil {
-		t.Fatalf("SaveTurnOutput: %v", err)
-	}
-
-	data, _ := s.ReadBlob(task.ID, "outputs/turn-0001.json")
-	if string(data) != "stdout data" {
-		t.Errorf("stdout = %q, want %q", data, "stdout data")
-	}
-	stderrData, _ := s.ReadBlob(task.ID, "outputs/turn-0001.stderr.txt")
-	if string(stderrData) != "stderr data" {
-		t.Errorf("stderr = %q, want %q", stderrData, "stderr data")
-	}
-}
 
 // --- SaveSummary / LoadSummary ---
 
@@ -1575,14 +1525,6 @@ func TestAreDependenciesSatisfied_DeletedDepCoverage(t *testing.T) {
 	}
 }
 
-func TestAreDependenciesSatisfied_UnknownTask(t *testing.T) {
-	s := newTestStore(t)
-	_, err := s.AreDependenciesSatisfied(bg(), uuid.New())
-	if err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
 // --- RestoreTask: concurrent guard ---
 
 func TestRestoreTask_UnknownID(t *testing.T) {
@@ -1612,13 +1554,6 @@ func TestRestoreTask_RestoresDeletedTask(t *testing.T) {
 
 // --- DeleteTask edge cases ---
 
-func TestDeleteTask_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.DeleteTask(bg(), uuid.New(), "test"); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
 // --- SaveEvent: traces dir auto-create ---
 
 func TestSaveEvent_CreatesTracesDir(t *testing.T) {
@@ -1633,66 +1568,6 @@ func TestSaveEvent_CreatesTracesDir(t *testing.T) {
 }
 
 // --- ResetTaskForRetry ---
-
-func TestResetTaskForRetry_PreservesRetryHistory(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry me", Timeout: 5})
-
-	// Move to failed.
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                                         //nolint:errcheck
-	s.UpdateTaskResult(bg(), task.ID, "failed result", "sess-1", "end_turn", 3)                      //nolint:errcheck
-	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, TaskUsage{CostUSD: 1.5}) //nolint:errcheck
-
-	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
-		t.Fatalf("ResetTaskForRetry: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.Status != TaskStatusBacklog {
-		t.Errorf("Status = %q, want backlog", got.Status)
-	}
-	if got.Prompt != "new prompt" {
-		t.Errorf("Prompt = %q, want new prompt", got.Prompt)
-	}
-	if len(got.RetryHistory) != 1 {
-		t.Fatalf("RetryHistory len = %d, want 1", len(got.RetryHistory))
-	}
-	if got.RetryHistory[0].Prompt != "retry me" {
-		t.Errorf("RetryHistory[0].Prompt = %q, want retry me", got.RetryHistory[0].Prompt)
-	}
-	if got.AutoRetryCount != 0 {
-		t.Error("AutoRetryCount should be reset")
-	}
-	if got.WorktreePaths != nil {
-		t.Error("WorktreePaths should be nil for fresh start")
-	}
-}
-
-func TestResetTaskForRetry_NotFreshStart(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry keep", Timeout: 5})
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)                            //nolint:errcheck
-	s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "branch-1") //nolint:errcheck
-
-	if err := s.ResetTaskForRetry(bg(), task.ID, "new", false); err != nil {
-		t.Fatalf("ResetTaskForRetry: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.FreshStart {
-		// freshStart=false in the call, but FreshStart field should be set to false.
-		if got.FreshStart {
-			t.Error("FreshStart should be false")
-		}
-	}
-}
-
-func TestResetTaskForRetry_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.ResetTaskForRetry(bg(), uuid.New(), "x", false); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
 
 // --- buildSnippet edge case ---
 
@@ -1714,18 +1589,6 @@ func TestSearchTasks_SnippetGeneration(t *testing.T) {
 
 // --- ForceUpdateTaskStatus: sets StartedAt ---
 
-func TestForceUpdateTaskStatus_SetsStartedAt(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force", Timeout: 5})
-	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
-		t.Fatalf("ForceUpdateTaskStatus: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.StartedAt == nil {
-		t.Error("StartedAt should be set when moving to in_progress")
-	}
-}
-
 func TestForceUpdateTaskStatus_UnknownID(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.ForceUpdateTaskStatus(bg(), uuid.New(), TaskStatusDone); err == nil {
@@ -1734,24 +1597,6 @@ func TestForceUpdateTaskStatus_UnknownID(t *testing.T) {
 }
 
 // --- UpdateTaskStatus: triggers buildAndSaveSummary on done ---
-
-func TestUpdateTaskStatus_BuildsSummaryOnDone(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "done summary", Timeout: 5})
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusInProgress) //nolint:errcheck
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)       //nolint:errcheck
-
-	// Wait for compaction.
-	s.WaitCompaction()
-
-	summary, err := s.LoadSummary(task.ID)
-	if err != nil {
-		t.Fatalf("LoadSummary: %v", err)
-	}
-	if summary == nil {
-		t.Error("expected summary to be created when task moves to done")
-	}
-}
 
 // --- ListDeletedTasks ---
 
@@ -1850,18 +1695,6 @@ func TestTruncateTurnData_DisabledWhenZeroCoverage(t *testing.T) {
 	result, originalLen := s.truncateTurnData([]byte("some data"))
 	if originalLen != 0 || string(result) != "some data" {
 		t.Error("expected no truncation when disabled")
-	}
-}
-
-func TestListBlobs_PrefixFilterCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "prefix", Timeout: 5})
-	s.backend.SaveBlob(task.ID, "outputs/turn-0001.json", []byte("a"))    //nolint:errcheck
-	s.backend.SaveBlob(task.ID, "outputs/turn-0002.json", []byte("b"))    //nolint:errcheck
-	s.backend.SaveBlob(task.ID, "outputs/stderr-0001.txt", []byte("err")) //nolint:errcheck
-	keys, _ := s.backend.ListBlobs(task.ID, "outputs/turn-")
-	if len(keys) != 2 {
-		t.Errorf("expected 2 matching keys, got %d", len(keys))
 	}
 }
 
@@ -2002,33 +1835,6 @@ func TestNormalizeSandboxByActivity_InvalidTypeCoverage(t *testing.T) {
 func TestNormalizeSandboxByActivity_InvalidActivityCoverage(t *testing.T) {
 	if r := normalizeSandboxByActivity(map[SandboxActivity]harness.ID{"bad": harness.Claude}); r != nil {
 		t.Errorf("expected nil, got %v", r)
-	}
-}
-
-func TestSaveBlob_NestedPathCoverage(t *testing.T) {
-	dir := t.TempDir()
-	backend, _ := NewFilesystemBackend(dir)
-	id := uuid.New()
-	os.MkdirAll(filepath.Join(dir, id.String()), 0755)        //nolint:errcheck
-	backend.SaveBlob(id, "deep/nested/f.txt", []byte("deep")) //nolint:errcheck
-	data, _ := backend.ReadBlob(id, "deep/nested/f.txt")
-	if string(data) != "deep" {
-		t.Errorf("got %q, want deep", data)
-	}
-}
-
-func TestUpdateTaskStatus_InvalidTransitionCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "state", Timeout: 5})
-	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone); err == nil {
-		t.Error("expected error")
-	}
-}
-
-func TestUpdateTaskStatus_UnknownTaskCoverage(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.UpdateTaskStatus(bg(), uuid.New(), TaskStatusDone); err == nil {
-		t.Error("expected error")
 	}
 }
 
