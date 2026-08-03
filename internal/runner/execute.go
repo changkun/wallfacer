@@ -192,8 +192,8 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		// non-fatal: continue execution
 	}
 
-	// Resolve the task's flow. Precedence: task.FlowID → legacy Kind
-	// mapping → "implement". The implement path stays on the turn loop
+	// Resolve the task's flow: task.FlowID when it names a registered flow,
+	// otherwise "implement". The implement path stays on the turn loop
 	// below (multi-turn semantics the linear engine does not express
 	// yet); any other flow runs through the flow engine.
 	flowSlug := "implement"

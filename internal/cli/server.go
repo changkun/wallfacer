@@ -668,10 +668,10 @@ func stripSSGContent(html string) string {
 	return html
 }
 
-// mountVueSPA overlays Vue SPA routes onto an existing mux, overriding
-// the legacy Go-templated UI for the root path and static assets. The
-// API routes registered by BuildMux are preserved because the SPA handler
-// only claims GET / and the /assets/ prefix, not /api/*.
+// mountVueSPA overlays Vue SPA routes onto an existing mux, claiming the
+// root path and static assets. The API routes registered by BuildMux are
+// preserved because the SPA handler only claims GET / and the /assets/
+// prefix, not /api/*.
 func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMode bool) {
 	dist, err := fs.Sub(vueDist, "frontend/dist")
 	if err != nil {
