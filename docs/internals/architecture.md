@@ -372,25 +372,30 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/atomicfile` | Atomic file writes (temp + rename) | `Write()` |
 | `pkg/cache` | TTL cache with expiration | `TTLCache[K,V]` |
 | `pkg/circuitbreaker` | Circuit breakers (lock-free and backoff variants) | `Breaker`, `BackoffBreaker` |
-| `pkg/cmdexec` | `os/exec` wrapper for agent commands | `Runner`, `Run()` |
+| `pkg/cmdexec` | `os/exec` wrapper for git and agent commands, with a rollback-capable step transaction | `Cmd`, `New()`, `Git()`, `Tx`, `NewTx()` |
 | `pkg/dagscorer` | DAG-based task dependency scoring | `Score()` |
 | `pkg/dircp` | Directory tree copy with filters | `Copy()` |
-| `pkg/envutil` | Environment variable parsing with defaults and validation | `String()`, `Int()`, `Bool()`, `Duration()` |
-| `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `Decode()`, `Respond()`, `Error()` |
+| `pkg/envutil` | Environment variable parsing with defaults and validation | `Int()`, `IntMin()`, `Duration()` |
+| `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `DecodeBody()`, `DecodeOptionalBody()`, `PathUUID()`, `Write()` |
 | `pkg/keyedmu` | Per-key mutex map for fine-grained locking | `Map[K]` |
 | `pkg/lazyval` | Lazily-computed cached value with invalidation | `Value[T]`, `New()` |
-| `pkg/ndjson` | Newline-delimited JSON reader | `Reader` |
+| `pkg/ndjson` | Newline-delimited JSON file reader/appender | `ReadFile()`, `AppendFile()`, `PreferResultLine()` |
 | `pkg/pagination` | Cursor-based pagination helpers | `Paginate()` |
-| `pkg/pty` | PTY relay for the WebSocket terminal integration | `PTY`, `Start()` |
+| `pkg/pty` | PTY relay for the WebSocket terminal integration | `Open()`, `StartWithSize()`, `Setsize()` |
 | `pkg/pubsub` | Generic fan-out notification hub with replay | `Hub[T]` |
-| `pkg/sanitize` | Input sanitization helpers | `String()` |
-| `pkg/set` | Generic set type | `Set[T]` |
+| `pkg/sanitize` | Slug and rune-safe truncation helpers | `Slug()`, `Truncate()`, `TruncateTrimRight()` |
+| `pkg/set` | Generic set type | `Set[T]`, `New()` |
 | `pkg/sortedkeys` | Sorted map key iteration | `Of()` |
+| `pkg/slugutil` | Kebab-case identifier validation for user-authored YAML registries | `IsValid()` |
+| `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()` |
 | `pkg/syncmap` | Type-safe generic wrapper around `sync.Map` | `Map[K,V]` |
-| `pkg/tail` | Tail-follow for log files | `Follow()` |
+| `pkg/tail` | Retains the last N elements of a slice | `Of()` |
 | `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
-| `pkg/uuidutil` | UUID parsing/generation helpers | `New()`, `Parse()` |
-| `pkg/watcher` | Event-loop background watcher | `Start()` |
+| `pkg/uuidutil` | UUID validation helper | `IsValid()` |
+| `pkg/watcher` | Event-loop background watcher | `Start()`, `Config`, `WakeSource` |
+| `pkg/registry` | Merges a built-in catalog with user-authored items keyed by slug; shared by the agent and flow stores | `MergeUnique()`, `ContainsSlug()` |
+| `pkg/yamldir` | Reads YAML definition files from a user directory | `ReadAll()`, `File`, `Remove()` |
+| `pkg/yamlwatch` | Debounces filesystem events on a YAML directory | `Watch()` |
 | `pkg/dag` | Generic DAG operations (ReverseEdges, DetectCycles, Reachable) | `ReverseEdges()`, `DetectCycles()`, `Reachable()` |
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Buffer`, `NewBuffer()`, `Reader` |
 | `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Transition()` |
