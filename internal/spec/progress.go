@@ -1,24 +1,9 @@
 package spec
 
-import "fmt"
-
 // Progress tracks completion of leaves in a spec subtree.
 type Progress struct {
 	Complete int // number of complete leaves in subtree
 	Total    int // total number of leaves in subtree
-}
-
-// Fraction returns the completion ratio (0.0 if no leaves).
-func (p Progress) Fraction() float64 {
-	if p.Total == 0 {
-		return 0
-	}
-	return float64(p.Complete) / float64(p.Total)
-}
-
-// String returns a human-readable progress summary.
-func (p Progress) String() string {
-	return fmt.Sprintf("%d/%d leaves done", p.Complete, p.Total)
 }
 
 // NodeProgress recursively computes progress for a node.

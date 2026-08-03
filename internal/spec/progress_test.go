@@ -149,31 +149,6 @@ func TestNodeProgress_NoChildren(t *testing.T) {
 	}
 }
 
-func TestProgress_Fraction(t *testing.T) {
-	tests := []struct {
-		p    Progress
-		want float64
-	}{
-		{Progress{2, 3}, 2.0 / 3.0},
-		{Progress{0, 5}, 0},
-		{Progress{3, 3}, 1.0},
-		{Progress{0, 0}, 0},
-	}
-	for _, tc := range tests {
-		got := tc.p.Fraction()
-		if got != tc.want {
-			t.Errorf("Progress%v.Fraction() = %f, want %f", tc.p, got, tc.want)
-		}
-	}
-}
-
-func TestProgress_String(t *testing.T) {
-	p := Progress{2, 3}
-	if s := p.String(); s != "2/3 leaves done" {
-		t.Errorf("String() = %q, want %q", s, "2/3 leaves done")
-	}
-}
-
 func TestTreeProgress_FullTree(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
 		"local/parent.md":       {Status: StatusValidated},
