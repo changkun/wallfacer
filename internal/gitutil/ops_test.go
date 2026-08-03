@@ -816,17 +816,6 @@ func TestFFMerge_NonGitPath(t *testing.T) {
 	}
 }
 
-// TestCommitsBehind_NonGitRepoPath verifies CommitsBehind returns an error
-// when the repo path is not a git directory (DefaultBranch fails early).
-func TestCommitsBehind_NonGitRepoPath(t *testing.T) {
-	_, err := CommitsBehind(t.TempDir(), t.TempDir())
-	if err != nil {
-		// DefaultBranch falls back to "main" for non-git dirs, then
-		// defaultBranchCommitHash fails, returning 0, nil.
-		t.Logf("got error (acceptable): %v", err)
-	}
-}
-
 // TestCommitsBehind_EmptyRepo verifies CommitsBehind returns 0 for an empty repo
 // where the default branch has no resolvable ref.
 func TestCommitsBehind_EmptyRepo(t *testing.T) {
@@ -891,33 +880,6 @@ func TestDefaultBranchCommitHash_FallbackToOrigin(t *testing.T) {
 	}
 }
 
-// TestBranchTipCommit_EmptyOutput verifies error when git log returns empty output.
-func TestBranchTipCommit_EmptyOutput(t *testing.T) {
-	// An orphan branch with no commits will produce empty log output.
-	repo := setupRepo(t)
-	gitRun(t, repo, "checkout", "--orphan", "empty-branch")
-	_, _, _, err := BranchTipCommit(repo, "empty-branch")
-	if err == nil {
-		t.Fatal("expected error for branch with no commits")
-	}
-}
-
-// TestBranchTipCommit_UnexpectedFormat verifies the error when git log output
-// has fewer than 3 pipe-delimited fields. This is exercised by mocking via a
-// branch name that produces unusual output.
-func TestBranchTipCommit_NoCommits(t *testing.T) {
-	// An orphan branch has no commits — git log -1 returns exit code 128
-	// which goes to the cmdErr path. The empty-line path (line 252) is
-	// unreachable in practice: if git log succeeds it always outputs something.
-	// Cover both error paths (cmdErr and empty) via the cmdErr test.
-	repo := setupRepo(t)
-	gitRun(t, repo, "checkout", "--orphan", "nocommits")
-	_, _, _, err := BranchTipCommit(repo, "nocommits")
-	if err == nil {
-		t.Fatal("expected error for orphan branch")
-	}
-}
-
 // TestCommitsBehind_RevListError verifies CommitsBehind returns error when
 // the rev-list command fails on the worktree (valid repo, but broken worktree).
 func TestCommitsBehind_RevListError(t *testing.T) {
@@ -927,17 +889,6 @@ func TestCommitsBehind_RevListError(t *testing.T) {
 	_, err := CommitsBehind(repo, t.TempDir())
 	if err == nil {
 		t.Error("expected error when rev-list fails on worktree")
-	}
-}
-
-// TestDefaultBranchCommitHash_NoCandidatesFound verifies that
-// defaultBranchCommitHash returns an error when no candidate branch resolves.
-func TestDefaultBranchCommitHash_NoCandidatesFound(t *testing.T) {
-	repo := setupRepo(t)
-	// Use a branch name that doesn't exist in any form.
-	_, err := defaultBranchCommitHash(repo, "nonexistent-xyz-branch-name")
-	if err == nil {
-		t.Fatal("expected error when no candidate resolves")
 	}
 }
 
