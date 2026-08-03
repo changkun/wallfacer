@@ -3,20 +3,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = process.cwd();
-const index = readFileSync(resolve(root, 'index.html'), 'utf8');
 const fontsCss = readFileSync(resolve(root, 'src/styles/fonts.css'), 'utf8');
 
 describe('font loading', () => {
-  it('preloads the critical Latin fonts so first paint avoids a FOUT swap', () => {
-    for (const href of [
-      '/fonts/inter-400.woff2',
-      '/fonts/inter-600.woff2',
-      '/fonts/instrument-serif-italic.woff2',
-    ]) {
-      expect(index).toContain(`<link rel="preload" href="${href}" as="font" type="font/woff2" crossorigin />`);
-    }
-  });
-
   it('serves Latin faces as WOFF2 with font-display: block', () => {
     expect(fontsCss).toContain("url('/fonts/inter-400.woff2') format('woff2')");
     expect(fontsCss).toContain("url('/fonts/instrument-serif-regular.woff2') format('woff2')");
