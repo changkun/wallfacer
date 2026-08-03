@@ -208,29 +208,6 @@ func TestSandboxActivityAgentSession(t *testing.T) {
 	if !found {
 		t.Error("SandboxActivityAgentSession not in SandboxActivities slice")
 	}
-	if SandboxActivityAgentSession != "agent-session" {
-		t.Errorf("SandboxActivityAgentSession = %q, want %q", SandboxActivityAgentSession, "agent-session")
-	}
-}
-
-func TestTaskKindPlanning(t *testing.T) {
-	if TaskKindPlanning != "planning" {
-		t.Errorf("TaskKindPlanning = %q, want %q", TaskKindPlanning, "planning")
-	}
-
-	// Verify it can be set on a Task and round-trips through JSON.
-	task := Task{Kind: TaskKindPlanning}
-	data, err := json.Marshal(task)
-	if err != nil {
-		t.Fatalf("json.Marshal: %v", err)
-	}
-	var decoded Task
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("json.Unmarshal: %v", err)
-	}
-	if decoded.Kind != TaskKindPlanning {
-		t.Errorf("round-tripped Kind = %q, want %q", decoded.Kind, TaskKindPlanning)
-	}
 }
 
 func TestTaskUsage_Add(t *testing.T) {

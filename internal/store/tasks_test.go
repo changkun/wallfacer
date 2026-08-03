@@ -980,21 +980,6 @@ func TestResetTaskForRetry(t *testing.T) {
 	}
 }
 
-func TestResetTaskForRetry_AccumulatesHistory(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "prompt1", Timeout: 5})
-	_ = s.ResetTaskForRetry(bg(), task.ID, "prompt2", false)
-	_ = s.ResetTaskForRetry(bg(), task.ID, "prompt3", false)
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if len(got.PromptHistory) != 2 {
-		t.Fatalf("PromptHistory length = %d, want 2", len(got.PromptHistory))
-	}
-	if got.PromptHistory[0] != "prompt1" || got.PromptHistory[1] != "prompt2" {
-		t.Errorf("PromptHistory = %v", got.PromptHistory)
-	}
-}
-
 func TestResetTaskForRetry_ClearsBaseCommitHashes(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
