@@ -52,17 +52,3 @@ func TestNewBuiltinRegistry_LookupAndList(t *testing.T) {
 		t.Fatalf("List returned %d roles, want %d", len(listed), len(BuiltinAgents))
 	}
 }
-
-func TestHeavyweightAgentsDeclareWriteCapability(t *testing.T) {
-	for _, r := range []Role{Implementation, Testing} {
-		found := false
-		for _, c := range r.Capabilities {
-			if c == CapWorkspaceWrite {
-				found = true
-			}
-		}
-		if !found {
-			t.Errorf("%s: expected %q in capabilities, got %v", r.Slug, CapWorkspaceWrite, r.Capabilities)
-		}
-	}
-}

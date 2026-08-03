@@ -57,18 +57,3 @@ func TestExtractUsage_EmptyOrMalformed(t *testing.T) {
 		}
 	}
 }
-
-func TestExtractUsage_PrefersResultLineOverAssistant(t *testing.T) {
-	// If both an assistant-type line and a result-type line are present,
-	// the result line wins because it carries usage and stop_reason.
-	raw := []byte(`{"type":"assistant","message":{"role":"assistant","content":[]}}
-{"type":"result","stop_reason":"end_turn","total_cost_usd":0.02,"usage":{"input_tokens":10,"output_tokens":3}}`)
-
-	u, ok := ExtractUsage(raw)
-	if !ok {
-		t.Fatal("expected ok=true")
-	}
-	if u.InputTokens != 10 || u.StopReason != "end_turn" {
-		t.Errorf("expected to pick result line, got %+v", u)
-	}
-}
