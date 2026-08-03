@@ -5,6 +5,4 @@
  */
 @import './spec-mode/layout.css';
 @import './spec-mode/prose-toc.css';
-@import './spec-mode/chat-pane.css';
 @import './spec-mode/explorer-tree.css';
-@import './spec-mode/chat-bubbles.css';
