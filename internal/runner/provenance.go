@@ -24,11 +24,6 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 		env.ModelName = r.modelFromEnvForSandbox(task.Sandbox)
 		env.APIBaseURL = cfg.BaseURL
 	}
-	// Per-task model override (deprecated field, kept for migration compatibility).
-	if task.Model != "" {
-		env.ModelName = task.Model
-	}
-
 	// Sandbox: record the configured sandbox for this task.
 	env.Sandbox = r.sandboxForTaskActivity(&task, activityImplementation)
 
