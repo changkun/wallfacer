@@ -22,11 +22,6 @@ type Route struct {
 	Pattern string
 	// Name is the unique Go handler method name in internal/handler (e.g. "ListTasks").
 	Name string
-	// JSName is the JavaScript method name emitted in routes.js. When empty the
-	// generator derives it from the URL path suffix (kebab-and-slash to camelCase).
-	// Set it explicitly only when auto-derivation would be ambiguous (e.g. two routes
-	// share the same URL but differ by HTTP method).
-	JSName string
 	// Description is a short human-readable summary of what the route does.
 	Description string
 	// Tags are logical group labels used for documentation and filtering.
@@ -75,7 +70,6 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/files", Name: "GetFiles",
-		JSName:      "list",
 		Description: "File listing for @ mention autocomplete.",
 		Tags:        []string{"files"},
 	},
@@ -84,13 +78,11 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/config", Name: "GetConfig",
-		JSName:      "get",
 		Description: "Get server configuration (workspaces, autoimplement flags, sandbox list).",
 		Tags:        []string{"config"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/config", Name: "UpdateConfig",
-		JSName:      "update",
 		Description: "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
 		Tags:        []string{"config"},
 	},
@@ -104,49 +96,41 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/pick-folder", Name: "PickFolder",
-		JSName:      "pickFolder",
 		Description: "Open the host OS native folder chooser and return the picked absolute path. Local-display only; 501 when no native picker is available (headless/cloud).",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/mkdir", Name: "MkdirWorkspace",
-		JSName:      "mkdir",
 		Description: "Create a new directory under an absolute host path.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/rename", Name: "RenameWorkspace",
-		JSName:      "rename",
 		Description: "Rename a directory at an absolute host path.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/workspaces", Name: "ListWorkspaces",
-		JSName:      "list",
 		Description: "List workspaces visible to the caller, each flagged active or dormant.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces", Name: "CreateWorkspace",
-		JSName:      "create",
 		Description: "Create a workspace (stable id, random storage key) from a name and folder set.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/workspaces/{id}", Name: "UpdateWorkspace",
-		JSName:      "updateOne",
 		Description: "Rename a workspace and/or replace its folder set without re-keying its history.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/workspaces/{id}", Name: "DeleteWorkspace",
-		JSName:      "remove",
 		Description: "Delete a workspace record (its data directory is left on disk).",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/{id}/activate", Name: "ActivateWorkspace",
-		JSName:      "activate",
 		Description: "Activate a workspace by id and switch the scoped task board.",
 		Tags:        []string{"workspaces"},
 	},
@@ -155,25 +139,21 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/routines", Name: "ListRoutines",
-		JSName:      "list",
 		Description: "List routine task cards with their schedules and next-run times.",
 		Tags:        []string{"routines"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/routines", Name: "CreateRoutine",
-		JSName:      "create",
 		Description: "Create a new routine card that spawns instance tasks on a fixed interval.",
 		Tags:        []string{"routines"},
 	},
 	{
 		Method: http.MethodPatch, Pattern: "/api/routines/{id}/schedule", Name: "UpdateRoutineSchedule",
-		JSName:      "updateSchedule",
 		Description: "Update a routine's interval or enabled flag; unset fields are left unchanged.",
 		Tags:        []string{"routines"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/routines/{id}/trigger", Name: "TriggerRoutine",
-		JSName:      "trigger",
 		Description: "Fire a routine immediately, bypassing the schedule; the scheduled cycle continues.",
 		Tags:        []string{"routines"},
 	},
@@ -182,31 +162,26 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agents", Name: "ListAgents",
-		JSName:      "list",
 		Description: "List all registered sub-agent roles (built-in catalog).",
 		Tags:        []string{"agents"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/agents/{slug}", Name: "GetAgent",
-		JSName:      "get",
 		Description: "Get one agent's full descriptor including its prompt template body.",
 		Tags:        []string{"agents"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agents", Name: "CreateAgent",
-		JSName:      "create",
 		Description: "Create a user-authored agent (rejects slugs that shadow a built-in).",
 		Tags:        []string{"agents"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/agents/{slug}", Name: "UpdateAgent",
-		JSName:      "update",
 		Description: "Update a user-authored agent; 409 for built-in slugs.",
 		Tags:        []string{"agents"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/agents/{slug}", Name: "DeleteAgent",
-		JSName:      "delete",
 		Description: "Delete a user-authored agent; 409 for built-in slugs.",
 		Tags:        []string{"agents"},
 	},
@@ -215,31 +190,26 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/flows", Name: "ListFlows",
-		JSName:      "list",
 		Description: "List all registered flows (built-in catalog).",
 		Tags:        []string{"flows"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/flows/{slug}", Name: "GetFlow",
-		JSName:      "get",
 		Description: "Get one flow's full descriptor including its step chain and agent names.",
 		Tags:        []string{"flows"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/flows", Name: "CreateFlow",
-		JSName:      "create",
 		Description: "Create a user-authored flow (rejects slugs that shadow a built-in).",
 		Tags:        []string{"flows"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/flows/{slug}", Name: "UpdateFlow",
-		JSName:      "update",
 		Description: "Update a user-authored flow; 409 for built-in slugs.",
 		Tags:        []string{"flows"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/flows/{slug}", Name: "DeleteFlow",
-		JSName:      "delete",
 		Description: "Delete a user-authored flow; 409 for built-in slugs.",
 		Tags:        []string{"flows"},
 	},
@@ -248,7 +218,6 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/specs/tree", Name: "GetSpecTree",
-		JSName:      "tree",
 		Description: "Get the full spec tree with metadata and progress.",
 		Tags:        []string{"specs"},
 	},
@@ -259,7 +228,6 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/graph", Name: "GetGraph",
-		JSName:      "graph",
 		Description: "Get the unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for the Map.",
 		Tags:        []string{"specs", "tasks"},
 	},
@@ -282,31 +250,26 @@ var Routes = []Route{
 	// --- Spec comments (coordination plane) ---
 	{
 		Method: http.MethodGet, Pattern: "/api/spec-comments", Name: "ListSpecComments",
-		JSName:      "listSpecComments",
 		Description: "List cloud-resident spec comment threads for the visible repos, each repositioned against the current spec body (orphaned flag set when the anchor is lost).",
 		Tags:        []string{"spec-comments"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/spec-comments", Name: "SubmitSpecComment",
-		JSName:      "submitSpecComment",
 		Description: "Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection. The coordinator is authoritative and echoes the result back over the SSE stream.",
 		Tags:        []string{"spec-comments"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/spec-comments/stream", Name: "StreamSpecComments",
-		JSName:      "specCommentsStream",
 		Description: "SSE stream of spec-comment events relayed from the coordinator (create/reply/resolve/reopen/sync).",
 		Tags:        []string{"spec-comments", "sse"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/coordination/status", Name: "GetCoordinationStatus",
-		JSName:      "coordinationStatus",
 		Description: "Report whether the coordination opt-in is enabled (and available).",
 		Tags:        []string{"spec-comments"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/coordination/opt-in", Name: "SetCoordinationOptIn",
-		JSName:      "setCoordinationOptIn",
 		Description: "Flip the coordination opt-in (the data-boundary gate). Body {enabled}.",
 		Tags:        []string{"spec-comments"},
 	},
@@ -315,19 +278,16 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agent", Name: "GetAgentSessionStatus",
-		JSName:      "status",
 		Description: "Get agent session status.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent", Name: "StartAgentSession",
-		JSName:      "start",
 		Description: "Start the agent session.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/agent", Name: "StopAgentSession",
-		JSName:      "stop",
 		Description: "Stop the agent session.",
 		Tags:        []string{"agent"},
 	},
@@ -336,49 +296,41 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agent/messages", Name: "GetAgentMessages",
-		JSName:      "messages",
 		Description: "Retrieve conversation history.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/messages", Name: "SendAgentMessage",
-		JSName:      "sendMessage",
 		Description: "Send a user message, triggers agent exec.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/agent/messages", Name: "ClearAgentMessages",
-		JSName:      "clearMessages",
 		Description: "Clear conversation history.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/agent/messages/stream", Name: "StreamAgentMessages",
-		JSName:      "messageStream",
 		Description: "Stream the agent's response tokens.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/messages/interrupt", Name: "InterruptAgentMessage",
-		JSName:      "interruptMessage",
 		Description: "Interrupt the current agent turn.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/undo", Name: "UndoPlanningRound",
-		JSName:      "undo",
 		Description: "Undo the last agent-session round (git reset --hard on the last commit carrying the Plan-Round trailer).",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/agent/commands", Name: "GetAgentCommands",
-		JSName:      "commands",
 		Description: "List available slash commands.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/tool/update_task_prompt", Name: "UpdateTaskPromptTool",
-		JSName:      "updateTaskPromptTool",
 		Description: "Tool endpoint: update a task's prompt from a task-mode agent session.",
 		Tags:        []string{"agent"},
 	},
@@ -387,25 +339,21 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/agent/sessions", Name: "ListAgentSessions",
-		JSName:      "listThreads",
 		Description: "List agent sessions for the current workspace group.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/agent/sessions", Name: "CreateAgentSession",
-		JSName:      "createThread",
 		Description: "Create a new agent session.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodPatch, Pattern: "/api/agent/sessions/{id}", Name: "PatchAgentSession",
-		JSName:      "patchThread",
 		Description: "Mutate an agent session: {name} renames; {state: archived|visible|active} archives, restores, or activates it.",
 		Tags:        []string{"agent"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/agent/sessions/{id}", Name: "DeleteAgentSession",
-		JSName:      "deleteThread",
 		Description: "Permanently delete an archived agent session and its stored conversation.",
 		Tags:        []string{"agent"},
 	},
@@ -414,13 +362,11 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/env", Name: "GetEnvConfig",
-		JSName:      "get",
 		Description: "Get environment configuration (tokens masked).",
 		Tags:        []string{"env"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/env", Name: "UpdateEnvConfig",
-		JSName:      "update",
 		Description: "Update environment file; omitted/empty token fields are preserved.",
 		Tags:        []string{"env"},
 	},
@@ -433,25 +379,21 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
-		JSName:      "list",
 		Description: "List all built-in system prompt templates with override status and content.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/system-prompts/{name}", Name: "GetSystemPrompt",
-		JSName:      "get",
 		Description: "Get a single built-in system prompt template by name.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/system-prompts/{name}", Name: "UpdateSystemPrompt",
-		JSName:      "update",
 		Description: "Write a user override for a built-in system prompt template; validates the template before writing.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/system-prompts/{name}", Name: "DeleteSystemPrompt",
-		JSName:      "delete",
 		Description: "Remove the user override for a built-in system prompt template, restoring the embedded default.",
 		Tags:        []string{"system-prompts"},
 	},
@@ -460,13 +402,11 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/whiteboard", Name: "GetWhiteboard",
-		JSName:      "get",
 		Description: "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
 		Tags:        []string{"whiteboard"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/whiteboard", Name: "PutWhiteboard",
-		JSName:      "save",
 		Description: "Save the active workspace's whiteboard scene JSON.",
 		Tags:        []string{"whiteboard"},
 	},
@@ -523,13 +463,11 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/usage", Name: "GetUsageStats",
-		JSName:      "stats",
 		Description: "Aggregated token and cost usage statistics.",
 		Tags:        []string{"stats"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/stats", Name: "GetStats",
-		JSName:      "get",
 		Description: "Task status and workspace cost statistics. Optional ?workspace=<repo-root-path> restricts aggregation to tasks for that workspace (400 if no tasks match).",
 		Tags:        []string{"stats"},
 	},
@@ -538,7 +476,6 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks", Name: "ListTasks",
-		JSName:      "list",
 		Description: "List all tasks (optionally including archived).",
 		Tags:        []string{"tasks"},
 	},
@@ -549,13 +486,11 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/tasks", Name: "CreateTask",
-		JSName:      "create",
 		Description: "Create a new task in the backlog.",
 		Tags:        []string{"tasks"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/tasks/batch", Name: "BatchCreateTasks",
-		JSName:      "batchCreate",
 		Description: "Create multiple tasks atomically with symbolic dependency wiring.",
 		Tags:        []string{"tasks"},
 	},
@@ -581,13 +516,11 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/summaries", Name: "ListSummaries",
-		JSName:      "summaries",
 		Description: "List immutable task summaries for completed tasks (cost dashboard, no full task.json read).",
 		Tags:        []string{"tasks", "stats"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/deleted", Name: "ListDeletedTasks",
-		JSName:      "listDeleted",
 		Description: "List soft-deleted (tombstoned) tasks that are within the retention window.",
 		Tags:        []string{"tasks"},
 	},
@@ -596,13 +529,11 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodPatch, Pattern: "/api/tasks/{id}", Name: "UpdateTask",
-		JSName:      "update",
 		Description: "Update task fields: status (incl. status=cancelled, which kills the worker and cleans worktrees), prompt, timeout, sandbox, dependencies, fresh_start, archived (true/false), deleted=false (restore).",
 		Tags:        []string{"tasks"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/tasks/{id}", Name: "DeleteTask",
-		JSName:      "delete",
 		Description: "Soft-delete a task (tombstone); data retained within retention window.",
 		Tags:        []string{"tasks"},
 	},
@@ -710,7 +641,6 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/explorer/tree", Name: "ExplorerTree",
-		JSName:      "tree",
 		Description: "List one level of a workspace directory.",
 		Tags:        []string{"explorer"},
 	},
@@ -721,13 +651,11 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/explorer/file", Name: "ExplorerReadFile",
-		JSName:      "readFile",
 		Description: "Read file contents from a workspace.",
 		Tags:        []string{"explorer"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/explorer/file", Name: "ExplorerWriteFile",
-		JSName:      "writeFile",
 		Description: "Write file contents to a workspace.",
 		Tags:        []string{"explorer"},
 	},
@@ -738,7 +666,6 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/explorer/task-prompts", Name: "ExplorerTaskPrompts",
-		JSName:      "taskPrompts",
 		Description: "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
 		Tags:        []string{"explorer"},
 	},
@@ -785,73 +712,61 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/me", Name: "AuthMe",
-		JSName:      "authMe",
 		Description: "Return the current signed-in user, or 204 when unauthenticated.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/auth/orgs", Name: "AuthOrgs",
-		JSName:      "authOrgs",
 		Description: "List the signed-in user's organizations; 204 when single-org or unauthenticated.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodPatch, Pattern: "/api/auth/me", Name: "PatchAuthMe",
-		JSName:      "patchAuthMe",
 		Description: "Mutate the signed-in principal — currently only org_id (active organization). Clears session and returns a redirect to /login?org_id=<target>.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/me/switch-org", Name: "SwitchOrg",
-		JSName:      "switchOrg",
 		Description: "Switch the active organization (latere-ui session convention). Validates membership, clears the session, and returns {redirect} to /login?org_id=<target>.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/auth/device/start", Name: "AuthDeviceStart",
-		JSName:      "authDeviceStart",
 		Description: "Local-mode RFC 8628 device-code: start a sign-in flow and return the user code + verification URI.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/auth/device/poll", Name: "AuthDevicePoll",
-		JSName:      "authDevicePoll",
 		Description: "Poll the in-flight local-mode device-code flow; returns {status: idle|pending|done|denied|expired}.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/auth/device/cancel", Name: "AuthDeviceCancel",
-		JSName:      "authDeviceCancel",
 		Description: "Cancel the in-flight local-mode device-code flow.",
 		Tags:        []string{"login"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/github/auth/status", Name: "GitHubAuthStatus",
-		JSName:      "githubAuthStatus",
 		Description: "GitHub connection state for the principal: connected, login, account, granted permissions, and whether the connect flow is available.",
 		Tags:        []string{"github"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/github/auth/connect", Name: "GitHubAuthConnect",
-		JSName:      "githubAuthConnect",
 		Description: "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the ../auth broker.",
 		Tags:        []string{"github"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/github/auth/disconnect", Name: "GitHubAuthDisconnect",
-		JSName:      "githubAuthDisconnect",
 		Description: "Disconnect GitHub by clearing the principal's stored token.",
 		Tags:        []string{"github"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/github/pulls", Name: "GitHubCreatePull",
-		JSName:      "githubCreatePull",
 		Description: "Create a pull request from head into base; returns the open PR if one already exists for the branch.",
 		Tags:        []string{"github"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/github/comments", Name: "GitHubCreateComment",
-		JSName:      "githubCreateComment",
 		Description: "Post a conversation comment to a pull request or issue.",
 		Tags:        []string{"github"},
 	},
