@@ -69,7 +69,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | Field | Type | JSON Key | Description |
 |---|---|---|---|
 | `Prompt` | `string` | `prompt` | Current task prompt |
-| `ExecutionPrompt` | `string` | `execution_prompt` | Override prompt sent to the agent (when non-empty) |
 | `PromptHistory` | `[]string` | `prompt_history` | Previous prompts (pruned to last 20) |
 | `RefineSessions` | `[]RefinementSession` | `refine_sessions` | Past refinement sessions (pruned to last 5) |
 | `CurrentRefinement` | `*RefinementJob` | `current_refinement` | Active refinement job state |
