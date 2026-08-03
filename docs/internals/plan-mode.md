@@ -296,7 +296,7 @@ After a successful round, the handler:
 4. Appends the assistant message with `PlanRound = max(round)` so the UI can attach an "Undo" affordance.
 5. Touches the session so recent-activity sort works.
 
-Commits write scope-prefixed subjects `<primary-path>(plan): <imperative>` plus the `Plan-Round: N` and `Plan-Thread: <id>` trailers. `hostGitIdentityOverrides` forces the host's global `user.name`/`user.email` so a sandbox-polluted repo-local config never poisons the author.
+Commits write scope-prefixed subjects `<primary-path>(plan): <imperative>` plus the `Plan-Round: N` and `Plan-Thread: <id>` trailers. `gitutil.GlobalIdentityOverrides` forces the host's global `user.name`/`user.email` so a sandbox-polluted repo-local config never poisons the author.
 
 ### Task Prompt Tool
 

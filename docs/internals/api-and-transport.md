@@ -295,7 +295,7 @@ Every SSE frame includes an `id:` field set to the delta sequence number, enabli
 
 #### Reconnection and Replay
 
-On reconnect, the client provides its last seen sequence via the `?last_event_id` query parameter or the `Last-Event-ID` HTTP header. The store's `DeltasSince(seq)` method binary-searches the replay buffer (up to 512 entries, `replayBufMax`) for deltas newer than the given sequence:
+On reconnect, the client provides its last seen sequence via the `?last_event_id` query parameter or the `Last-Event-ID` HTTP header. The store's `DeltasSince(seq)` method binary-searches the replay buffer (up to 512 entries, `pubsub.DefaultReplayCapacity`) for deltas newer than the given sequence:
 
 - **Buffer covers the gap**: Missed deltas are replayed individually as `task-updated` / `task-deleted` events. No full snapshot is needed.
 - **Gap too old** (oldest buffered delta's Seq > requested seq + 1): Falls back to a full `snapshot` event via `ListTasksAndSeq()`, which reads both the task list and current sequence under the same read lock to guarantee consistency.
@@ -306,12 +306,18 @@ On reconnect, the client provides its last seen sequence via the `?last_event_id
 
 ```go
 select {
-case ch <- cloneSequencedDelta(sd):
-default:  // channel full: drop this delta for this subscriber
+case ch <- Sequenced[T]{Seq: seq, Value: h.cloneValue(value)}:
+default: // channel full: close it and evict this subscriber
+	close(ch)
+	overflowed = append(overflowed, id)
 }
 ```
 
-If a subscriber's buffer (256 slots) is full, the delta is silently dropped for that subscriber. The subscriber will eventually receive a later delta; if it reconnects, the replay buffer provides catch-up. All deltas sent to subscribers are deep clones of the task state, preventing data races.
+If a subscriber's buffer (256 slots) is full, its channel is closed and the
+subscriber is evicted, so one slow consumer cannot block every publisher. The
+client sees the stream end and reconnects, where the replay buffer provides
+catch-up. All deltas sent to subscribers are deep clones of the task state,
+preventing data races.
 
 #### Connection Cleanup
 

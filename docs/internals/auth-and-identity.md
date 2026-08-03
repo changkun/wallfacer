@@ -36,7 +36,7 @@ The driver is wired only in local mode (`!cloudMode` in `internal/cli/server.go`
 
 ## Middleware Chain
 
-The server handler stack, outermost first (`internal/cli/server.go`, `startServerComponents`):
+The server handler stack, outermost first (`internal/cli/server.go`, `initServer`):
 
 ```
 logging -> CSRF -> session token bridge -> CookieAuth -> OptionalAuth (JWT) -> BearerAuth -> [ForceLogin, cloud only] -> mux

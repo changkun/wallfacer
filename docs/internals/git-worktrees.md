@@ -258,7 +258,7 @@ For each flagged task (skipping those with an empty `BranchName`):
 ### Timing
 
 - Runs an initial scan **immediately at startup** (before the first tick)
-- Then repeats every **2 minutes** (`defaultWorktreeHealthInterval`)
+- Then repeats every **2 minutes** (`constants.DefaultWorktreeHealthInterval`)
 
 ```mermaid
 flowchart LR

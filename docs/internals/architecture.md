@@ -142,7 +142,7 @@ See [Agent Graph](../guide/agent-graph.md) for the full user-facing model.
 
 **Harness** (`internal/harness/`), Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus the in-process `topos` harness. `harness.Default()` returns Claude. The `cursor` harness adapts the `cursor-agent` CLI and emits Claude-style stream-json.
 
-**Webserver** (`internal/webserver/`), Serves the embedded SPA from `internal/webserver/spa` (`MountSPA`); falls through to `index.html` for client-side routes.
+**Webserver** (`internal/webserver/`), Serves the SPA embedded from `frontend/dist` and passed in as an `fs.FS` (`MountSPA`, `internal/webserver/spa.go`); falls through to `index.html` for client-side routes.
 
 **Frontend** (`frontend/`), Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia). Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
@@ -354,8 +354,8 @@ Every `internal/` package and its role in the system:
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
-| `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `SequencedDelta`, `StorageBackend` |
-| `webserver` | Serves the embedded SPA frontend from `internal/webserver/spa` | `MountSPA()` |
+| `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
+| `webserver` | Serves the SPA embedded from `frontend/dist` | `MountSPA()` |
 | `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `StartFlow()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
@@ -411,7 +411,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `routines.go` | Routine card CRUD (list, create, update schedule, trigger) | `GET/POST /api/routines`, `PATCH /api/routines/{id}/schedule`, `POST /api/routines/{id}/trigger` |
 | `routines_engine.go` | Scheduler loop that fires routine tasks (user-defined) on their cadence | `StartRoutineEngine()` (internal loop) |
 | `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/me`, `GET /api/auth/orgs`, `PATCH /api/auth/me` |
-| `login.go` | Cloud sign-in flow handler | `POST /api/auth/login`, `POST /api/auth/logout` |
+| `login.go` | Cloud sign-in flow handler | `GET /login`, `GET /callback`, `GET /logout`, `GET /logout/notify` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
 | `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-review, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoReview()`, etc. |
