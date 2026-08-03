@@ -183,8 +183,8 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
 | `WALLFACER_AUTO_PUSH` | `false` | Automatic `git push` after commits |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push fires |
-| `WALLFACER_REVIEW_FORKS` | `2` | Independent critic forks per Review verification run |
-| `WALLFACER_REVIEW_ROUNDS` | `4` | Per-fork debate round cap |
+| `WALLFACER_REVIEW_FORKS` | `1` | Independent critic forks per Review verification run |
+| `WALLFACER_REVIEW_ROUNDS` | `3` | Per-fork debate round cap |
 | `WALLFACER_REVIEW_COST_CAP` | `50000` | Soft token budget per Review run |
 | `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window for session cost analytics; 0 = all time. `WALLFACER_PLANNING_WINDOW_DAYS` is a deprecated alias |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
@@ -209,8 +209,8 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive agent launch failures before the circuit breaker opens |
 | `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
 | `WALLFACER_WORKTREE_GC_INTERVAL` | `24h` | Interval between worktree garbage collection runs (duration syntax, e.g. `6h`) |
-| `WALLFACER_FLOWS_DIR` | `~/.wallfacer/flows` | Directory scanned for user flow descriptors; the loader is partially wired, so treat as experimental |
-| `WALLFACER_AGENTS_DIR` | `~/.wallfacer/agents` | Directory scanned for user agent descriptors; same caveat |
+| `WALLFACER_FLOWS_DIR` | `~/.wallfacer/flows` | Directory scanned for user flow descriptors; loaded at startup, merged with the built-ins, and reloaded when the directory changes |
+| `WALLFACER_AGENTS_DIR` | `~/.wallfacer/agents` | Directory scanned for user agent descriptors; loaded and reloaded the same way |
 | `WALLFACER_PROMPT_HISTORY_LIMIT` | | Cap on retained prompt revisions per task |
 | `WALLFACER_RETRY_HISTORY_LIMIT` | | Cap on retained retry records per task |
 | `WALLFACER_REFINE_SESSIONS_LIMIT` | | Cap on retained refine sessions per task |

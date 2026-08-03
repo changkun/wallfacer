@@ -65,7 +65,7 @@ Click **+ New Task** in the Backlog header, or press **n** anywhere on the board
 
 Two toggles sit on the action row:
 
-- **Batch mode** splits the prompt on blank lines and creates one task per section in a single atomic call. The underlying `POST /api/tasks/batch` endpoint also supports symbolic dependency wiring (`depends_on_refs` by position index), validated for cycles before anything is created.
+- **Batch mode** splits the prompt on blank lines and creates one task per section in a single atomic call. The underlying `POST /api/tasks/batch` endpoint also supports symbolic dependency wiring: each task may carry a `ref` name, and `depends_on_refs` entries name those refs or existing task UUIDs. Cycles are rejected before anything is created.
 - **Schedule** does not create a one-shot task: it creates a recurring [routine](routines.md) with the given interval.
 
 Every task carries a short **Title** (auto-generated after creation, or set manually) and the full **Prompt**.
