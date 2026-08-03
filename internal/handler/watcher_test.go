@@ -149,7 +149,13 @@ func TestRunTwoPhase(t *testing.T) {
 						if err != nil {
 							return false, err
 						}
-						if countRegularInProgress(tasks) >= 2 {
+						inProgress := 0
+						for i := range tasks {
+							if tasks[i].Status == store.TaskStatusInProgress && !tasks[i].IsTestRun {
+								inProgress++
+							}
+						}
+						if inProgress >= 2 {
 							return false, nil
 						}
 						transitionExecuted = true

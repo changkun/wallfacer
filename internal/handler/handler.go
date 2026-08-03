@@ -570,31 +570,11 @@ func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
 	return *v, true
 }
 
-// forEachActiveStore calls fn for every active workspace group's store.
-// When no workspace manager is configured, falls back to the viewed store.
-func (h *Handler) forEachActiveStore(fn func(s *store.Store, ws []string)) {
-	if h.workspace == nil {
-		h.snapshotMu.RLock()
-		s, ws := h.store, h.workspaces
-		h.snapshotMu.RUnlock()
-		if s != nil {
-			fn(s, ws)
-		}
-		return
-	}
-	for _, snap := range h.workspace.AllActiveSnapshots() {
-		if snap.Store != nil {
-			fn(snap.Store, snap.Workspaces)
-		}
-	}
-}
-
 // forCurrentStore calls fn only for the currently viewed workspace group's
 // store. This scopes automation actions (auto-promote, auto-retry, auto-test,
 // auto-submit, auto-sync) to the viewed group: tasks already
 // running in other groups finish as normal, but no new automation fires on
-// their backlogs. It is the action-taking counterpart to forEachActiveStore,
-// which remains in use for global concurrency counting.
+// their backlogs.
 func (h *Handler) forCurrentStore(fn func(s *store.Store, ws []string)) {
 	s, ok := h.currentStore()
 	if !ok || s == nil {

@@ -44,18 +44,6 @@ func (h *Handler) maxTestConcurrentTasks() int {
 	return h.cachedMaxTestParallel.Get()
 }
 
-// countRegularInProgress counts non-test in-progress tasks from a task slice.
-// Used in Phase 1 of auto-promotion where a snapshot is already available.
-func countRegularInProgress(tasks []store.Task) int {
-	count := 0
-	for i := range tasks {
-		if tasks[i].Status == store.TaskStatusInProgress && !tasks[i].IsTestRun {
-			count++
-		}
-	}
-	return count
-}
-
 // checkConcurrencyAndUpdateStatus acquires promoteMu, enforces the regular
 // in-progress concurrency limit, and calls store.UpdateTaskStatus. It writes
 // the appropriate HTTP error response and returns false on any failure;

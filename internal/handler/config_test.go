@@ -1539,15 +1539,9 @@ func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
 		t.Fatalf("CreateTask B: %v", err)
 	}
 
-	// Both stores should be visible to forEachActiveStore (used for global
-	// concurrency counts) since A still has an in-progress task pinning it.
-	var seenByEach []*store.Store
-	h.forEachActiveStore(func(s *store.Store, _ []string) {
-		seenByEach = append(seenByEach, s)
-	})
-	if len(seenByEach) < 2 {
-		snaps := wsMgr.AllActiveSnapshots()
-		t.Fatalf("forEachActiveStore should see both groups while A has in-progress work; saw %d (snapshots=%d)", len(seenByEach), len(snaps))
+	// Workspace A stays active while it has an in-progress task pinning it.
+	if snaps := wsMgr.AllActiveSnapshots(); len(snaps) < 2 {
+		t.Fatalf("both groups should stay active while A has in-progress work; saw %d", len(snaps))
 	}
 
 	// forCurrentStore must visit only the viewed group (B). Workspace A, though
