@@ -195,7 +195,7 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 | `POST /internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI) |
 | `GET /internal/sandbox-proxy/github-token` | Trust-plane GitHub token mint |
 
-The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox credential sidecar makes, not part of the browser contract. They are wired unconditionally but respond 503 when `SandboxProxyConfig.Enabled` is false (local runs with no credentials). When `SANDBOX_PROXY_AUTH_URL` is set, requests are validated against the JWKS built from `SANDBOX_PROXY_AUTH_JWKS_URL` and `SANDBOX_PROXY_AUTH_ISSUER`; when it is unset, validation is skipped and the endpoints rely on the `Enabled` flag alone (acceptable in single-tenant local runs).
+The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox credential sidecar makes, not part of the browser contract. They are wired unconditionally but respond 503 when `SandboxProxyConfig.Enabled` is false (local runs with no credentials). When `SANDBOX_PROXY_AUTH_URL` is set, requests are validated against the JWKS built from `SANDBOX_PROXY_AUTH_JWKS_URL` and `SANDBOX_PROXY_AUTH_ISSUER`. When it is unset no validator is built, and `requireClaims` fails closed: an enabled proxy rejects every trust-plane request with 503 rather than treating the caller as anonymous-but-authorized.
 
 ## Request Middleware Chain
 
