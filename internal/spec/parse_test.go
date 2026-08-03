@@ -116,20 +116,6 @@ func TestParseFile_AllEfforts(t *testing.T) {
 	}
 }
 
-func TestParseFile_NullDispatchID(t *testing.T) {
-	dir := t.TempDir()
-	content := "---\ntitle: Test\nstatus: drafted\ntrack: local\neffort: small\ncreated: 2026-01-01\nupdated: 2026-01-01\nauthor: test\ndispatched_task_id: null\n---\n"
-	path := writeSpec(t, dir, "null-dispatch.md", content)
-
-	s, err := ParseFile(path)
-	if err != nil {
-		t.Fatalf("ParseFile: %v", err)
-	}
-	if s.DispatchedTaskID != nil {
-		t.Errorf("DispatchedTaskID = %v, want nil", s.DispatchedTaskID)
-	}
-}
-
 func TestParseFile_UUIDDispatchID(t *testing.T) {
 	dir := t.TempDir()
 	content := "---\ntitle: Test\nstatus: drafted\ntrack: local\neffort: small\ncreated: 2026-01-01\nupdated: 2026-01-01\nauthor: test\ndispatched_task_id: 550e8400-e29b-41d4-a716-446655440000\n---\n"

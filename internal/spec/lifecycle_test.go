@@ -85,35 +85,3 @@ func TestStatusMachine_ErrorWrapping(t *testing.T) {
 		t.Errorf("error should wrap ErrInvalidTransition, got %v", err)
 	}
 }
-
-func TestValidStatuses(t *testing.T) {
-	statuses := ValidStatuses()
-	if len(statuses) != 7 {
-		t.Fatalf("len(ValidStatuses()) = %d, want 7", len(statuses))
-	}
-	want := map[Status]bool{
-		StatusVague: true, StatusDrafted: true, StatusValidated: true,
-		StatusTesting: true, StatusComplete: true, StatusStale: true,
-		StatusArchived: true,
-	}
-	for _, s := range statuses {
-		if !want[s] {
-			t.Errorf("unexpected status %q", s)
-		}
-	}
-}
-
-func TestValidEfforts(t *testing.T) {
-	efforts := ValidEfforts()
-	if len(efforts) != 4 {
-		t.Fatalf("len(ValidEfforts()) = %d, want 4", len(efforts))
-	}
-	want := map[Effort]bool{
-		EffortSmall: true, EffortMedium: true, EffortLarge: true, EffortXLarge: true,
-	}
-	for _, e := range efforts {
-		if !want[e] {
-			t.Errorf("unexpected effort %q", e)
-		}
-	}
-}

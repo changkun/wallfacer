@@ -47,11 +47,8 @@ func TestClassifyDrift_CriteriaAbsentFallback(t *testing.T) {
 	// The load-bearing case: a spec with no acceptance criteria (Total == 0)
 	// and unexpected files must NOT be classified minimal.
 	withUnexpected := DriftVerdict{Unexpected: []string{"surprise.go"}}
-	if got := ClassifyDrift(withUnexpected); got == DriftMinimal {
-		t.Errorf("criteria-less spec with unexpected files = %q, must not be minimal", got)
-	}
 	if got := ClassifyDrift(withUnexpected); got != DriftModerate {
-		t.Errorf("one unexpected, no criteria = %q, want moderate", got)
+		t.Errorf("one unexpected, no criteria = %q, want moderate (never minimal)", got)
 	}
 
 	// No criteria, no unexpected, no missing → minimal (a clean change).

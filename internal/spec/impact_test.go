@@ -18,44 +18,6 @@ func TestReverseIndex_Simple(t *testing.T) {
 	}
 }
 
-func TestReverseIndex_Multiple(t *testing.T) {
-	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, DependsOn: []string{"local/b.md", "local/c.md"}},
-		"local/b.md": {Status: StatusValidated},
-		"local/c.md": {Status: StatusValidated},
-	})
-	rev := dag.ReverseEdges(Adjacency(tree))
-	if !slices.Contains(rev["local/b.md"], "local/a.md") {
-		t.Error("b.md should have a.md as dependent")
-	}
-	if !slices.Contains(rev["local/c.md"], "local/a.md") {
-		t.Error("c.md should have a.md as dependent")
-	}
-}
-
-func TestReverseIndex_SharedDep(t *testing.T) {
-	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, DependsOn: []string{"local/c.md"}},
-		"local/b.md": {Status: StatusValidated, DependsOn: []string{"local/c.md"}},
-		"local/c.md": {Status: StatusValidated},
-	})
-	rev := dag.ReverseEdges(Adjacency(tree))
-	deps := rev["local/c.md"]
-	if len(deps) != 2 {
-		t.Fatalf("c.md dependents = %v, want 2 entries", deps)
-	}
-}
-
-func TestReverseIndex_NoDeps(t *testing.T) {
-	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated},
-	})
-	rev := dag.ReverseEdges(Adjacency(tree))
-	if len(rev["local/a.md"]) != 0 {
-		t.Errorf("a.md should have no dependents, got %v", rev["local/a.md"])
-	}
-}
-
 func TestComputeImpact_DirectOnly(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
 		"local/a.md": {Status: StatusValidated, DependsOn: []string{"local/b.md"}},

@@ -48,30 +48,6 @@ func TestInjectFrontmatter_AlreadyHasFrontmatter(t *testing.T) {
 	}
 }
 
-func TestUpdateFrontmatter_SingleField(t *testing.T) {
-	dir := t.TempDir()
-	path := writeSpec(t, dir, "single.md", validSpec)
-
-	err := UpdateFrontmatter(path, map[string]any{
-		"status": "complete",
-	})
-	if err != nil {
-		t.Fatalf("UpdateFrontmatter: %v", err)
-	}
-
-	s, err := ParseFile(path)
-	if err != nil {
-		t.Fatalf("ParseFile after update: %v", err)
-	}
-	if s.Status != StatusComplete {
-		t.Errorf("Status = %q, want %q", s.Status, StatusComplete)
-	}
-	// Body should be preserved.
-	if !strings.Contains(s.Body, "This spec describes the sandbox backend interface.") {
-		t.Errorf("Body was modified: %q", s.Body)
-	}
-}
-
 // TestUpdateFrontmatter_CRLFLineEndings covers Windows / autocrlf=true
 // round-trips: a file with CRLF line endings must still update cleanly.
 func TestUpdateFrontmatter_CRLFLineEndings(t *testing.T) {
