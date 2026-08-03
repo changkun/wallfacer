@@ -17,7 +17,7 @@ Remaining, intentionally not gated:
   Settings page), not a workspace-data surface, and gating it would block
   sandbox testing whenever an org workspace is active. Left ungated by design;
   revisit if a probe must never run against a workspace the caller can't see.
-- Internal/background callers (`persistPlanningRoundUsage`, group-toggle/limit
+- Internal/background callers (`persistAgentRoundUsage`, group-toggle/limit
   helpers, the spec-completion callback) keep `currentWorkspaces()` — they run
   without a request principal and act on the active group regardless of viewer.
 
