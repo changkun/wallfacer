@@ -37,9 +37,6 @@ type Claims = jwtauth.Claims
 // Validator validates RS256 JWTs issued by the auth service.
 type Validator = jwtauth.Validator
 
-// LoadConfig reads the OIDC configuration from environment variables.
-var LoadConfig = oidc.LoadConfig
-
 // New constructs a Client. Returns nil when the configuration is missing
 // required fields, which callers treat as "auth not configured".
 var New = oidc.New
