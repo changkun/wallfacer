@@ -25,6 +25,7 @@ Start here for the full reading order.
 - [Agent Graph](agent-graph.md). Defining agents, composing fleets, harness pinning, live traces.
 - [Routines](routines.md). Scheduled cards that spawn fresh tasks on an interval.
 - [Whiteboard](whiteboard.md). The free-form drawing canvas.
+- [Artifacts](artifacts.md). The gallery for self-contained pages produced in the workspace.
 
 ### Operate
 
