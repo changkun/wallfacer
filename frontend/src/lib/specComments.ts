@@ -186,32 +186,6 @@ export function triageThreads(threads: SpecCommentThread[]): SpecCommentThread[]
   return threads.filter((t) => anchorLost(t) && !isCleared(t));
 }
 
-// applyEvent folds one SSE event into a repo-keyed thread map. `sync` replaces
-// the repo's whole set; any other op upserts `thread` by id within its repo.
-// Returned map is a new object (callers treat it immutably). The streamed
-// threads carry no `line`/`orphaned`, so consumers that need repositioned values
-// refetch GET; this reducer keeps the optional incremental path honest and is
-// the pure unit-test target.
-export function applyEvent(
-  byRepo: Record<string, Thread[]>,
-  ev: SpecCommentEvent,
-): Record<string, Thread[]> {
-  if (!ev.repo) return byRepo;
-  const next = { ...byRepo };
-  if (ev.op === 'sync') {
-    next[ev.repo] = [...(ev.threads ?? [])];
-    return next;
-  }
-  if (!ev.thread) return next;
-  const existing = next[ev.repo] ?? [];
-  const idx = existing.findIndex((t) => t.id === ev.thread!.id);
-  const updated = idx >= 0
-    ? existing.map((t, i) => (i === idx ? ev.thread! : t))
-    : [...existing, ev.thread];
-  next[ev.repo] = updated;
-  return next;
-}
-
 // A rendered block's source line paired with its vertical offset in the body.
 // Collected from the DOM (elements carrying data-source-line) by the component.
 export interface BlockLine {

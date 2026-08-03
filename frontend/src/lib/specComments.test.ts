@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  applyEvent,
   activeCount,
   blockForLine,
   buildReplyTree,
@@ -13,7 +12,6 @@ import {
   triageThreads,
   type Comment,
   type SpecCommentThread,
-  type Thread,
 } from './specComments';
 
 function comment(p: Partial<Comment> & { id: string }): Comment {
@@ -131,39 +129,6 @@ describe('triageThreads', () => {
       thread({ id: 'out', status: 'outdated', orphaned: true, spec_path: 'z.md' }),
     ];
     expect(triageThreads(all).map((t) => t.id).sort()).toEqual(['orph']);
-  });
-});
-
-describe('applyEvent', () => {
-  const t1: Thread = thread({ id: '1' });
-  const t1b: Thread = thread({ id: '1', status: 'resolved', resolved: true });
-  const t2: Thread = thread({ id: '2' });
-
-  it('sync replaces the repo set', () => {
-    const next = applyEvent({ repo: [t1] }, { op: 'sync', repo: 'repo', threads: [t2] });
-    expect(next.repo.map((t) => t.id)).toEqual(['2']);
-  });
-
-  it('upserts a new thread by id', () => {
-    const next = applyEvent({ repo: [t1] }, { op: 'create', repo: 'repo', thread: t2 });
-    expect(next.repo.map((t) => t.id).sort()).toEqual(['1', '2']);
-  });
-
-  it('replaces an existing thread by id (reply/resolve)', () => {
-    const next = applyEvent({ repo: [t1] }, { op: 'resolve', repo: 'repo', thread: t1b });
-    expect(next.repo).toHaveLength(1);
-    expect(next.repo[0].resolved).toBe(true);
-  });
-
-  it('does not mutate the input map', () => {
-    const input = { repo: [t1] };
-    applyEvent(input, { op: 'create', repo: 'repo', thread: t2 });
-    expect(input.repo).toHaveLength(1);
-  });
-
-  it('ignores an event with no repo', () => {
-    const input = { repo: [t1] };
-    expect(applyEvent(input, { op: 'create', repo: '', thread: t2 })).toBe(input);
   });
 });
 

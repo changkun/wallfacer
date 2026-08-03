@@ -49,13 +49,6 @@ export function applyStreamingUpdate(
   return true;
 }
 
-export function timeOf(ts?: string): string {
-  if (!ts) return '';
-  const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
-
 /** Assistant text contributed by a single parsed frame (empty if none). */
 export function frameAssistantText(frame: Frame): string {
   let text = '';

@@ -18,7 +18,6 @@ vi.mock('./useStreamingFetch', () => ({
 
 import { ref, nextTick } from 'vue';
 import { useTaskActivity } from './useTaskActivity';
-import { createActivityParser } from '../lib/prettyNdjson';
 
 function frameLine(i: number): string {
   return JSON.stringify({
@@ -30,20 +29,6 @@ function frameLine(i: number): string {
 afterEach(() => {
   captured = null;
   vi.restoreAllMocks();
-});
-
-describe('createActivityParser', () => {
-  it('matches parseActivity over the full buffer regardless of chunking', () => {
-    const full = Array.from({ length: 7 }, (_, i) => frameLine(i)).join('');
-    const expected = parseActivity(full);
-
-    // Feed the same bytes in awkward chunk boundaries (mid-line splits).
-    const parser = createActivityParser();
-    for (let i = 0; i < full.length; i += 5) parser.push(full.slice(i, i + 5));
-    const got = parser.finalize();
-
-    expect(got).toEqual(expected);
-  });
 });
 
 describe('useTaskActivity', () => {

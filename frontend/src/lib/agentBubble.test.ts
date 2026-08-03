@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  timeOf,
   extractAssistantText,
   extractError,
   activityIcon,
@@ -43,18 +42,6 @@ describe('applyStreamingUpdate', () => {
     expect(ok).toBe(false);
     expect(msgs.map((b) => b.rawText)).toEqual(['foreign', 'also foreign']);
     expect(msgs).toHaveLength(2);
-  });
-});
-
-describe('timeOf', () => {
-  it('returns empty for undefined or invalid', () => {
-    expect(timeOf(undefined)).toBe('');
-    expect(timeOf('')).toBe('');
-    expect(timeOf('not-a-date')).toBe('');
-  });
-  it('formats a valid ISO timestamp to hh:mm', () => {
-    const out = timeOf('2026-06-01T13:45:00Z');
-    expect(out).toMatch(/^\d{1,2}:\d{2}( [AP]M)?$/);
   });
 });
 

@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { parseNormalized, createNormalizedParser, type NormalizedEvent } from './normalizedActivity';
+import {
+  createNormalizedParser,
+  type NormalizedEvent,
+  type NormalizedTurn,
+} from './normalizedActivity';
+
+// One-shot drive of the streaming parser over a whole buffer. Lives here
+// because only these tests need it; production pushes chunks incrementally.
+function parseNormalized(raw: string): NormalizedTurn {
+  const p = createNormalizedParser();
+  p.push(raw);
+  p.finalize();
+  return { rows: p.rows(), answer: p.answer(), usage: p.usage() };
+}
 
 function ndjson(...events: NormalizedEvent[]): string {
   return events.map((e) => JSON.stringify(e)).join('\n') + '\n';

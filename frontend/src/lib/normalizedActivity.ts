@@ -215,11 +215,3 @@ export function createNormalizedParser(): NormalizedParser {
     },
   };
 }
-
-// parseNormalized is the one-shot equivalent over a full buffer (tests / SSR).
-export function parseNormalized(raw: string): NormalizedTurn {
-  const p = createNormalizedParser();
-  p.push(raw);
-  p.finalize();
-  return { rows: p.rows(), answer: p.answer(), usage: p.usage() };
-}
