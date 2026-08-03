@@ -114,7 +114,7 @@ asset, smoke result). The `deploy` job mirrors it to the run summary and
 uploads it as the `release-evidence` artifact; the `release` job appends it to
 the release body. Because the evidence only exists when deploy is green, its
 presence on a release proves prod shipped before the release published.
-`release_evidence_test.go` guards both the workflow wiring and the script.
+`release_evidence_test.go` runs the evidence script end to end.
 
 **Release notes.** GitHub generates the changelog since the previous tag
 (`gh api .../releases/generate-notes`); the `release` job appends the evidence

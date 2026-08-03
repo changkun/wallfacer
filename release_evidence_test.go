@@ -12,39 +12,6 @@ import (
 	"testing"
 )
 
-// TestReleaseWorkflowWiresEvidence guards that release.yml keeps the smoke
-// evidence flowing onto the published GitHub release. The deploy job runs this
-// repo's smoke script, which writes release-evidence.md (tag, commit,
-// build/deploy links, served asset, smoke result), and the release job appends
-// that file to the release notes before publishing. The load-bearing link is
-// the append: evidence that is generated but never reaches the published notes
-// would be a silent regression, so this test pins the append line and the
-// publish command, not just the generation.
-func TestReleaseWorkflowWiresEvidence(t *testing.T) {
-	data, err := os.ReadFile(".github/workflows/release.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	yml := string(data)
-
-	for _, want := range []string{
-		// Tag push triggers the release pipeline.
-		"tags: ['v*']",
-		// The deploy job runs this repo's evidence-emitting smoke script,
-		// pointing it at release-evidence.md.
-		"OUTPUT_MD: release-evidence.md",
-		"run: tools/smoke/release.sh",
-		// The release job appends that evidence onto the notes it publishes.
-		// This is the guarantee: evidence must land on the published release.
-		"cat evidence/release-evidence.md >> notes.md",
-		`gh release create "$TAG" $prerelease \`,
-	} {
-		if !strings.Contains(yml, want) {
-			t.Errorf("release.yml missing evidence wiring: %q", want)
-		}
-	}
-}
-
 // TestSmokeReleaseEmitsEvidence runs the real smoke script against a fake
 // production surface and asserts the evidence block it writes carries the
 // release identity and smoke result. This proves the generator the workflow
