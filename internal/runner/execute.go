@@ -281,10 +281,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	isTestRun := task.IsTestRun
 
 	// Extract per-task model override (empty string means use global default).
-	modelOverride := ""
-	if task.ModelOverride != nil {
-		modelOverride = *task.ModelOverride
-	}
+	modelOverride := task.EffectiveModel()
 
 	// Apply per-task total timeout across all turns.
 	timeout := time.Duration(task.Timeout) * time.Minute

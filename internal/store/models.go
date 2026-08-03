@@ -451,6 +451,17 @@ func (t *Task) HasTag(tag string) bool {
 	return slices.Contains(t.Tags, tag)
 }
 
+// EffectiveModel returns the per-task model pin, or "" when the task uses the
+// global default. ModelOverride is the live field; Model is the deprecated
+// pre-migration spelling, read only as a fallback for tasks that have not
+// passed through migrateTaskJSON.
+func (t *Task) EffectiveModel() string {
+	if t.ModelOverride != nil {
+		return *t.ModelOverride
+	}
+	return t.Model
+}
+
 // IsRoutine reports whether the task is a routine schedule template.
 // Routine cards live outside the normal lifecycle — they stay in backlog
 // forever and are filtered out of autoimplement, archiving, and dep-graph walks.
