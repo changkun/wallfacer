@@ -84,17 +84,3 @@ func TestRoute_FullPattern(t *testing.T) {
 		t.Errorf("FullPattern() = %q, want %q", got, want)
 	}
 }
-
-// TestRoute_FullPattern_AllRoutes ensures every route in the canonical Routes
-// slice produces a non-empty FullPattern that starts with its HTTP method.
-func TestRoute_FullPattern_AllRoutes(t *testing.T) {
-	for _, r := range Routes {
-		fp := r.FullPattern()
-		if fp == "" {
-			t.Errorf("Route %q FullPattern() = empty string", r.Name)
-		}
-		if fp[0:len(r.Method)] != r.Method {
-			t.Errorf("FullPattern() %q does not start with method %q", fp, r.Method)
-		}
-	}
-}

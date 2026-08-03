@@ -1,15 +1,3 @@
-// Package apicontract is the single source of truth for all HTTP API routes.
-//
-// Routes is the canonical list used to:
-//   - Register handlers in the HTTP multiplexer (server.go buildMux).
-//   - Generate the machine-readable API contract (docs/internals/api-contract.json).
-//
-// To regenerate derived artifacts after editing Routes, run:
-//
-//	make api-contract
-//
-// Tests in server_routes_test.go assert that every route in Routes is actually
-// registered in the mux, and that the generated artifacts are not stale.
 package apicontract
 
 import "net/http"
