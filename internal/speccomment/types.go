@@ -21,15 +21,13 @@ const (
 )
 
 // Op values carried on a comment Event. Instance -> coordinator ops are
-// create/reply/resolve/reopen/replace/outdated/edit; coordinator -> instance
-// adds sync (the full thread set for a repo, pushed on connect).
+// create/reply/resolve/reopen/outdated; coordinator -> instance adds sync
+// (the full thread set for a repo, pushed on connect).
 const (
 	OpCreate   = "create"
 	OpReply    = "reply"
 	OpResolve  = "resolve"
 	OpReopen   = "reopen"
-	OpEdit     = "edit"
-	OpReplace  = "replace"  // re-place an orphaned thread onto a new anchor
 	OpOutdated = "outdated" // mark a thread no longer relevant (terminal)
 	OpSync     = "sync"     // coordinator -> instance: full thread set for a repo
 )
