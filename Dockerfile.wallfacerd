@@ -3,7 +3,6 @@ WORKDIR /src
 COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY frontend/ ./
-COPY docs/ /docs/
 RUN bun run build
 
 FROM golang:1.26-alpine AS build
@@ -16,7 +15,8 @@ RUN rm -rf frontend/dist
 # the directory is otherwise empty in a clean build context.
 COPY --from=frontend /src/dist frontend/dist/
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /wallfacer .
+RUN CGO_ENABLED=0 go build -trimpath \
+    -ldflags "-s -w -X latere.ai/x/wallfacer/internal/cli.Version=${VERSION}" -o /wallfacer .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
