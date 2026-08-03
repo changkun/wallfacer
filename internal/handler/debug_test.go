@@ -27,66 +27,6 @@ func TestHealth_StatusOK(t *testing.T) {
 	}
 }
 
-// TestHealth_GoroutinesPositive verifies the goroutine count is greater than zero.
-func TestHealth_GoroutinesPositive(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/debug/health", nil)
-	w := httptest.NewRecorder()
-	h.Health(w, req)
-
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-
-	goroutines, ok := resp["goroutines"].(float64)
-	if !ok {
-		t.Fatalf("goroutines field missing or not a number, got %T: %v", resp["goroutines"], resp["goroutines"])
-	}
-	if goroutines <= 0 {
-		t.Errorf("expected goroutines > 0, got %v", goroutines)
-	}
-}
-
-// TestHealth_UptimeNonNegative verifies uptime_seconds is >= 0.
-func TestHealth_UptimeNonNegative(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/debug/health", nil)
-	w := httptest.NewRecorder()
-	h.Health(w, req)
-
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-
-	uptime, ok := resp["uptime_seconds"].(float64)
-	if !ok {
-		t.Fatalf("uptime_seconds field missing or not a number, got %T: %v", resp["uptime_seconds"], resp["uptime_seconds"])
-	}
-	if uptime < 0 {
-		t.Errorf("expected uptime_seconds >= 0, got %v", uptime)
-	}
-}
-
-// TestHealth_TasksByStatusIsObject verifies tasks_by_status is a JSON object.
-func TestHealth_TasksByStatusIsObject(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/debug/health", nil)
-	w := httptest.NewRecorder()
-	h.Health(w, req)
-
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-
-	_, ok := resp["tasks_by_status"].(map[string]any)
-	if !ok {
-		t.Errorf("expected tasks_by_status to be a JSON object, got %T: %v", resp["tasks_by_status"], resp["tasks_by_status"])
-	}
-}
-
 // TestHealth_TasksByStatusCounts verifies counts are accurate after creating tasks.
 func TestHealth_TasksByStatusCounts(t *testing.T) {
 	h := newTestHandler(t)

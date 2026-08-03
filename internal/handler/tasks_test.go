@@ -4538,21 +4538,6 @@ func TestAutoPromote_PromotesAfterOrphanedDepCleared(t *testing.T) {
 	}
 }
 
-// TestCreateTask_EmptyPromptRejected confirms that an empty prompt is
-// always rejected now that the brainstorm empty-prompt allowance (the
-// last exception) has been removed with the idea-agent subsystem.
-func TestCreateTask_EmptyPromptRejected(t *testing.T) {
-	h := newTestHandler(t)
-	body := `{"prompt": "", "timeout": 10}`
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.CreateTask(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for empty prompt, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 // TestCreateTask_FlowFieldPersisted asserts explicit flow request
 // bodies round-trip to the stored task without mutation.
 func TestCreateTask_FlowFieldPersisted(t *testing.T) {

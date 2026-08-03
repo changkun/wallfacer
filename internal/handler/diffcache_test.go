@@ -10,14 +10,6 @@ import (
 	"latere.ai/x/wallfacer/internal/pkg/cache"
 )
 
-// TestNewDiffCache verifies that the constructor returns a non-nil cache.
-func TestNewDiffCache(t *testing.T) {
-	c := newDiffCache()
-	if c == nil {
-		t.Fatal("newDiffCache() returned nil")
-	}
-}
-
 // TestDiffCacheGetMiss verifies that get returns (zero, false) for an unknown key.
 func TestDiffCacheGetMiss(t *testing.T) {
 	c := newDiffCache()

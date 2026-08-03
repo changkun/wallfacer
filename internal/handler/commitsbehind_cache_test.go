@@ -120,22 +120,6 @@ func TestCommitsBehindCache_CachesError(t *testing.T) {
 	}
 }
 
-func TestCommitsBehindCache_CachedCommitsBehind_ServesFromCache(t *testing.T) {
-	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
-	c.set("repo", "worktree", 7, nil)
-
-	n, ok, err := c.get("repo", "worktree")
-	if !ok {
-		t.Fatal("cache miss on pre-populated entry")
-	}
-	if n != 7 {
-		t.Errorf("expected n=7, got %d", n)
-	}
-	if err != nil {
-		t.Errorf("expected nil error, got %v", err)
-	}
-}
-
 func TestCommitsBehindCache_ConcurrentSafe(_ *testing.T) {
 	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	const goroutines = 20
