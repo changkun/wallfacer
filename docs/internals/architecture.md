@@ -66,40 +66,11 @@ The codebase moved off three older designs. The docs and symbols below reflect t
 
 ## Task State Machine
 
-```mermaid
-stateDiagram-v2
-    [*] --> backlog
-
-    backlog --> in_progress : drag / autoimplement
-
-    in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
-    in_progress --> waiting : end_turn
-    in_progress --> waiting : empty stop_reason
-    in_progress --> failed : error / timeout / budget
-    in_progress --> backlog : reset
-    in_progress --> cancelled : cancel
-
-    committing --> done : commit success
-    committing --> failed : commit failure
-
-    waiting --> in_progress : feedback
-    waiting --> in_progress : test (IsTestRun)
-    waiting --> committing : mark done
-    waiting --> cancelled : cancel
-
-    failed --> backlog : retry / auto_retry
-    failed --> cancelled : cancel
-
-    done --> cancelled : cancel
-    cancelled --> backlog : retry
-
-    note right of waiting
-        sync: rebase onto default branch
-    end note
-```
-
 States: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
 `archived` is a boolean flag on done/cancelled tasks, not a separate state.
+
+See [Task Lifecycle](task-lifecycle.md) for the transition diagram and what each
+state means.
 
 ## Turn Loop
 
