@@ -156,33 +156,9 @@ flowchart TD
 
 The UI splits the live output panel into "Implementation" and "Test" sections using `TestRunStartTurn` as the boundary.
 
-Once a task has reached `waiting` (the agent finished but the user hasn't committed yet), a test verification agent can be triggered to check whether the implementation meets acceptance criteria.
-
-```
-POST /api/tasks/{id}/test
-  body: { criteria?: string }   // optional additional acceptance criteria
-  ↓
-  Sets IsTestRun = true, clears LastTestResult.
-  Transitions waiting → in_progress.
-  Runs a fresh test agent as a host process (separate session, no --resume) with a test prompt.
-
-Test agent runs (IsTestRun = true):
-  Host process executes: inspect code, run tests, verify requirements.
-  Agent must end its response with **PASS** or **FAIL**.
-
-On end_turn:
-  parseTestVerdict() extracts "pass", "fail", or "unknown" from the result.
-  Records verdict in LastTestResult.
-  Transitions in_progress → waiting (no commit).
-  Test output is shown separately from implementation output in the task detail panel.
-```
-
-The test verdict is displayed as a badge on the task card and in the task detail panel. Multiple test runs are allowed; each overwrites the previous verdict. The `TestRunStartTurn` field records which turn the test started so the UI can split implementation vs. test output.
-
-After reviewing the verdict, the user can:
-- Mark the task done (commit pipeline runs) if the verdict is PASS
-- Provide feedback to fix issues, then re-test
-- Cancel the task
+See [Task Lifecycle](task-lifecycle.md#test-verification) for the request
+contract, the verdict fields, and how the `review` toggle supersedes the test
+agent.
 
 ## Auto-Submit
 
@@ -207,30 +183,10 @@ Auto-push is not a watcher. After a successful commit pipeline, `Runner.maybeAut
 
 ## Auto-Retry
 
-Tasks can have an `AutoRetryBudget map[FailureCategory]int` that specifies how many automatic retries are allowed for each failure category. When a task fails:
-
-1. The failure is classified into a `FailureCategory`
-2. If the budget for that category has remaining retries, the count is decremented
-3. The task is automatically reset to `backlog` for a fresh run
-4. `AutoRetryCount` tracks the total number of auto-retries consumed
-
-A global cap (`constants.MaxAutoRetries`, currently 3) prevents infinite retry loops regardless of per-category budgets.
-
-Failure categories:
-
-| Category | Description |
-|---|---|
-| `timeout` | Per-turn timeout exceeded |
-| `budget_exceeded` | Cost or token budget limit reached |
-| `worktree_setup` | Git worktree creation failed |
-| `container_crash` | Agent process exited unexpectedly |
-| `agent_error` | Agent reported an error in its output |
-| `sync_error` | Rebase/sync operation failed |
-| `unknown` | Unclassifiable failure |
-
 The `StartAutoRetrier` watcher performs a startup recovery scan for tasks that failed with transient categories (`container_crash`, `worktree`, `sync_error`) while the server was down, then subscribes to store changes for ongoing monitoring.
 
-See [Task Lifecycle](task-lifecycle.md#auto-retry) for retry history and data models.
+See [Task Lifecycle](task-lifecycle.md#auto-retry) for the retry budget model,
+the failure categories, and retry history.
 
 ## Tip-Sync (Auto-Sync)
 
