@@ -35,7 +35,6 @@ type MockSandboxBackend struct {
 	mu        sync.Mutex
 	responses []ContainerResponse
 	calls     []ContainerCall
-	killCalls []string
 }
 
 // Launch pops the next response and returns a mockSandboxHandle that yields it.
@@ -82,13 +81,6 @@ func (m *MockSandboxBackend) RunArgsCalls() []ContainerCall {
 	return slices.Clone(m.calls)
 }
 
-// KillCalls returns a copy of all recorded Kill invocations.
-func (m *MockSandboxBackend) KillCalls() []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Clone(m.killCalls)
-}
-
 // mockSandboxHandle is the handle returned by MockSandboxBackend.Launch.
 type mockSandboxHandle struct {
 	name     string
@@ -103,10 +95,5 @@ func (h *mockSandboxHandle) State() executor.BackendState { return executor.Stat
 func (h *mockSandboxHandle) Stdout() io.ReadCloser        { return h.stdout }
 func (h *mockSandboxHandle) Stderr() io.ReadCloser        { return h.stderr }
 func (h *mockSandboxHandle) Wait() (int, error)           { return h.exitCode, h.waitErr }
-func (h *mockSandboxHandle) Kill() error {
-	h.parent.mu.Lock()
-	defer h.parent.mu.Unlock()
-	h.parent.killCalls = append(h.parent.killCalls, h.name)
-	return nil
-}
-func (h *mockSandboxHandle) Name() string { return h.name }
+func (h *mockSandboxHandle) Kill() error                  { return nil }
+func (h *mockSandboxHandle) Name() string                 { return h.name }

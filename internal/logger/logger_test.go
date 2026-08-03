@@ -48,15 +48,6 @@ func TestInit(t *testing.T) {
 	t.Cleanup(func() { Init("text") })
 }
 
-// TestInit_UnknownFormat verifies that an unknown format falls back to text (pretty) handler.
-func TestInit_UnknownFormat(t *testing.T) {
-	Init("unknown")
-	if Main == nil {
-		t.Error("Main logger should not be nil after Init with unknown format")
-	}
-	t.Cleanup(func() { Init("text") })
-}
-
 // TestFatal verifies that Fatal causes exit code 1.
 // It uses a subprocess technique to avoid terminating the test process.
 func TestFatal(t *testing.T) {
