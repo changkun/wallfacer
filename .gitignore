@@ -3,11 +3,7 @@
 wallfacer
 .claude/settings.local.json
 coverage.out
-coverage_handler.out
-ui/node_modules/
-ui/js/build/
 .vite/
-wallfacerd
 frontend/node_modules/
 frontend/dist/
 .DS_Store
