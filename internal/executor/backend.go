@@ -117,12 +117,10 @@ type ActivityCounter struct {
 // ContainerInfo holds runtime metadata about a container, used by List()
 // and the container monitor UI.
 type ContainerInfo struct {
-	ID        string `json:"id"`         // short container ID
-	Name      string `json:"name"`       // full container name (e.g. wallfacer-<slug>-<uuid8>)
-	TaskID    string `json:"task_id"`    // task UUID from label, empty if not a task container
-	TaskTitle string `json:"task_title"` // task title populated by the handler from the store
-	Image     string `json:"image"`      // image name
-	State     string `json:"state"`      // running | exited | paused | …
-	Status    string `json:"status"`     // human-readable status (e.g. "Up 5 minutes")
-	CreatedAt int64  `json:"created_at"` // unix timestamp
+	ID     string `json:"id"`      // short container ID
+	Name   string `json:"name"`    // full container name (e.g. wallfacer-<slug>-<uuid8>)
+	TaskID string `json:"task_id"` // task UUID from label, empty if not a task container
+	Image  string `json:"image"`   // image name
+	State  string `json:"state"`   // running | exited | paused | …
+	Status string `json:"status"`  // human-readable status (e.g. "Up 5 minutes")
 }
