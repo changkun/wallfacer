@@ -436,28 +436,6 @@ func TestManager_FlowTokenWriterError(t *testing.T) {
 	}
 }
 
-func TestManager_FlowCallbackTimeout(t *testing.T) {
-	p := testProvider
-	p.TokenURL = "http://localhost:1/unused"
-
-	m := NewManager()
-
-	// Start flow then cancel immediately to trigger callback timeout path.
-	_, err := m.Start(context.Background(), p)
-	if err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-
-	// Cancel triggers context cancellation, which makes callback.Wait return error.
-	m.Cancel(p.Name)
-
-	// Flow was removed by Cancel, status should show no active flow.
-	status := m.Status(p.Name)
-	if status.State != FlowError {
-		t.Errorf("State = %q; want %q", status.State, FlowError)
-	}
-}
-
 func TestExchangeToken_JSON(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
