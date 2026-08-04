@@ -128,11 +128,31 @@
 
 /* --- Board --- */
 .hs-board {
+  /* Single source of truth for the board geometry. The columns are a grid, but
+     the cards are absolutely positioned on the board plane, so both have to be
+     derived from the same numbers or the cards drift out of their column.
+     Percentages inside these calcs resolve against the board's padding box —
+     the same box the absolute cards are positioned in and the same width the
+     grid tracks are cut from — so `left` and `width` stay in one coordinate
+     space. */
+  --hs-pad: 14px;
+  --hs-gap: 10px;
+  --hs-col-w: calc((100% - 2 * var(--hs-pad) - 2 * var(--hs-gap)) / 3);
+  --hs-head-h: 30px;
+  --hs-inset: 8px; /* card gutter inside its column */
+  --hs-card-h: 51px; /* border + padding + 2 lines + tag row */
+
+  --hs-x1: calc(var(--hs-pad) + var(--hs-inset));
+  --hs-x2: calc(var(--hs-x1) + var(--hs-col-w) + var(--hs-gap));
+  --hs-x3: calc(var(--hs-x2) + var(--hs-col-w) + var(--hs-gap));
+  --hs-y1: calc(var(--hs-pad) + 1px + var(--hs-head-h) + var(--hs-inset));
+  --hs-y2: calc(var(--hs-y1) + var(--hs-card-h) + var(--hs-gap));
+
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 14px;
+  gap: var(--hs-gap);
+  padding: var(--hs-pad);
   min-height: 250px;
   border-right: 1px solid var(--rule);
   background:
@@ -149,7 +169,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 10px;
+  height: var(--hs-head-h);
+  padding: 0 10px;
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -160,11 +181,11 @@
 .hs-chip--progress { background: var(--col-progress); }
 .hs-chip--done { background: var(--col-done); }
 
-/* Cards travel across the three column slots. The board is a positioning
-   plane; column slot centers sit at 5.5% / 39% / 72.5% of its width. */
+/* Cards travel across the three column slots, inset by --hs-inset inside the
+   column they sit in. */
 .hs-card {
   position: absolute;
-  width: 27%;
+  width: calc(var(--hs-col-w) - 2 * var(--hs-inset));
   padding: 9px 10px 8px;
   border: 1px solid var(--rule);
   border-radius: 8px;
@@ -197,20 +218,20 @@
 .hs-card--a .hs-card-badge { animation: hs-badge-a 20s linear infinite; }
 .hs-card--b { animation: hs-journey-a 20s cubic-bezier(0.65, 0, 0.35, 1) -10s infinite; }
 .hs-card--b .hs-card-badge { animation: hs-badge-a 20s linear -10s infinite; }
-.hs-card--static { left: 5.5%; top: 118px; }
+.hs-card--static { left: var(--hs-x1); top: var(--hs-y2); }
 
-/* Column x positions (as % of the board plane) and two row slots. */
+/* Column slots on the board plane, resolved from the shared geometry vars. */
 @keyframes hs-journey-a {
-  0%   { left: 5.5%; top: 42px; }
-  12%  { left: 5.5%; top: 42px; }
-  20%  { left: 39%;  top: 42px; }
-  58%  { left: 39%;  top: 42px; }
-  66%  { left: 72.5%; top: 42px; }
-  96%  { left: 72.5%; top: 42px; }
-  98%  { left: 72.5%; top: 42px; opacity: 1; }
+  0%   { left: var(--hs-x1); top: var(--hs-y1); }
+  12%  { left: var(--hs-x1); top: var(--hs-y1); }
+  20%  { left: var(--hs-x2); top: var(--hs-y1); }
+  58%  { left: var(--hs-x2); top: var(--hs-y1); }
+  66%  { left: var(--hs-x3); top: var(--hs-y1); }
+  96%  { left: var(--hs-x3); top: var(--hs-y1); }
+  98%  { left: var(--hs-x3); top: var(--hs-y1); opacity: 1; }
   99%  { opacity: 0; }
-  99.5% { left: 5.5%; top: 42px; opacity: 0; }
-  100% { left: 5.5%; top: 42px; opacity: 1; }
+  99.5% { left: var(--hs-x1); top: var(--hs-y1); opacity: 0; }
+  100% { left: var(--hs-x1); top: var(--hs-y1); opacity: 1; }
 }
 @keyframes hs-badge-a {
   0%, 60% { opacity: 0; }
@@ -319,8 +340,8 @@
   .hs-ticker-tape {
     animation: none;
   }
-  .hs-card--a { left: 39%; top: 42px; }
-  .hs-card--b { left: 72.5%; top: 42px; }
+  .hs-card--a { left: var(--hs-x2); top: var(--hs-y1); }
+  .hs-card--b { left: var(--hs-x3); top: var(--hs-y1); }
   .hs-card--b .hs-card-badge { opacity: 1; }
 }
 </style>
