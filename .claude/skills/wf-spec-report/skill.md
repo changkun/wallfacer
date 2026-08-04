@@ -19,13 +19,14 @@ Otherwise, report on the full project.
 ## Step 1: Discover specs and tasks
 
 1. Glob for all spec files recursively: `specs/**/*.md` (excluding README.md).
-   Specs are grouped by **track** — either a directory under `specs/` (e.g.
-   `specs/<track>/`) or, in flat-numbered repos, the `track:` frontmatter field
-   on flat `specs/NNN-name.md` files. Take the track set from what is on disk,
-   never from a list memorized here or in an earlier run.
+   Specs are grouped by **track**: a directory under `specs/` where one exists,
+   otherwise the `track:` frontmatter field. An `NNN-` filename prefix is an
+   independent, per-directory ordering convention — report in that order where
+   it is present, but never read it as the dependency order. Take the track set
+   from what is on disk, never from a list memorized here or in an earlier run.
 2. For each spec, **parse YAML frontmatter** to extract `title`, `status`,
-   `depends_on`, `affects`, `effort`, `dispatched_task_id`, and `track` (if the
-   repo uses the flat-numbered layout).
+   `depends_on`, `affects`, `effort`, `dispatched_task_id`, and `track` (where
+   the path does not already supply it).
 3. Determine parent-child relationships from the filesystem: a spec at
    `specs/<track>/foo.md` with a directory `specs/<track>/foo/` is a non-leaf
    spec; its children are the specs inside that directory.

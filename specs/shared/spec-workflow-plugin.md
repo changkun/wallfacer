@@ -1,6 +1,6 @@
 ---
 title: Spec Workflow as an Installable Plugin
-status: drafted
+status: complete
 depends_on: []
 affects:
   - .claude/skills/
@@ -131,8 +131,13 @@ either place:
 - `make skills-check` diffs both directions and exits non-zero on drift. Wired
   into CI, where it shallow-clones upstream when no sibling checkout exists.
 
-`wf-spec-housekeeping` is deliberately not vendored: it only applies to
-flat-numbered trees.
+All fourteen skills are mirrored, `housekeeping` included: it repairs the
+numbering of one directory, so it applies to a wallfacer track that adopts
+`NNN-` prefixes just as it does to a flat `specs/`.
+
+Decided 2026-08-04: the mirror stays. Installing from a pinned plugin version at
+container build time is not revisited unless Claude Code gains headless plugin
+installation.
 
 ### 6. Product templates stay a separate surface
 
@@ -149,9 +154,7 @@ side by the rename in section 2, so nothing in the product had to move.
 ## Out of scope
 
 - Publishing any other skill (`prose-style`, `deep-tech-book`, `check-docs`) as
-  a plugin. The marketplace layout leaves room; adding them is separate work.
-- `wf-spec-housekeeping`, which only applies to flat-numbered spec trees. It
-  ships with the plugin but wallfacer does not vendor it.
+  a plugin. Decided 2026-08-04: the marketplace carries the spec workflow only.
 - Changing the lifecycle state machine or the transition API.
 
 ## Tests
@@ -169,11 +172,58 @@ side by the rename in section 2, so nothing in the product had to move.
   `spec.StatusMachine`, and track display names against `specs/README.md`
   headings.
 
-## Open questions
+## Outcome
 
-- Should the vendored copy stay a mirror at `.claude/skills/`, or be installed
-  from a pinned plugin version at container build time once Claude Code can do
-  that headlessly? The mirror is what shipped.
-- Should the plugin carry the other repo-agnostic skills (`prose-style`,
-  `deep-tech-book`, `check-docs`) as siblings under the same marketplace, or do
-  those want a marketplace of their own?
+Shipped 2026-08-04, directly implemented rather than dispatched. The verdict
+below is the drift assessment that carries the spec through the `testing` gate;
+drift is minimal.
+
+### What shipped
+
+`github.com/latere-ai/claude-plugins` is public and carries one plugin, `spec`,
+with fourteen skills. `/plugin marketplace add latere-ai/claude-plugins` then
+`/plugin install spec@latere-ai` installs it. Skills are file-first: `dispatch`,
+`drive`, and `drift` describe the transition API as an accelerator under a
+"when a task board is present" heading rather than assuming it, and the
+remaining wallfacer paths became described concepts.
+
+Wallfacer mirrors all fourteen into `.claude/skills/`.
+`scripts/skills.sh` moves skills in either
+direction, `make skills-check` gates CI, and upstream CI rejects a plugin Claude
+Code would silently ignore.
+
+### Design evolution
+
+- **The plugin is `spec`, not `spec-workflow`.** Skills are namespaced by their
+  plugin, so `spec-workflow:create` said the same word twice.
+- **Two skills were renamed on the way out**, which the spec did not anticipate:
+  `diff → drift` and `status → report`. Every description was also rewritten to
+  lead with what separates a skill from its neighbours, since that is all a
+  model sees when routing.
+- **One-way `make skills-sync` became bidirectional `skills-pull` /
+  `skills-push`.** A one-way sync answers "upstream changed" but not "I edited
+  the copy in front of me", which is the case that actually comes up. `pull`
+  also prunes vendored skills upstream no longer carries — without it the
+  rename left two orphans behind.
+- **Project-scoped plugin installation was tested and does not work.** A
+  `.claude/settings.json` carrying `extraKnownMarketplaces` + `enabledPlugins`
+  did not cause `claude -p` to fetch the marketplace, and the plugin's skills
+  were absent from the session. That result is what makes the vendored mirror
+  necessary rather than merely convenient.
+- **The `status` collision was resolved from the plugin side.** Renaming the
+  skill to `report` left the product's `/status` alone, so no user-visible
+  wallfacer command moved.
+- **Grouping and numbering turned out to be orthogonal.** The skills had
+  encoded track directories and `NNN-` prefixes as two mutually exclusive repo
+  layouts, with `validate` picking one by majority vote. They compose:
+  `specs/local/003-live-serve.md` is both, and a repo may number one track and
+  not another. Numbering is now judged per directory, each with its own number
+  space, and `housekeeping` takes a directory as its scope rather than refusing
+  when it sees track directories — which had made it unreachable in any
+  grouping repo, including this one.
+
+### Unspecified work
+
+The guard tests that pin all three copies to `internal/spec` landed alongside
+this (`8e365ac8`, `291298ef`, `9771fd51`, `03479c0e`) and are what make the
+mirror maintainable rather than merely checked.

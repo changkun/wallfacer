@@ -17,23 +17,33 @@ $ARGUMENTS has the form: `<track/name> [description...]`
 - The **first token** is the spec location: `<track>/<name>` where `<track>` is
   one of the tracks this repo actually uses and `<name>` is the kebab-case spec
   name without `.md`. Example: `local/live-serve`.
-- Never assume a fixed track list — tracks come and go. Read the live set with
-  `ls specs/` (track-directory repos) or from the `track:` frontmatter values in
-  use (flat-numbered repos), and take each track's meaning from its section
-  heading and intro in `specs/README.md`.
+- Never assume a fixed track list — tracks come and go. Read the live set from
+  the directories under `specs/`, plus any `track:` frontmatter values in use
+  where specs sit directly in a directory that holds no sub-tracks. Take each
+  track's meaning from its section heading and intro in `specs/README.md`.
 - If only a name is given without a track, list the live tracks with those
   one-line meanings and ask the user which one it belongs to.
 - Everything after the first token is a **description** — a short explanation
   of what the spec should cover. If no description is provided, ask the user
   what the spec should address.
 
-Derive the output file path from the repo's layout (check `specs/README.md` and
-how existing specs are laid out):
-- **Track-directory** repos: `specs/<track>/<name>.md`.
-- **Flat-numbered** repos (specs are `specs/NNN-name.md`): `specs/<NNN>-<name>.md`
-  where `<NNN>` is the next implementation-order position (usually the current max
-  + 1, zero-padded to 3 digits), and record the track as a `track:` **frontmatter
-  field** instead of a directory.
+Derive the output file path by answering two independent questions from how the
+tree is actually laid out. They compose: `specs/local/003-live-serve.md` is a
+perfectly ordinary path.
+
+1. **Which directory?** If `specs/` has track directories, the spec goes in the
+   one it belongs to: `specs/<track>/<name>.md`. If specs sit directly under
+   `specs/`, it goes there and the track is recorded as a `track:` frontmatter
+   field instead.
+2. **Numbered or not?** If the sibling specs *in that same directory* carry an
+   `NNN-` prefix, give the new one the next number in that directory — usually
+   its current max + 1, zero-padded to three digits. If they do not, use the
+   bare name. Numbering is a per-directory reading-order convention, not a
+   property of the repo, and a repo may number one directory and not another.
+
+The number is a local ordering hint only. Dependency order lives in
+`depends_on`, which resolves repo-root-relative and forms one DAG across the
+whole tree regardless of how any directory is grouped or numbered.
 
 ## Step 1: Read context
 
@@ -76,8 +86,9 @@ impact). Flag these to the user but do NOT modify them.
 
 ## Step 4: Write the spec
 
-Create the spec file at the path derived in Step 0 with this structure (in a
-flat-numbered repo, add a `track: <track>` line under `status:`):
+Create the spec file at the path derived in Step 0 with this structure (add a
+`track: <track>` line under `status:` only when the spec's directory does not
+already name its track):
 
 ````markdown
 ---
@@ -172,10 +183,9 @@ packages. Identify:>
 ## Step 5: Update specs/README.md
 
 1. Read `specs/README.md`.
-2. Add the new spec to the appropriate track table, maintaining alphabetical
-   order within the table. Use the format (link path follows the repo layout —
-   `<track>/<name>.md` for track-directory repos, `<NNN>-<name>.md` for
-   flat-numbered repos):
+2. Add the new spec to the appropriate track table, maintaining the table's
+   existing order — alphabetical, or by number where the directory is numbered.
+   The link path is whatever Step 0 derived, relative to `specs/`:
    ```
    | [<name>.md](<track>/<name>.md) | Not started | <one-line deliverable> |
    ```

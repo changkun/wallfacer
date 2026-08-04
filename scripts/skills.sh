@@ -27,14 +27,18 @@ vendored="$repo_root/.claude/skills"
 
 UPSTREAM_REPO=${UPSTREAM_REPO:-https://github.com/latere-ai/claude-plugins.git}
 cleanup=""
+upstream=""
+# Sets `upstream` (and `cleanup` when it had to clone) in this shell rather
+# than echoing a path: a command substitution would run the clone in a subshell,
+# leaving the parent's trap with nothing to remove.
 resolve_upstream() {
 	if [[ -n ${SKILLS_UPSTREAM:-} ]]; then
-		echo "$SKILLS_UPSTREAM"
+		upstream=$SKILLS_UPSTREAM
 		return
 	fi
 	local sibling="$repo_root/../claude-plugins"
 	if [[ -d $sibling/.git ]]; then
-		(cd "$sibling" && pwd)
+		upstream=$(cd "$sibling" && pwd)
 		return
 	fi
 	# No sibling clone: fetch a throwaway one. Pushing into it would be lost,
@@ -45,10 +49,10 @@ resolve_upstream() {
 	fi
 	cleanup=$(mktemp -d)
 	git clone --quiet --depth 1 "$UPSTREAM_REPO" "$cleanup" >&2
-	echo "$cleanup"
+	upstream=$cleanup
 }
-upstream=$(resolve_upstream)
 trap '[[ -n $cleanup ]] && rm -rf "$cleanup"' EXIT
+resolve_upstream
 
 skills_dir="$upstream/plugins/spec/skills"
 [[ -d $skills_dir ]] || { echo "no skills at $skills_dir" >&2; exit 2; }
@@ -67,16 +71,11 @@ to_upstream() {
 	       -e 's|`/wf-spec-\*`|`/spec:*`|g'
 }
 
-# Skills the vendored copy deliberately omits: housekeeping only applies to
-# flat-numbered spec trees, and this repo uses track directories.
-skip_vendored() { [[ $1 == housekeeping ]]; }
-
 drift=0
 report() { echo "$1"; drift=1; }
 
 for src in "$skills_dir"/*/SKILL.md; do
 	name=$(basename "$(dirname "$src")")
-	skip_vendored "$name" && continue
 	dst="$vendored/wf-spec-$name/skill.md"
 	case $mode in
 	pull)

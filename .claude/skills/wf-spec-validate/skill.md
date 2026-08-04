@@ -50,21 +50,30 @@ fields `implementation_commit` (`base..tip`, present during `testing`) and
 `testing_pending` (a reason string when the drift tester failed); both are valid.
 
 ### Valid track (error)
-A repo uses one of two layouts; detect which from how its specs are laid out:
+Grouping and ordering are independent axes, and they compose —
+`specs/local/003-live-serve.md` is grouped by directory *and* numbered. Check
+each separately; never infer one from the other, and never decide a single
+layout for the whole repo from a majority vote.
 
-- **Track-directory layout** (e.g. `specs/<track>/foo.md`): `track` is derived
-  from the path — the segment immediately after `specs/`. Every spec must live
-  under a non-empty track directory; flag any spec directly under `specs/` (no
-  track segment and no `track:` frontmatter) as an error. A stray `track:` key that
-  merely restates the directory is a removable no-op.
-- **Flat-numbered layout** (e.g. `specs/042-foo.md`, archived under
-  `specs/.archive/042-foo.md`): specs are flat files `NNN-name.md` and `track` is
-  the `track:` **frontmatter field**. Here a spec directly under `specs/` is valid;
-  instead flag a missing `track:` field on an active (non-`.archive/`) spec as an
-  error, and warn if the `NNN` prefix is missing or duplicated.
+**Grouping.** Every spec must have a track from exactly one source:
+- A directory under `specs/` supplies it — the segment immediately after
+  `specs/`. A `track:` key that merely restates the directory is a removable
+  no-op.
+- A spec sitting directly under `specs/` must carry a `track:` frontmatter
+  field. A spec with neither is an error.
 
-Pick the layout from the majority of specs (numbered flat files ⇒ flat-numbered).
-Do not flag a flat-numbered repo's specs for "no track directory".
+**Ordering.** An `NNN-` filename prefix is an optional, *per-directory* reading
+order. Judge it within each directory, never across the tree:
+- A directory whose specs are numbered should number all of them; flag an
+  unnumbered straggler.
+- Flag duplicate numbers inside one directory. The same number in two different
+  directories is fine — they are separate number spaces.
+- A directory with no numbering at all is not an error. Do not ask for numbers
+  that were never adopted.
+- An archived spec keeps the number it had (`specs/.archive/…/042-foo.md`), so
+  `depends_on` paths pointing at it still resolve.
+
+Numbers are never the dependency order. That is `depends_on`, checked below.
 
 ### Valid effort (error)
 `effort` must be one of: `small`, `medium`, `large`, `xlarge`.
@@ -124,11 +133,10 @@ assumptions about the stale spec may no longer hold. Does not fire for
 receives a `dependency-is-archived` advisory note instead (see below).
 
 ### Track location (warning)
-In **track-directory** repos, track is the path segment after `specs/`; warn if a
-spec sits directly under `specs/` with no track directory, or carries a stale no-op
-`track:` key. In **flat-numbered** repos, track is the `track:` frontmatter field;
-there is no directory to cross-check, so this warning does not apply (a missing
-`track:` on an active spec is the error above, not a warning).
+Where a spec sits in a track directory, warn if it also carries a `track:` key —
+the directory already supplies it and the loader ignores the field. Where a spec
+sits directly under `specs/`, there is no directory to cross-check, so this
+warning does not apply; a missing `track:` there is the error above.
 
 ### dependency-is-archived (warning)
 A live spec whose `depends_on` includes an archived spec. Advisory only —
