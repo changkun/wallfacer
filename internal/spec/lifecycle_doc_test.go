@@ -16,11 +16,17 @@ import (
 // StatusMachine gains a state or an edge.
 func docPath(t *testing.T) string {
 	t.Helper()
+	return filepath.Join(repoRootDir(t), "docs", "internals", "plan-mode.md")
+}
+
+// repoRootDir walks up from this source file to the repository root.
+func repoRootDir(t *testing.T) string {
+	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	return filepath.Join(filepath.Dir(thisFile), "..", "..", "docs", "internals", "plan-mode.md")
+	return filepath.Join(filepath.Dir(thisFile), "..", "..")
 }
 
 func readDoc(t *testing.T) string {

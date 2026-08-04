@@ -43,6 +43,8 @@ var trackDisplayNames = map[string]string{
 	"foundations": "Foundations",
 	"cloud":       "Cloud Platform",
 	"shared":      "Shared Design",
+	"identity":    "Identity",
+	"intent":      "Git Workflow",
 }
 
 // TrackDisplayName returns the human-readable heading for a given track
