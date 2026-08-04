@@ -63,6 +63,7 @@ Shared Design - 5 complete
   ○ Topos as Native Harness (Topos = default; decouple Claude Code default)
   ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
   ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
+  ○ Spec Workflow Plugin (wf-spec-* skills installable via latere-ai marketplace)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -247,6 +248,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [visual-identity/marketing-site.md](shared/visual-identity/marketing-site.md) | **Complete** | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
 | ↳ [visual-identity/theme-system.md](shared/visual-identity/theme-system.md) | **Complete** | Both | Slack-style user-selectable color themes: clay (the original palette) restored as default, indigo/amber/rose/copper as presets in palettes.css via a data-palette axis, typed PaletteName roster in the prefs store, Settings > Appearance picker, Lato as the UI sans. |
 | ↳ [visual-identity/docs-rewrite.md](shared/visual-identity/docs-rewrite.md) | **Complete** | Both | Docs teardown + re-architecture from the shipped surface: new 13-guide IA (agent-graph, mission control, whiteboard, GitHub, device sign-in documented; brainstorm/ideation/Agents+Flows drift removed), internals refresh + 2 new files, single-source nav (generator emits `data/docs.ts` from `usage.md` reading order), CLI usage fix, theme-refreshed screenshots. |
+| [spec-workflow-plugin.md](shared/spec-workflow-plugin.md) | Drafted | Both | Publish the `wf-spec-*` lifecycle skills as a `spec-workflow` plugin under `github.com/latere-ai/claude-plugins`, so the spec-driven workflow installs into any repo instead of being hand-copied. Wallfacer keeps a vendored `.claude/skills/` for harness reach behind a `make skills-check` drift gate; the three server-coupled skills invert to file-first with the transition API as an optional accelerator. |
 
 ### Why these are shared
 
