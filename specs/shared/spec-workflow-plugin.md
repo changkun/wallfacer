@@ -107,7 +107,7 @@ becomes canonical and the vendored copy is a mirror.
 - `make skills-check` diffs the two and exits non-zero on any difference,
   naming the drifted files. Wired into CI.
 
-### 6. Product template convergence
+### 6. Product templates stay a separate surface
 
 The twelve `commands_templates/*.tmpl` prompts and the thirteen skills overlap
 but do not match: no template for `drive`, `implement`, or `housekeeping`; no
@@ -116,9 +116,8 @@ product against "report across all specs" in the skill.
 
 This spec does **not** converge them. The templates stay a deliberately thinner
 surface for in-product chat, where the focused spec is already known and the
-server is always reachable. The name collision on `status` is resolved by
-renaming the product command to `/set-status`, leaving `status` free to mean the
-same thing in both surfaces.
+server is always reachable. The `status` collision is recorded as an open
+question below rather than resolved here.
 
 ## Out of scope
 
@@ -135,11 +134,12 @@ same thing in both surfaces.
   passes when they match.
 - A test asserts every skill directory named in the plugin manifest exists and
   carries frontmatter with `name` and `description`.
-- The existing guard tests keep passing: template status vocabulary against
-  `spec.ValidStatuses()`, plan-mode lifecycle renderings against
-  `spec.StatusMachine`, track display names against `specs/README.md` headings.
-- Renaming `/status` to `/set-status` keeps `commands_test.go`'s registry
-  assertions green with the new name.
+- The existing guard tests keep passing: template and skill status vocabulary
+  against `spec.ValidStatuses()`, skill transition arrows against
+  `spec.StatusMachine`, `wf-spec-drive`'s action list against the
+  `SpecTransition` switch, plan-mode lifecycle renderings against
+  `spec.StatusMachine`, and track display names against `specs/README.md`
+  headings.
 
 ## Open questions
 
@@ -149,3 +149,9 @@ same thing in both surfaces.
 - Should the vendored copy live at `.claude/skills/` (auto-discovered) or be
   installed from a pinned plugin version at container build time? The former is
   simpler and is what this spec assumes.
+- How should the `status` collision be resolved? Three options, none chosen:
+  rename the product command to `/set-status` (touches the plan-mode chat UI,
+  `docs/internals/plan-mode.md`, and every locale); rename the plugin skill to
+  `report` (touches only the plugin); or accept the collision, since the two
+  surfaces are never invoked from the same place. A rename in either direction
+  is user-visible and needs an explicit decision before it is scoped.
