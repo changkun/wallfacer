@@ -1,6 +1,6 @@
 ---
 name: wf-spec-review-impl
-description: Review an implementation against its spec or task. Check that acceptance criteria are met, no unintended changes were made, and tests cover the requirements. Use after implement-spec or after a task completes.
+description: Read-only verdict on whether an implementation meets its spec: each acceptance criterion classified, unintended changes flagged, test coverage checked. Writes nothing; returns COMPLETE, INCOMPLETE, or NEEDS FIXES. Use to judge finished work; use drift to record that judgement on the spec, wrapup to close the spec out.
 argument-hint: <spec-file.md or task-file.md> [commit-range]
 allowed-tools: Read, Grep, Glob, Agent, Bash(git diff *), Bash(git log *), Bash(git show *), Bash(go test *), Bash(ls *)
 ---

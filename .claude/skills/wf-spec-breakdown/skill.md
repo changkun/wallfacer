@@ -1,6 +1,6 @@
 ---
 name: wf-spec-breakdown
-description: Break down a spec into child specs — either design specs (non-leaf, need further iteration) or implementation tasks (leaf, ready to dispatch). Automatically determines breakdown mode from spec lifecycle state, or accepts an explicit override. Use when a spec needs decomposition.
+description: Split one spec into children — sub-design specs when questions are still open, or implementation-ready leaves when the plan is clear. Picks the mode from the spec's lifecycle state unless told otherwise. Writes new spec files and indexes them on the parent. Use when a spec is too large to build in one pass.
 argument-hint: <spec-file.md> [design|tasks]
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(ls *), Bash(mkdir *)
 ---

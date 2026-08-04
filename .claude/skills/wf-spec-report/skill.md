@@ -1,11 +1,11 @@
 ---
-name: wf-spec-status
-description: Report current status across all specs — what's done, in progress, blocked, and what's next. Reads reality (spec files, task files, git history) instead of relying on manually maintained status tables.
+name: wf-spec-report
+description: Survey the whole spec tree: what is complete, in progress, blocked, and actionable next. Reads the spec files, task files, and git history rather than any hand-maintained table. Read-only. Use for "where do things stand"; use validate to check the tree is structurally sound.
 argument-hint: [spec-file.md]
 allowed-tools: Read, Grep, Glob, Agent, Bash(git log *), Bash(ls *)
 ---
 
-# Project Status
+# Spec Tree Report
 
 Generate a live status report by reading specs, task files, and git history.
 If a specific spec is given, report on that spec only. Otherwise, report across

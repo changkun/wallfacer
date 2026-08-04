@@ -1,6 +1,6 @@
 ---
 name: wf-spec-create
-description: Create a new design spec in specs/. Gathers context, explores the codebase, writes the spec with proper frontmatter, and updates specs/README.md. Use when the user says "create a spec", "write a spec", "new spec", or "/spec".
+description: Write a new spec from scratch when none exists for the idea yet. Gathers context, explores the codebase, fills the frontmatter, and indexes it in specs/README.md. Use when the user says "create a spec", "write a spec", or "new spec". When a spec already exists but is out of date, use refine instead.
 argument-hint: <track/name> [one-line description...]
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(ls *), Bash(mkdir *), Bash(git log *), Bash(git diff *)

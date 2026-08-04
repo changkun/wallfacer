@@ -45,42 +45,57 @@ spec addresses the distribution problem that produced them.
 
 ### 1. Marketplace repository
 
-Create `github.com/latere-ai/claude-plugins` as a marketplace hosting one or
-more plugins. The spec workflow ships as the first, named `spec-workflow`.
+`github.com/latere-ai/claude-plugins` is a public marketplace hosting one or
+more plugins. The spec workflow ships as the first, named `spec`.
 
 ```
 claude-plugins/
   .claude-plugin/marketplace.json     # name, owner, plugins[] with source paths
-  plugins/spec-workflow/
+  plugins/spec/
     .claude-plugin/plugin.json        # name, version, description, author
     skills/<name>/SKILL.md            # one directory per skill
     README.md
     LICENSE
+  scripts/validate.py                 # manifests vs skill frontmatter, in CI
 ```
 
 Installation is two steps:
 
 ```
 /plugin marketplace add latere-ai/claude-plugins
-/plugin install spec-workflow@latere-ai
+/plugin install spec@latere-ai
 ```
 
 ### 2. Command naming
 
 Plugin skills are namespaced by their plugin, so `wf-spec-create` becomes
-`spec-workflow:create`. Drop the `wf-spec-` prefix from every skill directory;
-the namespace carries it.
+`spec:create`. Drop the `wf-spec-` prefix from every skill directory; the
+namespace carries it.
+
+Two skills are renamed on the way out, because their names collided with
+meanings a reader already has:
+
+| Was | Now | Why |
+| --- | --- | --- |
+| `diff` | `drift` | The skill does not show a diff; it classifies how far an implementation diverged from its spec |
+| `status` | `report` | `status` is the frontmatter field, and read as "this spec's status" when the skill surveys the whole tree |
+
+Descriptions lead with what separates a skill from its neighbours rather than
+with mechanics, since the description is all a model sees when routing. The
+after-implementation trio needed it most: `review-impl` is read-only and returns
+a verdict, `drift` writes that verdict onto the spec, `wrapup` closes the spec
+out.
 
 ### 3. Server coupling
 
-Ten of the thirteen skills are pure markdown, git, and frontmatter operations
+Eleven of the fourteen skills are pure markdown, git, and frontmatter operations
 and port unchanged. Three reach for wallfacer's HTTP API:
 
 | Skill | Endpoint |
 | --- | --- |
 | `dispatch` | `POST /api/specs/transition`, `POST /api/tasks` |
 | `drive` | `POST /api/specs/transition`, `GET /api/tasks/{id}` |
-| `diff` | `GET /api/tasks/{id}/diff` |
+| `drift` | `GET /api/tasks/{id}/diff` |
 
 All three already document a server-unreachable fallback. Invert the framing so
 the file-only path is the documented default and the transition API is an
@@ -97,43 +112,56 @@ document model, the status vocabulary, and the transition action list.
 
 ### 5. Vendoring and the drift check
 
-Wallfacer keeps `.claude/skills/` committed: the Claude harness runs
-`claude -p` in containers where no user-level plugin is installed, and dropping
-the committed copy would strip dispatched tasks of the workflow. Upstream
-becomes canonical and the vendored copy is a mirror.
+Wallfacer keeps `.claude/skills/` committed. The Claude harness runs `claude -p`
+in containers where no user-level plugin is installed, so dropping the committed
+copy would strip dispatched tasks of the workflow. Declaring the marketplace in
+project settings does not help: a `.claude/settings.json` carrying
+`extraKnownMarketplaces` + `enabledPlugins` was tested against `claude -p` and
+the marketplace was never fetched, with the plugin's skills absent from the
+session. Upstream is canonical; the vendored copy is a mirror.
 
-- `make skills-sync` pulls the upstream plugin's `skills/` into
-  `.claude/skills/`, rewriting names to the vendored convention.
-- `make skills-check` diffs the two and exits non-zero on any difference,
-  naming the drifted files. Wired into CI.
+The two conventions differ only in naming — unprefixed plugin skills invoked as
+`/spec:create` against prefixed project skills invoked as `/wf-spec-create` —
+and the rewrite is deterministic in both directions, so edits are legal in
+either place:
+
+- `make skills-pull` adopts upstream here, pruning vendored skills upstream no
+  longer carries.
+- `make skills-push` promotes edits made here into `../claude-plugins`.
+- `make skills-check` diffs both directions and exits non-zero on drift. Wired
+  into CI, where it shallow-clones upstream when no sibling checkout exists.
+
+`wf-spec-housekeeping` is deliberately not vendored: it only applies to
+flat-numbered trees.
 
 ### 6. Product templates stay a separate surface
 
-The twelve `commands_templates/*.tmpl` prompts and the thirteen skills overlap
+The twelve `commands_templates/*.tmpl` prompts and the fourteen skills overlap
 but do not match: no template for `drive`, `implement`, or `housekeeping`; no
 skill for `summarize`; and `/status` means "set this spec's status" in the
 product against "report across all specs" in the skill.
 
 This spec does **not** converge them. The templates stay a deliberately thinner
 surface for in-product chat, where the focused spec is already known and the
-server is always reachable. The `status` collision is recorded as an open
-question below rather than resolved here.
+server is always reachable. The `status` collision is resolved from the plugin
+side by the rename in section 2, so nothing in the product had to move.
 
 ## Out of scope
 
 - Publishing any other skill (`prose-style`, `deep-tech-book`, `check-docs`) as
   a plugin. The marketplace layout leaves room; adding them is separate work.
-- `wf-spec-housekeeping`, which only applies to flat-numbered spec trees and is
-  currently global-only. It ships with the plugin but wallfacer does not vendor
-  it.
+- `wf-spec-housekeeping`, which only applies to flat-numbered spec trees. It
+  ships with the plugin but wallfacer does not vendor it.
 - Changing the lifecycle state machine or the transition API.
 
 ## Tests
 
 - `make skills-check` fails when a vendored skill differs from upstream and
-  passes when they match.
-- A test asserts every skill directory named in the plugin manifest exists and
-  carries frontmatter with `name` and `description`.
+  passes when they match, in both directions and with no sibling clone present.
+- Upstream CI (`scripts/validate.py`) fails on a plugin Claude Code would
+  silently ignore: a skill whose frontmatter `name` does not match its
+  directory, a marketplace entry with no manifest, a version the two disagree
+  on, or a description too thin to route on.
 - The existing guard tests keep passing: template and skill status vocabulary
   against `spec.ValidStatuses()`, skill transition arrows against
   `spec.StatusMachine`, `wf-spec-drive`'s action list against the
@@ -143,15 +171,9 @@ question below rather than resolved here.
 
 ## Open questions
 
-- Does the marketplace repository need to be public for `/plugin marketplace
-  add latere-ai/claude-plugins` to resolve, or is a private repo reachable
-  through the user's GitHub auth?
-- Should the vendored copy live at `.claude/skills/` (auto-discovered) or be
-  installed from a pinned plugin version at container build time? The former is
-  simpler and is what this spec assumes.
-- How should the `status` collision be resolved? Three options, none chosen:
-  rename the product command to `/set-status` (touches the plan-mode chat UI,
-  `docs/internals/plan-mode.md`, and every locale); rename the plugin skill to
-  `report` (touches only the plugin); or accept the collision, since the two
-  surfaces are never invoked from the same place. A rename in either direction
-  is user-visible and needs an explicit decision before it is scoped.
+- Should the vendored copy stay a mirror at `.claude/skills/`, or be installed
+  from a pinned plugin version at container build time once Claude Code can do
+  that headlessly? The mirror is what shipped.
+- Should the plugin carry the other repo-agnostic skills (`prose-style`,
+  `deep-tech-book`, `check-docs`) as siblings under the same marketplace, or do
+  those want a marketplace of their own?

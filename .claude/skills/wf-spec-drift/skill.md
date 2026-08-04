@@ -1,11 +1,11 @@
 ---
-name: wf-spec-diff
-description: Compare a completed task's implementation against its source spec. Produces a structured divergence report — which acceptance criteria were satisfied, which diverged, and what was implemented but unspecified. Appends an Outcome section to the spec. Use after a dispatched task completes.
+name: wf-spec-drift
+description: Classify how far what shipped diverged from what was specced, and record it on the spec: every item marked satisfied, diverged, not implemented, or superseded, unspecified work called out, and an Outcome section appended. Writes to the spec and may mark it stale. Use after an implementation lands and the spec should carry the verdict.
 argument-hint: <spec-file.md> [commit-range]
 allowed-tools: Read, Grep, Glob, Agent, Bash(git diff *), Bash(git log *), Bash(git show *), Bash(go test *), Bash(ls *)
 ---
 
-# Spec-Implementation Diff
+# Spec-Implementation Drift
 
 Compare what a dispatched task actually built against what the spec asked for.
 This is the non-deterministic layer 2 of the task completion feedback loop —

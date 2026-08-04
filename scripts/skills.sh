@@ -102,6 +102,14 @@ for dst in "$vendored"/wf-spec-*/skill.md; do
 		mkdir -p "$(dirname "$src")"
 		to_upstream <"$dst" >"$src"
 		;;
+	pull)
+		# Upstream is canonical, so a vendored skill it no longer carries
+		# is a leftover from a rename or removal. Prune it loudly.
+		if [[ ! -f $src ]]; then
+			echo "removing wf-spec-$name (no longer upstream)"
+			rm -rf "$(dirname "$dst")"
+		fi
+		;;
 	check)
 		[[ -f $src ]] || report "vendored skill has no upstream: wf-spec-$name"
 		;;

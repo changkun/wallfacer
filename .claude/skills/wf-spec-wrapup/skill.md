@@ -1,6 +1,6 @@
 ---
 name: wf-spec-wrapup
-description: Finalize a completed spec — works for both a dispatched spec (verify all child tasks are done, synthesize from task notes) and a directly-implemented spec (no task files; reconstruct from git history of the affects files). Updates the spec with an Outcome section, flips status to complete, updates specs/README.md, and commits. Use when a spec's work is done and it needs its completion write-up.
+description: Close out a finished spec: write the Outcome section, move the status through the testing gate to complete, update specs/README.md, and commit. Reconstructs from task notes or from git history. Writes and commits. Use when the work is genuinely done; use drift when the point is to record divergence rather than to finish.
 argument-hint: <spec-file>
 user-invocable: true
 ---
@@ -46,7 +46,7 @@ Read the parent spec file and update it to match the completed-spec style:
 ### 2a. Run the divergence analysis (the shared engine)
 
 Before writing the Outcome, run the divergence analysis defined by
-`/wf-spec-diff` (its Steps 2–5) as wrap-up's analysis engine — do not eyeball the
+`/wf-spec-drift` (its Steps 2–5) as wrap-up's analysis engine — do not eyeball the
 diff. This is the single place that classification logic lives; wrap-up composes
 the Outcome from it, so the two skills never write the section twice.
 
@@ -60,14 +60,14 @@ the Outcome from it, so the two skills never write the section twice.
    improvement / scope creep), and compute the **drift level** (Minimal /
    Moderate / Significant) and satisfaction rate.
 
-If you are running `/wf-spec-diff` standalone (not via wrap-up), it writes the
+If you are running `/wf-spec-drift` standalone (not via wrap-up), it writes the
 Outcome itself; here, wrap-up owns the write (2b).
 
 ### 2b. Write the single Outcome section
 
 Insert one `## Outcome` section before any "Future Work" or "Phase N (Future)"
 sections. This is the canonical completion record — both `/wf-spec-implement`
-(which delegates here) and `/wf-spec-diff` (whose analysis 2a just consumed) feed
+(which delegates here) and `/wf-spec-drift` (whose analysis 2a just consumed) feed
 this one section, replacing the older split between "Outcome", per-task
 "Implementation notes", and diff's separate drift report. It contains:
 

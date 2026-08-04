@@ -1,6 +1,6 @@
 ---
 name: wf-spec-refine
-description: Refine a spec markdown file by removing already-completed items and updating remaining items to reflect the current project state. Optionally accepts feedback after the file path to guide specific changes (e.g., rewrite scope, change priorities, add/remove items). Use when a spec has drifted from reality and needs to be brought up to date.
+description: Rewrite an existing spec so it matches what the codebase does now: drop shipped items, update partially-done ones, fix stale paths and names, remove obsolete scope. Takes optional feedback after the path to steer the rewrite. Use when a spec no longer describes reality; use create when there is no spec yet.
 argument-hint: <spec-file.md> [feedback...]
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(git log *), Bash(git show *), Bash(git diff *), Bash(ls *)
 ---

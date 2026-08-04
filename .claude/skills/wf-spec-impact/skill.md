@@ -1,6 +1,6 @@
 ---
 name: wf-spec-impact
-description: Analyze what existing code and specs a proposed change will affect. Use before implementing a spec to understand blast radius, identify risks, and find specs that need updating.
+description: Blast radius of a change before it is made: which code and which other specs a proposed spec would touch, and which specs need updating as a consequence. Read-only. Use before implementing or breaking down, to size the work and surface hidden dependents.
 argument-hint: <spec-file.md>
 allowed-tools: Read, Grep, Glob, Agent, Bash(git log *), Bash(ls *)
 ---

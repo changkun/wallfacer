@@ -1,6 +1,6 @@
 ---
 name: wf-spec-drive
-description: Drive a spec through the spec-coordination lifecycle toward a target state, advancing the legal next transition(s) and reporting the new state each turn. Designed to run under a `/goal` so it continues autonomously across turns until the spec reaches the target (or a gate needs you). Pauses for confirmation at irreversible / outward-facing gates (dispatch to the board, archive, stale fan-out). Use when the user says "drive this spec to done", "take this spec through the lifecycle", or sets a goal to complete a spec.
+description: Run the whole lifecycle for one spec, calling the other skills in order and advancing one legal transition at a time until it reaches a target state (default complete), stopping to ask at irreversible gates. Use when the user wants a spec taken from wherever it is to done rather than running each step by hand — and start here when unsure which single-spec skill applies.
 argument-hint: <spec-file> [target-status=complete]
 user-invocable: true
 ---

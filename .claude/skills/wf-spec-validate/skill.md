@@ -1,6 +1,6 @@
 ---
 name: wf-spec-validate
-description: Validate all specs against the document model rules — check required frontmatter fields, valid status/effort values, track location (path-derived), DAG acyclicity, dispatch consistency, orphan detection, and status consistency. Use to catch structural issues across the spec tree.
+description: Structural lint over the spec tree — required frontmatter fields, valid status and effort values, track location, DAG acyclicity, dispatch consistency, orphans, status consistency. Read-only; reports problems and fixes nothing. Use to check the tree is well-formed; use report for what the specs say about progress.
 argument-hint: [spec-file.md]
 allowed-tools: Read, Grep, Glob, Bash(ls *)
 ---

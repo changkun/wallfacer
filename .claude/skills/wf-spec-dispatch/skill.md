@@ -1,6 +1,6 @@
 ---
 name: wf-spec-dispatch
-description: Dispatch a validated spec for execution. Validates prerequisites, resolves dependency wiring, and records the dispatch on the spec; where a task board with a transition API is present, creates the task and links it atomically. Also supports undispatching. Use when a spec is ready to be built.
+description: Mark a validated spec ready to build and resolve its dependency wiring; where a task board with a transition API is present, create the linked task atomically. Also undispatches. Use when a design is settled and work should start — the spec must be validated and its dependencies complete.
 argument-hint: <spec-file.md> [undispatch]
 allowed-tools: Read, Grep, Glob, Edit, Agent, Bash(ls *), Bash(curl *)
 ---

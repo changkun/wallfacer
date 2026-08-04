@@ -1,6 +1,6 @@
 ---
 name: wf-spec-implement
-description: Implement a design spec from specs/ — reads the spec, plans the work, implements each item with tests and docs, commits, then finalizes (full implementation delegates to wrap-up; partial implementation records running notes). Use when the user says "implement spec", "build spec", or references a spec file to implement.
+description: Build a spec: plan the work, implement each item with tests and docs, commit, then finalize. The only skill here that writes production code. Use when the user says "implement spec" or "build spec", or names a spec file to build.
 argument-hint: <spec-file> [items to focus on...]
 user-invocable: true
 ---
