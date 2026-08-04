@@ -7,8 +7,9 @@ allowed-tools: Read, Grep, Glob, Bash(ls *)
 
 # Validate Specs
 
-Run structural validation on spec documents as defined in
-`specs/local/spec-document-model.md`. If a specific spec file is given as
+Run structural validation on spec documents against the repo's document model
+(in wallfacer: `docs/internals/plan-mode.md`, sections "Document Model" and
+"Lifecycle State Machine"). If a specific spec file is given as
 `$ARGUMENTS`, validate only that spec (and run cross-spec checks it
 participates in). Otherwise, validate the entire spec tree.
 
@@ -36,8 +37,8 @@ For each spec, check these rules. Classify each finding as `error` or
 
 ### Required fields (error)
 `title`, `status`, `effort`, `created`, `updated`, `author` must all be present in
-the frontmatter. Report each missing field. (`track` is **not** a frontmatter
-field — in the model it is `yaml:"-"`, derived from the path; see Valid track.)
+the frontmatter. Report each missing field. (`track` may be a frontmatter field or
+derived from the path, depending on the repo's layout; see Valid track.)
 
 ### Valid status (error)
 `status` must be one of: `vague`, `drafted`, `validated`, `testing`, `complete`,
@@ -48,14 +49,22 @@ is the transient drift-verdict state between `validated` and `complete`; a spec 
 fields `implementation_commit` (`base..tip`, present during `testing`) and
 `testing_pending` (a reason string when the drift tester failed); both are valid.
 
-### Valid track (location, error)
-`track` is **derived from the path**, not a frontmatter field (the model marks it
-`yaml:"-"`): a spec at `specs/foundations/foo.md` is in track `foundations` (the
-segment immediately after `specs/`). So there is no `track:` value to cross-check —
-instead validate the *location*: every spec must live under a non-empty track
-directory (`specs/<track>/...`); flag any spec directly under `specs/` (no track
-segment) as an error. If a spec still carries a stale `track:` key in its
-frontmatter, flag it as a removable no-op (the loader ignores it).
+### Valid track (error)
+A repo uses one of two layouts; detect which from how its specs are laid out:
+
+- **Track-directory layout** (e.g. `specs/<track>/foo.md`): `track` is derived
+  from the path — the segment immediately after `specs/`. Every spec must live
+  under a non-empty track directory; flag any spec directly under `specs/` (no
+  track segment and no `track:` frontmatter) as an error. A stray `track:` key that
+  merely restates the directory is a removable no-op.
+- **Flat-numbered layout** (e.g. `specs/042-foo.md`, archived under
+  `specs/.archive/042-foo.md`): specs are flat files `NNN-name.md` and `track` is
+  the `track:` **frontmatter field**. Here a spec directly under `specs/` is valid;
+  instead flag a missing `track:` field on an active (non-`.archive/`) spec as an
+  error, and warn if the `NNN` prefix is missing or duplicated.
+
+Pick the layout from the majority of specs (numbered flat files ⇒ flat-numbered).
+Do not flag a flat-numbered repo's specs for "no track directory".
 
 ### Valid effort (error)
 `effort` must be one of: `small`, `medium`, `large`, `xlarge`.
@@ -115,10 +124,11 @@ assumptions about the stale spec may no longer hold. Does not fire for
 receives a `dependency-is-archived` advisory note instead (see below).
 
 ### Track location (warning)
-Track is the path segment after `specs/`, not a frontmatter value, so there is
-nothing to cross-check between a field and the path. Warn only if a spec sits
-directly under `specs/` with no track directory, or still carries a stale
-no-op `track:` key in its frontmatter.
+In **track-directory** repos, track is the path segment after `specs/`; warn if a
+spec sits directly under `specs/` with no track directory, or carries a stale no-op
+`track:` key. In **flat-numbered** repos, track is the `track:` frontmatter field;
+there is no directory to cross-check, so this warning does not apply (a missing
+`track:` on an active spec is the error above, not a warning).
 
 ### dependency-is-archived (warning)
 A live spec whose `depends_on` includes an archived spec. Advisory only —
@@ -142,9 +152,9 @@ Warnings: N
 
 ### Errors
 
-#### specs/foundations/sandbox-backends.md
+#### specs/shared/sandbox-backends.md
 - [error] Missing required field: author
-- [error] depends_on target does not exist: specs/foundations/nonexistent.md
+- [error] depends_on target does not exist: specs/shared/nonexistent.md
 
 #### specs/local/foo.md
 - [error] Invalid status: "wip" (must be vague|drafted|validated|testing|complete|stale|archived)
@@ -160,8 +170,8 @@ Warnings: N
 - [warning] Body is empty for a "drafted" spec
 
 ### Cross-Spec Warnings
-- [warning] Orphan directory: specs/foundations/old-feature/ has no parent spec
-- [warning] Stale propagation: specs/foundations/api.md is stale, but
+- [warning] Orphan directory: specs/shared/old-feature/ has no parent spec
+- [warning] Stale propagation: specs/shared/api.md is stale, but
   specs/local/client.md (validated) depends on it
 
 ### Verdict: PASS / N errors, M warnings
@@ -178,5 +188,5 @@ count. Warnings alone do not cause a failure.
   it, cycle detection through it).
 - Specs without YAML frontmatter are reported as having all required fields
   missing — they may be legacy specs that predate the document model.
-- The validation rules match those defined in the "Spec Validation" section of
-  `specs/local/spec-document-model.md`.
+- The validation rules mirror the checks in `internal/spec` (see
+  `docs/internals/plan-mode.md`, section "Validation").

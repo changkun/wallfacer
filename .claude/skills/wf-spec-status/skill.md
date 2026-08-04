@@ -19,10 +19,13 @@ Otherwise, report on the full project.
 ## Step 1: Discover specs and tasks
 
 1. Glob for all spec files recursively: `specs/**/*.md` (excluding README.md).
-   Specs are organized by track: `specs/foundations/`, `specs/local/`,
-   `specs/cloud/`, `specs/shared/`.
+   Specs are grouped by **track** — either a directory under `specs/` (e.g.
+   `specs/<track>/`) or, in flat-numbered repos, the `track:` frontmatter field
+   on flat `specs/NNN-name.md` files. Take the track set from what is on disk,
+   never from a list memorized here or in an earlier run.
 2. For each spec, **parse YAML frontmatter** to extract `title`, `status`,
-   `depends_on`, `affects`, `effort`, `dispatched_task_id`.
+   `depends_on`, `affects`, `effort`, `dispatched_task_id`, and `track` (if the
+   repo uses the flat-numbered layout).
 3. Determine parent-child relationships from the filesystem: a spec at
    `specs/<track>/foo.md` with a directory `specs/<track>/foo/` is a non-leaf
    spec; its children are the specs inside that directory.
@@ -112,21 +115,19 @@ Affects: <list of code paths from frontmatter>
 
 ### For the full project:
 
-Group specs by track (foundations, local, cloud, shared), then by lifecycle
-state within each track:
+Group specs by the tracks discovered in Step 1 — one section per live track, in
+the order `specs/README.md` presents them — then by lifecycle state within each
+track:
 
 ```
 ## Project Status
 
-### foundations
+### <track>
 - <spec-name> (complete) — <one-line summary>
 - <spec-name> (validated, 3/5 leaves done) — <progress note>
 
-### local
+### <next track>
 - <spec-name> (drafted) — <one-line summary>
-
-### cloud
-- <spec-name> (vague) — <one-line summary>
 
 ### Actionable (ready to implement)
 - <spec-name> — validated, all depends_on complete, <has/needs> child breakdown

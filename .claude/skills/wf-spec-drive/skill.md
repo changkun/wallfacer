@@ -50,8 +50,9 @@ Server-automatic vs. agent-initiated:
 Prefer the **server transition API** (authoritative — it validates the edge,
 runs drift / stale fan-out, and commits): `POST /api/specs/transition` with
 `{ "action": "<action>", "path": "<workspace-relative spec path>" }`. Actions:
-`dispatch`, `undispatch`, `validate`, `stale`, `dismiss-stale`, `force-complete`,
-`archive`, `unarchive`. `wf-spec-dispatch` already uses this.
+`dispatch`, `undispatch`, `archive`, `unarchive`, `validate`, `stale`,
+`unstale`, `dismiss-stale`, `force-complete`, `migrate` (the switch in
+`internal/handler/specs_dispatch.go`). `wf-spec-dispatch` already uses this.
 
 If the server is **not reachable**, fall back to editing the spec's `status`
 frontmatter directly — but only along a **legal edge** above, and commit it like

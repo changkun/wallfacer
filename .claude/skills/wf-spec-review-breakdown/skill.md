@@ -14,7 +14,7 @@ implementation. Catch structural issues that would cause failures mid-execution.
 
 Extract the spec file path or task folder from the first token. If given a spec
 file, locate its child spec directory (sibling directory with matching name,
-e.g., `specs/foundations/sandbox-backends/` for `sandbox-backends.md`). If given
+e.g., `specs/shared/visual-identity/` for `visual-identity.md`). If given
 a directory, locate the parent spec (the `.md` file in the containing directory
 whose name matches the directory).
 

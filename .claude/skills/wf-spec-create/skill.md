@@ -15,27 +15,35 @@ Create a new design spec in `specs/` following the spec document model.
 $ARGUMENTS has the form: `<track/name> [description...]`
 
 - The **first token** is the spec location: `<track>/<name>` where `<track>` is
-  one of the directories under `specs/` (e.g., `local`, `cloud`, `shared`,
-  `foundations`) and `<name>` is the kebab-case spec name without `.md`.
-  Examples: `local/live-serve`, `shared/sandbox-hooks`, `cloud/tenant-api`.
-- If only a name is given without a track, ask the user which track it belongs
-  to. Explain the tracks briefly:
-  - `foundations` — abstraction interfaces that all tracks build on
-  - `local` — desktop experience and developer workflow (single-user)
-  - `cloud` — cloud platform and multi-tenant deployment
-  - `shared` — cross-track specs used by both local and cloud
+  one of the tracks this repo actually uses and `<name>` is the kebab-case spec
+  name without `.md`. Example: `local/live-serve`.
+- Never assume a fixed track list — tracks come and go. Read the live set with
+  `ls specs/` (track-directory repos) or from the `track:` frontmatter values in
+  use (flat-numbered repos), and take each track's meaning from its section
+  heading and intro in `specs/README.md`.
+- If only a name is given without a track, list the live tracks with those
+  one-line meanings and ask the user which one it belongs to.
 - Everything after the first token is a **description** — a short explanation
   of what the spec should cover. If no description is provided, ask the user
   what the spec should address.
 
-Derive the output file path: `specs/<track>/<name>.md`.
+Derive the output file path from the repo's layout (check `specs/README.md` and
+how existing specs are laid out):
+- **Track-directory** repos: `specs/<track>/<name>.md`.
+- **Flat-numbered** repos (specs are `specs/NNN-name.md`): `specs/<NNN>-<name>.md`
+  where `<NNN>` is the next implementation-order position (usually the current max
+  + 1, zero-padded to 3 digits), and record the track as a `track:` **frontmatter
+  field** instead of a directory.
 
 ## Step 1: Read context
 
 1. Read `specs/README.md` to understand the track organization, dependency
    graph, and what already exists.
-2. Read `specs/local/spec-coordination/spec-document-model.md` (first 80 lines)
-   to review the frontmatter schema and spec conventions.
+2. Review the frontmatter schema and spec conventions. Where they are written
+   down varies by repo — look for a document-model spec under `specs/`, or the
+   internals doc that describes the spec package (in wallfacer:
+   `docs/internals/plan-mode.md`, sections "Document Model" and "Lifecycle
+   State Machine"). If neither exists, infer the schema from a recent spec.
 3. Grep spec files for any existing specs that overlap with the proposed topic
    — check by name and by `affects` paths. If a closely related spec exists,
    warn the user and ask whether to proceed, merge, or abort.
@@ -69,7 +77,8 @@ impact). Flag these to the user but do NOT modify them.
 
 ## Step 4: Write the spec
 
-Create the spec file at `specs/<track>/<name>.md` with this structure:
+Create the spec file at the path derived in Step 0 with this structure (in a
+flat-numbered repo, add a `track: <track>` line under `status:`):
 
 ````markdown
 ---
@@ -165,7 +174,9 @@ packages. Identify:>
 
 1. Read `specs/README.md`.
 2. Add the new spec to the appropriate track table, maintaining alphabetical
-   order within the table. Use the format:
+   order within the table. Use the format (link path follows the repo layout —
+   `<track>/<name>.md` for track-directory repos, `<NNN>-<name>.md` for
+   flat-numbered repos):
    ```
    | [<name>.md](<track>/<name>.md) | Not started | <one-line deliverable> |
    ```
