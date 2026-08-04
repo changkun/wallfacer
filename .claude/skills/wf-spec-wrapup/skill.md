@@ -95,7 +95,7 @@ this one section, replacing the older split between "Outcome", per-task
 
 ### 2c. Transition status through the `testing` gate (drift-aware)
 
-The lifecycle (`internal/spec/lifecycle.go`) forbids `validated → complete`
+The lifecycle forbids `validated → complete`
 directly: a spec reaches `complete` only via `testing`, where the drift verdict is
 rendered. The drift analysis from 2a **is** that verdict. Honor the gate; never
 hand-write `complete` onto a `validated` spec. Always set `updated: <today>` and

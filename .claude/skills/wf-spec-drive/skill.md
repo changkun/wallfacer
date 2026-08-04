@@ -18,7 +18,7 @@ and (b) end by stating the spec's current `status` in your message, so the
 evaluator can judge whether the goal is met. Do not try to finish everything in one
 turn — finish what's legal now, report status, and let the loop continue.
 
-## The canonical lifecycle (authoritative: `internal/spec/lifecycle.go`)
+## The canonical lifecycle
 
 Seven states. **`status` is the single source of truth; transitions must follow
 the legal edges below — there is no `implemented`/`in_progress` state, and
@@ -47,16 +47,20 @@ Server-automatic vs. agent-initiated:
 
 ## How status changes (hybrid)
 
-Prefer the **server transition API** (authoritative — it validates the edge,
-runs drift / stale fan-out, and commits): `POST /api/specs/transition` with
+By default there is no server: advance the status by editing the spec's
+frontmatter along a legal edge and committing it, exactly as the other skills
+do.
+
+Where a transition API is present (wallfacer is the reference implementation),
+prefer it — it is authoritative, validates the edge, runs drift / stale
+fan-out, and commits: `POST /api/specs/transition` with
 `{ "action": "<action>", "path": "<workspace-relative spec path>" }`. Actions:
 `dispatch`, `undispatch`, `archive`, `unarchive`, `validate`, `stale`,
 `unstale`, `dismiss-stale`, `force-complete`, `migrate` (the switch in
-`internal/handler/specs_dispatch.go`). `wf-spec-dispatch` already uses this.
+the server's action switch). `wf-spec-dispatch` already uses this.
 
-If the server is **not reachable**, fall back to editing the spec's `status`
-frontmatter directly — but only along a **legal edge** above, and commit it like
-the other skills do. Never write an illegal jump (e.g. `validated → complete`).
+Whether you edit frontmatter or call the API, only ever move along a **legal
+edge** above. Never write an illegal jump (e.g. `validated → complete`).
 
 Note there is no API action to enter `testing` or to `complete` from `validated`
 directly; the server enters `testing` on task-done, and `force-complete` only does
@@ -68,7 +72,7 @@ directly; the server enters `testing` on task-done, and `force-complete` only do
 1. Read the spec's frontmatter: `status`, `dispatched_task_id`, `depends_on`,
    `affects`, and whether it has a child-spec directory (non-leaf).
 2. If `dispatched_task_id` is set, check the linked task's status (done /
-   in_progress / failed) — `GET /api/tasks/{id}` or the board.
+   in_progress / failed) — `GET /api/tasks/{id}` or the board, where one exists.
 3. Establish the **target** (arg 2, default `complete`) and confirm the spec is
    not already there or past it.
 

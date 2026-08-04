@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go fmt-check hooks lint lint-go lint-js lint-otel test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go fmt-check hooks lint lint-go lint-js lint-otel test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push
 
 # Full build gate: fmt + frontend assets + lint + binary.
 build: fmt frontend-build lint build-binary
@@ -126,6 +126,22 @@ endif
 #   SKIP_BUILD=1 make ui-test
 ui-test:
 	sh frontend/scripts/ui-shots/ui-test.sh
+
+# The wf-spec-* skills in .claude/skills/ are a mirror of the `spec` plugin in
+# latere-ai/claude-plugins. They stay committed because the Claude harness runs
+# `claude -p`, which auto-discovers .claude/skills/ but does not install
+# plugins. Upstream is canonical; edits are legal in either place.
+#   make skills-check   fail on any difference (CI gate)
+#   make skills-pull    adopt upstream changes here
+#   make skills-push    promote local edits into ../claude-plugins
+skills-check:
+	./scripts/skills.sh check
+
+skills-pull:
+	./scripts/skills.sh pull
+
+skills-push:
+	./scripts/skills.sh push
 
 # ---- wallfacerd (wf.latere.ai) ----
 

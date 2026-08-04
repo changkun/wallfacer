@@ -47,7 +47,8 @@ $ARGUMENTS has the form: `<spec-file.md> [commit-range]`
 1. If a commit range was provided, use it directly.
 2. Otherwise, infer the range: find commits associated with the dispatched task.
    Look for the task UUID in commit messages, or use the task's worktree diff
-   via `GET /api/tasks/{id}/diff`.
+   via `GET /api/tasks/{id}/diff` where a task board exposes one; otherwise
+   from git history over the spec's `affects` paths.
 3. Get the diff: `git diff <range> --stat` for file list, `git diff <range>`
    for full changes.
 4. Get commit messages: `git log <range> --oneline`.
@@ -149,8 +150,8 @@ When writing a fresh Outcome standalone, append it before any "Future Work" or
 
 Update the spec's status — honoring the lifecycle gate (`validated → complete` is
 illegal; `complete` is reached only through `testing`) and the hybrid rule (prefer
-the `POST /api/specs/transition` API, which validates the edge; else legal-edge
-YAML). A dispatched task reaching `done` means the **server** already moved the
+a transition API where the repo has one, since it validates the edge; otherwise
+a legal-edge frontmatter edit). A dispatched task reaching `done` means the **server** already moved the
 spec along `validated → testing → complete/stale`, so usually you are only
 recording the verdict, not setting the status:
 

@@ -8,8 +8,8 @@ allowed-tools: Read, Grep, Glob, Bash(ls *)
 # Validate Specs
 
 Run structural validation on spec documents against the repo's document model
-(in wallfacer: `docs/internals/plan-mode.md`, sections "Document Model" and
-"Lifecycle State Machine"). If a specific spec file is given as
+— a document-model spec under `specs/`, an internals doc describing how specs
+are parsed, or, failing both, the conventions below. If a specific spec file is given as
 `$ARGUMENTS`, validate only that spec (and run cross-spec checks it
 participates in). Otherwise, validate the entire spec tree.
 
@@ -42,7 +42,7 @@ derived from the path, depending on the repo's layout; see Valid track.)
 
 ### Valid status (error)
 `status` must be one of: `vague`, `drafted`, `validated`, `testing`, `complete`,
-`stale`, `archived` (the seven states in `internal/spec/lifecycle.go`). `testing`
+`stale`, `archived` — the seven lifecycle states. `testing`
 is the transient drift-verdict state between `validated` and `complete`; a spec in
 `testing` is valid (not an error), though a long-lived `testing` carrying a
 `testing_pending` reason is worth a warning. The server may also set the optional
@@ -188,5 +188,5 @@ count. Warnings alone do not cause a failure.
   it, cycle detection through it).
 - Specs without YAML frontmatter are reported as having all required fields
   missing — they may be legacy specs that predate the document model.
-- The validation rules mirror the checks in `internal/spec` (see
-  `docs/internals/plan-mode.md`, section "Validation").
+- When the repo implements its own spec validator, these rules mirror it.
+  Report a disagreement rather than silently preferring one side.

@@ -39,6 +39,9 @@ jobs:
       - name: Lint UTF-8 truncation guardrail
         run: make lint-truncate
 
+      - name: Skills match latere-ai/claude-plugins
+        run: make skills-check
+
       - name: Test
         run: go test -v -race -timeout 20m ./...
         working-directory: .

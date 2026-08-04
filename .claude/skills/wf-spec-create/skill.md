@@ -40,10 +40,9 @@ how existing specs are laid out):
 1. Read `specs/README.md` to understand the track organization, dependency
    graph, and what already exists.
 2. Review the frontmatter schema and spec conventions. Where they are written
-   down varies by repo — look for a document-model spec under `specs/`, or the
-   internals doc that describes the spec package (in wallfacer:
-   `docs/internals/plan-mode.md`, sections "Document Model" and "Lifecycle
-   State Machine"). If neither exists, infer the schema from a recent spec.
+   down varies by repo — look for a document-model spec under `specs/`, or an
+   internals doc describing how specs are parsed. If neither exists, infer the
+   schema from the most recently updated spec in the tree.
 3. Grep spec files for any existing specs that overlap with the proposed topic
    — check by name and by `affects` paths. If a closely related spec exists,
    warn the user and ask whether to proceed, merge, or abort.
