@@ -47,7 +47,7 @@ Plan Mode layers strictly on top of the task board. The agent-session sandbox wr
 ```go
 type Spec struct {
     Title            string
-    Status           Status    // vague | drafted | validated | complete | stale | archived
+    Status           Status    // vague | drafted | validated | testing | complete | stale | archived
     DependsOn        []string
     Affects          []string
     Effort           Effort    // small | medium | large | xlarge
@@ -55,14 +55,20 @@ type Spec struct {
     Author           string
     DispatchedTaskID *string
 
+    // Set while a spec sits in testing, cleared when the verdict lands.
+    ImplementationCommit *string  // the task's base..tip commit range
+    TestingPending       *string  // drift-tester failure reason, if any
+
     // Derived fields (not from YAML).
-    Path  string
-    Track string
-    Body  string  // excluded from API responses
+    Path         string
+    Track        string
+    Body         string  // excluded from API responses
+    PhysicalPath string  // on-disk location when it differs from Path
+    Doc          bool    // frontmatter-less markdown node; no lifecycle
 }
 ```
 
-`Status` enumerates the six lifecycle states; `Effort` enumerates the four size buckets. Both sets are exposed via `ValidStatuses()` and `ValidEfforts()`. The `Date` type marshals from `YYYY-MM-DD` YAML scalars and serialises to the same shape in JSON. `Path` and `Track` are filled by the tree builder (they are not user-authored frontmatter). `Body` is kept in the Go struct but omitted from JSON responses because specs can be kilobytes long and the frontend renders bodies lazily through the file explorer endpoints.
+`Status` enumerates the seven lifecycle states; `Effort` enumerates the four size buckets. Both sets are exposed via `ValidStatuses()` and `ValidEfforts()`. The `Date` type marshals from `YYYY-MM-DD` YAML scalars and serialises to the same shape in JSON. `Path` and `Track` are filled by the tree builder (they are not user-authored frontmatter). `Body` is kept in the Go struct but omitted from JSON responses because specs can be kilobytes long and the frontend renders bodies lazily through the file explorer endpoints.
 
 ### Lifecycle State Machine
 
@@ -72,11 +78,15 @@ type Spec struct {
 stateDiagram-v2
     [*] --> vague
     vague --> drafted
+    vague --> archived
     drafted --> validated
     drafted --> stale
     drafted --> archived
-    validated --> complete
+    validated --> testing
     validated --> stale
+    testing --> complete
+    testing --> stale
+    testing --> archived
     complete --> stale
     complete --> archived
     stale --> drafted
@@ -87,12 +97,15 @@ stateDiagram-v2
 
 | From      | Allowed Targets                      |
 |-----------|--------------------------------------|
-| vague     | drafted                              |
+| vague     | drafted, archived                    |
 | drafted   | validated, stale, archived           |
-| validated | complete, stale                      |
+| validated | testing, stale                       |
+| testing   | complete, stale, archived            |
 | complete  | stale, archived                      |
 | stale     | drafted, validated, archived         |
 | archived  | drafted                              |
+
+`validated → complete` is deliberately absent: completion runs through `testing`, where the drift pipeline compares the landed implementation against the spec and renders the verdict. `validated → stale` stays legal so `FanOutStale` can mark validated dependents stale when an upstream spec changes.
 
 The machine is built atop `internal/pkg/statemachine.New`; handlers validate transitions through `spec.StatusMachine.Validate(from, to)` and convert `ErrInvalidTransition` errors into HTTP 422 responses.
 
