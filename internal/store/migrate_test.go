@@ -193,6 +193,68 @@ func TestMigrateTaskJSON_SchemaVersionStamped(t *testing.T) {
 	}
 }
 
+// TestMigrateTaskJSON_LegacyLineageFoldedIntoTrace covers the schema-3 rename:
+// a task.json written when the agent graph was called "lineage" must still
+// surface its graph, now under Trace, and must not carry the old key forward.
+func TestMigrateTaskJSON_LegacyLineageFoldedIntoTrace(t *testing.T) {
+	const graph = `{"Nodes":[{"ID":"run/lead","Name":"lead"}],"Edges":[]}`
+	raw := buildMinimalTaskJSON(t, map[string]any{"lineage": graph, "schema_version": 2})
+
+	task, changed, err := migrateTaskJSON(raw, time.Now())
+	if err != nil {
+		t.Fatalf("migrateTaskJSON: %v", err)
+	}
+	if !changed {
+		t.Error("expected changed=true when the legacy lineage key was folded")
+	}
+	if task.Trace == nil {
+		t.Fatal("Trace is nil; the legacy lineage graph was dropped")
+	}
+	if *task.Trace != graph {
+		t.Errorf("Trace = %q, want %q", *task.Trace, graph)
+	}
+	if task.Lineage != nil {
+		t.Errorf("Lineage = %q, want nil so the old key never round-trips to disk", *task.Lineage)
+	}
+
+	// The migrated task must serialize under the new key only.
+	out, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("marshal migrated task: %v", err)
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(out, &keys); err != nil {
+		t.Fatalf("unmarshal migrated task: %v", err)
+	}
+	if _, stale := keys["lineage"]; stale {
+		t.Error("migrated task.json still writes a lineage key")
+	}
+	if _, ok := keys["trace"]; !ok {
+		t.Error("migrated task.json does not write a trace key")
+	}
+}
+
+// TestMigrateTaskJSON_TraceWinsOverLegacyLineage pins the precedence when a
+// file somehow carries both keys: the current one is authoritative.
+func TestMigrateTaskJSON_TraceWinsOverLegacyLineage(t *testing.T) {
+	const current = `{"Nodes":[{"ID":"run/lead"}],"Edges":[]}`
+	raw := buildMinimalTaskJSON(t, map[string]any{
+		"lineage": `{"Nodes":[],"Edges":[]}`,
+		"trace":   current,
+	})
+
+	task, _, err := migrateTaskJSON(raw, time.Now())
+	if err != nil {
+		t.Fatalf("migrateTaskJSON: %v", err)
+	}
+	if task.Trace == nil || *task.Trace != current {
+		t.Errorf("Trace = %v, want the value from the trace key", task.Trace)
+	}
+	if task.Lineage != nil {
+		t.Error("Lineage should be cleared even when Trace already had a value")
+	}
+}
+
 func TestMigrateTaskJSON_InvalidJSON(t *testing.T) {
 	_, _, err := migrateTaskJSON([]byte("{bad json"), time.Now())
 	if err == nil {

@@ -109,22 +109,22 @@ func RunOptions(sessionID string, c ModelConfig, f flow.Flow) topos.Options {
 // RunFlowWithModel runs a flow through the agent-graph runtime using the model
 // the config selects, returning a topos-free Result. When the config carries no
 // credential it transparently uses the deterministic fake model, so tests and
-// no-credential dev keep working. sessionID seeds the run id so lineage node ids
+// no-credential dev keep working. sessionID seeds the run id so trace node ids
 // (<session>/<agent>) are stable.
 //
 // When worktree is non-empty, the local sandbox runs tools in that directory.
 // Options.Sandbox remains nil; sharing wallfacer's executor.Backend through a
 // topos.Sandbox adapter is future work.
-func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt, worktree string, onEvent func(TraceEvent)) (Result, error) {
+func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt, worktree string, onEvent func(Event)) (Result, error) {
 	opts := runOptions(sessionID, c, f)
 	if worktree != "" {
 		opts.Workdir = worktree
 	}
 	if onEvent != nil {
-		// Bridge topos's observer to a topos-free TraceEvent so only this seam
+		// Bridge topos's observer to a topos-free Event so only this seam
 		// names a topos type. The callback runs synchronously on the run's
 		// goroutine(s); the host's onEvent must be non-blocking.
-		opts.Observer = func(e topos.Event) { onEvent(toTraceEvent(e)) }
+		opts.Observer = func(e topos.Event) { onEvent(toEvent(e)) }
 	}
 	res, err := RunFlow(ctx, opts, f, reg, prompt)
 	if err != nil {
@@ -133,10 +133,10 @@ func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f fl
 	return toResult(res), nil
 }
 
-// toTraceEvent converts a topos.Event into the topos-free TraceEvent. Node is the
-// event's topos SessionID, which equals the emitting agent's lineage node id.
-func toTraceEvent(e topos.Event) TraceEvent {
-	return TraceEvent{
+// toEvent converts a topos.Event into the topos-free Event. Node is the
+// event's topos SessionID, which equals the emitting agent's trace node id.
+func toEvent(e topos.Event) Event {
+	return Event{
 		Name:        e.Name,
 		Node:        e.SessionID,
 		AgentID:     e.AgentID,

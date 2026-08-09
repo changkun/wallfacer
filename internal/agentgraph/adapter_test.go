@@ -129,13 +129,13 @@ func TestFromFlow_Errors(t *testing.T) {
 
 // TestRunFlowWithModel_ObserverReceivesEvents proves the observer seam: a run
 // delivers live trace events (lifecycle, per-turn assistant text, tool use) to
-// the host callback, and each event's Node joins to a lineage node.
+// the host callback, and each event's Node joins to a trace node.
 func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 	reg, f := twoAgentFixture()
-	var got []agentgraph.TraceEvent
+	var got []agentgraph.Event
 	res, err := agentgraph.RunFlowWithModel(
 		context.Background(), "run-obs", agentgraph.ModelConfig{}, f, reg, "do the thing", "",
-		func(ev agentgraph.TraceEvent) { got = append(got, ev) },
+		func(ev agentgraph.Event) { got = append(got, ev) },
 	)
 	if err != nil {
 		t.Fatalf("RunFlowWithModel: %v", err)
@@ -155,27 +155,27 @@ func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 			t.Errorf("missing event %q; got %v", want, names)
 		}
 	}
-	// Every event's Node must be a real lineage node id (the join key).
-	lineageIDs := map[string]bool{}
-	for _, n := range res.Lineage.Nodes {
-		lineageIDs[n.ID] = true
+	// Every event's Node must be a real trace node id (the join key).
+	traceIDs := map[string]bool{}
+	for _, n := range res.Trace.Nodes {
+		traceIDs[n.ID] = true
 	}
 	for n := range nodes {
-		if n != "" && !lineageIDs[n] {
-			t.Errorf("event Node %q is not a lineage node id %v", n, res.Lineage.Nodes)
+		if n != "" && !traceIDs[n] {
+			t.Errorf("event Node %q is not a trace node id %v", n, res.Trace.Nodes)
 		}
 	}
 }
 
 // TestRunAgent_SingleNode exercises the native-harness entry point: a single
 // agent runs as a one-node pinned region with the deterministic fake model,
-// producing a non-empty final text, exactly one lineage node (<session>/<name>,
+// producing a non-empty final text, exactly one trace node (<session>/<name>,
 // status done), no edges, and live observer events that join to that node.
 func TestRunAgent_SingleNode(t *testing.T) {
-	var got []agentgraph.TraceEvent
+	var got []agentgraph.Event
 	res, err := agentgraph.RunAgent(
 		context.Background(), "run-native", agentgraph.ModelConfig{}, "implement", "you implement", "do the thing", "",
-		func(ev agentgraph.TraceEvent) { got = append(got, ev) },
+		func(ev agentgraph.Event) { got = append(got, ev) },
 	)
 	if err != nil {
 		t.Fatalf("RunAgent: %v", err)
@@ -183,25 +183,25 @@ func TestRunAgent_SingleNode(t *testing.T) {
 	if res.Final == "" {
 		t.Error("final text is empty")
 	}
-	if len(res.Lineage.Nodes) != 1 {
-		t.Fatalf("nodes = %+v, want exactly 1", res.Lineage.Nodes)
+	if len(res.Trace.Nodes) != 1 {
+		t.Fatalf("nodes = %+v, want exactly 1", res.Trace.Nodes)
 	}
-	n := res.Lineage.Nodes[0]
+	n := res.Trace.Nodes[0]
 	if n.ID != "run-native/implement" {
 		t.Errorf("node id = %q, want run-native/implement", n.ID)
 	}
 	if n.Status != "done" {
 		t.Errorf("node status = %q, want done", n.Status)
 	}
-	if len(res.Lineage.Edges) != 0 {
-		t.Errorf("edges = %+v, want none (single agent, no delegation)", res.Lineage.Edges)
+	if len(res.Trace.Edges) != 0 {
+		t.Errorf("edges = %+v, want none (single agent, no delegation)", res.Trace.Edges)
 	}
 
 	names := map[string]bool{}
 	for _, ev := range got {
 		names[ev.Name] = true
 		if ev.Node != "" && ev.Node != n.ID {
-			t.Errorf("event Node %q is not the single lineage node %q", ev.Node, n.ID)
+			t.Errorf("event Node %q is not the single trace node %q", ev.Node, n.ID)
 		}
 	}
 	for _, want := range []string{"SessionStart", "AssistantMessage", "SessionEnd"} {
@@ -259,13 +259,13 @@ func TestRunAgent_DefaultName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunAgent: %v", err)
 	}
-	if len(res.Lineage.Nodes) != 1 || res.Lineage.Nodes[0].ID != "run-x/agent" {
-		t.Fatalf("nodes = %+v, want one node run-x/agent", res.Lineage.Nodes)
+	if len(res.Trace.Nodes) != 1 || res.Trace.Nodes[0].ID != "run-x/agent" {
+		t.Fatalf("nodes = %+v, want one node run-x/agent", res.Trace.Nodes)
 	}
 }
 
 // TestRunFlowFake exercises the full headless path with the deterministic fake
-// model: a two-agent pinned chain produces a lineage with two nodes joined by a
+// model: a two-agent pinned chain produces a trace with two nodes joined by a
 // single "next" edge, and a non-empty final text.
 func TestRunFlowFake(t *testing.T) {
 	reg, f := twoAgentFixture()
@@ -276,22 +276,22 @@ func TestRunFlowFake(t *testing.T) {
 	if res.Final == "" {
 		t.Error("final text is empty")
 	}
-	if len(res.Lineage.Nodes) != 2 {
-		t.Fatalf("nodes = %+v, want 2", res.Lineage.Nodes)
+	if len(res.Trace.Nodes) != 2 {
+		t.Fatalf("nodes = %+v, want 2", res.Trace.Nodes)
 	}
-	if res.Lineage.Nodes[0].ID != "run-x/planner" || res.Lineage.Nodes[1].ID != "run-x/builder" {
+	if res.Trace.Nodes[0].ID != "run-x/planner" || res.Trace.Nodes[1].ID != "run-x/builder" {
 		t.Errorf("node ids = %q, %q; want run-x/planner, run-x/builder",
-			res.Lineage.Nodes[0].ID, res.Lineage.Nodes[1].ID)
+			res.Trace.Nodes[0].ID, res.Trace.Nodes[1].ID)
 	}
-	for _, n := range res.Lineage.Nodes {
+	for _, n := range res.Trace.Nodes {
 		if n.Status != "done" {
 			t.Errorf("node %s status = %q, want done", n.ID, n.Status)
 		}
 	}
-	if len(res.Lineage.Edges) != 1 || res.Lineage.Edges[0].Kind != "next" {
-		t.Fatalf("edges = %+v, want one next edge", res.Lineage.Edges)
+	if len(res.Trace.Edges) != 1 || res.Trace.Edges[0].Kind != "next" {
+		t.Fatalf("edges = %+v, want one next edge", res.Trace.Edges)
 	}
-	if res.Lineage.Edges[0].From != "run-x/planner" || res.Lineage.Edges[0].To != "run-x/builder" {
-		t.Errorf("edge = %+v, want planner -> builder", res.Lineage.Edges[0])
+	if res.Trace.Edges[0].From != "run-x/planner" || res.Trace.Edges[0].To != "run-x/builder" {
+		t.Errorf("edge = %+v, want planner -> builder", res.Trace.Edges[0])
 	}
 }

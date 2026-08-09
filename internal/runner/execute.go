@@ -205,7 +205,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// (internal/agentgraph) rather than the legacy flow engine. The flow is
 	// compiled into a topos.Region (entry + ordered peer chain), executed with
 	// the deterministic fake model for now (real Lux wiring is M4), and the
-	// resulting lineage graph is persisted on the task. Dispatch happens after
+	// resulting trace graph is persisted on the task. Dispatch happens after
 	// worktree setup so its tools edit the real checkout and the commit pipeline
 	// can durably merge those edits.
 	agenticFlow, foundAgenticFlow := r.flowBySlug(flowSlug)

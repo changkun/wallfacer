@@ -275,11 +275,17 @@ type Task struct {
 	SessionID         *string             `json:"session_id"`
 	FreshStart        bool                `json:"fresh_start,omitempty"`
 	Result            *string             `json:"result"`
-	// Lineage holds the JSON-marshalled agentgraph.Lineage (nodes + edges),
+	// Trace holds the JSON-marshalled agentgraph.Trace (nodes + edges),
 	// produced by an agentic-flow run through internal/agentgraph. Nil
 	// for every non-agentic task. Persisted as an opaque string so the
 	// store does not depend on the topos package; the graph endpoint
 	// (M5) unmarshals it. See specs/local/topos-runtime-integration.md.
+	Trace *string `json:"trace,omitempty"`
+	// Lineage is the pre-schema-3 name of Trace, kept only so a task.json
+	// written before the rename still loads. migrateTaskJSON folds it into
+	// Trace and clears it, so it is always nil on a migrated task.
+	//
+	// Deprecated: use Trace.
 	Lineage           *string                        `json:"lineage,omitempty"`
 	StopReason        *string                        `json:"stop_reason"`
 	Turns             int                            `json:"turns"`

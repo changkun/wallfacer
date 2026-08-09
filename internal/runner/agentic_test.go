@@ -86,15 +86,15 @@ func TestAgenticModelConfig(t *testing.T) {
 	})
 }
 
-// TestRun_AgenticFlowReachesDoneWithLineage dispatches a task whose resolved
+// TestRun_AgenticFlowReachesDoneWithTrace dispatches a task whose resolved
 // flow is marked Agentic. The runner must route it through the topos
 // agent-graph runtime (with the deterministic fake model), reach done via the
-// normal state machine, record the final text, and persist a lineage graph with
+// normal state machine, record the final text, and persist a trace graph with
 // the expected two-node / one-next-edge shape. No container backend is invoked.
 // TestRun_NativeToposHarnessReachesDoneInProcess covers the native-harness
 // dispatch: a plain implement-path task pinned to the topos harness runs
 // in-process as a single topos agent (zero container launches), reaches done, and
-// persists a one-node lineage (no delegation edges). End-to-end worktree
+// persists a one-node trace (no delegation edges). End-to-end worktree
 // execution (the agent's tools running in the worktree via topos Options.Workdir)
 // is proven directly at the agentgraph layer by TestRunAgent_WithWorktreeExecutesInRepo,
 // since this runner harness does not provision a workspace.
@@ -130,25 +130,25 @@ func TestRun_NativeToposHarnessReachesDoneInProcess(t *testing.T) {
 		t.Errorf("expected 0 container launches for the native topos harness, got %d", n)
 	}
 
-	if updated.Lineage == nil {
-		t.Fatal("lineage was not persisted")
+	if updated.Trace == nil {
+		t.Fatal("trace was not persisted")
 	}
-	var lin agentgraph.Lineage
-	if err := json.Unmarshal([]byte(*updated.Lineage), &lin); err != nil {
-		t.Fatalf("unmarshal lineage: %v", err)
+	var lin agentgraph.Trace
+	if err := json.Unmarshal([]byte(*updated.Trace), &lin); err != nil {
+		t.Fatalf("unmarshal trace: %v", err)
 	}
 	if len(lin.Nodes) != 1 {
-		t.Fatalf("lineage nodes = %+v, want 1 (single agent)", lin.Nodes)
+		t.Fatalf("trace nodes = %+v, want 1 (single agent)", lin.Nodes)
 	}
 	if lin.Nodes[0].Name != "implement" {
 		t.Errorf("node name = %q, want implement", lin.Nodes[0].Name)
 	}
 	if len(lin.Edges) != 0 {
-		t.Errorf("lineage edges = %+v, want none (no delegation)", lin.Edges)
+		t.Errorf("trace edges = %+v, want none (no delegation)", lin.Edges)
 	}
 }
 
-func TestRun_AgenticFlowReachesDoneWithLineage(t *testing.T) {
+func TestRun_AgenticFlowReachesDoneWithTrace(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	r.agentsReg = agents.NewRegistry(
 		agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
@@ -191,21 +191,21 @@ func TestRun_AgenticFlowReachesDoneWithLineage(t *testing.T) {
 		t.Errorf("expected 0 container launches for an agentic flow, got %d", n)
 	}
 
-	if updated.Lineage == nil {
-		t.Fatal("lineage was not persisted")
+	if updated.Trace == nil {
+		t.Fatal("trace was not persisted")
 	}
-	var lin agentgraph.Lineage
-	if err := json.Unmarshal([]byte(*updated.Lineage), &lin); err != nil {
-		t.Fatalf("unmarshal lineage: %v", err)
+	var lin agentgraph.Trace
+	if err := json.Unmarshal([]byte(*updated.Trace), &lin); err != nil {
+		t.Fatalf("unmarshal trace: %v", err)
 	}
 	if len(lin.Nodes) != 2 {
-		t.Fatalf("lineage nodes = %+v, want 2", lin.Nodes)
+		t.Fatalf("trace nodes = %+v, want 2", lin.Nodes)
 	}
 	if lin.Nodes[0].Name != "ag-planner" || lin.Nodes[1].Name != "ag-builder" {
 		t.Errorf("node names = %q, %q; want ag-planner, ag-builder", lin.Nodes[0].Name, lin.Nodes[1].Name)
 	}
 	if len(lin.Edges) != 1 || lin.Edges[0].Kind != "next" {
-		t.Fatalf("lineage edges = %+v, want one next edge", lin.Edges)
+		t.Fatalf("trace edges = %+v, want one next edge", lin.Edges)
 	}
 }
 

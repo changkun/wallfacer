@@ -884,9 +884,9 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/tasks/{id}/lineage",
-      "name": "TaskLineage",
-      "description": "Read the agent-graph lineage (nodes + edges) of an agentic-flow run.",
+      "pattern": "/api/tasks/{id}/trace",
+      "name": "TaskTrace",
+      "description": "Read the agent-graph trace (nodes + edges) of an agentic-flow run.",
       "tags": [
         "tasks"
       ]

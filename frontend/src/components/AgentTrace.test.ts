@@ -1,0 +1,106 @@
+// AgentTrace renders an agentic run's agent graph (from GET
+// /api/tasks/{id}/trace) plus a live per-agent transcript (from the
+// agentgraph-tagged events on GET /api/tasks/{id}/events). The component is
+// self-contained, so the test mocks fetch (the transport behind api()) and
+// routes by URL.
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createApp, type App } from 'vue';
+import AgentTrace from './AgentTrace.vue';
+import type { TaskTrace } from '../api/types';
+
+let originalFetch: typeof globalThis.fetch;
+let trace: TaskTrace | null;
+let events: unknown[];
+
+beforeEach(() => {
+  trace = null;
+  events = [];
+  originalFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
+    const url = String(input);
+    if (url.includes('/trace')) {
+      return new Response(JSON.stringify(trace ?? { nodes: [], edges: [] }), { status: 200 });
+    }
+    return new Response(JSON.stringify(events), { status: 200 });
+  }) as unknown as typeof globalThis.fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+async function mount(): Promise<{ app: App; host: HTMLElement }> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const app = createApp(AgentTrace, { taskId: 't1', refreshKey: '1' });
+  app.mount(host);
+  for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+  return { app, host };
+}
+
+describe('AgentTrace', () => {
+  it('renders nodes with name/role/status and edges by kind', async () => {
+    trace = {
+      nodes: [
+        { id: 'run-x/planner', name: 'planner', role: 'Planner', status: 'done' },
+        { id: 'run-x/builder', name: 'builder', role: 'Builder', status: 'running' },
+      ],
+      edges: [{ from: 'run-x/planner', to: 'run-x/builder', kind: 'next' }],
+    };
+    const { app, host } = await mount();
+    const text = host.textContent ?? '';
+    expect(text).toContain('Planner');
+    expect(text).toContain('Builder');
+    expect(text).toContain('next');
+    expect(host.querySelectorAll('.trace__node').length).toBe(2);
+    expect(host.querySelectorAll('.trace__edge').length).toBe(1);
+    app.unmount();
+    host.remove();
+  });
+
+  it('renders the per-agent transcript from agentgraph trace events', async () => {
+    events = [
+      { id: 1, event_type: 'system', data: { source: 'agentgraph', kind: 'assistant', agent: 'planner', text: 'here is the **plan**' } },
+      { id: 2, event_type: 'system', data: { source: 'agentgraph', kind: 'delegate', agent: 'builder', result: '↳ delegated to builder' } },
+      { id: 3, event_type: 'system', data: { result: 'unrelated system event' } },
+    ];
+    const { app, host } = await mount();
+    const text = host.textContent ?? '';
+    expect(text).toContain('planner');
+    expect(text).toContain('plan'); // markdown-rendered assistant text
+    expect(text).toContain('delegated to builder');
+    expect(text).not.toContain('unrelated system event'); // non-agentgraph filtered out
+    // Bold markdown actually rendered (not raw).
+    expect(host.querySelector('.trace__turn-body strong')?.textContent).toBe('plan');
+    // No trace yet -> a provisional node per agent seen in the trace.
+    expect(host.querySelectorAll('.trace__node').length).toBe(2);
+    app.unmount();
+    host.remove();
+  });
+
+  it('brands the header with the Topos node-graph logo and wordmark', async () => {
+    trace = {
+      nodes: [{ id: 'run-x/implement', name: 'implement', role: '', status: 'done' }],
+      edges: [],
+    };
+    const { app, host } = await mount();
+    // The native runtime is surfaced: the node-graph logo + "powered by Topos"
+    // wordmark (the global .topos-brand gradient class).
+    expect(host.querySelector('.trace__header .trace__logo')).not.toBeNull();
+    const brand = host.querySelector('.trace__header .topos-brand');
+    expect(brand?.textContent).toBe('Topos');
+    expect(host.querySelector('.trace__powered')?.textContent).toContain('powered by');
+    app.unmount();
+    host.remove();
+  });
+
+  it('renders nothing when there is no trace and no trace', async () => {
+    trace = { nodes: [], edges: [] };
+    events = [];
+    const { app, host } = await mount();
+    expect(host.querySelector('.trace')).toBeNull();
+    app.unmount();
+    host.remove();
+  });
+});

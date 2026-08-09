@@ -18,7 +18,7 @@ import (
 //
 // The flow's first step becomes the region entry; the remaining steps become the
 // ordered peer chain. The resolver maps each agents.Role onto the spec: the slug is
-// the stable identity (so lineage node ids are <session>/<slug>), Title/Description
+// the stable identity (so trace node ids are <session>/<slug>), Title/Description
 // carry the role labels, PromptTmpl becomes the system prompt, and Capabilities
 // become the permission scopes. A non-dynamic flow lowers to a deterministic pinned
 // chain (Optional / RunInParallelWith hints are not expressed by the graph model); a
@@ -42,7 +42,7 @@ func FromFlow(f flow.Flow, reg *agents.Registry) (topos.Region, error) {
 }
 
 // RunFlow builds a topos runner from opts and runs the region compiled from the
-// flow against prompt, returning the run result (final text + lineage graph).
+// flow against prompt, returning the run result (final text + trace graph).
 func RunFlow(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.Registry, prompt string) (topos.RunResult, error) {
 	region, err := FromFlow(f, reg)
 	if err != nil {
@@ -58,12 +58,12 @@ func RunFlow(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.R
 // RunAgent runs a single agent in-process as a one-node topos region — the
 // degenerate, non-delegating case that backs the native Topos harness. A plain
 // task with no multi-agent flow executes as one agent, sharing the same engine,
-// lineage, observer, and model selection the multi-agent path uses. name is the
-// agent's lineage identity (node ids are <session>/<name>); systemPrompt is its
+// trace, observer, and model selection the multi-agent path uses. name is the
+// agent's trace identity (node ids are <session>/<name>); systemPrompt is its
 // system prompt; onEvent may be nil. Like RunFlowWithModel, an unconfigured
 // ModelConfig transparently uses the deterministic fake model, so tests and
 // no-credential dev keep working.
-func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt, worktree string, onEvent func(TraceEvent)) (Result, error) {
+func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt, worktree string, onEvent func(Event)) (Result, error) {
 	if name == "" {
 		name = "agent"
 	}
@@ -83,7 +83,7 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 	if onEvent != nil {
 		// Same topos-free observer bridge as RunFlowWithModel; this seam is the
 		// only place that names a topos type.
-		opts.Observer = func(e topos.Event) { onEvent(toTraceEvent(e)) }
+		opts.Observer = func(e topos.Event) { onEvent(toEvent(e)) }
 	}
 	runner, err := NewRunner(opts)
 	if err != nil {
@@ -100,14 +100,14 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 // topos.RunResult with topos-free types so a wallfacer package (e.g. the runner)
 // can consume a run without importing topos and crossing the seam.
 type Result struct {
-	Final   string
-	Lineage Lineage
+	Final string
+	Trace Trace
 }
 
-// Lineage is the topos-free mirror of topos.Trace: the renderable run graph of
+// Trace is the topos-free mirror of topos.Trace: the renderable run graph of
 // nodes (agents) and edges (delegate / deliver / next). It marshals to the same
 // JSON shape, so a host can persist it opaquely and a consumer can unmarshal it.
-type Lineage struct {
+type Trace struct {
 	Nodes []Node
 	Edges []Edge
 }
@@ -129,12 +129,12 @@ type Edge struct {
 	Kind string
 }
 
-// TraceEvent is the topos-free mirror of topos.Event: one observation emitted
+// Event is the topos-free mirror of topos.Event: one observation emitted
 // during a run (lifecycle, tool use, delegation, per-turn assistant text). Node
-// is the lineage node id the event came from (it equals the emitting agent's
-// topos session id), so a consumer can join a live event to a Lineage node.
+// is the trace node id the event came from (it equals the emitting agent's
+// topos session id), so a consumer can join a live event to a Trace node.
 // PayloadJSON is the full event payload, opaque to the seam.
-type TraceEvent struct {
+type Event struct {
 	Name        string
 	Node        string
 	AgentID     string
@@ -144,7 +144,7 @@ type TraceEvent struct {
 
 // RunFlowFake runs a flow through the agent-graph runtime with the deterministic,
 // network-free fake model, returning a topos-free Result. sessionID seeds the
-// run id so lineage node ids (<session>/<agent>) are stable. It is the explicit
+// run id so trace node ids (<session>/<agent>) are stable. It is the explicit
 // fake entrypoint, equivalent to RunFlowWithModel with an unconfigured config.
 func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents.Registry, prompt string) (Result, error) {
 	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt, "", nil)
@@ -153,16 +153,16 @@ func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents
 // toResult converts a topos.RunResult into the topos-free host Result.
 func toResult(in topos.RunResult) Result {
 	out := Result{Final: in.Final}
-	out.Lineage.Nodes = make([]Node, 0, len(in.Trace.Nodes))
+	out.Trace.Nodes = make([]Node, 0, len(in.Trace.Nodes))
 	for _, n := range in.Trace.Nodes {
-		out.Lineage.Nodes = append(out.Lineage.Nodes, Node{
+		out.Trace.Nodes = append(out.Trace.Nodes, Node{
 			ID: n.ID, Name: n.Name, Role: n.Role, Status: string(n.Status),
 			Grants: n.Grants, Sandbox: n.Sandbox,
 		})
 	}
-	out.Lineage.Edges = make([]Edge, 0, len(in.Trace.Edges))
+	out.Trace.Edges = make([]Edge, 0, len(in.Trace.Edges))
 	for _, e := range in.Trace.Edges {
-		out.Lineage.Edges = append(out.Lineage.Edges, Edge{From: e.From, To: e.To, Kind: string(e.Kind)})
+		out.Trace.Edges = append(out.Trace.Edges, Edge{From: e.From, To: e.To, Kind: string(e.Kind)})
 	}
 	return out
 }

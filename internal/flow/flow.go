@@ -30,7 +30,7 @@ type Flow struct {
 	// agent-graph runtime (internal/agentgraph) instead of the legacy
 	// flow engine. The runner dispatch builds a topos.Region from the
 	// flow's steps + the agents registry, runs it, and persists the
-	// resulting lineage on the task. Default false keeps every existing
+	// resulting trace on the task. Default false keeps every existing
 	// flow on its current execution path. See
 	// specs/local/topos-runtime-integration.md (M2).
 	Agentic bool

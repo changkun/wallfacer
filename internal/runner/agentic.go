@@ -76,19 +76,19 @@ func (r *Runner) flowBySlug(slug string) (flow.Flow, bool) {
 	return r.flows.Get(slug)
 }
 
-// agenticTraceEvent maps a topos trace event to a task-timeline event, returning
+// agenticEvent maps a topos trace event to a task-timeline event, returning
 // ok=false for events that should not surface (lifecycle bookkeeping, empty
 // payloads). It renders the agent-graph run as a readable live trace: each agent
 // turn's assistant text, delegations, and tool use. The agent label is the
-// lineage node id (ev.Node) so the timeline lines join to graph nodes.
-func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]string, bool) {
+// trace node id (ev.Node) so the timeline lines join to graph nodes.
+func agenticEvent(ev agentgraph.Event) (store.EventType, map[string]string, bool) {
 	label := ev.AgentID
 	if label == "" {
 		label = ev.Node
 	}
 	// trace builds the timeline data: a human "result" line (so the events tab
 	// reads naturally) plus structured fields the Agent Graph view groups on
-	// (source marks it as an agent-graph trace; node is the lineage join key).
+	// (source marks it as an agent-graph trace; node is the trace join key).
 	trace := func(kind, result, text string) (store.EventType, map[string]string, bool) {
 		return store.EventTypeSystem, map[string]string{
 			"result": result,
@@ -132,7 +132,7 @@ func agenticTraceEvent(ev agentgraph.TraceEvent) (store.EventType, map[string]st
 // multi-agent topos.Region and drives the resulting run onto the task via
 // driveToposRun. The caller sets statusSet=true before invoking this.
 func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt, worktree string) {
-	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error) {
+	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error) {
 		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, worktree, onEvent)
 	})
 }
@@ -141,7 +141,7 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 // in-process agent (a one-node topos region) rather than a multi-agent flow. It
 // is the path a task resolves to when its harness is Topos (the native default,
 // once harness.Default() is flipped; until then only an explicit topos pin
-// reaches here). Like the agentic-flow path it produces a final text + lineage
+// reaches here). Like the agentic-flow path it produces a final text + trace
 // and walks the state machine; driveToposRun then runs the real commit pipeline
 // so the worktree edits land as a durable git commit. Verification (the test
 // step) parity with the subprocess harnesses is tracked in the
@@ -149,7 +149,7 @@ func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task st
 func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task store.Task, prompt, worktree string) {
 	// worktree is the task's set-up worktree (the real repo) so the agent's tools
 	// edit actual files; an empty worktree falls back to the topos temp-dir sandbox.
-	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error) {
+	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error) {
 		return agentgraph.RunAgent(ctx, task.ID.String(), r.agenticModelConfig(), "implement", "", prompt, worktree, onEvent)
 	})
 }
@@ -168,8 +168,8 @@ func firstWorktreePath(worktreePaths map[string]string) string {
 // single-agent native-harness run) supplied as runFn, and maps the outcome onto
 // the task. It forwards the run's live trace events onto the task timeline (so
 // the per-turn assistant text, delegations, and tool use are visible as the run
-// proceeds, not just as a lineage graph at the end), persists the final text and
-// the JSON-marshalled lineage graph, then walks the task through the same
+// proceeds, not just as a trace graph at the end), persists the final text and
+// the JSON-marshalled trace graph, then walks the task through the same
 // in_progress -> waiting -> committing -> done state machine the flow-engine and
 // ideation branches use (the state machine forbids a direct in_progress -> done
 // transition). In the committing phase it runs the real commit pipeline
@@ -177,7 +177,7 @@ func firstWorktreePath(worktreePaths map[string]string) string {
 // durable git commit rather than reaching done uncommitted. runFn performs the
 // actual topos run, wired with the supplied non-blocking observer. The caller
 // sets statusSet=true before invoking this.
-func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task store.Task, runFn func(ctx context.Context, onEvent func(agentgraph.TraceEvent)) (agentgraph.Result, error)) {
+func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task store.Task, runFn func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error)) {
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
 		timeout = constants.DefaultTaskTimeout
@@ -189,19 +189,19 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 	// observer is called synchronously on the run goroutine(s), so it must not
 	// block: push to a buffered channel and drain into the store from a separate
 	// goroutine (dropping on overflow rather than backpressuring the run).
-	traceCh := make(chan agentgraph.TraceEvent, 256)
+	traceCh := make(chan agentgraph.Event, 256)
 	traceDone := make(chan struct{})
 	go func() {
 		defer close(traceDone)
 		for ev := range traceCh {
-			etype, data, ok := agenticTraceEvent(ev)
+			etype, data, ok := agenticEvent(ev)
 			if !ok {
 				continue
 			}
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, etype, data)
 		}
 	}()
-	onEvent := func(ev agentgraph.TraceEvent) {
+	onEvent := func(ev agentgraph.Event) {
 		select {
 		case traceCh <- ev:
 		default: // buffer full: drop rather than stall the run
@@ -229,15 +229,15 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 		return
 	}
 
-	// Persist the result and lineage before transitioning so the durable record
+	// Persist the result and trace before transitioning so the durable record
 	// is complete the moment the task reaches done.
 	_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, res.Final, "", "end_turn", 0)
-	if data, mErr := json.Marshal(res.Lineage); mErr == nil {
-		if lErr := r.taskStore(taskID).UpdateTaskLineage(bgCtx, taskID, string(data)); lErr != nil {
-			logger.Runner.Warn("agentic flow lineage persist", "task", taskID, "error", lErr)
+	if data, mErr := json.Marshal(res.Trace); mErr == nil {
+		if lErr := r.taskStore(taskID).UpdateTaskTrace(bgCtx, taskID, string(data)); lErr != nil {
+			logger.Runner.Warn("agentic flow trace persist", "task", taskID, "error", lErr)
 		}
 	} else {
-		logger.Runner.Warn("agentic flow lineage marshal", "task", taskID, "error", mErr)
+		logger.Runner.Warn("agentic flow trace marshal", "task", taskID, "error", mErr)
 	}
 	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
 		"result": res.Final,

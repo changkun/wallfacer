@@ -566,8 +566,8 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/lineage", Name: "TaskLineage",
-		Description: "Read the agent-graph lineage (nodes + edges) of an agentic-flow run.",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/trace", Name: "TaskTrace",
+		Description: "Read the agent-graph trace (nodes + edges) of an agentic-flow run.",
 		Tags:        []string{"tasks"},
 	},
 

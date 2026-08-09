@@ -26,7 +26,7 @@ func FromFlowGraph(f flow.Flow) (graph.Graph, error) {
 	}
 	refs := make([]graph.Agent, 0, len(f.Steps))
 	for _, step := range f.Steps {
-		// Name mirrors the ref slug so the in-graph identity (and lineage node id)
+		// Name mirrors the ref slug so the in-graph identity (and trace node id)
 		// stays <session>/<slug>, matching the FromFlow region path. Resolve
 		// preserves this authored Name.
 		refs = append(refs, graph.Agent{Ref: step.AgentSlug, Name: step.AgentSlug})

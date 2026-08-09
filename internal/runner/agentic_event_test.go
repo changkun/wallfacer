@@ -8,13 +8,13 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// TestAgenticTraceEvent maps topos trace events to task-timeline events: assistant
+// TestAgenticEvent maps topos trace events to task-timeline events: assistant
 // text and tool use become readable system lines labelled by agent; lifecycle
 // bookkeeping and empty payloads are filtered out.
-func TestAgenticTraceEvent(t *testing.T) {
+func TestAgenticEvent(t *testing.T) {
 	cases := []struct {
 		name      string
-		ev        agentgraph.TraceEvent
+		ev        agentgraph.Event
 		wantOK    bool
 		wantType  store.EventType
 		wantParts []string // substrings the result line must contain
@@ -22,7 +22,7 @@ func TestAgenticTraceEvent(t *testing.T) {
 	}{
 		{
 			name:      "assistant text",
-			ev:        agentgraph.TraceEvent{Name: "AssistantMessage", Node: "run-x/planner", AgentID: "planner", PayloadJSON: []byte(`{"text":"here is the plan"}`)},
+			ev:        agentgraph.Event{Name: "AssistantMessage", Node: "run-x/planner", AgentID: "planner", PayloadJSON: []byte(`{"text":"here is the plan"}`)},
 			wantOK:    true,
 			wantType:  store.EventTypeSystem,
 			wantParts: []string{"planner", "here is the plan"},
@@ -30,31 +30,31 @@ func TestAgenticTraceEvent(t *testing.T) {
 		},
 		{
 			name:   "assistant empty text filtered",
-			ev:     agentgraph.TraceEvent{Name: "AssistantMessage", AgentID: "planner", PayloadJSON: []byte(`{"text":""}`)},
+			ev:     agentgraph.Event{Name: "AssistantMessage", AgentID: "planner", PayloadJSON: []byte(`{"text":""}`)},
 			wantOK: false,
 		},
 		{
 			name:      "delegation",
-			ev:        agentgraph.TraceEvent{Name: "SubagentStart", AgentID: "reviewer", PayloadJSON: []byte(`{}`)},
+			ev:        agentgraph.Event{Name: "SubagentStart", AgentID: "reviewer", PayloadJSON: []byte(`{}`)},
 			wantOK:    true,
 			wantType:  store.EventTypeSystem,
 			wantParts: []string{"reviewer"},
 		},
 		{
 			name:      "tool use",
-			ev:        agentgraph.TraceEvent{Name: "PostToolUse", AgentID: "builder", PayloadJSON: []byte(`{"tool_call":{"name":"bash"}}`)},
+			ev:        agentgraph.Event{Name: "PostToolUse", AgentID: "builder", PayloadJSON: []byte(`{"tool_call":{"name":"bash"}}`)},
 			wantOK:    true,
 			wantType:  store.EventTypeSystem,
 			wantParts: []string{"builder", "bash"},
 		},
 		{
 			name:   "lifecycle filtered",
-			ev:     agentgraph.TraceEvent{Name: "SessionStart", AgentID: "planner", PayloadJSON: []byte(`{}`)},
+			ev:     agentgraph.Event{Name: "SessionStart", AgentID: "planner", PayloadJSON: []byte(`{}`)},
 			wantOK: false,
 		},
 		{
 			name:      "label falls back to node id",
-			ev:        agentgraph.TraceEvent{Name: "AssistantMessage", Node: "run-x/planner", PayloadJSON: []byte(`{"text":"hi"}`)},
+			ev:        agentgraph.Event{Name: "AssistantMessage", Node: "run-x/planner", PayloadJSON: []byte(`{"text":"hi"}`)},
 			wantOK:    true,
 			wantType:  store.EventTypeSystem,
 			wantParts: []string{"run-x/planner", "hi"},
@@ -63,7 +63,7 @@ func TestAgenticTraceEvent(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			etype, data, ok := agenticTraceEvent(tc.ev)
+			etype, data, ok := agenticEvent(tc.ev)
 			if ok != tc.wantOK {
 				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
 			}

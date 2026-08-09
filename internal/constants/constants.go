@@ -171,7 +171,7 @@ const DefaultTombstoneRetentionDays = 7
 // ---------------------------------------------------------------------------
 
 // CurrentTaskSchemaVersion is the on-disk schema version for task.json.
-const CurrentTaskSchemaVersion = 2
+const CurrentTaskSchemaVersion = 3
 
 // DefaultRetryHistoryLimit, DefaultRefineSessionsLimit, and
 // DefaultPromptHistoryLimit cap the number of entries persisted for the three

@@ -197,12 +197,12 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	})
 }
 
-// UpdateTaskLineage stores the JSON-marshalled topos lineage graph produced by
+// UpdateTaskTrace stores the JSON-marshalled topos trace graph produced by
 // an agentic-flow run (see internal/agentgraph). The store keeps it as an opaque
 // string so it never imports the topos package; the graph endpoint unmarshals it.
-func (s *Store) UpdateTaskLineage(_ context.Context, id uuid.UUID, lineageJSON string) error {
+func (s *Store) UpdateTaskTrace(_ context.Context, id uuid.UUID, traceJSON string) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.Lineage = &lineageJSON
+		t.Trace = &traceJSON
 		return nil
 	})
 }

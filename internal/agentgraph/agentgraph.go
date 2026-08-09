@@ -5,7 +5,7 @@
 // the curated embeddable surface. A boundary test enforces that.
 //
 // This is the M1 wiring slice (see specs/local/topos-runtime-integration.md). The
-// flow/agents -> region adapter, model and sandbox wiring, and lineage mapping
+// flow/agents -> region adapter, model and sandbox wiring, and trace mapping
 // land in later milestones; here the seam only constructs and runs a region.
 package agentgraph
 
@@ -29,7 +29,7 @@ func NewRunner(opts topos.Options) (*Runner, error) {
 	return &Runner{inner: r}, nil
 }
 
-// Run executes a region and returns its result (final text + lineage graph).
+// Run executes a region and returns its result (final text + trace graph).
 func (a *Runner) Run(ctx context.Context, region topos.Region, task string) (topos.RunResult, error) {
 	return a.inner.Run(ctx, region, task)
 }
