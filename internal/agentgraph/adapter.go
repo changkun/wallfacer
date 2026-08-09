@@ -153,15 +153,15 @@ func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents
 // toResult converts a topos.RunResult into the topos-free host Result.
 func toResult(in topos.RunResult) Result {
 	out := Result{Final: in.Final}
-	out.Lineage.Nodes = make([]Node, 0, len(in.Lineage.Nodes))
-	for _, n := range in.Lineage.Nodes {
+	out.Lineage.Nodes = make([]Node, 0, len(in.Trace.Nodes))
+	for _, n := range in.Trace.Nodes {
 		out.Lineage.Nodes = append(out.Lineage.Nodes, Node{
 			ID: n.ID, Name: n.Name, Role: n.Role, Status: string(n.Status),
 			Grants: n.Grants, Sandbox: n.Sandbox,
 		})
 	}
-	out.Lineage.Edges = make([]Edge, 0, len(in.Lineage.Edges))
-	for _, e := range in.Lineage.Edges {
+	out.Lineage.Edges = make([]Edge, 0, len(in.Trace.Edges))
+	for _, e := range in.Trace.Edges {
 		out.Lineage.Edges = append(out.Lineage.Edges, Edge{From: e.From, To: e.To, Kind: string(e.Kind)})
 	}
 	return out
