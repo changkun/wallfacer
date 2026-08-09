@@ -1,5 +1,5 @@
 ---
-title: Live Agent Traces for Topos Runs (Event Seam + Stream + UI)
+title: Live Agent Events for Topos Runs (Event Seam + Stream + UI)
 status: complete
 depends_on:
   - topos-runtime-integration
@@ -7,10 +7,10 @@ affects:
   - internal/agentgraph/adapter.go
   - internal/agentgraph/agentgraph.go
   - internal/runner/execute.go
-  - internal/handler/tasks_lineage.go
+  - internal/handler/tasks_trace.go
   - internal/apicontract/routes.go
   - internal/store/models.go
-  - frontend/src/components/AgentLineage.vue
+  - frontend/src/components/AgentTrace.vue
   - frontend/src/api/types.ts
 effort: xlarge
 created: 2026-06-28
@@ -19,19 +19,19 @@ author: changkun
 dispatched_task_id: null
 ---
 
-# Live Agent Traces for Topos Runs
+# Live Agent Events for Topos Runs
 
 ## Problem
 
 Topos agentic runs are headless from wallfacer's view. `topos.Runner.Run` is a
-blocking batch call that returns the final text plus a `Lineage` graph only when
+blocking batch call that returns the final text plus a `Trace` graph only when
 the whole run finishes (`topos/topos.go:191`); `internal/agentgraph` exposes no
 progress hook. So during a multi-agent run the user sees nothing live — the
-lineage graph (and `AgentLineage.vue`) materializes only after completion.
+trace graph (and `AgentTrace.vue`) materializes only after completion.
 
 Single-agent task runs stream live (harness stdout → Activity tab) and review
 streams live (per-round session-dir files → transcript endpoint). The new,
-multi-agent runtime is the one surface with no live trace.
+multi-agent runtime is the one surface with no live event stream.
 
 The data already exists inside topos. The agent loop builds a `Transcript
 []models.Message` and `FinalText`, and already consumes `models.KindTextDelta`
@@ -45,9 +45,9 @@ never dispatched as an event (only returned in `loop.Result`).
 ## Decision
 
 Expose topos's existing event stream to embedders, add an assistant-text event so
-the trace is a readable transcription (not just lifecycle/tool events), and in
+the event stream is a readable transcription (not just lifecycle/tool events), and in
 wallfacer forward it to a live per-task trace that an SSE endpoint streams and the
-task UI renders — with the lineage nodes lighting up live from the same events.
+task UI renders — with the trace nodes lighting up live from the same events.
 
 This is also the convergence the [[topos-runtime-integration]] / review discussion
 pointed at: review already solved live multi-agent tracing via session-dir files;
@@ -70,7 +70,7 @@ event types must be reachable from root.
   ```go
   type Event struct {
       Name      string    // re-exported EventName ("SessionStart", "PostToolUse", …)
-      AgentID   string    // which agent/peer emitted it (lineage node id)
+      AgentID   string    // which agent/peer emitted it (trace node id)
       SessionID string
       At        time.Time
       // Payload carries the typed hooks payload as already-marshalled JSON so
@@ -90,7 +90,7 @@ event types must be reachable from root.
 ### B. topos SDK — emit assistant text (the "transcription")
 
 Lifecycle + tool events alone omit the agent's own words. Add an assistant-turn
-event so the trace reads as a transcript:
+event so the stream reads as a transcript:
 
 - New `EventAssistantMessage` dispatched in the loop after a turn's assistant text
   is assembled (`loop.go` around the `KindTextDelta` accumulation), payload
@@ -113,7 +113,7 @@ event so the trace reads as a transcript:
 
 - Persist the trace so a completed run replays: append events to a per-task
   trace log (a sidecar file under the task's state dir, JSONL — cheaper than
-  growing a `Task` field unbounded). The final `Lineage` persistence is unchanged.
+  growing a `Task` field unbounded). The final `Trace` persistence is unchanged.
 - Endpoint `GET /api/tasks/{id}/agentgraph/trace`:
   - live run → **SSE** stream of events (do not reuse review's 2.5s poll; that
     polling + unmemoized render was the CPU sink found in the resource-governance
@@ -128,7 +128,7 @@ event so the trace reads as a transcript:
 
 ### E. frontend — render the live trace
 
-- Extend `AgentLineage.vue`: subscribe via `EventSource`; drive node status live
+- Extend `AgentTrace.vue`: subscribe via `EventSource`; drive node status live
   (`SessionStart`→running, `Stop`/`SessionEnd`→done, `SubagentStart`→new node +
   delegate edge) so the graph animates as the run proceeds.
 - A per-node transcript panel renders the agent's `AssistantMessage` text and a
@@ -150,8 +150,8 @@ resolve during co-development.
 {Name, SessionID, AgentID, At, PayloadJSON}, re-exported event-name constants,
 `EventAssistantMessage` (the loop now emits per-turn assistant text), and a
 `recover()` guard around the observer. Bonus fix: the dynamic entry's loop
-SessionID now equals its lineage node id (`entryID`), consistent with peers and
-pinned steps, so an event's SessionID is a reliable join key to its lineage node.
+SessionID now equals its trace node id (`entryID`), consistent with peers and
+pinned steps, so an event's SessionID is a reliable join key to its trace node.
 Tests (fake model) cover the ordered stream incl. assistant text + delegation,
 the SessionID→node join, determinism (output identical with/without observer),
 and observer-panic recovery; full topos suite + golangci-lint green.
@@ -164,23 +164,23 @@ and observer-panic recovery; full topos suite + golangci-lint green.
 trace hub + JSONL + dedicated SSE endpoint + new UI, the run's events are
 forwarded onto the **existing task timeline** via `InsertEvent`, which already
 renders live through `/api/tasks/stream`. This delivers the live multi-agent
-transcript (per-turn assistant text, delegations, tool use, labelled by lineage
+transcript (per-turn assistant text, delegations, tool use, labelled by trace
 node id) with no new endpoint and no frontend change — far less surface for the
 same user-visible outcome. agentgraph gained a topos-free `TraceEvent` + an
 `onEvent` observer on `RunFlowWithModel` (wired to `topos.Options.Observer` inside
 the seam); `runAgenticFlow` drains events through a buffered channel (non-blocking,
 honouring the synchronous-observer contract) and maps the meaningful ones to
-timeline lines. Tests: the observer receives the ordered stream with Node→lineage
+timeline lines. Tests: the observer receives the ordered stream with Node→trace
 join; `agenticTraceEvent` maps/filters correctly. Import guard intact; lint green.
 
-**Phase 3 — live per-agent transcript in AgentLineage. DONE** (`167b8313`,
+**Phase 3 — live per-agent transcript in AgentTrace. DONE** (`167b8313`,
 `cb02a2c5`). A leaner cut than the original D/E plan: instead of a bespoke trace
-hub + JSONL + dedicated SSE endpoint, `AgentLineage.vue` builds the live trace
+hub + JSONL + dedicated SSE endpoint, `AgentTrace.vue` builds the live event stream
 from the run's agentgraph-tagged timeline events (3a enriched them with
 `source`/`kind`/`node`/`agent`/`text`), refetched on `task.updated_at` via the
 existing live task-update path. It renders a per-agent transcript (assistant text
 as **memoized markdown** — the review CPU lesson), shows during the run (provisional
-running nodes synthesized from the trace before the lineage persists), and renders
+running nodes synthesized from the events before the trace persists), and renders
 nothing for non-agentgraph tasks. Mounted for `in_progress` agentic tasks. Tests
 cover graph, transcript (markdown rendered, non-agentgraph filtered, provisional
 nodes), and the empty case; `vue-tsc` + the SSG build pass.
@@ -196,7 +196,7 @@ this refetch already show the trace live.
 - Live trace for non-topos paths (single-agent already streams; review already has
   its trajectory view).
 - Rendering the trace inside the Map's `GraphCanvas` (coordinate with the
-  in-progress mission-control map work; task-detail `AgentLineage.vue` first).
+  in-progress mission-control map work; task-detail `AgentTrace.vue` first).
 
 ## Open Questions
 

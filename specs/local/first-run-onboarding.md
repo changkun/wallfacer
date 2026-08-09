@@ -49,7 +49,7 @@ onboarding design has to make the powerful thing legible, not just expose it.
 - The merged **agent graph** UI: replace the separate Agents and Flows pages with
   the unified graph (pinned vs dynamic regions, the peer directory) the SDK exposes;
   make pinned (deterministic flow) vs dynamic (mesh) legible to a newcomer.
-- Live lineage in the Map/`GraphCanvas` as the place a user watches a run.
+- Live trace in the Map/`GraphCanvas` as the place a user watches a run.
 
 ## Out of Scope
 

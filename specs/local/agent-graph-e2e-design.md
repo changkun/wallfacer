@@ -50,7 +50,7 @@ resolves via `flow.Registry.ResolveForTask` (FlowID, else legacy Kind, else
 
 1. **Agentic / topos fleet** — `flow.Agentic == true` -> `runAgenticFlow`
    (`internal/runner/agentic.go`) -> `agentgraph.RunFlowWithModel` ->
-   `topos.Region` (entry + peers, pinned or dynamic). Persists lineage. **Fully
+   `topos.Region` (entry + peers, pinned or dynamic). Persists trace. **Fully
    wired end to end, but used only by test fixtures.** No built-in flow is
    agentic; the only way to get an agentic flow is to author one via
    `POST /api/flows {agentic:true}`, which only the agent-graph editor does.
@@ -125,7 +125,7 @@ persistence across topos runs, output capture) -- a redesign.
    production path; delegating = a distinct mode), one dispatch, no engine
    teardown.
 2. **The delegating/agentic coordination is EXPERIMENTAL** until the
-   worktree-sandbox adapter exists. Today it produces a transcript + lineage but
+   worktree-sandbox adapter exists. Today it produces a transcript + trace but
    **no durable commits and no verification** -- so the agent-graph UI must not
    present a delegating graph as a production-ready way to run a real task. This
    is the genuine "suboptimal design" left to address: either gate/label the
@@ -192,9 +192,9 @@ forced.
 - **Agent graph** — a named graph of agents: a **lead** (the entry that receives
   the task), members, and a **coordination policy**. Replaces "flow" entirely.
 - **Task** — work assigned to an agent graph. Enters at the lead; the graph works
-  it to an outcome; the run's lineage is the graph lit up by what actually
+  it to an outcome; the run's trace is the graph lit up by what actually
   happened.
-- **Run / lineage** — the executed graph (status per node, real delegations).
+- **Run / trace** — the executed graph (status per node, real delegations).
 
 ### Authoring surface (one surface)
 

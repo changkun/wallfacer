@@ -51,7 +51,7 @@ Documented but gone:
 
 Shipped but undocumented:
 - Agent graph (`/agent-graph`, `internal/agentgraph`, embedded topos runtime,
-  live agent traces).
+  live agent events).
 - Whiteboard (`/whiteboard`, Excalidraw island, per-workspace scene).
 - Mission Control (`/mission`, unified spec+task graph, inline lifecycle
   actions).
@@ -100,7 +100,7 @@ but keep `getting-started` stable as the highest-inbound slug):
 
 `docs/internals/` — keep the strong 10-file skeleton, correct drift, add:
 - `agent-graph-runtime.md` — NEW: `internal/agentgraph`, topos embedding,
-  observer seam, lineage → timeline.
+  observer seam, trace → timeline.
 - `auth-and-identity.md` — NEW: OIDC/PKCE, device flow, session cookie,
   principal context (promote from `docs/cloud/`).
 - Existing files re-verified against code (esp. `automation.md`,

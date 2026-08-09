@@ -9,7 +9,7 @@ affects:
   - internal/runner/
   - internal/handler/
   - internal/store/
-  - frontend/src/components/AgentLineage.vue
+  - frontend/src/components/AgentTrace.vue
   - frontend/src/views/AgentGraphPage.vue
   - frontend/src/styles/app/buttons-hero.css
 effort: xlarge
@@ -33,7 +33,7 @@ with Cella remote workspaces.
 
 This is the harness-layer counterpart to the already-shipped
 [[topos-runtime-integration]] (which embedded Topos as a *separate* multi-agent runtime
-path) and [[topos-live-agent-trace]] (live tracing). Those made Topos *runnable*; this
+path) and [[topos-live-agent-events]] (live tracing). Those made Topos *runnable*; this
 spec makes it the *native default* and reconciles it with the harness abstraction.
 
 ## Current State
@@ -50,7 +50,7 @@ Two seams exist side by side and do not yet meet:
 
 2. **The Topos runtime path** (`internal/agentgraph/`). Topos is embedded **in-process**
    and runs agentic flows via Lux (`flow.Flow.Agentic`); it has **zero** references to
-   `internal/harness`. A run produces a lineage graph, not a harness `Event` stream. The
+   `internal/harness`. A run produces a trace graph, not a harness `Event` stream. The
    single importer of the root `topos` package is `internal/agentgraph`, guarded by an
    import-boundary test.
 
@@ -100,7 +100,7 @@ flowchart TD
   region --> mode{auth state}
   mode -->|not logged in| local[local Lux + sandbox/local]
   mode -->|logged in| cloud[Topos cloud /v1 + Cella remote workspace]
-  topos --> ev[topos.Event → canonical harness Event] --> stream[same Activity/timeline + lineage trace]
+  topos --> ev[topos.Event → canonical harness Event] --> stream[same Activity/timeline + trace trace]
 ```
 
 The native harness unifies the two seams: it is a registered `Harness` (so the picker,
@@ -115,7 +115,7 @@ same engine at different region sizes.
 - New `harness.Topos ID = "topos"` constant and a `toposHarness` registered via `init()`
   (mirrors `claude.go`/`codex.go`). Lives in `internal/harness/topos.go`.
 - Bridge `internal/agentgraph` into the harness contract: a single-agent run maps
-  `topos.Event` (already exposed via `Options.Observer`, see [[topos-live-agent-trace]])
+  `topos.Event` (already exposed via `Options.Observer`, see [[topos-live-agent-events]])
   to the canonical `harness.Event` (`KindAssistantText`, `KindToolCall*`, `KindResult`
   with `Usage`/`StopReason`). The canonical types are already harness-agnostic, so the
   mapping is total.
@@ -169,7 +169,7 @@ Surface the native-harness identity:
   alongside the existing `.wallfacer-brand`/`.cella-brand` (italic serif,
   `linear-gradient(135deg,#55707a 0%,#6f8a56 58%,#a07045 100%)` clipped to text), and a
   small 4-node graph SVG icon component (ported from the agents-repo `SiteNav` mark).
-- Brand `AgentLineage.vue`'s header ("Agent Graph" → node icon + Topos wordmark) and
+- Brand `AgentTrace.vue`'s header ("Agent Graph" → node icon + Topos wordmark) and
   upgrade the plain-text "topos runtime" mention in `AgentGraphPage.vue` to the wordmark.
 - Show the resolved harness (and local/cloud mode) in the harness picker so a user can
   see and switch the native default.
@@ -199,7 +199,7 @@ Surface the native-harness identity:
 - Cloud mode unreachable (offline, not logged in, platform error) degrades to local mode
   with a clear signal, never a hard failure of an otherwise-local-capable run.
 - Topos observer/runtime panics are already `recover()`-guarded in the SDK
-  ([[topos-live-agent-trace]] Phase 1); the harness bridge must not reintroduce a crash
+  ([[topos-live-agent-events]] Phase 1); the harness bridge must not reintroduce a crash
   path.
 
 ## Testing Strategy
@@ -216,7 +216,7 @@ Surface the native-harness identity:
   per auth state; local mode runs with no cloud dependency.
 - **Back-compat**: existing pinned tasks serialize/run byte-identically; the import-guard
   test still passes (only the agentgraph bridge names topos).
-- **Frontend**: `.topos-brand` renders; `AgentLineage.vue` shows the wordmark; non-topos
+- **Frontend**: `.topos-brand` renders; `AgentTrace.vue` shows the wordmark; non-topos
   tasks unaffected. `make build` (vue-tsc + SSG) and `golangci-lint` green.
 
 ## Open Questions
@@ -253,10 +253,10 @@ end in-process):
   path. Pkg cov 90.1%.
 - **Runner wiring DONE** (`519a1dd9`). `execute.go` routes an implement-path task
   whose resolved harness is in-process to `runNativeTopos` (zero container
-  launches, single-node lineage). Shared `driveToposRun` extracted from
+  launches, single-node trace). Shared `driveToposRun` extracted from
   `runAgenticFlow`. Integration-tested.
 - **Branding DONE** (`52d11106`). `.topos-brand` wordmark + the node-graph logo
-  in `AgentLineage.vue` ("Agent Graph · powered by Topos").
+  in `AgentTrace.vue` ("Agent Graph · powered by Topos").
 
 **Worktree execution DONE (end-to-end, locally) — `wallfacer 72f3fa2f` + `topos 0e8c971`.**
 `agentgraph.RunAgent` threads the task worktree into `topos.Options.Workdir` (a

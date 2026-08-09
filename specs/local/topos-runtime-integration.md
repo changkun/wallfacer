@@ -25,17 +25,17 @@ dispatched_task_id: null
 ## Goal
 
 Embed the public embeddable runtime SDK `latere.ai/x/topos` into the wallfacer
-backend as a new in-process execution path, and surface its deterministic lineage
+backend as a new in-process execution path, and surface its deterministic trace
 as a live agent graph. This is the foundation for merging the separate Agents and
 Flows surfaces into one agent-graph model: a flow becomes a region of agents, a run
-produces a lineage graph, and the Map renders it live.
+produces a trace graph, and the Map renders it live.
 
 ## Why now
 
 The runtime is extracted, public, and stable (`latere.ai/x/topos` v0.0.4: pure SDK,
 linted, covered). wallfacer already consumes sibling latere modules (`review`, `pkg`),
 so the dependency pattern exists. The current Agents and Flows pages are two disjoint
-surfaces; topos gives one model (agents, regions, topology, delegation, lineage) that
+surfaces; topos gives one model (agents, regions, topology, delegation, trace) that
 unifies them and powers an actual multi-agent run, not just a static pipeline.
 
 ## Approach
@@ -52,7 +52,7 @@ beside the existing brainstorm / flow-engine / implement branches. A new flow ki
 (`agentic`, resolved by `Registry.ResolveForTask`) routes a task to a topos run:
 build a `topos.Region` from the flow + the agents registry, call
 `topos.NewRunner(opts).Run(ctx, region, task.Prompt)`, and map the `RunResult`
-(final text + lineage) back onto the task through the same
+(final text + trace) back onto the task through the same
 `in_progress -> waiting -> committing -> done` state machine. Non-topos flows are
 unchanged.
 
@@ -68,7 +68,7 @@ existing credential/harness settings, routed through Lux. Provide a `topos.Sandb
 (`Options.Sandbox`) either as the topos local sandbox or an adapter over wallfacer's
 `executor.Backend`, so a topos run executes tools where wallfacer already runs work.
 
-**5. Live lineage in the Map.** Persist the `topos.Lineage` (nodes: id/name/role/
+**5. Live trace in the Map.** Persist the `topos.Trace` (nodes: id/name/role/
 status/grants/sandbox; edges: delegate/deliver/next) on the task (a new field or
 `Task.Result`). Extend `internal/graph` + `GET /api/graph` (or a task-scoped endpoint)
 to return it, and render it in `GraphCanvas` as a sub-graph under the task node, so a
@@ -82,7 +82,7 @@ editing the graph edits the underlying agents/flows YAML registries.
   (gitignored) uses local `../topos`; the import-guard test enforces the boundary.
 - **M2: execution seam (headless). DONE** (`a8abfa3b`). A flow flagged
   `flow.Flow.Agentic` runs in-process via `agentgraph.RunFlow` and the topos fake
-  model, persists the lineage to a typed `Task.Lineage` JSON field, and drives the
+  model, persists the trace to a typed `Task.Trace` JSON field, and drives the
   existing `in_progress -> waiting -> committing -> done` state machine with zero
   container launches. The runner consumes a topos-free `Result` mirror, so only
   `internal/agentgraph` names a topos type. Existing flows unchanged; tested.
@@ -98,8 +98,8 @@ editing the graph edits the underlying agents/flows YAML registries.
   -> `ModelLux`; bare key -> `ModelDirect`; none -> `ModelFake`), mapped inside the
   agentgraph seam. *Deferred:* OAuth/bearer credentials (a per-call `BearerSource`)
   and the `executor.Backend -> topos.Sandbox` adapter (OQ-1: local sandbox for now).
-- **M5: serve + render the lineage. DONE** (`c832fa8e`). `GET /api/tasks/{id}/lineage`
-  serves the parsed lineage; a self-contained `AgentLineage.vue` renders nodes (by
+- **M5: serve + render the trace. DONE** (`c832fa8e`). `GET /api/tasks/{id}/trace`
+  serves the parsed trace; a self-contained `AgentTrace.vue` renders nodes (by
   status) and edges (by kind) in the task detail. *Deferred:* rendering it as a
   sub-graph inside the Map's `GraphCanvas` (coordinate with the in-progress map work).
 - **M6: unified Agents/Flows graph UI.** Merge the two pages into the agent-graph
@@ -110,8 +110,8 @@ editing the graph edits the underlying agents/flows YAML registries.
 
 - M1: the import-guard test (compile-time boundary).
 - M2-M4: backend tests using the topos `ModelFake` so runs are deterministic and need
-  no network; assert task state transitions and the persisted lineage.
-- M5: graph endpoint returns the lineage; a frontend test renders the sub-graph.
+  no network; assert task state transitions and the persisted trace.
+- M5: graph endpoint returns the trace; a frontend test renders the sub-graph.
 - No change to existing flow execution paths is allowed to regress (run the current
   runner/flow tests).
 
@@ -126,7 +126,7 @@ editing the graph edits the underlying agents/flows YAML registries.
 - **OQ-1 RESOLVED** (M4, minimally): use the topos local sandbox (`Options.Sandbox`
   nil) for now. The `executor.Backend -> topos.Sandbox` adapter (so a topos run
   shares wallfacer's container/host execution) is deferred to a later milestone.
-- **OQ-2 RESOLVED** (M2): lineage is a typed `Task.Lineage *string` JSON field (an
+- **OQ-2 RESOLVED** (M2): trace is a typed `Task.Trace *string` JSON field (an
   opaque string so the store never imports topos), keeping `Task.Result` for the
   agent's final text. `omitempty` means non-agentic tasks serialize byte-identically.
 - **OQ-3**: how a dynamic flow declares topology (orchestrator-worker vs mesh) and the

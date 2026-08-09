@@ -32,7 +32,7 @@ dispatched_task_id: null
 Replace the two disjoint surfaces (Agents, a list of roles; Flows, a step composer)
 with one **agent-graph** surface. Agents are nodes; composing them into a graph is
 authoring a flow; the graph's shape is the topology (pinned chain or dynamic mesh);
-running it overlays the live lineage. This is the founding goal: make "define an
+running it overlays the live trace. This is the founding goal: make "define an
 agent", "compose a flow", and "watch a run" one understandable thing, powered by the
 topos model already wired in (`topos-runtime-integration.md`).
 
@@ -90,10 +90,10 @@ A single view (provisional route `/agents`, eventually replacing both
 - **Topology controls.** A flow toggles pinned (deterministic chain) vs dynamic
   (mesh), sets the topology (orchestrator-worker | mesh) and the handoff-depth bound.
   These map directly to the topos `Region`/`Options` the runner already builds.
-- **Run overlay.** When a task runs an agentic flow, overlay its lineage (the
-  `AgentLineage` data from M5: node status, delegate/deliver/next edges) on the same
+- **Run overlay.** When a task runs an agentic flow, overlay its trace (the
+  `AgentTrace` data from M5: node status, delegate/deliver/next edges) on the same
   canvas, so a live mesh handoff is visible on the graph that authored it. Reuse the
-  M5 lineage endpoint.
+  M5 trace endpoint.
 
 The canvas reuses the existing `GraphCanvas` patterns (hand-rolled SVG, RAF-batched
 drag, curved edges) where it fits; a new graph component is acceptable if entangling
@@ -103,8 +103,8 @@ regress the Map's spec/task graph.
 ## Data flow
 
 Nothing new is invented for storage: agent nodes <-> agents YAML registry; the graph
-<-> flows YAML registry; the run overlay <-> the M5 task-lineage endpoint. The UI is a
-graph editor over the two existing registries plus a lineage overlay. Any new backend
+<-> flows YAML registry; the run overlay <-> the M5 task-trace endpoint. The UI is a
+graph editor over the two existing registries plus a trace overlay. Any new backend
 is thin (e.g. a combined read for the editor); prefer the existing agents/flows CRUD.
 
 ## Milestones (built additively, reviewed visually each step)
@@ -163,9 +163,9 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     controls, and a jump to the agent editor -- all persisting through the flow
     and agents CRUD.
 - **M6.3: run overlay. DONE** (fleet model). A read-only run picker lists the
-  selected fleet's agentic runs (tasks with `flow_id` == the fleet + a lineage);
-  choosing one fetches `GET /api/tasks/{id}/lineage` and colours the agent nodes
-  by status (running / done / failed), matched by lineage node name == agent
+  selected fleet's agentic runs (tasks with `flow_id` == the fleet + a trace);
+  choosing one fetches `GET /api/tasks/{id}/trace` and colours the agent nodes
+  by status (running / done / failed), matched by trace node name == agent
   slug. Component-tested (filter by fleet, name-keyed status colouring).
 - **M6.4: retire the old pages. PARITY DONE; cutover deferred.** The unified
   fleet surface now has full CRUD parity with `FlowsPage`: clone/edit/save (M6.2),
@@ -181,9 +181,9 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
 
 - Frontend: `bun run build` (vite + vue-tsc) green at every slice; component tests
   (vitest) for the palette, the graph render from a flow, the edit->YAML round-trip,
-  and the lineage overlay. I cannot verify pixels, so each slice is reviewed visually
+  and the trace overlay. I cannot verify pixels, so each slice is reviewed visually
   by the author before the next.
-- Backend: any new/changed handler has a Go test; existing agents/flows/lineage
+- Backend: any new/changed handler has a Go test; existing agents/flows/trace
   handlers must not regress.
 - The topos import guard and the integration tests stay green (this is UI over the
   existing registries + the M5 endpoint; it adds no topos import).
@@ -205,4 +205,4 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
 ## Notes
 
 The UX merge that motivated the whole topos effort. Builds entirely on shipped pieces:
-the agents/flows YAML registries, the M3 flow fields, and the M5 lineage endpoint.
+the agents/flows YAML registries, the M3 flow fields, and the M5 trace endpoint.
