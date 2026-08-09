@@ -104,7 +104,7 @@ type Result struct {
 	Lineage Lineage
 }
 
-// Lineage is the topos-free mirror of topos.Lineage: the renderable run graph of
+// Lineage is the topos-free mirror of topos.Trace: the renderable run graph of
 // nodes (agents) and edges (delegate / deliver / next). It marshals to the same
 // JSON shape, so a host can persist it opaquely and a consumer can unmarshal it.
 type Lineage struct {
@@ -112,7 +112,7 @@ type Lineage struct {
 	Edges []Edge
 }
 
-// Node mirrors topos.LineageNode.
+// Node mirrors topos.TraceNode.
 type Node struct {
 	ID      string
 	Name    string
@@ -122,7 +122,7 @@ type Node struct {
 	Sandbox string
 }
 
-// Edge mirrors topos.LineageEdge (Kind is "delegate", "deliver", or "next").
+// Edge mirrors topos.TraceEdge (Kind is "delegate", "deliver", or "next").
 type Edge struct {
 	From string
 	To   string

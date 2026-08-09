@@ -275,7 +275,7 @@ type Task struct {
 	SessionID         *string             `json:"session_id"`
 	FreshStart        bool                `json:"fresh_start,omitempty"`
 	Result            *string             `json:"result"`
-	// Lineage holds the JSON-marshalled topos.Lineage (nodes + edges)
+	// Lineage holds the JSON-marshalled agentgraph.Lineage (nodes + edges),
 	// produced by an agentic-flow run through internal/agentgraph. Nil
 	// for every non-agentic task. Persisted as an opaque string so the
 	// store does not depend on the topos package; the graph endpoint
