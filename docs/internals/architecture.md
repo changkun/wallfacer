@@ -122,7 +122,7 @@ Both directories are fsnotify-watched; edits reload the merged registry without 
 
 Task execution picks one of three dispatch paths (`internal/runner/execute.go`):
 
-- a flow marked `Agentic` -> the in-process topos agent-graph runtime. `internal/agentgraph` is the single seam onto the embedded topos runtime: it compiles the flow plus agents registry into a `topos.Region` and `runAgenticFlow` executes it, persisting the resulting lineage graph on the task. The built-in `implement` flow does not set `Agentic`; this path is experimental/opt-in. A task whose resolved harness is `topos` similarly runs through `runNativeTopos` instead of a subprocess.
+- a flow marked `Agentic` -> the in-process topos agent-graph runtime. `internal/agentgraph` is the single seam onto the embedded topos runtime: it compiles the flow plus agents registry into a `topos.Region` and `runAgenticFlow` executes it, persisting the resulting trace graph on the task. The built-in `implement` flow does not set `Agentic`; this path is experimental/opt-in. A task whose resolved harness is `topos` similarly runs through `runNativeTopos` instead of a subprocess.
 - `flow == "implement"` -> the turn-loop path in `execute.go` (impl -> test -> commit pipeline with full session-recovery semantics).
 - any other flow slug -> the flow engine in `internal/flow/engine.go`. It walks steps linearly, fans parallel-sibling groups through an `errgroup`, and launches each role via `Runner.RunAgent`.
 
@@ -337,7 +337,7 @@ Every `internal/` package and its role in the system:
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
 | `adversarial` | Review adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `ReviewVerifier` |
-| `agentgraph` | The single seam onto the embedded topos runtime: compiles a flow + agents registry into a `topos.Region`, executes it, returns final text plus a lineage graph | `FromFlow()`, `RunFlow()`, `Runner`, `Lineage` |
+| `agentgraph` | The single seam onto the embedded topos runtime: compiles a flow + agents registry into a `topos.Region`, executes it, returns final text plus a trace graph | `FromFlow()`, `RunFlow()`, `Runner`, `Trace` |
 | `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload. Five built-in roles: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Registry`, `Role`, `BuiltinAgents`, `NewRegistry()`, `Load()` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |

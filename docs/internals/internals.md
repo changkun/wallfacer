@@ -58,7 +58,7 @@ Background watchers, the autoimplement promotion loop, auto-test, auto-review, a
 
 [Agent Graph Runtime](agent-graph-runtime.md)
 
-The embedded topos runtime: the `internal/agentgraph` import seam and its boundary test, model resolution (fake / Lux gateway / direct key), the two execution paths (agentic flows and the native in-process `topos` harness), lineage persistence and the live trace mapping onto the task timeline, and the agent/flow CRUD surface behind `/agent-graph`.
+The embedded topos runtime: the `internal/agentgraph` import seam and its boundary test, model resolution (fake / Lux gateway / direct key), the two execution paths (agentic flows and the native in-process `topos` harness), trace persistence and the live trace mapping onto the task timeline, and the agent/flow CRUD surface behind `/agent-graph`.
 
 ### 9. Plan Mode
 

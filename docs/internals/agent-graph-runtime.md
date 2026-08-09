@@ -1,6 +1,6 @@
 # Agent Graph Runtime
 
-Wallfacer embeds the topos runtime SDK (`latere.ai/x/topos`) as an in-process multi-agent execution engine. A topos run compiles a set of agents into a `topos.Region`, executes it inside the wallfacer server process, and returns a final text plus a lineage graph of which agent did what and who delegated to whom. This is the execution substrate behind the Agent Graph page (`/agent-graph`), agentic flows, and the native `topos` harness.
+Wallfacer embeds the topos runtime SDK (`latere.ai/x/topos`) as an in-process multi-agent execution engine. A topos run compiles a set of agents into a `topos.Region`, executes it inside the wallfacer server process, and returns a final text plus a trace graph of which agent did what and who delegated to whom. This is the execution substrate behind the Agent Graph page (`/agent-graph`), agentic flows, and the native `topos` harness.
 
 The integration is deliberately experimental and opt-in. The built-in `implement` flow does **not** run through it: an ordinary task keeps the multi-turn subprocess turn loop documented in [Task Lifecycle](task-lifecycle.md). Only a flow explicitly marked agentic, or a task explicitly pinned to the `topos` harness, reaches this runtime. Current constraints: static API-key credentials only (Bearer/OAuth deferred), transparent fallback to a deterministic fake model when no credential is configured, no session resume, no MCP, and no verification pass after the in-process run. The milestone history lives in `specs/local/topos-runtime-integration.md`.
 
@@ -11,9 +11,9 @@ The integration is deliberately experimental and opt-in. The built-in `implement
 | Seam type | Mirrors | Purpose |
 |---|---|---|
 | `agentgraph.Runner` | `topos.Runner` | `Run(ctx, region, task)` executes a region and returns the result |
-| `agentgraph.Result` | `topos.RunResult` | `Final` text + `Lineage` graph |
-| `agentgraph.Lineage` / `Node` / `Edge` | `topos.Lineage` | Renderable run graph; marshals to the same JSON shape |
-| `agentgraph.TraceEvent` | `topos.Event` | One live observation (assistant text, delegation, tool use); `PayloadJSON` stays opaque |
+| `agentgraph.Result` | `topos.RunResult` | `Final` text + `Trace` graph |
+| `agentgraph.Trace` / `Node` / `Edge` | `topos.Trace` | Renderable run graph; marshals to the same JSON shape |
+| `agentgraph.Event` | `topos.Event` | One live observation (assistant text, delegation, tool use); `PayloadJSON` stays opaque |
 | `agentgraph.ModelConfig` / `ModelMode` | `topos.ModelOptions` / `ModelKind` | Host-side model selection; mapped in exactly one function, `modelOptions` |
 
 Only the curated root package `latere.ai/x/topos` is a supported surface. `TestWallfacerImportsOnlyRootTopos` (`internal/agentgraph/boundary_test.go`) runs `go list` over every package and fails if any wallfacer package imports a topos engine subpackage (`latere.ai/x/topos/...`). This keeps the runtime an implementation detail: the engine can restructure internally without touching wallfacer, and no second seam can grow by accident.
@@ -40,7 +40,7 @@ Only the static `x-api-key` credential is wired. Bearer-style credentials (`ANTH
 
 ## Flow Compilation
 
-`FromFlow` (`internal/agentgraph/adapter.go`) compiles a wallfacer `flow.Flow` plus the agents registry into a `topos.Region`. The flow's first step becomes the region entry, the remaining steps the ordered peer chain. Each step's `AgentSlug` resolves through the registry into an `agents.Role` and maps onto a `topos.AgentSpec`: the slug is the stable identity (lineage node ids are `<session>/<slug>`), `PromptTmpl` becomes the system prompt, and `Capabilities` become permission scopes. Built-in roles leave `PromptTmpl` empty (they render through the prompts package); an empty system prompt is legal for the fake model and the headless path.
+`FromFlow` (`internal/agentgraph/adapter.go`) compiles a wallfacer `flow.Flow` plus the agents registry into a `topos.Region`. The flow's first step becomes the region entry, the remaining steps the ordered peer chain. Each step's `AgentSlug` resolves through the registry into an `agents.Role` and maps onto a `topos.AgentSpec`: the slug is the stable identity (trace node ids are `<session>/<slug>`), `PromptTmpl` becomes the system prompt, and `Capabilities` become permission scopes. Built-in roles leave `PromptTmpl` empty (they render through the prompts package); an empty system prompt is legal for the fake model and the headless path.
 
 Three flow fields shape the region's autonomy (`internal/flow/flow.go`):
 
@@ -68,18 +68,18 @@ Both paths converge on `driveToposRun` (`internal/runner/agentic.go`), which:
 - applies the task timeout (`task.Timeout` minutes, falling back to `constants.DefaultTaskTimeout`);
 - forwards live trace events onto the task timeline. The topos observer is called synchronously on the run's goroutines, so it must not block: events are pushed into a 256-slot buffered channel and drained into the store by a separate goroutine, dropping on overflow rather than backpressuring the run;
 - on error, respects an already-cancelled task, classifies the failure (`classifyFailure`), attempts `tryAutoRetry`, and otherwise fails the task with an error event;
-- on success, persists the final text (`UpdateTaskResult` with stop reason `end_turn`) and the JSON-marshalled lineage (`UpdateTaskLineage`) **before** transitioning, so the durable record is complete the moment the task reaches done;
+- on success, persists the final text (`UpdateTaskResult` with stop reason `end_turn`) and the JSON-marshalled trace (`UpdateTaskTrace`) **before** transitioning, so the durable record is complete the moment the task reaches done;
 - walks `in_progress -> waiting -> committing`, runs `Runner.Commit` to stage, commit, rebase, merge, and clean up the task worktrees, then transitions to `done`. A commit failure transitions from `committing` to `failed`; the state machine forbids a direct `in_progress -> done` transition.
 
-## Task.Lineage and the Graph Endpoint
+## Task.Trace and the Graph Endpoint
 
-`store.Task.Lineage` (`internal/store/models.go`) holds the JSON-marshalled lineage as an opaque `*string`, so the store never depends on topos types. Nil for every non-agentic task.
+`store.Task.Trace` (`internal/store/models.go`) holds the JSON-marshalled trace as an opaque `*string`, so the store never depends on topos types. Nil for every non-agentic task.
 
-`GET /api/tasks/{id}/lineage` (`internal/handler/tasks_lineage.go`, `TaskLineage`) reparses the stored string into the thin frontend shape: `nodes` (id, name, role, status `running|done|failed`, grants, sandbox) and `edges` (from, to, kind `delegate|deliver|next`). The stored JSON uses capitalised keys with no tags; `json.Unmarshal` matches case-insensitively, so it binds directly to the lowercase wire fields. A task with no lineage returns 200 with empty arrays, never null, so the client renders nothing without special casing. `AgentLineage.vue` draws the graph in the task detail modal.
+`GET /api/tasks/{id}/trace` (`internal/handler/tasks_trace.go`, `TaskTrace`) reparses the stored string into the thin frontend shape: `nodes` (id, name, role, status `running|done|failed`, grants, sandbox) and `edges` (from, to, kind `delegate|deliver|next`). The stored JSON uses capitalised keys with no tags; `json.Unmarshal` matches case-insensitively, so it binds directly to the lowercase wire fields. A task with no trace returns 200 with empty arrays, never null, so the client renders nothing without special casing. `AgentTrace.vue` draws the graph in the task detail modal.
 
 ## Live Traces on the Task Timeline
 
-`agenticTraceEvent` (`internal/runner/agentic.go`) maps a `TraceEvent` onto a task-timeline event, returning `ok=false` for anything that should not surface (lifecycle bookkeeping, empty payloads). Exactly three topos event names surface today:
+`agenticEvent` (`internal/runner/agentic.go`) maps an `Event` onto a task-timeline event, returning `ok=false` for anything that should not surface (lifecycle bookkeeping, empty payloads). Exactly three topos event names surface today:
 
 | Topos event | `kind` | Rendered line |
 |---|---|---|
@@ -87,7 +87,7 @@ Both paths converge on `driveToposRun` (`internal/runner/agentic.go`), which:
 | `SubagentStart` | `delegate` | `delegated to <agent>` |
 | `PostToolUse` | `tool` | `<agent> used <tool>` (dropped when the tool name is missing) |
 
-Each surfaces as a `store.EventTypeSystem` event whose data carries `result` (the human-readable line, so the events tab reads naturally), `source: "agentgraph"` (marks it as an agent-graph trace), `kind`, `node` (the lineage node id, the join key back to graph nodes), `agent`, and `text`. The agent label prefers `AgentID` and falls back to `Node`. This is what makes an agent-graph run visible as it proceeds, not only as a lineage graph at the end.
+Each surfaces as a `store.EventTypeSystem` event whose data carries `result` (the human-readable line, so the events tab reads naturally), `source: "agentgraph"` (marks it as an agent-graph trace), `kind`, `node` (the trace node id, the join key back to graph nodes), `agent`, and `text`. The agent label prefers `AgentID` and falls back to `Node`. This is what makes an agent-graph run visible as it proceeds, not only as a trace graph at the end.
 
 ## The Topos In-Process Harness
 

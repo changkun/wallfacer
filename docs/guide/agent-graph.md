@@ -96,7 +96,7 @@ Current limitations, stated plainly:
 What a topos run does provide:
 
 - **Live agent traces**: each agent turn's text, delegations, and tool use stream onto the task timeline as it happens.
-- **Lineage**: the run's agent graph is persisted on the task and rendered in the task detail (Agent Lineage) and as a **Run** overlay on this page, coloring each fleet node with its per-run status. Fleet-wide activity across specs and tasks is visible on [Mission Control](mission-control.md).
+- **Trace**: the run's agent graph is persisted on the task and rendered in the task detail (Agent Trace) and as a **Run** overlay on this page, coloring each fleet node with its per-run status. Fleet-wide activity across specs and tasks is visible on [Mission Control](mission-control.md).
 
 ## Related pages
 

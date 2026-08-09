@@ -132,7 +132,7 @@ Click any card to open the detail view. A left rail carries the header (status, 
 
 | Tab | Content |
 |---|---|
-| **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy), the agent lineage graph, and, for waiting tasks, the inline feedback box. |
+| **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy), the agent trace graph, and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
 | **Changes** | Per-file git diff of the worktree against the default branch, with a commits-behind warning. |
 | **Verification** | The Review panel and the test agent's per-turn results. |
