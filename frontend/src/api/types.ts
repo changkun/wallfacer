@@ -167,31 +167,31 @@ export interface Task {
   review_unresolved?: number;
   review_headline?: string;
   // Present (non-empty string) only for tasks run via the agentic flow kind;
-  // the opaque JSON of the run's agent-graph lineage. The thin parsed shape is
-  // served by GET /api/tasks/{id}/lineage (see AgentLineage).
-  lineage?: string | null;
+  // the opaque JSON of the run's agent-graph trace. The thin parsed shape is
+  // served by GET /api/tasks/{id}/trace (see AgentTrace).
+  trace?: string | null;
 }
 
-// Agent-graph lineage of an agentic-flow run (GET /api/tasks/{id}/lineage).
+// Agent-graph trace of an agentic-flow run (GET /api/tasks/{id}/trace).
 // status is the node lifecycle; kind is the handoff type between agents.
-export type LineageNodeStatus = 'running' | 'done' | 'failed' | string;
-export type LineageEdgeKind = 'delegate' | 'deliver' | 'next' | string;
-export interface LineageNode {
+export type TraceNodeStatus = 'running' | 'done' | 'failed' | string;
+export type TraceEdgeKind = 'delegate' | 'deliver' | 'next' | string;
+export interface TraceNode {
   id: string;
   name: string;
   role: string;
-  status: LineageNodeStatus;
+  status: TraceNodeStatus;
   grants?: string[];
   sandbox?: string;
 }
-export interface LineageEdge {
+export interface TraceEdge {
   from: string;
   to: string;
-  kind: LineageEdgeKind;
+  kind: TraceEdgeKind;
 }
-export interface TaskLineage {
-  nodes: LineageNode[];
-  edges: LineageEdge[];
+export interface TaskTrace {
+  nodes: TraceNode[];
+  edges: TraceEdge[];
 }
 
 // Review verification trajectory (GET /api/tasks/{id}/review/transcript).

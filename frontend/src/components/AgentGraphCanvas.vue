@@ -12,7 +12,7 @@ import { coordinationOf, type Coordination } from '../lib/flowDraft';
 // A task enters at the lead and the fleet works it to an outcome. Editing emits
 // intent keyed by agent_slug (remove, set-lead, edit-agent); the page owns the
 // draft. Free-form node positioning is a follow-up; this lays the fleet out.
-// runStatus overlays a run's lineage: agent_slug -> 'running' | 'done' |
+// runStatus overlays a run's trace: agent_slug -> 'running' | 'done' |
 // 'failed'. When present (a run is selected) the matching agent nodes are
 // coloured by status, so a finished or in-flight run is visible on the same
 // graph that authored it.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { api } from '../api/client';
-import type { Agent, Flow, Task, TaskLineage } from '../api/types';
+import type { Agent, Flow, Task, TaskTrace } from '../api/types';
 import AgentGraphCanvas from '../components/AgentGraphCanvas.vue';
 import AgentEditor from '../components/AgentEditor.vue';
 import {
@@ -62,7 +62,7 @@ const canvasFlow = computed<Flow | null>(() =>
   draft.value ? draftToFlow(draft.value) : selectedFlow.value,
 );
 
-// Run overlay (M6.3): the agentic runs of the selected fleet, and the lineage
+// Run overlay (M6.3): the agentic runs of the selected fleet, and the trace
 // status of the chosen run keyed by agent slug for the canvas to colour.
 const runs = ref<Task[]>([]);
 const selectedRunId = ref<string | null>(null);
@@ -76,7 +76,7 @@ async function loadRuns(slug: string) {
   try {
     const all = await api<Task[]>('GET', '/api/tasks');
     runs.value = (Array.isArray(all) ? all : [])
-      .filter((t) => t.flow_id === slug && !!t.lineage)
+      .filter((t) => t.flow_id === slug && !!t.trace)
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   } catch (e) {
     console.error('runs:', e);
@@ -88,15 +88,15 @@ async function onSelectRun(id: string | null) {
   runStatus.value = {};
   if (!id) return;
   try {
-    const lin = await api<TaskLineage>('GET', `/api/tasks/${encodeURIComponent(id)}/lineage`);
+    const lin = await api<TaskTrace>('GET', `/api/tasks/${encodeURIComponent(id)}/trace`);
     const status: Record<string, string> = {};
     for (const n of lin.nodes ?? []) {
-      // A lineage node's name is the agent slug it ran as (agentgraph adapter).
+      // A trace node's name is the agent slug it ran as (agentgraph adapter).
       if (n.name) status[n.name] = n.status;
     }
     runStatus.value = status;
   } catch (e) {
-    console.error('lineage:', e);
+    console.error('trace:', e);
   }
 }
 

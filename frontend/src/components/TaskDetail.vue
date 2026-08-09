@@ -17,7 +17,7 @@ import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import ReviewVerification from './ReviewVerification.vue';
-import AgentLineage from './AgentLineage.vue';
+import AgentTrace from './AgentTrace.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import TaskPrPanel from './TaskPrPanel.vue';
@@ -1085,8 +1085,8 @@ async function submitReview() {
                     <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
                   </template>
 
-                  <AgentLineage
-                    v-if="task.lineage || task.status === 'in_progress'"
+                  <AgentTrace
+                    v-if="task.trace || task.status === 'in_progress'"
                     :task-id="task.id"
                     :refresh-key="task.updated_at"
                   />

@@ -14,13 +14,13 @@ let originalFetch: typeof globalThis.fetch;
 let agents: Agent[];
 let flows: Flow[];
 let tasks: unknown[];
-let lineages: Record<string, unknown>;
+let traces: Record<string, unknown>;
 
 beforeEach(() => {
   agents = [];
   flows = [];
   tasks = [];
-  lineages = {};
+  traces = {};
   originalFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
@@ -31,9 +31,9 @@ beforeEach(() => {
       flows = flows.filter((f) => f.slug !== decodeURIComponent(flowDetail[1]));
       return new Response(null, { status: 204 });
     }
-    const lin = url.match(/\/api\/tasks\/([^/?]+)\/lineage/);
+    const lin = url.match(/\/api\/tasks\/([^/?]+)\/trace/);
     if (url.includes('/api/agents')) body = agents;
-    else if (lin) body = lineages[decodeURIComponent(lin[1])] ?? { nodes: [], edges: [] };
+    else if (lin) body = traces[decodeURIComponent(lin[1])] ?? { nodes: [], edges: [] };
     else if (url.includes('/api/tasks')) body = tasks;
     else {
       // GET /api/flows/<slug> returns a single flow (the detail route the editor
@@ -221,10 +221,10 @@ describe('AgentGraphPage (fleet)', () => {
       },
     ];
     tasks = [
-      { id: 'task-1', title: 'A run', status: 'done', created_at: '2026-06-28T10:00:00Z', flow_id: 'runnable', lineage: '{...}' },
-      { id: 'task-x', title: 'Other', status: 'done', created_at: '2026-06-28T09:00:00Z', flow_id: 'other', lineage: '{...}' },
+      { id: 'task-1', title: 'A run', status: 'done', created_at: '2026-06-28T10:00:00Z', flow_id: 'runnable', trace: '{...}' },
+      { id: 'task-x', title: 'Other', status: 'done', created_at: '2026-06-28T09:00:00Z', flow_id: 'other', trace: '{...}' },
     ];
-    lineages['task-1'] = {
+    traces['task-1'] = {
       nodes: [
         { id: 'n1', name: 'impl', role: 'Implementation', status: 'done' },
         { id: 'n2', name: 'test', role: 'Testing', status: 'failed' },
@@ -248,7 +248,7 @@ describe('AgentGraphPage (fleet)', () => {
     sel.dispatchEvent(new Event('change', { bubbles: true }));
     for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
 
-    // impl -> done, test -> failed (matched by lineage node name == agent slug).
+    // impl -> done, test -> failed (matched by trace node name == agent slug).
     expect(host.querySelectorAll('.agc-node--run-done').length).toBe(1);
     expect(host.querySelectorAll('.agc-node--run-failed').length).toBe(1);
 
