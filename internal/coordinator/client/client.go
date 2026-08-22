@@ -306,11 +306,7 @@ func (c *Connector) jitter(d time.Duration) time.Duration {
 
 // nextBackoff doubles cur, capped at limit.
 func nextBackoff(cur, limit time.Duration) time.Duration {
-	n := cur * 2
-	if n > limit {
-		return limit
-	}
-	return n
+	return min(cur*2, limit)
 }
 
 func writeJSON(ctx context.Context, conn *websocket.Conn, v any) error {
