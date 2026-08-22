@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // writeArtifactFixture builds a workspace whose artifacts/ dir holds a deck, a
@@ -132,6 +134,53 @@ func TestListArtifacts_ListsWebFilesOnly(t *testing.T) {
 	}
 	if a := paths["deck.html"]; a.URL != "/artifact/deck.html" {
 		t.Errorf("deck url = %q, want /artifact/deck.html", a.URL)
+	}
+}
+
+// TestListArtifacts_NewestFirst pins the listing order documented on
+// ListArtifacts: most recently modified first. The fixture deliberately gives
+// the lexically last file the newest mtime, so a walk-order or ascending sort
+// would fail here.
+func TestListArtifacts_NewestFirst(t *testing.T) {
+	ws := t.TempDir()
+	art := filepath.Join(ws, "artifacts")
+	if err := os.MkdirAll(art, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Now().Add(-time.Hour).Truncate(time.Second)
+	// name -> age rank: "a" oldest, "c" newest, so newest-first is c, b, a.
+	ages := map[string]time.Duration{"a.html": 0, "b.html": time.Minute, "c.html": 2 * time.Minute}
+	for name, age := range ages {
+		p := filepath.Join(art, name)
+		if err := os.WriteFile(p, []byte("<p>"+name+"</p>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		mod := base.Add(age)
+		if err := os.Chtimes(p, mod, mod); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	h := &Handler{workspaces: []string{ws}}
+	req := httptest.NewRequest(http.MethodGet, "/api/artifacts", nil)
+	rec := httptest.NewRecorder()
+	h.ListArtifacts(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var resp struct {
+		Artifacts []ArtifactInfo `json:"artifacts"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got := make([]string, 0, len(resp.Artifacts))
+	for _, a := range resp.Artifacts {
+		got = append(got, a.Path)
+	}
+	want := []string{"c.html", "b.html", "a.html"}
+	if !slices.Equal(got, want) {
+		t.Errorf("listing order = %v, want %v (newest first)", got, want)
 	}
 }
 

@@ -3,7 +3,7 @@ package yamldir
 import (
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,7 +56,7 @@ func TestReadAll_PicksOnlyYAML(t *testing.T) {
 	for i, f := range files {
 		got[i] = filepath.Base(f.Path)
 	}
-	sort.Strings(got)
+	slices.Sort(got)
 	want := []string{"a.yaml", "b.yml"}
 	for i := range want {
 		if got[i] != want[i] {

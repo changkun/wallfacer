@@ -1,8 +1,9 @@
 package spec
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 )
 
@@ -40,6 +41,6 @@ func ScanStaleCandidates(tree *Tree, changedSince ChangedSinceFunc) []StaleCandi
 			Reason: fmt.Sprintf("%d affects path(s) changed since %s", len(changed), s.Updated.Format(time.DateOnly)),
 		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	slices.SortFunc(out, func(a, b StaleCandidate) int { return cmp.Compare(a.Path, b.Path) })
 	return out
 }

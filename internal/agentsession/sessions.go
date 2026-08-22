@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -547,8 +547,8 @@ func (m *Manager) threadDir(id string) string {
 
 func (m *Manager) writeManifest() error {
 	// Sort for deterministic serialization: by Created timestamp.
-	sort.SliceStable(m.manifest.Threads, func(i, j int) bool {
-		return m.manifest.Threads[i].Created.Before(m.manifest.Threads[j].Created)
+	slices.SortStableFunc(m.manifest.Threads, func(a, b SessionMeta) int {
+		return a.Created.Compare(b.Created)
 	})
 	m.manifest.Version = threadManifestV1
 	return atomicfile.WriteJSON(filepath.Join(m.root, threadsManifestFile), m.manifest, 0o644)

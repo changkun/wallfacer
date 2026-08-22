@@ -2,8 +2,9 @@ package agentsession
 
 import (
 	"bytes"
+	"cmp"
 	"embed"
-	"sort"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -112,7 +113,7 @@ func (r *CommandRegistry) Commands() []Command {
 	for _, def := range r.commands {
 		cmds = append(cmds, def.Command)
 	}
-	sort.Slice(cmds, func(i, j int) bool { return cmds[i].Name < cmds[j].Name })
+	slices.SortFunc(cmds, func(a, b Command) int { return cmp.Compare(a.Name, b.Name) })
 	return cmds
 }
 

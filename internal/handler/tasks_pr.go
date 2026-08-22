@@ -2,7 +2,7 @@ package handler
 
 import (
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -39,7 +39,7 @@ func taskRepoRef(task *store.Task) (owner, name, base, head string, ok bool) {
 	for repoPath := range task.WorktreePaths {
 		repoPaths = append(repoPaths, repoPath)
 	}
-	sort.Strings(repoPaths)
+	slices.Sort(repoPaths)
 	for _, repoPath := range repoPaths {
 		if !gitutil.IsGitRepo(repoPath) {
 			continue

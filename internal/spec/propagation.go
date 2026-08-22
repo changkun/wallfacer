@@ -4,7 +4,6 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -152,7 +151,7 @@ func AffectsImpactFromSpec(tree *Tree, source string) []string {
 // paths actually transitioned, sorted.
 func FanOutStale(tree *Tree, impacted []string, resolve func(string) string, now time.Time) ([]string, error) {
 	sorted := slices.Clone(impacted)
-	sort.Strings(sorted)
+	slices.Sort(sorted)
 
 	var applied []string
 	var errs []error
@@ -188,6 +187,6 @@ func setToSorted(set map[string]bool) []string {
 	for p := range set {
 		out = append(out, p)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }

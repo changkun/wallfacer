@@ -1,6 +1,9 @@
 package spec
 
-import "sort"
+import (
+	"cmp"
+	"slices"
+)
 
 // SubtreeSpecs returns the dispatchable leaves and the non-leaf nodes within
 // the subtree rooted at root (inclusive of root). Archived nodes and their
@@ -34,6 +37,6 @@ func SubtreeSpecs(tree *Tree, root string) (leaves, nonLeaves []*Node) {
 	}
 	walk(node)
 
-	sort.Slice(leaves, func(i, j int) bool { return leaves[i].Key < leaves[j].Key })
+	slices.SortFunc(leaves, func(a, b *Node) int { return cmp.Compare(a.Key, b.Key) })
 	return leaves, nonLeaves
 }

@@ -1,8 +1,9 @@
 package coordinator
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
 	"sync"
 
 	"latere.ai/x/wallfacer/internal/speccomment"
@@ -51,7 +52,7 @@ func (m *memStore) ThreadsForRepo(_ context.Context, org, repo string) ([]specco
 			out = append(out, t)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	slices.SortFunc(out, func(a, b speccomment.Thread) int { return cmp.Compare(a.ID, b.ID) })
 	return out, nil
 }
 

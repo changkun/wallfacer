@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -112,7 +112,7 @@ func (h *Handler) ListArtifacts(w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Modified.After(out[j].Modified) })
+	slices.SortFunc(out, func(a, b ArtifactInfo) int { return b.Modified.Compare(a.Modified) })
 	httpjson.Write(w, http.StatusOK, map[string]any{"artifacts": out})
 }
 

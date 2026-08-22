@@ -1,13 +1,14 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"latere.ai/x/wallfacer/internal/spec"
@@ -196,15 +197,18 @@ func printValidateReport(tree *spec.Tree, results []spec.Result, errCount, warnC
 	for p := range byPath {
 		paths = append(paths, p)
 	}
-	sort.Strings(paths)
+	slices.Sort(paths)
 
 	for _, p := range paths {
 		rs := byPath[p]
-		sort.SliceStable(rs, func(i, j int) bool {
-			if rs[i].Severity != rs[j].Severity {
-				return rs[i].Severity == spec.SeverityError
+		slices.SortStableFunc(rs, func(a, b spec.Result) int {
+			if a.Severity != b.Severity {
+				if a.Severity == spec.SeverityError {
+					return -1
+				}
+				return 1
 			}
-			return rs[i].Rule < rs[j].Rule
+			return cmp.Compare(a.Rule, b.Rule)
 		})
 		label := p
 		if label == "" {
