@@ -1,15 +1,8 @@
 // ChatComposer button visibility: the slash "/" and mention "@" shortcuts must
 // be discoverable from an empty composer, not hidden until the user types.
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createApp, nextTick, type App } from 'vue';
-
-const memStore = new Map<string, string>();
-vi.stubGlobal('localStorage', {
-  getItem: (k: string) => (memStore.has(k) ? memStore.get(k)! : null),
-  setItem: (k: string, v: string) => { memStore.set(k, String(v)); },
-  removeItem: (k: string) => { memStore.delete(k); },
-  clear: () => { memStore.clear(); },
-});
+import { createPinia } from 'pinia';
 
 import ChatComposer from './ChatComposer.vue';
 
@@ -17,6 +10,8 @@ async function mount(): Promise<{ app: App; host: HTMLElement }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const app = createApp(ChatComposer, { streaming: false });
+  // ChatComposer reads the task store to learn which harnesses are installed.
+  app.use(createPinia());
   app.mount(host);
   await nextTick();
   return { app, host };
