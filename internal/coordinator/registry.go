@@ -129,23 +129,10 @@ func (r *Registry) UpdateManifest(instanceID string, m Manifest) {
 	r.broadcast(ev)
 }
 
-// Leave removes an instance (socket close or liveness timeout). No-op if absent.
-func (r *Registry) Leave(instanceID string) {
-	r.mu.Lock()
-	inst, ok := r.byInstance[instanceID]
-	if !ok {
-		r.mu.Unlock()
-		return
-	}
-	delete(r.byInstance, instanceID)
-	ev := Event{Kind: EventLeave, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: instanceID}
-	r.mu.Unlock()
-	r.broadcast(ev)
-}
-
-// LeaveRegistration removes an instance only if the current registry entry still
-// matches the generation returned by Join. Stale sockets that were replaced by a
-// reconnect become no-ops.
+// LeaveRegistration removes an instance (socket close or liveness timeout), but
+// only if the current registry entry still matches the generation returned by
+// Join. Stale sockets that were replaced by a reconnect become no-ops, as does
+// an unknown instance id.
 func (r *Registry) LeaveRegistration(reg Registration) {
 	r.mu.Lock()
 	inst, ok := r.byInstance[reg.InstanceID]

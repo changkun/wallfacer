@@ -18,7 +18,7 @@ func inst(id, sub, org string, remotes ...string) Instance {
 func TestRegistryJoinLeaveSnapshot(t *testing.T) {
 	r := NewRegistry()
 	r.Join(inst("i1", "alice", "org1", "github.com/a/b"))
-	r.Join(inst("i2", "bob", "org1", "github.com/a/b"))
+	reg2 := r.Join(inst("i2", "bob", "org1", "github.com/a/b"))
 	r.Join(inst("i3", "carol", "org2"))
 
 	if got := len(r.Snapshot("org1")); got != 2 {
@@ -28,11 +28,11 @@ func TestRegistryJoinLeaveSnapshot(t *testing.T) {
 		t.Fatalf("org2 snapshot = %d, want 1", got)
 	}
 
-	r.Leave("i2")
+	r.LeaveRegistration(reg2)
 	if got := len(r.Snapshot("org1")); got != 1 {
 		t.Fatalf("after leave, org1 snapshot = %d, want 1", got)
 	}
-	r.Leave("nonexistent") // no-op, no panic
+	r.LeaveRegistration(Registration{InstanceID: "nonexistent"}) // no-op, no panic
 	if r.Len() != 2 {
 		t.Fatalf("Len = %d, want 2", r.Len())
 	}
@@ -93,12 +93,12 @@ func TestRegistrySubscribe(t *testing.T) {
 		t.Fatalf("join event = %+v", ev)
 	}
 
-	r.Join(inst("i1", "alice", "org1")) // reconnect -> EventManifest
+	reg := r.Join(inst("i1", "alice", "org1")) // reconnect -> EventManifest
 	if ev := <-ch; ev.Kind != EventManifest {
 		t.Fatalf("reconnect event kind = %v, want EventManifest", ev.Kind)
 	}
 
-	r.Leave("i1")
+	r.LeaveRegistration(reg)
 	if ev := <-ch; ev.Kind != EventLeave {
 		t.Fatalf("leave event kind = %v, want EventLeave", ev.Kind)
 	}
