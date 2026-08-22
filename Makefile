@@ -92,6 +92,12 @@ lint-otel:
 # package does not type-check, which is a build error rather than a finding,
 # so stderr is dropped and the decision rests on the patch alone.
 lint-modernize:
+	@for fixer in newexpr errorsastype; do \
+		go tool fix help 2>&1 | grep -q "^    $$fixer " || { \
+			echo "go fix no longer carries the $$fixer fixer, so -$$fixer=false is rejected and this check passes silently"; \
+			exit 1; \
+		}; \
+	done
 	@patch=$$(go fix -diff -newexpr=false -errorsastype=false ./... 2>/dev/null); \
 	if [ -n "$$patch" ]; then \
 		echo "$$patch"; \
