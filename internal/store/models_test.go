@@ -137,23 +137,6 @@ func TestTaskMachine_Allowed(t *testing.T) {
 	}
 }
 
-func TestTask_HasTag(t *testing.T) {
-	task := &Task{Tags: []string{"backend", "idea-agent"}}
-
-	if !task.HasTag("backend") {
-		t.Error("expected HasTag to find existing tag")
-	}
-	if task.HasTag("IDEA-AGENT") {
-		t.Error("expected case-sensitive tag matching")
-	}
-	if !task.HasTag("idea-agent") {
-		t.Error("expected HasTag to find second tag")
-	}
-	if task.HasTag("frontend") {
-		t.Error("expected HasTag to return false for missing tag")
-	}
-}
-
 // TestTaskBudgetFieldsRoundTrip verifies that MaxCostUSD and MaxInputTokens
 // survive JSON marshal→unmarshal with correct values, and that zero values are
 // omitted (omitempty) for backwards compatibility with existing task files.

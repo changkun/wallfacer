@@ -441,11 +441,6 @@ func IsAutoRetryEligible(t Task, category FailureCategory) bool {
 	return t.AutoRetryBudget[category] > 0 && t.AutoRetryCount < constants.MaxAutoRetries
 }
 
-// HasTag reports whether the task has the given tag.
-func (t *Task) HasTag(tag string) bool {
-	return slices.Contains(t.Tags, tag)
-}
-
 // EffectiveModel returns the per-task model pin, or "" when the task uses the
 // global default. ModelOverride is the live field; Model is the deprecated
 // pre-migration spelling, read only as a fallback for tasks that have not
