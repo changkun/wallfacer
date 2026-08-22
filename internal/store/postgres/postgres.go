@@ -58,8 +58,8 @@ func runMigrations(dsn string) error {
 // golang-migrate uses for the pgx/v5 driver.
 func pgxScheme(dsn string) string {
 	for _, p := range []string{"postgres://", "postgresql://"} {
-		if strings.HasPrefix(dsn, p) {
-			return "pgx5://" + dsn[len(p):]
+		if rest, ok := strings.CutPrefix(dsn, p); ok {
+			return "pgx5://" + rest
 		}
 	}
 	return dsn

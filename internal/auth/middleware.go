@@ -174,10 +174,11 @@ func withIdentity(r *http.Request, id *Identity) *http.Request {
 // extractor instead of re-implementing it.
 func BearerToken(header string) (string, bool) {
 	const prefix = "Bearer "
-	if !strings.HasPrefix(header, prefix) {
+	rest, ok := strings.CutPrefix(header, prefix)
+	if !ok {
 		return "", false
 	}
-	tok := strings.TrimSpace(header[len(prefix):])
+	tok := strings.TrimSpace(rest)
 	if tok == "" {
 		return "", false
 	}

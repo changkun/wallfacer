@@ -308,10 +308,10 @@ func buildRevertSubject(originalSummary string, originalRound int) string {
 // isn't a planning-revert.
 func revertedRoundFromSubject(subject string) (int, bool) {
 	subject = strings.TrimSpace(subject)
-	if !strings.HasPrefix(subject, revertSubjectPrefix) {
+	rest, ok := strings.CutPrefix(subject, revertSubjectPrefix)
+	if !ok {
 		return 0, false
 	}
-	rest := subject[len(revertSubjectPrefix):]
 	// Round number runs until end, space, or '('.
 	end := len(rest)
 	for i, r := range rest {
