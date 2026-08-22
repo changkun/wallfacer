@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -267,7 +268,7 @@ func gitDiffNames(ctx context.Context, ws, base, tip string) []string {
 func unionPaths(a, b []string) []string {
 	seen := make(map[string]bool, len(a)+len(b))
 	var out []string
-	for _, p := range append(append([]string{}, a...), b...) {
+	for _, p := range slices.Concat(a, b) {
 		if !seen[p] {
 			seen[p] = true
 			out = append(out, p)
