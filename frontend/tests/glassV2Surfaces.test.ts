@@ -71,10 +71,8 @@ describe('Liquid Glass v2 — no glass over content', () => {
     'src/styles/whiteboard.css',
     // The docked terminal / xterm surface — content the spec names explicitly.
     'src/styles/dock.css',
-    // Mermaid diagrams + the aggregated oversight logs/stream view — rendered
-    // content, never floating chrome.
+    // Mermaid diagrams — rendered content, never floating chrome.
     'src/styles/mermaid.css',
-    'src/styles/oversight.css',
     // Spec mode paints the reading-view prose. spec-mode.css is a barrel of
     // @imports, so guard the partial that actually paints content — the
     // barrel itself carries no rules.

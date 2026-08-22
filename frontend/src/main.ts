@@ -21,7 +21,6 @@ import './styles/task-detail.css';
 import './styles/mermaid.css';
 import './styles/diffs.css';
 import './styles/multi-turn.css';
-import './styles/oversight.css';
 import './styles/search.css';
 import './styles/command-palette.css';
 import './styles/workspace-picker.css';
