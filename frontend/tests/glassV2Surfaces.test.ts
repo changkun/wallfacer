@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Regression guard for the Liquid Glass "native v2" adoption. Two contracts:
@@ -13,7 +13,15 @@ import { resolve } from 'node:path';
 // of a full render; mirrors the tests/latereLogo.test.ts harness.
 
 const root = process.cwd();
-const read = (rel: string) => readFileSync(resolve(root, rel), 'utf8');
+// Fail with the path and a fix hint rather than a bare ENOENT: these lists are
+// hand-maintained, so a stylesheet deleted elsewhere shows up here first.
+const read = (rel: string) => {
+  const abs = resolve(root, rel);
+  if (!existsSync(abs)) {
+    throw new Error(`${rel} no longer exists; drop it from this guard's list`);
+  }
+  return readFileSync(abs, 'utf8');
+};
 
 describe('Liquid Glass v2 — shared-token chrome surfaces', () => {
   it('landing navbar is a floating thin-glass capsule with pill links', () => {
@@ -67,11 +75,9 @@ describe('Liquid Glass v2 — no glass over content', () => {
     // content, never floating chrome.
     'src/styles/mermaid.css',
     'src/styles/oversight.css',
-    // Spec mode paints chat prose, the spec tree, and the reading-view TOC.
-    // spec-mode.css is a barrel of @imports, so guard the partials that
-    // actually paint content — the barrel itself carries no rules.
-    'src/styles/spec-mode/chat-pane.css',
-    'src/styles/spec-mode/chat-bubbles.css',
+    // Spec mode paints the spec tree and the reading-view TOC. spec-mode.css
+    // is a barrel of @imports, so guard the partials that actually paint
+    // content — the barrel itself carries no rules.
     'src/styles/spec-mode/prose-toc.css',
     'src/styles/spec-mode/explorer-tree.css',
   ];
