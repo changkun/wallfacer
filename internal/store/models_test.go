@@ -77,7 +77,7 @@ func TestTaskMachine_Validate(t *testing.T) {
 	}
 }
 
-func TestTaskStatus_CanTransitionTo(t *testing.T) {
+func TestTaskMachine_CanTransition(t *testing.T) {
 	// A few representative positive cases.
 	positive := []struct {
 		from, to TaskStatus
@@ -89,20 +89,20 @@ func TestTaskStatus_CanTransitionTo(t *testing.T) {
 		{TaskStatusCancelled, TaskStatusBacklog},
 	}
 	for _, tc := range positive {
-		if !tc.from.CanTransitionTo(tc.to) {
-			t.Errorf("%s.CanTransitionTo(%s) = false, want true", tc.from, tc.to)
+		if !TaskMachine.CanTransition(tc.from, tc.to) {
+			t.Errorf("TaskMachine.CanTransition(%s, %s) = false, want true", tc.from, tc.to)
 		}
 	}
 
 	// Self-transitions must always be false.
 	for _, s := range allStatuses {
-		if s.CanTransitionTo(s) {
-			t.Errorf("%s.CanTransitionTo(%s) = true, want false (self-transition)", s, s)
+		if TaskMachine.CanTransition(s, s) {
+			t.Errorf("TaskMachine.CanTransition(%s, %s) = true, want false (self-transition)", s, s)
 		}
 	}
 }
 
-func TestTaskStatus_AllowedTransitions(t *testing.T) {
+func TestTaskMachine_Allowed(t *testing.T) {
 	tests := []struct {
 		status   TaskStatus
 		expected []TaskStatus
@@ -117,23 +117,23 @@ func TestTaskStatus_AllowedTransitions(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := tc.status.AllowedTransitions()
+		got := TaskMachine.Allowed(tc.status)
 		if len(got) != len(tc.expected) {
-			t.Errorf("%s.AllowedTransitions(): len = %d, want %d (got %v, want %v)",
+			t.Errorf("TaskMachine.Allowed(%s): len = %d, want %d (got %v, want %v)",
 				tc.status, len(got), len(tc.expected), got, tc.expected)
 			continue
 		}
 		for i, g := range got {
 			if g != tc.expected[i] {
-				t.Errorf("%s.AllowedTransitions()[%d] = %s, want %s", tc.status, i, g, tc.expected[i])
+				t.Errorf("TaskMachine.Allowed(%s)[%d] = %s, want %s", tc.status, i, g, tc.expected[i])
 			}
 		}
 	}
 
 	// An unknown status should return nil (no outgoing transitions).
 	unknown := TaskStatus("unknown")
-	if got := unknown.AllowedTransitions(); got != nil {
-		t.Errorf("AllowedTransitions() for unknown status = %v, want nil", got)
+	if got := TaskMachine.Allowed(unknown); got != nil {
+		t.Errorf("TaskMachine.Allowed(unknown) = %v, want nil", got)
 	}
 }
 

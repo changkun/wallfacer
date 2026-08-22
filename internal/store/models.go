@@ -233,18 +233,6 @@ var TaskMachine = statemachine.New(map[TaskStatus][]TaskStatus{
 	TaskStatusCancelled:  {TaskStatusBacklog},
 })
 
-// CanTransitionTo reports whether transitioning from s to next is permitted
-// by the task state machine.
-func (s TaskStatus) CanTransitionTo(next TaskStatus) bool {
-	return TaskMachine.CanTransition(s, next)
-}
-
-// AllowedTransitions returns the list of states reachable from s.
-// Returns nil if s has no outgoing transitions (e.g. terminal or unknown state).
-func (s TaskStatus) AllowedTransitions() []TaskStatus {
-	return TaskMachine.Allowed(s)
-}
-
 // PayloadLimits holds the effective pruning limits for the three
 // unboundedly-growing task slice fields. Values are exposed via GET /api/config
 // so the UI can display "showing last N entries" contextual messages.
