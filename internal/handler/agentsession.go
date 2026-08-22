@@ -15,6 +15,7 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
+	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"
@@ -265,6 +266,10 @@ func (h *Handler) GetAgentMessages(w http.ResponseWriter, r *http.Request) {
 // Returns 409 if an exec is already in flight. The `?thread=<id>` query
 // parameter (or body field) selects which thread receives the message;
 // when omitted, the active thread is used.
+// agentStderrLogRunes bounds the stderr excerpt logged when an agent exits
+// non-zero: enough to identify a crash or an auth failure, not the whole stream.
+const agentStderrLogRunes = 2000
+
 func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
@@ -480,8 +485,16 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		// Tee stdout into the live log so SSE consumers can stream it.
 		tee := io.TeeReader(handle.Stdout(), ll)
 		rawStdout, _ := io.ReadAll(tee)
-		_, _ = io.ReadAll(handle.Stderr())
-		_, _ = handle.Wait()
+		stderr, _ := io.ReadAll(handle.Stderr())
+		// A non-zero exit (crash, OOM, expired credentials) otherwise looks
+		// exactly like a clean run: the code carries on and parses whatever
+		// partial stdout arrived. Logging the status with a bounded stderr
+		// excerpt makes the difference visible. Control flow is unchanged - the
+		// parse below still handles a truncated stream on its own.
+		if code, err := handle.Wait(); err != nil || code != 0 {
+			slog.Error("agent exited non-zero", "code", code, "error", err,
+				"stderr", sanitize.Truncate(string(stderr), agentStderrLogRunes))
+		}
 
 		// Extract session ID and save for future --resume calls.
 		// Load the existing session first to preserve both mode pins.
@@ -526,8 +539,11 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			}
 			retryTee := io.TeeReader(retryHandle.Stdout(), ll2)
 			rawStdout, _ = io.ReadAll(retryTee)
-			_, _ = io.ReadAll(retryHandle.Stderr())
-			_, _ = retryHandle.Wait()
+			retryStderr, _ := io.ReadAll(retryHandle.Stderr())
+			if code, err := retryHandle.Wait(); err != nil || code != 0 {
+				slog.Error("agent retry exited non-zero", "code", code, "error", err,
+					"stderr", sanitize.Truncate(string(retryStderr), agentStderrLogRunes))
+			}
 			h.agentSession.CloseLiveLog()
 
 			sessionID = agentsession.ExtractSessionID(rawStdout)
