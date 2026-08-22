@@ -136,12 +136,8 @@ func (r *CommandRegistry) Expand(input, focusedSpec string) (string, bool) {
 	}
 
 	// Split into command name and args.
-	parts := strings.SplitN(input[1:], " ", 2)
-	name := parts[0]
-	args := ""
-	if len(parts) > 1 {
-		args = strings.TrimSpace(parts[1])
-	}
+	name, args, _ := strings.Cut(input[1:], " ")
+	args = strings.TrimSpace(args)
 
 	def, ok := r.commands[name]
 	if !ok {

@@ -107,9 +107,9 @@ func BodyForAnchoring(data []byte, path string) (string, error) {
 // The leading "specs/" prefix is stripped before extracting the track.
 func trackFromPath(path string) string {
 	p := strings.TrimPrefix(path, "specs/")
-	parts := strings.SplitN(p, "/", 2)
-	if len(parts) < 2 {
+	track, _, ok := strings.Cut(p, "/")
+	if !ok {
 		return ""
 	}
-	return parts[0]
+	return track
 }

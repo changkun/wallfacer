@@ -392,8 +392,8 @@ func resolveUniqueSpecPath(workspace, specPath string) string {
 // When the prompt does not start with a `/spec-new` line, returns the
 // prompt unchanged, an empty scaffolded path, and a nil error.
 func applySlashSpecNew(prompt, workspace string, now time.Time) (string, string, error) {
-	lines := strings.SplitN(prompt, "\n", 2)
-	first := strings.TrimSpace(lines[0])
+	head, rest, _ := strings.Cut(prompt, "\n")
+	first := strings.TrimSpace(head)
 	if !strings.HasPrefix(first, "/spec-new") {
 		return prompt, "", nil
 	}
@@ -414,11 +414,7 @@ func applySlashSpecNew(prompt, workspace string, now time.Time) (string, string,
 	}
 	// Strip the directive line from the prompt the agent sees so its
 	// response can't accidentally re-trigger the scanner on echo.
-	rest := ""
-	if len(lines) > 1 {
-		rest = strings.TrimLeft(lines[1], "\n")
-	}
-	return rest, directive.Path, nil
+	return strings.TrimLeft(rest, "\n"), directive.Path, nil
 }
 
 // processDirectives runs each captured [Directive] against a workspace.

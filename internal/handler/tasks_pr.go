@@ -179,7 +179,8 @@ func prTitleForTask(task *store.Task) string {
 		if r := []rune(p); len(r) > 72 {
 			p = string(r[:72])
 		}
-		return strings.SplitN(p, "\n", 2)[0]
+		firstLine, _, _ := strings.Cut(p, "\n")
+		return firstLine
 	}
 	return "Changes from " + task.BranchName
 }
