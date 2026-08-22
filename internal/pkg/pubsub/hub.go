@@ -56,11 +56,6 @@ func WithReplayCapacity[T any](n int) Option[T] {
 	return func(h *Hub[T]) { h.replayCap = n }
 }
 
-// WithChannelSize sets the per-subscriber channel buffer (default: 256).
-func WithChannelSize[T any](n int) Option[T] {
-	return func(h *Hub[T]) { h.channelSize = n }
-}
-
 // WithClone sets a function to deep-copy values before sending to subscribers
 // and before storing in the replay buffer. If nil (default), values are shared.
 func WithClone[T any](fn func(T) T) Option[T] {

@@ -59,24 +59,30 @@ done:
 // TestHub_OverflowEviction verifies that a subscriber whose channel buffer is
 // full gets evicted (channel closed) rather than blocking the publisher.
 func TestHub_OverflowEviction(t *testing.T) {
-	h := NewHub[int](WithChannelSize[int](1))
+	h := NewHub[int]()
 	id, ch := h.Subscribe()
 	defer h.Unsubscribe(id)
 
-	// Fill the buffer (1 item) then overflow.
-	h.Publish(1) // fills buffer
-	h.Publish(2) // should overflow and close
-
-	// Channel should be closed.
-	_, ok := <-ch
-	if !ok {
-		// Already closed with no buffered item — fine.
-		return
+	// Never read from ch, so the buffer fills; one publish past capacity must
+	// evict rather than block the publisher.
+	for i := range DefaultChannelSize + 1 {
+		h.Publish(i)
 	}
-	// Got the first item; next read should detect close.
-	_, ok = <-ch
-	if ok {
-		t.Fatal("expected channel to be closed after overflow")
+
+	// Drain: the buffered items come through, then the channel reads closed.
+	for range DefaultChannelSize {
+		if _, ok := <-ch; !ok {
+			// Closed early with items still buffered — also fine.
+			return
+		}
+	}
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("expected channel to be closed after overflow")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("overflowing subscriber was neither closed nor evicted")
 	}
 }
 
