@@ -10,6 +10,8 @@
 //
 // Other CSI sequences (cursor movement, erase-line, etc.) are dropped.
 
+import { escapeHtml } from './html';
+
 const ANSI_FG = [
   '#484f58', '#ff7b72', '#3fb950', '#e3b341',
   '#79c0ff', '#ff79c6', '#39c5cf', '#b1bac4',
@@ -19,9 +21,6 @@ const ANSI_FG_BRIGHT = [
   '#cae8ff', '#fecfe8', '#b3f0ff', '#ffffff',
 ];
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 /** Drop everything before the last \r on each line. */
 export function collapseCarriageReturns(raw: string): string {

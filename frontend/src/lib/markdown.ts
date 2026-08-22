@@ -1,13 +1,8 @@
 import MarkdownIt from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { escapeHtml } from './html';
+
 
 const md = new MarkdownIt({
   html: true,
