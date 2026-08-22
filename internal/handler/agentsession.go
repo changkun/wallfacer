@@ -261,15 +261,15 @@ func (h *Handler) GetAgentMessages(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, msgs)
 }
 
+// agentStderrLogRunes bounds the stderr excerpt logged when an agent exits
+// non-zero: enough to identify a crash or an auth failure, not the whole stream.
+const agentStderrLogRunes = 2000
+
 // SendAgentMessage sends a user message to the agent.
 // The agent exec runs in a background goroutine; returns 202 immediately.
 // Returns 409 if an exec is already in flight. The `?thread=<id>` query
 // parameter (or body field) selects which thread receives the message;
 // when omitted, the active thread is used.
-// agentStderrLogRunes bounds the stderr excerpt logged when an agent exits
-// non-zero: enough to identify a crash or an auth failure, not the whole stream.
-const agentStderrLogRunes = 2000
-
 func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVisibleWorkspace(w, r) {
 		return
