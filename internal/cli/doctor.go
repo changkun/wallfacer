@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"flag"
 	"fmt"
@@ -29,11 +30,11 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Printf("wallfacer doctor (%s)\n\n", v)
 
 	issues := 0
-	envFile := envOrDefault("ENV_FILE", filepath.Join(configDir, ".env"))
+	envFile := cmp.Or(os.Getenv("ENV_FILE"), filepath.Join(configDir, ".env"))
 
 	// --- Paths ---
 	fmt.Printf("Config directory:  %s\n", configDir)
-	fmt.Printf("Data directory:    %s\n", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")))
+	fmt.Printf("Data directory:    %s\n", cmp.Or(os.Getenv("DATA_DIR"), filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
 	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
 	fmt.Println()

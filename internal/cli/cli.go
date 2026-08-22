@@ -81,15 +81,6 @@ func initConfigDir(configDir, envFile string) {
 	}
 }
 
-// envOrDefault returns the value of the environment variable key, or fallback
-// if the variable is unset or empty.
-func envOrDefault(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
 // isWSL reports whether the process is running inside Windows Subsystem for Linux.
 func isWSL() bool {
 	return os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != ""

@@ -22,19 +22,6 @@ func TestPrintUsage(t *testing.T) {
 	}
 }
 
-// TestEnvOrDefault verifies that envOrDefault returns the env value when set
-// and the fallback when the variable is empty.
-func TestEnvOrDefault(t *testing.T) {
-	t.Setenv("WALLF_TEST_KEY", "value")
-	if got := envOrDefault("WALLF_TEST_KEY", "fallback"); got != "value" {
-		t.Fatalf("envOrDefault with env set = %q, want value", got)
-	}
-	t.Setenv("WALLF_TEST_KEY", "")
-	if got := envOrDefault("WALLF_TEST_KEY", "fallback"); got != "fallback" {
-		t.Fatalf("envOrDefault without env = %q, want fallback", got)
-	}
-}
-
 // TestInitConfigDir_CreatesEnvTemplate verifies that initConfigDir creates the
 // .env template on first call and leaves it untouched on subsequent calls.
 func TestInitConfigDir_CreatesEnvTemplate(t *testing.T) {

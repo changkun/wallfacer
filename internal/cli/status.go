@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -163,7 +164,7 @@ func printBoard(addr string, tasks []taskSummary) {
 // RunStatus implements the `wallfacer status` subcommand.
 func RunStatus(_ string, args []string) {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
-	defaultAddr := envOrDefault("ADDR", "http://localhost:8080")
+	defaultAddr := cmp.Or(os.Getenv("ADDR"), "http://localhost:8080")
 	addr := fs.String("addr", defaultAddr, "wallfacer server address (or ADDR env var)")
 	watch := fs.Bool("watch", false, "re-render every 2 seconds until Ctrl-C")
 	jsonOut := fs.Bool("json", false, "emit raw JSON from /api/tasks for scripting")

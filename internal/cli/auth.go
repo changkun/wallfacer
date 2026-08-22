@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -74,8 +75,8 @@ with the latere CLI; signing in here carries over to %s.
 
 func runAuthLogin(args []string) error {
 	fs := flag.NewFlagSet("auth login", flag.ExitOnError)
-	authURL := fs.String("auth-url", envOrDefault("AUTH_URL", "https://auth.latere.ai"), "auth service base URL")
-	clientID := fs.String("client-id", envOrDefault("AUTH_CLIENT_ID", "wallfacer-cli"), "OAuth client id")
+	authURL := fs.String("auth-url", cmp.Or(os.Getenv("AUTH_URL"), "https://auth.latere.ai"), "auth service base URL")
+	clientID := fs.String("client-id", cmp.Or(os.Getenv("AUTH_CLIENT_ID"), "wallfacer-cli"), "OAuth client id")
 	scopes := fs.String("scopes", "openid email profile offline_access", "space-separated scopes")
 	orgID := fs.String("org", "", "scope login to this org_id (empty string = personal context)")
 	personal := fs.Bool("personal", false, "force personal context (equivalent to --org=\"\" being set)")

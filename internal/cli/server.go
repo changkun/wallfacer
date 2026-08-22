@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
@@ -602,10 +603,10 @@ func requireClaudeOrExit(envFile string) {
 func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
-	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
-	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
-	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
-	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file with credentials and runtime settings")
+	logFormat := fs.String("log-format", cmp.Or(os.Getenv("LOG_FORMAT"), "text"), `log output format: "text" or "json"`)
+	addr := fs.String("addr", cmp.Or(os.Getenv("ADDR"), ":8080"), "listen address")
+	dataDir := fs.String("data", cmp.Or(os.Getenv("DATA_DIR"), filepath.Join(configDir, "data")), "data directory")
+	envFile := fs.String("env-file", cmp.Or(os.Getenv("ENV_FILE"), filepath.Join(configDir, ".env")), "env file with credentials and runtime settings")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
