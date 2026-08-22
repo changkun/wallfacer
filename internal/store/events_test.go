@@ -274,11 +274,9 @@ func TestConcurrentInsertEvent(t *testing.T) {
 	var wg sync.WaitGroup
 	const n = 10
 	for i := range n {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, idx)
-		}(i)
+		wg.Go(func() {
+			_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		})
 	}
 	wg.Wait()
 

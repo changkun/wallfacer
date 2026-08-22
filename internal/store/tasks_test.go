@@ -1345,11 +1345,9 @@ func TestConcurrentUpdateStatus(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for _, status := range []TaskStatus{TaskStatusInProgress, TaskStatusDone, TaskStatusFailed, TaskStatusBacklog, TaskStatusWaiting} {
-		wg.Add(1)
-		go func(st TaskStatus) {
-			defer wg.Done()
-			_ = s.ForceUpdateTaskStatus(bg(), task.ID, st)
-		}(status)
+		wg.Go(func() {
+			_ = s.ForceUpdateTaskStatus(bg(), task.ID, status)
+		})
 	}
 	wg.Wait()
 

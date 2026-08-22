@@ -51,13 +51,11 @@ func TestMap_Concurrent(t *testing.T) {
 
 	for key := range 10 {
 		for range 100 {
-			wg.Add(1)
-			go func(k int) {
-				defer wg.Done()
-				km.Lock(k)
-				defer km.Unlock(k)
-				counter[k]++
-			}(key)
+			wg.Go(func() {
+				km.Lock(key)
+				defer km.Unlock(key)
+				counter[key]++
+			})
 		}
 	}
 	wg.Wait()

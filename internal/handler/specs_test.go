@@ -769,14 +769,12 @@ func TestWorkspaceCommitLock_SerializesConcurrentCommits(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make([]error, n)
 	for i := range n {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			rel := fmt.Sprintf("specs/c%d.md", i)
 			writeSpec(t, ws, fmt.Sprintf("c%d.md", i), "# c\n\nbody\n")
 			errs[i] = commitSpecChanges(ctx, []string{ws}, filepath.Join(ws, rel),
 				[]string{rel}, fmt.Sprintf("%s: add", rel))
-		}(i)
+		})
 	}
 	wg.Wait()
 

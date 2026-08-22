@@ -93,11 +93,9 @@ func TestMap_Concurrent(t *testing.T) {
 
 	const n = 100
 	for i := range n {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			m.Store(i, fmt.Sprintf("val-%d", i))
-		}(i)
+		})
 	}
 	wg.Wait()
 

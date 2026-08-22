@@ -99,19 +99,15 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 
 	// Concurrent Set
 	for i := range goroutines {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			r.Set(ids[i], fmt.Sprintf("container-%d", i))
-		}(i)
+		})
 	}
 	wg.Wait()
 
 	// Concurrent Get
 	for i := range goroutines {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			name, ok := r.Get(ids[i])
 			if !ok {
 				t.Errorf("goroutine %d: expected entry for id %v", i, ids[i])
@@ -120,17 +116,15 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 			if name != fmt.Sprintf("container-%d", i) {
 				t.Errorf("goroutine %d: expected 'container-%d', got %q", i, i, name)
 			}
-		}(i)
+		})
 	}
 	wg.Wait()
 
 	// Concurrent Delete
 	for i := range goroutines {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			r.Delete(ids[i])
-		}(i)
+		})
 	}
 	wg.Wait()
 

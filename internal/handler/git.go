@@ -47,13 +47,11 @@ func collectWorkspaceStatuses(workspaces []string) []gitutil.WorkspaceGitStatus 
 	sem := make(chan struct{}, 4) // cap concurrency at 4 git processes
 	var wg sync.WaitGroup
 	for i, ws := range workspaces {
-		wg.Add(1)
-		go func(idx int, path string) {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[idx] = gitutil.WorkspaceStatus(path)
-		}(i, ws)
+			results[i] = gitutil.WorkspaceStatus(ws)
+		})
 	}
 	wg.Wait()
 	return results

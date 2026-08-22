@@ -28,11 +28,9 @@ func TestManager_ConcurrentCreate_NoLostRecords(t *testing.T) {
 	errs := make([]error, n)
 	var wg sync.WaitGroup
 	for i := range n {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			_, errs[i] = m.Create(fmt.Sprintf("ws-%d", i), []string{dirs[i]}, nil)
-		}(i)
+		})
 	}
 	wg.Wait()
 	for i, err := range errs {
