@@ -3,6 +3,5 @@
  * bundles `@import` at build time, so this is equivalent to importing each
  * file directly from main.ts but keeps the public import stable.
  */
-@import './spec-mode/layout.css';
 @import './spec-mode/prose-toc.css';
 @import './spec-mode/explorer-tree.css';
