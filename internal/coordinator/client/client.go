@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"sync"
 	"sync/atomic"
