@@ -155,11 +155,7 @@ func routineNextRunEqual(a, b *time.Time) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	d := a.Sub(*b)
-	if d < 0 {
-		d = -d
-	}
-	return d < 500*time.Millisecond
+	return a.Sub(*b).Abs() < 500*time.Millisecond
 }
 
 // unregisterRoutine drops any engine timer for the given task id. Safe
