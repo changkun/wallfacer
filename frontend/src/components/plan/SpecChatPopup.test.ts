@@ -23,6 +23,9 @@ vi.stubGlobal('localStorage', {
 import SpecChatPopup from './SpecChatPopup.vue';
 
 const KEY = 'wallfacer-spec-chat-popup';
+// Mirrors SpecChatPopup.vue: the launcher is a 48px button kept 20px clear of
+// every viewport edge.
+const LAUNCHER_SIZE = 48, LAUNCHER_MARGIN = 20;
 
 function setViewport(w: number, h: number) {
   Object.defineProperty(window, 'innerWidth', { value: w, configurable: true });
@@ -118,9 +121,10 @@ describe('SpecChatPopup geometry', () => {
     window.dispatchEvent(pointer('pointermove', 5000, 5000)); // far off the bottom-right
     window.dispatchEvent(pointer('pointerup', 5000, 5000));
     await nextTick();
-    // Bottoms out at viewport minus the 48px button.
-    expect(fab.style.left).toBe(`${1280 - 48}px`);
-    expect(fab.style.top).toBe(`${800 - 48}px`);
+    // Bottoms out at the viewport minus the 48px button and the 20px margin
+    // the component keeps so the launcher's shadow is never clipped.
+    expect(fab.style.left).toBe(`${1280 - LAUNCHER_SIZE - LAUNCHER_MARGIN}px`);
+    expect(fab.style.top).toBe(`${800 - LAUNCHER_SIZE - LAUNCHER_MARGIN}px`);
   });
 
   it('restores a persisted launcher position', async () => {
