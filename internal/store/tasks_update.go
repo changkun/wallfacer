@@ -413,17 +413,6 @@ func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb harness.ID
 	})
 }
 
-// UpdateTaskFlow sets the flow slug a task runs against. Empty string
-// clears the field so the runner's legacy Kind→Flow resolver picks
-// the default. Callers validate the slug against the flow registry
-// before calling.
-func (s *Store) UpdateTaskFlow(_ context.Context, id uuid.UUID, flowID string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.FlowID = flowID
-		return nil
-	})
-}
-
 // UpdateTaskModelOverride replaces the task's per-task model pin;
 // empty string clears it.
 func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model string) error {

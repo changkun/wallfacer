@@ -1815,34 +1815,3 @@ func TestTaskFlowID_OmittedFromJSONWhenEmpty(t *testing.T) {
 		t.Error("flow_id should be omitted from JSON when empty")
 	}
 }
-
-// TestUpdateTaskFlow_WritesField guards the post-create writer so the
-// composer's "reflow" follow-up can swap a task's flow after creation.
-func TestUpdateTaskFlow_WritesField(t *testing.T) {
-	s, err := newTestFileStore(t, t.TempDir())
-	if err != nil {
-		t.Fatalf("NewFileStore: %v", err)
-	}
-	defer s.Close()
-
-	task, err := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p"})
-	if err != nil {
-		t.Fatalf("CreateTaskWithOptions: %v", err)
-	}
-	if err := s.UpdateTaskFlow(context.Background(), task.ID, "implement"); err != nil {
-		t.Fatalf("UpdateTaskFlow: %v", err)
-	}
-	got, _ := s.GetTask(context.Background(), task.ID)
-	if got.FlowID != "implement" {
-		t.Errorf("FlowID = %q, want implement", got.FlowID)
-	}
-
-	// Clearing works.
-	if err := s.UpdateTaskFlow(context.Background(), task.ID, ""); err != nil {
-		t.Fatalf("UpdateTaskFlow clear: %v", err)
-	}
-	got, _ = s.GetTask(context.Background(), task.ID)
-	if got.FlowID != "" {
-		t.Errorf("cleared FlowID = %q, want empty", got.FlowID)
-	}
-}
