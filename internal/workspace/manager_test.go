@@ -556,11 +556,22 @@ func TestSwitch_SuccessClosesPreviousStore(t *testing.T) {
 
 // --- activeGroups tests ---
 
+// activeKeys lists the workspace keys of every group with an open store, the
+// set AllActiveSnapshots reports on.
+func activeKeys(m *Manager) []string {
+	snaps := m.AllActiveSnapshots()
+	keys := make([]string, 0, len(snaps))
+	for _, snap := range snaps {
+		keys = append(keys, snap.Key)
+	}
+	return keys
+}
+
 // TestActiveGroupsInitialization verifies that after NewManager, activeGroups
 // has exactly one entry matching the initial snapshot.
 func TestActiveGroupsInitialization(t *testing.T) {
 	m, _ := newTestManager(t)
-	keys := m.ActiveGroupKeys()
+	keys := activeKeys(m)
 	if len(keys) != 1 {
 		t.Fatalf("expected 1 active group, got %d", len(keys))
 	}
@@ -586,7 +597,7 @@ func TestActiveGroupsInitializationStatic(t *testing.T) {
 		t.Fatalf("NewFileStore: %v", err)
 	}
 	m := NewStatic(s, []string{"/fake/ws"})
-	keys := m.ActiveGroupKeys()
+	keys := activeKeys(m)
 	if len(keys) != 1 {
 		t.Fatalf("expected 1 active group, got %d", len(keys))
 	}
@@ -722,7 +733,7 @@ func TestIncrementUnknownKeyIsNoOp(t *testing.T) {
 	m, _ := newTestManager(t)
 	m.IncrementTaskCount("nonexistent")
 	// Should not panic or add an entry.
-	if len(m.ActiveGroupKeys()) != 1 {
+	if len(activeKeys(m)) != 1 {
 		t.Fatal("expected no new group created for unknown key")
 	}
 }
@@ -767,8 +778,8 @@ func TestSwitchKeepsStoreForRunningTasks(t *testing.T) {
 	}
 
 	// Should have 2 active groups now.
-	if len(m.ActiveGroupKeys()) != 2 {
-		t.Fatalf("expected 2 active groups, got %d", len(m.ActiveGroupKeys()))
+	if len(activeKeys(m)) != 2 {
+		t.Fatalf("expected 2 active groups, got %d", len(activeKeys(m)))
 	}
 }
 
@@ -800,8 +811,8 @@ func TestSwitchClosesIdleGroup(t *testing.T) {
 	}
 
 	// Should have only 1 active group (B).
-	if len(m.ActiveGroupKeys()) != 1 {
-		t.Fatalf("expected 1 active group, got %d", len(m.ActiveGroupKeys()))
+	if len(activeKeys(m)) != 1 {
+		t.Fatalf("expected 1 active group, got %d", len(activeKeys(m)))
 	}
 }
 
@@ -855,7 +866,7 @@ func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
 		t.Fatalf("NewManager: %v", err)
 	}
 
-	keysBefore := m.ActiveGroupKeys()
+	keysBefore := activeKeys(m)
 	snapBefore := m.Snapshot()
 
 	// Switch to the same workspace — should be a no-op.
@@ -868,7 +879,7 @@ func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
 			snapBefore.Generation, snapAfter.Generation)
 	}
 
-	keysAfter := m.ActiveGroupKeys()
+	keysAfter := activeKeys(m)
 	if len(keysBefore) != len(keysAfter) {
 		t.Fatalf("activeGroups count changed on no-op switch: before=%d after=%d",
 			len(keysBefore), len(keysAfter))

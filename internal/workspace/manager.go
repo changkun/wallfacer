@@ -381,17 +381,6 @@ func (m *Manager) StoreForKey(key string) (*store.Store, bool) {
 	return ag.snapshot.Store, ag.snapshot.Store != nil
 }
 
-// ActiveGroupKeys returns the workspace keys for all groups with open stores.
-func (m *Manager) ActiveGroupKeys() []string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	keys := make([]string, 0, len(m.activeGroups))
-	for k := range m.activeGroups {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 // IncrementTaskCount marks a new running task in the given workspace group.
 // RLock suffices because activeGroup.taskCount is an atomic.Int32, and the
 // activeGroups map entry is only deleted by DecrementAndCleanup (under write lock)

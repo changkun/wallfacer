@@ -159,9 +159,9 @@ func TestRunBackgroundIncrementsTaskCount(t *testing.T) {
 	// After both tasks complete, DecrementAndCleanup should have been
 	// called twice. Since this is the viewed group, it stays in
 	// activeGroups even at count 0.
-	keys := mgr.ActiveGroupKeys()
-	if len(keys) != 1 {
-		t.Fatalf("expected 1 active group, got %d", len(keys))
+	snaps := mgr.AllActiveSnapshots()
+	if len(snaps) != 1 {
+		t.Fatalf("expected 1 active group, got %d", len(snaps))
 	}
 }
 
