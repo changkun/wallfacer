@@ -27,8 +27,8 @@ func NormalizeRemoteURL(raw string) string {
 	// Detected by a colon that is not part of a scheme "://" and that comes
 	// before any slash.
 	if !strings.Contains(s, "://") {
-		if at := strings.LastIndex(s, "@"); at >= 0 {
-			s = s[at+1:] // strip user@
+		if _, host, ok := strings.CutLast(s, "@"); ok {
+			s = host // strip user@
 		}
 		if host, path, ok := strings.Cut(s, ":"); ok {
 			return canonForm(host, path)
@@ -39,8 +39,8 @@ func NormalizeRemoteURL(raw string) string {
 
 	// URL syntax: <scheme>://[user[:pass]@]host[:port]/owner/repo[.git]
 	_, s, _ = strings.Cut(s, "://") // "://" present in this branch
-	if at := strings.LastIndex(s, "@"); at >= 0 {
-		s = s[at+1:] // strip credentials
+	if _, host, ok := strings.CutLast(s, "@"); ok {
+		s = host // strip credentials
 	}
 	hostPort, path, ok := strings.Cut(s, "/")
 	if !ok {
