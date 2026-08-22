@@ -65,7 +65,6 @@
 
 /* ===== Flat style: no card boxes ===== */
 .product-card,
-.download-card,
 .download-icon-btn,
 .docs-grid {
     border-radius: 0;
