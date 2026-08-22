@@ -150,9 +150,7 @@ func (b *FilesystemBackend) LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, er
 	// can skip numbered trace files that are already covered.
 	compactMaxID := int64(0)
 	for _, evt := range events {
-		if evt.ID > compactMaxID {
-			compactMaxID = evt.ID
-		}
+		compactMaxID = max(compactMaxID, evt.ID)
 	}
 
 	// Phase 2: Merge in numbered trace files whose sequence exceeds the compact
@@ -205,9 +203,7 @@ func (b *FilesystemBackend) CompactEvents(taskID uuid.UUID, events []TaskEvent) 
 	// Determine the highest event ID — this is the compaction boundary.
 	var maxID int64
 	for _, evt := range events {
-		if evt.ID > maxID {
-			maxID = evt.ID
-		}
+		maxID = max(maxID, evt.ID)
 	}
 
 	// Build compact.ndjson from the provided events.

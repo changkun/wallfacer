@@ -626,9 +626,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 						slog.Warn("planning commit failed", "workspace", ws, "err", cerr)
 						continue
 					}
-					if n > planRound {
-						planRound = n
-					}
+					planRound = max(planRound, n)
 					// Auto-push after a successful planning commit, mirroring the
 					// behaviour of the task "mark as done" flow.
 					if n > 0 && h.runner != nil {

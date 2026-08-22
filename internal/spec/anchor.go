@@ -262,15 +262,8 @@ func sectionPathAt(headings []heading, line int) []string {
 // tree text still anchors entirely on content.
 func ComputeAnchor(body string, startLine, endLine int) speccomment.Anchor {
 	lines := bodyLines(body)
-	if startLine < 1 {
-		startLine = 1
-	}
-	if endLine < startLine {
-		endLine = startLine
-	}
-	if endLine > len(lines) {
-		endLine = len(lines)
-	}
+	startLine = max(startLine, 1)
+	endLine = min(max(endLine, startLine), len(lines))
 
 	headings := parseHeadings(lines)
 

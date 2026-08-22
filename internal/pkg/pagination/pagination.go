@@ -30,9 +30,7 @@ func Paginate[T any](
 	if limit <= 0 {
 		limit = defaultLimit
 	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
+	limit = min(limit, maxLimit)
 
 	var result []T // lazily allocated on first match; nil-checked below for JSON
 	totalFiltered := 0
