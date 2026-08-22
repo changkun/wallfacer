@@ -384,17 +384,10 @@ func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// PurgeTask permanently removes a tombstoned task's directory and all in-memory
-// state. It can only be called on tasks already in s.deleted.
-func (s *Store) PurgeTask(_ context.Context, id uuid.UUID) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.purgeTaskLocked(id)
-}
-
-// purgeTaskLocked is the internal implementation of PurgeTask, called while
-// s.mu is already held for writing. It is shared between PurgeTask and
-// PurgeExpiredTombstones to avoid re-locking.
+// purgeTaskLocked permanently removes a tombstoned task's directory and all
+// in-memory state. It can only be called on tasks already in s.deleted, and
+// only while s.mu is held for writing, so the tombstone sweep in
+// PurgeExpiredTombstones purges a batch under a single lock.
 func (s *Store) purgeTaskLocked(id uuid.UUID) error {
 	if _, ok := s.deleted[id]; !ok {
 		return fmt.Errorf("no tombstoned task: %s", id)

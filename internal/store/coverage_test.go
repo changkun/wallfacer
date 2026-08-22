@@ -125,6 +125,13 @@ func TestStore_SubscriberCount(t *testing.T) {
 	}
 }
 
+// purgeTask takes the write lock purgeTaskLocked expects its caller to hold.
+func purgeTask(s *Store, id uuid.UUID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.purgeTaskLocked(id)
+}
+
 func TestPurgeTask_PurgesDeletedTask(t *testing.T) {
 	s := newTestStore(t)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "to purge", Timeout: 5})
@@ -136,8 +143,8 @@ func TestPurgeTask_PurgesDeletedTask(t *testing.T) {
 		t.Fatalf("DeleteTask: %v", err)
 	}
 
-	if err := s.PurgeTask(bg(), task.ID); err != nil {
-		t.Fatalf("PurgeTask: %v", err)
+	if err := purgeTask(s, task.ID); err != nil {
+		t.Fatalf("purgeTaskLocked: %v", err)
 	}
 
 	_, err = s.GetTask(bg(), task.ID)
@@ -150,14 +157,14 @@ func TestPurgeTask_FailsForNonDeletedTask(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "alive", Timeout: 5})
 
-	if err := s.PurgeTask(bg(), task.ID); err == nil {
+	if err := purgeTask(s, task.ID); err == nil {
 		t.Error("expected error when purging non-tombstoned task, got nil")
 	}
 }
 
 func TestPurgeTask_FailsForUnknownID(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.PurgeTask(bg(), uuid.New()); err == nil {
+	if err := purgeTask(s, uuid.New()); err == nil {
 		t.Error("expected error for unknown task ID, got nil")
 	}
 }
