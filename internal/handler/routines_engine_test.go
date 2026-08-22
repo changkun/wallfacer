@@ -540,3 +540,37 @@ func TestTriggerRoutine_WithEngine_SpawnsInstance(t *testing.T) {
 	}
 	t.Fatalf("timed out waiting for Trigger to spawn instance")
 }
+
+// TestRoutineNextRunEqual covers the nullable-pointer comparison, the 500ms
+// jitter tolerance, and the saturating case: time.Time.Sub clamps a gap wider
+// than the int64 nanosecond range to the minimum Duration, and Duration.Abs
+// maps that to the maximum Duration, so a stored zero timestamp reads as
+// different from a live next-run time rather than as equal.
+func TestRoutineNextRunEqual(t *testing.T) {
+	now := time.Now()
+	near := now.Add(100 * time.Millisecond)
+	far := now.Add(2 * time.Second)
+	var zero time.Time
+
+	cases := []struct {
+		name string
+		a, b *time.Time
+		want bool
+	}{
+		{"both nil", nil, nil, true},
+		{"a nil", nil, &now, false},
+		{"b nil", &now, nil, false},
+		{"identical", &now, &now, true},
+		{"within tolerance", &now, &near, true},
+		{"outside tolerance", &now, &far, false},
+		{"zero against now", &zero, &now, false},
+		{"now against zero", &now, &zero, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := routineNextRunEqual(tc.a, tc.b); got != tc.want {
+				t.Errorf("routineNextRunEqual = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
