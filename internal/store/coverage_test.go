@@ -1769,10 +1769,10 @@ func TestRebuildSearchIndex_RepairsChangedEntriesCoverage(t *testing.T) {
 	}
 }
 
-func TestCriticalPathScore_MalformedDepCoverage(t *testing.T) {
+func TestCriticalPathScores_MalformedDepCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad dep", Timeout: 5, DependsOn: []string{"not-a-uuid"}})
-	if score := s.CriticalPathScore(task.ID); score != 1 {
+	if score := s.CriticalPathScores([]uuid.UUID{task.ID})[task.ID]; score != 1 {
 		t.Errorf("expected 1, got %d", score)
 	}
 }

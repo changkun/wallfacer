@@ -6,13 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestCriticalPathScore verifies the basic chain and sibling-branch cases.
+// TestCriticalPathScores verifies the basic chain and sibling-branch cases.
 //
 // Graph:
 //
 //	A → B → C   (longest chain: length 3)
 //	A → D       (sibling branch: length 1)
-func TestCriticalPathScore(t *testing.T) {
+func TestCriticalPathScores(t *testing.T) {
 	s := newTestStore(t)
 
 	taskA, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "A", Timeout: 15})
@@ -37,49 +37,24 @@ func TestCriticalPathScore(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := s.CriticalPathScore(tc.id); got != tc.want {
-				t.Errorf("CriticalPathScore = %d, want %d", got, tc.want)
+			if got := s.CriticalPathScores([]uuid.UUID{tc.id})[tc.id]; got != tc.want {
+				t.Errorf("CriticalPathScores = %d, want %d", got, tc.want)
 			}
 		})
 	}
 }
 
-// TestCriticalPathScores_MatchesSingle verifies the batch method returns the
-// same per-id score as the single-id CriticalPathScore, including for an
-// unknown id (0).
-func TestCriticalPathScores_MatchesSingle(t *testing.T) {
+// TestCriticalPathScores_UnknownTask verifies that an unknown task ID returns 0.
+func TestCriticalPathScores_UnknownTask(t *testing.T) {
 	s := newTestStore(t)
-
-	taskA, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "A", Timeout: 15})
-	taskB, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "B", Timeout: 15})
-	taskC, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "C", Timeout: 15})
-	taskD, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "D", Timeout: 15})
-
-	_ = s.UpdateTaskDependsOn(bg(), taskB.ID, []string{taskA.ID.String()})
-	_ = s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskB.ID.String()})
-	_ = s.UpdateTaskDependsOn(bg(), taskD.ID, []string{taskA.ID.String()})
-
-	unknown := uuid.New()
-	ids := []uuid.UUID{taskA.ID, taskB.ID, taskC.ID, taskD.ID, unknown}
-	batch := s.CriticalPathScores(ids)
-	for _, id := range ids {
-		if got, want := batch[id], s.CriticalPathScore(id); got != want {
-			t.Errorf("CriticalPathScores[%s] = %d, want %d (single)", id, got, want)
-		}
+	if got := unknownScore(s); got != 0 {
+		t.Errorf("CriticalPathScores(unknown) = %d, want 0", got)
 	}
 }
 
-// TestCriticalPathScore_UnknownTask verifies that an unknown task ID returns 0.
-func TestCriticalPathScore_UnknownTask(t *testing.T) {
-	s := newTestStore(t)
-	if got := s.CriticalPathScore(uuid.New()); got != 0 {
-		t.Errorf("CriticalPathScore(unknown) = %d, want 0", got)
-	}
-}
-
-// TestCriticalPathScore_Cycle verifies that a dependency cycle returns a finite
+// TestCriticalPathScores_Cycle verifies that a dependency cycle returns a finite
 // value (>= 1) rather than causing a stack overflow.
-func TestCriticalPathScore_Cycle(t *testing.T) {
+func TestCriticalPathScores_Cycle(t *testing.T) {
 	s := newTestStore(t)
 
 	taskA, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "A", Timeout: 15})
@@ -89,13 +64,19 @@ func TestCriticalPathScore_Cycle(t *testing.T) {
 	_ = s.UpdateTaskDependsOn(bg(), taskA.ID, []string{taskC.ID.String()})
 	_ = s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskA.ID.String()})
 
-	scoreA := s.CriticalPathScore(taskA.ID)
-	scoreC := s.CriticalPathScore(taskC.ID)
+	scoreA := s.CriticalPathScores([]uuid.UUID{taskA.ID})[taskA.ID]
+	scoreC := s.CriticalPathScores([]uuid.UUID{taskC.ID})[taskC.ID]
 
 	if scoreA < 1 {
-		t.Errorf("CriticalPathScore(A) in cycle = %d, want >= 1 (finite)", scoreA)
+		t.Errorf("CriticalPathScores(A) in cycle = %d, want >= 1 (finite)", scoreA)
 	}
 	if scoreC < 1 {
-		t.Errorf("CriticalPathScore(C) in cycle = %d, want >= 1 (finite)", scoreC)
+		t.Errorf("CriticalPathScores(C) in cycle = %d, want >= 1 (finite)", scoreC)
 	}
+}
+
+// unknownScore scores a freshly minted id that belongs to no task.
+func unknownScore(s *Store) int {
+	id := uuid.New()
+	return s.CriticalPathScores([]uuid.UUID{id})[id]
 }
