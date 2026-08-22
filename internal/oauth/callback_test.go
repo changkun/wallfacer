@@ -210,3 +210,29 @@ func TestCallbackServer_BindsLocalhost(t *testing.T) {
 		t.Errorf("listener IP = %v; want loopback (127.0.0.1)", addr.IP)
 	}
 }
+
+// A provider with a fixed redirect URI (Claude uses 1455) can only rebind if
+// Close has actually released the port. http.Server.Close closes the listeners
+// it is tracking, but Serve registers the listener from inside its own
+// goroutine, so a Close racing the goroutine's start leaves the port bound
+// until that goroutine happens to run. Manager.Start cancels the old flow and
+// rebinds immediately, so the user sees "address already in use" and a 500.
+func TestCallbackServer_CloseReleasesPortForImmediateRebind(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixedPort := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+
+	for i := range 20 {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		srv, err := NewCallbackServer(ctx, fixedPort, "")
+		if err != nil {
+			cancel()
+			t.Fatalf("rebind %d on port %d: %v", i, fixedPort, err)
+		}
+		srv.Close()
+		cancel()
+	}
+}

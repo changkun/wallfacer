@@ -108,10 +108,19 @@ func (s *CallbackServer) Wait() (CallbackResult, error) {
 	}
 }
 
-// Close force-closes the listener and cancels the context.
+// Close force-closes the listener and cancels the context. It blocks until the
+// serve goroutine has returned, so the port is free the moment Close does.
+//
+// Waiting is the point: Serve registers its listener from inside the goroutine,
+// so a Close that races the goroutine's start finds nothing to close and the
+// port stays bound until that goroutine is scheduled. Callers rebind a fixed
+// port immediately after cancelling (see Manager.Start), which is close enough
+// to lose that race. Closing the listener directly covers the untracked case.
 func (s *CallbackServer) Close() {
 	s.cancel()
 	_ = s.server.Close()
+	_ = s.listener.Close()
+	s.wg.Wait()
 }
 
 const callbackPageHTML = `<!DOCTYPE html>
