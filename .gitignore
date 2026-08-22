@@ -15,7 +15,7 @@ frontend/dist/
 !docs/guide/images/*.png
 .playwright-mcp/
 frontend/test-results/
-release-evidence/
+release-evidence.md
 deploy/prebuilt/wallfacer
 
 # Local dev workspace
@@ -24,3 +24,4 @@ go.work.sum
 
 # Runtime-served static artifacts (decks, reports); user content, not source.
 /artifacts/
+frontend/coverage-js/
