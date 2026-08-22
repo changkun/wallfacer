@@ -398,9 +398,19 @@ func TestEngine_RegisterDuringFireWins(t *testing.T) {
 		fires <- id
 		fireCount++
 		if fireCount == 1 {
-			// Switch the routine to a slower schedule from inside the fire
-			// callback. Without the race fix, reArmAfterFire would
-			// clobber this with the original 10-second cadence.
+			// Pin the interleaving the regression is about. reArmAfterFire
+			// runs on the goroutine that delivered the fire, concurrently
+			// with this callback, so without a barrier the two orderings
+			// interleave at random. Wait until the engine's re-arm has
+			// installed the stale 10-second cycle, then switch schedules:
+			// an in-fire Register must win over a re-arm that already ran.
+			stale := clock.Now().Add(10 * time.Second)
+			for range 2000 {
+				if eng.NextRuns()[id].Equal(stale) {
+					break
+				}
+				time.Sleep(time.Millisecond)
+			}
 			eng.Register(id, FixedInterval{D: 60 * time.Second})
 		}
 	})
@@ -413,12 +423,19 @@ func TestEngine_RegisterDuringFireWins(t *testing.T) {
 	if got := <-fires; got != id {
 		t.Fatalf("first fire id mismatch")
 	}
-	// Give the re-arm goroutine a moment to run.
-	for range 100 {
-		if eng.NextRuns()[id] != (time.Time{}) {
+	// Wait for the in-fire Register to land. The FireFunc publishes to fires
+	// before it registers, and reArmAfterFire provisionally arms the old
+	// 10-second cycle, so neither "a fire arrived" nor "next run is non-zero"
+	// identifies the new schedule. Its exact next run does.
+	wantNext := clock.Now().Add(60 * time.Second)
+	for range 2000 {
+		if eng.NextRuns()[id].Equal(wantNext) {
 			break
 		}
 		time.Sleep(time.Millisecond)
+	}
+	if got := eng.NextRuns()[id]; !got.Equal(wantNext) {
+		t.Fatalf("in-fire Register did not win the re-arm: next run %v, want %v", got, wantNext)
 	}
 
 	// Advance past the old 10-second cycle but well shy of the new 60-second
