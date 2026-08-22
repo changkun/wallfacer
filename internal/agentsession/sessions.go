@@ -349,7 +349,7 @@ func (m *Manager) Delete(id string) error {
 	if !m.manifest.Threads[idx].Archived {
 		return ErrThreadNotArchived
 	}
-	m.manifest.Threads = append(m.manifest.Threads[:idx], m.manifest.Threads[idx+1:]...)
+	m.manifest.Threads = slices.Delete(m.manifest.Threads, idx, idx+1)
 	if err := m.writeManifest(); err != nil {
 		return err
 	}

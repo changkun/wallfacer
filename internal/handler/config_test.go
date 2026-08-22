@@ -198,6 +198,48 @@ func TestGetConfig_ExcludesDormantFromWorkspaceGroups(t *testing.T) {
 	}
 }
 
+// TestGetConfig_PromotesActiveGroupToFront pins the promote-to-front rewrite in
+// buildConfigResponse: the group matching the active workspace moves to index 0
+// with its Name intact, every other group keeps its relative order, and the
+// promoted group is not duplicated by the in-place removal.
+func TestGetConfig_PromotesActiveGroupToFront(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	other1, other2 := t.TempDir(), t.TempDir()
+	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
+		{Folders: []string{other1}, Name: "First"},
+		{Folders: []string{ws}, Name: "Active"},
+		{Folders: []string{other2}, Name: "Last"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		WorkspaceGroups []struct {
+			Name       string   `json:"name"`
+			Workspaces []string `json:"workspaces"`
+		} `json:"workspace_groups"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got := make([]string, 0, len(resp.WorkspaceGroups))
+	for _, g := range resp.WorkspaceGroups {
+		got = append(got, g.Name)
+	}
+	want := []string{"Active", "First", "Last"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("group order = %v, want %v", got, want)
+	}
+	if fs := resp.WorkspaceGroups[0].Workspaces; !slices.Equal(fs, []string{ws}) {
+		t.Errorf("promoted group folders = %v, want %v", fs, []string{ws})
+	}
+}
+
 func TestGetConfig_UsesCWDForWorkspaceBrowserPathWithoutWorkspaces(t *testing.T) {
 	h := newTestHandler(t)
 	cwd, err := os.Getwd()

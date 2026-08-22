@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -200,7 +201,8 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 				// Promote existing group to front, preserving its Name.
 				promoted := g
 				promoted.Folders = workspaces
-				groups = append([]workspace.Workspace{promoted}, append(groups[:i], groups[i+1:]...)...)
+				rest := slices.Delete(groups, i, i+1)
+				groups = append([]workspace.Workspace{promoted}, rest...)
 				found = true
 				break
 			}
