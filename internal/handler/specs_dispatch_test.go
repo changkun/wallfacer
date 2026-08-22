@@ -805,3 +805,59 @@ func TestDispatchSpecs_RunStatusWriteFailureSkipsRunner(t *testing.T) {
 		t.Fatalf("expected 0 RunBackground calls when the status write failed, got %d", len(calls))
 	}
 }
+
+// failOnCancelledBackend wraps a StorageBackend and makes SaveTask fail when the
+// task is persisted in the cancelled state, so a test can fail only the
+// undispatch cancellation while dispatch and frontmatter writes still work.
+type failOnCancelledBackend struct {
+	store.StorageBackend
+}
+
+func (b *failOnCancelledBackend) SaveTask(t *store.Task) error {
+	if t.Status == store.TaskStatusCancelled {
+		return errors.New("injected save failure for cancelled")
+	}
+	return b.StorageBackend.SaveTask(t)
+}
+
+// Undispatch discarded the CancelTask error and cleared dispatched_task_id
+// regardless, so a task that was still running lost the spec it reports back
+// to while the event trail claimed it had been cancelled. The spec must keep
+// its linkage when the cancel does not land.
+func TestUndispatchSpecs_KeepsLinkageWhenCancelFails(t *testing.T) {
+	ws := t.TempDir()
+
+	fsBackend, err := store.NewFilesystemBackend(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemBackend: %v", err)
+	}
+	s, err := storetest.NewStore(t, &failOnCancelledBackend{StorageBackend: fsBackend})
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	h := NewHandler(s, &runner.MockRunner{}, t.TempDir(), []string{ws}, nil)
+
+	writeTestSpec(t, ws, "specs/local/cancel.md", testSpecValidated)
+	dw, dresp := doDispatch(t, h, []string{"specs/local/cancel.md"}, false)
+	if dw.Code != http.StatusCreated {
+		t.Fatalf("dispatch failed: %d %s", dw.Code, dw.Body.String())
+	}
+	taskID := dresp.Dispatched[0].TaskID
+
+	uw, uresp := doUndispatch(t, h, []string{"specs/local/cancel.md"})
+	if len(uresp.Undispatched) != 0 {
+		t.Errorf("undispatched count = %d, want 0 when the cancel failed", len(uresp.Undispatched))
+	}
+	if uw.Code == http.StatusOK && len(uresp.Undispatched) > 0 {
+		t.Errorf("undispatch reported success despite the failed cancel; body: %s", uw.Body.String())
+	}
+
+	// The spec must still point at the task, so the running work is not orphaned.
+	body, err := os.ReadFile(filepath.Join(ws, "specs/local/cancel.md"))
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	if !strings.Contains(string(body), taskID) {
+		t.Errorf("spec lost dispatched_task_id %q after a failed cancel:\n%s", taskID, body)
+	}
+}

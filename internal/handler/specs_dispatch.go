@@ -518,7 +518,13 @@ func (h *Handler) UndispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			case store.TaskStatusDone, store.TaskStatusCancelled:
 				// Already terminal — skip cancellation.
 			default:
-				_ = st.CancelTask(r.Context(), taskID)
+				// Keep the linkage when the cancel does not land. Clearing it
+				// anyway would leave a still-running task with no spec to
+				// report back to, while the event claimed it was cancelled.
+				if err := st.CancelTask(r.Context(), taskID); err != nil {
+					errs = append(errs, dispatchError{relPath, fmt.Sprintf("cancel dispatched task: %v", err)})
+					continue
+				}
 				h.insertEventOrLog(r.Context(), taskID, store.EventTypeStateChange,
 					store.NewStateChangeData(task.Status, store.TaskStatusCancelled, store.TriggerUser, nil))
 			}
