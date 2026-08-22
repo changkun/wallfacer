@@ -6,6 +6,7 @@
 // the renderer is shared across every harness.
 
 import type { ActivityRow } from './prettyNdjson';
+import { MAX_SUMMARY, basename, truncate } from './prettyNdjson';
 
 // NormalizedEvent mirrors handler.normalizedEvent (Go). `kind` is the wire token
 // from harness.EventKind.String().
@@ -31,19 +32,6 @@ export interface NormalizedEvent {
   session_id?: string;
 }
 
-const MAX_SUMMARY = 220;
-
-function truncate(s: string, n = MAX_SUMMARY): string {
-  if (!s) return '';
-  const oneline = s.replace(/\s+/g, ' ').trim();
-  return oneline.length > n ? oneline.slice(0, n) + '…' : oneline;
-}
-
-function basename(p: string): string {
-  const cleaned = p.replace(/\/+$/, '');
-  const i = cleaned.lastIndexOf('/');
-  return i >= 0 ? cleaned.slice(i + 1) : cleaned;
-}
 
 function pretty(v: unknown): string {
   if (v == null) return '';

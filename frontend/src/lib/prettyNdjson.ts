@@ -52,15 +52,17 @@ export function frameModel(frame: Frame): string {
   return '';
 }
 
-const MAX_SUMMARY = 220;
+export const MAX_SUMMARY = 220;
 
-function truncate(s: string, n = MAX_SUMMARY): string {
+/** Collapse whitespace to one line and cap the length with an ellipsis. */
+export function truncate(s: string, n = MAX_SUMMARY): string {
   if (!s) return '';
   const oneline = s.replace(/\s+/g, ' ').trim();
   return oneline.length > n ? oneline.slice(0, n) + '…' : oneline;
 }
 
-function basename(p: string): string {
+/** Last path segment, trailing slashes ignored. Empty for a bare "/". */
+export function basename(p: string): string {
   const cleaned = p.replace(/\/+$/, '');
   const i = cleaned.lastIndexOf('/');
   return i >= 0 ? cleaned.slice(i + 1) : cleaned;
