@@ -12,7 +12,7 @@ import (
 
 func TestAppendAgentSessionUsage_RoundtripsRecord(t *testing.T) {
 	root := t.TempDir()
-	key := AgentSessionGroupKey([]string{"/repo/a"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/a"})
 
 	now := time.Now().UTC().Truncate(time.Second)
 	want := TurnUsageRecord{
@@ -44,7 +44,7 @@ func TestAppendAgentSessionUsage_RoundtripsRecord(t *testing.T) {
 
 func TestReadAgentSessionUsage_MissingFileReturnsEmpty(t *testing.T) {
 	root := t.TempDir()
-	key := AgentSessionGroupKey([]string{"/repo/never-written"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/never-written"})
 
 	got, err := ReadAgentSessionUsage(root, key, time.Time{})
 	if err != nil {
@@ -57,7 +57,7 @@ func TestReadAgentSessionUsage_MissingFileReturnsEmpty(t *testing.T) {
 
 func TestReadAgentSessionUsage_FiltersBySince(t *testing.T) {
 	root := t.TempDir()
-	key := AgentSessionGroupKey([]string{"/repo/a"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/a"})
 
 	base := time.Now().UTC().Truncate(time.Second)
 	records := []TurnUsageRecord{
@@ -91,12 +91,12 @@ func TestAgentSessionUsageDir_UsesWorkspaceDataKey(t *testing.T) {
 	root := "/tmp/wf-test"
 	want := prompts.WorkspaceDataKey(paths)
 
-	dir := AgentSessionUsageDir(root, AgentSessionGroupKey(paths))
+	dir := AgentSessionUsageDir(root, prompts.WorkspaceDataKey(paths))
 	if !strings.HasSuffix(dir, string(filepath.Separator)+want) {
 		t.Errorf("dir %q does not end with WorkspaceDataKey %q", dir, want)
 	}
 
-	dirSwapped := AgentSessionUsageDir(root, AgentSessionGroupKey(swapped))
+	dirSwapped := AgentSessionUsageDir(root, prompts.WorkspaceDataKey(swapped))
 	if dir != dirSwapped {
 		t.Errorf("key should be order-insensitive: %q vs %q", dir, dirSwapped)
 	}
@@ -104,7 +104,7 @@ func TestAgentSessionUsageDir_UsesWorkspaceDataKey(t *testing.T) {
 
 func TestAppendAgentSessionUsage_CreatesDir(t *testing.T) {
 	root := t.TempDir()
-	key := AgentSessionGroupKey([]string{"/repo/fresh"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/fresh"})
 
 	dir := AgentSessionUsageDir(root, key)
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {

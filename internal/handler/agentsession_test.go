@@ -520,7 +520,7 @@ func TestAgentSessionHandler_PersistsRoundUsage(t *testing.T) {
 	raw := agentRoundStdout(120, 40, 15, 5, 0.0123)
 	h.persistAgentRoundUsage(raw)
 
-	key := store.AgentSessionGroupKey([]string{ws})
+	key := prompts.WorkspaceDataKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
 	if err != nil {
 		t.Fatalf("ReadAgentSessionUsage: %v", err)
@@ -559,7 +559,7 @@ func TestAgentSessionHandler_IncrementsTurn(t *testing.T) {
 	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001))
 	h.persistAgentRoundUsage(agentRoundStdout(20, 8, 0, 0, 0.002))
 
-	key := store.AgentSessionGroupKey([]string{ws})
+	key := prompts.WorkspaceDataKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
 	if err != nil {
 		t.Fatalf("ReadAgentSessionUsage: %v", err)
@@ -579,7 +579,7 @@ func TestAgentSessionHandler_FailedExecDoesNotPersist(t *testing.T) {
 	errLine := []byte(`{"type":"result","stop_reason":"end_turn","result":"boom","session_id":"s1","is_error":true,"total_cost_usd":0.001}`)
 	h.persistAgentRoundUsage(errLine)
 
-	key := store.AgentSessionGroupKey([]string{ws})
+	key := prompts.WorkspaceDataKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
 	if err != nil {
 		t.Fatalf("ReadAgentSessionUsage: %v", err)

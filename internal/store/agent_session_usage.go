@@ -6,16 +6,7 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/pkg/ndjson"
-	"latere.ai/x/wallfacer/internal/prompts"
 )
-
-// AgentSessionGroupKey returns the path-safe fingerprint used to scope a
-// agent-session usage log to a workspace group. It matches the scheme used by
-// workspace AGENTS.md (internal/prompts) so the same set of workspaces
-// always resolves to the same agent-session directory regardless of order.
-func AgentSessionGroupKey(workspaces []string) string {
-	return prompts.WorkspaceDataKey(workspaces)
-}
 
 // agentSessionsDirName is the per-root directory that holds agent-session
 // state (chat threads + usage logs), one subdirectory per workspace-group

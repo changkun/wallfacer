@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -264,7 +265,7 @@ func TestUsage_NoAgentSessionRecords(t *testing.T) {
 
 func TestUsage_AgentSessionMergedIntoBySubAgent(t *testing.T) {
 	h := newTestHandler(t)
-	key := store.AgentSessionGroupKey([]string{"/repo/a"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/a"})
 	now := time.Now().UTC()
 
 	for _, rec := range []store.TurnUsageRecord{
@@ -295,7 +296,7 @@ func TestUsage_AgentSessionMergedIntoBySubAgent(t *testing.T) {
 
 func TestUsage_AgentSessionRespectsDaysWindow(t *testing.T) {
 	h := newTestHandler(t)
-	key := store.AgentSessionGroupKey([]string{"/repo/a"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/a"})
 	now := time.Now().UTC()
 
 	// An "old" record 10 days back and a "new" record now.
@@ -323,8 +324,8 @@ func TestUsage_AgentSessionRespectsDaysWindow(t *testing.T) {
 
 func TestUsage_AgentSessionAcrossMultipleGroups(t *testing.T) {
 	h := newTestHandler(t)
-	keyA := store.AgentSessionGroupKey([]string{"/repo/a"})
-	keyB := store.AgentSessionGroupKey([]string{"/repo/b"})
+	keyA := prompts.WorkspaceDataKey([]string{"/repo/a"})
+	keyB := prompts.WorkspaceDataKey([]string{"/repo/b"})
 	now := time.Now().UTC()
 
 	if err := store.AppendAgentSessionUsage(h.configDir, keyA, store.TurnUsageRecord{
@@ -350,7 +351,7 @@ func TestUsage_AgentSessionAcrossMultipleGroups(t *testing.T) {
 
 func TestUsage_TaskCountUnchangedByAgentSession(t *testing.T) {
 	h := newTestHandler(t)
-	key := store.AgentSessionGroupKey([]string{"/repo/a"})
+	key := prompts.WorkspaceDataKey([]string{"/repo/a"})
 	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, CostUSD: 0.01,
 	}); err != nil {

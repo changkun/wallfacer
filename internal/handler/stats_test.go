@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -634,8 +635,8 @@ func TestAggregateAgentSessionStats_Aggregation(t *testing.T) {
 
 	wsA := []string{"/repo/a"}
 	wsB := []string{"/repo/b"}
-	keyA := store.AgentSessionGroupKey(wsA)
-	keyB := store.AgentSessionGroupKey(wsB)
+	keyA := prompts.WorkspaceDataKey(wsA)
+	keyB := prompts.WorkspaceDataKey(wsB)
 
 	for i, rec := range []store.TurnUsageRecord{
 		{Turn: 1, Timestamp: base, InputTokens: 10, OutputTokens: 5, CostUSD: 0.01},
@@ -651,7 +652,7 @@ func TestAggregateAgentSessionStats_Aggregation(t *testing.T) {
 		t.Fatalf("append B: %v", err)
 	}
 
-	got := aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(wsA), wsA, time.Time{})
+	got := aggregateAgentSessionStats(configDir, prompts.WorkspaceDataKey(wsA), wsA, time.Time{})
 
 	if len(got) != 2 {
 		t.Fatalf("want 2 groups, got %d", len(got))
@@ -691,7 +692,7 @@ func TestAggregateAgentSessionStats_RespectsSince(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 	ws := []string{"/repo/a"}
-	key := store.AgentSessionGroupKey(ws)
+	key := prompts.WorkspaceDataKey(ws)
 
 	records := []store.TurnUsageRecord{
 		{Turn: 1, Timestamp: base.Add(-2 * time.Hour), InputTokens: 10, CostUSD: 0.01},
@@ -705,7 +706,7 @@ func TestAggregateAgentSessionStats_RespectsSince(t *testing.T) {
 	}
 
 	since := base.Add(-30 * time.Minute)
-	got := aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(ws), ws, since)
+	got := aggregateAgentSessionStats(configDir, prompts.WorkspaceDataKey(ws), ws, since)
 
 	stat, ok := got[key]
 	if !ok {
@@ -726,7 +727,7 @@ func TestAggregateAgentSessionStats_TimelineOrdered(t *testing.T) {
 	configDir := t.TempDir()
 	base := time.Now().UTC().Truncate(time.Second)
 	ws := []string{"/repo/a"}
-	key := store.AgentSessionGroupKey(ws)
+	key := prompts.WorkspaceDataKey(ws)
 
 	// Append out of chronological order (timestamps jump).
 	for i, rec := range []store.TurnUsageRecord{
@@ -739,7 +740,7 @@ func TestAggregateAgentSessionStats_TimelineOrdered(t *testing.T) {
 		}
 	}
 
-	got := aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(ws), ws, time.Time{})
+	got := aggregateAgentSessionStats(configDir, prompts.WorkspaceDataKey(ws), ws, time.Time{})
 	tl := got[key].Timeline
 	if len(tl) != 3 {
 		t.Fatalf("Timeline length = %d, want 3", len(tl))
@@ -772,13 +773,13 @@ func TestGetStats_ExecutionUnchangedByAgentSession(t *testing.T) {
 	withAgentSession := aggregateStats(tasks, noSummary)
 	configDir := t.TempDir()
 	ws := []string{"/repo/x"}
-	key := store.AgentSessionGroupKey(ws)
+	key := prompts.WorkspaceDataKey(ws)
 	if err := store.AppendAgentSessionUsage(configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: now, CostUSD: 0.99, InputTokens: 9999, OutputTokens: 9999,
 	}); err != nil {
 		t.Fatalf("seed agent-session: %v", err)
 	}
-	withAgentSession.AgentSessions = aggregateAgentSessionStats(configDir, store.AgentSessionGroupKey(ws), ws, time.Time{})
+	withAgentSession.AgentSessions = aggregateAgentSessionStats(configDir, prompts.WorkspaceDataKey(ws), ws, time.Time{})
 
 	// Zero out the AgentSessions field on both sides, then compare the rest
 	// via JSON round-trip to catch any silent drift in execution buckets.
@@ -798,7 +799,7 @@ func TestGetStats_AgentSessionEndpoint(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
-	key := store.AgentSessionGroupKey([]string{ws})
+	key := prompts.WorkspaceDataKey([]string{ws})
 	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{
 		Turn: 1, Timestamp: time.Now().UTC(), InputTokens: 10, OutputTokens: 5, CostUSD: 0.01,
 	}); err != nil {
