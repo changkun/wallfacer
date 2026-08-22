@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -134,14 +135,14 @@ func isColorEnabled(w io.Writer) bool {
 }
 
 // clone returns a shallow copy with an independent preAttrs slice.
-// The three-index slice expression caps capacity so that subsequent appends
-// to the clone allocate a new backing array rather than mutating the original.
+// slices.Clip caps capacity to length so that subsequent appends to the clone
+// allocate a new backing array rather than mutating the original.
 func (h *prettyHandler) clone() *prettyHandler {
 	return &prettyHandler{
 		w:        h.w,
 		opts:     h.opts,
 		mu:       h.mu,
-		preAttrs: h.preAttrs[:len(h.preAttrs):len(h.preAttrs)],
+		preAttrs: slices.Clip(h.preAttrs),
 		color:    h.color,
 	}
 }

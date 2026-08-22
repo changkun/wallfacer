@@ -504,10 +504,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// throttling, 0 keeps the backend default, 1..19 sets the niceness.
 	var agentNice *string
 	if req.AgentNice != nil {
-		v := max(*req.AgentNice, -1)
-		if v > 19 {
-			v = 19
-		}
+		v := min(max(*req.AgentNice, -1), 19)
 		s := fmt.Sprintf("%d", v)
 		agentNice = &s
 	}
@@ -537,19 +534,13 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Clamp to [0, 120]: 0 = disabled; 120 minutes = max.
 	var oversightInterval *string
 	if req.OversightInterval != nil {
-		v := max(*req.OversightInterval, 0)
-		if v > 120 {
-			v = 120
-		}
+		v := min(max(*req.OversightInterval, 0), 120)
 		s := fmt.Sprintf("%d", v)
 		oversightInterval = &s
 	}
 	var archivedTasksPerPage *string
 	if req.ArchivedTasksPerPage != nil {
-		v := max(*req.ArchivedTasksPerPage, 1)
-		if v > 200 {
-			v = 200
-		}
+		v := min(max(*req.ArchivedTasksPerPage, 1), 200)
 		s := fmt.Sprintf("%d", v)
 		archivedTasksPerPage = &s
 	}
