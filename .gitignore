@@ -13,6 +13,7 @@ frontend/dist/
 # ...except committed product assets: landing screenshots and guide doc images.
 !frontend/public/static/*.png
 !docs/guide/images/*.png
+!assets/*.png
 .playwright-mcp/
 frontend/test-results/
 release-evidence.md
