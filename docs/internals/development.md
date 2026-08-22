@@ -116,7 +116,8 @@ the release body. Because the evidence only exists when deploy is green, its
 presence on a release proves prod shipped before the release published.
 `release_evidence_test.go` runs the evidence script end to end.
 
-**Release notes.** GitHub generates the changelog since the previous tag
-(`gh api .../releases/generate-notes`); the `release` job appends the evidence
-block and publishes via `--notes-file`. Hand-written notes for older releases
-are archived under `docs/releases/`.
+**Release notes.** The `release` job prefers a hand-written note at
+`docs/releases/<TAG>.md` and falls back to GitHub's generated changelog since
+the previous tag (`gh api .../releases/generate-notes`) when that file is
+absent. Either way it appends the evidence block and publishes via
+`--notes-file`.
