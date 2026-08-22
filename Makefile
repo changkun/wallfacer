@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go fmt-check hooks lint lint-go lint-js lint-otel test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push
+.PHONY: build build-binary server frontend-build api-contract fmt fmt-go fmt-check hooks lint lint-go lint-js lint-otel lint-truncate test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push web-frontend web-run web-dev web-docker
 
 # Full build gate: fmt + frontend assets + lint + binary.
 build: fmt frontend-build lint build-binary
