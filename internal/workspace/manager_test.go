@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -512,7 +513,7 @@ func TestSwitch_FailedEnvPersistenceRollsBack(t *testing.T) {
 		t.Errorf("generation changed after failed env update: before=%d after=%d",
 			previousSnap.Generation, snap.Generation)
 	}
-	if !workspacesEqual(snap.Workspaces, previousSnap.Workspaces) {
+	if !slices.Equal(snap.Workspaces, previousSnap.Workspaces) {
 		t.Errorf("workspaces changed after failed env update: before=%v after=%v",
 			previousSnap.Workspaces, snap.Workspaces)
 	}

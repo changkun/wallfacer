@@ -219,7 +219,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	// Only after the first successful Switch (generation > 0) so that the
 	// initial Switch call in NewManager always proceeds and creates the store.
 	m.mu.RLock()
-	sameSet := m.current.Generation > 0 && workspacesEqual(validated, m.current.Workspaces)
+	sameSet := m.current.Generation > 0 && slices.Equal(validated, m.current.Workspaces)
 	m.mu.RUnlock()
 	if sameSet {
 		return m.Snapshot(), nil
@@ -469,12 +469,6 @@ func validate(paths []string) ([]string, error) {
 	}
 	slices.Sort(validated)
 	return validated, nil
-}
-
-// workspacesEqual reports whether two validated (sorted, deduplicated) workspace
-// slices represent the same set.
-func workspacesEqual(a, b []string) bool {
-	return slices.Equal(a, b)
 }
 
 // cloneSnapshot creates a shallow copy of s with the Workspaces slice cloned
