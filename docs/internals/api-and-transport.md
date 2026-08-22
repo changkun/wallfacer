@@ -190,6 +190,9 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 | `GET /api/docs` | List embedded docs (`{slug, title, category, order}`), reading-order sorted |
 | `GET /api/docs/{slug...}` | Serve one embedded doc as `text/markdown` (path-traversal guarded) |
 | `GET /api/docs-asset/{path...}` | Serve embedded doc images; only whitelisted image extensions are served |
+| `GET /api/docs-search` | Full-text search over embedded doc bodies (not just titles), capped at 20 hits; backs the command palette |
+| `GET /api/artifacts` | List the self-contained web files under `<workspace>/artifacts/` |
+| `GET /artifact/{path...}` | Serve one artifact. Singular on purpose, so the raw route never collides with the SPA gallery page at `/artifacts` |
 | `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
 | `POST /internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic) |
 | `POST /internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI) |
