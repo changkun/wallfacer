@@ -11,12 +11,29 @@ linters:
     - misspell
     - revive
     - sloglint
+    # modernize reports hand-written code that a standard library call or a
+    # language builtin already covers: membership loops that are
+    # slices.Contains, if/else pairs that are min/max, map loops that are
+    # maps.Copy, HasPrefix/TrimPrefix pairs that are strings.CutPrefix.
+    - modernize
   settings:
     sloglint:
       # Request-path logs must use the *Context slog variants so the otelslog
       # bridge stamps TraceId/SpanId onto exported records (observability
       # spec 02). "scope" flags a plain call only where a context is in scope.
       context: scope
+    modernize:
+      disable:
+        # newexpr rewrites pointer helpers such as func ptr(v T) *T to
+        # new(v), then inlines call sites unevenly: the helper is left with
+        # no callers (which trips unused), and an untyped constant argument
+        # takes the wrong default type.
+        - newexpr
+        # errorsastype rewrites errors.As to errors.AsType[T], whose type
+        # parameter is constrained to [E error]. A local non-error interface
+        # target such as interface{ SQLState() string } does not satisfy it,
+        # so the rewrite does not compile.
+        - errorsastype
   exclusions:
     rules:
       # Context enforcement covers the web-mode request path only. CLI-mode

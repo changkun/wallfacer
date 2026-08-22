@@ -1,14 +1,42 @@
 #!/bin/sh
-# pre-commit: block commits that introduce gofmt-unformatted Go files.
+# pre-commit: block commits that introduce gofmt-unformatted Go files, or Go
+# code that a standard library call already covers.
 # Install with: make hooks    Bypass once with: git commit --no-verify
 
 gofiles=$(git diff --cached --name-only --diff-filter=ACM -- '*.go')
 [ -z "$gofiles" ] && exit 0
 
 unformatted=$(gofmt -l $gofiles)
-[ -z "$unformatted" ] && exit 0
+if [ -n "$unformatted" ]; then
+	echo "gofmt: staged Go files are not formatted:" >&2
+	printf '  %s\n' $unformatted >&2
+	echo "fix with: make fmt (then re-stage), or bypass with: git commit --no-verify" >&2
+	exit 1
+fi
 
-echo "gofmt: staged Go files are not formatted:" >&2
-printf '  %s\n' $unformatted >&2
-echo "fix with: make fmt (then re-stage), or bypass with: git commit --no-verify" >&2
+# go fix carries the toolchain's modernizers, which rewrite hand-written code
+# into the standard library call that already covers it. Scoped to the
+# packages holding staged files so the hook stays a few seconds rather than a
+# whole-module type-check.
+#
+# newexpr and errorsastype are off for the reasons recorded in .golangci.yml.
+# Only a non-empty patch blocks the commit: stderr is dropped so a
+# work-in-progress tree that does not type-check is still committable.
+pkgs=""
+for dir in $(printf '%s\n' $gofiles | xargs -n1 dirname | sort -u); do
+	[ -d "$dir" ] || continue
+	case "$dir" in
+	.) pkgs="$pkgs ." ;;
+	*) pkgs="$pkgs ./$dir" ;;
+	esac
+done
+[ -z "$pkgs" ] && exit 0
+
+patch=$(go fix -diff -newexpr=false -errorsastype=false $pkgs 2>/dev/null)
+[ -z "$patch" ] && exit 0
+
+echo "go fix: staged packages hold code the standard library already covers:" >&2
+echo "$patch" >&2
+echo "apply with: go fix -newexpr=false -errorsastype=false$pkgs (then re-stage)," >&2
+echo "or bypass with: git commit --no-verify" >&2
 exit 1
