@@ -91,6 +91,13 @@ The `wallfacerd` web-server variant and the release/skills helpers:
 | `make skills-pull` | Adopt upstream skill changes into this repo |
 | `make skills-push` | Promote local skill edits into `../claude-plugins` |
 
+Not every E2E script has a make target. `scripts/e2e-auth-flow.sh` walks the
+full cloud-mode auth chain (`/login` → `/authorize` → email OTP → `/callback` →
+session → `/api/auth/me` → `/api/auth/orgs`), asserting every hop. It prompts
+for an email address and the six-digit code, so it is run by hand rather than
+from CI. It needs a local wallfacer with `WALLFACER_CLOUD=true` and `AUTH_URL`
+pointing at a reachable auth service.
+
 ## Frontend Dev Mode
 
 The Vue SPA is built to `frontend/dist/` and embedded into the binary via
