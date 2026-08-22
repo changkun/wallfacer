@@ -3,6 +3,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -76,8 +77,7 @@ func (r *sessionRegistry) create(shell, cwd string, cols, rows int) (string, err
 		for {
 			n, err := ptmx.Read(buf)
 			if n > 0 {
-				data := make([]byte, n)
-				copy(data, buf[:n])
+				data := bytes.Clone(buf[:n])
 				select {
 				case outputCh <- data:
 				case <-ctx.Done():

@@ -1,6 +1,10 @@
 package flow
 
-import "latere.ai/x/wallfacer/internal/store"
+import (
+	"slices"
+
+	"latere.ai/x/wallfacer/internal/store"
+)
 
 // Registry is the merged catalog of built-in and (future) user-
 // authored flows. Today it wraps the embedded built-ins and exposes a
@@ -109,9 +113,7 @@ func cloneFlow(f Flow) Flow {
 		for i, s := range f.Steps {
 			steps[i] = s
 			if len(s.RunInParallelWith) > 0 {
-				parallel := make([]string, len(s.RunInParallelWith))
-				copy(parallel, s.RunInParallelWith)
-				steps[i].RunInParallelWith = parallel
+				steps[i].RunInParallelWith = slices.Clone(s.RunInParallelWith)
 			}
 		}
 		out.Steps = steps

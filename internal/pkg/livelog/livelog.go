@@ -4,6 +4,7 @@
 package livelog
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"sync"
@@ -94,8 +95,7 @@ func (r *Reader) ReadChunk(ctx context.Context) ([]byte, error) {
 	for {
 		buf, done, wake := r.log.snapshot()
 		if r.offset < len(buf) {
-			data := make([]byte, len(buf)-r.offset)
-			copy(data, buf[r.offset:])
+			data := bytes.Clone(buf[r.offset:])
 			r.offset = len(buf)
 			return data, nil
 		}
