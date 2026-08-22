@@ -56,10 +56,8 @@
   --sp-6: 20px;
   --sp-7: 28px;
 
-  /* Chrome heights */
-  --h-header: 40px;
+  /* Chrome height */
   --h-status: 24px;
-  --h-row: 28px;
 
   /* Sidebar widths */
   --sb-w: 240px;
@@ -161,7 +159,6 @@
   --border: var(--rule);
   --accent-hover: var(--accent-2);
   --shadow: var(--sh-2);
-  --shadow-md: var(--sh-2);
   --shadow-lg: var(--sh-pop);
 
   /* Cloud-page tokens (used by landing/docs styles in app.css) */
@@ -170,9 +167,7 @@
   --accent-subtle: var(--accent-tint);
   --accent-glow: rgba(196, 90, 51, 0.15);
   --accent-glow-strong: rgba(196, 90, 51, 0.3);
-  --accent-deep: var(--accent-2);
   --border-strong: var(--rule-2);
-  --border-emphasis: var(--rule-2);
   --grid-color: rgba(0, 0, 0, 0.035);
 
   /* Sandbox-aligned typography helpers */
@@ -268,7 +263,6 @@
   --border: var(--rule);
   --accent-hover: var(--accent-2);
   --shadow: var(--sh-2);
-  --shadow-md: var(--sh-2);
   --shadow-lg: var(--sh-pop);
 
   --bg-surface: var(--bg-elevated);
@@ -276,9 +270,7 @@
   --accent-subtle: var(--accent-tint);
   --accent-glow: rgba(224, 122, 81, 0.10);
   --accent-glow-strong: rgba(224, 122, 81, 0.20);
-  --accent-deep: var(--accent-2);
   --border-strong: var(--rule-2);
-  --border-emphasis: var(--rule-2);
   --grid-color: rgba(255, 255, 255, 0.025);
 
   /* Terminal surface — dark values for the dark theme. */
