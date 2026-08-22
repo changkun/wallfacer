@@ -82,25 +82,6 @@ func (p *Runtime) Sessions() *Manager {
 	return p.threads
 }
 
-// ActiveConversation returns the [ConversationStore] for the currently
-// active thread, or nil when no thread exists or thread storage is not
-// configured. Handlers should prefer looking up a store by explicit
-// thread ID via Threads().Store(id).
-func (p *Runtime) ActiveConversation() *ConversationStore {
-	if p.threads == nil {
-		return nil
-	}
-	id := p.threads.ActiveID()
-	if id == "" {
-		return nil
-	}
-	s, err := p.threads.Store(id)
-	if err != nil {
-		return nil
-	}
-	return s
-}
-
 // Start marks the runtime as active. The agent process is spawned lazily
 // on the first Exec call.
 func (p *Runtime) Start(_ context.Context) error {

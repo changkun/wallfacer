@@ -157,12 +157,27 @@ func TestGetAgentMessages_Empty(t *testing.T) {
 	}
 }
 
+// activeThreadStore resolves the runtime's active thread to its conversation
+// store, the lookup handlers perform through lookupThreadStore.
+func activeThreadStore(t *testing.T, p *agentsession.Runtime) *agentsession.ConversationStore {
+	t.Helper()
+	tm := p.Sessions()
+	if tm == nil {
+		t.Fatal("Sessions() = nil, want a thread manager")
+	}
+	cs, err := tm.Store(tm.ActiveID())
+	if err != nil {
+		t.Fatalf("Store(ActiveID()): %v", err)
+	}
+	return cs
+}
+
 func TestGetAgentMessages_WithHistory(t *testing.T) {
 	h := newTestHandler(t)
 	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
-	cs := p.ActiveConversation()
+	cs := activeThreadStore(t, p)
 	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
 	_ = cs.AppendMessage(agentsession.Message{Role: "assistant", Content: "hi", Timestamp: time.Now().UTC()})
 
@@ -194,7 +209,7 @@ func TestGetAgentMessages_Pagination(t *testing.T) {
 	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
-	cs := p.ActiveConversation()
+	cs := activeThreadStore(t, p)
 	t1 := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 4, 1, 11, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
@@ -296,7 +311,7 @@ func TestClearAgentMessages(t *testing.T) {
 	p := newAgentSessionWithStore(t)
 	h.agentSession = p
 
-	cs := p.ActiveConversation()
+	cs := activeThreadStore(t, p)
 	_ = cs.AppendMessage(agentsession.Message{Role: "user", Content: "hello", Timestamp: time.Now().UTC()})
 
 	rec := httptest.NewRecorder()

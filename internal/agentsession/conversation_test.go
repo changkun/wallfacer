@@ -361,15 +361,19 @@ func TestRuntimeConversation(t *testing.T) {
 		Fingerprint: "test123",
 		ConfigDir:   t.TempDir(),
 	})
-	if p.ActiveConversation() == nil {
-		t.Error("ActiveConversation() = nil, want non-nil when ConfigDir is set")
+	tm := p.Sessions()
+	if tm == nil {
+		t.Fatal("Sessions() = nil, want a thread manager when ConfigDir is set")
+	}
+	if _, err := tm.Store(tm.ActiveID()); err != nil {
+		t.Errorf("Store(ActiveID()) = %v, want a conversation store", err)
 	}
 }
 
 func TestRuntimeConversation_NoConfigDir(t *testing.T) {
 	p := New(Config{Fingerprint: "test123"})
-	if p.ActiveConversation() != nil {
-		t.Error("ActiveConversation() should be nil when ConfigDir is empty")
+	if p.Sessions() != nil {
+		t.Error("Sessions() should be nil when ConfigDir is empty")
 	}
 }
 
