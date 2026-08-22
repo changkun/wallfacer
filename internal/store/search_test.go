@@ -635,8 +635,7 @@ func BenchmarkSearchTasks_Indexed(b *testing.B) {
 		}
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := s.SearchTasks(bg(), "keywords"); err != nil {
 			b.Fatalf("SearchTasks: %v", err)
 		}
@@ -693,8 +692,7 @@ func BenchmarkSearchTasks_OversightDisk(b *testing.B) {
 		return "", "", false
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		s.mu.RLock()
 		snapshot := make([]*Task, 0, len(s.tasks))
 		for _, t := range s.tasks {

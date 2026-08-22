@@ -918,8 +918,7 @@ func seedBenchmarkStore(b *testing.B, n int) *Store {
 // from the secondary index on a 200-task store.
 func BenchmarkListTasksByStatus(b *testing.B) {
 	s := seedBenchmarkStore(b, 200)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := s.ListTasksByStatus(bg(), TaskStatusWaiting); err != nil {
 			b.Fatal(err)
 		}
@@ -930,8 +929,7 @@ func BenchmarkListTasksByStatus(b *testing.B) {
 // ListTasks+filter pattern on the same 200-task store.
 func BenchmarkListTasksFilterWaiting(b *testing.B) {
 	s := seedBenchmarkStore(b, 200)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		all, err := s.ListTasks(bg(), false)
 		if err != nil {
 			b.Fatal(err)
@@ -949,8 +947,7 @@ func BenchmarkListTasksFilterWaiting(b *testing.B) {
 // BenchmarkCountByStatus measures the O(1) count path.
 func BenchmarkCountByStatus(b *testing.B) {
 	s := seedBenchmarkStore(b, 200)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = s.CountByStatus(TaskStatusWaiting)
 	}
 }
@@ -958,8 +955,7 @@ func BenchmarkCountByStatus(b *testing.B) {
 // BenchmarkCountByStatusFullScan measures the old full-scan pattern.
 func BenchmarkCountByStatusFullScan(b *testing.B) {
 	s := seedBenchmarkStore(b, 200)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		all, err := s.ListTasks(bg(), false)
 		if err != nil {
 			b.Fatal(err)

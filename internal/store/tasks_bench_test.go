@@ -53,8 +53,7 @@ func BenchmarkUpdateTaskTitle(b *testing.B) {
 
 	title := strings.Repeat("benchmark title word ", 20) // ~400 chars
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.UpdateTaskTitle(ctx, task.ID, title); err != nil {
 			b.Fatalf("UpdateTaskTitle: %v", err)
 		}
@@ -68,8 +67,8 @@ func BenchmarkUpdateTaskTitle(b *testing.B) {
 // BenchmarkCreateTask_LargeOversight measures the RestoreTask path with a
 // large (~55 KB) oversight string.  Before the optimisation, LoadOversightText
 // and buildIndexEntry ran inside the write lock; after, they run before it.
-// The benchmark calls RestoreTask b.N times, re-deleting the task between
-// iterations so the task stays available in the deleted map.
+// The benchmark calls RestoreTask once per iteration, re-deleting the task
+// between iterations so the task stays available in the deleted map.
 func BenchmarkCreateTask_LargeOversight(b *testing.B) {
 	s := newBenchStore(b)
 	ctx := context.Background()
@@ -104,8 +103,7 @@ func BenchmarkCreateTask_LargeOversight(b *testing.B) {
 	}
 	benchID := task0.ID
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := s.RestoreTask(ctx, benchID); err != nil {
 			b.Fatalf("RestoreTask: %v", err)
 		}

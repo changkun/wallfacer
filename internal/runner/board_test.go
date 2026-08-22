@@ -436,9 +436,8 @@ func BenchmarkGenerateBoardContext(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, err := r.generateBoardContextAndMounts(selfID, false)
 		if err != nil {
 			b.Fatal(err)
