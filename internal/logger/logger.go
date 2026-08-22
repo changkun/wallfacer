@@ -281,10 +281,5 @@ func needsQuoting(s string) bool {
 	if s == "" {
 		return true
 	}
-	for _, r := range s {
-		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '"' || r == '=' {
-			return true
-		}
-	}
-	return false
+	return strings.ContainsAny(s, " \t\n\r\"=")
 }
