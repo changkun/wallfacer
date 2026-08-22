@@ -2,6 +2,7 @@ package gitutil
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -203,7 +204,7 @@ func TestConflictError_Error(t *testing.T) {
 	if msg == "" {
 		t.Error("expected non-empty error message")
 	}
-	if !contains(msg, "2") {
+	if !strings.Contains(msg, "2") {
 		t.Errorf("error message should mention 2 conflicted files, got: %q", msg)
 	}
 }
@@ -284,16 +285,4 @@ func TestRemoteDefaultBranch(t *testing.T) {
 			t.Errorf("RemoteDefaultBranch = %q, want %q", got, "main")
 		}
 	})
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
-		func() bool {
-			for i := 0; i <= len(s)-len(sub); i++ {
-				if s[i:i+len(sub)] == sub {
-					return true
-				}
-			}
-			return false
-		}())
 }

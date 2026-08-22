@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/runner"
@@ -87,7 +88,7 @@ func TestStartOAuth_ReturnsAuthorizeURL(t *testing.T) {
 	if result.AuthorizeURL == "" {
 		t.Error("authorize_url is empty")
 	}
-	if !contains(result.AuthorizeURL, "claude.ai") {
+	if !strings.Contains(result.AuthorizeURL, "claude.ai") {
 		t.Errorf("authorize_url = %q; want to contain 'claude.ai'", result.AuthorizeURL)
 	}
 }
@@ -173,17 +174,4 @@ func TestStartOAuth_Integration(t *testing.T) {
 	if status.State != "error" {
 		t.Errorf("state after cancel = %q; want 'error'", status.State)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsImpl(s, substr))
-}
-
-func containsImpl(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

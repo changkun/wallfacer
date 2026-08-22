@@ -74,7 +74,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 	// Verify no session_id in the raw JSON output.
 	if json.Valid(data) {
 		raw := string(data)
-		if contains(raw, "sess-secret") {
+		if strings.Contains(raw, "sess-secret") {
 			t.Error("session_id should not appear in board.json output")
 		}
 	}
@@ -341,22 +341,9 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 	if manifest.Tasks[0].ID != normal.ID.String() {
 		t.Errorf("manifest task ID = %q, want %q", manifest.Tasks[0].ID, normal.ID.String())
 	}
-	if contains(string(data), archived.ID.String()) {
+	if strings.Contains(string(data), archived.ID.String()) {
 		t.Error("archived task ID should not appear in the board manifest")
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsString(s, substr))
-}
-
-func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // waitBoardSeqStable blocks until boardChangeSeq has not changed for one
