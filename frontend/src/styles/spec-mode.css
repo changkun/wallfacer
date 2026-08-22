@@ -4,4 +4,3 @@
  * file directly from main.ts but keeps the public import stable.
  */
 @import './spec-mode/prose-toc.css';
-@import './spec-mode/explorer-tree.css';

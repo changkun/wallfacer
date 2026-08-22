@@ -75,11 +75,10 @@ describe('Liquid Glass v2 — no glass over content', () => {
     // content, never floating chrome.
     'src/styles/mermaid.css',
     'src/styles/oversight.css',
-    // Spec mode paints the spec tree and the reading-view TOC. spec-mode.css
-    // is a barrel of @imports, so guard the partials that actually paint
-    // content — the barrel itself carries no rules.
+    // Spec mode paints the reading-view prose. spec-mode.css is a barrel of
+    // @imports, so guard the partial that actually paints content — the
+    // barrel itself carries no rules.
     'src/styles/spec-mode/prose-toc.css',
-    'src/styles/spec-mode/explorer-tree.css',
   ];
 
   it.each(contentStylesheets)('%s carries no backdrop-filter', (file) => {
