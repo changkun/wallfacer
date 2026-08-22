@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -1232,15 +1233,10 @@ func (h *Handler) reviewTuning() (forks, rounds, costCap int) {
 // (lexicographically smallest), so a multi-repo run picks the same cwd on
 // every tick instead of a random map-iteration entry.
 func primaryWorktree(worktreePaths map[string]string) string {
-	paths := make([]string, 0, len(worktreePaths))
-	for _, p := range worktreePaths {
-		paths = append(paths, p)
-	}
-	if len(paths) == 0 {
+	if len(worktreePaths) == 0 {
 		return ""
 	}
-	slices.Sort(paths)
-	return paths[0]
+	return slices.Min(slices.Collect(maps.Values(worktreePaths)))
 }
 
 // reviewEndFile is the minimal subset of review's session end.json that carries

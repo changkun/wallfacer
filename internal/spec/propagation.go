@@ -2,6 +2,7 @@ package spec
 
 import (
 	"errors"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -183,10 +184,5 @@ func FanOutStale(tree *Tree, impacted []string, resolve func(string) string, now
 }
 
 func setToSorted(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for p := range set {
-		out = append(out, p)
-	}
-	slices.Sort(out)
-	return out
+	return slices.Sorted(maps.Keys(set))
 }

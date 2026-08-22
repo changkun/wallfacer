@@ -3,6 +3,8 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -118,10 +120,7 @@ func (s *pgStore) PutThread(ctx context.Context, t speccomment.Thread) error {
 
 // loadComments fills the Comments slice of each thread in byID with one query.
 func (s *pgStore) loadComments(ctx context.Context, byID map[string]*speccomment.Thread) error {
-	ids := make([]string, 0, len(byID))
-	for id := range byID {
-		ids = append(ids, id)
-	}
+	ids := slices.Collect(maps.Keys(byID))
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, thread_id, parent_id, author_sub, body, created_at, edited_at
 		FROM spec_comments
