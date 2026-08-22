@@ -209,6 +209,17 @@ func TestBuildTree_DeepNesting(t *testing.T) {
 	}
 }
 
+// rootsInTrack counts the tree's root specs assigned to a track.
+func rootsInTrack(tree *Tree, track string) int {
+	n := 0
+	for _, r := range tree.Roots {
+		if r.Value != nil && r.Value.Track == track {
+			n++
+		}
+	}
+	return n
+}
+
 func TestBuildTree_MultipleTracks(t *testing.T) {
 	specsDir := filepath.Join(t.TempDir(), "specs")
 	writeTestSpec(t, specsDir, "foundations/x.md", makeSpec("X", "foundations"))
@@ -220,17 +231,17 @@ func TestBuildTree_MultipleTracks(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	if len(tree.ByTrack("foundations")) != 1 {
-		t.Errorf("foundations roots = %d, want 1", len(tree.ByTrack("foundations")))
+	if rootsInTrack(tree, "foundations") != 1 {
+		t.Errorf("foundations roots = %d, want 1", rootsInTrack(tree, "foundations"))
 	}
-	if len(tree.ByTrack("local")) != 1 {
-		t.Errorf("local roots = %d, want 1", len(tree.ByTrack("local")))
+	if rootsInTrack(tree, "local") != 1 {
+		t.Errorf("local roots = %d, want 1", rootsInTrack(tree, "local"))
 	}
-	if len(tree.ByTrack("cloud")) != 1 {
-		t.Errorf("cloud roots = %d, want 1", len(tree.ByTrack("cloud")))
+	if rootsInTrack(tree, "cloud") != 1 {
+		t.Errorf("cloud roots = %d, want 1", rootsInTrack(tree, "cloud"))
 	}
-	if len(tree.ByTrack("shared")) != 0 {
-		t.Errorf("shared roots = %d, want 0", len(tree.ByTrack("shared")))
+	if rootsInTrack(tree, "shared") != 0 {
+		t.Errorf("shared roots = %d, want 0", rootsInTrack(tree, "shared"))
 	}
 }
 

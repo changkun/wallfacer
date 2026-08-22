@@ -23,17 +23,6 @@ type Tree struct {
 	Errs []error // parse errors collected during tree building
 }
 
-// ByTrack returns root nodes belonging to the given track.
-func (t *Tree) ByTrack(track string) []*Node {
-	var nodes []*Node
-	for _, r := range t.Roots {
-		if r.Value != nil && r.Value.Track == track {
-			nodes = append(nodes, r)
-		}
-	}
-	return nodes
-}
-
 // BuildTree walks the specs directory and assembles the spec tree.
 // The specsDir should be the path to the top-level specs/ directory.
 // Parse errors are collected in Tree.Errs rather than aborting the build.
