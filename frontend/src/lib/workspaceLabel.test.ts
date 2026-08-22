@@ -44,3 +44,17 @@ describe('workspaceLabel', () => {
     expect(workspaceLabel(undefined, [])).toBe('Untitled workspace');
   });
 });
+
+describe('basename on Windows paths', () => {
+  it('splits on backslashes, which is how host paths arrive on Windows', () => {
+    expect(basename('C:\\Users\\dev\\projects\\wallfacer')).toBe('wallfacer');
+  });
+
+  it('ignores trailing backslashes', () => {
+    expect(basename('C:\\Users\\dev\\wallfacer\\\\')).toBe('wallfacer');
+  });
+
+  it('still handles posix paths', () => {
+    expect(basename('/Users/dev/wallfacer')).toBe('wallfacer');
+  });
+});

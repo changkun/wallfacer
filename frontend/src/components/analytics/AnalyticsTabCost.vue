@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, useTemplateRef, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../../api/client';
+import { basename } from '../../lib/workspaceLabel';
 import AppSelect from '../AppSelect.vue';
 
 const WINDOW_OPTIONS = [
@@ -88,11 +89,6 @@ function sortedActivityKeys() {
 function sortedWorkspaceKeys() {
   const m = data.value?.by_workspace || {};
   return Object.keys(m).sort((a, b) => (m[b].cost_usd || 0) - (m[a].cost_usd || 0));
-}
-
-function workspaceLabel(p: string) {
-  const parts = p.replace(/\\/g, '/').split('/');
-  return parts[parts.length - 1] || p;
 }
 
 function sortedAgentSessionKeys() {
@@ -328,7 +324,7 @@ watch(agentSessionWindowDays, () => fetchAndRender());
               <tbody>
                 <tr v-for="path in sortedWorkspaceKeys()" :key="path">
                   <td style="padding: 6px 10px; font-weight: 500;">
-                    <span :title="path" style="cursor: default;">{{ workspaceLabel(path) }}</span>
+                    <span :title="path" style="cursor: default;">{{ basename(path) }}</span>
                   </td>
                   <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_workspace || {})[path].count) }}</td>
                   <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_workspace || {})[path].input_tokens) }}</td>

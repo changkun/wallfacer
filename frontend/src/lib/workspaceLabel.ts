@@ -3,9 +3,12 @@
 // basename(s) of its paths; using the raw path truncates uselessly to
 // "/Users/ch..." in the narrow popover.
 
-/** Last path segment, trailing slashes ignored. Returns the input if empty. */
+/** Last path segment, trailing separators ignored. Returns the input if empty.
+ * Accepts both separators: workspace paths arrive from the host, so on Windows
+ * they are backslash-delimited and splitting on "/" alone yields the whole
+ * path. */
 export function basename(p: string): string {
-  const parts = p.replace(/\/+$/, '').split('/');
+  const parts = p.replace(/[\\/]+$/, '').split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
 
