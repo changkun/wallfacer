@@ -1263,6 +1263,28 @@ func TestCollectWorkspaceStatuses_NonGitDir(t *testing.T) {
 	}
 }
 
+// TestCollectWorkspaceStatuses_PreservesInputOrder pins the index/value pairing
+// of the concurrent collector: every result must sit at the slot of the
+// workspace it describes. The goroutines run out of order and write into a
+// shared slice, so a mis-captured loop variable would land every status in one
+// slot (or in the wrong one) without failing to compile.
+func TestCollectWorkspaceStatuses_PreservesInputOrder(t *testing.T) {
+	const n = 8 // exceeds the collector's concurrency cap of 4
+	dirs := make([]string, n)
+	for i := range dirs {
+		dirs[i] = t.TempDir()
+	}
+	results := collectWorkspaceStatuses(dirs)
+	if len(results) != n {
+		t.Fatalf("len(results) = %d, want %d", len(results), n)
+	}
+	for i, got := range results {
+		if got.Path != dirs[i] {
+			t.Errorf("results[%d].Path = %q, want %q", i, got.Path, dirs[i])
+		}
+	}
+}
+
 // BenchmarkCollectWorkspaceStatuses measures parallel git status collection
 // across 5 bare git repos to quantify the parallel speedup.
 func BenchmarkCollectWorkspaceStatuses(b *testing.B) {
