@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -530,7 +531,7 @@ func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
 	}
 	h, _ := newTestHandlerWithEnv(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"sandbox": "claude",
 		"timeout": 1,
 	}
@@ -604,7 +605,7 @@ func TestTestSandbox_SandboxTestTag(t *testing.T) {
 	}
 	h, _ := newTestHandlerWithEnv(t)
 
-	body := map[string]interface{}{"sandbox": "claude", "timeout": 1}
+	body := map[string]any{"sandbox": "claude", "timeout": 1}
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/api/env/test", strings.NewReader(string(raw)))
 	w := httptest.NewRecorder()
@@ -628,13 +629,7 @@ func TestTestSandbox_SandboxTestTag(t *testing.T) {
 		t.Fatalf("GetTask: %v", err)
 	}
 
-	hasTag := false
-	for _, tag := range task.Tags {
-		if tag == "sandbox-test" {
-			hasTag = true
-			break
-		}
-	}
+	hasTag := slices.Contains(task.Tags, "sandbox-test")
 	if !hasTag {
 		t.Errorf("expected task to have tag %q, got tags=%v", "sandbox-test", task.Tags)
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -1020,8 +1021,8 @@ func parseTestVerdict(result string, customPass, customFail []string) string {
 	lines := strings.Split(upper, "\n")
 	maxTailLines := constants.MaxTailLines
 	seen := 0
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimRight(strings.TrimSpace(lines[i]), ".*!?:;,-")
+	for _, line := range slices.Backward(lines) {
+		line := strings.TrimRight(strings.TrimSpace(line), ".*!?:;,-")
 		if line == "" {
 			continue
 		}

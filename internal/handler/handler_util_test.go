@@ -119,11 +119,11 @@ func TestBrowseWorkspaces_ValidDir(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	entries, ok := resp["entries"].([]interface{})
+	entries, ok := resp["entries"].([]any)
 	if !ok {
 		t.Fatalf("entries is not an array: %v", resp["entries"])
 	}
@@ -149,10 +149,10 @@ func TestBrowseWorkspaces_HiddenFilesFiltering(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp1 map[string]interface{}
+	var resp1 map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp1)
 
-	entries1 := resp1["entries"].([]interface{})
+	entries1 := resp1["entries"].([]any)
 	if len(entries1) != 1 {
 		t.Errorf("expected 1 entry without hidden, got %d: %v", len(entries1), entries1)
 	}
@@ -164,10 +164,10 @@ func TestBrowseWorkspaces_HiddenFilesFiltering(t *testing.T) {
 	if w2.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w2.Code)
 	}
-	var resp2 map[string]interface{}
+	var resp2 map[string]any
 	_ = json.NewDecoder(w2.Body).Decode(&resp2)
 
-	entries2 := resp2["entries"].([]interface{})
+	entries2 := resp2["entries"].([]any)
 	if len(entries2) != 2 {
 		t.Errorf("expected 2 entries with hidden, got %d: %v", len(entries2), entries2)
 	}
@@ -191,10 +191,10 @@ func TestBrowseWorkspaces_FilesNotIncluded(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-	entries := resp["entries"].([]interface{})
+	entries := resp["entries"].([]any)
 	if len(entries) != 1 {
 		t.Errorf("expected only directory entry, got %d entries", len(entries))
 	}
@@ -211,7 +211,7 @@ func TestBrowseWorkspaces_EmptyDirReturnsEmptyEntries(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
 	if resp["path"] != dir {

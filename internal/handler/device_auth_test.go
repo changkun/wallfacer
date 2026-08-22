@@ -154,7 +154,7 @@ func TestDeviceAuth_SaveFailureReportsFailedNotDenied(t *testing.T) {
 	}
 
 	var presp pollResponse
-	for i := 0; i < 60; i++ {
+	for range 60 {
 		rec = httptest.NewRecorder()
 		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/auth/device/poll", nil))
 		presp = pollResponse{}

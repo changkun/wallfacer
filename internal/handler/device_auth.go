@@ -175,10 +175,7 @@ func (d *DeviceAuth) start(w http.ResponseWriter, r *http.Request) {
 		d.mu.Unlock()
 	}()
 
-	expiresIn := int(time.Until(flow.expiresAt).Seconds())
-	if expiresIn < 0 {
-		expiresIn = 0
-	}
+	expiresIn := max(int(time.Until(flow.expiresAt).Seconds()), 0)
 	httpjson.Write(w, http.StatusOK, startResponse{
 		VerificationURI:         da.VerificationURI,
 		VerificationURIComplete: verify,
@@ -218,8 +215,7 @@ func (d *DeviceAuth) poll(w http.ResponseWriter, _ *http.Request) {
 			// expiry maps to those user-facing reasons; a token-store Save error
 			// or any other server-side failure must not be reported as "denied".
 			status := "failed"
-			var rerr *oauth2.RetrieveError
-			if errors.As(err, &rerr) {
+			if rerr, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
 				switch rerr.ErrorCode {
 				case "expired_token":
 					status = "expired"

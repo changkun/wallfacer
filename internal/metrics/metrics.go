@@ -14,6 +14,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -179,9 +180,7 @@ func (c *Counter) Add(labels map[string]string, delta uint64) {
 	if !ok {
 		// Deep-copy labels so the caller can reuse its map safely.
 		cp := make(map[string]string, len(labels))
-		for k, v := range labels {
-			cp[k] = v
-		}
+		maps.Copy(cp, labels)
 		cell = &counterCell{labels: cp}
 		c.obs[key] = cell
 	}
@@ -253,9 +252,7 @@ func (h *Histogram) Observe(labels map[string]string, value float64) {
 	cell, ok := h.obs[key]
 	if !ok {
 		cp := make(map[string]string, len(labels))
-		for k, v := range labels {
-			cp[k] = v
-		}
+		maps.Copy(cp, labels)
 		cell = &histogramCell{
 			labels: cp,
 			counts: make([]uint64, len(h.buckets)+1),
@@ -392,9 +389,7 @@ func formatFloat(v float64) string {
 // labelSetWithLE returns a shallow copy of labels with the "le" key added.
 func labelSetWithLE(labels map[string]string, le string) map[string]string {
 	cp := make(map[string]string, len(labels)+1)
-	for k, v := range labels {
-		cp[k] = v
-	}
+	maps.Copy(cp, labels)
 	cp["le"] = le
 	return cp
 }

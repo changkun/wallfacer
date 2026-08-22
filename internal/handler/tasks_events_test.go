@@ -92,7 +92,7 @@ func TestGetEvents_Paged_DefaultLimit(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	// Insert several events.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := h.store.InsertEvent(ctx, task.ID, store.EventTypeSystem, map[string]string{"i": fmt.Sprintf("%d", i)}); err != nil {
 			t.Fatalf("InsertEvent %d: %v", i, err)
 		}
@@ -128,7 +128,7 @@ func TestGetEvents_Paged_Limit2(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	// Insert 5 events.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := h.store.InsertEvent(ctx, task.ID, store.EventTypeSystem, map[string]string{"i": fmt.Sprintf("%d", i)}); err != nil {
 			t.Fatalf("InsertEvent %d: %v", i, err)
 		}

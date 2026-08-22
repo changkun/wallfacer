@@ -549,7 +549,7 @@ func TestEnsurePlanScope(t *testing.T) {
 func TestWrapLine(t *testing.T) {
 	got := wrapLine("this is a fairly long sentence that should wrap", 20)
 	// Each output line must not exceed 20 unless it's a single long word.
-	for _, l := range strings.Split(got, "\n") {
+	for l := range strings.SplitSeq(got, "\n") {
 		if len(l) > 20 && !strings.Contains(l, " ") {
 			continue // single long word, allowed to overflow
 		}

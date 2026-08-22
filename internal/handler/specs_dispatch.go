@@ -29,8 +29,7 @@ import (
 func (h *Handler) SpecTransition(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			httpjson.Write(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
 			return
 		}
@@ -360,7 +359,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			// Rollback: delete any tasks created so far.
-			for j := 0; j < i; j++ {
+			for j := range i {
 				_ = s.DeleteTask(r.Context(), createdTaskIDs[j], "dispatch rollback")
 			}
 			http.Error(w, fmt.Sprintf("create task for %s: %v", rs.relPath, err), http.StatusInternalServerError)
@@ -388,7 +387,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 				_ = s.DeleteTask(r.Context(), createdTaskIDs[j], "dispatch rollback: frontmatter write failed")
 			}
 			// Attempt to revert any frontmatter already written.
-			for j := 0; j < i; j++ {
+			for j := range i {
 				_ = spec.UpdateFrontmatter(resolved[j].absPath, map[string]any{
 					"dispatched_task_id": nil,
 				})

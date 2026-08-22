@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -203,10 +204,8 @@ func TestPatchTaskToInProgress(t *testing.T) {
 	// The handler calls RunBackground synchronously before returning the
 	// response, so the mock should have the task ID recorded by now.
 	runs := mock.RunCalls()
-	for _, id := range runs {
-		if id == taskID {
-			return
-		}
+	if slices.Contains(runs, taskID) {
+		return
 	}
 	t.Fatalf("RunBackground not called with task ID %s; calls: %v", taskID, runs)
 }
@@ -319,7 +318,7 @@ func TestEnvRoundtrip(t *testing.T) {
 		b, _ := io.ReadAll(getResp.Body)
 		t.Fatalf("GET /api/env: status %d, body: %s", getResp.StatusCode, b)
 	}
-	var cfg map[string]interface{}
+	var cfg map[string]any
 	if err := json.NewDecoder(getResp.Body).Decode(&cfg); err != nil {
 		t.Fatalf("decode env config: %v", err)
 	}
@@ -354,7 +353,7 @@ func TestSSETaskStream(t *testing.T) {
 	}
 
 	data := readFirstSSEData(t, resp.Body)
-	var tasks []interface{}
+	var tasks []any
 	if err := json.Unmarshal(data, &tasks); err != nil {
 		t.Fatalf("unmarshal SSE task list: %v (data=%q)", err, data)
 	}

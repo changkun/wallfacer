@@ -141,7 +141,7 @@ func TestListTasks_ArchivedPaged(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	archivedIDs := make([]uuid.UUID, 0, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: fmt.Sprintf("archived %d", i), Timeout: 15})
 		if err != nil {
 			t.Fatal(err)
@@ -711,7 +711,7 @@ func TestGetEvents_PagedEnvelopeWithLimitParam(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
 
 	}
@@ -740,7 +740,7 @@ func TestGetEvents_PagedAfterCursor(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
 
 	}
@@ -911,7 +911,7 @@ func TestGetEvents_LimitCappedAt1000(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
 
 	}
@@ -997,7 +997,7 @@ func TestGetEvents_HasMoreFalseWhenAllFit(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
 
 	}
@@ -1021,7 +1021,7 @@ func TestGetEvents_TotalFilteredAccountsForTypeFilter(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
 
 	}
@@ -1169,7 +1169,7 @@ func TestGenerateMissingTitles_WithUntitled(t *testing.T) {
 func TestGenerateMissingTitles_LimitParam(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task without title", Timeout: 15})
 
 	}
@@ -1562,7 +1562,7 @@ func TestTryAutoRetry_MaxRetries(t *testing.T) {
 	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 		t.Fatalf("SetTaskFailureCategory: %v", err)
 	}
-	for i := 0; i < constants.MaxAutoRetries; i++ {
+	for i := range constants.MaxAutoRetries {
 		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 			t.Fatalf("IncrementAutoRetryCount(%d): %v", i, err)
 		}
@@ -1599,7 +1599,7 @@ func TestTryAutoRetry_CircuitOpen(t *testing.T) {
 	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 		t.Fatalf("SetTaskFailureCategory: %v", err)
 	}
-	for i := 0; i < constants.DefaultCBThreshold; i++ {
+	for range constants.DefaultCBThreshold {
 		h.runner.RecordContainerFailure()
 	}
 
@@ -1637,7 +1637,7 @@ func TestTryAutoRetry_ManualRetriesDoNotBlock(t *testing.T) {
 	}
 
 	// Simulate two manual retries: RetryHistory grows but AutoRetryCount stays 0.
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
 			t.Fatalf("ResetTaskForRetry(%d): %v", i, err)
 		}
@@ -2166,7 +2166,7 @@ func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 	}
 
 	// Two regular tasks already in_progress (fills the regular slots).
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		reg, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: fmt.Sprintf("regular %d", i), Timeout: 15})
 		_ = h.store.ForceUpdateTaskStatus(ctx, reg.ID, store.TaskStatusInProgress)
 
@@ -2878,7 +2878,7 @@ func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 	// Collect both Phase 1 completion signals within the timeout.
 	timeout := time.NewTimer(5 * time.Second)
 	defer timeout.Stop()
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		select {
 		case <-phase1Done:
 			// Goroutine i+1 completed Phase 1 concurrently — good.
@@ -3263,7 +3263,7 @@ func TestUpdateTask_SetScheduledAt(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sched test", Timeout: 15})
 
 	future := time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"scheduled_at": future.Format(time.RFC3339),
 	})
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(string(body)))
@@ -4157,7 +4157,7 @@ func TestSearchTasks_NoResults(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
-	var results []interface{}
+	var results []any
 	if err := json.NewDecoder(w.Body).Decode(&results); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -4181,7 +4181,7 @@ func TestSearchTasks_MatchesPrompt(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
-	var results []interface{}
+	var results []any
 	if err := json.NewDecoder(w.Body).Decode(&results); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -4203,7 +4203,7 @@ func TestGetStats_EmptyStore(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var stats interface{}
+	var stats any
 	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
 		t.Fatalf("decode: %v", err)
 	}

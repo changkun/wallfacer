@@ -372,10 +372,7 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 			t.MaxCostUSD = v
 		}
 		if maxInputTokens != nil {
-			v := *maxInputTokens
-			if v < 0 {
-				v = 0
-			}
+			v := max(*maxInputTokens, 0)
 			t.MaxInputTokens = v
 		}
 		if prompt != nil {
@@ -401,10 +398,7 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 			t.MaxCostUSD = v
 		}
 		if maxInputTokens != nil {
-			v := *maxInputTokens
-			if v < 0 {
-				v = 0
-			}
+			v := max(*maxInputTokens, 0)
 			t.MaxInputTokens = v
 		}
 		return nil

@@ -39,7 +39,7 @@ func TestWallfacerImportsOnlyRootTopos(t *testing.T) {
 		t.Fatalf("go list: %v\n%s", err, out)
 	}
 	var offenders []string
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue

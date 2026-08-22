@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -80,10 +81,7 @@ func buildNDJSON(n, lineSize int) []byte {
 		// The minimum object without padding is: {"i":0,"p":""}\n = 14 bytes for i<10.
 		prefix := `{"i":` + string(rune('0'+i%10)) + `,"p":"`
 		suffix := "\"}\n"
-		padLen := lineSize - len(prefix) - len(suffix)
-		if padLen < 0 {
-			padLen = 0
-		}
+		padLen := max(lineSize-len(prefix)-len(suffix), 0)
 		buf.WriteString(prefix)
 		buf.WriteString(strings.Repeat("x", padLen))
 		buf.WriteString(suffix)
@@ -172,13 +170,7 @@ func TestSaveTurnOutput_Truncation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	found := false
-	for _, tt := range updated.TruncatedTurns {
-		if tt == turn {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(updated.TruncatedTurns, turn)
 	if !found {
 		t.Errorf("TruncatedTurns = %v, want to contain turn %d", updated.TruncatedTurns, turn)
 	}

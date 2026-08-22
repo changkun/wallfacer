@@ -279,8 +279,8 @@ func (b *FilesystemBackend) ListBlobs(taskID uuid.UUID, prefix string) ([]string
 	//   "outputs/turn-" → dir="outputs", filePrefix="turn-"
 	//   "outputs/"      → dir="outputs", filePrefix="" (list all)
 	var dirPart, filePrefix string
-	if strings.HasSuffix(prefix, "/") {
-		dirPart = strings.TrimSuffix(prefix, "/")
+	if before, ok := strings.CutSuffix(prefix, "/"); ok {
+		dirPart = before
 		filePrefix = ""
 	} else {
 		dirPart = filepath.Dir(prefix)

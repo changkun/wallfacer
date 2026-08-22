@@ -231,7 +231,7 @@ func ValidateTemplate(content string) error {
 // mockContextFor returns a fully initialized zero-valued context struct for
 // the given template API name. It is used by Validate to perform a dry-run
 // execution and catch field-access errors at write time.
-func mockContextFor(apiName string) (interface{}, bool) {
+func mockContextFor(apiName string) (any, bool) {
 	switch apiName {
 	case "task_prompt_refine":
 		return RefinementData{

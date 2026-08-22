@@ -47,7 +47,7 @@ func TestParseTurnActivityTextBlock(t *testing.T) {
 // TestParseTurnActivityToolCall verifies that tool_use blocks are extracted as
 // "ToolName(input)" entries.
 func TestParseTurnActivityToolCall(t *testing.T) {
-	input := map[string]interface{}{"file_path": "/workspace/main.go"}
+	input := map[string]any{"file_path": "/workspace/main.go"}
 	inputJSON, _ := json.Marshal(input)
 	ndjson := fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":%s}]}}`, inputJSON)
 	act := parseTurnActivity([]byte(ndjson), 2)
@@ -62,7 +62,7 @@ func TestParseTurnActivityToolCall(t *testing.T) {
 // TestParseTurnActivityMultipleBlocks verifies that multiple content blocks
 // in a single turn are all captured.
 func TestParseTurnActivityMultipleBlocks(t *testing.T) {
-	input := map[string]interface{}{"command": "go test ./..."}
+	input := map[string]any{"command": "go test ./..."}
 	inputJSON, _ := json.Marshal(input)
 	ndjson := `{"type":"assistant","message":{"content":[{"type":"text","text":"Running tests now"},{"type":"tool_use","name":"Bash","input":` + string(inputJSON) + `}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","content":[{"type":"text","text":"PASS"}]}]}}`
@@ -102,7 +102,7 @@ func TestParseTurnActivityCodexToolItems(t *testing.T) {
 }
 
 func TestParseTurnActivityLowercaseToolName(t *testing.T) {
-	input := map[string]interface{}{"file_path": "/workspace/main.go"}
+	input := map[string]any{"file_path": "/workspace/main.go"}
 	inputJSON, _ := json.Marshal(input)
 	ndjson := fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"read_file","input":%s}]}}`, inputJSON)
 	act := parseTurnActivity([]byte(ndjson), 6)
@@ -1139,42 +1139,42 @@ func TestExtractToolInputGo(t *testing.T) {
 	tests := []struct {
 		name  string
 		tool  string
-		input map[string]interface{}
+		input map[string]any
 		want  string
 	}{
 		// Bash
-		{name: "bash command", tool: "Bash", input: map[string]interface{}{"command": "ls -la"}, want: "ls -la"},
-		{name: "bash alias", tool: "bash", input: map[string]interface{}{"command": "echo hi"}, want: "echo hi"},
+		{name: "bash command", tool: "Bash", input: map[string]any{"command": "ls -la"}, want: "ls -la"},
+		{name: "bash alias", tool: "bash", input: map[string]any{"command": "echo hi"}, want: "echo hi"},
 		{name: "bash nil input", tool: "Bash", input: nil, want: ""},
 		// Read
-		{name: "read file_path", tool: "Read", input: map[string]interface{}{"file_path": "/workspace/main.go"}, want: "/workspace/main.go"},
-		{name: "read alias", tool: "read_file", input: map[string]interface{}{"file_path": "/foo.go"}, want: "/foo.go"},
+		{name: "read file_path", tool: "Read", input: map[string]any{"file_path": "/workspace/main.go"}, want: "/workspace/main.go"},
+		{name: "read alias", tool: "read_file", input: map[string]any{"file_path": "/foo.go"}, want: "/foo.go"},
 		// Write
-		{name: "write file_path", tool: "Write", input: map[string]interface{}{"file_path": "/workspace/out.txt"}, want: "/workspace/out.txt"},
+		{name: "write file_path", tool: "Write", input: map[string]any{"file_path": "/workspace/out.txt"}, want: "/workspace/out.txt"},
 		// Edit
-		{name: "edit file_path", tool: "Edit", input: map[string]interface{}{"file_path": "/workspace/a.go"}, want: "/workspace/a.go"},
+		{name: "edit file_path", tool: "Edit", input: map[string]any{"file_path": "/workspace/a.go"}, want: "/workspace/a.go"},
 		// Glob
-		{name: "glob pattern", tool: "Glob", input: map[string]interface{}{"pattern": "**/*.go"}, want: "**/*.go"},
+		{name: "glob pattern", tool: "Glob", input: map[string]any{"pattern": "**/*.go"}, want: "**/*.go"},
 		// Grep
-		{name: "grep pattern", tool: "Grep", input: map[string]interface{}{"pattern": "func main"}, want: "func main"},
+		{name: "grep pattern", tool: "Grep", input: map[string]any{"pattern": "func main"}, want: "func main"},
 		// WebFetch
-		{name: "webfetch url", tool: "WebFetch", input: map[string]interface{}{"url": "https://example.com"}, want: "https://example.com"},
+		{name: "webfetch url", tool: "WebFetch", input: map[string]any{"url": "https://example.com"}, want: "https://example.com"},
 		// WebSearch
-		{name: "websearch query", tool: "WebSearch", input: map[string]interface{}{"query": "golang channels"}, want: "golang channels"},
+		{name: "websearch query", tool: "WebSearch", input: map[string]any{"query": "golang channels"}, want: "golang channels"},
 		// Task short prompt
-		{name: "task short prompt", tool: "Task", input: map[string]interface{}{"prompt": "do something"}, want: "do something"},
+		{name: "task short prompt", tool: "Task", input: map[string]any{"prompt": "do something"}, want: "do something"},
 		// Task long prompt truncated at 120 runes with a trailing ellipsis,
 		// matching the other tool-input branches.
-		{name: "task long prompt truncated", tool: "Task", input: map[string]interface{}{"prompt": string(make([]byte, 200))}, want: string(make([]byte, 120)) + "…"},
+		{name: "task long prompt truncated", tool: "Task", input: map[string]any{"prompt": string(make([]byte, 200))}, want: string(make([]byte, 120)) + "…"},
 		// Task empty prompt
-		{name: "task empty prompt", tool: "Task", input: map[string]interface{}{"prompt": ""}, want: ""},
+		{name: "task empty prompt", tool: "Task", input: map[string]any{"prompt": ""}, want: ""},
 		// Default fallback keys
-		{name: "default file_path fallback", tool: "custom_tool", input: map[string]interface{}{"file_path": "/some/file"}, want: "/some/file"},
-		{name: "default command fallback", tool: "custom_tool", input: map[string]interface{}{"command": "run me"}, want: "run me"},
-		{name: "default pattern fallback", tool: "custom_tool", input: map[string]interface{}{"pattern": "*.go"}, want: "*.go"},
-		{name: "default query fallback", tool: "custom_tool", input: map[string]interface{}{"query": "search term"}, want: "search term"},
-		{name: "default path fallback", tool: "custom_tool", input: map[string]interface{}{"path": "/a/b"}, want: "/a/b"},
-		{name: "default no known key", tool: "custom_tool", input: map[string]interface{}{"other": "val"}, want: ""},
+		{name: "default file_path fallback", tool: "custom_tool", input: map[string]any{"file_path": "/some/file"}, want: "/some/file"},
+		{name: "default command fallback", tool: "custom_tool", input: map[string]any{"command": "run me"}, want: "run me"},
+		{name: "default pattern fallback", tool: "custom_tool", input: map[string]any{"pattern": "*.go"}, want: "*.go"},
+		{name: "default query fallback", tool: "custom_tool", input: map[string]any{"query": "search term"}, want: "search term"},
+		{name: "default path fallback", tool: "custom_tool", input: map[string]any{"path": "/a/b"}, want: "/a/b"},
+		{name: "default no known key", tool: "custom_tool", input: map[string]any{"other": "val"}, want: ""},
 	}
 
 	for _, tc := range tests {
@@ -1497,8 +1497,7 @@ func TestPeriodicOversightWorker_EnvFileMissing(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{EnvFile: "/does/not/exist/.env"})
 	t.Cleanup(func() { r.Shutdown() })
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	done := make(chan struct{})
 	go func() {

@@ -35,7 +35,7 @@ func TestRebuildIndex_WithTasks_ReturnsJSON(t *testing.T) {
 	ctx := context.Background()
 
 	// Create some tasks so the rebuild has something to process.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task prompt", Timeout: 30, Kind: store.TaskKindTask}); err != nil {
 			t.Fatalf("CreateTask %d: %v", i, err)
 		}

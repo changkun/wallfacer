@@ -274,14 +274,8 @@ func ComputeAnchor(body string, startLine, endLine int) speccomment.Anchor {
 
 	headings := parseHeadings(lines)
 
-	prefixStart := startLine - contextWindow
-	if prefixStart < 1 {
-		prefixStart = 1
-	}
-	suffixEnd := endLine + contextWindow
-	if suffixEnd > len(lines) {
-		suffixEnd = len(lines)
-	}
+	prefixStart := max(startLine-contextWindow, 1)
+	suffixEnd := min(endLine+contextWindow, len(lines))
 
 	return speccomment.Anchor{
 		SectionPath: sectionPathAt(headings, startLine),
@@ -472,10 +466,7 @@ func slugify(s string) string {
 // window, computed on frozen-normalized lines so cloud and the future
 // git-export path score identically.
 func contextSimilarity(a speccomment.Anchor, lines []string, line, rangeLen int) float64 {
-	prefixStart := line - contextWindow
-	if prefixStart < 1 {
-		prefixStart = 1
-	}
+	prefixStart := max(line-contextWindow, 1)
 	// The suffix window starts AFTER the anchored range. ComputeAnchor stores
 	// Suffix as [endLine+1, endLine+contextWindow] where endLine = line +
 	// rangeLen - 1. Anchoring the candidate suffix at line+1 would overlap the
@@ -484,10 +475,7 @@ func contextSimilarity(a speccomment.Anchor, lines []string, line, rangeLen int)
 	// depressed, over-orphaning multi-line anchors. For rangeLen == 1 this is
 	// identical to the previous line+1..line+contextWindow window.
 	endLine := line + rangeLen - 1
-	suffixEnd := endLine + contextWindow
-	if suffixEnd > len(lines) {
-		suffixEnd = len(lines)
-	}
+	suffixEnd := min(endLine+contextWindow, len(lines))
 	curPrefix := normalizeRange(lines, prefixStart, line-1)
 	curSuffix := normalizeRange(lines, endLine+1, suffixEnd)
 
@@ -519,7 +507,7 @@ func jaccard(a, b string) float64 {
 
 func tokenSet(s string) map[string]struct{} {
 	set := make(map[string]struct{})
-	for _, tok := range strings.Fields(s) {
+	for tok := range strings.FieldsSeq(s) {
 		set[tok] = struct{}{}
 	}
 	return set

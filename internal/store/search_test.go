@@ -225,7 +225,7 @@ func TestSearchTasks_CaseInsensitive(t *testing.T) {
 func TestSearchTasks_Cap(t *testing.T) {
 	s := newTestStore(t)
 	// Create 60 tasks that all match the query.
-	for i := 0; i < 60; i++ {
+	for i := range 60 {
 		if _, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "captest-match content", Timeout: 60, Kind: TaskKindTask}); err != nil {
 			t.Fatalf("CreateTask %d: %v", i, err)
 		}
@@ -616,7 +616,7 @@ func BenchmarkSearchTasks_Indexed(b *testing.B) {
 	}
 
 	// Create 500 tasks, half with oversight, to simulate a loaded board.
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("benchmark task prompt number %d with various keywords", i), Timeout: 60, Kind: TaskKindTask})
 		if err != nil {
 			b.Fatalf("CreateTask: %v", err)
@@ -653,7 +653,7 @@ func BenchmarkSearchTasks_OversightDisk(b *testing.B) {
 	}
 
 	// Same setup as the indexed benchmark.
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("benchmark task prompt number %d with various keywords", i), Timeout: 60, Kind: TaskKindTask})
 		if err != nil {
 			b.Fatalf("CreateTask: %v", err)

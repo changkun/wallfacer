@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,8 +56,7 @@ func TestCommentEndToEndCrossInstance(t *testing.T) {
 		return c
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	connA := connFor("u_alice", relayA)
 	connB := connFor("u_bob", relayB)
 	go connA.Run(ctx)

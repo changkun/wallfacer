@@ -2,6 +2,7 @@ package syncmap
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"testing"
 )
@@ -52,10 +53,7 @@ func TestMap_All(t *testing.T) {
 	m.Store(2, "two")
 	m.Store(3, "three")
 
-	seen := map[int]string{}
-	for k, v := range m.All() {
-		seen[k] = v
-	}
+	seen := maps.Collect(m.All())
 
 	if len(seen) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(seen))

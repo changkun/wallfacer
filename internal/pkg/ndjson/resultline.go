@@ -2,6 +2,7 @@ package ndjson
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 )
 
@@ -47,8 +48,8 @@ func PreferResultLine[T any](raw string, backward bool, isCandidate, isTerminal 
 	}
 
 	if backward {
-		for i := len(lines) - 1; i >= 0; i-- {
-			if c, ok := consider(lines[i]); ok {
+		for _, line := range slices.Backward(lines) {
+			if c, ok := consider(line); ok {
 				return c, true
 			}
 		}

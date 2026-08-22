@@ -96,7 +96,7 @@ func TestGetSpanStats_KnownSpanPairs(t *testing.T) {
 
 	// Insert three agent_turn spans with fixed durations by sleeping between events.
 	// We sleep at least 10ms per span so DurationMs is reliably > 0.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
 
 			Phase: "agent_turn",
@@ -382,7 +382,7 @@ func TestGetSpanStats_ThroughputWithDoneAndFailed(t *testing.T) {
 	ctx := context.Background()
 
 	// Create 2 done tasks and 1 failed task.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 15, Kind: store.TaskKindTask})
 		if err != nil {
 			t.Fatal(err)

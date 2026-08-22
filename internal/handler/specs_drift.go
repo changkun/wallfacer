@@ -256,7 +256,7 @@ func gitDiffNames(ctx context.Context, ws, base, tip string) []string {
 		return nil
 	}
 	var files []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(out), "\n") {
 		if p := strings.TrimSpace(line); p != "" {
 			files = append(files, p)
 		}

@@ -1326,12 +1326,10 @@ func TestConcurrentCreateTask(t *testing.T) {
 	s := newTestStore(t)
 	var wg sync.WaitGroup
 	const n = 20
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range n {
+		wg.Go(func() {
 			_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "concurrent", Timeout: 5})
-		}()
+		})
 	}
 	wg.Wait()
 

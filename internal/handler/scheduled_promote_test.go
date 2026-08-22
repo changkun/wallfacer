@@ -15,8 +15,7 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	h.autoimplement.Store(true)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create a backlog task scheduled 200ms from now.
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "scheduled soon", Timeout: 15})

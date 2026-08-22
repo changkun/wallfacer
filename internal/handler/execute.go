@@ -420,8 +420,8 @@ func (h *Handler) applyCancel(ctx context.Context, task store.Task) error {
 func spawnedByRoutineID(t store.Task) uuid.UUID {
 	const prefix = "spawned-by:"
 	for _, tag := range t.Tags {
-		if strings.HasPrefix(tag, prefix) {
-			if id, err := uuid.Parse(strings.TrimPrefix(tag, prefix)); err == nil {
+		if after, ok := strings.CutPrefix(tag, prefix); ok {
+			if id, err := uuid.Parse(after); err == nil {
 				return id
 			}
 		}

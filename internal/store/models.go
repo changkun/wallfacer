@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -551,7 +552,7 @@ type OversightPhase struct {
 // It is generated asynchronously when a task transitions to waiting, done, or failed.
 type TaskOversight struct {
 	Status      OversightStatus  `json:"status"`
-	GeneratedAt time.Time        `json:"generated_at,omitempty"`
+	GeneratedAt time.Time        `json:"generated_at"`
 	Error       string           `json:"error,omitempty"`
 	Phases      []OversightPhase `json:"phases,omitempty"`
 }
@@ -596,9 +597,7 @@ func NewStateChangeData(from, to TaskStatus, trigger Trigger, extra map[string]s
 		"to":      string(to),
 		"trigger": string(trigger),
 	}
-	for k, v := range extra {
-		data[k] = v
-	}
+	maps.Copy(data, extra)
 	return data
 }
 

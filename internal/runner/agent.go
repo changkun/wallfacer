@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -231,9 +232,7 @@ func (r *Runner) runAgent(
 	if task != nil {
 		labels["wallfacer.task.id"] = task.ID.String()
 	}
-	for k, v := range opts.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, opts.Labels)
 
 	// span_start / span_end bracket each launch attempt so the event
 	// timeline shows a clean bar per container run — including retries.
@@ -368,12 +367,8 @@ func (r *Runner) launchOne(
 	// migrated title/oversight/commit call sites do) cannot be mutated
 	// by the backend or by a later retry.
 	merged := make(map[string]string, len(spec.Labels)+len(labels))
-	for k, v := range spec.Labels {
-		merged[k] = v
-	}
-	for k, v := range labels {
-		merged[k] = v
-	}
+	maps.Copy(merged, spec.Labels)
+	maps.Copy(merged, labels)
 	spec.Labels = merged
 
 	handle, launchErr := r.backend.Launch(ctx, spec)

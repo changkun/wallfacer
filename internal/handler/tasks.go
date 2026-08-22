@@ -393,7 +393,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	// Seed the queue with tasks that have no batch-internal dependencies.
 	queue := make([]int, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if inDegree[i] == 0 {
 			queue = append(queue, i)
 		}

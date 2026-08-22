@@ -40,7 +40,7 @@ func TestSetAutoimplement_Disable(t *testing.T) {
 
 func TestSetAutoimplement_Toggle(t *testing.T) {
 	h := newTestHandler(t)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		enabled := i%2 == 0
 		h.SetAutoimplement(enabled)
 		if h.AutoimplementEnabled() != enabled {

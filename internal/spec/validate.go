@@ -93,11 +93,9 @@ func checkDateOrdering(s *Spec) []Result {
 }
 
 func checkNoSelfDependency(s *Spec) []Result {
-	for _, dep := range s.DependsOn {
-		if dep == s.Path {
-			return []Result{{s.Path, SeverityError, "no-self-dependency",
-				"spec depends on itself"}}
-		}
+	if slices.Contains(s.DependsOn, s.Path) {
+		return []Result{{s.Path, SeverityError, "no-self-dependency",
+			"spec depends on itself"}}
 	}
 	return nil
 }
@@ -303,12 +301,7 @@ func hasIncompleteLeaf(node *Node) bool {
 	if node.IsLeaf {
 		return node.Value != nil && node.Value.Status != StatusComplete
 	}
-	for _, child := range node.Children {
-		if hasIncompleteLeaf(child) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(node.Children, hasIncompleteLeaf)
 }
 
 // checkStalePropagation warns when a stale spec has validated dependents.

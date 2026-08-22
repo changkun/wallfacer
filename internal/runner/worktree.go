@@ -250,7 +250,7 @@ func killWorktreeProcesses(dir string) {
 
 	var pids []int
 	var curPID int
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		switch {
 		case strings.HasPrefix(line, "p"):
 			pid, err := strconv.Atoi(strings.TrimPrefix(line, "p"))

@@ -47,7 +47,7 @@ func TestListSystemPrompts_ReturnsAll(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	var result []map[string]interface{}
+	var result []map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestListSystemPrompts_NoOverrideByDefault(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ListSystemPrompts(w, req)
 
-	var result []map[string]interface{}
+	var result []map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&result)
 
 	for _, item := range result {
@@ -95,7 +95,7 @@ func TestGetSystemPrompt_KnownName(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
-	var result map[string]interface{}
+	var result map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&result)
 
 	if result["name"] != "title" {

@@ -245,7 +245,7 @@ func (h *Handler) validatedExpandedDirs(ctx context.Context, raw string) []strin
 	workspaces := h.visibleWorkspaces(ctx)
 	seen := make(map[string]bool)
 	var out []string
-	for _, p := range strings.Split(raw, ",") {
+	for p := range strings.SplitSeq(raw, ",") {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue

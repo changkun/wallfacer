@@ -48,7 +48,7 @@ func TestAcquireSlot_Unlimited(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewHostBackend: %v", err)
 	}
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		if _, err := b.acquireSlot(context.Background()); err != nil {
 			t.Fatalf("unlimited budget blocked at %d: %v", i, err)
 		}

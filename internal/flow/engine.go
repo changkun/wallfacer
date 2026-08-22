@@ -96,7 +96,6 @@ func (e *Engine) Execute(ctx context.Context, f Flow, task *store.Task) error {
 		parsedBySlug := make(map[string]any, len(group))
 		var parsedMu sync.Mutex
 		for i, step := range group {
-			step := step
 			prompt := prompts[i]
 			g.Go(func() error {
 				parsed, err := e.launcher.RunAgent(gctx, step.AgentSlug, task, prompt)

@@ -16,8 +16,6 @@ var (
 	t4 = uuid.MustParse("44444444-4444-4444-4444-444444444444")
 )
 
-func strptr(s string) *string { return &s }
-
 // fixture builds a representative spec tree + task list exercising all four
 // edge kinds, both actions, the blocked set, and the critical path.
 //
@@ -51,7 +49,7 @@ func fixture() ([]spec.NodeResponse, []store.Task) {
 				Title:            "Child B",
 				Status:           spec.StatusValidated,
 				DependsOn:        []string{"specs/x/parent/childA.md"},
-				DispatchedTaskID: strptr(t1.String()),
+				DispatchedTaskID: new(t1.String()),
 			},
 		},
 	}
@@ -131,7 +129,7 @@ func TestSpecActions_PerState(t *testing.T) {
 	leaf := func(st spec.Status, dispatched bool) *spec.Spec {
 		s := &spec.Spec{Status: st}
 		if dispatched {
-			s.DispatchedTaskID = strptr(t1.String())
+			s.DispatchedTaskID = new(t1.String())
 		}
 		return s
 	}
@@ -304,7 +302,7 @@ func TestBuild_DanglingEdgesDropped(t *testing.T) {
 		{Path: "specs/a.md", IsLeaf: true, Spec: &spec.Spec{
 			Status:           spec.StatusValidated,
 			DependsOn:        []string{"specs/missing.md"},
-			DispatchedTaskID: strptr(t4.String()),
+			DispatchedTaskID: new(t4.String()),
 		}},
 	}
 	tasks := []store.Task{

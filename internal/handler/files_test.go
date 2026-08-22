@@ -191,12 +191,10 @@ func TestFileIndex_OnlyOneRefreshInFlight(t *testing.T) {
 	// Launch N concurrent stale reads.
 	const N = 50
 	var wg sync.WaitGroup
-	for i := 0; i < N; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range N {
+		wg.Go(func() {
 			idx.Files(ws)
-		}()
+		})
 	}
 
 	// Wait for ALL goroutines to finish returning stale data.
@@ -276,13 +274,13 @@ func TestGetFiles_MaxCapEnforcedAcrossWorkspaces(t *testing.T) {
 
 	// Fill each workspace with more than half of constants.MaxFileListSize files.
 	half := constants.MaxFileListSize/2 + 100
-	for i := 0; i < half; i++ {
+	for i := range half {
 		name := filepath.Join(ws1, fmt.Sprintf("f%d.go", i))
 		if err := os.WriteFile(name, nil, 0644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < half; i++ {
+	for i := range half {
 		name := filepath.Join(ws2, fmt.Sprintf("f%d.go", i))
 		if err := os.WriteFile(name, nil, 0644); err != nil {
 			t.Fatal(err)
@@ -354,23 +352,21 @@ func TestGetFiles_ConcurrentSafe(t *testing.T) {
 	h, ws, _ := newTestHandlerWithTwoWorkspaces(t)
 
 	// Populate workspace so the index has something to cache.
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		_ = os.WriteFile(filepath.Join(ws, fmt.Sprintf("f%d.go", i)), []byte("x"), 0644)
 
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 30; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 30 {
+		wg.Go(func() {
 			req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 			w := httptest.NewRecorder()
 			h.GetFiles(w, req)
 			if w.Code != http.StatusOK {
 				t.Errorf("expected 200, got %d", w.Code)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

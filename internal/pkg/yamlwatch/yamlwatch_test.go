@@ -14,8 +14,7 @@ import (
 // window.
 func TestWatch_FiresOnYAMLWrite(t *testing.T) {
 	dir := t.TempDir()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var fired atomic.Int32
 	stop, err := Watch(ctx, "test", dir, func() { fired.Add(1) })
@@ -41,8 +40,7 @@ func TestWatch_FiresOnYAMLWrite(t *testing.T) {
 // extension in the watched directory does NOT trigger onChange.
 func TestWatch_IgnoresNonYAML(t *testing.T) {
 	dir := t.TempDir()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var fired atomic.Int32
 	stop, err := Watch(ctx, "test", dir, func() { fired.Add(1) })
@@ -65,8 +63,7 @@ func TestWatch_IgnoresNonYAML(t *testing.T) {
 // per event.
 func TestWatch_DebouncesBursts(t *testing.T) {
 	dir := t.TempDir()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var fired atomic.Int32
 	stop, err := Watch(ctx, "test", dir, func() { fired.Add(1) })

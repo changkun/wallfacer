@@ -152,7 +152,7 @@ func TestInsertEvent_SequentialIDs(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := s.InsertEvent(bg(), task.ID, EventTypeOutput, i); err != nil {
 			t.Fatalf("InsertEvent[%d]: %v", i, err)
 		}
@@ -214,7 +214,7 @@ func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 	s, _ := newTestFileStore(t, dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -273,7 +273,7 @@ func TestConcurrentInsertEvent(t *testing.T) {
 
 	var wg sync.WaitGroup
 	const n = 10
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -468,7 +468,7 @@ func TestCompactTaskEvents_Idempotent(t *testing.T) {
 func TestGetEventsPage_AllEventsNoFilter(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -490,7 +490,7 @@ func TestGetEventsPage_AllEventsNoFilter(t *testing.T) {
 func TestGetEventsPage_OrderedByID(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -509,7 +509,7 @@ func TestGetEventsPage_OrderedByID(t *testing.T) {
 func TestGetEventsPage_CursorAfterExclusive(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -542,7 +542,7 @@ func TestGetEventsPage_CursorAfterExclusive(t *testing.T) {
 func TestGetEventsPage_CursorNextAfterIsLastID(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -621,7 +621,7 @@ func TestGetEventsPage_MultiTypeFilter(t *testing.T) {
 func TestGetEventsPage_LimitDefault(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -638,7 +638,7 @@ func TestGetEventsPage_LimitDefault(t *testing.T) {
 func TestGetEventsPage_LimitCappedAt1000(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -655,7 +655,7 @@ func TestGetEventsPage_LimitCappedAt1000(t *testing.T) {
 func TestGetEventsPage_LimitTruncatesPage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -677,7 +677,7 @@ func TestGetEventsPage_LimitTruncatesPage(t *testing.T) {
 func TestGetEventsPage_HasMoreFalseWhenExact(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
@@ -970,7 +970,7 @@ func TestGetEventsPage_FullPaginationWalk(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	const total = 7
-	for i := 0; i < total; i++ {
+	for i := range total {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 

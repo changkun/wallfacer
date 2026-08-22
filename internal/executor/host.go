@@ -484,8 +484,7 @@ func (h *hostHandle) Wait() (int, error) {
 		return s == StateStopped || s == StateFailed
 	}
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			if !terminal() {
 				transition(&h.state, StateStopped)
 			}

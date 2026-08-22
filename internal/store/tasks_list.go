@@ -165,20 +165,14 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 		if idx == -1 {
 			return nil, total, false, false, fmt.Errorf("before cursor task not found")
 		}
-		start = idx + 1
-		if start > total {
-			start = total
-		}
+		start = min(idx+1, total)
 		end = min(start+pageSize, total)
 	case afterID != nil:
 		idx := slices.IndexFunc(archived, func(t Task) bool { return t.ID == *afterID })
 		if idx == -1 {
 			return nil, total, false, false, fmt.Errorf("after cursor task not found")
 		}
-		end = idx
-		if end < 0 {
-			end = 0
-		}
+		end = max(idx, 0)
 		start = max(0, end-pageSize)
 	}
 

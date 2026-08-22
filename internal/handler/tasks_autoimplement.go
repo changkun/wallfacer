@@ -183,12 +183,7 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 			return false
 		}
 		visited[cur] = true
-		for _, dep := range adj[cur] {
-			if dfs(dep) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(adj[cur], dfs)
 	}
 	return dfs(start)
 }

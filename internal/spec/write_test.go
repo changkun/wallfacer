@@ -442,11 +442,11 @@ func TestUpdateFrontmatter_DoesNotAccreteBlankLines(t *testing.T) {
 			t.Fatalf("read: %v", err)
 		}
 		s := string(data)
-		idx := strings.Index(s, "\n---\n")
-		if idx < 0 {
+		_, after, ok := strings.Cut(s, "\n---\n")
+		if !ok {
 			t.Fatalf("no closing delimiter in %q", s)
 		}
-		body := s[idx+5:]
+		body := after
 		n := 0
 		for n < len(body) && body[n] == '\n' {
 			n++
@@ -454,7 +454,7 @@ func TestUpdateFrontmatter_DoesNotAccreteBlankLines(t *testing.T) {
 		return n
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := UpdateFrontmatter(path, map[string]any{"status": "active"}); err != nil {
 			t.Fatalf("UpdateFrontmatter[%d]: %v", i, err)
 		}

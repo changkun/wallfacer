@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -722,10 +723,5 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 // check keeps an org-scoped workspace from being read or mutated through a
 // session that config.go reports as having "no workspace".
 func (h *Handler) isAllowedWorkspace(ctx context.Context, ws string) bool {
-	for _, configured := range h.visibleWorkspaces(ctx) {
-		if configured == ws {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(h.visibleWorkspaces(ctx), ws)
 }

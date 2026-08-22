@@ -52,7 +52,6 @@ func TestParseOutputGolden(t *testing.T) {
 	}
 
 	for _, fixture := range fixtures {
-		fixture := fixture
 		t.Run(strings.TrimSuffix(filepath.Base(fixture), ".ndjson"), func(t *testing.T) {
 			content, err := os.ReadFile(fixture)
 			if err != nil {
@@ -101,7 +100,6 @@ func TestExtractSessionIDGolden(t *testing.T) {
 	}
 
 	for _, fixture := range cases {
-		fixture := fixture
 		t.Run(strings.TrimSuffix(filepath.Base(fixture), ".ndjson"), func(t *testing.T) {
 			content, err := os.ReadFile(fixture)
 			if err != nil {

@@ -418,7 +418,7 @@ func TestStreamTasks_DeltaCarriesID(t *testing.T) {
 	body := w.Body.String()
 	// Count lines starting with "id:" — one for snapshot, one for the delta.
 	idCount := 0
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "id:") {
 			idCount++
 		}
@@ -457,7 +457,7 @@ func TestStreamTasks_MonotonicIDs(t *testing.T) {
 
 	// Extract all id: values and verify they are strictly increasing.
 	var ids []int64
-	for _, line := range strings.Split(w.Body.String(), "\n") {
+	for line := range strings.SplitSeq(w.Body.String(), "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "id:") {
 			continue
@@ -507,10 +507,10 @@ func TestStreamTasks_ReplaySuccess(t *testing.T) {
 
 	// Extract the last id: field from the first response.
 	var lastID string
-	for _, line := range strings.Split(w1.Body.String(), "\n") {
+	for line := range strings.SplitSeq(w1.Body.String(), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "id:") {
-			lastID = strings.TrimSpace(strings.TrimPrefix(line, "id:"))
+		if after, ok := strings.CutPrefix(line, "id:"); ok {
+			lastID = strings.TrimSpace(after)
 		}
 	}
 	if lastID == "" {

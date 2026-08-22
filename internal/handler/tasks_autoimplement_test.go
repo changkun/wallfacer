@@ -78,7 +78,6 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockStore := tc.store
@@ -182,7 +181,7 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 
 	// Simulate IncrementAutoRetryCount until the budget and count are exhausted
 	// (ContainerCrash budget = 2, maxHandlerAutoRetries = 3).
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
 		}
@@ -656,8 +655,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 
 	h := newTestHandler(t)
 	h.SetAutotest(true)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create a waiting task with a worktree so it would be eligible for
 	// auto-test once the watcher runs.
@@ -696,7 +694,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	// on slow CI the retry ensures delivery without a fragile sleep.
 	wakeCount := 0
 	go func() {
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			time.Sleep(25 * time.Millisecond)
 			_ = h.store.UpdateTaskTitle(ctx, task.ID, fmt.Sprintf("trigger wake %d", i))
 			wakeCount++
@@ -730,8 +728,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 
 	h := newTestHandler(t)
 	h.SetAutosubmit(true)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create a waiting task that qualifies for auto-submit: has worktrees,
 	// passing test result, up to date, no conflicts.
@@ -767,7 +764,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	// Send wake signals repeatedly so at least one arrives after the
 	// goroutine has subscribed (avoids race on slow CI).
 	go func() {
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			time.Sleep(25 * time.Millisecond)
 			_ = h.store.UpdateTaskTitle(ctx, task.ID, fmt.Sprintf("trigger wake %d", i))
 		}
@@ -834,7 +831,7 @@ func TestCheckConcurrencyAndUpdateStatus_MaxConcurrency(t *testing.T) {
 	ctx := context.Background()
 	maxConc := h.maxConcurrentTasks()
 	// Saturate the concurrency limit with in-progress regular tasks.
-	for i := 0; i < maxConc; i++ {
+	for range maxConc {
 		task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "running", Timeout: 15})
 		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress) //nolint:errcheck
 	}
@@ -1161,8 +1158,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 //	(c) in_progress → not in the failed list, must remain unchanged
 func TestStartAutoRetrier_StartupScan(t *testing.T) {
 	h := newTestHandler(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// (a) Eligible failed task.
 	taskA, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "crash task", Timeout: 5})
@@ -1244,8 +1240,7 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 //     The scan must NOT retry this — the total cap is already hit.
 func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	h := newTestHandler(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// ── task1: count=2, container_crash budget=1 ─────────────────────────────
 	// Build count=2 with container_crash budget=1 by incrementing two different
@@ -1455,7 +1450,7 @@ func TestTryAutoPromote_PromotesMultipleTasks(t *testing.T) {
 
 	// Create 3 backlog tasks.
 	var taskIDs []uuid.UUID
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 			Prompt:  fmt.Sprintf("task %d", i),
 			Timeout: 15,
@@ -1498,7 +1493,7 @@ func TestTryAutoPromote_RespectsCapacityLimit(t *testing.T) {
 
 	// Create 5 backlog tasks.
 	var taskIDs []uuid.UUID
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 			Prompt:  fmt.Sprintf("task %d", i),
 			Timeout: 15,

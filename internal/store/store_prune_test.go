@@ -40,7 +40,7 @@ func TestPruneTaskPayload(t *testing.T) {
 	tp := s.tasks[task.ID]
 
 	// 15 RetryHistory entries (limit = constants.DefaultRetryHistoryLimit = 10).
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		tp.RetryHistory = append(tp.RetryHistory, RetryRecord{
 			RetiredAt: now.Add(time.Duration(i) * time.Second),
 			Prompt:    fmt.Sprintf("retry-%d", i),
@@ -49,7 +49,7 @@ func TestPruneTaskPayload(t *testing.T) {
 	}
 
 	// 8 RefineSessions entries (limit = constants.DefaultRefineSessionsLimit = 5).
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		tp.RefineSessions = append(tp.RefineSessions, RefinementSession{
 			ID:        fmt.Sprintf("session-%d", i),
 			CreatedAt: now.Add(time.Duration(i) * time.Second),
@@ -57,7 +57,7 @@ func TestPruneTaskPayload(t *testing.T) {
 	}
 
 	// 25 PromptHistory entries (limit = constants.DefaultPromptHistoryLimit = 20).
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		tp.PromptHistory = append(tp.PromptHistory, fmt.Sprintf("prompt-%d", i))
 	}
 
@@ -169,20 +169,20 @@ func TestPruneTaskPayload_LoadTimeMigration(t *testing.T) {
 		UpdatedAt:     time.Now(),
 	}
 	now := time.Now()
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		overLimit.RetryHistory = append(overLimit.RetryHistory, RetryRecord{
 			RetiredAt: now.Add(time.Duration(i) * time.Second),
 			Prompt:    fmt.Sprintf("retry-%d", i),
 			Status:    TaskStatusFailed,
 		})
 	}
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		overLimit.RefineSessions = append(overLimit.RefineSessions, RefinementSession{
 			ID:        fmt.Sprintf("session-%d", i),
 			CreatedAt: now.Add(time.Duration(i) * time.Second),
 		})
 	}
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		overLimit.PromptHistory = append(overLimit.PromptHistory, fmt.Sprintf("prompt-%d", i))
 	}
 
@@ -233,7 +233,7 @@ func TestPruneTaskPayload_ZeroLimitDisablesPruning(t *testing.T) {
 	now := time.Now()
 	s.mu.Lock()
 	tp := s.tasks[task.ID]
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		tp.RetryHistory = append(tp.RetryHistory, RetryRecord{
 			RetiredAt: now.Add(time.Duration(i) * time.Second),
 			Prompt:    fmt.Sprintf("retry-%d", i),

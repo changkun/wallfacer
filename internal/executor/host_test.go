@@ -105,7 +105,7 @@ func launchAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) map[string
 	}
 
 	// First NDJSON line is the init record.
-	line := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
+	line, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
 	var got map[string]any
 	if err := json.Unmarshal([]byte(line), &got); err != nil {
 		t.Fatalf("decode init line: %v\nline: %s\nfull: %s", err, line, out)

@@ -49,8 +49,8 @@ func TestMap_Concurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	counter := make([]int, 10)
 
-	for key := 0; key < 10; key++ {
-		for g := 0; g < 100; g++ {
+	for key := range 10 {
+		for range 100 {
 			wg.Add(1)
 			go func(k int) {
 				defer wg.Done()

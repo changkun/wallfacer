@@ -97,11 +97,9 @@ func NewCommandRegistry() *CommandRegistry {
 
 	for _, d := range defs {
 		r.commands[d.name] = commandDef{
-			Command: Command{
-				Name:        d.name,
-				Description: d.desc,
-				Usage:       d.usage,
-			},
+			Name:         d.name,
+			Description:  d.desc,
+			Usage:        d.usage,
 			templateFile: d.tmpl,
 		}
 	}

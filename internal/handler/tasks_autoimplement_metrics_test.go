@@ -61,7 +61,7 @@ func autoimplementCounterValue(t *testing.T, reg *metrics.Registry, watcher, out
 	// Prometheus text format labels are sorted alphabetically, so outcome comes
 	// before watcher in the label set.
 	target := fmt.Sprintf(`outcome="%s",watcher="%s"`, outcome, watcher)
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		if !strings.HasPrefix(line, "wallfacer_autoimplement_actions_total{") {
 			continue
 		}
@@ -150,7 +150,7 @@ func TestAutoRetrySuppressedMaxCount(t *testing.T) {
 	// Increment AutoRetryCount to the global cap using a different category so
 	// that the ContainerCrash budget (set as FailureCategory) remains non-zero.
 	// This isolates the count-cap path from the budget-exhausted path.
-	for i := 0; i < constants.MaxAutoRetries; i++ {
+	for i := range constants.MaxAutoRetries {
 		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
 			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
 		}

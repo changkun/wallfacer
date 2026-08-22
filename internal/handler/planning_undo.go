@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -193,7 +194,7 @@ func findLatestThreadPlanCommit(ctx context.Context, ws, threadID string) (hash,
 		round               int
 	}
 	var entries []entry
-	for _, rec := range strings.Split(out, "\x1E") {
+	for rec := range strings.SplitSeq(out, "\x1E") {
 		rec = strings.TrimLeft(rec, "\n")
 		if rec == "" {
 			continue
@@ -231,8 +232,7 @@ func findLatestThreadPlanCommit(ctx context.Context, ws, threadID string) (hash,
 	reverted := map[int]bool{}
 	// Build the set newest -> oldest? Easier: process oldest -> newest
 	// so state converges as the log is replayed.
-	for i := len(entries) - 1; i >= 0; i-- {
-		e := entries[i]
+	for _, e := range slices.Backward(entries) {
 		if r, ok := revertedRoundFromSubject(e.subject); ok {
 			reverted[r] = true
 			continue
@@ -406,8 +406,7 @@ func (h *Handler) undoTaskModeRound(ctx context.Context, w http.ResponseWriter, 
 	// whose round is not yet reverted. Within a thread, event order equals
 	// round order, so the first match is the highest un-reverted round.
 	var target *store.PromptRoundData
-	for i := len(events) - 1; i >= 0; i-- {
-		ev := events[i]
+	for _, ev := range slices.Backward(events) {
 		if ev.EventType != store.EventTypePromptRound {
 			continue
 		}

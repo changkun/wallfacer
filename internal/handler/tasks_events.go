@@ -165,10 +165,7 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, _ *http.Request, id uuid.UU
 	// A truncation_notice sentinel is appended by SaveTurnOutput when the output
 	// exceeds the WALLFACER_MAX_TURN_OUTPUT_BYTES budget.
 	if len(data) > 0 {
-		tailSize := 256
-		if len(data) < tailSize {
-			tailSize = len(data)
-		}
+		tailSize := min(len(data), 256)
 		if bytes.Contains(data[len(data)-tailSize:], []byte(`"truncation_notice"`)) {
 			w.Header().Set("X-Wallfacer-Truncated", "true")
 		}

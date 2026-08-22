@@ -704,7 +704,7 @@ func TestStatusIndex_CountsAndContents(t *testing.T) {
 
 	totals := map[TaskStatus]int{}
 	for status, n := range want {
-		for i := 0; i < n; i++ {
+		for i := range n {
 			task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("task-%s-%d", status, i), Timeout: 10})
 			if err != nil {
 				t.Fatalf("CreateTask: %v", err)
@@ -899,7 +899,7 @@ func seedBenchmarkStore(b *testing.B, n int) *Store {
 		TaskStatusFailed:     {TaskStatusInProgress, TaskStatusFailed},
 	}
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		target := statuses[i%len(statuses)]
 		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("bench-task-%d", i), Timeout: 10})
 		if err != nil {

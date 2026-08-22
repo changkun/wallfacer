@@ -600,10 +600,7 @@ func (r *Runner) taskStore(taskID uuid.UUID) *store.Store {
 // mutations and workspace switches, incrementing boardChangeSeq on each event
 // so that generateBoardContextAndMounts can detect stale cache entries.
 func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
-	r.boardSubscriptionWg.Add(1)
-	go func() {
-		defer r.boardSubscriptionWg.Done()
-
+	r.boardSubscriptionWg.Go(func() {
 		var (
 			wsSubID int
 			wsCh    <-chan workspace.Snapshot
@@ -650,7 +647,7 @@ func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
 				subscribeStore(snap.Store)
 			}
 		}
-	}()
+	})
 }
 
 // Command returns the container runtime binary path (podman/docker).

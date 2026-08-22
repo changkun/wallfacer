@@ -34,7 +34,7 @@ func TestWorktreeConcurrency(t *testing.T) {
 	wg.Add(numSetup + numPrune)
 
 	// goroutines: setup + cleanup a unique task worktree
-	for i := 0; i < numSetup; i++ {
+	for range numSetup {
 		go func() {
 			defer wg.Done()
 			taskID := uuid.New()
@@ -51,7 +51,7 @@ func TestWorktreeConcurrency(t *testing.T) {
 	}
 
 	// goroutines: prune unknown worktrees
-	for i := 0; i < numPrune; i++ {
+	for range numPrune {
 		go func() {
 			defer wg.Done()
 			runner.PruneUnknownWorktrees()
@@ -82,7 +82,7 @@ func TestWorktreeConcurrencySetupAndPrune(t *testing.T) {
 	// goroutine A: repeatedly setup + cleanup distinct task worktrees
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for i := range iterations {
 			taskID := uuid.New()
 			wt, br, err := runner.setupWorktrees(taskID)
 			if err != nil {
@@ -96,7 +96,7 @@ func TestWorktreeConcurrencySetupAndPrune(t *testing.T) {
 	// goroutine B: repeatedly prune (should never remove the active worktree)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			runner.PruneUnknownWorktrees()
 		}
 	}()

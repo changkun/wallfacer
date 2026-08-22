@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"maps"
 	"testing"
 	"time"
 
@@ -19,9 +20,7 @@ func buildMinimalTaskJSON(t *testing.T, overrides map[string]any) []byte {
 		"id":     uuid.New().String(),
 		"prompt": "test prompt",
 	}
-	for k, v := range overrides {
-		base[k] = v
-	}
+	maps.Copy(base, overrides)
 	data, err := json.Marshal(base)
 	if err != nil {
 		t.Fatalf("marshal task JSON: %v", err)

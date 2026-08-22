@@ -895,7 +895,7 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	}
 
 	// Trip the circuit breaker by recording failures above the threshold.
-	for i := 0; i < constants.DefaultCBThreshold+1; i++ {
+	for range constants.DefaultCBThreshold + 1 {
 		r.RecordContainerFailure()
 	}
 

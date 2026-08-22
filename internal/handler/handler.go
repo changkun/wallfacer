@@ -94,10 +94,10 @@ type watcherHealthEntry struct {
 func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
 	open := wb.breaker.IsOpen()
 	entry := watcherHealthEntry{
-		Name:    name,
-		Healthy: !open,
+		Name:     name,
+		Healthy:  !open,
+		Failures: wb.breaker.Failures(),
 	}
-	entry.Failures = wb.breaker.Failures()
 	if open {
 		if retryAt, ok := wb.breaker.RetryAt(); ok {
 			entry.RetryAt = &retryAt

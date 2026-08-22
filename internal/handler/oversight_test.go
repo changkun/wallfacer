@@ -277,7 +277,7 @@ func TestGenerateMissingOversight_LimitParam(t *testing.T) {
 	h := newTestHandlerForOversight(t)
 	ctx := context.Background()
 
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 15})
 		_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "sess", "end_turn", 1)
 

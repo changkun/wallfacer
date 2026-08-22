@@ -1007,7 +1007,7 @@ func TestContainerCircuitOpen_DoesNotConsumeProbe(t *testing.T) {
 
 	// Repeated metrics scrapes must keep reading "open" and must NOT consume
 	// the probe.
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if !r.ContainerCircuitOpen() {
 			t.Fatalf("scrape %d: expected circuit to read open", i)
 		}

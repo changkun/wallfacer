@@ -205,7 +205,7 @@ func TestGetUsageStats_MultipleTasksAggregated(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 30, Kind: store.TaskKindTask})
 		if err != nil {
 			t.Fatalf("CreateTask %d: %v", i, err)

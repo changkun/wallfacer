@@ -72,7 +72,7 @@ func TestContainerRegistry_Range(t *testing.T) {
 
 func TestContainerRegistry_RangeEarlyStop(t *testing.T) {
 	r := &containerRegistry{}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		r.Set(uuid.New(), fmt.Sprintf("container-%d", i))
 	}
 
@@ -98,7 +98,7 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Concurrent Set
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -108,7 +108,7 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// Concurrent Get
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -125,7 +125,7 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// Concurrent Delete
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

@@ -54,7 +54,6 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 	dummyFile := "turn-0001.json"
 
 	for _, route := range apicontract.Routes {
-		route := route // capture loop variable
 		t.Run(fmt.Sprintf("%s %s", route.Method, route.Pattern), func(t *testing.T) {
 			path := route.Pattern
 			path = strings.ReplaceAll(path, "{id}", dummyID)
@@ -115,7 +114,6 @@ func TestIdeateRoutesRemoved(t *testing.T) {
 		{"DELETE", "/api/ideate"},
 	}
 	for _, rt := range retiredRoutes {
-		rt := rt
 		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
 			req := httptest.NewRequest(rt.method, rt.path, nil)
 			w := httptest.NewRecorder()
@@ -168,7 +166,6 @@ func TestRefineRoutesRemoved(t *testing.T) {
 		{"POST", "/api/tasks/" + dummyID + "/refine/dismiss"},
 	}
 	for _, rt := range retiredRoutes {
-		rt := rt
 		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
 			req := httptest.NewRequest(rt.method, rt.path, nil)
 			w := httptest.NewRecorder()

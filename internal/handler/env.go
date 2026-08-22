@@ -479,10 +479,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Convert max_parallel_tasks int to string for the env file.
 	var maxParallel *string
 	if req.MaxParallelTasks != nil {
-		v := *req.MaxParallelTasks
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.MaxParallelTasks, 1)
 		s := fmt.Sprintf("%d", v)
 		maxParallel = &s
 	}
@@ -490,10 +487,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Convert max_test_parallel_tasks int to string for the env file.
 	var maxTestParallel *string
 	if req.MaxTestParallelTasks != nil {
-		v := *req.MaxTestParallelTasks
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.MaxTestParallelTasks, 1)
 		s := fmt.Sprintf("%d", v)
 		maxTestParallel = &s
 	}
@@ -501,10 +495,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Convert max_agents int to string. Clamp to [0, ∞): 0 = unlimited.
 	var maxAgents *string
 	if req.MaxAgents != nil {
-		v := *req.MaxAgents
-		if v < 0 {
-			v = 0
-		}
+		v := max(*req.MaxAgents, 0)
 		s := fmt.Sprintf("%d", v)
 		maxAgents = &s
 	}
@@ -513,10 +504,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// throttling, 0 keeps the backend default, 1..19 sets the niceness.
 	var agentNice *string
 	if req.AgentNice != nil {
-		v := *req.AgentNice
-		if v < -1 {
-			v = -1
-		}
+		v := max(*req.AgentNice, -1)
 		if v > 19 {
 			v = 19
 		}
@@ -528,28 +516,19 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// cost cap to [1, ∞). These apply live (reviewTuning re-reads on each run).
 	var reviewForks *string
 	if req.ReviewForks != nil {
-		v := *req.ReviewForks
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.ReviewForks, 1)
 		s := fmt.Sprintf("%d", v)
 		reviewForks = &s
 	}
 	var reviewRounds *string
 	if req.ReviewRounds != nil {
-		v := *req.ReviewRounds
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.ReviewRounds, 1)
 		s := fmt.Sprintf("%d", v)
 		reviewRounds = &s
 	}
 	var reviewCostCap *string
 	if req.ReviewCostCap != nil {
-		v := *req.ReviewCostCap
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.ReviewCostCap, 1)
 		s := fmt.Sprintf("%d", v)
 		reviewCostCap = &s
 	}
@@ -558,10 +537,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Clamp to [0, 120]: 0 = disabled; 120 minutes = max.
 	var oversightInterval *string
 	if req.OversightInterval != nil {
-		v := *req.OversightInterval
-		if v < 0 {
-			v = 0
-		}
+		v := max(*req.OversightInterval, 0)
 		if v > 120 {
 			v = 120
 		}
@@ -570,10 +546,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	var archivedTasksPerPage *string
 	if req.ArchivedTasksPerPage != nil {
-		v := *req.ArchivedTasksPerPage
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.ArchivedTasksPerPage, 1)
 		if v > 200 {
 			v = 200
 		}
@@ -595,10 +568,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Clamp to [1, ∞): minimum threshold is 1 commit ahead.
 	var autoPushThreshold *string
 	if req.AutoPushThreshold != nil {
-		v := *req.AutoPushThreshold
-		if v < 1 {
-			v = 1
-		}
+		v := max(*req.AutoPushThreshold, 1)
 		s := fmt.Sprintf("%d", v)
 		autoPushThreshold = &s
 	}

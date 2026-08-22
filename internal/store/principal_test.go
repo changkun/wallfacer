@@ -134,7 +134,7 @@ func TestTasksForPrincipal_OrgViewIsStrict(t *testing.T) {
 // The org view no longer admits them.
 func TestTasksForPrincipal_PersonalViewSeesLegacy(t *testing.T) {
 	s, insert := newFiltStore(t)
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		insert("", "") // three legacy local-mode tasks
 	}
 

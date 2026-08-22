@@ -138,14 +138,14 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 		}
 		id := SpecID(n.Path)
 		node := Node{
-			ID:     id,
-			Kind:   NodeSpec,
-			Label:  specLabel(n),
-			Status: string(s.Status),
-			Ref:    n.Path,
-			Depth:  n.Depth,
+			ID:               id,
+			Kind:             NodeSpec,
+			Label:            specLabel(n),
+			Status:           string(s.Status),
+			Ref:              n.Path,
+			Depth:            n.Depth,
+			AvailableActions: specActions(s, n.IsLeaf),
 		}
-		node.AvailableActions = specActions(s, n.IsLeaf)
 		g.Nodes = append(g.Nodes, node)
 
 		// containment: parent → each child spec present in the set.

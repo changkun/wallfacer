@@ -231,7 +231,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	// Build 30-day daily completions, always emitting exactly 30 entries.
 	now := time.Now().UTC()
 	dailyCompletions := make([]DayCount, 30)
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		day := now.AddDate(0, 0, -(29 - i))
 		key := day.Format("2006-01-02")
 		dailyCompletions[i] = DayCount{Date: key, Count: dailyBuckets[key]}

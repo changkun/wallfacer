@@ -410,10 +410,10 @@ func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, i
 // "turn-0001.json" or "turn-0001.stderr.txt". Returns 0 if not parseable.
 func parseTurnNumber(name string) int {
 	base := strings.TrimPrefix(name, "turn-")
-	dotIdx := strings.IndexByte(base, '.')
-	if dotIdx < 0 {
+	before, _, ok := strings.Cut(base, ".")
+	if !ok {
 		return 0
 	}
-	n, _ := strconv.Atoi(base[:dotIdx])
+	n, _ := strconv.Atoi(before)
 	return n
 }

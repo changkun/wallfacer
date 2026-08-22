@@ -17,7 +17,7 @@ ifneq ($(VERSION),)
 LDFLAGS += -X latere.ai/x/wallfacer/internal/cli.Version=$(VERSION)
 endif
 GOLANGCI_LINT ?= golangci-lint
-GOLANGCI_LINT_VERSION ?= 2.11.3
+GOLANGCI_LINT_VERSION ?= 2.13.1
 
 build-binary: frontend-build
 	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .

@@ -59,7 +59,7 @@ func runNormalized(t *testing.T, id harness.ID, raw []byte, byteByByte bool) []n
 	nw.finish()
 
 	var out []normalizedEvent
-	for _, line := range strings.Split(strings.TrimSpace(capRW.body.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(capRW.body.String()), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

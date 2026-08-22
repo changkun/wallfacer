@@ -247,7 +247,7 @@ func fanOutPlanningStaleness(ctx context.Context, ws, stagedNameList string) {
 // spec tree keys.
 func planModifiedSpecs(stagedNameList string) []string {
 	var out []string
-	for _, line := range strings.Split(strings.TrimSpace(stagedNameList), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(stagedNameList), "\n") {
 		p := strings.TrimSpace(line)
 		if p == "" || !strings.HasSuffix(p, ".md") || path.Base(p) == "README.md" {
 			continue
@@ -399,7 +399,7 @@ func ensurePlanScope(subject, primary string) string {
 // is empty or the common prefix reduces to the repo root.
 func primaryPlanPath(stagedOut string) string {
 	var files []string
-	for _, l := range strings.Split(strings.TrimSpace(stagedOut), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(stagedOut), "\n") {
 		l = strings.TrimSpace(l)
 		if l != "" {
 			files = append(files, l)

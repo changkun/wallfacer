@@ -541,7 +541,7 @@ func inferCodexToolName(command string) string {
 
 // extractToolInputGo returns a short representative string for a tool call
 // given the tool name and its input map. Mirrors the logic in modal.js.
-func extractToolInputGo(name string, input map[string]interface{}) string {
+func extractToolInputGo(name string, input map[string]any) string {
 	name = canonicalizeToolName(name)
 	if input == nil {
 		return ""
@@ -587,19 +587,19 @@ func extractToolInputGo(name string, input map[string]interface{}) string {
 }
 
 // parseRawInput decodes a JSON raw input into a map for extractToolInputGo.
-func parseRawInput(raw json.RawMessage) map[string]interface{} {
+func parseRawInput(raw json.RawMessage) map[string]any {
 	if len(raw) == 0 {
 		return nil
 	}
 	// Try string first (some formats encode input as a JSON string).
 	var s string
 	if json.Unmarshal(raw, &s) == nil {
-		var m map[string]interface{}
+		var m map[string]any
 		_ = json.Unmarshal([]byte(s), &m)
 
 		return m
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	_ = json.Unmarshal(raw, &m)
 
 	return m

@@ -184,18 +184,15 @@ func TestParseServerAPIKey(t *testing.T) {
 	}
 }
 
-// ptr returns a pointer to s, used to construct non-nil Updates fields in tests.
-func ptr(s string) *string { return &s }
-
 // TestUpdateExistingKeys verifies that Update replaces existing keys and appends new ones.
 func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
 	if err := envconfig.Update(path, envconfig.Updates{
-		OAuthToken:   ptr("new-token"),
-		BaseURL:      ptr("https://new.example.com"),
-		DefaultModel: ptr("claude-haiku-4-5"),
+		OAuthToken:   new("new-token"),
+		BaseURL:      new("https://new.example.com"),
+		DefaultModel: new("claude-haiku-4-5"),
 	}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -222,7 +219,7 @@ func TestUpdateNilSkips(t *testing.T) {
 
 	// nil pointer → leave unchanged.
 	if err := envconfig.Update(path, envconfig.Updates{
-		BaseURL: ptr("https://example.com"),
+		BaseURL: new("https://example.com"),
 	}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -243,8 +240,8 @@ func TestUpdateClearsField(t *testing.T) {
 
 	// Empty string pointer → clear the field.
 	if err := envconfig.Update(path, envconfig.Updates{
-		BaseURL:      ptr(""),
-		DefaultModel: ptr(""),
+		BaseURL:      new(""),
+		DefaultModel: new(""),
 	}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -270,7 +267,7 @@ func TestUpdatePreservesBlankSeparators(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// Clear only the middle key; the blank separator after it must survive.
-	if err := envconfig.Update(path, envconfig.Updates{BaseURL: ptr("")}); err != nil {
+	if err := envconfig.Update(path, envconfig.Updates{BaseURL: new("")}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -290,9 +287,9 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	if err := envconfig.Update(path, envconfig.Updates{
-		BaseURL:      ptr("https://example.com"),
-		DefaultModel: ptr("claude-sonnet-4-5"),
-		TitleModel:   ptr("claude-haiku-4-5"),
+		BaseURL:      new("https://example.com"),
+		DefaultModel: new("claude-sonnet-4-5"),
+		TitleModel:   new("claude-haiku-4-5"),
 	}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}

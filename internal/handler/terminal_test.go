@@ -266,8 +266,7 @@ func TestTerminalWS_ShellExit(t *testing.T) {
 }
 
 func TestSessionRegistry_CreateAndGet(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
@@ -303,8 +302,7 @@ func TestSessionRegistry_CreateAndGet(t *testing.T) {
 }
 
 func TestSessionRegistry_Remove(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
@@ -330,8 +328,7 @@ func TestSessionRegistry_Remove(t *testing.T) {
 }
 
 func TestSessionRegistry_CloseAll(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
@@ -358,8 +355,7 @@ func TestSessionRegistry_CloseAll(t *testing.T) {
 }
 
 func TestSessionRegistry_ActiveSession(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
@@ -408,8 +404,7 @@ func TestSessionRegistry_ActiveSession(t *testing.T) {
 }
 
 func TestRelayDispatcher_SwitchActive(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
@@ -853,7 +848,7 @@ func TestTerminalWS_CwdValidation(t *testing.T) {
 // spawned its own Process.Wait, so two goroutines raced to reap the same
 // process. Run under -race; each iteration drives the concurrent path.
 func TestTerminalSessionCleanup_SingleReaper(t *testing.T) {
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, "/bin/sh")
 		cmd.Dir = t.TempDir()

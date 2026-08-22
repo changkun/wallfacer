@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/pkg/statemachine"
@@ -198,13 +199,7 @@ func TestTaskBudgetFieldsRoundTrip(t *testing.T) {
 }
 
 func TestSandboxActivityAgentSession(t *testing.T) {
-	found := false
-	for _, a := range SandboxActivities {
-		if a == SandboxActivityAgentSession {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(SandboxActivities, SandboxActivityAgentSession)
 	if !found {
 		t.Error("SandboxActivityAgentSession not in SandboxActivities slice")
 	}

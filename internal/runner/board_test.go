@@ -381,7 +381,7 @@ func TestBoardCacheHit(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := context.Background()
 	var selfID [16]byte
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task prompt", Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
@@ -408,7 +408,7 @@ func TestBoardCacheHit(t *testing.T) {
 	// is hot. As long as one iteration clears the bar, the cache is doing its job.
 	const limit = 500 * time.Microsecond
 	best := time.Duration(math.MaxInt64)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		start := time.Now()
 		_, _, err := r.generateBoardContextAndMounts(selfID, false)
 		elapsed := time.Since(start)
@@ -431,7 +431,7 @@ func BenchmarkGenerateBoardContext(b *testing.B) {
 	s, r := setupRunnerWithCmd(b, nil, "echo")
 	ctx := context.Background()
 	var selfID [16]byte
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task prompt", Timeout: 5})
 		if err != nil {
 			b.Fatal(err)
@@ -498,7 +498,7 @@ func TestTruncate(t *testing.T) {
 // repeat returns s repeated n times (helper for constructing long strings).
 func repeat(s string, n int) string {
 	var b strings.Builder
-	for i := 0; i < n; i++ {
+	for range n {
 		b.WriteString(s)
 	}
 	return b.String()
@@ -519,7 +519,7 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 
 	// Create several sibling tasks with long text so the manifest would be huge
 	// without truncation.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: longPrompt, Timeout: 5})
 		if err != nil {
 			t.Fatal(err)

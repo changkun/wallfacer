@@ -293,7 +293,7 @@ func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget(t *testing.T) {
 	}
 
 	// Simulate three auto-retry increments (exhaust count cap).
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := s.IncrementAutoRetryCount(ctx, task.ID, FailureCategoryContainerCrash); err != nil {
 			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
 		}
@@ -397,7 +397,6 @@ func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget_Persisted(t *testing.T)
 // always clears CurrentRefinement regardless of the freshStart flag.
 func TestResetTaskForRetry_ClearsCurrentRefinement(t *testing.T) {
 	for _, freshStart := range []bool{true, false} {
-		freshStart := freshStart
 		t.Run(fmt.Sprintf("freshStart=%v", freshStart), func(t *testing.T) {
 			s := newTestStore(t)
 			task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt", Timeout: 15, Kind: TaskKindTask})

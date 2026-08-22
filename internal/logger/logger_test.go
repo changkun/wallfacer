@@ -162,7 +162,7 @@ func TestPrettyHandler_ConcurrentDerivedLoggersShareLock(t *testing.T) {
 	b := slog.New(base.WithAttrs([]slog.Attr{slog.String("logger", "b")}))
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		wg.Add(2)
 		go func() { defer wg.Done(); a.Info("from a") }()
 		go func() { defer wg.Done(); b.Info("from b") }()

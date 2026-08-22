@@ -3,6 +3,7 @@ package cmdexec
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -134,8 +135,7 @@ func (tx *Tx) run(ctx context.Context) error {
 	}
 
 	var deferErrors []error
-	for i := len(tx.defers) - 1; i >= 0; i-- {
-		d := tx.defers[i]
+	for i, d := range slices.Backward(tx.defers) {
 		if d.ctx == nil {
 			d = d.WithContext(cleanupCtx)
 		}

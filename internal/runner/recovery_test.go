@@ -168,8 +168,7 @@ func TestRecoverOrphanedTasks_InProgressMissingWorktreeBecomesFailed(t *testing.
 	}
 	t.Cleanup(func() { s.Close() })
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
 	if err != nil {
@@ -269,8 +268,7 @@ func TestRecoverOrphanedTasks_CommittingGitCheck(t *testing.T) {
 			t.Fatalf("git commit: %v\n%s", err, out)
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		RecoverOrphanedTasks(ctx, s, &mockLister{})
 
 		got, err := s.GetTask(context.Background(), task.ID)
@@ -292,8 +290,7 @@ func TestRecoverOrphanedTasks_CommittingGitCheck(t *testing.T) {
 
 		_, s := newCommittingTask(t, repoDir)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		RecoverOrphanedTasks(ctx, s, &mockLister{})
 
 		tasks, err := s.ListTasks(context.Background(), true)

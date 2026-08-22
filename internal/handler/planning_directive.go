@@ -179,7 +179,7 @@ func tokenize(s string) []string {
 // newlines and concatenated in the order it appeared in the stream.
 func extractAssistantLines(raw []byte) []string {
 	var lines []string
-	for _, rawLine := range strings.Split(string(raw), "\n") {
+	for rawLine := range strings.SplitSeq(string(raw), "\n") {
 		trimmed := strings.TrimSpace(rawLine)
 		if trimmed == "" || trimmed[0] != '{' {
 			continue
@@ -293,7 +293,7 @@ func firstSentence(body string) string {
 	}
 	inFence := false
 	var sentence strings.Builder
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "```") {
 			inFence = !inFence

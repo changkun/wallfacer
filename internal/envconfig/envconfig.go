@@ -366,8 +366,8 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 		return "", "", false
 	}
 
-	if strings.HasPrefix(line, "export ") {
-		line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+	if after, ok0 := strings.CutPrefix(line, "export "); ok0 {
+		line = strings.TrimSpace(after)
 	}
 
 	k, v, hasEquals := strings.Cut(line, "=")

@@ -130,11 +130,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	} else {
 		task.MaxCostUSD = opts.MaxCostUSD
 	}
-	if opts.MaxInputTokens < 0 {
-		task.MaxInputTokens = 0
-	} else {
-		task.MaxInputTokens = opts.MaxInputTokens
-	}
+	task.MaxInputTokens = max(opts.MaxInputTokens, 0)
 
 	// ScheduledAt: copy to avoid aliasing the caller's pointer.
 	if opts.ScheduledAt != nil {

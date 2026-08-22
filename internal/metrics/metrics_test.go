@@ -184,8 +184,8 @@ func TestHistogram_CumulativeBuckets(t *testing.T) {
 	bucketVal := func(le string) string {
 		prefix := fmt.Sprintf(`latency_bucket{le="%s",route="/api"} `, le)
 		for _, l := range lines {
-			if strings.HasPrefix(l, prefix) {
-				return strings.TrimPrefix(l, prefix)
+			if after, ok := strings.CutPrefix(l, prefix); ok {
+				return after
 			}
 		}
 		return ""
@@ -464,13 +464,13 @@ func TestRegistry_ConcurrentIncrement(t *testing.T) {
 
 	const goroutines = 100
 	done := make(chan struct{})
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			c.Inc(labels)
 			done <- struct{}{}
 		}()
 	}
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		<-done
 	}
 
@@ -492,13 +492,13 @@ func TestRegistry_ConcurrentObserve(t *testing.T) {
 
 	const goroutines = 50
 	done := make(chan struct{})
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			h.Observe(labels, 0.01)
 			done <- struct{}{}
 		}()
 	}
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		<-done
 	}
 

@@ -83,11 +83,9 @@ func NewCallbackServer(ctx context.Context, port int, callbackPath string) (*Cal
 		go func() { _ = srv.Shutdown(context.Background()) }()
 	})
 
-	cs.wg.Add(1)
-	go func() {
-		defer cs.wg.Done()
+	cs.wg.Go(func() {
 		_ = srv.Serve(ln)
-	}()
+	})
 
 	return cs, nil
 }

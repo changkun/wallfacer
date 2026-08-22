@@ -59,14 +59,12 @@ func TestValue_ConcurrentGet(t *testing.T) {
 	})
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			if got := v.Get(); got != "hello" {
 				t.Errorf("want hello, got %q", got)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -84,7 +82,7 @@ func TestValue_ConcurrentInvalidate(t *testing.T) {
 	})
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()

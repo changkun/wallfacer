@@ -54,8 +54,8 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 		// Fall back to CODEX_DEFAULT_MODEL from env if set (matches
 		// codex-agent.sh behaviour).
 		for _, kv := range env {
-			if strings.HasPrefix(kv, "CODEX_DEFAULT_MODEL=") {
-				req.Model = strings.TrimPrefix(kv, "CODEX_DEFAULT_MODEL=")
+			if after, ok := strings.CutPrefix(kv, "CODEX_DEFAULT_MODEL="); ok {
+				req.Model = after
 				break
 			}
 		}

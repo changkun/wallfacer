@@ -38,10 +38,8 @@ func BenchmarkUpdateTaskTitle(b *testing.B) {
 	const readers = 8
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
-	for i := 0; i < readers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range readers {
+		wg.Go(func() {
 			for {
 				select {
 				case <-stop:
@@ -50,7 +48,7 @@ func BenchmarkUpdateTaskTitle(b *testing.B) {
 					s.GetTask(ctx, task.ID) //nolint:errcheck
 				}
 			}
-		}()
+		})
 	}
 
 	title := strings.Repeat("benchmark title word ", 20) // ~400 chars

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -281,8 +282,8 @@ func ExtractResultText(raw []byte) string {
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
 
 	// First pass: look for a "result" line (most reliable).
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, line := range slices.Backward(lines) {
+		line := strings.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
@@ -326,8 +327,8 @@ func ExtractResultText(raw []byte) string {
 // or expired session by inspecting the structured error fields.
 func IsStaleSessionError(raw []byte) bool {
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, line := range slices.Backward(lines) {
+		line := strings.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
@@ -357,8 +358,8 @@ func IsStaleSessionError(raw []byte) bool {
 // IsErrorResult checks if the NDJSON output contains an error result.
 func IsErrorResult(raw []byte) bool {
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, line := range slices.Backward(lines) {
+		line := strings.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
