@@ -58,11 +58,38 @@ make test-frontend  # Frontend tests: cd frontend && bunx vitest run
 | `make lint` | Lint only (`golangci-lint` 2.13.1 + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
 | `make test` | fmt + lint + backend tests + frontend tests |
 | `make test-backend` | Go unit tests (`go test ./...`) |
-| `make test-frontend` | Frontend Vitest runner (`cd frontend && bunx vitest run`) |
+| `make test-frontend` | Frontend Vitest runner (`cd frontend && bun run test`) |
 | `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
 | `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
 | `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
 | `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
+| `make ui-test` | Boot against seeded demo data and assert UI invariants in a real browser (`SKIP_BUILD=1` reuses `./wallfacer`) |
+| `make fmt-check` | Fail if any Go source is not gofmt-formatted |
+| `make hooks` | Install the git hooks (pre-commit gofmt guard) via `core.hooksPath` |
+
+Lint sub-targets, all folded into `make lint`:
+
+| Target | Description |
+|---|---|
+| `make lint-go` | `golangci-lint` at the repo-pinned version |
+| `make lint-js` | Frontend type check (`vue-tsc --noEmit`) |
+| `make lint-otel` | Fail on any outbound `&http.Client{}` without the otel transport |
+| `make lint-truncate` | Fail on byte-index truncation of strings, which can cut a multi-byte rune |
+
+The `wallfacerd` web-server variant and the release/skills helpers:
+
+| Target | Description |
+|---|---|
+| `make web-frontend` | Build the wallfacerd frontend for embedding |
+| `make web-run` | Run wallfacerd locally on `:8080` with the embedded SPA |
+| `make web-dev` | Dev stack: Go on `:8080` plus Vite on `:5173` |
+| `make web-docker` | Build the `wallfacerd:dev` image from `Dockerfile.wallfacerd` |
+| `make release-prod` | Build and publish the prod image (`VERSION=`, else the short HEAD sha) |
+| `make commit-seq MSG=...` | Commit one staged scope with a required message |
+| `make push-once` | Push once via `scripts/push-once.sh` (`REMOTE=`, `BRANCH=`) |
+| `make skills-check` | Fail on any difference between `.claude/skills/` and upstream (CI gate) |
+| `make skills-pull` | Adopt upstream skill changes into this repo |
+| `make skills-push` | Promote local skill edits into `../claude-plugins` |
 
 ## Frontend Dev Mode
 
