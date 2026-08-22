@@ -15,14 +15,6 @@
   border-bottom: none;
 }
 
-.result-entry-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0 0 8px;
-  background: transparent;
-  border-bottom: none;
-}
 .result-entry-summary {
   display: flex;
   align-items: center;
@@ -120,40 +112,7 @@ pre.result-entry-body {
   color: var(--text-muted);
 }
 
-/* ===== Mobile Column Navigator ===== */
-#mobile-col-nav {
-  display: none; /* hidden on desktop */
-}
-
 /* ===== Branch Switcher ===== */
-.branch-switcher-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px 1px 4px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  max-width: 160px;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-}
-.branch-switcher-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--text-muted);
-}
-.branch-switcher-btn .branch-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .branch-dropdown {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -256,46 +215,6 @@ pre.result-entry-body {
 
 /* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
-  /* --- Mobile column navigator --- */
-  #mobile-col-nav {
-    display: flex;
-    overflow-x: auto;
-    gap: 6px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-    flex-shrink: 0;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  #mobile-col-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .mobile-col-btn {
-    white-space: nowrap;
-    padding: 5px 14px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-  .mobile-col-btn:active {
-    opacity: 0.75;
-  }
-  .mobile-col-btn.active {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-  }
-
   /* --- Board: horizontal scroll with snap --- */
   .board-grid {
     display: flex !important;
@@ -325,13 +244,6 @@ pre.result-entry-body {
     gap: 8px;
     padding: 10px 14px;
   }
-  .workspace-group-tabs {
-    order: 10;
-    flex-basis: 100%;
-  }
-  .workspace-git-bar {
-    padding: 4px 14px;
-  }
   .app-header__actions {
     width: 100%;
     flex: 0 0 auto;
@@ -357,28 +269,9 @@ pre.result-entry-body {
     flex-wrap: nowrap;
     gap: 8px;
   }
-  .command-palette-trigger-btn {
-    min-width: 0;
-    flex: 1 1 auto;
-    justify-content: center;
-    padding-inline: 10px;
-  }
-  .command-palette-trigger-kbd {
-    display: none;
-  }
-  .command-palette-trigger-text {
-    font-size: 12px;
-  }
   .automation-menu {
     right: -4px;
     min-width: min(280px, calc(100vw - 28px));
-  }
-  .header-toggle-strip::-webkit-scrollbar {
-    display: none;
-  }
-  .app-header__next-run {
-    white-space: normal;
-    text-align: center;
   }
 
   /* --- Modals: bottom-sheet on mobile --- */
@@ -400,44 +293,6 @@ pre.result-entry-body {
   /* Reduce modal inner padding on mobile */
   .modal-card .p-6 {
     padding: 16px !important;
-  }
-
-  .settings-layout {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .settings-tab-list {
-    flex-direction: row;
-    flex: 0 0 auto;
-    width: 100%;
-    max-height: none;
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding-right: 0;
-    padding-bottom: 8px;
-    scrollbar-width: none;
-  }
-  .settings-tab-list::-webkit-scrollbar {
-    display: none;
-  }
-  .settings-tab-content-wrap {
-    width: 100%;
-  }
-  .settings-tab {
-    width: auto;
-    flex: 0 0 auto;
-    white-space: nowrap;
-    border-left: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 999px;
-    padding: 8px 10px;
-  }
-  .settings-tab.active {
-    border-left-color: transparent;
-    border-bottom-color: var(--accent);
   }
 
   /* Modal content stays a single column on narrow screens */
