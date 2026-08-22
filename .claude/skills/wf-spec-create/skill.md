@@ -31,6 +31,11 @@ Derive the output file path by answering two independent questions from how the
 tree is actually laid out. They compose: `specs/local/003-live-serve.md` is a
 perfectly ordinary path.
 
+If `specs/` does not exist yet, bootstrap a flat tree: create `specs/`, put the
+first spec directly inside it with the requested track in `track:` frontmatter,
+and create `specs/README.md` in Step 5. Do not force a directory scheme before
+the project has chosen one.
+
 1. **Which directory?** If `specs/` has track directories, the spec goes in the
    one it belongs to: `specs/<track>/<name>.md`. If specs sit directly under
    `specs/`, it goes there and the track is recorded as a `track:` frontmatter
@@ -48,7 +53,8 @@ whole tree regardless of how any directory is grouped or numbered.
 ## Step 1: Read context
 
 1. Read `specs/README.md` to understand the track organization, dependency
-   graph, and what already exists.
+   graph, and what already exists. For a new tree where it is absent, record
+   that Step 5 must create a minimal index.
 2. Review the frontmatter schema and spec conventions. Where they are written
    down varies by repo — look for a document-model spec under `specs/`, or an
    internals doc describing how specs are parsed. If neither exists, infer the
@@ -145,8 +151,8 @@ section if the spec doesn't involve data flow.>
 ## API Surface
 
 <New or modified API routes, CLI flags, env variables, or configuration
-options. Use the existing format from CLAUDE.md. Skip this section if no
-external surface changes.>
+options. Follow the repository's existing reference format. Skip this section
+if no external surface changes.>
 
 ## Error Handling
 
@@ -169,8 +175,8 @@ packages. Identify:>
   instead of code blocks where possible.
 - Keep sections proportional to complexity — a simple spec doesn't need all
   sections. Delete sections marked "skip if..." when they don't apply.
-- Reference existing patterns: "follows the same pattern as `internal/handler/tasks.go`"
-  is better than re-explaining a pattern.
+- Reference existing patterns with a concrete path from the repository instead
+  of re-explaining the pattern.
 - Be specific about file paths and function names. Vague specs produce vague
   implementations.
 - Size the spec appropriately:
@@ -182,7 +188,9 @@ packages. Identify:>
 
 ## Step 5: Update specs/README.md
 
-1. Read `specs/README.md`.
+1. Read `specs/README.md`. If it does not exist, create a minimal index with a
+   title, a short explanation of the track recorded in frontmatter, and the
+   spec table below.
 2. Add the new spec to the appropriate track table, maintaining the table's
    existing order — alphabetical, or by number where the directory is numbered.
    The link path is whatever Step 0 derived, relative to `specs/`:

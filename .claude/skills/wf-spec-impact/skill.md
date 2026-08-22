@@ -89,10 +89,10 @@ For each referencing spec, assess whether it:
 
 Scan documentation files for references to things being changed:
 
-1. `CLAUDE.md` — API routes, env vars, CLI flags, key files list.
-2. `docs/guide/*.md` — user-facing documentation.
-3. `docs/internals/*.md` — technical documentation.
-4. `README.md` at project root if it exists.
+1. Repository instructions such as `AGENTS.md` or `CLAUDE.md`.
+2. User-facing guides and reference documentation.
+3. Architecture or internals documentation.
+4. `README.md` and `CONTRIBUTING.md` at the project root when present.
 
 Flag any doc sections that reference modified APIs, types, or behaviors.
 

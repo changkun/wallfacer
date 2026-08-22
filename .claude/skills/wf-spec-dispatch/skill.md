@@ -80,8 +80,8 @@ the spec itself:
 
 ### When a task board with a transition API is present
 
-Some repos — wallfacer is the reference implementation — run a server that owns
-dispatch atomically: it creates the board task with a pre-assigned UUID,
+Some repos expose a server that owns dispatch atomically: it creates the board
+task with a pre-assigned UUID,
 resolves dependency edges, sets the spec `validated`, writes
 `dispatched_task_id`, and commits the frontmatter in one transaction (a
 folder/non-leaf path expands into its subtree leaves and promotes drafted

@@ -2,7 +2,6 @@
 name: wf-spec-review-impl
 description: Read-only verdict on whether an implementation meets its spec: each acceptance criterion classified, unintended changes flagged, test coverage checked. Writes nothing; returns COMPLETE, INCOMPLETE, or NEEDS FIXES. Use to judge finished work; use drift to record that judgement on the spec, wrapup to close the spec out.
 argument-hint: <spec-file.md or task-file.md> [commit-range]
-allowed-tools: Read, Grep, Glob, Agent, Bash(git diff *), Bash(git log *), Bash(git show *), Bash(go test *), Bash(ls *)
 ---
 
 # Review Implementation Against Spec
@@ -69,7 +68,7 @@ For each "Tests" requirement in the spec/task:
 - Verify the test actually tests what the requirement asks for (not just that a
   test with a similar name exists).
 - Flag requirements with no corresponding test.
-- Run `go test ./...` on affected packages to verify tests pass.
+- Discover and run the affected repository's documented test command.
 
 Report: test coverage against requirements.
 
@@ -88,7 +87,8 @@ If the spec or task mentions documentation updates:
 
 - Verify the relevant doc files were modified in the diff.
 - Check that new API routes, env vars, or CLI flags appear in the docs.
-- Cross-reference against CLAUDE.md for consistency.
+- Cross-reference repository instructions and public documentation for
+  consistency.
 
 Report: documentation gaps, or "Docs: OK".
 

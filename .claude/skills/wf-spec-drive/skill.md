@@ -51,8 +51,8 @@ By default there is no server: advance the status by editing the spec's
 frontmatter along a legal edge and committing it, exactly as the other skills
 do.
 
-Where a transition API is present (wallfacer is the reference implementation),
-prefer it — it is authoritative, validates the edge, runs drift / stale
+Where a transition API is present, prefer it because it is authoritative,
+validates the edge, runs drift / stale
 fan-out, and commits: `POST /api/specs/transition` with
 `{ "action": "<action>", "path": "<workspace-relative spec path>" }`. Actions:
 `dispatch`, `undispatch`, `archive`, `unarchive`, `validate`, `stale`,

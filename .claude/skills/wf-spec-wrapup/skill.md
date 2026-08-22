@@ -35,9 +35,9 @@ Finalize the spec at `$ARGUMENTS` after all implementation tasks are done.
    **Direct-implement path:** confirm the spec body's items are actually present
    in the code (spot-check the `affects` files / recent commits). If the
    implementation is clearly incomplete, report what is missing and stop.
-4. Run `make test` to confirm all tests pass. If tests fail, stop. (If you just
-   ran the equivalent full suites in-session and they were green, say so and you
-   may skip the re-run.)
+4. Discover and run the repository's documented full verification command. If
+   it fails, stop. If you just ran the equivalent full gates in-session and
+   they were green, say so and you may skip the re-run.
 
 ## Step 2: Update the parent spec
 

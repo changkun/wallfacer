@@ -83,44 +83,52 @@ For each task in the approved plan:
 ### 3a. Write the code
 
 - Read all files you plan to modify before changing them.
+- Discover the repository's working agreements and commands from files such as
+  `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `README.md`, package manifests,
+  build files, and CI workflows. Treat the live repository as authoritative.
 - Follow existing code patterns — match style, naming, error handling, and
   structure of surrounding code.
 - Keep changes minimal and focused on what the spec requires.
-- For new API routes: add them to `internal/apicontract/routes.go` first, then
-  run `make api-contract` to regenerate the JS route file.
+- When changing a generated surface, find and edit its source of truth, then run
+  the repository's documented generation command.
 
 ### 3b. Write tests
 
-- Every new or changed behavior must have tests.
-- Backend: add Go tests in the same package (`_test.go` files).
-- Frontend: add vitest tests next to the source in `frontend/src/` (e.g.
-  `frontend/src/lib/foo.test.ts`, `frontend/src/components/Foo.test.ts`).
-- Tests must cover the happy path and at least one error/edge case.
+- Follow the repository's test framework, placement, naming, and coverage
+  conventions.
+- Every new or changed behavior must have a focused test. Every bug fix needs a
+  regression test that fails without the fix.
+- Cover the happy path and relevant error or boundary cases in proportion to
+  the change's risk.
 
 ### 3c. Verify
 
-After implementing each task:
+After implementing each task, run the repository's documented gates in this
+order where they exist:
 
-1. Run `make fmt` and `make lint` — fix any issues.
-2. Run `go vet ./...`
-3. Run `go test ./...` for backend changes.
-4. Run `make test-frontend` for frontend changes.
-5. Fix any failures before moving on.
+1. Format and lint the changed files.
+2. Run the smallest relevant test target for fast feedback.
+3. Run the broader test suite required by the repository.
+4. Run build, type-check, generation-drift, or static-analysis checks required
+   by the affected area.
+5. Fix every failure before moving on. If no command is documented, infer it
+   from package manifests and CI, then report the command you chose.
 
 ### 3d. Update docs
 
 If the task adds, removes, or modifies any API route, CLI flag, env variable,
 data model field, or user-visible behavior:
 
-- Update the relevant guide in `docs/guide/`.
-- Update `docs/internals/` if internal architecture changed.
-- Update `CLAUDE.md` if new routes, env vars, or conventions were added.
+- Update the repository's relevant user guide or reference page.
+- Update architecture or internals documentation when internal contracts
+  changed.
+- Update repository instruction files when commands or conventions changed.
 
 ### 3e. Commit
 
 - Stage only the files for this task.
 - Write a scoped, imperative commit message matching the repo style
-  (e.g., `internal/handler: add file content endpoint`).
+  (e.g., `api: add file content endpoint`).
 - Do NOT push unless the user explicitly asks.
 
 ### 3f. Update progress
@@ -130,11 +138,9 @@ status update: what was done, what's next.
 
 ## Step 4: Final verification
 
-After all tasks are implemented:
-
-1. Run the full test suite: `make test`
-2. Run `make build` to confirm the binary builds cleanly.
-3. If any tests fail, diagnose and fix before finishing.
+After all tasks are implemented, run the full verification set required by the
+repository, including its test suite and build or type-check command where they
+exist. If any gate fails, diagnose and fix it before finishing.
 
 ## Step 5: Finalize the spec
 
@@ -210,9 +216,8 @@ Report to the user:
   features, abstractions, or configurability beyond what's specified.
 - **Ask when ambiguous** — if the spec is unclear or contradicts the codebase,
   ask the user rather than guessing.
-- **Preserve existing patterns** — match the conventions in `CLAUDE.md` and
-  the surrounding code. This project uses stdlib `net/http` (no framework) on
-  the backend, a Vue 3 + TypeScript SPA in `frontend/` (Pinia stores, vitest),
-  and per-task directory storage.
-- **Follow the implementation checklist** — every task must have tests, docs,
-  and a quick refactoring pass (per CLAUDE.md).
+- **Preserve existing patterns** — follow the repository's instruction files
+  and the surrounding code rather than importing conventions from another
+  project.
+- **Follow the repository checklist** — include the tests, docs, and review
+  steps required by the project being changed.

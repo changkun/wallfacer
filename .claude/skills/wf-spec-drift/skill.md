@@ -2,7 +2,6 @@
 name: wf-spec-drift
 description: Classify how far what shipped diverged from what was specced, and record it on the spec: every item marked satisfied, diverged, not implemented, or superseded, unspecified work called out, and an Outcome section appended. Writes to the spec and may mark it stale. Use after an implementation lands and the spec should carry the verdict.
 argument-hint: <spec-file.md> [commit-range]
-allowed-tools: Read, Grep, Glob, Agent, Bash(git diff *), Bash(git log *), Bash(git show *), Bash(go test *), Bash(ls *)
 ---
 
 # Spec-Implementation Drift
@@ -171,7 +170,7 @@ Set `updated` to today's date whenever you change the status.
 
 If the spec has a "Tests" or "Testing Strategy" section:
 
-1. Run `go test ./...` on affected packages to verify tests pass.
+1. Discover and run the affected repository's documented test command.
 2. Cross-reference test results against the spec's test requirements.
 3. Note any spec-required tests that are missing or failing.
 
