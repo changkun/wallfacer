@@ -3,9 +3,11 @@ package workspace
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
@@ -164,11 +166,7 @@ func recoverFolders(dir string) []string {
 			}
 		}
 	}
-	out := make([]string, 0, len(seen))
-	for k := range seen {
-		out = append(out, k)
-	}
-	return normalizeGroupPaths(out)
+	return normalizeGroupPaths(slices.Collect(maps.Keys(seen)))
 }
 
 // writeMigrationBackup snapshots the legacy file and records what was adopted,

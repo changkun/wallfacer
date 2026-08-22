@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -193,11 +194,7 @@ func printValidateReport(tree *spec.Tree, results []spec.Result, errCount, warnC
 	for _, r := range results {
 		byPath[r.Path] = append(byPath[r.Path], r)
 	}
-	paths := make([]string, 0, len(byPath))
-	for p := range byPath {
-		paths = append(paths, p)
-	}
-	slices.Sort(paths)
+	paths := slices.Sorted(maps.Keys(byPath))
 
 	for _, p := range paths {
 		rs := byPath[p]
