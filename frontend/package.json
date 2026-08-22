@@ -9,7 +9,7 @@
     "build": "vue-tsc --noEmit && NODE_OPTIONS=--no-experimental-webstorage vite-ssg build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.0",
@@ -54,6 +54,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vitest/coverage-v8": "4.1.5",
     "happy-dom": "^20.9.0",
     "typescript": "^5.6.3",
     "vite": "^6.0.3",

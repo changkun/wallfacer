@@ -97,7 +97,7 @@ test-backend: frontend-build
 
 # Run Vue SPA unit tests under frontend/.
 test-frontend:
-	cd frontend && bunx vitest run
+	cd frontend && bun run test
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex.
 # Requires a running wallfacer server with valid credentials.
