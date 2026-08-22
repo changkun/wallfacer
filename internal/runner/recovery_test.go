@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -586,6 +587,82 @@ func TestMonitorContainerUntilStoppedWithConfig_IntermittentErrors(t *testing.T)
 	for i, want := range wantEvents {
 		if gotTypes[i] != want {
 			t.Errorf("event[%d] = %q, want %q", i, gotTypes[i], want)
+		}
+	}
+}
+
+// failOnStatusBackend wraps a StorageBackend and fails SaveTask when the task
+// is persisted in a chosen status, so a test can make one specific recovery
+// write fail while the committing seed still succeeds.
+type failOnStatusBackend struct {
+	store.StorageBackend
+	failStatus store.TaskStatus
+}
+
+func (b *failOnStatusBackend) SaveTask(t *store.Task) error {
+	if t.Status == b.failStatus {
+		return errInjectedRecoverySave
+	}
+	return b.StorageBackend.SaveTask(t)
+}
+
+type errInjectedRecovery string
+
+func (e errInjectedRecovery) Error() string { return string(e) }
+
+const errInjectedRecoverySave = errInjectedRecovery("injected save failure")
+
+// Crash recovery used to write the committing -> failed state-change event
+// whether or not the status update persisted, so a task that stayed in
+// committing carried a trace asserting it had failed. Recovery is the one path
+// a user cannot redrive from the UI, so the event must not outrun the write.
+func TestRecoverOrphanedTasks_NoStateChangeEventWhenStatusWriteFails(t *testing.T) {
+	const branchName = "task/test-recovery-save-fail"
+	ctx := context.Background()
+
+	repoDir := setupTestRepo(t)
+	// Branch at HEAD: its only commit predates the task's UpdatedAt, so
+	// recovery takes the "commit never landed, mark failed" path.
+	gitRun(t, repoDir, "checkout", "-b", branchName)
+	gitRun(t, repoDir, "checkout", "main")
+
+	fsBackend, err := store.NewFilesystemBackend(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFilesystemBackend: %v", err)
+	}
+	s, err := storetest.NewStore(t, &failOnStatusBackend{
+		StorageBackend: fsBackend,
+		failStatus:     store.TaskStatusFailed,
+	})
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt: "test prompt", Kind: store.TaskKindTask,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repoDir: repoDir}, branchName); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
+		t.Fatalf("seed committing: %v", err)
+	}
+
+	RecoverOrphanedTasks(ctx, s, &mockLister{})
+
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	for _, ev := range events {
+		if ev.EventType != store.EventTypeStateChange {
+			continue
+		}
+		if strings.Contains(string(ev.Data), string(store.TaskStatusFailed)) {
+			t.Fatalf("recovery recorded a committing -> failed state change even though the status write failed: %s", ev.Data)
 		}
 	}
 }

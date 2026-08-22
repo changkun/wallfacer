@@ -113,8 +113,15 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 					recovered = true
 					logger.Recovery.Warn("task was committing at startup; commit found after UpdatedAt, auto-recovering to done",
 						"task", t.ID, "repo", repoPath, "commit", hash, "recovered", true)
-					_ = s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone)
-
+					// Only claim the recovery once it has actually persisted.
+					// Emitting the state-change event regardless would leave the
+					// task in committing while its trace says done, and this is
+					// the one path a user cannot redrive from the UI.
+					if err := s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
+						logger.Recovery.Error("auto-recovery to done did not persist; task stays in committing for the next startup",
+							"task", t.ID, "error", err)
+						break
+					}
 					_ = s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 
 						"result": "server restarted after commit completed; auto-recovered to done",
@@ -128,15 +135,18 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 			if !recovered {
 				logger.Recovery.Warn("task was committing at startup, marking as failed",
 					"task", t.ID, "recovered", false)
-				_ = s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusFailed)
+				if err := s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusFailed); err != nil {
+					logger.Recovery.Error("marking an interrupted commit failed did not persist; task stays in committing for the next startup",
+						"task", t.ID, "error", err)
+				} else {
+					_ = s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
 
-				_ = s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
+						"error": "server restarted during commit",
+					})
+					_ = s.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
 
-					"error": "server restarted during commit",
-				})
-				_ = s.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
-
-					store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusFailed, store.TriggerRecovery, nil))
+						store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusFailed, store.TriggerRecovery, nil))
+				}
 			}
 
 		case store.TaskStatusInProgress:
