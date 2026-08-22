@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"latere.ai/x/wallfacer/internal/oauth"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
@@ -49,6 +52,16 @@ func newAuthTestServer(t *testing.T) *httptest.Server {
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
+	// Starting a flow binds that provider's fixed callback port (53692 for
+	// Claude, 1455 for Codex - both pinned by the redirect URI registered with
+	// the provider). Nothing else releases it: each test builds its own Manager,
+	// so the next one's Start finds an empty flows map and has no predecessor to
+	// cancel. Without this the port stays bound for the flow's full five-minute
+	// timeout and every later bind fails.
+	t.Cleanup(func() {
+		h.oauthManager.Cancel(oauth.ClaudeProvider.Name)
+		h.oauthManager.Cancel(oauth.CodexProvider.Name)
+	})
 	return srv
 }
 
@@ -76,7 +89,8 @@ func TestStartOAuth_ReturnsAuthorizeURL(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d; want 200", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d; want 200 (body: %s)", resp.StatusCode, body)
 	}
 
 	var result struct {
@@ -173,5 +187,25 @@ func TestStartOAuth_Integration(t *testing.T) {
 	_ = resp.Body.Close()
 	if status.State != "error" {
 		t.Errorf("state after cancel = %q; want 'error'", status.State)
+	}
+}
+
+// Claude's callback port is pinned to 53692 by its registered redirect URI, so
+// a leaked flow makes every later authorization fail with a 500. Repeating the
+// start across fresh servers proves the teardown actually frees it.
+func TestStartOAuth_FixedPortIsReusableAcrossServers(t *testing.T) {
+	for i := range 3 {
+		t.Run(fmt.Sprintf("attempt-%d", i), func(t *testing.T) {
+			srv := newAuthTestServer(t)
+			resp, err := http.Post(srv.URL+"/api/auth/claude/start", "", nil)
+			if err != nil {
+				t.Fatalf("POST: %v", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				t.Fatalf("status = %d; want 200 (body: %s)", resp.StatusCode, body)
+			}
+		})
 	}
 }
