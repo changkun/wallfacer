@@ -348,26 +348,6 @@ func TestNotify_StampsMonotonicSeq(t *testing.T) {
 	}
 }
 
-func TestLatestDeltaSeq_StartsAtZero(t *testing.T) {
-	s := newTestStore(t)
-	if got := s.LatestDeltaSeq(); got != 0 {
-		t.Errorf("expected initial LatestDeltaSeq=0, got %d", got)
-	}
-}
-
-func TestLatestDeltaSeq_IncreasesWithNotify(t *testing.T) {
-	s := newTestStore(t)
-	dummy := &Task{}
-	s.notify(dummy, false)
-	if got := s.LatestDeltaSeq(); got != 1 {
-		t.Errorf("expected LatestDeltaSeq=1 after one notify, got %d", got)
-	}
-	s.notify(dummy, false)
-	if got := s.LatestDeltaSeq(); got != 2 {
-		t.Errorf("expected LatestDeltaSeq=2 after two notifies, got %d", got)
-	}
-}
-
 func TestDeltasSince_EmptyBuffer(t *testing.T) {
 	s := newTestStore(t)
 	deltas, tooOld := s.DeltasSince(0)

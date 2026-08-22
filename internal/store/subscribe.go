@@ -51,11 +51,6 @@ func (s *Store) notify(task *Task, deleted bool) {
 	s.hub.Publish(td)
 }
 
-// LatestDeltaSeq returns the sequence number of the most recently emitted delta.
-func (s *Store) LatestDeltaSeq() int64 {
-	return s.hub.LatestSeq()
-}
-
 // DeltasSince returns all buffered SequencedDeltas with Seq > seq.
 // The second return value is true when the requested seq predates the oldest
 // entry in the replay buffer (gap-too-old).

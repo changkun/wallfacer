@@ -615,8 +615,9 @@ func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 	// Trigger a mutation so the replay buffer has at least one entry.
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
-	// Record the current seq (after the mutation).
-	seqBefore := h.store.LatestDeltaSeq()
+	// Record the current seq (after the mutation), read the way the snapshot
+	// handler reads it.
+	_, seqBefore, _ := h.store.ListTasksAndSeq(ctx, false)
 
 	// Trigger another mutation that the client will have "missed".
 	// in_progress → waiting is a valid transition.
