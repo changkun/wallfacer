@@ -1,6 +1,6 @@
 ---
 title: Internal consolidation — extract shared helpers and fix layer boundaries
-status: draft
+status: drafted
 depends_on: []
 affects:
   - internal/handler/
