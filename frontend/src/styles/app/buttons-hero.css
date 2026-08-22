@@ -110,32 +110,6 @@
     margin: 0 auto 28px;
     line-height: 1.6;
 }
-.hero-mono {
-    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
-    font-weight: 600;
-}
-.hero-brand {
-    font-size: 1.5rem;
-    margin-bottom: 12px;
-    letter-spacing: 0.05em;
-}
-.hero-version {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 8px;
-    font-family: ui-monospace, 'SF Mono', 'Fira Code', Menlo, monospace;
-}
-.hero-version a { color: var(--text-muted); }
-.hero-version a:hover { color: var(--text); }
-.hero-link {
-    font-size: 14px;
-    margin-top: 24px;
-}
-.hero-link a {
-    color: var(--text-secondary);
-    transition: color 0.2s;
-}
-.hero-link a:hover { color: var(--text); }
 .hero-actions {
     display: flex;
     gap: 12px;
@@ -156,10 +130,6 @@
 .wallfacer-hero-icon {
     display: block;
     margin: 0 auto 8px;
-}
-.product-icon-img {
-    display: block;
-    margin-bottom: 16px;
 }
 
 /* ===== Cella Brand ===== */
@@ -206,13 +176,6 @@
     font-size: 14px;
     color: var(--text-muted);
 }
-.product-hero-img {
-    display: block;
-    width: 100%;
-    border-radius: 10px;
-    border: 1px solid var(--border-strong);
-    box-shadow: var(--shadow-lg);
-}
 
 /* ===== Download Row ===== */
 .download-row {
@@ -248,15 +211,6 @@
     color: var(--text-muted);
 }
 
-/* ===== Install Inline ===== */
-.install-inline {
-    margin-top: 24px;
-    text-align: center;
-}
-.install-inline .install-steps {
-    margin-top: 8px;
-}
-
 /* ===== Definition List ===== */
 .def-list {
     max-width: 720px;
@@ -275,6 +229,4 @@
     line-height: 1.6;
     margin: 4px 0 0 0;
 }
-.def-list-compact dt { margin-top: 16px; }
-.def-list-compact dd { font-size: 12px; color: var(--text-muted); }
 
