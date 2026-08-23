@@ -2,7 +2,7 @@
 # Move the spec workflow skills between their upstream home and the copy
 # committed here.
 #
-# Upstream is latere-ai/claude-plugins, where the skills are plugin skills:
+# Upstream is latere-ai/agent-skills, where the skills are plugin skills:
 # unprefixed directory names invoked as /spec:create. The committed copy is a
 # project skill directory, where those names would be far too generic, so it
 # carries the wf-spec- prefix. The rename is the only difference, and it is
@@ -17,7 +17,7 @@
 #   push    .claude/skills/ -> upstream         (promote local edits)
 #   check   diff both ways; non-zero on drift   (CI gate)
 #
-# Upstream resolves to ../claude-plugins when that clone exists, else a shallow
+# Upstream resolves to ../agent-skills when that clone exists, else a shallow
 # clone into a temp directory. Set SKILLS_UPSTREAM to override.
 set -euo pipefail
 
@@ -25,7 +25,7 @@ mode=${1:-check}
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 vendored="$repo_root/.claude/skills"
 
-UPSTREAM_REPO=${UPSTREAM_REPO:-https://github.com/latere-ai/claude-plugins.git}
+UPSTREAM_REPO=${UPSTREAM_REPO:-https://github.com/latere-ai/agent-skills.git}
 cleanup=""
 upstream=""
 # Sets `upstream` (and `cleanup` when it had to clone) in this shell rather
@@ -36,7 +36,7 @@ resolve_upstream() {
 		upstream=$SKILLS_UPSTREAM
 		return
 	fi
-	local sibling="$repo_root/../claude-plugins"
+	local sibling="$repo_root/../agent-skills"
 	if [[ -d $sibling/.git ]]; then
 		upstream=$(cd "$sibling" && pwd)
 		return
@@ -44,7 +44,7 @@ resolve_upstream() {
 	# No sibling clone: fetch a throwaway one. Pushing into it would be lost,
 	# so refuse that mode rather than silently discard the user's edits.
 	if [[ $mode == push ]]; then
-		echo "push needs a writable clone at ../claude-plugins (or SKILLS_UPSTREAM)" >&2
+		echo "push needs a writable clone at ../agent-skills (or SKILLS_UPSTREAM)" >&2
 		exit 2
 	fi
 	cleanup=$(mktemp -d)

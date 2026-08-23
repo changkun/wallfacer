@@ -150,12 +150,12 @@ ui-test:
 	sh frontend/scripts/ui-shots/ui-test.sh
 
 # The wf-spec-* skills in .claude/skills/ are a mirror of the `spec` plugin in
-# latere-ai/claude-plugins. They stay committed because the Claude harness runs
+# latere-ai/agent-skills. They stay committed because the Claude harness runs
 # `claude -p`, which auto-discovers .claude/skills/ but does not install
 # plugins. Upstream is canonical; edits are legal in either place.
 #   make skills-check   fail on any difference (CI gate)
 #   make skills-pull    adopt upstream changes here
-#   make skills-push    promote local edits into ../claude-plugins
+#   make skills-push    promote local edits into ../agent-skills
 skills-check:
 	./scripts/skills.sh check
 
