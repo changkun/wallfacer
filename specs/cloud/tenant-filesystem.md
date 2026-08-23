@@ -4,7 +4,7 @@ status: drafted
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/foundations/storage-backends.md
-affects: [internal/workspace/, internal/gitutil/]
+affects: [internal/workspace/, latere.ai/x/pkg/gitutil/]
 effort: large
 created: 2026-03-28
 updated: 2026-06-14
@@ -75,7 +75,7 @@ This spec covers the wallfacer-specific git and workspace concerns, delegating p
 
 Key coupling points in today's code:
 - **Workspace key** = `strings.Join(sorted absolute paths, "\n")`. Depends on local path identity (`internal/workspace/manager.go`, `internal/workspace/groups.go`).
-- **Worktree creation** calls `git worktree add` against the repo's `.git` dir on the host (`internal/gitutil/worktree.go` primitives, orchestrated by `internal/runner/worktree.go`).
+- **Worktree creation** calls `git worktree add` against the repo's `.git` dir on the host (`latere.ai/x/pkg/gitutil/worktree.go` primitives, orchestrated by `internal/runner/worktree.go`).
 - **Worktree GC** scans the `worktrees/` directory (`PruneUnknownWorktrees` in `internal/runner/worktree.go`, `StartWorktreeGC` / `ScanOrphanedWorktrees` in `internal/runner/worktree_gc.go`).
 - **Instructions file** references per-repo `AGENTS.md` / `CLAUDE.md` by host path.
 
@@ -165,7 +165,7 @@ For tenants with very large repos, the initial clone cost is amortized: repos on
 A new component manages the lifecycle of git repos on the runtime workspace. Its placement splits along the existing package seam:
 
 - **Mapping / orchestration** (canonical identifier to hot-path repo dir, list, prune) lives in `internal/workspace/`, alongside the manager and `RepoResolver`.
-- **Git primitives** (clone, fetch) live in `internal/gitutil/`, the package that already owns git operations. `FetchOrigin` exists there today; a partial-clone `Clone` is new. Push from a worktree branch and worktree add/remove already exist (`internal/gitutil/ops.go`, `internal/gitutil/worktree.go`).
+- **Git primitives** (clone, fetch) live in `latere.ai/x/pkg/gitutil/`, the package that already owns git operations. `FetchOrigin` exists there today; a partial-clone `Clone` is new. Push from a worktree branch and worktree add/remove already exist (`latere.ai/x/pkg/gitutil/ops.go`, `latere.ai/x/pkg/gitutil/worktree.go`).
 
 **Operations:**
 
@@ -237,7 +237,7 @@ This means `Snapshot.Workspaces` still contains absolute paths (for the runner a
 
 ### Worktree Management
 
-Worktree creation logic is unchanged: `internal/runner/worktree.go` orchestrates `internal/gitutil/worktree.go` primitives (`CreateWorktree`, `CreateWorktreeAt`, `RemoveWorktree`) against the repo's `.git` dir. The difference in cloud is that both the repo and the worktree live on the fs.latere.ai hot tier instead of the host filesystem.
+Worktree creation logic is unchanged: `internal/runner/worktree.go` orchestrates `latere.ai/x/pkg/gitutil/worktree.go` primitives (`CreateWorktree`, `CreateWorktreeAt`, `RemoveWorktree`) against the repo's `.git` dir. The difference in cloud is that both the repo and the worktree live on the fs.latere.ai hot tier instead of the host filesystem.
 
 **Worktree reachability for the sandbox:**
 
@@ -280,12 +280,12 @@ The workspace manager takes a `RepoResolver` at construction. `Switch()` (`inter
 
 No changes to worktree orchestration itself. The runner already receives workspace paths from the snapshot. There is no wallfacer-side volume-mount assembly to change; off-host worktree transport is owned by the cella-runtime seam.
 
-### New: Repo Provisioner (`internal/workspace/` + `internal/gitutil/`)
+### New: Repo Provisioner (`internal/workspace/` + `latere.ai/x/pkg/gitutil/`)
 
 ```go
 // RepoProvisioner manages git repo lifecycle on the runtime workspace.
 // Mapping and orchestration sit in internal/workspace/; the underlying
-// clone/fetch primitives are in internal/gitutil/.
+// clone/fetch primitives are in latere.ai/x/pkg/gitutil/.
 type RepoProvisioner struct {
     reposDir string          // e.g., /hot/<workspace-id>/repos/
     creds    CredentialStore // Identity-scoped git credentials

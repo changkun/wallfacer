@@ -202,7 +202,7 @@ Non-git directories are supported as plain mount targets (no worktree, no commit
 
 ## RoutineEngine
 
-`StartRoutineEngine` (`internal/handler/routines_engine.go`) drives all scheduled, fire-and-forget routines on the board. It builds a single `routine.Engine` (`internal/routine`) and attaches it to the store change stream: every store change reconciles the engine against the current routine cards.
+`StartRoutineEngine` (`internal/handler/routines_engine.go`) drives all scheduled, fire-and-forget routines on the board. It builds a single `routine.Engine` (`latere.ai/x/pkg/routine`) and attaches it to the store change stream: every store change reconciles the engine against the current routine cards.
 
 Each routine card carries `RoutineEnabled` and `RoutineIntervalSeconds`. The reconciler maps an active, enabled card with a positive interval to a `routine.FixedInterval` schedule and registers it; cancelled, done, failed, archived, or disabled cards become `routine.Disabled()` and are dropped. When a routine's timer elapses, the engine invokes `h.fireRoutine`, which spawns a fresh task for that routine's flow.
 

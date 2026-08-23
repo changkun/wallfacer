@@ -316,13 +316,13 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Add a new API endpoint | `internal/apicontract/routes.go` -> `internal/handler/<concern>.go` -> run `make api-contract` |
 | Add a field to Task | `internal/store/models.go` -> `internal/store/migrate.go` |
 | Change the turn loop | `internal/runner/execute.go` (`Run()`) |
-| Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `internal/gitutil/ops.go` |
+| Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `latere.ai/x/pkg/gitutil/ops.go` |
 | Add a new automation watcher | `internal/handler/tasks_autoimplement.go` (follow `SubscribeWake` pattern) |
 | Change the agent launch spec | `internal/runner/container.go` (`buildContainerSpecForSandbox()`) + `internal/executor/host.go` |
 | Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `opencode.go`, `pi.go`, `topos.go`, `registry.go`) |
 | Add a new env config variable | `internal/envconfig/envconfig.go` |
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
-| Debug a failing rebase | `internal/gitutil/ops.go` + `internal/gitutil/stash.go` |
+| Debug a failing rebase | `latere.ai/x/pkg/gitutil/ops.go` + `latere.ai/x/pkg/gitutil/stash.go` |
 | Understand why a task failed | `data/<key>/<uuid>/traces/` + `outputs/turn-NNNN.json` |
 | Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
 | Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |

@@ -50,7 +50,7 @@ When a workspace is not a git repository (or is an empty git repo with no commit
 
 ### Stale Branch Recovery
 
-`CreateWorktree()` (`internal/gitutil/worktree.go`) handles the case where the branch already exists but the worktree directory was lost (e.g. after a server crash). If `git worktree add -b` fails because the branch or worktree entry already exists, it retries with `git worktree add --force <path> <branch>` to reattach the existing branch. `CreateWorktreeAt()` follows the same pattern but accepts an explicit base commit.
+`CreateWorktree()` (`latere.ai/x/pkg/gitutil/worktree.go`) handles the case where the branch already exists but the worktree directory was lost (e.g. after a server crash). If `git worktree add -b` fails because the branch or worktree entry already exists, it retries with `git worktree add --force <path> <branch>` to reattach the existing branch. `CreateWorktreeAt()` follows the same pattern but accepts an explicit base commit.
 
 ### Broken Worktree Detection
 
@@ -82,7 +82,7 @@ Triggered automatically after `end_turn`, or manually when a user marks a `waiti
 
 Staging and committing happen on the host. A host-process agent run generates the commit message, which the host-side `git commit` then uses.
 
-### Phase 2 -- Rebase & Merge (host-side, `internal/gitutil/ops.go`)
+### Phase 2 -- Rebase & Merge (host-side, `latere.ai/x/pkg/gitutil/ops.go`)
 
 ```mermaid
 flowchart TD
@@ -97,7 +97,7 @@ flowchart TD
     Merge --> Hashes["Collect resulting commit hashes"]
 ```
 
-`DefaultBranch()` (`internal/gitutil/repo.go`) resolves the target branch by checking, in order:
+`DefaultBranch()` (`latere.ai/x/pkg/gitutil/repo.go`) resolves the target branch by checking, in order:
 1. Current local HEAD branch (so tasks merge back to whatever branch the user is working on)
 2. `origin/HEAD` (remote default)
 3. Falls back to `"main"`
@@ -106,7 +106,7 @@ flowchart TD
 
 **Conflict resolution loop:** If `git rebase` exits non-zero, Wallfacer invokes the agent again -- using the original task's session ID -- passing it the conflict details. The agent resolves the conflicts and stages the result. The rebase is then continued and retried. Up to 3 attempts are made before the task is marked `failed`.
 
-**Stash operations:** `StashIfDirty()` and `StashPop()` (`internal/gitutil/stash.go`) are used during conflict resolution to preserve uncommitted changes. A failed `StashPop` aborts via `git checkout -- .` + `git clean -fd` to restore a clean state, preserving the stash entry for manual recovery.
+**Stash operations:** `StashIfDirty()` and `StashPop()` (`latere.ai/x/pkg/gitutil/stash.go`) are used during conflict resolution to preserve uncommitted changes. A failed `StashPop` aborts via `git checkout -- .` + `git clean -fd` to restore a clean state, preserving the stash entry for manual recovery.
 
 ### Phase 3 -- Cleanup
 
@@ -116,7 +116,7 @@ git branch -D task/<uuid8>    <- delete task branch
 rm -rf ~/.wallfacer/worktrees/<uuid>/   <- remove task worktree directory
 ```
 
-`RemoveWorktree()` (`internal/gitutil/worktree.go`) handles edge cases: if the directory is already gone, it runs `git worktree prune` and continues to the branch deletion. Branch deletion is best-effort and always attempted.
+`RemoveWorktree()` (`latere.ai/x/pkg/gitutil/worktree.go`) handles edge cases: if the directory is already gone, it runs `git worktree prune` and continues to the branch deletion. Branch deletion is best-effort and always attempted.
 
 Note: `data/<uuid>/` (task record, traces, outputs, oversights, summary) is **preserved** after cleanup so execution history remains accessible in the UI.
 
@@ -171,7 +171,7 @@ Additionally, siblings must share at least one workspace with the requesting tas
 
 ### Default Branch Detection
 
-`DefaultBranch()` (`internal/gitutil/repo.go`) prefers the currently checked-out branch so tasks merge back to whatever branch the user is working on (e.g. `develop`), not necessarily the remote's default:
+`DefaultBranch()` (`latere.ai/x/pkg/gitutil/repo.go`) prefers the currently checked-out branch so tasks merge back to whatever branch the user is working on (e.g. `develop`), not necessarily the remote's default:
 
 1. `git branch --show-current` -- returns the local HEAD branch
 2. `git symbolic-ref --short refs/remotes/origin/HEAD` -- remote default (strips `origin/` prefix)
@@ -303,9 +303,9 @@ This is useful when other tasks have merged changes to the default branch and yo
 - **Non-git workspaces** -- for active tasks, the diff is computed live from the snapshot's git repo; for terminal tasks, the stored `SnapshotDiffs` captured at commit time are returned
 - **Caching** -- terminal tasks (done/cancelled/archived) are cached with `immutable` Cache-Control; active tasks are cached for 10 seconds with ETag support for conditional requests
 
-## Git Helper Functions (`internal/gitutil/`)
+## Git Helper Functions (`latere.ai/x/pkg/gitutil/`)
 
-Git operations are organized in the `internal/gitutil` package:
+Git operations are organized in the `latere.ai/x/pkg/gitutil` package:
 
 | File | Purpose |
 |---|---|

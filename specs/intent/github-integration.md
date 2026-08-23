@@ -76,7 +76,7 @@ no path to clone-and-fix a repo the user has not already checked out locally.
 Today the only GitHub-aware code is git plumbing:
 [`NormalizeRemoteURL`](../cloud/latere-integration/coordination-plane/repo-identity.md)
 (`internal/coordinator/identity.go`, canonical `host/owner/repo`),
-`internal/gitutil/` (repo/status/worktree ops), and `internal/handler/git.go`
+`latere.ai/x/pkg/gitutil/` (repo/status/worktree ops), and `internal/handler/git.go`
 (status, push, sync, rebase, branch, diff). There is no GitHub API client, no
 `gh` CLI usage, and no GitHub OAuth. The only token machinery is the generic
 OIDC device-code flow in `internal/handler/device_auth.go` (latere.ai sign-in,

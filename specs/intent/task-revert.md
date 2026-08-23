@@ -6,7 +6,7 @@ affects:
   - internal/runner/revert.go
   - internal/handler/revert.go
   - internal/apicontract/routes.go
-  - internal/gitutil/ops.go
+  - latere.ai/x/pkg/gitutil/ops.go
   - internal/store/models.go
   - internal/prompts/revert.tmpl
   - frontend/src/components/TaskDetail.vue

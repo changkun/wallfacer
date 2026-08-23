@@ -396,7 +396,7 @@ It stamps the schema version (`constants.CurrentTaskSchemaVersion`, see [Migrati
 
 ### Atomic Writes (FilesystemBackend)
 
-`FilesystemBackend.SaveTask` and all blob/event writes go through `atomicfile.WriteJSON` (`internal/pkg/atomicfile`), which marshals with `json.MarshalIndent`, writes to a random `.tmp-*` file created in the destination directory, then `os.Rename`s it into place:
+`FilesystemBackend.SaveTask` and all blob/event writes go through `atomicfile.WriteJSON` (`latere.ai/x/pkg/atomicfile`), which marshals with `json.MarshalIndent`, writes to a random `.tmp-*` file created in the destination directory, then `os.Rename`s it into place:
 
 ```go
 func (b *FilesystemBackend) SaveTask(t *Task) error {

@@ -107,7 +107,7 @@ stateDiagram-v2
 
 `validated → complete` is deliberately absent: completion runs through `testing`, where the drift pipeline compares the landed implementation against the spec and renders the verdict. `validated → stale` stays legal so `FanOutStale` can mark validated dependents stale when an upstream spec changes.
 
-The machine is built atop `internal/pkg/statemachine.New`; handlers validate transitions through `spec.StatusMachine.Validate(from, to)` and convert `ErrInvalidTransition` errors into HTTP 422 responses.
+The machine is built atop `latere.ai/x/pkg/statemachine.New`; handlers validate transitions through `spec.StatusMachine.Validate(from, to)` and convert `ErrInvalidTransition` errors into HTTP 422 responses.
 
 ### Tree Builder
 
@@ -134,7 +134,7 @@ Orphan directories (a `foo/` with no `foo.md` sibling) are still scanned; their 
 
 Cross-spec rules (`ValidateTree`):
 
-- **dag-acyclic**, `checkDAGAcyclic` delegates to `internal/pkg/dag.DetectCycles(Adjacency(tree))`.
+- **dag-acyclic**, `checkDAGAcyclic` delegates to `latere.ai/x/pkg/dag.DetectCycles(Adjacency(tree))`.
 - **no-orphan-directories**, companion directories without parent `.md` files.
 - **status-consistency**, `complete` non-leaf specs whose subtree still has incomplete leaves.
 - **stale-propagation**, validated specs that depend on stale ones.
