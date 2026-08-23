@@ -50,7 +50,7 @@ var unprotectedPrefixes = []string{
 // fires when:
 //
 //   - `Handler.HasAuth()` is true (cloud mode), AND
-//   - no *auth.Claims are in context, AND
+//   - no *authkit.Identity is in context, AND
 //   - the request is a GET, AND
 //   - the Accept header indicates HTML navigation (contains
 //     "text/html"), AND

@@ -1,7 +1,7 @@
 // Principal identifies the caller of a store operation for org-scoped
 // reads. Defined here (not imported from internal/auth) so the store
 // stays domain-layer and never depends on the HTTP or JWT packages.
-// Handlers translate auth.Claims to *store.Principal at the request
+// Handlers translate the resolved authkit.Identity to *store.Principal at the request
 // boundary.
 
 package store

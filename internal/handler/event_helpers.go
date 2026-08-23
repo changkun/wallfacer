@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
@@ -70,7 +71,7 @@ func stampEventActor(ctx context.Context) context.Context {
 // attributionally indistinguishable from the user at the audit log
 // level. Deeper delegated attribution went away with auth's agent
 // delegation.
-func actorTypeFor(c *auth.Identity) store.ActorType {
+func actorTypeFor(c *authkit.Identity) store.ActorType {
 	if c.PrincipalType == "service" {
 		return store.ActorService
 	}

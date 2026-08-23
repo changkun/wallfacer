@@ -33,7 +33,7 @@ type actorInfo struct {
 }
 
 // WithActorPrincipal attaches a caller principal to ctx. Handlers
-// call this after resolving auth.Claims, passing the sub and the
+// call this after resolving the caller's identity, passing the sub and the
 // matching ActorType (usually ActorUser for OIDC principals,
 // ActorService for service accounts, ActorAPIKey when the request
 // was gated only by the static server key).

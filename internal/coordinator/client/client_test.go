@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/coordinator"
 )
@@ -21,7 +22,7 @@ func acceptHarness(t *testing.T, sub, org string) (wsURL string, reg *coordinato
 	reg = coordinator.NewRegistry()
 	coord := coordinator.NewCoordinator(reg)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := auth.WithIdentity(r.Context(), &auth.Identity{Sub: sub, OrgID: org})
+		ctx := auth.WithIdentity(r.Context(), &authkit.Identity{Sub: sub, OrgID: org})
 		coord.HandleWS(w, r.WithContext(ctx))
 	}))
 	t.Cleanup(srv.Close)

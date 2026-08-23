@@ -901,7 +901,7 @@ func TestParse_AgentSessionWindowDaysInvalid(t *testing.T) {
 
 // TestReadRaw verifies that keys not modeled in Config — such as the
 // AUTH_* vars handled by the OIDC package — are still surfaced to the
-// caller so the server boot can build an auth.Config from .env.
+// caller so the server boot can build an oidc.Config from .env.
 func TestReadRaw(t *testing.T) {
 	path := writeEnvFile(t, "AUTH_CLIENT_ID=abc\nAUTH_CLIENT_SECRET=\"sh h\"\n# comment\nCLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	raw, err := envconfig.ReadRaw(path)

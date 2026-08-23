@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -162,7 +163,7 @@ func TestWorkspaceUpdate_VisibilityIsolation(t *testing.T) {
 
 	// Personal caller (different principal) cannot see it: 404.
 	preq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+id, bytes.NewReader(rename))
-	preq = preq.WithContext(auth.WithIdentity(preq.Context(), &auth.Identity{Sub: "u", OrgID: ""}))
+	preq = preq.WithContext(auth.WithIdentity(preq.Context(), &authkit.Identity{Sub: "u", OrgID: ""}))
 	preq.SetPathValue("id", id)
 	prec := httptest.NewRecorder()
 	h.UpdateWorkspace(prec, preq)
@@ -172,7 +173,7 @@ func TestWorkspaceUpdate_VisibilityIsolation(t *testing.T) {
 
 	// Owning org caller passes the guard.
 	oreq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+id, bytes.NewReader(rename))
-	oreq = oreq.WithContext(auth.WithIdentity(oreq.Context(), &auth.Identity{Sub: "owner", OrgID: "org-a"}))
+	oreq = oreq.WithContext(auth.WithIdentity(oreq.Context(), &authkit.Identity{Sub: "owner", OrgID: "org-a"}))
 	oreq.SetPathValue("id", id)
 	orec := httptest.NewRecorder()
 	h.UpdateWorkspace(orec, oreq)

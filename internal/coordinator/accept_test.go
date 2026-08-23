@@ -11,6 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
@@ -22,7 +23,7 @@ func acceptHarness(t *testing.T, p Principal) (string, *Registry) {
 	reg := NewRegistry()
 	coord := NewCoordinator(reg)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := auth.WithIdentity(r.Context(), &auth.Identity{Sub: p.Sub, OrgID: p.OrgID})
+		ctx := auth.WithIdentity(r.Context(), &authkit.Identity{Sub: p.Sub, OrgID: p.OrgID})
 		coord.HandleWS(w, r.WithContext(ctx))
 	}))
 	t.Cleanup(srv.Close)

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
@@ -33,7 +34,7 @@ func TestRequireSuperadmin_SuperadminClaim_Passes(t *testing.T) {
 	h := auth.RequireSuperadmin(inner)
 
 	r := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{Sub: "root", IsSuperadmin: true}))
+	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{Sub: "root", IsSuperadmin: true}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -50,7 +51,7 @@ func TestRequireSuperadmin_RegularUser_Forbidden(t *testing.T) {
 	h := auth.RequireSuperadmin(inner)
 
 	r := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{Sub: "alice", IsSuperadmin: false}))
+	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{Sub: "alice", IsSuperadmin: false}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -85,7 +86,7 @@ func TestRequireScope_WithScope_Passes(t *testing.T) {
 	h := auth.RequireScope(testScope)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
-	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{
+	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{
 		Sub:    "alice",
 		Scopes: []string{otherScope, testScope},
 	}))
@@ -105,7 +106,7 @@ func TestRequireScope_WithoutScope_Forbidden(t *testing.T) {
 	h := auth.RequireScope(testScope)(inner)
 
 	r := httptest.NewRequest(http.MethodGet, "/api/anything", nil)
-	r = r.WithContext(auth.WithIdentity(r.Context(), &auth.Identity{
+	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{
 		Sub:    "alice",
 		Scopes: []string{otherScope},
 	}))

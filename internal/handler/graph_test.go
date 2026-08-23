@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/graph"
 	"latere.ai/x/wallfacer/internal/store"
@@ -129,7 +130,7 @@ func TestGetGraph_HiddenForMismatchedPrincipal(t *testing.T) {
 
 	// Personal caller (mismatched org) sees an empty graph.
 	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
-	req = req.WithContext(auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""}))
+	req = req.WithContext(auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""}))
 	personal := getGraph(t, h, req)
 	for _, n := range personal.Nodes {
 		if n.Kind == graph.NodeSpec {

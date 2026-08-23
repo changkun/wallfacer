@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
@@ -45,7 +47,7 @@ func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)        {
 func (fakeAuthProvider) HandleCallback(http.ResponseWriter, *http.Request)     {}
 func (fakeAuthProvider) HandleLogout(http.ResponseWriter, *http.Request)       {}
 func (fakeAuthProvider) HandleLogoutNotify(http.ResponseWriter, *http.Request) {}
-func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *auth.User {
+func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *oidc.User {
 	return nil
 }
 func (fakeAuthProvider) AuthURL() string { return "https://auth.latere.ai" }
@@ -122,7 +124,7 @@ func TestForceLogin_AuthenticatedPassesThrough(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/mode/board", nil)
 	req.Header.Set("Accept", "text/html")
-	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "alice"}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "alice"}))
 	w := httptest.NewRecorder()
 	mw.ServeHTTP(w, req)
 

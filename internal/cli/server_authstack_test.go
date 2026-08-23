@@ -13,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/authkit"
+	"latere.ai/x/pkg/jwtauth"
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/handler"
 )
@@ -29,7 +32,7 @@ import (
 // when WALLFACER_CLOUD is on: BearerAuth wraps next, OptionalAuth wraps
 // BearerAuth. apiKey="" disables the static-key check (local cloud
 // deployment without a key).
-func stackWithValidator(t *testing.T, v *auth.Validator, apiKey string, captured **auth.Identity) http.Handler {
+func stackWithValidator(t *testing.T, v *jwtauth.Validator, apiKey string, captured **authkit.Identity) http.Handler {
 	t.Helper()
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, _ := auth.PrincipalFromContext(r.Context())
@@ -98,12 +101,12 @@ func signJWT(t *testing.T, key *rsa.PrivateKey, sub string, exp time.Time) strin
 func TestAPIRoutes_ClaimsContext_InCloudMode(t *testing.T) {
 	key, jwks := mintRSAKeyAndJWKS(t)
 	v := auth.BuildValidator(
-		auth.Config{AuthURL: jwks.URL, ClientID: "my-client"},
+		oidc.Config{AuthURL: jwks.URL, ClientID: "my-client"},
 		jwks.URL,
 		"https://auth.latere.ai",
 	)
 
-	var captured *auth.Identity
+	var captured *authkit.Identity
 	stack := stackWithValidator(t, v, "", &captured)
 
 	tok := signJWT(t, key, "user-abc", time.Now().Add(time.Hour))
@@ -126,12 +129,12 @@ func TestAPIRoutes_ClaimsContext_InCloudMode(t *testing.T) {
 func TestAPIRoutes_JWTWithStaticKeySet_BypassesKeyCheck(t *testing.T) {
 	key, jwks := mintRSAKeyAndJWKS(t)
 	v := auth.BuildValidator(
-		auth.Config{AuthURL: jwks.URL, ClientID: "my-client"},
+		oidc.Config{AuthURL: jwks.URL, ClientID: "my-client"},
 		jwks.URL,
 		"https://auth.latere.ai",
 	)
 
-	var captured *auth.Identity
+	var captured *authkit.Identity
 	stack := stackWithValidator(t, v, "server-api-key-value", &captured)
 
 	tok := signJWT(t, key, "user-abc", time.Now().Add(time.Hour))
@@ -154,7 +157,7 @@ func TestAPIRoutes_JWTWithStaticKeySet_BypassesKeyCheck(t *testing.T) {
 // and requests behave exactly as today (no claims, BearerAuth gate
 // unchanged).
 func TestAPIRoutes_NoValidator_InLocalMode(t *testing.T) {
-	var captured *auth.Identity
+	var captured *authkit.Identity
 	stack := stackWithValidator(t, nil, "", &captured)
 
 	// Stray Bearer header. No validator -> no validation attempted.

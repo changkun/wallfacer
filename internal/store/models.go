@@ -645,7 +645,7 @@ type TaskEvent struct {
 	// this event. Empty for events written on anonymous calls, by the
 	// runner's background goroutines (see ActorType "system"), or on
 	// pre-Phase-2 records deserialized from disk. Populated by
-	// InsertEvent when the context carries auth.Claims.
+	// InsertEvent when the context carries a resolved principal.
 	ActorSub string `json:"actor_sub,omitempty"`
 
 	// ActorType categorizes who caused the event. Values: "user" (a

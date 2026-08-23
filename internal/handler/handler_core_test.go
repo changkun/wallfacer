@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -481,7 +482,7 @@ func TestRequirePrincipalMiddleware_AuthConfigured(t *testing.T) {
 
 	// Authenticated: principal injected -> next called, 200.
 	called = false
-	ctx := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "user-123"})
+	ctx := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "user-123"})
 	req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/api/spec-comments", nil)
 	w2 := httptest.NewRecorder()
 	mw.ServeHTTP(w2, req2)

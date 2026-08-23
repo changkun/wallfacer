@@ -1,7 +1,7 @@
 // JWT validation middleware for /api/* routes in cloud mode. Wraps an
 // http.Handler so a valid Authorization: Bearer <jwt> surfaces as
-// *Claims in the request context. Local mode (cfg.Cloud == false)
-// never instantiates a Validator and never wraps routes, so the only
+// an *authkit.Identity in the request context. Local mode (cfg.Cloud == false)
+// never instantiates a validator and never wraps routes, so the only
 // gate remains WALLFACER_SERVER_API_KEY.
 
 package auth
@@ -18,11 +18,11 @@ import (
 
 // identityCtxKey scopes the context value used to carry the resolved principal
 // through the middleware chain. A pointer (nil = anonymous) preserves the
-// (Identity, ok) presence semantics PrincipalFromContext exposes — distinct
+// (identity, ok) presence semantics PrincipalFromContext exposes — distinct
 // from authkit.IdentityFromContext, which cannot tell "absent" from "zero".
 type identityCtxKey struct{}
 
-// BuildValidator constructs a Validator from the auth configuration.
+// BuildValidator constructs a jwtauth.Validator from the OIDC configuration.
 // JWKS endpoint is auto-derived from cfg.AuthURL when not passed
 // explicitly. Issuer validation is optional and only applied when an
 // explicit issuer is passed or AUTH_ISSUER is set — fosite-issued JWT
@@ -35,7 +35,7 @@ type identityCtxKey struct{}
 // to keep the default (empty issuer = skip iss check). The CLI boot
 // path reads AUTH_JWKS_URL and AUTH_ISSUER from the environment and
 // forwards them here.
-func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
+func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwtauth.Validator {
 	if cfg.AuthURL == "" {
 		return nil
 	}
@@ -74,10 +74,10 @@ func BuildValidator(cfg Config, jwksURL, issuer string) *Validator {
 //   - No Authorization header           -> pass through, no identity
 //   - Authorization header not "Bearer" -> pass through, no identity
 //   - Bearer present, validation fails  -> pass through, no identity
-//   - Bearer present, validation ok     -> inject *Identity into ctx
+//   - Bearer present, validation ok     -> inject *authkit.Identity into ctx
 //
 // A nil validator (local mode) returns next unchanged.
-func OptionalAuth(v *Validator, next http.Handler) http.Handler {
+func OptionalAuth(v *jwtauth.Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
@@ -94,7 +94,7 @@ func OptionalAuth(v *Validator, next http.Handler) http.Handler {
 // Auth validates a Bearer JWT and rejects the request on failure with
 // 401. Use this on routes that strictly require an authenticated
 // principal. A nil validator returns next unchanged (local mode).
-func Auth(v *Validator, next http.Handler) http.Handler {
+func Auth(v *jwtauth.Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
@@ -123,7 +123,7 @@ func Auth(v *Validator, next http.Handler) http.Handler {
 //
 //	identity already in ctx     -> pass through unchanged
 //	no cookie / decode failure  -> pass through anonymous
-//	cookie decodes              -> inject *Identity, proceed
+//	cookie decodes              -> inject *authkit.Identity, proceed
 func CookieAuth(client *oidc.Client, next http.Handler) http.Handler {
 	if client == nil {
 		return next
@@ -145,8 +145,8 @@ func CookieAuth(client *oidc.Client, next http.Handler) http.Handler {
 // PrincipalFromContext returns the resolved Identity if the request was
 // authenticated by OptionalAuth, Auth, or CookieAuth. The second return is
 // false for anonymous requests (no header, expired token, local mode).
-func PrincipalFromContext(ctx context.Context) (*Identity, bool) {
-	c, ok := ctx.Value(identityCtxKey{}).(*Identity)
+func PrincipalFromContext(ctx context.Context) (*authkit.Identity, bool) {
+	c, ok := ctx.Value(identityCtxKey{}).(*authkit.Identity)
 	if !ok || c == nil {
 		return nil, false
 	}
@@ -157,12 +157,12 @@ func PrincipalFromContext(ctx context.Context) (*Identity, bool) {
 // handler-layer tests can exercise downstream middleware without standing up a
 // full JWKS server and signing a real token. Production code should only inject
 // an Identity via OptionalAuth / Auth / CookieAuth after validation.
-func WithIdentity(ctx context.Context, id *Identity) context.Context {
+func WithIdentity(ctx context.Context, id *authkit.Identity) context.Context {
 	return context.WithValue(ctx, identityCtxKey{}, id)
 }
 
 // withIdentity attaches an Identity to the request's context.
-func withIdentity(r *http.Request, id *Identity) *http.Request {
+func withIdentity(r *http.Request, id *authkit.Identity) *http.Request {
 	return r.WithContext(WithIdentity(r.Context(), id))
 }
 

@@ -1,4 +1,4 @@
-// Principal translation: turn validated auth.Claims in the request
+// Principal translation: turn a validated jwtauth.Claims in the request
 // context into a store.Principal the domain layer can use. Kept as a
 // one-function helper so every CreateTask / list / workspace-write
 // site reads the same single line, and the store package never has

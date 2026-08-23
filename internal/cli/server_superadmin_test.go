@@ -5,7 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/metrics"
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
@@ -22,7 +24,7 @@ func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)        {
 func (fakeAuthProvider) HandleCallback(http.ResponseWriter, *http.Request)     {}
 func (fakeAuthProvider) HandleLogout(http.ResponseWriter, *http.Request)       {}
 func (fakeAuthProvider) HandleLogoutNotify(http.ResponseWriter, *http.Request) {}
-func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *auth.User {
+func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *oidc.User {
 	return nil
 }
 func (fakeAuthProvider) AuthURL() string { return "https://auth.latere.ai" }
@@ -58,7 +60,7 @@ func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 func TestAdminRebuildIndex_CloudSuperadmin200(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, true)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "root", IsSuperadmin: true}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "root", IsSuperadmin: true}))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -73,7 +75,7 @@ func TestAdminRebuildIndex_CloudSuperadmin200(t *testing.T) {
 func TestAdminRebuildIndex_CloudRegular403(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, true)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "alice", IsSuperadmin: false}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "alice", IsSuperadmin: false}))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -30,7 +31,7 @@ func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 
 	// Personal caller (cannot see the org workspace): 403.
 	personal := httptest.NewRequest(http.MethodPost, "/api/specs/archive", bytes.NewReader(body))
-	personal = personal.WithContext(auth.WithIdentity(personal.Context(), &auth.Identity{Sub: "u", OrgID: ""}))
+	personal = personal.WithContext(auth.WithIdentity(personal.Context(), &authkit.Identity{Sub: "u", OrgID: ""}))
 	pw := httptest.NewRecorder()
 	h.ArchiveSpec(pw, personal)
 	if pw.Code != http.StatusForbidden {
@@ -40,7 +41,7 @@ func TestArchiveSpec_ForbiddenForHiddenWorkspace(t *testing.T) {
 	// Owning org caller passes the visibility guard (and fails later on the
 	// missing spec file, not the guard) — proving the guard is principal-scoped.
 	owner := httptest.NewRequest(http.MethodPost, "/api/specs/archive", bytes.NewReader(body))
-	owner = owner.WithContext(auth.WithIdentity(owner.Context(), &auth.Identity{Sub: "owner", OrgID: "org-a"}))
+	owner = owner.WithContext(auth.WithIdentity(owner.Context(), &authkit.Identity{Sub: "owner", OrgID: "org-a"}))
 	ow := httptest.NewRecorder()
 	h.ArchiveSpec(ow, owner)
 	if ow.Code == http.StatusForbidden {
@@ -71,7 +72,7 @@ func TestVisibleWorkspaces_LocalIsolatesByPrincipal(t *testing.T) {
 
 	// Signed-in but not the owning org: the org workspace is hidden and a
 	// workspace-scoped mutation is refused.
-	for _, id := range []*auth.Identity{
+	for _, id := range []*authkit.Identity{
 		{Sub: "u", OrgID: ""},      // personal view
 		{Sub: "u", OrgID: "org-b"}, // different org
 	} {
@@ -89,7 +90,7 @@ func TestVisibleWorkspaces_LocalIsolatesByPrincipal(t *testing.T) {
 	}
 
 	// The owning org sees it and passes the visibility guard.
-	ownerCtx := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "owner", OrgID: "org-a"})
+	ownerCtx := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "owner", OrgID: "org-a"})
 	if got := h.visibleWorkspaces(ownerCtx); len(got) != 1 || got[0] != ws {
 		t.Errorf("owning org: visibleWorkspaces = %v, want [%s]", got, ws)
 	}

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -42,7 +43,7 @@ func runWeb(args []string, frontendFS fs.FS) error {
 		*addr = env
 	}
 
-	authCfg := auth.Config{
+	authCfg := oidc.Config{
 		AuthURL:      os.Getenv("AUTH_URL"),
 		ClientID:     os.Getenv("AUTH_CLIENT_ID"),
 		ClientSecret: os.Getenv("AUTH_CLIENT_SECRET"),
@@ -52,7 +53,7 @@ func runWeb(args []string, frontendFS fs.FS) error {
 	if authCfg.AuthURL == "" {
 		authCfg.AuthURL = "https://auth.latere.ai"
 	}
-	authClient := auth.New(authCfg)
+	authClient := oidc.New(authCfg)
 
 	// JWT validator for the coordination WebSocket: a local instance dials with
 	// Authorization: Bearer <jwt>, validated on the same internal/auth path as
@@ -103,7 +104,7 @@ func runWeb(args []string, frontendFS fs.FS) error {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			resp := struct {
-				*auth.User
+				*oidc.User
 				AuthURL string `json:"auth_url,omitempty"`
 			}{User: user, AuthURL: authClient.AuthURL()}
 			_ = json.NewEncoder(w).Encode(resp)

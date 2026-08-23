@@ -5,11 +5,9 @@ import (
 	"net/http"
 
 	"latere.ai/x/pkg/oidc"
-
-	"latere.ai/x/wallfacer/internal/auth"
 )
 
-// AuthProvider is the subset of *auth.Client the HTTP handlers need. Kept
+// AuthProvider is the subset of *oidc.Client the HTTP handlers need. Kept
 // as an interface so tests can substitute a fake without spinning up a real
 // OIDC client. An untyped-nil value means auth is not configured.
 //
@@ -22,7 +20,7 @@ type AuthProvider interface {
 	HandleCallback(http.ResponseWriter, *http.Request)
 	HandleLogout(http.ResponseWriter, *http.Request)
 	HandleLogoutNotify(http.ResponseWriter, *http.Request)
-	UserFromRequest(http.ResponseWriter, *http.Request) *auth.User
+	UserFromRequest(http.ResponseWriter, *http.Request) *oidc.User
 	AuthURL() string
 }
 
@@ -87,7 +85,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		fn()
 	}
 	if h.auth == nil {
-		auth.ClearSession(w)
+		oidc.ClearSession(w)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -111,13 +109,13 @@ func (h *Handler) LogoutNotify(w http.ResponseWriter, r *http.Request) {
 		h.auth.HandleLogoutNotify(w, r)
 		return
 	}
-	auth.ClearSession(w)
+	oidc.ClearSession(w)
 	w.WriteHeader(http.StatusOK)
 }
 
 // meBuilder is the optional subset of AuthProvider that assembles the full
 // principal (identity + /userinfo avatar + /me/orgs list) with correct
-// single-refresh token handling. *auth.Client satisfies it via oidc.BuildMe;
+// single-refresh token handling. *oidc.Client satisfies it via oidc.BuildMe;
 // test doubles don't and fall back to the identity-only branch below.
 type meBuilder interface {
 	BuildMe(http.ResponseWriter, *http.Request) (*oidc.Me, error)

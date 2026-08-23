@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/coordinator/client"
@@ -31,7 +32,7 @@ func TestCommentEndToEndCrossInstance(t *testing.T) {
 	// the two connectors authenticate as two different teammates in one org.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sub := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		ctx := auth.WithIdentity(r.Context(), &auth.Identity{Sub: sub, OrgID: org})
+		ctx := auth.WithIdentity(r.Context(), &authkit.Identity{Sub: sub, OrgID: org})
 		coord.HandleWS(w, r.WithContext(ctx))
 	}))
 	defer srv.Close()

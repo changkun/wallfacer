@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -38,14 +39,14 @@ func TestBuildConfigResponse_HidesCrossOrgWorkspace(t *testing.T) {
 	}
 
 	// Same org: the active workspace is presented.
-	ctxA := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
+	ctxA := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-a"})
 	respA := h.buildConfigResponse(ctxA, nil)
 	if got, _ := respA["workspaces"].([]string); len(got) != 1 || got[0] != ws {
 		t.Errorf("org-a workspaces = %v, want [%s]", respA["workspaces"], ws)
 	}
 
 	// Different org: the cross-org active workspace is hidden.
-	ctxB := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-b"})
+	ctxB := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-b"})
 	respB := h.buildConfigResponse(ctxB, nil)
 	if got, _ := respB["workspaces"].([]string); len(got) != 0 {
 		t.Errorf("org-b workspaces = %v, want empty (cross-org hidden)", respB["workspaces"])
@@ -347,7 +348,7 @@ func TestUpdateWorkspaces_RoundTripsToConfig(t *testing.T) {
 func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
 	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
 	pick := t.TempDir()
-	id := &auth.Identity{Sub: "user-1", OrgID: "org-a"}
+	id := &authkit.Identity{Sub: "user-1", OrgID: "org-a"}
 	ctx := auth.WithIdentity(context.Background(), id)
 
 	// Create (stamps CreatedBy=user-1, OrgID=org-a).
@@ -410,17 +411,17 @@ func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T
 		t.Errorf("local visibleWorkspaces = %v, want [%s]", got, ws)
 	}
 	// Owning org: visible.
-	ctxA := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
+	ctxA := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-a"})
 	if got := h.visibleWorkspaces(ctxA); len(got) != 1 || got[0] != ws {
 		t.Errorf("org-a visibleWorkspaces = %v, want [%s]", got, ws)
 	}
 	// Personal caller: hidden (org group not in personal view).
-	ctxPersonal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
+	ctxPersonal := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""})
 	if got := h.visibleWorkspaces(ctxPersonal); len(got) != 0 {
 		t.Errorf("personal visibleWorkspaces = %v, want empty", got)
 	}
 	// Different org: hidden.
-	ctxB := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-b"})
+	ctxB := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-b"})
 	if got := h.visibleWorkspaces(ctxB); len(got) != 0 {
 		t.Errorf("org-b visibleWorkspaces = %v, want empty", got)
 	}
@@ -459,12 +460,12 @@ func TestConfig_OrgViewDropsLegacyActiveWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	personal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
+	personal := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""})
 	if got := configActiveWorkspaces(t, personal, h); len(got) != 1 || got[0] != ws {
 		t.Errorf("personal view: active workspaces = %v, want [%s]", got, ws)
 	}
 
-	org := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: "org-a"})
+	org := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-a"})
 	if got := configActiveWorkspaces(t, org, h); len(got) != 0 {
 		t.Errorf("org view after switch: active workspaces = %v, want [] (clean slate)", got)
 	}
@@ -495,7 +496,7 @@ func TestGetSpecTree_HiddenForMismatchedPrincipal(t *testing.T) {
 		t.Fatal("expected roadmap index for local caller, got nil")
 	}
 	// Personal caller (cannot see org workspace) gets an empty tree.
-	ctxPersonal := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""})
+	ctxPersonal := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""})
 	if tree := h.collectSpecTree(ctxPersonal); tree.Index != nil || len(tree.Nodes) != 0 {
 		t.Errorf("expected empty spec tree for mismatched principal, got index=%v nodes=%d", tree.Index, len(tree.Nodes))
 	}

@@ -4,13 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
 // TestInsertEventOrLog_StampsActorFromClaims confirms the
 // auth → store attribution bridge at the handler layer. A ctx with
-// auth.Identity produces an event stamped with the caller's sub and
+// authkit.Identity produces an event stamped with the caller's sub and
 // "user" actor type.
 func TestInsertEventOrLog_StampsActorFromClaims(t *testing.T) {
 	h := newTestHandler(t)
@@ -19,7 +20,7 @@ func TestInsertEventOrLog_StampsActorFromClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "user-xyz", PrincipalType: "user"})
+	ctx := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "user-xyz", PrincipalType: "user"})
 	h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "claim-derived"})
 
 	events, err := h.store.GetEvents(context.Background(), task.ID)
@@ -46,7 +47,7 @@ func TestInsertEventOrLog_ServicePrincipalMapsToService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := auth.WithIdentity(context.Background(), &auth.Identity{Sub: "svc-1", PrincipalType: "service"})
+	ctx := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "svc-1", PrincipalType: "service"})
 	h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "svc"})
 
 	events, _ := h.store.GetEvents(context.Background(), task.ID)

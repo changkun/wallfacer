@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"
@@ -803,7 +804,7 @@ func TestExplorerStream_HiddenWorkspaceNoLeak(t *testing.T) {
 	}
 
 	// Personal caller (OrgID "") cannot see the org-a workspace.
-	ctx, cancel := context.WithCancel(auth.WithIdentity(context.Background(), &auth.Identity{Sub: "u", OrgID: ""}))
+	ctx, cancel := context.WithCancel(auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""}))
 	req := httptest.NewRequest(http.MethodGet, "/api/explorer/stream", nil).WithContext(ctx)
 	w := newSyncResponseWriter()
 

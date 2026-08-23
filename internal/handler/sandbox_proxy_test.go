@@ -14,11 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/jwtauth"
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // proxyKeyAndJWKS returns an RSA key and a JWKS server exposing its
-// public half, for building a real auth.Validator in tests.
+// public half, for building a real jwtauth.Validator in tests.
 func proxyKeyAndJWKS(t *testing.T) (*rsa.PrivateKey, *httptest.Server) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -71,9 +73,9 @@ func signProxyJWT(t *testing.T, key *rsa.PrivateKey, sub, aud string, scopes []s
 	return in + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
 
-func proxyValidator(t *testing.T, jwksURL string) *auth.Validator {
+func proxyValidator(t *testing.T, jwksURL string) *jwtauth.Validator {
 	t.Helper()
-	return auth.BuildValidator(auth.Config{AuthURL: jwksURL}, jwksURL, "https://auth.latere.ai")
+	return auth.BuildValidator(oidc.Config{AuthURL: jwksURL}, jwksURL, "https://auth.latere.ai")
 }
 
 // proxyMux wires the three trust-plane routes exactly as

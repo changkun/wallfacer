@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"latere.ai/x/pkg/oidc"
-
-	"latere.ai/x/wallfacer/internal/auth"
 )
 
 // fakeMeAuth is an AuthProvider that also implements meBuilder, so AuthMe takes
@@ -68,7 +66,7 @@ func TestAuthMe_BuildMe_IncludesOrgs(t *testing.T) {
 // without constructing a real OIDC client (which would require a live auth
 // service for UserFromRequest to succeed).
 type fakeAuth struct {
-	user              *auth.User
+	user              *oidc.User
 	url               string
 	loginCalls        int
 	callbackCalls     int
@@ -93,11 +91,11 @@ func (f *fakeAuth) HandleLogout(w http.ResponseWriter, _ *http.Request) {
 
 func (f *fakeAuth) HandleLogoutNotify(w http.ResponseWriter, _ *http.Request) {
 	f.logoutNotifyCalls++
-	auth.ClearSession(w)
+	oidc.ClearSession(w)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (f *fakeAuth) UserFromRequest(_ http.ResponseWriter, _ *http.Request) *auth.User {
+func (f *fakeAuth) UserFromRequest(_ http.ResponseWriter, _ *http.Request) *oidc.User {
 	return f.user
 }
 
@@ -138,7 +136,7 @@ func TestAuthMe_NoSession_Returns204(t *testing.T) {
 // consumes. Required keys: sub, email, name, picture.
 func TestAuthMe_WithSession_Returns200(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	h.SetAuth(&fakeAuth{user: &auth.User{
+	h.SetAuth(&fakeAuth{user: &oidc.User{
 		Sub:     "u-123",
 		Email:   "a@b.com",
 		Name:    "Alice",
@@ -203,7 +201,7 @@ func TestLogin_WithClient_Delegates(t *testing.T) {
 // rejects the flow, which is exactly the "login doesn't work" failure.
 func TestLogin_PublicClient_RedirectsToAuthorize(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	client := auth.New(auth.Config{
+	client := oidc.New(oidc.Config{
 		AuthURL:         "https://auth.latere.ai",
 		ClientID:        "wallfacer",
 		RedirectURL:     "http://localhost:8080/callback",
@@ -211,7 +209,7 @@ func TestLogin_PublicClient_RedirectsToAuthorize(t *testing.T) {
 		InsecureCookies: true,
 	})
 	if client == nil {
-		t.Fatal("auth.New returned nil for a public browser client")
+		t.Fatal("oidc.New returned nil for a public browser client")
 	}
 	h.SetAuth(client)
 
@@ -248,7 +246,7 @@ func TestLogoutNotify_ClearsCookie(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("code = %d; want 200", w.Code)
 	}
-	// auth.ClearSession writes a Set-Cookie with MaxAge <= 0 to expire it.
+	// oidc.ClearSession writes a Set-Cookie with MaxAge <= 0 to expire it.
 	setCookie := w.Header().Get("Set-Cookie")
 	if setCookie == "" {
 		t.Fatal("expected Set-Cookie header clearing the session; got none")

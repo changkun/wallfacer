@@ -21,7 +21,9 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
+	"latere.ai/x/pkg/jwtauth"
 	"latere.ai/x/pkg/metrics"
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/auth"
@@ -212,8 +214,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
 	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
 	var (
-		jwtValidator *auth.Validator
-		authClient   *auth.Client
+		jwtValidator *jwtauth.Validator
+		authClient   *oidc.Client
 	)
 	// Sign-in is wired by default using the public (secret-less) "wallfacer"
 	// client, so a plain `wallfacer run` presents a login button with no
@@ -221,7 +223,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// and a confidential client (AUTH_CLIENT_SECRET set) works unchanged.
 	// WALLFACER_CLOUD only controls whether sign-in is *forced* (see ForceLogin),
 	// not whether it is available.
-	authCfg := auth.Config{
+	authCfg := oidc.Config{
 		AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
 		ClientID:     envconfig.Lookup(envFileKV, "AUTH_CLIENT_ID"),
 		ClientSecret: envconfig.Lookup(envFileKV, "AUTH_CLIENT_SECRET"),
@@ -232,7 +234,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	if err != nil {
 		logger.Fatal("auth: resolve configuration", "error", err)
 	}
-	authClient = auth.New(authCfg)
+	authClient = oidc.New(authCfg)
 	if authClient == nil {
 		logger.Fatal("auth: client construction failed; check AUTH_* configuration")
 	}
@@ -515,7 +517,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 // once and persisted under configDir. A loopback HTTP callback serves cookies
 // insecurely (pkg/oidc then drops the __Host- prefix) since browsers reject
 // Secure cookies over plain HTTP.
-func resolveAuthConfig(cfg auth.Config, addr, configDir string) (auth.Config, error) {
+func resolveAuthConfig(cfg oidc.Config, addr, configDir string) (oidc.Config, error) {
 	if cfg.AuthURL == "" {
 		cfg.AuthURL = "https://auth.latere.ai"
 	}
@@ -1356,10 +1358,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// fail closed: an enabled proxy without a validator rejects every
 	// request, so a deployment that sets the SANDBOX_PROXY_*
 	// credentials must set the auth URL too.
-	var sandboxProxyValidator *auth.Validator
+	var sandboxProxyValidator *jwtauth.Validator
 	if u := os.Getenv("SANDBOX_PROXY_AUTH_URL"); u != "" {
 		sandboxProxyValidator = auth.BuildValidator(
-			auth.Config{AuthURL: u},
+			oidc.Config{AuthURL: u},
 			os.Getenv("SANDBOX_PROXY_AUTH_JWKS_URL"),
 			os.Getenv("SANDBOX_PROXY_AUTH_ISSUER"),
 		)

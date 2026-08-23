@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
@@ -18,11 +20,11 @@ import (
 // code path needs.
 type fakeAuthClientWithSession struct {
 	fakeAuthProvider
-	sess *auth.Session
+	sess *oidc.Session
 	err  error
 }
 
-func (f *fakeAuthClientWithSession) GetSession(_ *http.Request) (*auth.Session, error) {
+func (f *fakeAuthClientWithSession) GetSession(_ *http.Request) (*oidc.Session, error) {
 	return f.sess, f.err
 }
 
@@ -53,7 +55,7 @@ func stubOrgsHTTPCapture(t *testing.T, status int, body string) {
 // even for the common single-org case.
 func TestAuthOrgs_SingleOrgReturns200(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc","slug":"alice"}]`)
 
@@ -76,7 +78,7 @@ func TestAuthOrgs_SingleOrgReturns200(t *testing.T) {
 // to render" case: the user has zero orgs.
 func TestAuthOrgs_NoMembershipsReturns204(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[]`)
 
@@ -93,12 +95,12 @@ func TestAuthOrgs_NoMembershipsReturns204(t *testing.T) {
 // org produces a 200 with the full list + current_id from claims.
 func TestAuthOrgs_MultiOrgReturns200(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc"},{"id":"org-b","name":"Bob Corp"}]`)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/orgs", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "u1", OrgID: "org-b"}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "u1", OrgID: "org-b"}))
 	w := httptest.NewRecorder()
 	h.AuthOrgs(w, req)
 
@@ -151,7 +153,7 @@ func TestAuthOrgs_LocalModeReturns204(t *testing.T) {
 // org_id, session cookie is cleared.
 func TestPatchAuthMe_HappyPath(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc"},{"id":"org-b","name":"Bob Corp"}]`)
 
@@ -189,7 +191,7 @@ func TestPatchAuthMe_HappyPath(t *testing.T) {
 // instead of silently redirecting.
 func TestPatchAuthMe_NonMemberReturns403(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
 
 	stubOrgsHTTPCapture(t, http.StatusOK, `[{"id":"org-a","name":"Alice Inc"}]`)
 
@@ -225,7 +227,7 @@ func TestPatchAuthMe_Unauthenticated401(t *testing.T) {
 // active_org on this SSO session".
 func TestPatchAuthMe_EmptyOrgIDSwitchesToPersonal(t *testing.T) {
 	h := newTestHandler(t)
-	h.SetAuth(&fakeAuthClientWithSession{sess: &auth.Session{AccessToken: "tok"}})
+	h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
 
 	body := bytes.NewBufferString(`{"org_id":""}`)
 	req := httptest.NewRequest(http.MethodPatch, "/api/auth/me", body)

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/auth"
 )
@@ -193,7 +194,7 @@ func TestBearerAuthMiddleware_ClaimsBypass(t *testing.T) {
 
 	// No Authorization header, but claims are already in context — should pass.
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &auth.Identity{Sub: "user-xyz"}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "user-xyz"}))
 	w := httptest.NewRecorder()
 	next.ServeHTTP(w, req)
 

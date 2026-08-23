@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/pkg/oidc"
 )
 
 // TestResolveAuthConfig_PublicDefault verifies that with no AUTH_* env a plain
@@ -15,7 +15,7 @@ import (
 // non-nil oidc client.
 func TestResolveAuthConfig_PublicDefault(t *testing.T) {
 	dir := t.TempDir()
-	cfg, err := resolveAuthConfig(auth.Config{}, ":8080", dir)
+	cfg, err := resolveAuthConfig(oidc.Config{}, ":8080", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,8 +37,8 @@ func TestResolveAuthConfig_PublicDefault(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "cookie-key")); err != nil {
 		t.Errorf("cookie key not persisted: %v", err)
 	}
-	if auth.New(cfg) == nil {
-		t.Error("auth.New returned nil for the default public config")
+	if oidc.New(cfg) == nil {
+		t.Error("oidc.New returned nil for the default public config")
 	}
 }
 
@@ -46,11 +46,11 @@ func TestResolveAuthConfig_PublicDefault(t *testing.T) {
 // persisted and reused, so sessions survive a restart.
 func TestResolveAuthConfig_CookieKeyStable(t *testing.T) {
 	dir := t.TempDir()
-	a, err := resolveAuthConfig(auth.Config{}, ":8080", dir)
+	a, err := resolveAuthConfig(oidc.Config{}, ":8080", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := resolveAuthConfig(auth.Config{}, ":8080", dir)
+	b, err := resolveAuthConfig(oidc.Config{}, ":8080", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestResolveAuthConfig_CookieKeyStable(t *testing.T) {
 // a cookie key and keeps Secure cookies.
 func TestResolveAuthConfig_EnvOverride(t *testing.T) {
 	dir := t.TempDir()
-	in := auth.Config{
+	in := oidc.Config{
 		AuthURL:      "https://auth.example.com",
 		ClientID:     "custom",
 		ClientSecret: "sec",

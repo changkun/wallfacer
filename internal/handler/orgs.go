@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/pkg/httpjson"
@@ -119,22 +120,22 @@ func (h *Handler) AuthOrgs(w http.ResponseWriter, r *http.Request) {
 }
 
 // sessionReader is the subset of AuthProvider the org-listing handler
-// needs. *auth.Client satisfies it via oidc.Client.GetSession; tests
+// needs. *oidc.Client satisfies it via its GetSession method; tests
 // substitute a fake. Kept narrow so the interface doesn't accidentally
 // grow.
 type sessionReader interface {
-	GetSession(*http.Request) (*auth.Session, error)
+	GetSession(*http.Request) (*oidc.Session, error)
 }
 
 // tokenRefresher is the optional subset of AuthProvider that can
-// auto-refresh an expired access token. *auth.Client satisfies it via
+// auto-refresh an expired access token. *oidc.Client satisfies it via
 // oidc.Client.UserFromRequest, which internally refreshes with the
 // stored refresh token and updates the session cookie. When the
 // provider doesn't implement this (test fakes, older cores), we skip
 // the refresh step and the caller falls back to the stored access
 // token as-is.
 type tokenRefresher interface {
-	UserFromRequest(http.ResponseWriter, *http.Request) *auth.User
+	UserFromRequest(http.ResponseWriter, *http.Request) *oidc.User
 }
 
 // patchAuthMeRequest is the PATCH /api/auth/me body. Only org_id is
@@ -204,7 +205,7 @@ func (h *Handler) doOrgSwitch(w http.ResponseWriter, r *http.Request) (string, b
 			return "", false
 		}
 	}
-	auth.ClearSession(w)
+	oidc.ClearSession(w)
 	return "/login?org_id=" + req.OrgID, true
 }
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/coordinator"
 	coordclient "latere.ai/x/wallfacer/internal/coordinator/client"
@@ -33,7 +34,7 @@ func TestCommentRoundTripThroughCoordinator(t *testing.T) {
 	coord := coordinator.NewCoordinator(reg)
 	coord.SetCommentService(coordinator.NewCommentService(coordinator.NewMemCommentStore(), reg))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := auth.WithIdentity(r.Context(), &auth.Identity{Sub: sub, OrgID: org})
+		ctx := auth.WithIdentity(r.Context(), &authkit.Identity{Sub: sub, OrgID: org})
 		coord.HandleWS(w, r.WithContext(ctx))
 	}))
 	defer srv.Close()
