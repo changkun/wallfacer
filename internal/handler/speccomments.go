@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"latere.ai/x/pkg/cmdexec"
+	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/wallfacer/internal/coordinator"
-	"latere.ai/x/wallfacer/internal/gitutil"
-	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/speccomment"
 )

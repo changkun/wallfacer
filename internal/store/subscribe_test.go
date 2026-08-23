@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/pubsub"
+	"latere.ai/x/pkg/pubsub"
 )
 
 func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {

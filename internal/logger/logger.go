@@ -13,9 +13,9 @@ import (
 	"strings"
 	"sync"
 
+	"latere.ai/x/pkg/sanitize"
+	"latere.ai/x/pkg/uuidutil"
 	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/pkg/sanitize"
-	"latere.ai/x/wallfacer/internal/pkg/uuidutil"
 )
 
 // Package-level named loggers, populated by Init.

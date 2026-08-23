@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // folderPickerArgs returns the command that pops the host OS native folder

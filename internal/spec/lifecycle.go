@@ -1,7 +1,7 @@
 package spec
 
 import (
-	"latere.ai/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/pkg/statemachine"
 )
 
 // StatusMachine is the spec lifecycle state machine.

@@ -1,7 +1,7 @@
 package spec
 
 import (
-	"latere.ai/x/wallfacer/internal/pkg/dag"
+	"latere.ai/x/pkg/dag"
 )
 
 // Impact describes the direct and transitive dependents of a spec.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/pkg/atomicfile"
 )
 
 // Meta is the minimum information [EnsureReadme] needs to reference a

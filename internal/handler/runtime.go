@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"time"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
 )
 

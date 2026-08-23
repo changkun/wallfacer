@@ -5,8 +5,8 @@ import (
 	"io"
 	"sync/atomic"
 
+	"latere.ai/x/pkg/statemachine"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/statemachine"
 )
 
 // BackendState represents the lifecycle state of a sandbox container.

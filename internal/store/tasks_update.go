@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 )
 
 // UpdateTaskStatus transitions the task identified by id to the given status.

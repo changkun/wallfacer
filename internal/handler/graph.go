@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/graph"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // GetGraph returns the unified spec+task dependency graph the Map renders and

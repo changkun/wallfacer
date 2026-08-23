@@ -19,9 +19,9 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/pty"
 )
 

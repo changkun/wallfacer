@@ -1,6 +1,6 @@
 package store
 
-import "latere.ai/x/wallfacer/internal/pkg/pubsub"
+import "latere.ai/x/pkg/pubsub"
 
 // TaskDelta carries the payload for a single task change notification.
 // Deleted is true when the task was removed; Task.ID holds the affected task's ID.

@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/atomicfile"
+	"latere.ai/x/pkg/ndjson"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
-	"latere.ai/x/wallfacer/internal/pkg/ndjson"
 )
 
 // FilesystemBackend implements StorageBackend using per-task directories

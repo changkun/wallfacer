@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/pkg/cmdexec"
+	"latere.ai/x/pkg/gitutil"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"

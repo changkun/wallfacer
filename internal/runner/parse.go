@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/pkg/ndjson"
 )
 
 // parseOutput tries to parse raw as a single JSON object first; if that fails

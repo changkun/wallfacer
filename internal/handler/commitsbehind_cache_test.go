@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/cache"
 	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/pkg/cache"
 )
 
 func TestCommitsBehindCache_Miss(t *testing.T) {

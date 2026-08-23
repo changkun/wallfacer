@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
-	"latere.ai/x/wallfacer/internal/pkg/sanitize"
+	"latere.ai/x/pkg/atomicfile"
+	"latere.ai/x/pkg/sanitize"
 )
 
 // Message is a single entry in the agent-session conversation log.

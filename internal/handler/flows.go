@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"sync"
 
+	"latere.ai/x/pkg/httpjson"
+	"latere.ai/x/pkg/slugutil"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/pkg/slugutil"
 )
 
 // flowRegistry returns the merged built-in + user-authored flow

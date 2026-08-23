@@ -1,7 +1,7 @@
 package agentsession
 
 import (
-	"latere.ai/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/pkg/ndjson"
 )
 
 // RoundUsage captures the token and cost fields from a single agent-session round's

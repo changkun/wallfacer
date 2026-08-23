@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/pkg/atomicfile"
 )
 
 // ErrAlreadyHasFrontmatter is returned by [InjectFrontmatter] when the target

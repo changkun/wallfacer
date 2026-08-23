@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/cmdexec"
+	"latere.ai/x/pkg/sortedkeys"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
-	"latere.ai/x/wallfacer/internal/pkg/sortedkeys"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"

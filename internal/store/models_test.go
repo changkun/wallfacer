@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"latere.ai/x/wallfacer/internal/pkg/statemachine"
+	"latere.ai/x/pkg/statemachine"
 )
 
 // allStatuses lists every defined TaskStatus for exhaustive negative-case coverage.

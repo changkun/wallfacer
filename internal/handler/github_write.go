@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/github"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // GitHub write surface (spec: github-integration component 4):

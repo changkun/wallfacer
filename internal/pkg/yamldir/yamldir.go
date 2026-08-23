@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/pkg/slugutil"
+	"latere.ai/x/pkg/slugutil"
 )
 
 // File is one .yaml/.yml entry returned by ReadAll: the absolute

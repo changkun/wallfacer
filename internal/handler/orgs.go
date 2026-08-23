@@ -26,9 +26,9 @@ import (
 
 	"latere.ai/x/pkg/otel"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // authHTTPClient calls the auth service with the otel transport so the

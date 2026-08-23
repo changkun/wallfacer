@@ -9,9 +9,9 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/tail"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/tail"
 )
 
 // pruneTaskPayload trims the three unboundedly-growing slice fields on t to

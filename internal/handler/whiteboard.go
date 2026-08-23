@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/atomicfile"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // The whiteboard is a per-workspace infinite drawing canvas. Its scene is

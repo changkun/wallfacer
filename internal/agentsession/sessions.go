@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/pkg/atomicfile"
 )
 
 // SessionMeta describes a single agent session.

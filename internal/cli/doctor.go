@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/wallfacer/internal/envconfig"
-	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // RunDoctor implements the `wallfacer doctor` subcommand.

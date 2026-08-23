@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
-	"latere.ai/x/wallfacer/internal/pkg/set"
+	"latere.ai/x/pkg/atomicfile"
+	"latere.ai/x/pkg/set"
 )
 
 // Workspace is an owned, stably-identified set of folder paths. Its identity

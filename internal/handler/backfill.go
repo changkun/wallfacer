@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
 )
 

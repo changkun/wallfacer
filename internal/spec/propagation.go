@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/dag"
+	"latere.ai/x/pkg/dag"
 )
 
 // Stale propagation fans out staleness to specs impacted by an event (a chat

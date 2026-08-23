@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
-	"latere.ai/x/wallfacer/internal/pkg/registry"
-	"latere.ai/x/wallfacer/internal/pkg/slugutil"
+	"latere.ai/x/pkg/atomicfile"
+	"latere.ai/x/pkg/registry"
+	"latere.ai/x/pkg/slugutil"
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 
 	"gopkg.in/yaml.v3"

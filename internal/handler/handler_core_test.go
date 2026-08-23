@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
 )
 

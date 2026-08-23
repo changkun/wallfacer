@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/pkg/cmdexec"
+	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
 )
 
 const (

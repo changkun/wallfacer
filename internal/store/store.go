@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/envutil"
+	"latere.ai/x/pkg/pubsub"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/envutil"
-	"latere.ai/x/wallfacer/internal/pkg/pubsub"
 )
 
 // indexedTaskText holds pre-lowercased searchable text for a single task.

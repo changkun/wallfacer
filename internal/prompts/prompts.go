@@ -18,8 +18,8 @@ import (
 	"slices"
 	"text/template"
 
+	"latere.ai/x/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 )
 
 //go:embed *.tmpl

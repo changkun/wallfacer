@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/wallfacer/internal/handler"
-	"latere.ai/x/wallfacer/internal/metrics"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"

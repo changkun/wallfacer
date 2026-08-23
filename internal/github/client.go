@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/otel"
-	"latere.ai/x/wallfacer/internal/pkg/sanitize"
+	"latere.ai/x/pkg/sanitize"
 )
 
 // DefaultBaseURL is the GitHub REST API root. Overridable on [Client] so tests

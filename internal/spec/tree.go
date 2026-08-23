@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	gentree "latere.ai/x/wallfacer/internal/pkg/tree"
+	gentree "latere.ai/x/pkg/tree"
 )
 
 // Node is a spec document within the spec tree.

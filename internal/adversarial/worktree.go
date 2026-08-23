@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/pkg/gitutil"
 )
 
 // newCriticWorktree creates a throwaway git worktree at the current HEAD of

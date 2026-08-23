@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/pkg/ndjson"
 )
 
 // agentSessionsDirName is the per-root directory that holds agent-session

@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/prompts"
 )
 

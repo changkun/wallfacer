@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/store"
 )
 

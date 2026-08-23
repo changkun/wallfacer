@@ -9,9 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"latere.ai/x/pkg/set"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/set"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )

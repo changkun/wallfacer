@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/httpjson"
+	"latere.ai/x/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
-	"latere.ai/x/wallfacer/internal/pkg/sanitize"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"

@@ -18,9 +18,9 @@ import (
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/oidc"
 
+	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/coordinator/client"
-	"latere.ai/x/wallfacer/internal/gitutil"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/speccomment"

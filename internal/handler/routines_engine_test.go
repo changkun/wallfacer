@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/routine"
+	"latere.ai/x/pkg/routine"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )

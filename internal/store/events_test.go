@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/pkg/atomicfile"
 
 	"github.com/google/uuid"
 )

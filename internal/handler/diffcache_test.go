@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/cache"
 	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/pkg/cache"
 )
 
 // TestDiffCacheGetMiss verifies that get returns (zero, false) for an unknown key.

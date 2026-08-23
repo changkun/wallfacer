@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // Convenience aliases so callers can write handler.BodyLimitDefault etc.

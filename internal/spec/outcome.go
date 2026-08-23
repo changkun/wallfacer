@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
+	"latere.ai/x/pkg/atomicfile"
 )
 
 // outcomeHeading is the body section the drift pipeline writes its verdict to.

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"latere.ai/x/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/pkg/atomicfile"
 	"latere.ai/x/wallfacer/internal/store"
 )
 

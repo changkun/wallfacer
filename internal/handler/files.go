@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // skipDirs lists directory names that should never be traversed during file listing.

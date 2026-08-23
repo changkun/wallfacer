@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"latere.ai/x/pkg/httpjson"
+	"latere.ai/x/pkg/slugutil"
 	"latere.ai/x/wallfacer/internal/agents"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
-	"latere.ai/x/wallfacer/internal/pkg/slugutil"
 )
 
 // AgentResponse is the wire shape for an agent descriptor surfaced on

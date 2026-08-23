@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/sanitize"
+	"latere.ai/x/pkg/sanitize"
 )
 
 // taskUsage mirrors the JSON shape of store.TaskUsage (cost field only).

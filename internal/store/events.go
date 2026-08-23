@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/pkg/pagination"
+	"latere.ai/x/pkg/pagination"
 )
 
 // InsertEvent appends a new event to the task's audit trail. When ctx

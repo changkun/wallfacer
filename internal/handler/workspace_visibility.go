@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // workspaceHiddenFromRequest reports whether there is an active workspace that

@@ -6,10 +6,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"latere.ai/x/wallfacer/internal/gitutil"
+	"latere.ai/x/pkg/cmdexec"
+	"latere.ai/x/pkg/dircp"
+	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/pkg/cmdexec"
-	"latere.ai/x/wallfacer/internal/pkg/dircp"
 )
 
 // setupNonGitSnapshot copies ws into snapshotPath and initialises a local git

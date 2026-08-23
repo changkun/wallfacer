@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/github"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // GitHub auth surface (spec: github-integration component 1, oauth-token-store):

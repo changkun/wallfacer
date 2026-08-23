@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // maxReviewRoundBytes caps a single round body in the transcript response so one

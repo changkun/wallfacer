@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // traceNode is one agent in an agentic run's trace graph. It is the thin,

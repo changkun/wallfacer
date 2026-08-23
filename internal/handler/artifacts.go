@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // artifactContentTypes whitelists the web content types Wallfacer serves from a

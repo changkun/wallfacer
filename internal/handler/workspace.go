@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"latere.ai/x/wallfacer/internal/gitutil"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
+	"latere.ai/x/pkg/gitutil"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // workspaceBrowseEntry describes a single directory entry returned by

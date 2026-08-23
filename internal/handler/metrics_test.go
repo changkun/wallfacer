@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/wallfacer/internal/metrics"
+	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/wallfacer/internal/store"
 )
 

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"latere.ai/x/wallfacer/internal/pkg/ndjson"
+	"latere.ai/x/pkg/ndjson"
 )
 
 // turnUsagePath returns the JSONL file path for a task's per-turn usage log.

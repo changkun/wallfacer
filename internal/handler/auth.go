@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/oauth"
-	"latere.ai/x/wallfacer/internal/pkg/httpjson"
 )
 
 // providerByName maps URL path values to OAuth provider configs.

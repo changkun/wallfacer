@@ -3,8 +3,8 @@ package handler
 import (
 	"time"
 
-	"latere.ai/x/wallfacer/internal/gitutil"
-	"latere.ai/x/wallfacer/internal/pkg/cache"
+	"latere.ai/x/pkg/cache"
+	"latere.ai/x/pkg/gitutil"
 )
 
 // commitsBehindResult stores a cached CommitsBehind outcome.
