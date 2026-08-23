@@ -36,8 +36,14 @@ var seamPackages = map[string]map[string]bool{
 // surface (supportedToposPackages), or a designated seam (seamPackages). This
 // keeps the runtime an implementation detail behind a seam. The whole module is
 // scanned by import path so the check does not depend on the test's CWD.
+//
+// Test files are scanned too (TestImports and XTestImports alongside Imports):
+// a package whose tests name an engine type has the same coupling to the engine
+// as one whose production code does, and the seam is meant to be the only place
+// that coupling exists.
 func TestWallfacerImportsOnlyRootTopos(t *testing.T) {
-	out, err := exec.Command("go", "list", "-f", "{{.ImportPath}} {{range .Imports}}{{.}} {{end}}", "latere.ai/x/wallfacer/...").CombinedOutput()
+	const format = "{{.ImportPath}} {{range .Imports}}{{.}} {{end}}{{range .TestImports}}{{.}} {{end}}{{range .XTestImports}}{{.}} {{end}}"
+	out, err := exec.Command("go", "list", "-f", format, "latere.ai/x/wallfacer/...").CombinedOutput()
 	if err != nil {
 		t.Fatalf("go list: %v\n%s", err, out)
 	}
