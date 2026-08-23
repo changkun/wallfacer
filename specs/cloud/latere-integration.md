@@ -82,7 +82,7 @@ seam is inert and local behavior is byte-identical to today.
 
 | Seam | Latere service | Wallfacer interface | Status | Spec |
 |------|----------------|---------------------|--------|------|
-| **Identity** | auth.latere.ai | `internal/auth` middleware + `pkg/jwtauth`/`oidc`; `authkit.Identity{Sub,OrgID}` principal | ✅ shipped (Phase 1+2) | [identity/authentication.md](../identity/authentication.md) |
+| **Identity** | auth.latere.ai | `internal/auth` middleware + `pkg/jwtauth`/`oidc`; `authkit.Identity{Sub,OrgID}` principal | ✅ shipped (Phase 1+2) | [identity/authentication.md](../.archive/identity/authentication.md) |
 | **Runtime** | Cella | `executor.Backend` (today: Host only; the cloud impl slots in as a third executor) | drafted | [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md) |
 | **Cella wire client** | Cella | a shared Go client published by Cella, consumed by Wallfacer's `CellaBackend` and Topos's `cella.Provider` | drafted | [latere-integration/shared-cella-client.md](latere-integration/shared-cella-client.md) |
 | **File data plane** | FS | `internal/workspace` + `internal/runner` (worktree staging) | drafted; **blocked on FS Workspace API** | [tenant-filesystem.md](tenant-filesystem.md) |

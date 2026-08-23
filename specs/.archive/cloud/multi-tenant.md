@@ -24,15 +24,15 @@ dispatched_task_id: null
 > - **Per-instance runtime, provisioning, warm pools, hibernation, egress
 >   policy** → owned by **Cella** (cella.latere.ai).
 >   Wallfacer consumes it through the runtime integration seam — see
->   [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md).
+>   [latere-integration/cella-runtime.md](../../cloud/latere-integration/cella-runtime.md).
 > - **Cluster, routing, DNS/TLS, node pools** → owned by **terraform** (DOKS).
 >   Wallfacer needs only a thin deploy module — see
->   [cloud-infrastructure.md](cloud-infrastructure.md).
+>   [cloud-infrastructure.md](../../cloud/cloud-infrastructure.md).
 > - **Identity / org isolation** → already shipped via Identity Phase 2
 >   (`internal/auth`, `store.Principal{Sub,OrgID}`, org-scoped task filtering).
 > - **Org/team scoping within a shared instance** (the part still genuinely
 >   wallfacer's) → tracked under
->   [identity/multi-user-collaboration.md](../identity/multi-user-collaboration.md),
+>   [identity/multi-user-collaboration.md](../../identity/multi-user-collaboration.md),
 >   not here.
 >
 > The Latere product boundary for wallfacer is explicit:
@@ -40,7 +40,7 @@ dispatched_task_id: null
 > **consume** Latere services rather than absorb them; cloud v1 is metadata
 > coordination, not per-tenant instance hosting. The "one wallfacer process per
 > user, provisioned on login" model in this spec is no longer the plan. Retained
-> for historical context. See [latere-integration.md](latere-integration.md) for
+> for historical context. See [latere-integration.md](../../cloud/latere-integration.md) for
 > the current integration approach.
 
 ## Problem
@@ -261,7 +261,7 @@ The sandbox is a **stateless, policy-controlled runtime for autonomous agents**.
 - **Harness lives in the sandbox.** Different harnesses (Claude Code, Codex, future agents) ship as separate sandbox images. Wallfacer selects the image per task; the harness binary is not pulled from fs.latere.ai.
 - **Files are selected and mounted from fs.latere.ai.** The control plane tells fs.latere.ai which files this task needs (repo, worktree, config), fs.latere.ai stages them to the hot tier, and the sandbox mounts that hot-tier path. The sandbox's local filesystem outside the mount is ephemeral; it is destroyed when the task ends.
 - **Autonomous agent.** The agent makes its own decisions about what tools to install and what commands to run. No pre-declaration or approval loop.
-- **Policy-controlled action space.** The sandbox runtime monitors the agent's actions — network egress, filesystem writes, process execution — and evaluates them against a policy. Actions that would cross a forbidden boundary are blocked; everything is logged. See [sandbox-isolation.md](sandbox-isolation.md) for the policy engine design.
+- **Policy-controlled action space.** The sandbox runtime monitors the agent's actions — network egress, filesystem writes, process execution — and evaluates them against a policy. Actions that would cross a forbidden boundary are blocked; everything is logged. The policy engine design is owned by Cella, the sandbox runtime.
 - **Full network observability.** Network policy is a mixed allow+deny list (allow known destinations: LLM API, package registries, git hosts; deny known-bad: private IPs, SSRF targets; log everything). The activity log is available to the user and the control plane.
 
 ### Why this works without being a "cloud workstation"

@@ -45,7 +45,7 @@ When a workspace is not a git repository (or is an empty git repo with no commit
 1. `cp -a ws/. snapshotPath` copies all files including hidden ones.
 2. `git init` + `git add -A` + `git commit --allow-empty` initializes a local git repo for change tracking.
 3. The standard commit pipeline (Phase 1) can then commit changes within the snapshot.
-4. Before extraction, `computeSnapshotDiff()` captures a unified diff of all changes relative to the initial snapshot commit. This diff is stored in `Task.SnapshotDiffs` so the diff view works even after the snapshot is cleaned up.
+4. Before extraction, `gitutil.SnapshotDiff()` captures a unified diff of all changes relative to the initial snapshot commit. This diff is stored in `Task.SnapshotDiffs` so the diff view works even after the snapshot is cleaned up.
 5. `extractSnapshotToWorkspace()` copies changes back using `rsync --delete --exclude=.git` (falling back to `cp` if rsync is unavailable).
 
 ### Stale Branch Recovery

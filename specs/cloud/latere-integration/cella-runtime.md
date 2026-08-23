@@ -128,7 +128,7 @@ plaintext env.
   is no `--backend`/`--executor` flag and no `case "host"`/`case "cella"`
   branch in the codebase. Selecting Cella therefore depends on the
   `Executor`/`--executor` interface defined in
-  [shared/harness-abstraction.md](../../shared/harness-abstraction.md) (Layer 2,
+  [shared/harness-abstraction.md](../../.archive/shared/harness-abstraction.md) (Layer 2,
   Executor), which introduces the executor-selection seam. Land that seam first;
   then this spec adds `cella` as a selectable executor (`--executor cella`),
   with `NewRunner` constructing `executor.NewCellaBackend(...)` instead of the
@@ -151,7 +151,7 @@ executor selector and in `docs/`.
   through the same `r.backend.Launch()` path as the host backend, unmodified.
 - `--executor cella` selects it; default (host) behavior is byte-identical to
   today. (Depends on the executor-selection seam from
-  [harness-abstraction.md](../../shared/harness-abstraction.md) landing first.)
+  [harness-abstraction.md](../../.archive/shared/harness-abstraction.md) landing first.)
 - A task runs end-to-end in a Cella sandbox (with the chosen worktree-sync
   mechanism), streams output live, commits results, and cleans up the sandbox on
   completion, cancel, and kill.

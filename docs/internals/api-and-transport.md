@@ -93,7 +93,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto the latest default branch |
 | `POST /api/tasks/{id}/test` | Trigger the test agent for a task |
 | `GET /api/tasks/{id}/diff` | Git diff of task worktrees versus the default branch |
-| `GET /api/tasks/{id}/logs` | Live log stream for a running task (`text/plain`, not SSE; see [Live Task Logs](#live-task-logs)) |
+| `GET /api/tasks/{id}/logs` | Live log stream for a running task (`text/plain`, not SSE; see [Live Task Logs](#live-task-logs-get-apitasksidlogs)) |
 | `GET /api/tasks/{id}/outputs/{filename}` | Raw Claude Code output file for a single agent turn |
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
@@ -197,6 +197,10 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 | `POST /internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic) |
 | `POST /internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI) |
 | `GET /internal/sandbox-proxy/github-token` | Trust-plane GitHub token mint |
+| `GET /` | Serves the embedded SPA index for every non-API path, so client-side routes survive a hard load |
+| `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |
+| `GET /static/` | Embedded SPA assets served without the cache wrapper |
+| `GET /favicon.ico` | Embedded favicon, 404 when the build did not produce one |
 
 The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox credential sidecar makes, not part of the browser contract. They are wired unconditionally but respond 503 when `SandboxProxyConfig.Enabled` is false (local runs with no credentials). When `SANDBOX_PROXY_AUTH_URL` is set, requests are validated against the JWKS built from `SANDBOX_PROXY_AUTH_JWKS_URL` and `SANDBOX_PROXY_AUTH_ISSUER`. When it is unset no validator is built, and `requireClaims` fails closed: an enabled proxy rejects every trust-plane request with 503 rather than treating the caller as anonymous-but-authorized.
 
@@ -272,7 +276,7 @@ sequenceDiagram
 
 The same pattern applies to `GET /api/git/stream`, except the source is a time-based ticker (polling `git status` every few seconds) rather than a store write signal.
 
-Live task logs use a different mechanism: `GET /api/tasks/{id}/logs` streams the running agent process's live-log reader (`runner.TaskLogReader`) line-by-line. See [Live Task Logs](#live-task-logs).
+Live task logs use a different mechanism: `GET /api/tasks/{id}/logs` streams the running agent process's live-log reader (`runner.TaskLogReader`) line-by-line. See [Live Task Logs](#live-task-logs-get-apitasksidlogs).
 
 ### Task Stream (`GET /api/tasks/stream`)
 
@@ -390,7 +394,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 ### Architecture
 
 - **`sessionRegistry`** (`terminal.go`): manages `map[string]*terminalSession`, tracks the active session, and provides `create`, `switchTo`, `remove`, `closeAll`, and `activeSession` methods. A `switchCh` channel signals the relay dispatcher when the active session changes.
-- **`relayDispatcher`**: the PTY→WS goroutine re-resolves the active session on each switch signal. The WS→PTY goroutine resolves `activeSession()` per message.
+- **Relay goroutines** (started in `HandleTerminalWS`): the PTY→WS goroutine re-resolves the active session on each switch signal. The WS→PTY goroutine resolves `activeSession()` per message.
 - **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
 - **Frontend** (`frontend/src/components/TerminalPanel.vue`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
 
@@ -434,7 +438,7 @@ These are computed on each `/metrics` scrape via registered collector functions:
 |---|---|---|
 | `wallfacer_tasks_total` | `status`, `archived` | Number of tasks grouped by status and archived flag. |
 | `wallfacer_running_containers` |, | Number of running task processes currently tracked (legacy metric name; the value counts host processes). |
-| `wallfacer_background_goroutines` |, | Number of outstanding background goroutines tracked by the runner's `trackedWg`. |
+| `wallfacer_background_goroutines` |, | Number of outstanding background goroutines tracked by the runner's `trackedwg.WaitGroup`. |
 | `wallfacer_store_subscribers` |, | Number of active SSE subscribers listening for task state changes. |
 | `wallfacer_failed_tasks_by_category` | `category` | Number of currently-failed (non-archived) tasks grouped by failure category. |
 | `wallfacer_circuit_breaker_open` |, | 1 when the launch circuit breaker is open (executor unavailable), 0 when closed. |
@@ -535,8 +539,8 @@ The handler returns 400 for:
 
 `store.go` manages an in-memory `map[uuid.UUID]*Task` behind a `sync.RWMutex`:
 
-- Reads (`List`, `Get`) acquire a read lock
-- Writes (`Create`, `Update`, `UpdateStatus`) acquire a write lock, mutate memory, then atomically persist to disk (temp file + `os.Rename`)
+- Reads (`ListTasks`, `GetTask`) acquire a read lock
+- Writes (`CreateTaskWithOptions`, the `UpdateTask*` family, `UpdateTaskStatus`) acquire a write lock, mutate memory, then atomically persist to disk (temp file + `os.Rename`)
 - After every write, `notify()` is called to wake SSE subscribers
 
 Event traces are append-only. Each event is written as a separate file (`traces/NNNN.json`) using the same atomic write pattern. Files are never modified after creation.

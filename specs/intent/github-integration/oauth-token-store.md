@@ -41,7 +41,7 @@ revoked.
   `~/.config/latere/token.json`. The GitHub token is a **distinct** credential
   and must not be conflated with the latere.ai identity token.
 - Principal context (user sub, org) comes from
-  [authentication.md](../../identity/authentication.md); the GitHub token is
+  [authentication.md](../../.archive/identity/authentication.md); the GitHub token is
   scoped to it so a signed-in user's token is not reused across principals.
 - `/api/config` (`internal/handler/config.go`, `buildConfigResponse`) is the
   existing place the UI reads capability/auth status; extend it.

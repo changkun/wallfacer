@@ -31,7 +31,7 @@ Wallfacer today executes every task locally — even in cloud mode, the harness 
 
 ## Layering
 
-The [harness-abstraction.md](../../shared/harness-abstraction.md) spec separates two concerns:
+The [harness-abstraction.md](../../.archive/shared/harness-abstraction.md) spec separates two concerns:
 
 - **Harness** (`internal/harness/`) — which CLI to spawn and how to parse its events.
 - **Executor** (existing `sandbox.Backend` interface, narrowed) — where the harness process runs.
@@ -40,12 +40,12 @@ Topos integration is an **Executor**, not a Harness. The remote side already run
 
 ## Decision
 
-Add `internal/executor/topos.go` implementing the executor interface against the Topos `/v1/agents` HTTP API. Selectable via `--executor topos` (replacing the now-removed `--backend` flag from [host-default.md](../../shared/host-default.md), in the executor dimension only).
+Add `internal/executor/topos.go` implementing the executor interface against the Topos `/v1/agents` HTTP API. Selectable via `--executor topos` (replacing the now-removed `--backend` flag from [host-default.md](../../.archive/shared/host-default.md), in the executor dimension only).
 
 Topos integration depends on Latere's platform pieces:
 
 - **Cella** runs the underlying sandbox on the Topos side. Wallfacer does not talk to Cella directly when using Topos — Topos owns that coupling. The [cella-runtime](cella-runtime.md) spec handles the *direct* Cella path; this spec handles the *via-Topos* path. They are parallel runtime options.
-- **Latere auth** (Identity) provides the principal that Topos authorizes. Wallfacer reuses the existing OIDC token from [authentication.md](../../identity/authentication.md); Topos validates it against the same Latere issuer.
+- **Latere auth** (Identity) provides the principal that Topos authorizes. Wallfacer reuses the existing OIDC token from [authentication.md](../../.archive/identity/authentication.md); Topos validates it against the same Latere issuer.
 
 ## Shape
 
@@ -63,7 +63,7 @@ TOPOS_BASE_URL=https://topos.latere.ai
 # No separate TOPOS_API_KEY in v1.
 ```
 
-### Executor interface (defined in [harness-abstraction.md](../../shared/harness-abstraction.md))
+### Executor interface (defined in [harness-abstraction.md](../../.archive/shared/harness-abstraction.md))
 
 ```go
 type Executor interface {
@@ -114,7 +114,7 @@ Per-task workspace transport is the hardest piece. Options:
 
 - `internal/executor/topos.go` implementing `Executor`.
 - `TOPOS_BASE_URL` env var; wired into config UI.
-- `--executor` CLI flag (replaces the local `--backend` removed by [host-default](../../shared/host-default.md)).
+- `--executor` CLI flag (replaces the local `--backend` removed by [host-default](../../.archive/shared/host-default.md)).
 - Settings UI surface to enable Topos as the default executor for new tasks.
 - E2E test against a Topos staging endpoint (or a recorded fake when staging is unavailable).
 - `docs/cloud/topos.md` — user-facing guide.

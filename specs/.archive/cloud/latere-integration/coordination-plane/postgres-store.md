@@ -29,7 +29,7 @@ real migration framework (its Outcome: "schema migrations framework. Deferred;
 the Postgres schema is applied idempotently on init rather than via golang-migrate").
 This spec delivers that framework: a single shared Postgres store that owns the
 pool and runs embedded, versioned migrations, so the next durable consumer
-([metadata-projection.md](metadata-projection.md)'s rollups, and any future
+([metadata-projection.md](../../../../cloud/latere-integration/coordination-plane/metadata-projection.md)'s rollups, and any future
 storage) adds a numbered migration file instead of another inline schema string.
 
 The inline `IF NOT EXISTS` pattern only ever creates new tables. It cannot
@@ -270,6 +270,6 @@ confirmed shipped on `main`.
   team may prefer the coordinator to refuse to start in cloud mode rather than
   serve split-brain comments. Not changed here (it is the pre-existing behavior
   and a deliberate prior decision); flagged for an explicit call.
-- The next durable consumer ([metadata-projection.md](metadata-projection.md)
+- The next durable consumer ([metadata-projection.md](../../../../cloud/latere-integration/coordination-plane/metadata-projection.md)
   rollups) adds `000002_*.sql` and a constructor taking `*pgxpool.Pool`; no
   further infra work for the framework itself.

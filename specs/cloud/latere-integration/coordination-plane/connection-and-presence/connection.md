@@ -219,7 +219,7 @@ authoritative** data does **not** live in Valkey:
 - **Spec comments** are cloud-authoritative (the one relay-not-mirror exception),
   so their system of record is **Postgres** (`latere-pg`), not the cache. The
   `wallfacer` database and `WALLFACER_DATABASE_URL` are provisioned (see
-  [spec-comments](../spec-comments.md)). Connection and presence themselves are
+  [spec-comments](../../../../.archive/cloud/latere-integration/coordination-plane/spec-comments.md)). Connection and presence themselves are
   Valkey-only and need no Postgres.
 - **Metadata projection** live read-model may sit in Valkey (it is a cache of
   record, regenerable by replay); only its long-retention rollups want Postgres

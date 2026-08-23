@@ -153,7 +153,7 @@ field never carries a local path, a token, or repo contents (data boundary).
 - Cross-org collaboration. The org boundary is absolute; an external collaborator
   is an Identity/org-membership concern, not this spec.
 - Mirroring repo *contents* to the coordinator. Comments anchor to specs by path
-  and content hash (see [spec-comments](spec-comments.md)); the coordinator never
+  and content hash (see [spec-comments](../../../.archive/cloud/latere-integration/coordination-plane/spec-comments.md)); the coordinator never
   holds source.
 
 ## Open questions

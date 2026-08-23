@@ -270,7 +270,7 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 ### Goroutine model
 
-There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedWg`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
+There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedwg.WaitGroup`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
 The seven automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
 
@@ -338,7 +338,7 @@ Every `internal/` package and its role in the system:
 |---|---|---|
 | `adversarial` | Review adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `ReviewVerifier` |
 | `agentgraph` | The single seam onto the embedded topos runtime: compiles a flow + agents registry into a `topos.Region`, executes it, returns final text plus a trace graph | `FromFlow()`, `RunFlow()`, `Runner`, `Trace` |
-| `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload. Five built-in roles: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Registry`, `Role`, `BuiltinAgents`, `NewRegistry()`, `Load()` |
+| `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload. Five built-in roles: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Registry`, `Role`, `BuiltinAgents`, `NewMergedRegistry()`, `LoadUserAgents()`, `WriteUserAgent()`, `DeleteUserAgent()` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec, auth, web) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `RunAuth()`, `RunWeb()`, `BuildMux()`, `ConfigDir()` |
@@ -358,9 +358,9 @@ Every `internal/` package and its role in the system:
 | `webserver` | Serves the SPA embedded from `frontend/dist` | `MountSPA()` |
 | `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
-| `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `StartFlow()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
+| `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
-| `routine` | Routine scheduler engine that fires routine-kind tasks (user-defined) on their configured cadence | `Engine`, `Start()`, `Trigger()` |
+| `routine` | Routine scheduler engine that fires routine-kind tasks (user-defined) on their configured cadence | `Engine`, `NewEngine()`, `Register()`, `Unregister()`, `Trigger()` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; seven-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
 | `speccomment` | Domain types for inline spec comments (the coordinator-authoritative collaboration artifact of the coordination plane) | `Comment`, `Thread`, `Anchor`, `NewID()` |
 | `prompts` | System prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Manager`, `NewManager()`, `WorkspaceDataKey()`, `NewDataKey()` |
@@ -397,8 +397,8 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/yamldir` | Reads YAML definition files from a user directory | `ReadAll()`, `File`, `Remove()` |
 | `pkg/yamlwatch` | Debounces filesystem events on a YAML directory | `Watch()` |
 | `pkg/dag` | Generic DAG operations (ReverseEdges, DetectCycles, Reachable) | `ReverseEdges()`, `DetectCycles()`, `Reachable()` |
-| `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Buffer`, `NewBuffer()`, `Reader` |
-| `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Transition()` |
+| `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader` |
+| `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Validate()`, `CanTransition()`, `Allowed()` |
 | `pkg/tree` | Generic tree data structure with `iter.Seq` walk | `Node[T]`, `Walk()` |
 
 ## Handler Organisation

@@ -106,7 +106,7 @@ spec:
 
 `ReadWriteOnce` ties the server to a single replica - fine for v1. Multi-replica
 (a Postgres/object-storage `StorageBackend`) is deferred; see
-[storage-backends.md](../foundations/storage-backends.md) (those backend tasks
+[storage-backends.md](../.archive/foundations/storage-backends.md) (those backend tasks
 are archived until multi-instance scaling is actually needed).
 
 ### 4. Secret
@@ -153,7 +153,7 @@ sandboxes on its own (tainted) pool and accounts for that compute.
 
 ## Dependencies
 
-- [storage-backends.md](../foundations/storage-backends.md) - `FilesystemBackend` on the PVC (complete).
+- [storage-backends.md](../.archive/foundations/storage-backends.md) - `FilesystemBackend` on the PVC (complete).
 - [latere-integration.md](latere-integration.md) - the umbrella; the runtime
   ([cella-runtime.md](latere-integration/cella-runtime.md)) and FS
   ([tenant-filesystem.md](tenant-filesystem.md)) seams the deployed server consumes.

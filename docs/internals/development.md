@@ -17,11 +17,13 @@ This guide is for contributors who want to build Wallfacer from source, run test
 git clone https://github.com/changkun/wallfacer.git
 cd wallfacer
 
-# Build the server binary
-go build -o wallfacer .
+# Build the frontend, then the server binary
+make build-binary
 ```
 
-`make build` runs the full gate (fmt + lint + frontend build + binary). At runtime the server execs the selected CLI directly as a host process, with the task's git worktree as the working directory; the binary per task is set via the `WALLFACER_AGENT` env var (`claude`, `codex`, `cursor`, `opencode`, or `pi`).
+The Go binary embeds the built SPA from `frontend/dist/`, so the frontend must be built first. `make build-binary` does both; a bare `go build .` on a fresh clone fails with `pattern all:frontend/dist: no matching files found`. `make build` runs the full gate (fmt + frontend build + lint + binary).
+
+At runtime the server execs the selected CLI directly as a host process, with the task's git worktree as the working directory; the binary per task is set via the `WALLFACER_AGENT` env var (`claude`, `codex`, `cursor`, `opencode`, or `pi`).
 
 ## Configure Credentials
 
@@ -32,7 +34,7 @@ wallfacer run
 ```
 
 ```bash
-# wallfacer/.env, set one of:
+# ~/.wallfacer/.env, set one of:
 CLAUDE_CODE_OAUTH_TOKEN=<your-token>
 # ANTHROPIC_API_KEY=sk-ant-...
 ```
@@ -47,6 +49,24 @@ make test-backend   # Go unit tests: go test ./...
 make test-frontend  # Frontend tests: cd frontend && bunx vitest run
 ```
 
+### Tests that skip without setup
+
+Some packages skip silently when their dependency is absent, so a green
+`make test` does not mean every test ran:
+
+| Tests | Skipped unless | Effect |
+|---|---|---|
+| `internal/store/postgres`, the coordinator comment-store contract tests | `WALLFACER_TEST_DATABASE_URL` points at a reachable PostgreSQL | The Postgres storage backend is exercised only through the filesystem-backed contract tests |
+| Harness integration tests in `internal/harness` and `internal/executor` | `cursor-agent`, `opencode`, or `pi` is on `PATH` (and authenticated) | Real subprocess launches for those harnesses are not covered |
+| `make e2e-lifecycle`, `make e2e-dependency-dag`, `make ui-test` | Run explicitly; they are not part of `make test` | End-to-end task execution and browser invariants are not covered |
+
+CI runs without a database, so the Postgres tests skip there too. To run them:
+
+```bash
+WALLFACER_TEST_DATABASE_URL=postgres://user:pass@localhost:5432/wallfacer_test?sslmode=disable \
+  go test ./internal/store/postgres/ ./internal/coordinator/
+```
+
 ## Make Targets
 
 | Target | Description |
@@ -54,13 +74,14 @@ make test-frontend  # Frontend tests: cd frontend && bunx vitest run
 | `make build` | Full gate: fmt + lint (Go + Vue typecheck) + frontend build + binary |
 | `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
 | `make server` | Build and run the server natively |
-| `make fmt` | Format Go in place |
+| `make fmt` | Format Go in place (alias for `make fmt-go`) |
+| `make fmt-go` | Run `gofmt -w` over the repository |
 | `make lint` | Lint only (`golangci-lint` 2.13.1 + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
 | `make test` | fmt + lint + backend tests + frontend tests |
 | `make test-backend` | Go unit tests (`go test ./...`) |
 | `make test-frontend` | Frontend Vitest runner (`cd frontend && bun run test`) |
 | `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
-| `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
+| `make api-contract` | Regenerate API route artifacts from `internal/apicontract/routes.go` |
 | `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
 | `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
 | `make ui-test` | Boot against seeded demo data and assert UI invariants in a real browser (`SKIP_BUILD=1` reuses `./wallfacer`) |
@@ -74,6 +95,7 @@ Lint sub-targets, all folded into `make lint`:
 | `make lint-go` | `golangci-lint` at the repo-pinned version |
 | `make lint-js` | Frontend type check (`vue-tsc --noEmit`) |
 | `make lint-otel` | Fail on any outbound `&http.Client{}` without the otel transport |
+| `make lint-modernize` | Fail on hand-rolled equivalents of stdlib constructs that `go fix` would rewrite |
 | `make lint-truncate` | Fail on byte-index truncation of strings, which can cut a multi-byte rune |
 
 The `wallfacerd` web-server variant and the release/skills helpers:

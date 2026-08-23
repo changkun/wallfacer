@@ -2,6 +2,7 @@
 
 **Full autonomy when you trust it. Full control when you don't.**
 
+[![Test](https://github.com/changkun/wallfacer/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/changkun/wallfacer/actions/workflows/test.yml)
 [![Go](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Release](https://img.shields.io/github/v/release/changkun/wallfacer?display_name=tag&logo=github)](https://github.com/changkun/wallfacer/releases)
 [![License](https://img.shields.io/github/license/changkun/wallfacer)](./LICENSE)
@@ -206,6 +207,17 @@ Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the developer orien
 ## Origin
 
 Wallfacer started as a task board for coordinating concurrent agent runs and grew from there: spec coordination, oversight, refinement, an integrated IDE. Most recent capabilities were developed by Wallfacer itself. See [docs/origin.md](docs/origin.md) for the long version.
+
+## Status
+
+Wallfacer is pre-1.0 and released from `main` as tagged versions. The HTTP API
+(documented in [API & Transport](docs/internals/api-and-transport.md)), the
+on-disk layout under `~/.wallfacer/`, and the `WALLFACER_*` environment
+variables can still change between releases. Per-release changes are recorded
+in [docs/releases/](docs/releases/). The command surface (`wallfacer run`,
+`status`, `spec`, `auth`, `web`, `doctor`) has been stable across recent
+releases. Every Go package lives under `internal/`, so this repository exposes
+no importable public Go API.
 
 ## License
 

@@ -131,7 +131,7 @@ Auth-by-default has shipped (archived). Agent token exchange (◌) is dormant: i
 
 ## Spec Coordination
 
-Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automation. Promoted to its own track (`specs/spec-coordination/`): it is the largest self-contained body of work in the project. All four subtrees are implemented, including the drift pipeline's agent-backed tester (gated behind `WALLFACER_DRIFT_TESTER`, off by default).
+Recursive spec tree model, planning UX, dispatch workflow, and lifecycle automation. Promoted to its own track: it is the largest self-contained body of work in the project, and the whole tree is now archived under `specs/.archive/local/spec-coordination/`. All four subtrees are implemented, including the drift pipeline's agent-backed tester (gated behind `WALLFACER_DRIFT_TESTER`, off by default).
 
 | Spec | Status | Delivers |
 |------|--------|----------|

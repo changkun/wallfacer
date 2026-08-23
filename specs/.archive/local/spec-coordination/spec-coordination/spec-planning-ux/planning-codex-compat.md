@@ -23,7 +23,7 @@ dispatched_task_id: null
 > *implementation* below is obsolete: the container/sandbox model it targets
 > (`buildContainerSpec`, `sandbox.Type`, the `codex.sh` image entrypoint
 > wrapper, `~/.codex` bind mounts, image rewriting) was replaced by the
-> [harness abstraction](../../../shared/harness-abstraction.md) and host
+> [harness abstraction](../../../../shared/harness-abstraction.md) and host
 > execution. The planner is now a host process emitting an
 > `executor.ContainerSpec` via `buildSpec(name, harness.ID)`; there is no image
 > to rewrite and no auth volume to mount. A revival re-scopes around plumbing a

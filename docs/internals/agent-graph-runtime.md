@@ -48,7 +48,7 @@ Three flow fields shape the region's autonomy (`internal/flow/flow.go`):
 - `Dynamic` opts an agentic flow into model-driven delegation (`topos.Dynamic`): the entry agent gets a delegate tool over the peer directory and the model decides handoffs. Default is the deterministic pinned chain (`topos.Pinned`), where `Optional` / `RunInParallelWith` hints are ignored.
 - `Topology` gates who may delegate on a dynamic flow: `orchestrator-worker` (default, only the entry agent delegates) or `mesh` (any agent delegates recursively, bounded by `MaxHandoffDepth`; zero passes through and topos applies its default of 3).
 
-`toTopology` in the adapter is the only place that names the topos topology constants, and `runOptions` the only place that names `topos.Options`.
+The autonomy switch in `FromFlow` (`adapter.go`) is the only place that names the topos autonomy constants, its authoring-model twin `coordination` (`graph.go`) the only place that names the graph coordination constants, and `runOptions` / `RunOptions` (`model.go`) the only place that names `topos.Options`.
 
 ## Two Execution Paths in the Runner
 

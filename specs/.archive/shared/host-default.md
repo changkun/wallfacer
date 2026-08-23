@@ -59,7 +59,7 @@ Wallfacer's per-task git worktree already bounds blast radius to a single direct
 
 ## Decision
 
-**Remove the container backend from local mode entirely.** Host becomes the only execution path; the `--backend` flag goes away. Cloud / multi-tenant execution is unaffected — it has its own runtime ([cella-runtime.md](../cloud/latere-integration/cella-runtime.md)), which speaks to Cella's API, not the local container backend.
+**Remove the container backend from local mode entirely.** Host becomes the only execution path; the `--backend` flag goes away. Cloud / multi-tenant execution is unaffected — it has its own runtime ([cella-runtime.md](../../cloud/latere-integration/cella-runtime.md)), which speaks to Cella's API, not the local container backend.
 
 ## Scope
 

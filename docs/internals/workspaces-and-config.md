@@ -213,6 +213,10 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 | `test.tmpl` | `test_verification` | Test verification agent prompt |
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
 | `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
+| `task_prompt_refine.tmpl` | `task_prompt_refine` | Task prompt refinement in Plan mode |
+| `spec.tmpl` | `spec` | Spec authoring |
+| `spec_system_empty.tmpl` | `spec_system_empty` | Plan session system prompt, empty spec tree |
+| `spec_system_nonempty.tmpl` | `spec_system_nonempty` | Plan session system prompt, existing spec tree |
 
 ### Override Storage
 
@@ -258,7 +262,7 @@ All templates (embedded and override) share a single `FuncMap`:
 
 | Method | Path | Behavior |
 |---|---|---|
-| `GET /api/system-prompts` | Lists all 8 templates with their content and override status |
+| `GET /api/system-prompts` | Lists all nine templates with their content and override status |
 | `GET /api/system-prompts/{name}` | Returns a single template by API name |
 | `PUT /api/system-prompts/{name}` | Validates and writes override to `~/.wallfacer/prompts/<name>.tmpl` |
 | `DELETE /api/system-prompts/{name}` | Deletes the override file, restoring the embedded default |

@@ -16,7 +16,7 @@ dispatched_task_id: null
 
 # Inline Spec Comments
 
-Capability 4 of the [Cloud Coordination Plane](../coordination-plane.md): teammates
+Capability 4 of the [Cloud Coordination Plane](../../../../cloud/latere-integration/coordination-plane.md): teammates
 on the same workspace comment on spec lines, see who commented, reply, and resolve,
 in real time. This is the **one scoped exception** to relay-not-mirror. Comment
 threads are **cloud-resident and authoritative in the coordinator** in v1, relayed
@@ -412,7 +412,7 @@ on `latere-pg` unlike auth/cella/fs/lux/web) and is now **provisioned**: a
 `WALLFACER_DATABASE_URL`, wired into the wallfacerd deployment (the same pattern
 every other service uses). The implementation owns the schema, migrations, and the
 read/write path against that database; the relay still rides Valkey. The store is
-shared with [metadata-projection](metadata-projection.md)'s rollup tier.
+shared with [metadata-projection](../../../../cloud/latere-integration/coordination-plane/metadata-projection.md)'s rollup tier.
 
 ## Future: git-export (separate leaf)
 

@@ -82,7 +82,7 @@ Today the only GitHub-aware code is git plumbing:
 OIDC device-code flow in `internal/handler/device_auth.go` (latere.ai sign-in,
 not GitHub).
 
-The drafted [pull-request.md](pull-request.md) is the one prior attempt at a
+The drafted [pull-request.md](github-integration/pull-request.md) is the one prior attempt at a
 GitHub feature. It shells `gh pr create` on the host. That works only where a
 host `gh` is installed and logged in, which excludes headless and cloud
 deployments, and it cannot read anything back (PR comments, issues, PR list).
@@ -124,13 +124,13 @@ children, not here.
   upgrade" verification tier that repo-identity foreshadows. The OAuth token
   this spec introduces is what upgrades a repo from credential-proof to
   OAuth-verified.
-- **Supersedes the mechanism of** [pull-request.md](pull-request.md).
+- **Supersedes the mechanism of** [pull-request.md](github-integration/pull-request.md).
   PR creation is still wanted, but the `gh pr create` host-CLI mechanism is
   replaced by the GitHub API path defined here. pull-request.md folds in as the
   PR-write child (the "collect branch context + sandbox-generate title/body"
   pipeline it specs is reused; only the final create call changes from CLI to
   API). It is re-homed under `github-integration/` at breakdown time.
-- **Depends on** [authentication.md](../identity/authentication.md) for the
+- **Depends on** [authentication.md](../.archive/identity/authentication.md) for the
   principal context that scopes stored GitHub tokens to a user/org.
 
 ### Architecture
@@ -164,7 +164,7 @@ user-to-server OAuth flow brokered through latere.ai auth and an install step th
 grants per-repo permissions
 (`contents`, `pull_requests`, `issues`, `metadata`). Tokens are stored
 server-side, scoped to the principal (user/org from
-[authentication.md](../identity/authentication.md)), and refreshed on expiry.
+[authentication.md](../.archive/identity/authentication.md)), and refreshed on expiry.
 `/api/config` gains GitHub auth status (connected, login, installation/granted
 scopes) so the UI can gate the rest of the surface. Reuse the `authkit`
 token-store patterns (`internal/handler/device_auth.go`) where they fit; GitHub
@@ -201,7 +201,7 @@ per endpoint.
 #### 4. Write surface (create PR, comment)
 
 - **Create PR**: reuse the branch-context collection and sandbox title/body
-  generation from [pull-request.md](pull-request.md); replace `gh pr create`
+  generation from [pull-request.md](github-integration/pull-request.md); replace `gh pr create`
   with a GitHub API call. Push the branch first (existing `git.go` push path).
   Existing-PR detection returns the open PR instead of erroring.
 - **Comment**: post a comment to a PR or issue.

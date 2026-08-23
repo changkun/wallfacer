@@ -109,8 +109,8 @@ The former `sandbox.Backend` interface lives on as `executor.Backend` - the **ex
 | Category | Examples | Composes a `Harness`? |
 |---|---|---|
 | **Harness-running, local** | `HostExecutor` (from [host-default.md](host-default.md)) | yes |
-| **Harness-running, remote** | `TopozExecutor` ([cloud/latere-integration/topos-remote-executor.md](../cloud/latere-integration/topos-remote-executor.md)) | yes - Topos runs the wallfacer-selected harness server-side |
-| **Self-contained, remote** | `ClaudeManagedAgentsExecutor` ([cloud/claude-managed-agents.md](../cloud/claude-managed-agents.md)), `AntigravityExecutor` ([cloud/antigravity.md](../cloud/antigravity.md)) | no - the harness is baked into the platform, model and tools may be selectable but the agent loop is not |
+| **Harness-running, remote** | `TopozExecutor` ([cloud/latere-integration/topos-remote-executor.md](../../cloud/latere-integration/topos-remote-executor.md)) | yes - Topos runs the wallfacer-selected harness server-side |
+| **Self-contained, remote** | `ClaudeManagedAgentsExecutor` ([cloud/claude-managed-agents.md](../../cloud/claude-managed-agents.md)), `AntigravityExecutor` ([cloud/antigravity.md](../../cloud/antigravity.md)) | no - the harness is baked into the platform, model and tools may be selectable but the agent loop is not |
 
 The K8s/Cella path keeps its own backend on the cloud side.
 
@@ -143,7 +143,7 @@ The `Executor` interface must be high-level enough to host both - likely `RunTas
 3. **`Capabilities` is read at runtime**, not compile-time, so callers can degrade gracefully (skip `MaxCostUSD` on harnesses that don't honor it, prepend `SystemPrompt` into the user prompt on harnesses without `--append-system-prompt`).
 4. **No Tier-C support in v1.** Aider and Crush lack a structured event stream; supporting them needs a stdout-scraping adapter and a "lossy harness" UX. Deferred.
 5. **Goose deferred too** - Tier B, but its NDJSON schema is least documented externally. Add once a user asks.
-6. **Topos is not a harness, neither are Claude Managed Agents or Antigravity.** They're all *executors*. Topos proxies a wallfacer-selected harness; Managed Agents and Antigravity are self-contained (fixed harness, with selectable model in the Managed Agents case). Separate specs: [`cloud/latere-integration/topos-remote-executor.md`](../cloud/latere-integration/topos-remote-executor.md), [`cloud/claude-managed-agents.md`](../cloud/claude-managed-agents.md), [`cloud/antigravity.md`](../cloud/antigravity.md).
+6. **Topos is not a harness, neither are Claude Managed Agents or Antigravity.** They're all *executors*. Topos proxies a wallfacer-selected harness; Managed Agents and Antigravity are self-contained (fixed harness, with selectable model in the Managed Agents case). Separate specs: [`cloud/latere-integration/topos-remote-executor.md`](../../cloud/latere-integration/topos-remote-executor.md), [`cloud/claude-managed-agents.md`](../../cloud/claude-managed-agents.md), [`cloud/antigravity.md`](../../cloud/antigravity.md).
 
 ## Out of Scope
 

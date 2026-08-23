@@ -378,7 +378,7 @@ This aligns with the `SandboxBackend` abstraction in [sandbox-backends.md](sandb
 
 ### Relationship to Epic Coordination
 
-The file explorer is a prerequisite for the epic coordination UX ([epic-coordination.md](epic-coordination.md)). The planning workflow revolves around iterating on spec markdown files — browsing specs in the explorer, viewing them in a focused markdown panel, and updating them via a chat-driven agent. Phase 1 (read-only browsing + preview) unblocks the planner task creation UX; Phase 2 (editing) enables chat-driven spec iteration where the planner agent proposes spec changes and the user reviews them inline.
+The file explorer is a prerequisite for the epic coordination UX. The planning workflow revolves around iterating on spec markdown files — browsing specs in the explorer, viewing them in a focused markdown panel, and updating them via a chat-driven agent. Phase 1 (read-only browsing + preview) unblocks the planner task creation UX; Phase 2 (editing) enables chat-driven spec iteration where the planner agent proposes spec changes and the user reviews them inline.
 
 ---
 

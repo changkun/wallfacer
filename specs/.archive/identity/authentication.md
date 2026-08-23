@@ -51,7 +51,7 @@ Identity is delegated to the centralized **latere.ai auth service**
   entirely different system, unchanged by this spec).
 - **Agent token exchange** for sandbox agents calling latere.ai backends
   (RFC 8693 delegation), split out into
-  [`identity/agent-token-exchange.md`](agent-token-exchange.md) because it
+  [`identity/agent-token-exchange.md`](../../identity/agent-token-exchange.md) because it
   doesn't block the cloud move.
 
 ## Platform dependencies
@@ -90,9 +90,9 @@ Phase 1 (shipped) ──→ Phase 2 (shipped) ──→ Phase 3 (future)
 |-------|-------|--------|----------|
 | 1 | `WALLFACER_CLOUD` flag, browser login routes, sign-in badge | **Shipped** | Visual cloud/local partition |
 | 2 | JWT on API, principal context, org fields, forced login, authz, org switcher | **Shipped** | Cloud multi-tenant + multi-user collab |
-| 3 | [`third-party-oidc.md`](third-party-oidc.md), [`remote-control.md`](remote-control.md) | Future (vague) | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
+| 3 | [`third-party-oidc.md`](../../identity/third-party-oidc.md), [`remote-control.md`](../../identity/remote-control.md) | Future (vague) | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
 
-The agent-token-exchange spec ([link](agent-token-exchange.md)) is a
+The agent-token-exchange spec ([link](../../identity/agent-token-exchange.md)) is a
 peer, not a phase, it runs on Phase 2's principal context but doesn't
 gate the cloud move.
 
@@ -241,7 +241,7 @@ out from those two roots.
 
 ### Explicitly out of scope for Phase 2
 
-- Agent token exchange, see [`agent-token-exchange.md`](agent-token-exchange.md).
+- Agent token exchange, see [`agent-token-exchange.md`](../../identity/agent-token-exchange.md).
 - In-app user / org administration, handled by the auth service.
 - Third-party OIDC providers, Phase 3.
 - Cross-org visibility (shared workspaces across orgs), belongs in
@@ -324,7 +324,7 @@ path still works exactly as before.
    (migration 000013) to persist the caller's selected org across refreshes.
    NULL = personal view; a UUID = org-scoped view.
 7. **Agent-token exchange extracted** to a separate spec
-   ([`agent-token-exchange.md`](agent-token-exchange.md)) during Phase 2
+   ([`agent-token-exchange.md`](../../identity/agent-token-exchange.md)) during Phase 2
    planning. It depends on the Phase 2 principal context but does not
    gate the cloud-track unblock.
 8. **Audit log deferred** to a follow-up spec. Phase 2 only lays
@@ -345,11 +345,11 @@ path still works exactly as before.
 Phase 3 splits into two sibling specs, both currently `vague` and
 unblocked by Phase 2:
 
-- [`identity/third-party-oidc.md`](third-party-oidc.md) —
+- [`identity/third-party-oidc.md`](../../identity/third-party-oidc.md) —
   pluggable OIDC so self-hosted non-latere.ai deployments can log in
   against Keycloak, Entra ID, Okta, etc. Until this ships, those
   deployments keep using `WALLFACER_SERVER_API_KEY`.
-- [`identity/remote-control.md`](remote-control.md) —
+- [`identity/remote-control.md`](../../identity/remote-control.md) —
   wire protocol + latere.ai-side registry that lets the latere.ai web
   UI or a mobile client observe and operate a user's signed-in local
   wallfacer instances. Phase 2 laid down the identity link; Phase 3

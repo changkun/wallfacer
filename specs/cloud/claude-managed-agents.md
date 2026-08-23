@@ -28,7 +28,7 @@ Anthropic ships a managed agent platform ([platform.claude.com/docs/en/managed-a
 
 Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. This differs from the [topos-remote-executor](latere-integration/topos-remote-executor.md), which dispatches to a remote service that *runs* a wallfacer-selected harness (Claude Code, Codex, Cursor, …). For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
 
-Implication for [harness-abstraction.md](../shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host and Topos executors compose `Executor` with a `Harness`; the Managed Agents executor *is* both.
+Implication for [harness-abstraction.md](../.archive/shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host and Topos executors compose `Executor` with a `Harness`; the Managed Agents executor *is* both.
 
 ## Selection
 
@@ -114,7 +114,7 @@ Capabilities{
 - `internal/executor/claude_managed_agents.go` implementing the executor.
 - Agent-definition caching (hash-keyed reuse of `/v1/agents` resources).
 - SSE consumption with reconnect on transient failure.
-- Self-hosted sandbox container lifecycle (this is the one place wallfacer keeps a "run a container" code path post-[host-default](../shared/host-default.md) — but it's the Managed Agents sandbox image from Anthropic, not wallfacer's own agent image).
+- Self-hosted sandbox container lifecycle (this is the one place wallfacer keeps a "run a container" code path post-[host-default](../.archive/shared/host-default.md) — but it's the Managed Agents sandbox image from Anthropic, not wallfacer's own agent image).
 - `--executor claude-managed-agents` CLI selection.
 - Settings UI surface and `wallfacer doctor` checks.
 - `docs/cloud/claude-managed-agents.md` user guide.
@@ -139,7 +139,7 @@ Capabilities{
 
 - Should wallfacer reuse a single long-lived "wallfacer agent" definition across tasks, or one per (system prompt + tools) hash? Lean toward hash-keyed reuse — agent definitions are cheap to create and reuse maximizes Anthropic-side caching.
 - How does this compose with [agent-token-exchange](../identity/agent-token-exchange.md)? If a task's sub-agent needs to call Latere services, the Managed Agents sandbox would need the same RFC 8693 token. Defer until both ship.
-- Does this replace the [oauth-token-setup](../local/oauth-token-setup.md) Claude path for users who pick Managed Agents? No — Managed Agents needs a billing-capable API key, not an OAuth subscription token. Document the distinction clearly.
+- Does this replace the [oauth-token-setup](../.archive/local/oauth-token-setup.md) Claude path for users who pick Managed Agents? No — Managed Agents needs a billing-capable API key, not an OAuth subscription token. Document the distinction clearly.
 
 ## Why a separate spec from Topos
 

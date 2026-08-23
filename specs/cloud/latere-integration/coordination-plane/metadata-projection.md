@@ -198,7 +198,7 @@ read-model must be shared, not per-replica:
   buckets and the >90-day history that instances may no longer be able to replay.
   These are durable and want a real query store, not an eviction-unsafe cache. The
   `wallfacer` database and `WALLFACER_DATABASE_URL` are **provisioned** (shared
-  with authoritative spec comments, see [spec-comments](spec-comments.md)); the
+  with authoritative spec comments, see [spec-comments](../../../.archive/cloud/latere-integration/coordination-plane/spec-comments.md)); the
   implementation owns the rollup schema. Live projection stays in Valkey
   (regenerable by replay); only the durable rollups land in Postgres.
 
