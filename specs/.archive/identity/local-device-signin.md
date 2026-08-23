@@ -112,7 +112,8 @@ sequenceDiagram
   AU-->>BE: token
   BE->>BE: Store.Save(tok)
   UI->>BE: GET /api/auth/device/poll
-  BE->>BE: SetSession(w, SessionFromToken(tok))  %% cookie minted here
+  Note over BE: cookie minted here
+  BE->>BE: SetSession(w, SessionFromToken(tok))
   BE-->>UI: done (Set-Cookie)
   UI->>BE: GET /api/me
   BE-->>UI: principal (signed in)

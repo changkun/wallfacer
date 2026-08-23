@@ -72,17 +72,17 @@ engine.
 ```mermaid
 graph TD
   subgraph Rename
-    R["/map -> /mission + redirect; nav 'Mission Control'"]
+    R["/map to /mission + redirect;<br/>nav 'Mission Control'"]
   end
   subgraph Coordination
-    SM["internal/pkg/statemachine"] --> GB["internal/graph: full legal available_actions per node"]
-    GB --> NM["Node action menu -> POST /api/specs/transition"]
-    AS["agentStore.focusedSpecPath"] --> CH["mount SpecChatPopup focused on the node's spec"]
+    SM["internal/pkg/statemachine"] --> GB["internal/graph:<br/>legal available_actions<br/>per node"]
+    GB --> NM["Node action menu to<br/>POST /api/specs/transition"]
+    AS["agentStore.focusedSpecPath"] --> CH["mount SpecChatPopup<br/>on the node's spec"]
   end
   subgraph Live
-    TS["/api/tasks/stream SSE"] --> LP["in-place node state updates"]
-    LP --> AN["client-side animation: pulse/ring/settle"]
-    CP["critical_path"] --> YH["'you are here' active-chain highlight"]
+    TS["/api/tasks/stream SSE"] --> LP["in-place node<br/>state updates"]
+    LP --> AN["client-side animation:<br/>pulse/ring/settle"]
+    CP["critical_path"] --> YH["'you are here'<br/>active-chain highlight"]
   end
 ```
 

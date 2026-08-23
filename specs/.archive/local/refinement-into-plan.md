@@ -53,7 +53,7 @@ graph LR
   Plan -- spec file --> FileTools[File tools + git commit round]
   Plan -- task prompt --> TaskTool[update_task_prompt tool + event round]
   FileTools --> Repo[(Workspace repo)]
-  TaskTool --> TaskRec[(data/<uuid>/task.json + traces)]
+  TaskTool --> TaskRec[("data/&lt;uuid&gt;/task.json + traces")]
 ```
 
 The split is internal to Plan. The user sees one chat pane, one round model, one undo button. The header makes the current target explicit (`Spec · <path>` vs `Task Prompt · <title> (<status>)`), and the backend branches on the selection kind when committing a round and when undoing one.

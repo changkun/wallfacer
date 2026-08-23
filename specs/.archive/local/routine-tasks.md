@@ -88,10 +88,10 @@ next cycle.
 ```mermaid
 graph TB
   RC[Routine Card<br/>Kind=routine] -->|fires on schedule| SP[Scheduler Engine<br/>internal/routine]
-  SP -->|spawns| IT[Instance Task<br/>Kind="" or idea-agent]
+  SP -->|spawns| IT["Instance Task<br/>Kind is empty or idea-agent"]
   IT -->|normal lifecycle| Done[Done / Waiting / Failed]
   Watcher[watcher.Start] -->|store change| SP
-  SP -->|Reconcile<br/>map routine cards → timers| SP
+  SP -->|reconcile timers| SP
 ```
 
 Why this shape:

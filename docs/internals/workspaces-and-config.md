@@ -62,7 +62,7 @@ flowchart TD
     Validate["Validate & normalize paths<br/>(absolute, clean, exist, deduplicated, sorted)"] --> Same{"Same set as<br/>current?"}
     Same -->|yes| NoOp["Return current snapshot"]
     Same -->|no| Resolve["Resolve or create the Workspace record<br/>(stable ID + DataKey; workspaces.json, MRU)"]
-    Resolve --> OpenStore["Open or reuse scoped store<br/>(data/<DataKey>/)"]
+    Resolve --> OpenStore["Open or reuse scoped store<br/>(data/&lt;DataKey&gt;/)"]
     OpenStore --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
     Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
     Swap --> Publish["Notify subscribers via channels"]
@@ -228,7 +228,7 @@ User overrides are stored at `~/.wallfacer/prompts/<apiName>.tmpl`. The `Manager
 flowchart TD
     Render["Manager.render(embeddedName, data)"] --> CheckDir{"userDir set?"}
     CheckDir -->|no| Embedded["Execute embedded template"]
-    CheckDir -->|yes| ReadOverride["os.ReadFile(userDir/<apiName>.tmpl)"]
+    CheckDir -->|yes| ReadOverride["os.ReadFile(userDir/&lt;apiName&gt;.tmpl)"]
     ReadOverride --> Found{"File exists?"}
     Found -->|no| Embedded
     Found -->|yes| ParseOverride["template.New().Funcs(funcMap).Parse(content)"]

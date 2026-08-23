@@ -201,15 +201,18 @@ graph LR
   FE --> IFP[Editor Tabs]
   HT[Host Terminal ✅] --> TS[Terminal Sessions ✅] --> CE[Container Exec ✅]
 
-  EW[Excalidraw Whiteboard]
-  DRC[Diff Review Comments]
-  TC[Test Criteria]
-  VV[Visual Verification]
-  LS[Live Serve]
-  OTS[OAuth Token Setup ✅]
-  TUI[Terminal UI]
-  PA[Pixel Agents ✅]
-  VFM[Vue Frontend Migration ✅]
+  subgraph IND["No prerequisites"]
+    direction LR
+    EW[Excalidraw Whiteboard]
+    DRC[Diff Review Comments]
+    TC[Test Criteria]
+    VV[Visual Verification]
+    LS[Live Serve]
+    OTS[OAuth Token Setup ✅]
+    TUI[Terminal UI]
+    PA[Pixel Agents ✅]
+    VFM[Vue Frontend Migration ✅]
+  end
 
   style FE fill:#d4edda,stroke:#28a745
   style HT fill:#d4edda,stroke:#28a745

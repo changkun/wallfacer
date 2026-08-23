@@ -163,7 +163,7 @@ override per-request via the period picker in the stats modal.
 | [Planning tile in usage-stats.js](progress-cost-tracking/usage-stats-planning-tile.md) | usage-planning-merge, planning-window-config | small | **complete** |
 
 ```mermaid
-graph LR
+graph TD
   A[Planning usage store primitive]
   B[Capture planning round usage]
   C[Planning section in /api/stats]

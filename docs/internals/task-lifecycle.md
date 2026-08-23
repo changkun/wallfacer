@@ -10,17 +10,16 @@ stateDiagram-v2
 
     backlog --> in_progress : drag / autoimplement
 
-    in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
-    in_progress --> waiting : end_turn / empty stop_reason
-    in_progress --> failed : error / timeout / budget
+    in_progress --> in_progress : auto-continue
+    in_progress --> waiting : end_turn
+    in_progress --> failed : error
     in_progress --> backlog : reset
     in_progress --> cancelled : cancel
 
-    committing --> done : commit success
-    committing --> failed : commit failure
+    committing --> done : commit ok
+    committing --> failed : commit fail
 
-    waiting --> in_progress : feedback
-    waiting --> in_progress : test (IsTestRun)
+    waiting --> in_progress : feedback / test
     waiting --> committing : mark done
     waiting --> cancelled : cancel
 
@@ -43,6 +42,18 @@ stateDiagram-v2
         archived flag can be set
     end note
 ```
+
+Transition labels are shortened for legibility. In full:
+
+| Transition | Trigger |
+|---|---|
+| `backlog` to `in_progress` | User drag, or autoimplement promoting a backlog card |
+| `in_progress` to `in_progress` | `stop_reason` of `max_tokens` or `pause_turn`, auto-continued in the same session |
+| `in_progress` to `waiting` | `stop_reason` of `end_turn`, or an empty/unknown `stop_reason` |
+| `in_progress` to `failed` | Process error, agent error, timeout, or a budget limit exceeded |
+| `waiting` to `in_progress` | User feedback, or a test run (`IsTestRun`) |
+| `committing` to `done` / `failed` | Commit pipeline success or failure |
+| `failed` to `backlog` | Manual retry or auto-retry |
 
 ## States
 

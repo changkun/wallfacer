@@ -209,7 +209,7 @@ The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox
 The HTTP server wraps the `ServeMux` in a layered middleware chain. Each request passes through these layers in order:
 
 ```mermaid
-flowchart LR
+flowchart TD
     Request --> Logging["loggingMiddleware<br/>(server.go)"]
     Logging --> CSRF["CSRFMiddleware<br/>(handler/middleware.go)"]
     CSRF --> Cookie["CookieAuth<br/>(internal/auth)"]
@@ -217,8 +217,8 @@ flowchart LR
     Optional --> Bearer["BearerAuthMiddleware<br/>(handler/middleware.go)"]
     Bearer --> Force["ForceLogin<br/>(handler/force_login.go)"]
     Force --> Mux["ServeMux route matching"]
-    Mux --> BodyLimit["MaxBytesMiddleware<br/>(per-route, handler/middleware.go)"]
-    BodyLimit --> StoreGuard["RequireStoreMiddleware<br/>(per-route, handler/handler.go)"]
+    Mux --> BodyLimit["MaxBytesMiddleware<br/>(per-route,<br/>handler/middleware.go)"]
+    BodyLimit --> StoreGuard["RequireStoreMiddleware<br/>(per-route,<br/>handler/handler.go)"]
     StoreGuard --> Handler["Handler method"]
 ```
 
