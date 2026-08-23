@@ -107,7 +107,7 @@ affects:
 effort: <small | medium | large | xlarge>
 created: <today's date, YYYY-MM-DD>
 updated: <today's date, YYYY-MM-DD>
-author: changkun
+author: your-name
 dispatched_task_id: null
 ---
 

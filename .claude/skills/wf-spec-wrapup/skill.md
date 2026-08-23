@@ -106,8 +106,9 @@ API (it validates the edge and runs stale fan-out); fall back to legal-edge YAML
 only when the server is unreachable:
 
 - **Dispatched path** — the **server already owns** `validated → testing →
-  complete/stale` (the task-done drift pipeline; or, with `WALLFACER_DRIFT_TESTER`
-  off, an unconditional `complete`). Do **not** re-set the status. Read it:
+  complete/stale` (the task-done drift pipeline; or, where that server runs its
+  drift tester disabled, an unconditional `complete`). Do **not** re-set the
+  status. Read it:
   - Already `complete`/`stale` → leave it; you are only enriching the Outcome.
   - Stuck in `testing` (verdict pending / tester failed) → use the
     `force-complete` action (it's `testing → complete`) only if your analysis says
