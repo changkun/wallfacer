@@ -56,7 +56,7 @@ conflicts with the original "## Design" section below, **this section wins**.
 
 ### Decided execution model (hybrid)
 
-`claude --resume` is **cwd-scoped** (review spec 17: `ErrCwdMismatch` on cwd
+`claude --resume` is **cwd-scoped** (the library reports `ErrCwdMismatch` on cwd
 mismatch). The fork-session proposer therefore *must* run in the original task
 worktree; a fully-isolated tree would break it. The critic is stateless
 `claude -p` with no cwd constraint, so it can run anywhere. Hence:
@@ -96,7 +96,7 @@ opt-in / diff-size gating), not by weakening the critic.
   there; they can build/run tests with zero risk to the task branch. The
   proposer keeps the real worktree (fork-session is cwd-scoped). _(commit: run
   critics in a throwaway worktree)_
-- [x] **review: read-only proposer option** (review repo, spec 38, released v0.1.1).
+- [x] **read-only proposer option** (landed upstream in the adversarial-review library, v0.1.1).
   `claude.WithProposerReadOnly()` bars Write/Edit/MultiEdit/NotebookEdit/Bash so
   the fork-session proposer (which shares the real worktree) can argue/concede
   but never edit it. Wired into `NewSessionProposer` and live (go.mod bumped to
@@ -131,16 +131,15 @@ itself; it has the same blind spots as the implementation run. Adversarial
 multi-agent debate — multiple critic agents attacking the changes, the proposer
 rebuttng — is proven to surface issues the implementer missed.
 
-Review (`latere.ai/x/review`, at `~/dev/latere.ai/review`) implements exactly this
-protocol. Today it is a standalone CLI. Its core logic is under `internal/` and
-cannot be imported by wallfacer or any other Go module. The test step can be skipped
+A separate Latere adversarial-review library implements exactly this protocol.
+At the time of writing it was a standalone CLI whose core logic sat under
+`internal/` and could not be imported by wallfacer or any other Go module. The test step can be skipped
 globally; no equivalent mechanism exists for adversarial verification.
 
 ## Goal
 
-1. Extract review's engine, interfaces, and result types into a public
-   `pkg/adversarial` API (prerequisite in the review repo — see
-   `~/dev/latere.ai/review/specs/37-pkg-public-api.md`).
+1. Extract that library's engine, interfaces, and result types into a public
+   `pkg/adversarial` API (a prerequisite owned upstream, not by wallfacer).
 2. Define a `Verifier` interface in `internal/adversarial/` — the wallfacer-internal
    plugin seam — so other verification strategies can plug in alongside the review
    implementation.
@@ -161,13 +160,9 @@ globally; no equivalent mechanism exists for adversarial verification.
 
 ## External prerequisite
 
-This spec **requires** `latere.ai/x/review/pkg/adversarial` to be importable first.
-That extraction is specified in review `specs/37-pkg-public-api.md`. While that spec
-is being implemented, wallfacer's `go.mod` should add a local `replace` directive:
-
-```
-replace latere.ai/x/review => ../../review
-```
+This spec **requires** the library's `pkg/adversarial` package to be importable
+first. That extraction is specified upstream. While it is being implemented,
+wallfacer's `go.mod` should point at a local checkout with a `replace` directive.
 
 Phase 1 of this spec (the `internal/adversarial/` package) can be drafted and
 tested with a stub that returns a fixed `Result{}` until the review extraction
@@ -178,8 +173,8 @@ lands; the stub is replaced in Phase 2.
 ### The `Verifier` interface (review-owned, not wallfacer-owned)
 
 The `adversarial.Verifier` interface and its `VerifyInput`/`VerifyResult` types are
-defined in `latere.ai/x/review/pkg/adversarial` (see review
-`specs/37-pkg-public-api.md`). Wallfacer imports them; it does not redefine them.
+defined in the library's `pkg/adversarial` package. Wallfacer imports them; it
+does not redefine them.
 This makes `adversarial.Verifier` the canonical, latere-wide integration seam —
 any latere tool that wants to embed adversarial verification satisfies the same
 interface without per-tool reinvention.
@@ -248,7 +243,7 @@ package interface). It wires the proposer and critic into an `adversarial.Engine
 and calls `Run`:
 
 ```go
-// ReviewVerifier implements latere.ai/x/review/pkg/adversarial.Verifier.
+// ReviewVerifier implements the adversarial-review library's Verifier.
 type ReviewVerifier struct {
     runner  *runner.Runner
     harness harness.Harness
@@ -457,10 +452,10 @@ adversarial multi-agent layer. Either works without the other.
 ## Phasing / Acceptance Criteria
 
 **Phase 1 — package skeleton** (`internal/adversarial/`). Implement `NoopVerifier`
-and the `ReviewVerifier` stub against `latere.ai/x/review/pkg/adversarial.Verifier`.
-Add the `replace` directive to `go.mod` pointing at the local review path. Compile
-against a stub `pkg/adversarial` (empty package with just the interfaces) until review
-spec 37 lands. Tests: `NoopVerifier.Verify` returns nil; `ReviewVerifier` with a mock
+and the `ReviewVerifier` stub against the library's `adversarial.Verifier`.
+Add the `replace` directive to `go.mod` pointing at a local checkout of the
+library. Compile against a stub `pkg/adversarial` (empty package with just the
+interfaces) until the upstream extraction lands. Tests: `NoopVerifier.Verify` returns nil; `ReviewVerifier` with a mock
 engine returns the correct `VerifyResult` fields.
 
 **Phase 2 — Task model + store queries**. Add `ReviewUnresolved *int`,

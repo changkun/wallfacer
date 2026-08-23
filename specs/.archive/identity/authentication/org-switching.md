@@ -30,7 +30,7 @@ filtered by the new `org_id`. Users with a single org see no chooser.
 
 1. **Org list endpoint**, `GET /api/auth/orgs`:
    - Calls `auth.latere.ai/userinfo` (or the dedicated org-list endpoint
-     if the platform exposes one, check `~/dev/latere.ai/pkg/oidc/`
+     if the platform exposes one, check `latere.ai/x/pkg/oidc`
      before adding a new HTTP call).
    - Returns JSON `{orgs: [{id, name, current}], current_id}`.
    - 204 when the user has only one org.
@@ -93,7 +93,7 @@ service persists it on the SSO session row.
 
 ### What shipped (three-repo change set)
 
-**`latere.ai/auth`** (migration + two handler helpers):
+**Identity service** (migration + two handler helpers):
 - Migration `000013_sso_active_org.{up,down}.sql`: adds
   `active_org_id UUID REFERENCES orgs(id) ON DELETE SET NULL` to
   `sso_sessions`.

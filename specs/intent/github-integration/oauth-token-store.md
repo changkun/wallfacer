@@ -64,8 +64,8 @@ high in practice; the UI and scopes below assume the GitHub App path.
 
 Brokering is resolved to the **brokered-via-latere.ai** model, and deliberately
 **product-general**: a single GitHub App named **"Latere AI"** is registered once
-at the latere.ai org level and shared across latere products (lectio, lux,
-wallfacer, ...), not a wallfacer-specific app. Users install "Latere AI" on their
+at the latere.ai org level and shared across latere.ai products, not a
+wallfacer-specific app. Users install "Latere AI" on their
 org once; the install/authorize callback rides latere.ai's auth infra (the same
 place the public OIDC client lives), and wallfacer receives the brokered token
 scoped to the principal. This mirrors how `AccountControl.vue` already federates
@@ -76,31 +76,30 @@ Consequences:
 - **No per-install app registration.** Installs do not each create a GitHub App;
   they install the one central "Latere AI" app. The client secret / app private
   key lives in latere.ai infra, never in a wallfacer instance.
-- **Brokering home is the `../auth` service, not terraform.** `../auth` already
-  brokers external OAuth providers (`internal/authn/providers.go`: google,
+- **Brokering home is the Latere identity service, not the infrastructure
+  layer.** That service already brokers external OAuth providers (google,
   github, x) but its GitHub provider is **social-login / identity only** (scopes
-  `read:user`, `user:email`; `HandleCallback` exchanges the code, fetches
-  userinfo, and discards the token -- there is no connected-account / external
-  token store). The "Latere AI" GitHub *App* is a separate credential class
-  (repo-scoped `contents`/`pull_requests`/`issues`/`metadata`) that `../auth`
-  does **not** broker today. The new `../auth` work is now specced at
-  [auth/specs/github-app-brokering.md](../../../auth/specs/github-app-brokering.md):
+  `read:user`, `user:email`; the callback exchanges the code, fetches userinfo,
+  and discards the token -- there is no connected-account / external token
+  store). The "Latere AI" GitHub *App* is a separate credential class
+  (repo-scoped `contents`/`pull_requests`/`issues`/`metadata`) that the identity
+  service does **not** broker today. That work is specced identity-side:
   register the App, the install flow, and a `/internal/github/installation-token`
-  mint endpoint gated by a `github:mint-token` service scope. Notably, the
-  capability **previously existed in `../auth`** and was removed in `870d9f6`
-  (incidental to a sandbox-admin cut); that removed code is the design
-  precedent. Terraform only carries the app secrets. Until the endpoint lands,
+  mint endpoint gated by a `github:mint-token` service scope. The capability
+  previously existed there and was removed incidental to an unrelated cut; that
+  removed code is the design precedent. The infrastructure layer only carries
+  the app secrets. Until the endpoint lands,
   wallfacer's `internal/github` client + token store run against a mock; the
   `Direct` localhost path below is retained only as a dev stopgap behind the same
   client seam, not as the shipping model.
 - **Cross-repo decision -- credential kind (recommended: user-to-server).** The
-  `../auth` spec recommends a **user-to-server token** so actions are authored
+  identity-side spec recommends a **user-to-server token** so actions are authored
   **as the user**, matching how Claude Code's GitHub connector behaves (GitHub
   App install, durable, repo-select, acts as you) and matching this `Token` model
   (`Login`, `RefreshToken`) and the "Signed in as @login" UI already built here
-  -- so no wallfacer rework; the live `Broker` just calls auth's
-  `/internal/github/token`. The cost is encrypted refresh-token storage in
-  `../auth`. The alternative (installation token, bot attribution, no token at
+  -- so no wallfacer rework; the live `Broker` just calls the identity
+  service's `/internal/github/token`. The cost is encrypted refresh-token
+  storage on that side. The alternative (installation token, bot attribution, no token at
   rest) would instead leave `Login`/`RefreshToken` unused and reword the settings
   UI to "Installed on \<org\>". Durability and repo-selection are the same either
   way (both are GitHub App installs). Confirm before implementing the live
@@ -154,10 +153,10 @@ above.
 1. ~~OAuth App or GitHub App for v1?~~ **Resolved: GitHub App** (see above).
 2. ~~Self-registered localhost callback, or brokered through latere.ai?~~
    **Resolved: brokered** via a single central "Latere AI" GitHub App (see
-   above). Remaining sub-question: the brokering home is the `../auth` service,
-   which today brokers GitHub only for social login (identity) -- the GitHub App
-   repo-access brokering is new `../auth` work and must be built there before the
-   live flow works; wallfacer runs against a mock until then.
+   above). Remaining sub-question: the brokering home is the Latere identity
+   service, which today brokers GitHub only for social login -- the GitHub App
+   repo-access brokering is new identity-side work and must be built there
+   before the live flow works; wallfacer runs against a mock until then.
 3. Which scopes/permissions are the minimum for read + PR-create + comment
    (`repo`, `read:org`, `read:user`; or GitHub App `contents`, `pull_requests`,
    `issues`, `metadata`)?

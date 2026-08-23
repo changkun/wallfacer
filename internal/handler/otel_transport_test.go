@@ -8,7 +8,7 @@ import (
 )
 
 // The outbound clients must carry the otel transport so W3C trace context
-// propagates across service hops (observability spec 01). These tests fail on
+// propagates across service hops. These tests fail on
 // a bare client (nil Transport).
 
 func TestAuthHTTPClientUsesOtelTransport(t *testing.T) {

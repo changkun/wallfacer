@@ -7,11 +7,12 @@ name: Release
 # the binaries plus their supply-chain attestation (SHA256 checksums, an SPDX
 # SBOM, and keyless cosign signatures over both).
 #
-# Vendored, not the central latere-ai/ci pipeline: this repo lives under a
-# personal account and GitHub cannot call an org-private reusable workflow
-# across that boundary (the caller fails at startup with no logs; releases
-# v0.0.16 through v0.0.19 shipped nothing). Re-adopt service-release.yml if
-# the repo moves into the org or latere-ai/ci becomes callable from outside.
+# Vendored rather than delegated to a shared reusable workflow: this repo lives
+# under a personal account and GitHub cannot call an org-private reusable
+# workflow across that boundary (the caller fails at startup with no logs;
+# releases v0.0.16 through v0.0.19 shipped nothing). Re-adopt the shared
+# pipeline if the repo moves into the org or that workflow becomes callable
+# from outside.
 
 on:
   push:

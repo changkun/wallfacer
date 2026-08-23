@@ -2,11 +2,6 @@
 title: wallfacer — Auth Unification Migration (cloud + local-mode device-code)
 status: archived
 depends_on:
-  - "auth/specs/auth-unification.md"
-  - "auth/specs/auth-unification/authkit-hybrid-identity.md"
-  - "auth/specs/auth-unification/authkit-device-code-and-token-store.md"
-  - "auth/specs/auth-unification/authkit-cookie-and-env-compat.md"
-  - "auth/specs/auth-unification/integration-doc-rewrite.md"
   - "latere-ui/specs/auth-client-v1.8.md"
 affects:
   - internal/handler/login.go
@@ -191,7 +186,7 @@ The SPA uses `latere-ui`'s vanilla `me()` and `switchOrg()` against the local HT
 5. Cloud-mode: replace env reader; inline cookie-name fallback.
 6. Frontend bump from v1.2.3 to v1.8.0 (own commit; verify SiteFooter etc.).
 7. Frontend: adopt `createSessionStore` + `AccountMenu`; port `ui/js/status-bar.js` to `mountOrgSwitcher`.
-8. Local-mode: verify `auth/oauth/device_authorization` exists (per `auth/specs/auth-unification/device-authorization-endpoint.md`); block on it if missing.
+8. Local-mode: verify the identity service exposes `oauth/device_authorization`; block on it if missing.
 9. Local-mode: add Wails `AuthDeviceLogin` binding; wire `pkg/authkit.DeviceCodeClient` + `FileTokenStore`.
 10. Local-mode: implement `/api/me` proxy handler; implement org-switch via refresh-grant.
 11. Manual smoke test on the desktop binary (checklist below).
@@ -219,7 +214,7 @@ The SPA uses `latere-ui`'s vanilla `me()` and `switchOrg()` against the local HT
 
 ## Risks
 
-- **Device-authorization endpoint may not exist.** Local-mode is blocked on `auth/specs/auth-unification/device-authorization-endpoint.md` if so. Verify first.
+- **Device-authorization endpoint may not exist.** Local-mode is blocked on the identity service shipping it. Verify first.
 - **Wails runtime opening URLs**: cross-platform (macOS / Linux / Windows). `pkg/authkit.DeviceCodeClient`'s default opener uses `runtime.GOOS`-based dispatch; test on all three.
 - **Token file shared with `latere-cli`**: both write to `~/.config/latere/token.json`. Document this in `docs/auth.md` and in `latere-cli`'s docs. Intended: sign in once, both apps see it. Risk: if a user runs both with different `AUTH_URL` configs, the file gets overwritten with inconsistent tokens. Mitigation: the device-code flow records the issuer in the token file and refuses to load mismatched ones.
 - **Wallfacer SiteFooter regression**: `latere-ui` v1.2.3 → v1.8.0 is a big jump. Snapshot tests on SiteFooter before bumping; review release notes for v1.3..v1.7 changes.

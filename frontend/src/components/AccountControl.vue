@@ -3,7 +3,8 @@
 // prefs stores: feeds the principal in, wires switch-org / logout / login /
 // navigate back to the store and router, tracks the org being switched for the
 // per-row spinner, and hosts theme + language via the shared AccountPrefs in
-// the menu's #prefs slot. Same pattern as lectio/lux so the chrome matches.
+// the menu's #prefs slot. Same pattern as the other latere.ai products so the
+// chrome matches.
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';

@@ -11,7 +11,7 @@ import (
 
 // githubHandlerWithMock returns a Handler whose GitHub provider has a seeded
 // valid token and a client pointed at mockGH, so the write handlers exercise
-// the full transport without ../auth.
+// the full transport without the identity service.
 func githubHandlerWithMock(t *testing.T, mockGH *httptest.Server) *Handler {
 	t.Helper()
 	store, _ := github.NewFileStore(t.TempDir())

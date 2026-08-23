@@ -108,7 +108,7 @@ Everything about principals, sessions, delegation, and what data crosses the mac
 | ↳ [rbac-matrix.md](identity/multi-user-collaboration/rbac-matrix.md) | Stale | Lead child: the canonical scope-to-permission matrix (admin/editor/viewer mapped onto `Identity.Scopes`, since there is no role claim), wiring `RequireScope`/`RequireSuperadmin` onto mutating routes. Anonymous mode unchanged. |
 | [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Self-hosted non-latere.ai deployments log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. by configuring/extending the platform `pkg/oidc` RP rather than forking a local package. |
 | [remote-control.md](identity/remote-control.md) | Stale | Re-homed onto the cloud coordination plane: now the command-router capability (control UI, instance picker, offline handling, per-action auth + audit, opt-out scope) riding the one coordination connection, not its own wire. Transport lives in [coordination-plane.md](cloud/latere-integration/coordination-plane.md). |
-| [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | Per-task agent credentials for calling latere.ai services on behalf of the dispatching user. Reopened 2026-07-17 against the identity-fabric epic: the credential source is the registered-agent delegation chain (auth agent principal + delegation row + `/internal/agent-runner-tokens`, if-05), superseding the parked user-session-exchange premise. Trust plane already shipped as the `sandbox_proxy.go` server-side proxy; stays drafted until a cloud executor consumes it (if-09). |
+| [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | Per-task agent credentials for calling latere.ai services on behalf of the dispatching user. Reopened 2026-07-17 against the Latere identity fabric: the credential source is the registered-agent delegation chain (auth agent principal + delegation row + `/internal/agent-runner-tokens`), superseding the parked user-session-exchange premise. Trust plane already shipped as the `sandbox_proxy.go` server-side proxy; stays drafted until a cloud executor consumes it. |
 
 ### Identity dependencies
 
@@ -163,7 +163,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [dockable-panel-workspace.md](local/dockable-panel-workspace.md) | Drafted | VS Code-style dockable panel workspace: terminal (later explorer/file panel) docks to any edge, maximizes to fullscreen, and splits via drag-and-drop, persisted to localStorage. Editor-center model wrapping the RouterView in `AppLayout`; custom split-tree (no docking library). |
 | [test-criteria.md](.archive/local/test-criteria.md) | Drafted | Persist user-defined free-form test criteria on a task (`Task.Criteria`) so the auto-tester checks them, threaded into the existing `buildTestPrompt` / `tryAutoTest` path. Closes a live hole: autoimplement test runs currently pass empty criteria. Supersedes the archived validation-barrier. |
 | [static-artifacts.md](local/static-artifacts.md) | Drafted | Lightweight static serving of self-contained HTML artifacts (decks, reports) from `<workspace>/artifacts/`: a `GET /artifact/{path...}` route confined via `os.OpenRoot` with a web-asset content-type whitelist, a `GET /api/artifacts` listing, and an Artifacts gallery (`/artifacts`) with iframe preview + open-in-tab. The lightweight end of [live-serve](local/live-serve.md); no build step or process. Backend + frontend implemented directly. |
-| [review-adversarial-verification.md](.archive/local/review-adversarial-verification.md) | Drafted | Post-run adversarial multi-agent verification via review (`latere.ai/x/review`). `HarnessCritic` adapts all five wallfacer harnesses as critics; `SessionProposer` uses `Task.SessionID` for the fork-session path; `tryAutoAdon` in the autoimplement loop gated by a toggleable `reviewEnabled` flag (off by default). Requires review `specs/37-pkg-public-api.md` first. |
+| [review-adversarial-verification.md](.archive/local/review-adversarial-verification.md) | Drafted | Post-run adversarial multi-agent verification via a separate adversarial-review library. `HarnessCritic` adapts all five wallfacer harnesses as critics; `SessionProposer` uses `Task.SessionID` for the fork-session path; `tryAutoAdon` in the autoimplement loop gated by a toggleable `reviewEnabled` flag (off by default). Requires that library to expose a public API first. |
 | [visual-verification.md](.archive/local/visual-verification.md) | Drafted | Browser-based UI regression checks (`frontend/scripts/ui-shots/checks.mjs`, `make ui-test`) already catch render crashes and broken layout via deterministic geometry assertions, not pixel-diffing. Remaining: wire `make ui-test` into CI as an advisory step. |
 | [unified-transcript-rendering.md](.archive/local/unified-transcript-rendering.md) | **Complete** | Activity tab gets a `Raw ↔ Rendered` transcript toggle (default Rendered) that works for all five harnesses. Hybrid normalization: Claude keeps the rich FE `prettyNdjson` parser; cursor/opencode/pi render from the backend canonical `harness.Event` via a new `?format=normalized` on the logs stream; codex's `item.*` gets enriched; additive `KindThinking`. Fixes the prose-only raw-JSON dump and renders the answer prose. Review gets only a raw toggle (no refactor). |
 | [internal-consolidation.md](local/internal-consolidation.md) | Draft | Behavior-preserving refactors surfaced by a codebase audit: extract a handler mutate-commit helper family, a runner `failTask` terminal-state helper, and a shared one-shot LLM-call + NDJSON-parse path; make the prompts template-name set a single source of truth; and move workspace storage-identity out of the prompts package. Audit's mechanical cleanups and bug fixes already landed on `main`. |
@@ -186,10 +186,10 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [agent-graph-e2e-design.md](local/agent-graph-e2e-design.md) | Drafted | **Decision anchor.** Re-evaluates the whole agent-graph surface against the code as it actually is (three execution engines, split Agents/Flows/Graph vocabulary, board not wired to fleets), defines one coherent end-to-end target and editing model, and plans the teardown of the legacy flow mechanism. Default path: ship the coherent authoring surface + board wiring + terminology cleanup while the proven `implement` loop runs untouched; engine convergence gated. No code until accepted — its acceptance gates `unified-agent-graph-ui` and `workflows-graph-ux`. |
 | [workflows-graph-ux.md](local/workflows-graph-ux.md) | Drafted (at risk) | Rename Flows→Workflows and redraw the `FlowsPage` step editor as a connected pipeline graph. Overlaps the agent-graph surface; **pending the e2e-design decision**, which may reframe or absorb it (the e2e target removes "flow" from the UI and retires `FlowsPage`). Do not dispatch until that decision lands. |
 | [remove-idea-agent-subsystem.md](.archive/local/remove-idea-agent-subsystem.md) | **Complete** | Full teardown of the idea-agent (brainstorm) auto-ideation engine and the test-only flow: removed across runner/handler/flow/agents/store/envconfig/constants/apicontract/frontend/docs. Accepted feature loss; clears vestigial flow paths ahead of the agent-graph convergence. |
-| [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | The founding "fresh user has no clue how to start" concern + discoverability of the merged agent graph (Agents + Flows unified). Depends on the embeddable SDK foundation in `../agents`. Deliberately deferred behind the engine; tracked here so it is not lost. |
+| [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | The founding "fresh user has no clue how to start" concern + discoverability of the merged agent graph (Agents + Flows unified). Depends on the embeddable agent-SDK foundation owned by Topos. Deliberately deferred behind the engine; tracked here so it is not lost. |
 | [agents-and-flows/refinements.md](.archive/local/agents-and-flows/refinements.md) | **Archived** | Post-ship follow-ups: split-pane UI redesign, token-based CSS restyle, `Role.PromptTmpl` runtime wiring, a dedicated [`docs/guide/agent-graph.md`](../docs/guide/agent-graph.md) guide, and a cross-reference repair across 12 docs. |
 
-Archived local specs (superseded or dropped) are listed in the [Archive](#local--archived-superseded-or-dropped) section below.
+Archived local specs (superseded or dropped) are listed in the [Archive](#local-archived-superseded-or-dropped) section below.
 
 ### Local product dependencies
 
@@ -258,7 +258,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 ## Cloud Platform
 
-Integration track. Wallfacer is the autonomous-engineering control plane; in cloud mode it **consumes** Latere platform services rather than absorbing them (`latere.ai/specs/products/wallfacer.md`). Each integration is a thin client over a service boundary (Identity, Cella, FS), config-gated so local mode is unchanged.
+Integration track. Wallfacer is the autonomous-engineering control plane; in cloud mode it **consumes** Latere platform services rather than absorbing them. Each integration is a thin client over a service boundary (Identity, Cella, FS), config-gated so local mode is unchanged.
 
 The track now splits into **two axes** (see the umbrella): **Axis A, the coordination plane (Cloud v1, lead)** has signed-in local instances hold one outbound connection to a coordinator role on wallfacerd (wf.latere.ai) for presence, remote control, an allow-listed metadata projection, and spec-comment collaboration; local stays source of truth (relay + projection, never mirror). **Axis B, remote execution (Cloud v2+, demand-gated)** dispatches agent runs to Cella/Topos and is blocked on the `Executor` seam from harness-abstraction.
 
@@ -272,7 +272,7 @@ The track now splits into **two axes** (see the umbrella): **Axis A, the coordin
 | ↳↳ [coordination-plane/spec-comments.md](.archive/cloud/latere-integration/coordination-plane/spec-comments.md) | Complete | Phase 4: cloud-resident inline spec comments relayed in real time, ActorSub attribution, content-hash anchoring, export-friendly schema. Shipped v1; anchored text highlighted inline (`<mark>`). RBAC gate, outdated/re-place triage, comment edit deferred. |
 | ↳↳ [coordination-plane/postgres-store.md](.archive/cloud/latere-integration/coordination-plane/postgres-store.md) | Validated (impl shipped, drift gate pending) | Shared Postgres store owning the pool + embedded golang-migrate versioned migrations; replaced the inline `IF NOT EXISTS` schema string so future durable consumers add a numbered migration. Generic = one shared pool + one linear sequence. |
 | ↳ [latere-integration/cella-runtime.md](cloud/latere-integration/cella-runtime.md) | Stale | **Axis B lead.** `CellaBackend` implementing `executor.Backend`, a cloud runtime alongside Host, selected by `--executor cella`. Maps the task spec onto Cella's `/v1/sandboxes` API; worktree transport via FS. |
-| ↳ [latere-integration/shared-cella-client.md](cloud/latere-integration/shared-cella-client.md) | Drafted | Extract Cella's wire client into a standalone `latere.ai/x/sandbox/client` package shared by `CellaBackend` and Topos. Mostly external (Cella repo); thin in-repo stake. |
+| ↳ [latere-integration/shared-cella-client.md](cloud/latere-integration/shared-cella-client.md) | Drafted | Extract Cella's wire client into a standalone Go package shared by `CellaBackend` and Topos. Mostly owned by Cella; thin in-repo stake. |
 | ↳ [latere-integration/topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md) | Stale | `TopozExecutor`: dispatch task runs to Latere Topos's `/v1/agents` control plane via `--executor topos`. Topos runs the harness remote-side; client streams canonical events back. |
 | [claude-managed-agents.md](cloud/claude-managed-agents.md) | Drafted | Third-party remote executor: dispatch to Anthropic's Managed Agents API (`POST /v1/sessions`) with a self-hosted sandbox mounting the worktree locally. Independent of Latere infra. |
 | [antigravity.md](cloud/antigravity.md) | Drafted | Third-party remote executor: dispatch to Google's Antigravity Interactions API. Harness + model both fixed (Gemini). Independent of Latere infra. |
@@ -358,7 +358,7 @@ GitHub Integration is the OAuth umbrella; PR creation folds into it and cloud cl
 
 **Cross-track:**
 - Agent and harness abstraction reduce duplication before either track adds new agent roles.
-- Sandbox backends (K8s, native-OS, hardening) live in the external `latere.ai/sandbox` repo; wallfacer depends on the `Runtime` interface it exposes.
+- Sandbox backends (K8s, native-OS, hardening) are owned by Cella, the Latere sandbox runtime; wallfacer depends on the `Runtime` interface it exposes.
 - The only hard cross-track dependency: the cloud integration track requires authentication (shipped).
 
 ---
@@ -381,13 +381,13 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 | [host-terminal.md](.archive/foundations/host-terminal.md) | Interactive shell in the web UI (WebSocket + PTY) |
 | [windows-support.md](.archive/foundations/windows-support.md) | Tier 2 Windows host support |
 
-### Identity - Completed
+### Identity: completed
 
 | Spec | Delivers |
 |------|----------|
 | [auth-by-default.md](.archive/identity/auth-by-default.md) | Zero-config browser sign-in in `wallfacer run` (secret-less public client via `resolveAuthConfig`, silent-available first run, anonymous still first-class), `authkit.Identity` on the principal path, headless RFC 8628 device-code login, and latere-ui console-shell adoption (`AccountMenu`, org switcher, `Sidebar`) via thin wrappers. Adoption spec; further console work lands by bumping the `latere-ui` pin. |
 
-### Local - Completed
+### Local: completed
 
 | Spec | Delivers |
 |------|----------|
@@ -398,7 +398,7 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 | [pixel-agents.md](.archive/local/pixel-agents.md) | Pixel art office view, animated characters representing task agents |
 | [vue-frontend-migration.md](.archive/local/vue-frontend-migration.md) | Converged the vanilla-JS `ui/` board and the Vue `frontend/` site into one Vue 3 + TypeScript SPA; legacy `ui/` and its build/CI pipeline removed, single embedded `frontend/dist` served by the Go server. Superseded typescript-migration and typed-dom-hooks. |
 
-### Local - Archived (superseded or dropped)
+### Local: archived (superseded or dropped)
 
 Specs that were never implemented and whose designs target architecture since removed (the vanilla-JS `ui/` frontend, the per-task container model, the Goal field). The still-wanted features were re-specced against the current Vue + host-backend architecture; the dropped one has no replacement.
 
@@ -409,12 +409,12 @@ Specs that were never implemented and whose designs target architecture since re
 | [diff-review-comments.md](.archive/local/diff-review-comments.md) | Vue-targeted redraft of the diff-comment feature. Folded back into the revived [inline-diff-feedback.md](.archive/local/inline-diff-feedback.md), which adds login-gating and owns the key-bug fix. |
 | [spatial-canvas.md](.archive/local/spatial-canvas.md) | Exploratory infinite-canvas view targeting `ui/js/` (removed). No replacement specced. |
 
-### Cloud - Archived
+### Cloud: archived
 
 Wallfacer build/deploy and infrastructure specs that are no longer active. Most propose infrastructure that Latere services now own (replaced by the integration track, [latere-integration.md](cloud/latere-integration.md)); one is a dropped deploy migration. Retained for context.
 
 | Spec | Why archived |
 |------|--------------|
-| [multi-tenant.md](.archive/cloud/multi-tenant.md) | Control plane, per-user instance provisioning, routing, and hibernation are owned by **Cella** (runtime) and **terraform** (infra); org/team scoping is Identity's. Wallfacer consumes, not builds. |
-| [billing-idempotency.md](.archive/cloud/billing-idempotency.md) | Stripe charge mechanics and idempotency are owned by **Identity** (`latere.ai/x/auth`). Wallfacer's only billing surface is an optional read-only subscription UX, to be specced if/when payment is introduced. |
+| [multi-tenant.md](.archive/cloud/multi-tenant.md) | Control plane, per-user instance provisioning, routing, and hibernation are owned by **Cella** (runtime) and the platform infrastructure layer; org/team scoping is Identity's. Wallfacer consumes, not builds. |
+| [billing-idempotency.md](.archive/cloud/billing-idempotency.md) | Stripe charge mechanics and idempotency are owned by **Identity**. Wallfacer's only billing surface is an optional read-only subscription UX, to be specced if/when payment is introduced. |
 | [local-build-deploy.md](.archive/cloud/local-build-deploy.md) | Local `make release` / `make deploy` for the wallfacerd server image. Implemented then deliberately reverted in favor of GitHub Actions (`0ba7b225`). |

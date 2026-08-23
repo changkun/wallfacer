@@ -49,7 +49,7 @@ to number. Say which sub-directories are candidates and let the user pick one,
 rather than recursing on your own.
 
 Look at a sibling repo's `specs/README.md` (or lux's, if reachable at
-`../lux/specs/README.md`) as the reference shape for the index: a status-legend
+a sibling repo's `specs/README.md`) as the reference shape for the index: a status-legend
 line plus one `| # | Spec | Status |` table ordered by number, active rows
 linking to the root and archived rows into `.archive/`.
 

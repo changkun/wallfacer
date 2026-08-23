@@ -277,7 +277,7 @@ path still works exactly as before.
   subtitle; popup menu using `position: fixed` + `getBoundingClientRect`
   to escape the sidebar's `overflow: hidden` in both expanded and collapsed
   layouts; Organizations submenu that reloads after `POST /api/auth/switch-org`.
-- **Cross-repo deploys**: `latere.ai/auth` `v0.5.8` (active-org column on
+- **Cross-repo deploys**: Identity service `v0.5.8` (active-org column on
   `sso_sessions`, `/authorize` accepts `org_id`, `/userinfo` returns
   `name` + `picture`, JWT `iss` populated on access tokens);
   `latere.ai/x/pkg/oidc` `v0.10.2` (`AuthCodeURLWithOpts` and `HandleLogin`

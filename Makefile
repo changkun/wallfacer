@@ -208,8 +208,8 @@ push-once:
 # ── Local production release ────────────────────────────────────────────────
 # Build natively (avoids the qemu bun/go crash when building Dockerfile.wallfacerd
 # on an arm64 host), push the image, and roll it out to the live cluster via
-# kubectl. The automated release.yml pipeline (latere-ai/ci reusable workflow) is
-# the canonical path; this is the local fallback while that is unavailable.
+# kubectl. The automated release.yml pipeline is the canonical path; this is the
+# local fallback while that is unavailable.
 #
 #   make release-prod                 # tag = short git sha
 #   make release-prod VERSION=0.0.7-alpha.24

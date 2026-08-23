@@ -49,7 +49,7 @@ function shortSpecPath(p: string): string {
   return p.replace(/^specs\//, '').replace(/\.md$/, '');
 }
 // A depends_on target that escapes the workspace specs tree (e.g.
-// ../../agents/specs/...) cannot be opened here; it resolves to no spec and
+// ../../other-repo/specs/...) cannot be opened here; it resolves to no spec and
 // would render an empty view. Mark it as external and non-navigating instead.
 function isExternalDep(p: string): boolean {
   return p.includes('../') || p.startsWith('/');

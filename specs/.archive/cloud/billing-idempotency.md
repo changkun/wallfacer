@@ -20,11 +20,11 @@ dispatched_task_id: null
 >
 > This spec proposed that wallfacer call Stripe directly with idempotency keys.
 > Stripe integration, charge/subscription mechanics, and idempotency now live in
-> the **Identity service** (`latere.ai/x/auth`), which already ships a Stripe
+> the **Identity service**, which already ships a Stripe
 > billing integration. Wallfacer does not hold payment credentials or call
 > Stripe; in cloud mode it consumes billing/subscription state from Identity.
 >
-> Per the product boundary (`latere.ai/specs/products/wallfacer.md`), wallfacer's
+> Per the Latere product boundary, wallfacer's
 > only remaining billing surface is an optional **subscription/usage UX** "if
 > payment is introduced" — a thin read-only view over Identity's billing state,
 > to be specced when that feature is actually scheduled. The charge-idempotency

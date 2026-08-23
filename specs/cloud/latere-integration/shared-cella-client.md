@@ -21,12 +21,12 @@ different layers and with different control flows:
 
 | Product | Where the agent runs | Sandbox role | Natural API shape |
 |---------|----------------------|--------------|-------------------|
-| **Topos** (`latere.ai/x/agents`) | harness **outside**, in `toposd` | dumb workspace the harness pokes at | many small `Exec` / `ReadFile` / `WriteFile` against one long-lived sandbox |
+| **Topos** | harness **outside**, in `toposd` | dumb workspace the harness pokes at | many small `Exec` / `ReadFile` / `WriteFile` against one long-lived sandbox |
 | **Wallfacer** (`latere.ai/x/wallfacer`) | harness **inside** — the agent CLI runs in the sandbox | the agent's whole world | one `Launch` per turn, stream stdout until the CLI exits |
-| **Cella** (`latere.ai/x/sandbox`) | n/a — it *is* the sandbox platform | runtime owner | ships OpenAPI; no Go client today |
+| **Cella** | n/a — it *is* the sandbox platform | runtime owner | ships OpenAPI; no Go client today |
 
-Today, the **only Go client** for Cella's REST API is buried inside Topos at
-`agents/internal/sandbox/cella/provider.go` — request/response DTOs, error
+Today, the **only Go client** for Cella's REST API is buried inside Topos's
+sandbox provider — request/response DTOs, error
 envelope decoding, retry, auth header wiring, and the `SandboxProvider`
 abstraction are all in one package. When [cella-runtime.md](cella-runtime.md)
 lands, Wallfacer's `CellaBackend` will need the same wire-level functionality.
@@ -84,7 +84,7 @@ look similar by name.
 │                     │               └─ CellaBackend ─┐        │
 │                     ▼                                ▼        │
 │              ┌──────────────────────────────────────────┐     │
-│              │  latere.ai/x/sandbox/client  ◄── SHARED  │     │
+│              │   shared Cella wire client   ◄── SHARED  │     │
 │              │  (Cella REST DTOs + HTTP client)         │     │
 │              └──────────────────────────────────────────┘     │
 │                                │                              │
@@ -95,15 +95,15 @@ look similar by name.
 
 ### Module location
 
-`latere.ai/x/sandbox/client` — published from the Cella repo, alongside
-`api/openapi.yaml`. Cella owns its wire contract; the client co-evolves with
-the OpenAPI spec it implements. Versioned with Cella's API tags.
+The client is published from Cella, alongside its OpenAPI document. Cella owns
+its wire contract; the client co-evolves with the OpenAPI spec it implements.
+Versioned with Cella's API tags.
 
 Rejected alternatives:
-- **Separate repo `latere.ai/x/sandbox-client`** — cleaner ownership boundary,
+- **A separate client-only repo** — cleaner ownership boundary,
   but extra release machinery for no extra clarity. The client is a derivative
   of the OpenAPI; they belong together.
-- **Promote `latere.ai/x/agents/sandbox/cella`** (Wallfacer imports Topos) —
+- **Promote Topos's existing Cella provider** (Wallfacer imports Topos) —
   fast, but couples Wallfacer's release cadence to Topos and inverts the
   ownership story (Topos becomes Cella's de-facto Go client maintainer). OK as
   a stopgap, not a destination.
@@ -116,8 +116,8 @@ What the package exports:
   `Sandbox`, `CreateCommandReq`, `Command`, `LogsResp`, file ops, list filters.
 - **Client struct** with one function per endpoint, returning DTOs.
 - **Error contract** — `ErrNotFound`, `ErrConflict`, `*APIError` (status, code,
-  message, request_id). Lifted from Topos's existing design at
-  `agents/internal/sandbox/provider.go:23`; it's already the right shape.
+  message, request_id). Lifted from Topos's existing provider design; it's
+  already the right shape.
 - **Auth hook** — caller-supplied `func() (token string, err error)` so the
   package stays neutral about how tokens are minted (Topos uses its trust
   plane; Wallfacer uses the local-mode device-code token).
@@ -133,10 +133,10 @@ What the package **does not** export:
 
 ### Migration plan
 
-1. **Lift the client into Cella.** Copy `agents/internal/sandbox/cella/`
-   (`provider.go`, `tokensource.go`, error decoding, integration test scaffold)
-   into `latere.ai/x/sandbox/client`. Strip the `SandboxProvider` adapter
-   layer; keep only DTOs + raw client + error contract. Tag a `v0.1.0`.
+1. **Lift the client into Cella.** Copy Topos's Cella provider package
+   (client, token source, error decoding, integration test scaffold) into the
+   new shared package. Strip the `SandboxProvider` adapter layer; keep only
+   DTOs + raw client + error contract. Tag a `v0.1.0`.
 2. **Migrate Topos.** `cella.Provider` becomes ~50 LoC of adapter:
    `SandboxProvider` methods call `client.*` functions and map errors through.
    Topos's existing test suite is the regression gate; expect a no-op diff at
@@ -160,7 +160,7 @@ synthesize per-stream separation. Each consumer decides how to map this onto
 its own interface:
 
 - Topos already accepts the merge: `ExecResult.Stdout` carries combined output,
-  `Stderr` is nil (`agents/internal/sandbox/provider.go:116`).
+  `Stderr` is nil.
 - Wallfacer's `CellaBackend` accepts the merge for v0: `Handle.Stdout()` is the
   combined stream, `Handle.Stderr()` returns an immediately-EOF reader.
   Stream-json output is on stdout regardless, so end-to-end works; stderr-only
@@ -172,20 +172,18 @@ client package will surface separated streams the moment the API does.
 
 ## Acceptance criteria
 
-- `latere.ai/x/sandbox/client` exists in the Cella repo, exports DTOs +
-  function-style client + error contract, has no dependency on Topos or
+- The shared client package exists on the Cella side, exports DTOs +
+  function-style client + error contract, and has no dependency on Topos or
   Wallfacer.
-- A `make test` in the Cella repo covers the client with table-driven unit
-  tests against an `httptest.Server` and an opt-in integration test against a
-  real Cella endpoint.
-- Topos's `agents/internal/sandbox/cella/` is reduced to a `SandboxProvider`
-  adapter; the old DTOs and HTTP wiring are deleted; Topos's existing tests
-  pass unchanged.
+- Cella's own test suite covers the client with table-driven unit tests
+  against an `httptest.Server` and an opt-in integration test against a real
+  Cella endpoint.
+- Topos's Cella provider is reduced to a `SandboxProvider` adapter; the old
+  DTOs and HTTP wiring are deleted; Topos's existing tests pass unchanged.
 - Wallfacer's `CellaBackend` (delivered by [cella-runtime.md](cella-runtime.md))
-  imports `latere.ai/x/sandbox/client` and does not duplicate any wire-level
-  code.
-- Bumping Cella's OpenAPI version requires updating exactly one package
-  (`latere.ai/x/sandbox/client`); both consumers pick it up via go.mod.
+  imports the shared client and does not duplicate any wire-level code.
+- Bumping Cella's OpenAPI version requires updating exactly one package (the
+  shared client); both consumers pick it up via go.mod.
 
 ## Boundaries
 

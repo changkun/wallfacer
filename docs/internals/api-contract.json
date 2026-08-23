@@ -1180,7 +1180,7 @@
       "method": "POST",
       "pattern": "/api/github/auth/connect",
       "name": "GitHubAuthConnect",
-      "description": "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the ../auth broker.",
+      "description": "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the Latere identity broker.",
       "tags": [
         "github"
       ]

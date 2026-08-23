@@ -30,7 +30,7 @@ fields so the frontend can decide whether to render the sign-in badge.
 1. **Handler constructor**, Extend `handler.NewHandler` (see
    `internal/handler/doc.go` and the existing constructor) to accept an
    `*auth.Client` (nullable). Store it on the `Handler` struct. Follow the
-   pattern in `~/dev/latere.ai/latere-ai/internal/handler/handler.go`.
+   pattern used by the Latere website service's HTTP handler.
    Before editing, grep the codebase for every call site of
    `handler.NewHandler` (CLI server wiring, desktop entry, `*_test.go`
    fixtures) and update them all in the same commit; pass `nil` for the

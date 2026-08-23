@@ -20,8 +20,7 @@ dispatched_task_id: null
 # Runtime Integration: Cella Backend
 
 > Identity/auth contracts for this executor are now governed by the
-> identity-fabric epic (`latere-ai/specs products/identity-fabric.md`,
-> Phase 4 / if-09); refresh this spec against it before dispatch.
+> Latere identity fabric; refresh this spec against it before dispatch.
 
 ## Problem
 
@@ -38,7 +37,7 @@ containers). The runner hard-wires it: `NewRunner`
 with no executor-selection switch.
 
 To execute tasks in the cloud, wallfacer needs a second backend that dispatches
-to **Cella** (`latere.ai/x/sandbox`, cella.latere.ai) - Latere's hardened K8s
+to **Cella** (cella.latere.ai) - Latere's hardened K8s
 sandbox runtime - without wallfacer taking on any K8s scheduling, warm-pool,
 quota, or egress-policy logic. Cella owns all of that and exposes a `Runtime`
 interface plus a `/v1/sandboxes` REST API (the `sandbox-backends` foundation

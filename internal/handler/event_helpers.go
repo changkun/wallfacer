@@ -69,7 +69,7 @@ func stampEventActor(ctx context.Context) context.Context {
 // agent) maps to "user", since agents acting on behalf of a user are
 // attributionally indistinguishable from the user at the audit log
 // level. Deeper delegated attribution went away with auth's agent
-// delegation (its spec 068).
+// delegation.
 func actorTypeFor(c *auth.Identity) store.ActorType {
 	if c.PrincipalType == "service" {
 		return store.ActorService

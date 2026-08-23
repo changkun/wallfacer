@@ -20,7 +20,7 @@ dispatched_task_id: null
 
 Migrate the wallfacer project identity from `changkun.de/x/wallfacer` to `latere.ai/x/wallfacer`, aligning the product under the latere.ai brand.
 
-The `/x/` segment mirrors the sibling latere Go modules (`latere.ai/x/agents`, `latere.ai/x/auth`, `latere.ai/x/fs`, `latere.ai/x/lux`, `latere.ai/x/pkg`, `latere.ai/x/sandbox`) and the old `changkun.de/x/wallfacer` structure.
+The `/x/` segment mirrors the sibling Latere Go modules and the old `changkun.de/x/wallfacer` structure.
 
 ## Scope
 

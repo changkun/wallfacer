@@ -127,4 +127,4 @@ The spec originated on 2026-03-23 as **"Cloud Sandbox Executor"** — part of a 
 
 ## Future Work
 
-Remote backend implementations (K8s, native-OS, hardening) live in the external [`latere.ai/sandbox`](https://github.com/latere-ai/sandbox) repo, which defines the `Runtime` interface that wallfacer's cloud track consumes. Cloud worktree management remains in-repo under the cloud track — see [tenant-filesystem.md](../cloud/tenant-filesystem.md).
+Remote backend implementations (K8s, native-OS, hardening) are owned by Cella, the Latere sandbox runtime, which defines the `Runtime` interface that wallfacer's cloud track consumes. Cloud worktree management remains in-repo under the cloud track — see [tenant-filesystem.md](../cloud/tenant-filesystem.md).

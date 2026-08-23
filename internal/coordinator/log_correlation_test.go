@@ -10,7 +10,7 @@ import (
 
 // spanCtxCapture records whether the ctx passed to Handle carried a valid span
 // context, which is what the otelslog bridge needs to stamp TraceId/SpanId onto
-// exported records (observability spec 02). A plain slog call hands the bridge
+// exported records. A plain slog call hands the bridge
 // context.Background(), so the record loses its trace correlation.
 type spanCtxCapture struct {
 	sawSpan bool

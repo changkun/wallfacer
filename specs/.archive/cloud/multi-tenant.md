@@ -22,7 +22,7 @@ dispatched_task_id: null
 > those concerns:
 >
 > - **Per-instance runtime, provisioning, warm pools, hibernation, egress
->   policy** → owned by **Cella** (`latere.ai/sandbox`, cella.latere.ai).
+>   policy** → owned by **Cella** (cella.latere.ai).
 >   Wallfacer consumes it through the runtime integration seam — see
 >   [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md).
 > - **Cluster, routing, DNS/TLS, node pools** → owned by **terraform** (DOKS).
@@ -35,7 +35,7 @@ dispatched_task_id: null
 >   [identity/multi-user-collaboration.md](../identity/multi-user-collaboration.md),
 >   not here.
 >
-> The product north star (`latere.ai/specs/products/wallfacer.md`) is explicit:
+> The Latere product boundary for wallfacer is explicit:
 > wallfacer is the control plane for autonomous engineering and should
 > **consume** Latere services rather than absorb them; cloud v1 is metadata
 > coordination, not per-tenant instance hosting. The "one wallfacer process per

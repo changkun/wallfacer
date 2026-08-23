@@ -16,10 +16,8 @@ dispatched_task_id: null
 
 # Third-Party OIDC
 
-> The family BYOC posture is defined in
-> `latere-ai/specs products/identity-fabric/if-08-byoc-agent-grant.md` and
-> sandbox spec 56 (BYOC IDP portability); align this spec with it when
-> picked up.
+> The bring-your-own-cloud posture for the Latere identity and sandbox
+> services is defined platform-side; align this spec with it when picked up.
 
 ## Problem
 

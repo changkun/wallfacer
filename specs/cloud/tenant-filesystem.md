@@ -30,7 +30,7 @@ Cloud storage handles task data (row 2). This spec handles the remaining four ro
 
 ## External Dependency: fs.latere.ai
 
-**latere.ai/fs** is the platform's canonical user data plane, a per-user persistent storage service with two tiers:
+**FS** (fs.latere.ai) is the platform's canonical user data plane, a per-user persistent storage service with two tiers:
 
 - **Cold tier** (S3/DO Spaces): durable blob storage. Source of truth for all user files. Accessed via Files API (`PUT/GET/DELETE /files/{path...}`).
 - **Hot tier** (local disk on compute node): fast ephemeral I/O for sandbox runtimes. Accessed via Workspace API (`POST/GET/DELETE /workspaces`). Stages files from cold to hot, syncs dirty files hot to cold on destroy.

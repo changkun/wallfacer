@@ -9,7 +9,7 @@ import (
 )
 
 // The default token-exchange client must carry the otel transport so the
-// outbound hop records a client span (observability spec 01). This test fails
+// outbound hop records a client span. This test fails
 // on a bare client (nil Transport).
 
 func TestManagerDefaultClientUsesOtelTransport(t *testing.T) {

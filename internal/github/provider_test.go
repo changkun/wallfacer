@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-// fakeBroker is an in-memory Broker for exercising Provider without ../auth.
+// fakeBroker is an in-memory Broker for exercising Provider without the
+// identity service.
 type fakeBroker struct {
 	tok   *Token
 	err   error

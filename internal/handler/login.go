@@ -127,7 +127,7 @@ type meBuilder interface {
 // Content means "no session" (not an error). 200 returns the latere-ui
 // Principal shape (identity, avatar/initials, active org, org list) so the
 // shared AccountMenu renders the avatar and org switcher, the same payload
-// cella/lectio serve.
+// the other latere.ai products serve.
 func (h *Handler) AuthMe(w http.ResponseWriter, r *http.Request) {
 	if h.auth == nil {
 		w.WriteHeader(http.StatusNoContent)

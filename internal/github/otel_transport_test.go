@@ -9,7 +9,7 @@ import (
 )
 
 // The default GitHub clients must carry the otel transport so outbound calls
-// record client spans and propagate trace context (observability spec 01).
+// record client spans and propagate trace context.
 // These tests fail on a bare client (nil Transport).
 
 func TestClientDefaultUsesOtelTransport(t *testing.T) {

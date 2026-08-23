@@ -27,7 +27,7 @@ foundation all other Phase 1 tasks build on.
 
 1. Add `latere.ai/x/pkg/oidc` to `go.mod`. Run `go mod tidy`. The module is a
    vanity path served by latere.ai's `go-import` meta; it resolves to
-   `github.com/latere-ai/pkg`.
+   `latere.ai/x/pkg`.
 2. Extend `internal/envconfig/envconfig.Config` with:
    ```go
    Cloud bool `env:"WALLFACER_CLOUD"`
@@ -40,7 +40,7 @@ foundation all other Phase 1 tasks build on.
    already reads `h.runner.HostMode()`; pick the equivalent surface for a
    plain env-sourced flag).
 4. Create `internal/auth/auth.go` as a thin re-export, matching
-   `~/dev/latere.ai/latere-ai/internal/auth/auth.go`:
+   the Latere website service's auth package:
    ```go
    // Package auth re-exports latere.ai/x/pkg/oidc so internal packages import
    // a single path. Nil-safety semantics come from the platform package:

@@ -44,7 +44,7 @@ website doesn't need: **durable task-data storage**.
 
 | Component | State |
 |-----------|-------|
-| DOKS cluster, nginx ingress, cert-manager, Spaces, DNS, OTEL→ClickHouse→Grafana | exists (latere.ai/terraform) |
+| DOKS cluster, nginx ingress, cert-manager, Spaces, DNS, OTEL→ClickHouse→Grafana | exists (platform infrastructure) |
 | `wallfacerd` = `wallfacer web` (public site) at `wf.latere.ai` | **deployed** |
 | Deploy pattern (Deployment/Service/Ingress + TLS + OTLP into `latere` ns) | **proven by `wallfacerd`** |
 | **task-board server** (`wallfacer run`) Deployment + PVC for task data | **this spec** |
@@ -53,8 +53,8 @@ website doesn't need: **durable task-data storage**.
 
 | Concern | Owner |
 |---------|-------|
-| K8s cluster, node pools, Spaces, DNS, TLS ClusterIssuer | latere.ai/terraform |
-| **Sandbox runtime** (scheduling, pods, warm pools, egress, hardening, RBAC for Jobs) | **Cella** (`latere.ai/sandbox`) - consumed via [cella-runtime.md](latere-integration/cella-runtime.md) |
+| K8s cluster, node pools, Spaces, DNS, TLS ClusterIssuer | platform infrastructure |
+| **Sandbox runtime** (scheduling, pods, warm pools, egress, hardening, RBAC for Jobs) | **Cella** - consumed via [cella-runtime.md](latere-integration/cella-runtime.md) |
 | Identity / sign-in | Identity (auth.latere.ai), already wired in `wallfacerd` |
 | Workspace files | FS (fs.latere.ai), see [tenant-filesystem.md](tenant-filesystem.md) |
 | Task-board server Deployment, Service, Ingress, PVC, Secret | **wallfacer** (`deploy/`) |

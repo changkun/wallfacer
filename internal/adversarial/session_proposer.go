@@ -9,7 +9,7 @@ import (
 // Returns nil if sessionID is empty — callers must check.
 //
 // The proposer runs in the task's real worktree (fork-session is cwd-scoped, so
-// it cannot run elsewhere) and is restricted to read-only tools (review spec 38):
+// it cannot run elsewhere) and is restricted to read-only tools:
 // it can read the code to rebut and concede but cannot edit the tree wallfacer's
 // commit pipeline would then stage. This is an explicit guarantee on top of
 // claude's headless default-deny.

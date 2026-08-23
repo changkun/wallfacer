@@ -19,15 +19,17 @@ import (
 //	POST /api/github/auth/disconnect  -> clear the stored token
 //
 // Status and disconnect operate on the token store alone. Connect needs the
-// ../auth broker (the "Latere AI" GitHub App is brokered there); until that is
-// wired the endpoint reports the connect flow unavailable rather than 500.
+// identity-service broker (the "Latere AI" GitHub App is brokered there);
+// until that is wired the endpoint reports the connect flow unavailable rather
+// than 500.
 
 // SetGitHub wires the principal-scoped GitHub token provider. Called from the
 // CLI boot path; leaving it unset disables the /api/github/* surface.
 func (h *Handler) SetGitHub(p *github.Provider) { h.github = p }
 
 // SetGitHubBroker wires the live broker onto the provider, enabling connect and
-// token resolution against the ../auth service. No-op if the provider is unset.
+// token resolution against the Latere identity service. No-op if the provider
+// is unset.
 func (h *Handler) SetGitHubBroker(b github.Broker) {
 	if h.github != nil {
 		h.github.Broker = b
@@ -54,11 +56,11 @@ type githubAuthStatus struct {
 	Account     string     `json:"account,omitempty"`
 	Permissions []string   `json:"permissions,omitempty"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	// CanConnect reports whether the live connect flow can run (the ../auth
+	// CanConnect reports whether the live connect flow can run (the identity
 	// broker is wired). When false the UI shows connect as unavailable.
 	CanConnect bool `json:"can_connect"`
-	// ManageURL is the ../auth account page where the user connects/manages
-	// GitHub centrally. wallfacer does not connect GitHub itself; it borrows the
+	// ManageURL is the identity service account page where the user
+	// connects/manages GitHub centrally. wallfacer does not connect GitHub itself; it borrows the
 	// connection from the signed-in latere.ai account and points here.
 	ManageURL string `json:"manage_url,omitempty"`
 }
@@ -91,16 +93,16 @@ func (h *Handler) githubStatus(ctx context.Context) githubAuthStatus {
 
 // GitHubAuthStatus reports the connection state for the signed-in principal.
 // It best-effort resolves the token via the broker first, so the status
-// reflects the GitHub connection held in ../auth for the user (wallfacer borrows
-// it -- there is no wallfacer-side connect). It also surfaces the ../auth manage
-// URL for the UI to link to.
+// reflects the GitHub connection held in the identity service for the user
+// (wallfacer borrows it -- there is no wallfacer-side connect). It also
+// surfaces that service's manage URL for the UI to link to.
 func (h *Handler) GitHubAuthStatus(w http.ResponseWriter, r *http.Request) {
 	if h.github == nil {
 		httpjson.Write(w, http.StatusOK, githubAuthStatus{})
 		return
 	}
 	if h.github.Broker != nil {
-		// Populates the local store from ../auth when a connection exists.
+		// Populates the local store from the identity service when a connection exists.
 		_, _ = h.github.Get(r.Context(), h.githubPrincipal(r.Context()))
 	}
 	st := h.githubStatus(r.Context())
@@ -111,16 +113,16 @@ func (h *Handler) GitHubAuthStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // GitHubAuthConnect starts the brokered install + grant flow. Gated on the
-// ../auth broker; until it is wired the endpoint reports the flow unavailable
-// (503) so the UI shows a clear state rather than a server error.
+// identity-service broker; until it is wired the endpoint reports the flow
+// unavailable (503) so the UI shows a clear state rather than a server error.
 func (h *Handler) GitHubAuthConnect(w http.ResponseWriter, r *http.Request) {
 	if h.github == nil || h.github.Broker == nil || h.authURL == "" {
 		http.Error(w, "github connect not available", http.StatusServiceUnavailable)
 		return
 	}
-	// The brokered install + grant flow lives on the ../auth service; return its
-	// install-start URL for the UI to navigate to. After installing, ../auth
-	// captures the user token; wallfacer's next status poll resolves it via the
+	// The brokered install + grant flow lives on the Latere identity service;
+	// return its install-start URL for the UI to navigate to. After installing,
+	// that service captures the user token; wallfacer's next status poll resolves it via the
 	// broker and flips to connected.
 	install := strings.TrimRight(h.authURL, "/") + "/me/integrations/github/install/start"
 	if ret := strings.TrimSpace(r.URL.Query().Get("return_to")); ret != "" {

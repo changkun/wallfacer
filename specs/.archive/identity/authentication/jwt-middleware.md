@@ -34,7 +34,7 @@ Local mode is untouched, `WALLFACER_SERVER_API_KEY` remains the only gate.
 1. Add `latere.ai/x/pkg/jwtauth` to `go.mod` (vanity path resolves alongside
    `pkg/oidc` already in use by Phase 1).
 2. Extend `internal/auth/` with middleware constructors mirroring the
-   reference consumer at `~/dev/latere.ai/latere-ai/internal/auth/middleware.go`:
+   reference consumer, the Latere website service's auth middleware:
    ```go
    // BuildValidator constructs a *jwtauth.Validator from env vars
    // (AUTH_URL, AUTH_JWKS_URL, AUTH_ISSUER, AUTH_CLIENT_ID as audience).

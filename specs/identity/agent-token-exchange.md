@@ -18,16 +18,13 @@ dispatched_task_id: null
 # Agent Token Exchange
 
 > **Reopened 2026-07-17 (drafted).** The reopening condition is met: the
-> identity-fabric epic (`latere-ai/specs products/identity-fabric.md`)
-> provides the backend delegation chain. Per-task agent credentials come from
-> the registered-agent delegation chain (auth agent principal + delegation row
-> + `POST /internal/agent-runner-tokens`; see
-> `latere-ai/specs products/identity-fabric/if-05-agent-principal-registration.md`),
+> Latere identity service now provides the backend delegation chain. Per-task
+> agent credentials come from the registered-agent delegation chain (auth
+> agent principal + delegation row + `POST /internal/agent-runner-tokens`),
 > not from exchanging the dispatching user's session token as the parked
 > design assumed. Sections marked **historical** below record that parked
 > design and are superseded on the credential-source question. This spec
-> stays drafted until a cloud executor consumes it; the convergence scope is
-> `latere-ai/specs products/identity-fabric/if-09-wallfacer-convergence.md`.
+> stays drafted until a cloud executor consumes it.
 
 ## Problem
 
@@ -38,7 +35,7 @@ etc.), those agents need credentials to call those services **on behalf of**
 the user who dispatched the task, not with the user's own refresh-capable
 JWT, and not as anonymous clients.
 
-The credential source is the registered-agent delegation chain (if-05): the
+The credential source is the registered-agent delegation chain: the
 agent is registered as an auth principal, the owning user's consent is a
 delegation row, and a per-task token is minted via
 `POST /internal/agent-runner-tokens` (RFC 8693 exchange underneath). The
@@ -117,20 +114,20 @@ In scope:
   logs can trace an agent action back to the delegating user.
 
 Out of scope:
-- Agent-principal registration in the auth service (owned by if-05: the
-  product that creates the agent registers it via `POST {AUTH}/agents` and
-  creates the delegation row; wallfacer consumes existing delegations).
+- Agent-principal registration in the auth service (the product that creates
+  the agent registers it via `POST {AUTH}/agents` and creates the delegation
+  row; wallfacer consumes existing delegations).
 - Per-service authorization policy (fs.latere.ai decides what an
   `agent_token` with scope X can do, not wallfacer).
 - User-facing delegation UI (view / revoke active agent sessions).
 - `internal/oauth/` (the PKCE OAuth flow for agent *credential* login like
   Claude/Codex, entirely separate from RFC 8693 token exchange).
 
-## Family audience scheme (if-04)
+## Family audience scheme
 
 The audience and scope names on wallfacer's trust-plane edges are
-wallfacer's entries in the family audience scheme defined in the auth
-repo's `specs/delegation-claims-contract.md` (identity-fabric if-04):
+wallfacer's entries in the family audience scheme defined by the Latere
+identity service's delegation-claims contract:
 
 - `wallfacer-sandbox-proxy`: the audience `requireClaims` enforces on
   inbound sidecar JWTs.
@@ -225,13 +222,13 @@ That is a real point in the proxy's favor.
 
 ## Dependencies
 
-- Agent principal registration (if-05): the task's agent must exist as an
+- Agent principal registration: the task's agent must exist as an
   auth principal with an active delegation row from the dispatching user
   before wallfacer can mint runner tokens for it.
 - `identity/authentication.md` Phase 2, this spec needs a real user
   `*jwtauth.Claims` on the task creator so the delegation can be attributed.
 - A cloud executor that consumes the minted credential; until one exists
-  this spec stays drafted (if-09 convergence scope).
+  this spec stays drafted.
 
 ## Open Decisions
 

@@ -189,8 +189,8 @@ type Handler struct {
 	// github backs the /api/github/* surface with a principal-scoped GitHub
 	// App token provider. Nil until SetGitHub; endpoints then report the
 	// GitHub surface unavailable. The live connect flow additionally needs the
-	// ../auth broker (github.Provider.Broker); status and disconnect work with
-	// the token store alone.
+	// identity-service broker (github.Provider.Broker); status and disconnect
+	// work with the token store alone.
 	github *github.Provider
 
 	diffCache          *diffCache

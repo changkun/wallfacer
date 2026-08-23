@@ -29,7 +29,7 @@ to a random port when `cfg.Addr` is taken (e.g. a second wallfacer instance). Th
 redirect then points at a port the server is not listening on.
 
 Deriving the redirect from the *bound* port does NOT fix sign-in: the auth
-service (`../auth`) uses ory/fosite with exact `redirect_uri` matching, and
+service (auth.latere.ai) uses ory/fosite with exact `redirect_uri` matching, and
 fosite's RFC 8252 dynamic-port loopback exception applies only to IP literals
 (`127.0.0.1`/`[::1]`), not the `localhost` hostname that `defaultRedirectURL`
 emits (`isLoopbackAddress` = `net.ParseIP(host).IsLoopback()`). So the registered

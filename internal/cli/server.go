@@ -195,7 +195,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	// GitHub integration: a principal-scoped token store under the config dir
 	// backs /api/github/*. The live broker (the "Latere AI" GitHub App via the
-	// ../auth service) is wired further down whenever an auth URL is
+	// Latere identity service) is wired further down whenever an auth URL is
 	// configured; it activates once the signed-in account has a GitHub
 	// connection. Status and disconnect work against the store either way.
 	if ghStore, gerr := github.NewFileStore(filepath.Join(configDir, "github")); gerr != nil {
@@ -294,8 +294,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	}
 
 	// Wire the live GitHub broker: wallfacer fetches the principal's GitHub
-	// token from the ../auth self endpoint using the signed-in user's OIDC
-	// token (the same token the coordination connector reads). With it set,
+	// token from the identity service's self endpoint using the signed-in user's
+	// OIDC token (the same token the coordination connector reads). With it set,
 	// the /api/github/* connect + read/write surface goes live.
 	if authCfg.AuthURL != "" && coordTokenStore != nil {
 		h.SetGitHubBroker(&github.HTTPBroker{

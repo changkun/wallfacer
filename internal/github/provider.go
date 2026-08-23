@@ -12,13 +12,14 @@ import (
 var ErrNotConnected = errors.New("github: principal not connected")
 
 // Broker mints or refreshes a GitHub App token for a principal by brokering
-// through the ../auth service (which owns the "Latere AI" app registration and
-// the install + user-to-server flow). It is the single seam that reaches
-// ../auth; everything else in this package works against a stored [Token].
+// through the Latere identity service (which owns the "Latere AI" app
+// registration and the install + user-to-server flow). It is the single seam
+// that reaches that service; everything else in this package works against a
+// stored [Token].
 //
 // Implementations:
-//   - the live broker calls ../auth (gated on that service exposing the token
-//     endpoint; see the spec's brokering note),
+//   - the live broker calls the identity service (gated on that service
+//     exposing the token endpoint; see the spec's brokering note),
 //   - tests and local-without-auth runs use a fake.
 //
 // Token returns [ErrNotConnected] when the principal has no usable grant.

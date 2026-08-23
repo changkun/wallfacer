@@ -69,11 +69,11 @@ Apply the wrappers at the router in `internal/cli/server.go`, grouping routes by
 - A viewer (`wallfacer:read` only) gets 403 on every mutating route and 200 on reads (filtered by `CanSee`).
 - An editor can create/dispatch/feedback/cancel and edit specs/planning; an admin additionally passes the admin-scoped routes.
 - Anonymous / local mode is byte-identical to today (no wrappers installed).
-- Scope names are confirmed against what the platform actually issues in `Identity.Scopes` (coordinate with `latere.ai/x/auth`).
+- Scope names are confirmed against what the platform actually issues in `Identity.Scopes` (coordinate with the Latere identity service).
 
 ## Open Questions
 
-- Final scope names: `wallfacer:{read,write,admin}` vs reusing platform-wide scope names. Gated on what `latere.ai/x/auth` issues.
+- Final scope names: `wallfacer:{read,write,admin}` vs reusing platform-wide scope names. Gated on what the Latere identity service issues.
 - Whether `wallfacer:admin` is per-org or global. Lean per-org, carried with `org_id`.
 
 ## Non-Goals

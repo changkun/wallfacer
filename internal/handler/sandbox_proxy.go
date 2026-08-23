@@ -281,7 +281,7 @@ func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, sco
 
 // callerSub is the user a proxied call acts for. It used to resolve an RFC
 // 8693 delegator first, so a delegated agent's call attributed to its grantor;
-// auth removed agent delegation (its spec 068) and no longer mints a token
+// the identity service removed agent delegation and no longer mints a token
 // carrying a delegator, so the principal IS the user.
 func callerSub(c *auth.Claims) string {
 	if c == nil {

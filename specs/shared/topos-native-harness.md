@@ -149,7 +149,7 @@ identical ("author once, run local or cloud").
 | Mode | Trigger | Control plane | Model creds | Execution backend |
 |------|---------|---------------|-------------|-------------------|
 | Local (default) | not logged in | in-process embedded `latere.ai/x/topos` | local Lux (`luxd` stateless / BYO keys) | topos `sandbox/local` |
-| Cloud | logged into latere.ai | Topos cloud platform `/v1` | metered Lux | Cella remote workspaces (`../sandbox`, `latere.ai/x/sandbox`, via topos `sandbox/cella`) |
+| Cloud | logged into latere.ai | Topos cloud platform `/v1` | metered Lux | Cella remote workspaces (via topos `sandbox/cella`) |
 
 - The seam is `topos.Options.Sandbox sandbox.Provider` (`topos/topos.go:200`). Local mode
   injects `sandbox/local`; cloud mode injects the `sandbox/cella` provider pointed at a
@@ -189,7 +189,7 @@ Surface the native-harness identity:
   follow-up) defaulting to `topos`; a local-vs-cloud execution selector for logged-in
   users.
 - No new HTTP routes required for local mode; cloud mode consumes the Topos platform
-  `/v1` (owned by `../agents`), not a new wallfacer route.
+  `/v1` (owned by Topos), not a new wallfacer route.
 
 ## Error Handling
 

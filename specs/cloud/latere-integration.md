@@ -28,11 +28,11 @@ that knows nothing about the rest of the Latere ecosystem. Identity sign-in
 grown standalone services that own concerns wallfacer's older cloud specs
 proposed to build from scratch:
 
-- **Identity** (`latere.ai/x/auth`, auth.latere.ai) - OIDC, JWTs, orgs, teams,
+- **Identity** (auth.latere.ai) - OIDC, JWTs, orgs, teams,
   service accounts, Stripe billing, RFC 8693 token exchange.
-- **Cella** (`latere.ai/x/sandbox`, cella.latere.ai) - K8s sandbox execution,
+- **Cella** (cella.latere.ai) - K8s sandbox execution,
   warm pools, durable workspaces, credential vault, per-sandbox identity JWTs.
-- **FS** (`latere.ai/x/fs`, fs.latere.ai) - two-tier file data plane (Spaces
+- **FS** (fs.latere.ai) - two-tier file data plane (Spaces
   cold + PVC hot); `/files/*` is live, `/workspaces/*` is planned.
 - **Lux** - model key custody and routing.
 - **MCP Registry** - approved tool catalog.
@@ -61,7 +61,7 @@ catalogs the per-service seams both axes draw on.
 
 ## Principle: consume, don't absorb
 
-From the product north star (`latere.ai/specs/products/wallfacer.md`):
+The Latere product boundary for wallfacer states:
 
 > Wallfacer is the autonomous engineering control plane. It should consume
 > Latere platform services in cloud mode rather than absorbing them. Cloud v1
@@ -84,10 +84,10 @@ seam is inert and local behavior is byte-identical to today.
 |------|----------------|---------------------|--------|------|
 | **Identity** | auth.latere.ai | `internal/auth` middleware + `pkg/jwtauth`/`oidc`; `authkit.Identity{Sub,OrgID}` principal | ✅ shipped (Phase 1+2) | [identity/authentication.md](../identity/authentication.md) |
 | **Runtime** | Cella | `executor.Backend` (today: Host only; the cloud impl slots in as a third executor) | drafted | [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md) |
-| **Cella wire client** | Cella | shared Go client at `latere.ai/x/sandbox/client`, consumed by Wallfacer's `CellaBackend` and Topos's `cella.Provider` | drafted | [latere-integration/shared-cella-client.md](latere-integration/shared-cella-client.md) |
+| **Cella wire client** | Cella | a shared Go client published by Cella, consumed by Wallfacer's `CellaBackend` and Topos's `cella.Provider` | drafted | [latere-integration/shared-cella-client.md](latere-integration/shared-cella-client.md) |
 | **File data plane** | FS | `internal/workspace` + `internal/runner` (worktree staging) | drafted; **blocked on FS Workspace API** | [tenant-filesystem.md](tenant-filesystem.md) |
 | **Per-task delegation** | auth (RFC 8693) | mint short-lived agent tokens so sandboxes call back | drafted | [identity/agent-token-exchange.md](../identity/agent-token-exchange.md) |
-| **Deploy** | terraform (DOKS) | thin deploy module + `pkg/otel` OTLP emit | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |
+| **Deploy** | Latere platform infrastructure (DOKS) | thin deploy module + `pkg/otel` OTLP emit | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |
 | **Model keys** | Lux | credential injection into task env | future | - (specced when scheduled) |
 | **MCP catalog** | MCP Registry | approved-tool resolution | future | - |
 | **Coordination plane** (presence, remote control, metadata projection, collaboration) | coordinator role on wallfacerd (wf.latere.ai) | one outbound connection per signed-in instance; tap `store.TaskEvent`, redact to an allow-list, push | **drafted (Cloud v1 lead)** | [latere-integration/coordination-plane.md](latere-integration/coordination-plane.md) |

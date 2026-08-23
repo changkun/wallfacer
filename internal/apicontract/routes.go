@@ -740,7 +740,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/github/auth/connect", Name: "GitHubAuthConnect",
-		Description: "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the ../auth broker.",
+		Description: "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the Latere identity broker.",
 		Tags:        []string{"github"},
 	},
 	{

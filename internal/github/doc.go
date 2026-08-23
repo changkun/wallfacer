@@ -7,10 +7,10 @@
 // OIDC identity token (see [latere.ai/x/wallfacer/internal/handler] device
 // auth): it is a GitHub App user-to-server credential granting repo-scoped
 // access (contents, pull_requests, issues, metadata). It is obtained by
-// brokering through the ../auth service rather than a host `gh` login, so it
-// works headless and in cloud. This package consumes that brokered token; it
-// does not register the GitHub App or run the install flow (that is ../auth's
-// responsibility).
+// brokering through the Latere identity service rather than a host `gh` login,
+// so it works headless and in cloud. This package consumes that brokered
+// token; it does not register the GitHub App or run the install flow (that is
+// the identity service's responsibility).
 //
 // # Connected packages
 //
