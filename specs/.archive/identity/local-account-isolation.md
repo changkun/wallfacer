@@ -111,7 +111,7 @@ flowchart TD
   S --> T[TasksForPrincipal]
   W --> V{OrgID?}
   T --> V
-  V -- "personal（\"\")" --> OWN[own + adopted-legacy]
+  V -- "personal (empty OrgID)" --> OWN[own + adopted-legacy]
   V -- "org X" --> ORG[strictly org X]
 ```
 
