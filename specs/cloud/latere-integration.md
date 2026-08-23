@@ -28,12 +28,12 @@ that knows nothing about the rest of the Latere ecosystem. Identity sign-in
 grown standalone services that own concerns wallfacer's older cloud specs
 proposed to build from scratch:
 
-- **Identity** (auth.latere.ai) - OIDC, JWTs, orgs, teams,
-  service accounts, Stripe billing, RFC 8693 token exchange.
-- **Cella** (cella.latere.ai) - K8s sandbox execution,
-  warm pools, durable workspaces, credential vault, per-sandbox identity JWTs.
-- **FS** (fs.latere.ai) - two-tier file data plane (Spaces
-  cold + PVC hot); `/files/*` is live, `/workspaces/*` is planned.
+- **Identity** (auth.latere.ai) - OIDC, JWTs, orgs, teams, service accounts,
+  Stripe billing, RFC 8693 token exchange.
+- **Cella** (cella.latere.ai) - K8s sandbox execution, warm pools, durable
+  workspaces, credential vault, per-sandbox identity JWTs.
+- **FS** (fs.latere.ai) - two-tier file data plane (Spaces cold + PVC hot);
+  `/files/*` is live, `/workspaces/*` is planned.
 - **Lux** - model key custody and routing.
 - **MCP Registry** - approved tool catalog.
 - **`latere.ai/x/pkg`** - shared Go libraries (`jwtauth`, `oidc`, `authkit`,

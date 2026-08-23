@@ -214,10 +214,9 @@ Wallfacer is pre-1.0 and released from `main` as tagged versions. The HTTP API
 (documented in [API & Transport](docs/internals/api-and-transport.md)), the
 on-disk layout under `~/.wallfacer/`, and the `WALLFACER_*` environment
 variables can still change between releases. Per-release changes are recorded
-in [docs/releases/](docs/releases/). The command surface (`wallfacer run`,
-`status`, `spec`, `auth`, `web`, `doctor`) has been stable across recent
-releases. Every Go package lives under `internal/`, so this repository exposes
-no importable public Go API.
+in [docs/releases/](docs/releases/). The command surface is `wallfacer run`,
+`status`, `spec`, `auth`, `web`, and `doctor`. Every Go package lives under
+`internal/`, so this repository exposes no importable public Go API.
 
 ## License
 
