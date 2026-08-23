@@ -19,9 +19,12 @@ var supportedToposPackages = map[string]bool{
 // seamPackages maps a wallfacer package to the topos engine subpackages it is
 // the designated seam for. A seam confines an engine import to one package so
 // the rest of wallfacer depends on the seam rather than the engine directly.
-// internal/toposadv is the sole importer of the topos adversarial engine.
+// internal/adversarial is the sole importer of the topos adversarial engine: it
+// holds the engine implementations (ReviewVerifier, HarnessCritic, the
+// fork-session proposer) and exposes its own Verifier/VerifyInput/VerifyResult
+// types, so no other package names an engine type.
 var seamPackages = map[string]map[string]bool{
-	"latere.ai/x/wallfacer/internal/toposadv": {
+	"latere.ai/x/wallfacer/internal/adversarial": {
 		"latere.ai/x/topos/adversarial":        true,
 		"latere.ai/x/topos/adversarial/claude": true,
 	},

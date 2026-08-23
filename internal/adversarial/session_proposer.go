@@ -1,7 +1,8 @@
 package adversarial
 
 import (
-	"latere.ai/x/wallfacer/internal/toposadv"
+	toposadv "latere.ai/x/topos/adversarial"
+	reviewClaude "latere.ai/x/topos/adversarial/claude"
 )
 
 // NewSessionProposer returns a Proposer backed by the claude fork-session path.
@@ -17,5 +18,5 @@ func NewSessionProposer(sessionID, cwd string) toposadv.Proposer {
 	if sessionID == "" {
 		return nil
 	}
-	return toposadv.NewReadOnlyClaudeProposer(sessionID, cwd)
+	return reviewClaude.NewProposer(sessionID, cwd, reviewClaude.WithProposerReadOnly())
 }

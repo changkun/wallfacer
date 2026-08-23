@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
+	toposadv "latere.ai/x/topos/adversarial"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/toposadv"
 )
 
-// HarnessCritic implements toposadv.Critic using wallfacer's existing
+// HarnessCritic implements the topos adversarial Critic interface using wallfacer's existing
 // runner.RunCriticRound infrastructure. Each Round call is a one-shot
-// stateless invocation: the critic prompt is assembled by toposadv.AssemblePrompt,
+// stateless invocation: the critic prompt is assembled by the engine's AssemblePrompt,
 // passed to the harness, and the stdout is returned as CriticResult.Markdown.
 //
 // The critic harness defaults to harness.Claude; future configuration can

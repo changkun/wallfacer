@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/topos/adversarial"
+	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -312,7 +312,7 @@ func TestReviewTask_RejectsTaskWithoutSession(t *testing.T) {
 
 func TestReviewTask_Accepts202ForWaitingTaskWithSession(t *testing.T) {
 	h := newTestHandler(t)
-	h.verifier = &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0}}
+	h.verifier = &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0}}
 
 	id := createWaitingTask(t, h, "verify-me")
 	// Set a session ID on the task.

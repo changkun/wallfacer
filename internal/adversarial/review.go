@@ -1,6 +1,12 @@
-// Package adversarial wires wallfacer's harnesses into review's adversarial
-// debate protocol. It provides implementations of [toposadv.Verifier]
-// — the review-owned integration interface — backed by wallfacer's runner.
+// Package adversarial wires wallfacer's harnesses into the topos adversarial
+// debate protocol. It provides implementations of [Verifier] — the
+// wallfacer-side verification interface — backed by wallfacer's runner.
+//
+// This package is the single wallfacer seam onto the topos adversarial engine
+// (latere.ai/x/topos/adversarial and its claude proposer): it holds the engine
+// implementations, so it names the engine, and the embeddable-boundary guard
+// (internal/agentgraph) permits those imports only here. Every other wallfacer
+// package depends on this package's own types instead.
 //
 // [ReviewVerifier] is the only implementation. It is constructed once at
 // handler startup; the reviewEnabled runtime flag is checked per call rather
@@ -13,14 +19,14 @@ import (
 	"fmt"
 	"strings"
 
+	toposadv "latere.ai/x/topos/adversarial"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/toposadv"
 )
 
-// ReviewVerifier implements toposadv.Verifier using review's Engine.
+// ReviewVerifier implements [Verifier] using the topos adversarial Engine.
 // It wires a Claude SessionProposer (fork-session) and a HarnessCritic
-// (wallfacer runner one-shot) into toposadv.Engine and calls Run.
+// (wallfacer runner one-shot) into the engine and calls Run.
 type ReviewVerifier struct {
 	runner          runner.Interface
 	criticHarnesses []harness.ID // rotated per fork for perspective diversity
@@ -31,7 +37,7 @@ type ReviewVerifier struct {
 // perspective diversity — different models with different blind spots, which is
 // the point of adversarial debate. Defaults to Claude-only when none are given.
 // The proposer is always Claude (fork-session is Claude-native).
-func NewReviewVerifier(r runner.Interface, criticHarnesses ...harness.ID) toposadv.Verifier {
+func NewReviewVerifier(r runner.Interface, criticHarnesses ...harness.ID) Verifier {
 	if len(criticHarnesses) == 0 {
 		criticHarnesses = []harness.ID{harness.Claude}
 	}
@@ -53,7 +59,7 @@ func (v *ReviewVerifier) criticHarnessForFork(forkIdx int) harness.ID {
 
 // Verify runs adversarial verification on a completed task's implementation.
 // Returns nil result when SessionID is empty (no fork-session available).
-func (v *ReviewVerifier) Verify(ctx context.Context, in toposadv.VerifyInput) (*toposadv.VerifyResult, error) {
+func (v *ReviewVerifier) Verify(ctx context.Context, in VerifyInput) (*VerifyResult, error) {
 	if in.SessionID == "" {
 		return nil, nil
 	}
@@ -88,7 +94,7 @@ func (v *ReviewVerifier) Verify(ctx context.Context, in toposadv.VerifyInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return &toposadv.VerifyResult{
+	return &VerifyResult{
 		Unresolved: sum.Unresolved,
 		Headline:   sum.Headline,
 		SessionDir: sum.SessionDir,

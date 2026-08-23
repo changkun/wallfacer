@@ -18,12 +18,12 @@ import (
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/statemachine"
 	"latere.ai/x/pkg/watcher"
+	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
-	"latere.ai/x/wallfacer/internal/toposadv"
 )
 
 // maxConcurrentTasks returns the configured parallel task limit. Per-group
@@ -1312,7 +1312,7 @@ func (h *Handler) runReview(ctx context.Context, s *store.Store, t store.Task) e
 
 	forks, rounds, costCap := h.reviewTuning()
 
-	input := toposadv.VerifyInput{
+	input := wadversarial.VerifyInput{
 		TaskPrompt:    t.Prompt,
 		Criteria:      t.Criteria, // anchors critics to the same acceptance bar as the test agent
 		SessionID:     *t.SessionID,

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/topos/adversarial"
+	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -44,12 +44,12 @@ func TestSetReview_EnablesAndDisables(t *testing.T) {
 // mockVerifier records Verify calls.
 type mockVerifier struct {
 	called int
-	lastIn adversarial.VerifyInput
-	result *adversarial.VerifyResult
+	lastIn wadversarial.VerifyInput
+	result *wadversarial.VerifyResult
 	err    error
 }
 
-func (v *mockVerifier) Verify(_ context.Context, in adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
+func (v *mockVerifier) Verify(_ context.Context, in wadversarial.VerifyInput) (*wadversarial.VerifyResult, error) {
 	v.called++
 	v.lastIn = in
 	return v.result, v.err
@@ -57,7 +57,7 @@ func (v *mockVerifier) Verify(_ context.Context, in adversarial.VerifyInput) (*a
 
 func TestTryAutoReview_SkipsWhenDisabled(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0}}
 	h.verifier = v
 	// ReviewEnabled defaults to false — tryAutoReview must not call verifier.
 	h.tryAutoReview(context.Background())
@@ -68,7 +68,7 @@ func TestTryAutoReview_SkipsWhenDisabled(t *testing.T) {
 
 func TestTryAutoReview_SkipsTaskWithoutSession(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0}}
 	h.verifier = v
 	h.SetReview(true)
 
@@ -94,7 +94,7 @@ func TestTryAutoReview_SkipsTaskWithoutSession(t *testing.T) {
 
 func TestTryAutoReview_SkipsTaskWithReviewAlreadyRun(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0}}
 	h.verifier = v
 	h.SetReview(true)
 
@@ -217,7 +217,7 @@ func waitingTaskWithSession(t *testing.T, s *store.Store) store.Task {
 func TestRunReview_PersistsWhenWaiting(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	unresolved := 3
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: unresolved, Headline: "boom"}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: unresolved, Headline: "boom"}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -246,7 +246,7 @@ func TestRunReview_PersistsWhenWaiting(t *testing.T) {
 // usage total and recorded under the "review" sub-agent breakdown.
 func TestRunReview_AttributesCost(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0, USD: 0.42}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0, USD: 0.42}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -282,7 +282,7 @@ func TestRunReview_AttributesTokensFromEndJson(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(sessionDir, "end.json"), []byte(endJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0, USD: 0.91, SessionDir: sessionDir}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0, USD: 0.91, SessionDir: sessionDir}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -313,7 +313,7 @@ func TestRunReview_AttributesTokensFromEndJson(t *testing.T) {
 // than silently running in the background.
 func TestRunReview_EmitsTimelineEvents(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref in foo"}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 2, Headline: "nil deref in foo"}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -379,7 +379,7 @@ func TestReviewSupersedesTest_Gate(t *testing.T) {
 func TestRunReview_BlocksOnUnresolved(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	h.SetAutoimplement(true)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 2, Headline: "nil deref"}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 2, Headline: "nil deref"}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -410,7 +410,7 @@ func TestRunReview_BlocksOnUnresolved(t *testing.T) {
 	}
 
 	// A clean verdict clears the barrier.
-	v.result = &adversarial.VerifyResult{Unresolved: 0}
+	v.result = &wadversarial.VerifyResult{Unresolved: 0}
 	if err := h.runReview(ctx, s, task); err != nil {
 		t.Fatalf("runReview clean: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestRunReview_BlocksOnUnresolved(t *testing.T) {
 // the test agent (the previously-blocked goal #7).
 func TestRunReview_ThreadsCriteria(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 0}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -455,7 +455,7 @@ func TestRunReview_ThreadsCriteria(t *testing.T) {
 // result onto it.
 func TestRunReview_SkipsPersistWhenNotWaiting(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	v := &mockVerifier{result: &adversarial.VerifyResult{Unresolved: 5, Headline: "stale"}}
+	v := &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 5, Headline: "stale"}}
 	h.verifier = v
 
 	ctx := context.Background()
@@ -494,13 +494,13 @@ type blockingVerifier struct {
 	release chan struct{}
 }
 
-func (v *blockingVerifier) Verify(_ context.Context, _ adversarial.VerifyInput) (*adversarial.VerifyResult, error) {
+func (v *blockingVerifier) Verify(_ context.Context, _ wadversarial.VerifyInput) (*wadversarial.VerifyResult, error) {
 	v.mu.Lock()
 	v.called++
 	v.mu.Unlock()
 	v.entered <- struct{}{}
 	<-v.release
-	return &adversarial.VerifyResult{Unresolved: 0}, nil
+	return &wadversarial.VerifyResult{Unresolved: 0}, nil
 }
 
 // TestTryAutoReview_DedupesConcurrentTicks proves a waiting task whose review run is
