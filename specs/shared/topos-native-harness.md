@@ -2,7 +2,7 @@
 title: Topos as Native Harness
 status: stale
 depends_on:
-  - topos-runtime-integration
+  - specs/local/topos-runtime-integration.md
 affects:
   - internal/harness/
   - internal/agentgraph/

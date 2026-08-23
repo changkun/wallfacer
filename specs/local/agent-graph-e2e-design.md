@@ -2,8 +2,8 @@
 title: Agent Graph — end-to-end design and teardown of the legacy flow mechanism
 status: stale
 depends_on:
-  - local/unified-agent-graph-ui.md
-  - local/topos-runtime-integration.md
+  - specs/local/unified-agent-graph-ui.md
+  - specs/local/topos-runtime-integration.md
 affects:
   - internal/flow/
   - internal/runner/

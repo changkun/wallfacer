@@ -2,7 +2,7 @@
 title: Unified Agent-Graph UI (merge Agents and Flows)
 status: stale
 depends_on:
-  - local/topos-runtime-integration.md
+  - specs/local/topos-runtime-integration.md
 affects:
   - frontend/src/views/
   - frontend/src/components/

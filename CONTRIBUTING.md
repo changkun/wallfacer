@@ -43,13 +43,15 @@ so this is a local-macOS ergonomics issue, not a correctness one. Locally, pass
 ## Conventions
 
 - **Every bug fix ships with a regression test** that fails without the fix and
-  passes with it. No exceptions across backend, frontend, and CLI.
-- **Run `make build` before committing.** It is the full gate.
+  passes with it. This holds across backend, frontend, and CLI.
+- **Run `make build` before committing** to catch formatting, lint, and
+  typecheck failures locally. `make test` adds the backend and frontend test
+  suites and is what CI runs.
 - **Keep commits small** and scoped to one logical change. Use imperative,
   scoped messages: `internal/runner: ...`, `frontend: ...`, `docs: ...`.
 - **Update docs** when a change touches an API route, CLI flag, env variable,
   data model field, or user-visible behavior. User docs live in
   [`docs/guide/`](docs/guide/); internals in [`docs/internals/`](docs/internals/).
 
-The commit and workflow conventions every change must follow are in
-[CLAUDE.md](CLAUDE.md).
+Commit and workflow conventions are in [CLAUDE.md](CLAUDE.md); the same file is
+what coding agents working in this repository read.

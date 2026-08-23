@@ -2,7 +2,7 @@
 title: Live Agent Events for Topos Runs (Event Seam + Stream + UI)
 status: complete
 depends_on:
-  - topos-runtime-integration
+  - specs/local/topos-runtime-integration.md
 affects:
   - internal/agentgraph/adapter.go
   - internal/agentgraph/agentgraph.go
