@@ -6,6 +6,14 @@ metadata:
     app: wallfacerd
 spec:
   replicas: 1
+  # maxSurge 0 is deliberate, not a default. The shared Postgres has 25
+  # connection slots across every latere database, so a surge pod holds two
+  # wallfacerd pools at once and the migration run fails to connect
+  # (SQLSTATE 53300). Replacing the pod keeps the peak at a single pool.
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: wallfacerd
