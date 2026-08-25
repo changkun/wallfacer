@@ -172,7 +172,7 @@ every connected instance's pushes:
   when a laptop closes); it is refreshed on the next reconnect via the rebuild
   path.
 
-### Storage substrate (decided)
+### Storage (decided)
 
 **A thin coordinator-owned store on wf.latere.ai**, co-located with the
 wallfacerd coordinator. Rejected alternatives and why:
@@ -185,7 +185,7 @@ wallfacerd coordinator. Rejected alternatives and why:
   need aggregation queries (group-by member / model / status / time bucket) that
   a blob plane does not serve.
 
-The substrate is **tiered**, because wallfacerd runs multiple replicas (see
+The store is **tiered**, because wallfacerd runs multiple replicas (see
 [connection](connection-and-presence/connection.md) horizontal scaling) and the
 read-model must be shared, not per-replica:
 

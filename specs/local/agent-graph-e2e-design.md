@@ -120,7 +120,7 @@ persistence across topos runs, output capture) -- a redesign.
 
 1. **A4 is ruled out** for now. The legacy flow engine and the `implement`
    multi-turn loop are **not removable** -- they are the working execution
-   substrate. The end state is the staged plan's fallback: **two clean
+   path. The end state is the staged plan's fallback: **two clean
    coordination semantics under one surface** (deterministic DAG = the real
    production path; delegating = a distinct mode), one dispatch, no engine
    teardown.
@@ -343,7 +343,7 @@ Each teardown step ships with a regression test proving the capability survives
   Topos cannot carry the `implement` job without a redesign (no worktrees, no
   commit pipeline, no review/oversight; races to done). See "Spike S outcome".
 - **A4: RULED OUT.** The flow engine and the `implement` loop stay (the working
-  substrate). End state = two clean coordination semantics under one surface.
+  path). End state = two clean coordination semantics under one surface.
 - **A4': delegating-mode honesty (replaces A4).** The delegating/agentic path
   produces no durable commits today, so the surface must mark it EXPERIMENTAL and
   center deterministic graphs as the production path; do not present a delegating

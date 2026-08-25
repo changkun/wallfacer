@@ -15,7 +15,7 @@ effort: small
 
 # Lifecycle: Should There Be a `testing` State?
 
-Load-bearing decision that blocks the drift pipeline
+Decision that blocks the drift pipeline
 ([drift-pipeline.md](drift-pipeline.md)): when a task's implementation is
 done but the tester hasn't rendered a verdict yet, what status does the
 spec carry?

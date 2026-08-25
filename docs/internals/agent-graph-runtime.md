@@ -1,6 +1,6 @@
 # Agent Graph Runtime
 
-Wallfacer embeds the topos runtime SDK (`latere.ai/x/topos`) as an in-process multi-agent execution engine. A topos run compiles a set of agents into a `topos.Region`, executes it inside the wallfacer server process, and returns a final text plus a trace graph of which agent did what and who delegated to whom. This is the execution substrate behind the Agent Graph page (`/agent-graph`), agentic flows, and the native `topos` harness.
+Wallfacer embeds the topos runtime SDK (`latere.ai/x/topos`) as an in-process multi-agent execution engine. A topos run compiles a set of agents into a `topos.Region`, executes it inside the wallfacer server process, and returns a final text plus a trace graph of which agent did what and who delegated to whom. This is the execution engine behind the Agent Graph page (`/agent-graph`), agentic flows, and the native `topos` harness.
 
 The integration is deliberately experimental and opt-in. The built-in `implement` flow does **not** run through it: an ordinary task keeps the multi-turn subprocess turn loop documented in [Task Lifecycle](task-lifecycle.md). Only a flow explicitly marked agentic, or a task explicitly pinned to the `topos` harness, reaches this runtime. Current constraints: static API-key credentials only (Bearer/OAuth deferred), transparent fallback to a deterministic fake model when no credential is configured, no session resume, no MCP, and no verification pass after the in-process run. The milestone history lives in `specs/local/topos-runtime-integration.md`.
 

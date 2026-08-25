@@ -280,7 +280,7 @@ work — DOM-render and drag behavior do not survive jsdom).
   wiring; `SplitContainer` renders the right node kinds; tab bodies use `v-show`
   (assert backgrounded panels stay in the DOM).
 - **Playwright / manual** — drag-and-drop drop zones, gutter resizing, and the
-  load-bearing claim that **the live terminal survives a move** (open terminal,
+  central claim that **the live terminal survives a move** (open terminal,
   type, dock left, confirm the same session/scrollback and a working prompt).
   jsdom cannot exercise xterm or HTML5 drag, so this is verified in a real
   browser (reuse the `frontend/scripts/ui-shots` harness pattern).

@@ -31,7 +31,7 @@ identity decisions are inherited.
 
 ## The two transports, kept separate
 
-The single most load-bearing distinction in this spec. There are **two** wires
+The distinction this spec turns on. There are **two** wires
 and they do not merge:
 
 1. **Browser to local instance: unchanged.** The board still talks to its own

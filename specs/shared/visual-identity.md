@@ -116,7 +116,7 @@ Three child specs, sequenced:
    re-architecture, rewrite, and screenshot regeneration (screenshots depend on
    1; prose can proceed in parallel).
 
-The token contract is the load-bearing decision: **token names do not change**,
+The token contract is the central decision: **token names do not change**,
 only values (plus any additive tokens the new design needs, e.g. gradient and
 glow tokens). That keeps the ~38 style files and all component-scoped CSS
 working without a mass rewrite, and keeps the redesign reviewable.

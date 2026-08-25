@@ -72,7 +72,7 @@ The CPU sink is not the agent CLI itself — it is the **build/test/vite/ripgrep
 subprocesses the agent spawns**. (Hitting *Test*, which is roughly one agent, pegs
 the machine; so count is not the driver — the tool subtree is.) The fix must
 therefore throttle the whole descendant tree, not just the leader. This is the
-load-bearing workstream; C and B do not touch the tool children.
+workstream that fixes it; C and B do not touch the tool children.
 
 In the host launch path (`launchPlainHostAgent` / `launchClaude`), before
 `cmd.Start()`:
@@ -204,7 +204,7 @@ All four phases shipped (directly implemented, not dispatched).
 
 - **Phase 1** — review defaults dropped to the floor (1 fork / 3 rounds);
   `TestReviewTuning_MinimalDefaultsAndOverride` guards the floor + the dial.
-- **Phase 2** (load-bearing) — `HostBackend` launches every agent in its own
+- **Phase 2** (the fix) — `HostBackend` launches every agent in its own
   process group (`Setpgid`) and throttles it: macOS `PRIO_DARWIN_BG` (CPU+I/O,
   inherited by tool children), Linux `PRIO_PGRP` nice, no-op elsewhere; teardown
   and ctx-cancel kill the group, not just the leader. Split across

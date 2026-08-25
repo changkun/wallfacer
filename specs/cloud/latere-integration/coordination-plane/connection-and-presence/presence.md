@@ -43,7 +43,7 @@ the browser re-home.
 
 ## The two transports stay separate
 
-Restating the parent's load-bearing rule, because this leaf touches both:
+Restating the parent's rule, because this leaf touches both:
 
 1. **Browser to its instance: unchanged.** The board keeps the existing SSE
    (`internal/handler/stream.go`, `GET /api/tasks/stream`) and

@@ -549,7 +549,7 @@ Sequenced to deliver value at each step and avoid a year-long landing. Each step
 8. **Presence + focus** - new events on the SSE stream, `/api/presence/focus` endpoint, avatar stack in the header, viewers on cards. **Pending.**
 9. **Attribution UI** - timeline actor chips, created-by chips on cards, audit log tab. **Pending.**
 10. **Planning thread visibility** - `Visibility` field, creator-gated read for private, admin-only visibility change, lock icon in the tab bar. **Pending.**
-11. **Typing indicators + compose awareness** - optional polish; last to land because it is the least load-bearing. **Pending.**
+11. **Typing indicators + compose awareness** - optional polish; last to land because nothing depends on it. **Pending.**
 12. **Per-member autoimplement controls** - `WALLFACER_AUTOIMPLEMENT_ALLOWED_ACTORS`, `WALLFACER_AUTOIMPLEMENT_PER_ACTOR_LIMIT`, admin UI. **Pending.**
 
 Steps 1-5 form the **RBAC-on-rails** minimum viable milestone. Steps 1-2 have landed; with steps 3-5 any cloud-hosted deployment can launch with correct attribution + authorization; 6-12 layer collaborative polish.

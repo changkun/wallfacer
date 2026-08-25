@@ -31,7 +31,7 @@ the reconciliation model needs design before it is `drafted`.
   yours, diffable, and survive the coordinator.
 - **Offline.** A teammate with no coordinator connection (no network, no shared
   remote yet) can still read and author comments locally; the git copy is the
-  durable substrate when the relay is unavailable.
+  durable store when the relay is unavailable.
 
 ## What export does
 

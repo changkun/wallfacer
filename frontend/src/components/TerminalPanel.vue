@@ -8,8 +8,8 @@ import type { DockRegion } from '../lib/dock/types';
 // The terminal is a dockable panel. DockWorkspace mounts this component once and
 // passes the mount element its body should teleport into (the current region, or
 // the maximize overlay). Teleport preserves the component instance across moves,
-// so the xterm instance and WebSocket survive being docked to another edge — the
-// load-bearing constraint in specs/local/dockable-panel-workspace.md. Only the
+// so the xterm instance and WebSocket survive being docked to another edge, the
+// constraint stated in specs/local/dockable-panel-workspace.md. Only the
 // DOM renderer is loaded; a canvas/WebGL addon would lose its context on
 // re-parent and must not be added.
 const props = defineProps<{ target: HTMLElement | null }>();

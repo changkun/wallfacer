@@ -108,7 +108,7 @@ func TestNew_AppliesMigrations(t *testing.T) {
 	}
 }
 
-// TestNew_ExistingTablesUpgrade is the load-bearing case: a deployment that ran
+// TestNew_ExistingTablesUpgrade is the case that matters: a deployment that ran
 // the original inline schema has the tables but no schema_migrations row. New
 // must run 000001 against it as a no-op that stamps version 1, never erroring or
 // going dirty. It fails if 000001 is ever rewritten to non-idempotent DDL.

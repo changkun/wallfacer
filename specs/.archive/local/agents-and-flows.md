@@ -35,9 +35,9 @@ pipes through multiple stages" into two first-class user-facing primitives:
 Users define both from dedicated sidebar tabs. The task composer collapses
 to "pick a Flow, optionally write a prompt, submit" — no more Type picker
 (`Implement` / `Brainstorm`), no per-task Agent overrides, no hidden
-`idea-agent` TaskKind special case. The primitive also gives routines,
-observability agents, and future multi-agent workflows a common substrate
-instead of minting a new `TaskKind` for each.
+`idea-agent` TaskKind special case. The primitive also serves routines,
+observability agents, and future multi-agent workflows instead of minting a
+new `TaskKind` for each.
 
 ## Current State
 

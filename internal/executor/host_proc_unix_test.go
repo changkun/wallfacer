@@ -16,8 +16,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TestConfigureProcessGroup_GroupKillReapsChildren proves the load-bearing
-// teardown property: an agent put in its own process group, then group-killed,
+// TestConfigureProcessGroup_GroupKillReapsChildren proves the teardown
+// property: an agent put in its own process group, then group-killed,
 // takes its tool subprocesses down with it (no orphans). Without Setpgid + the
 // negative-pid group kill, the inner `sleep` would survive the leader.
 func TestConfigureProcessGroup_GroupKillReapsChildren(t *testing.T) {

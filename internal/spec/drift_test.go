@@ -44,7 +44,7 @@ func TestClassifyDrift_WithCriteria(t *testing.T) {
 }
 
 func TestClassifyDrift_CriteriaAbsentFallback(t *testing.T) {
-	// The load-bearing case: a spec with no acceptance criteria (Total == 0)
+	// The case that matters: a spec with no acceptance criteria (Total == 0)
 	// and unexpected files must NOT be classified minimal.
 	withUnexpected := DriftVerdict{Unexpected: []string{"surprise.go"}}
 	if got := ClassifyDrift(withUnexpected); got != DriftModerate {

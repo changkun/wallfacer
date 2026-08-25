@@ -15,7 +15,7 @@ effort: medium
 
 Two tightly linked concerns:
 1. **Small write**: on dispatch, write `status: validated` alongside
-   `dispatched_task_id`. Defensive today; load-bearing for folder
+   `dispatched_task_id`. Defensive today; required for folder
    dispatch.
 2. **Folder dispatch**: lift the "non-leaf specs cannot be dispatched"
    rejection so a design spec can dispatch its whole subtree in one

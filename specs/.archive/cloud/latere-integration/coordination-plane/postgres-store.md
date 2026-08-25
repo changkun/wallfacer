@@ -104,7 +104,7 @@ Files: new `internal/store/postgres/postgres.go`, new
 
 `000001_spec_comments.up.sql` is the **verbatim** current `pgSchema` body: the
 two `CREATE TABLE IF NOT EXISTS` plus their `CREATE INDEX IF NOT EXISTS`. This
-is load-bearing for upgrades: an existing deployment that already set
+matters for upgrades: an existing deployment that already set
 `WALLFACER_DATABASE_URL` has both tables but no `schema_migrations` table.
 golang-migrate reads version 0 and runs `000001` against it; the idempotent
 `IF NOT EXISTS` DDL makes that a no-op that simply stamps version 1. Rewriting
@@ -175,7 +175,7 @@ gate `commentstore_contract_test.go` already uses.
 - **`postgres_test.go` (new), env-gated.**
   - `New` on an empty database creates `schema_migrations` and applies `000001`;
     the comment tables exist and version is 1.
-  - **Existing-table upgrade (the load-bearing case):** pre-create
+  - **Existing-table upgrade (the case that matters):** pre-create
     `spec_comment_threads` / `spec_comments` (the pre-migration shape), then run
     `New`; assert it succeeds, is not dirty, and stamps version 1. This proves
     today's `WALLFACER_DATABASE_URL` deployments upgrade cleanly. It fails if
@@ -219,7 +219,7 @@ confirmed shipped on `main`.
   unchanged. `web.go` needed no change (it never closed the store).
 - **Tests**: `postgres_test.go` (empty-DB, existing-tables upgrade, idempotent
   re-run, down) and the updated comment-store contract branch, both env-gated on
-  `WALLFACER_TEST_DATABASE_URL`. Verified against Postgres 16: the load-bearing
+  `WALLFACER_TEST_DATABASE_URL`. Verified against Postgres 16:
   `TestNew_ExistingTablesUpgrade` and the `postgres` contract subtest pass.
 
 ### Decisions made during implementation

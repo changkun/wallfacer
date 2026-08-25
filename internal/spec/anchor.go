@@ -7,7 +7,7 @@ package spec
 //
 // The contract lives in
 // specs/cloud/latere-integration/coordination-plane/spec-comments.md
-// ("Anchoring across spec edits"). Two properties are load-bearing:
+// ("Anchoring across spec edits"). Two properties must hold:
 //
 //   - Portability: normalizeLine + LineHash are FROZEN. The coordinator stores
 //     the hash but never computes it (it holds no source); the client and the

@@ -300,7 +300,7 @@ heading, or text inside a skipped code/mermaid block). Because each mark sits on
 text span, two comments on one paragraph both stay visible — there is no shared anchor
 position for a newer comment to stack over and hide.
 
-The load-bearing rule the user asked for: **a thread stops highlighting the spec the
+The rule the user asked for: **a thread stops highlighting the spec the
 moment its anchor is lost.** An orphaned thread does not sit on the spec as a stale
 mark; it leaves the inline view entirely and surfaces only in the triage list. So
 opening a spec is never flagged "has comments" because of a comment whose text is

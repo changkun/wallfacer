@@ -121,7 +121,7 @@ independently:
 | Child spec | Focus | Effort | Status |
 |---|---|---|---|
 | [propagation-algorithm.md](spec-state-control-plane/propagation-algorithm.md) | Two-channel fan-out (`depends_on` reverse + `affects` overlap); reverse index; containment; `FanOutStale` helper. Shared infrastructure used by chat-edit and drift-pipeline. | medium | complete |
-| [lifecycle-testing-state.md](spec-state-control-plane/lifecycle-testing-state.md) | Decide: add a 7th `testing` state or keep implicit. Load-bearing for the drift pipeline. | small | complete |
+| [lifecycle-testing-state.md](spec-state-control-plane/lifecycle-testing-state.md) | Decide: add a 7th `testing` state or keep implicit. The drift pipeline depends on it. | small | complete |
 | [drift-pipeline.md](spec-state-control-plane/drift-pipeline.md) | Task-done flow: `validated → testing`, tester agent + verdict schema, branch to `complete`/`stale`, fan-out, tester failure handling, `implementation_commit` frontmatter, commit concurrency. | large | complete |
 | [chat-edit-fanout.md](spec-state-control-plane/chat-edit-fanout.md) | Chat rounds that modify specs fan out staleness to dependents using the propagation algorithm. `updated`-only bumps skipped. | small | complete |
 | [dispatch-validated.md](spec-state-control-plane/dispatch-validated.md) | Dispatch writes `status: validated`; folder dispatch accepts non-leaf paths and marks the subtree validated. | medium | complete |
@@ -146,7 +146,7 @@ graph LR
 ```
 
 - `propagation-algorithm` and `lifecycle-testing-state` must settle
-  first - they're load-bearing for the drift pipeline.
+  first - the drift pipeline depends on them.
 - `chat-edit-fanout` also depends on `propagation-algorithm`.
 - `dispatch-validated`, `explicit-validate`, `periodic-scan` are
   independent and can run in parallel.
