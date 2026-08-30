@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -472,4 +473,54 @@ func TestPrettyValue(t *testing.T) {
 			t.Errorf("prettyValue(true) = %q, want %q", got, "true")
 		}
 	})
+}
+
+// TestAdoptRoutesNamedLoggersThroughBase verifies that Adopt rebuilds every
+// named logger on the supplied base, so records written through them reach the
+// base handler. This is the seam that puts the server tree's logs on the OTLP
+// bridge: without it, the named loggers keep their own local handler and the
+// bridge sees nothing.
+func TestAdoptRoutesNamedLoggersThroughBase(t *testing.T) {
+	t.Cleanup(func() { Init("text") })
+
+	var buf bytes.Buffer
+	Adopt(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	named := map[string]*slog.Logger{
+		"main":     Main,
+		"runner":   Runner,
+		"store":    Store,
+		"git":      Git,
+		"handler":  Handler,
+		"recovery": Recovery,
+		"prompts":  Prompts,
+	}
+	for component, lg := range named {
+		buf.Reset()
+		lg.Info("adopted")
+		var rec struct {
+			Msg       string `json:"msg"`
+			Component string `json:"component"`
+		}
+		if err := json.Unmarshal(buf.Bytes(), &rec); err != nil {
+			t.Fatalf("%s: decode record %q: %v", component, buf.String(), err)
+		}
+		if rec.Msg != "adopted" {
+			t.Errorf("%s: msg = %q, want %q", component, rec.Msg, "adopted")
+		}
+		if rec.Component != component {
+			t.Errorf("%s: component = %q, want %q", component, rec.Component, component)
+		}
+	}
+}
+
+// TestNewFormatHandlerFormats verifies the handler Init builds is available on
+// its own, in both formats, for handing to otel.Bootstrap as Config.Stdout.
+func TestNewFormatHandlerFormats(t *testing.T) {
+	if _, ok := NewFormatHandler("json").(*slog.JSONHandler); !ok {
+		t.Error(`NewFormatHandler("json") must return a JSON handler`)
+	}
+	if _, ok := NewFormatHandler("text").(*prettyHandler); !ok {
+		t.Error(`NewFormatHandler("text") must return the pretty handler`)
+	}
 }
