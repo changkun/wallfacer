@@ -29,8 +29,9 @@ import (
 // bootstrap running later in the test keeps its noop path and leaves these
 // globals alone.
 //
-// The provider is shut down at test cleanup, which flushes every span into the
-// recorder. Call Spans after the work under test has finished.
+// The recorder collects spans as they end, so read it with [SpanNames] or
+// rec.Ended() once the work under test has finished. The provider is shut down
+// at test cleanup.
 func Install(t *testing.T) *tracetest.SpanRecorder {
 	t.Helper()
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
