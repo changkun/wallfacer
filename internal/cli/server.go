@@ -7,6 +7,7 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -72,13 +73,48 @@ type ServerComponents struct {
 	TelemetryShutdown func(context.Context) error
 }
 
-// Shutdown performs a graceful shutdown: drains HTTP connections and waits
-// for background runner goroutines to finish.
+// shutdownTimeout is the budget for draining HTTP connections and stopping
+// background workers before the process gives up and exits.
+const shutdownTimeout = 5 * time.Second
+
+// Serve runs the HTTP server on the already-bound listener until sc.Ctx is
+// cancelled, then shuts everything down within shutdownTimeout. It returns nil
+// on a clean stop; http.ErrServerClosed is the normal stop signal.
+//
+// This mirrors otel.RunServer's contract, which wallfacer cannot call directly:
+// otel.RunServer owns the listen call (srv.ListenAndServe), while wallfacer
+// binds its listener up front so it can fall back to a free port and feed the
+// resolved host:port into the CSRF middleware and the browser it opens.
+func (sc *ServerComponents) Serve() error {
+	srvErr := make(chan error, 1)
+	go func() {
+		err := sc.Srv.Serve(sc.Ln)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		srvErr <- err
+	}()
+
+	logger.Main.Info("listening", "addr", sc.Ln.Addr().String())
+
+	select {
+	case err := <-srvErr:
+		// The server stopped on its own (accept failure or an early close).
+		return err
+	case <-sc.Ctx.Done():
+		logger.Main.Info("received shutdown signal, shutting down gracefully")
+	}
+	sc.Shutdown()
+	return nil
+}
+
+// Shutdown performs a graceful shutdown: drains HTTP connections, waits for
+// background runner goroutines to finish, and flushes telemetry.
 func (sc *ServerComponents) Shutdown() {
 	sc.Stop()
 
 	logger.Main.Info("shutting down http server")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
 		logger.Main.Error("http server shutdown", "error", err)
@@ -521,8 +557,15 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// via the board enables the outbound coordination connection automatically.
 	srvHandler = coordBridge.wrap(srvHandler)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
+	// otel.Handler is the outermost wrapper: it starts the server span, sets the
+	// X-Trace-Id response header, and records http.route from the matched
+	// ServeMux pattern. loggingMiddleware stays inside it and keeps feeding the
+	// wallfacer_* Prometheus series unchanged. It is not folded into
+	// WithMetricsHook because the hook reports a status class ("2xx") while
+	// wallfacer_http_requests_total is labelled with the exact status code, and
+	// because probes skipped for tracing must still be counted.
 	srv := &http.Server{
-		Handler:     loggingMiddleware(srvHandler, reg),
+		Handler:     otel.Handler(loggingMiddleware(srvHandler, reg), "wallfacer", otel.WithSkip(skipTracing)),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 
@@ -666,24 +709,9 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, sc.ActualPort))
 	}
 
-	srvErr := make(chan error, 1)
-	go func() {
-		srvErr <- sc.Srv.Serve(sc.Ln)
-	}()
-
-	logger.Main.Info("listening", "addr", sc.Ln.Addr().String())
-
-	select {
-	case <-sc.Ctx.Done():
-		logger.Main.Info("received shutdown signal, shutting down gracefully")
-	case err := <-srvErr:
-		if err != nil && err != http.ErrServerClosed {
-			logger.Fatal("server", "error", err)
-		}
-		return
+	if err := sc.Serve(); err != nil {
+		logger.Fatal("server", "error", err)
 	}
-
-	sc.Shutdown()
 }
 
 // stripSSGContent disables vite-ssg hydration and injects a script that
@@ -1458,6 +1486,13 @@ func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return h.Hijack()
 	}
 	return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
+}
+
+// skipTracing filters requests that must not produce a server span. The
+// Prometheus scrape runs on a fixed interval and would otherwise dominate trace
+// volume while saying nothing about user-visible work.
+func skipTracing(r *http.Request) bool {
+	return r.URL.Path == "/metrics"
 }
 
 // loggingMiddleware logs each HTTP request and records Prometheus metrics.
