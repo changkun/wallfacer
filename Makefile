@@ -72,14 +72,18 @@ lint-go: frontend-build
 lint-js:
 	cd frontend && bun run typecheck
 
-# Guardrail from observability spec 01: every outbound HTTP client must carry
-# the otel transport so W3C trace context propagates across service hops.
-# Flags any non-test &http.Client{...} literal that does not set Transport.
+# lint-otel keeps outbound HTTP instrumented so traces propagate across
+# services. It fails on two shapes: an &http.Client{ ... } composite literal
+# whose body sets no Transport field, and any use of http.DefaultClient. The awk
+# program walks from the opening brace to its matching close brace, so a
+# Transport field several lines down still counts. Strings and comments are
+# removed before matching, so writing about this rule does not trip it. Brace
+# character classes are bracketed so mawk, the awk on ubuntu-latest, parses them.
 lint-otel:
-	@bare="$$(grep -rn '&http.Client{' --include='*.go' internal/ *.go 2>/dev/null | grep -v _test.go | grep -v Transport || true)"; \
-	if [ -n "$$bare" ]; then \
-		echo "bare &http.Client{} without otel.Transport (observability spec 01):"; \
-		echo "$$bare"; \
+	@bad=$$(find internal scripts *.go -name '*.go' ! -name '*_test.go' -exec awk 'function strip(l, i, n, c, d, out) { n = length(l); out = ""; i = 1; while (i <= n) { c = substr(l, i, 1); d = substr(l, i + 1, 1); if (blk) { if (c == "*" && d == "/") { blk = 0; i += 2 } else { i++ } } else if (q != "") { out = out c; if (c == q) q = ""; i++ } else if (c == "\"" || c == "`") { q = c; out = out c; i++ } else if (c == "/" && d == "/") { break } else if (c == "/" && d == "*") { blk = 1; i += 2 } else { out = out c; i++ } } return out } FNR == 1 { blk = 0; q = "" } { c = strip($$0); if (index(c, "http.DefaultClient")) print FILENAME ":" FNR ": http.DefaultClient is not instrumented; use otel.HTTPClient()"; p = index(c, "&http.Client{"); if (p == 0) next; start = FNR; s = substr(c, p + 13); body = s; depth = 1; while (1) { depth += gsub(/[{]/, "{", s) - gsub(/[}]/, "}", s); if (depth <= 0) break; if ((getline) <= 0) break; s = strip($$0); if (index(s, "http.DefaultClient")) print FILENAME ":" FNR ": http.DefaultClient is not instrumented; use otel.HTTPClient()"; body = body s } if (body !~ /Transport/) print FILENAME ":" start ": bare &http.Client{...} literal sets no Transport; use otel.Transport(...)" }' {} +); \
+	if [ -n "$$bad" ]; then \
+		echo "uninstrumented outbound HTTP client:" >&2; \
+		echo "$$bad" >&2; \
 		exit 1; \
 	fi
 
