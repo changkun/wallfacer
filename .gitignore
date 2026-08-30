@@ -26,3 +26,6 @@ go.work.sum
 # Runtime-served static artifacts (decks, reports); user content, not source.
 /artifacts/
 frontend/coverage-js/
+
+# Agent instructions live in AGENTS.md; CLAUDE.md is a local symlink to it.
+CLAUDE.md
