@@ -2,22 +2,46 @@ package github
 
 import (
 	"net/http"
-	"reflect"
 	"testing"
 
-	"latere.ai/x/pkg/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	"latere.ai/x/wallfacer/internal/oteltest"
 )
 
-// The default GitHub clients must carry the otel transport so outbound calls
-// record client spans and propagate trace context.
-// These tests fail on a bare client (nil Transport).
+// The default GitHub clients must record a client span and send W3C trace
+// context. These tests issue a real request rather than asserting on the
+// transport's type, which cannot tell a working client from an inert one.
 
-func TestClientDefaultUsesOtelTransport(t *testing.T) {
-	c := &Client{}
-	want := reflect.TypeOf(otel.Transport(nil))
-	if got := reflect.TypeOf(c.httpClient().Transport); got != want {
-		t.Fatalf("Client default transport = %v, want %v", got, want)
+// requireTraced issues a request through client against a recording server and
+// asserts both halves of a live client hop.
+func requireTraced(t *testing.T, name string, client *http.Client) {
+	t.Helper()
+	rec := oteltest.Install(t)
+	srv := oteltest.NewServer(t, nil)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
 	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("%s request: %v", name, err)
+	}
+	_ = resp.Body.Close()
+
+	srv.RequireTraceparent(t)
+	if names := oteltest.SpanNames(rec, trace.SpanKindClient); len(names) == 0 {
+		t.Fatalf("%s recorded no client span", name)
+	}
+}
+
+func TestClientDefaultPropagatesTraceContext(t *testing.T) {
+	requireTraced(t, "github client", (&Client{}).httpClient())
+}
+
+func TestBrokerDefaultPropagatesTraceContext(t *testing.T) {
+	requireTraced(t, "github broker", (&HTTPBroker{}).httpClient())
 }
 
 func TestClientKeepsCustomHTTPClient(t *testing.T) {
@@ -25,14 +49,6 @@ func TestClientKeepsCustomHTTPClient(t *testing.T) {
 	c := &Client{HTTP: custom}
 	if c.httpClient() != custom {
 		t.Fatal("Client must return the configured HTTP client unchanged")
-	}
-}
-
-func TestBrokerDefaultUsesOtelTransport(t *testing.T) {
-	b := &HTTPBroker{}
-	want := reflect.TypeOf(otel.Transport(nil))
-	if got := reflect.TypeOf(b.httpClient().Transport); got != want {
-		t.Fatalf("HTTPBroker default transport = %v, want %v", got, want)
 	}
 }
 

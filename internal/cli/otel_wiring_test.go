@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,8 +11,9 @@ import (
 
 	otelapi "go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
+
+	"latere.ai/x/wallfacer/internal/oteltest"
 )
 
 // otlpSink stands in for a collector so otel.Bootstrap takes its live path
@@ -67,26 +67,12 @@ func TestRunBootstrapsTelemetry(t *testing.T) {
 	}
 }
 
-// installRecorder registers an SDK TracerProvider backed by a span recorder as
-// the process-wide provider and returns the recorder. OTEL_EXPORTER_OTLP_ENDPOINT
-// is cleared so otel.Bootstrap keeps its noop path and leaves this provider in
-// place.
-func installRecorder(t *testing.T) *tracetest.SpanRecorder {
-	t.Helper()
-	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-	rec := tracetest.NewSpanRecorder()
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
-	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
-	otelapi.SetTracerProvider(tp)
-	return rec
-}
-
 // TestRunServerRecordsServerSpan is the discriminator for the run server's
 // inbound path: it fails when the run handler chain is not wrapped in
 // otel.Handler, which is exactly the pre-fix state. A type assertion on the
 // middleware stack could not tell the two apart.
 func TestRunServerRecordsServerSpan(t *testing.T) {
-	rec := installRecorder(t)
+	rec := oteltest.Install(t)
 	sc := newRunServer(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/debug/health", nil)
@@ -112,7 +98,7 @@ func TestRunServerRecordsServerSpan(t *testing.T) {
 // server span. The scrape runs on a fixed interval and would otherwise dominate
 // trace volume.
 func TestRunServerSkipsMetricsScrapeSpan(t *testing.T) {
-	rec := installRecorder(t)
+	rec := oteltest.Install(t)
 	sc := newRunServer(t)
 
 	rr := httptest.NewRecorder()
@@ -134,7 +120,7 @@ func TestRunServerSkipsMetricsScrapeSpan(t *testing.T) {
 // change: the hook reports a status class ("2xx"), while this counter carries
 // the exact status code.
 func TestRunServerPreservesPrometheusSeries(t *testing.T) {
-	installRecorder(t)
+	oteltest.Install(t)
 	sc := newRunServer(t)
 
 	sc.Srv.Handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/debug/health", nil))

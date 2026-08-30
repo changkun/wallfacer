@@ -2,21 +2,34 @@ package oauth
 
 import (
 	"net/http"
-	"reflect"
 	"testing"
 
-	"latere.ai/x/pkg/otel"
+	"go.opentelemetry.io/otel/trace"
+
+	"latere.ai/x/wallfacer/internal/oteltest"
 )
 
-// The default token-exchange client must carry the otel transport so the
-// outbound hop records a client span. This test fails
-// on a bare client (nil Transport).
+// The default token-exchange client must record a client span and send W3C
+// trace context. This test issues a real request rather than asserting on the
+// transport's type, which cannot tell a working client from an inert one.
 
-func TestManagerDefaultClientUsesOtelTransport(t *testing.T) {
-	m := NewManager()
-	want := reflect.TypeOf(otel.Transport(nil))
-	if got := reflect.TypeOf(m.httpClient().Transport); got != want {
-		t.Fatalf("Manager default transport = %v, want %v", got, want)
+func TestManagerDefaultClientPropagatesTraceContext(t *testing.T) {
+	rec := oteltest.Install(t)
+	srv := oteltest.NewServer(t, nil)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := NewManager().httpClient().Do(req)
+	if err != nil {
+		t.Fatalf("token exchange request: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	srv.RequireTraceparent(t)
+	if names := oteltest.SpanNames(rec, trace.SpanKindClient); len(names) == 0 {
+		t.Fatal("token exchange client recorded no client span")
 	}
 }
 
