@@ -56,10 +56,20 @@ func newRunServer(t *testing.T) *ServerComponents {
 // otel.Transport-wrapped client in the run tree is silently inert.
 func TestRunBootstrapsTelemetry(t *testing.T) {
 	otlpSink(t)
-	newRunServer(t)
 
-	if _, ok := otelapi.GetTracerProvider().(*sdktrace.TracerProvider); !ok {
-		t.Fatalf("run did not register an SDK TracerProvider, got %T", otelapi.GetTracerProvider())
+	// Compare provider identity across the call rather than only its type: an
+	// earlier test in this package may already have installed an SDK provider,
+	// which would make a bare type assertion pass without run registering
+	// anything. Pre-fix the provider is untouched, so before and after match.
+	before := otelapi.GetTracerProvider()
+	newRunServer(t)
+	after := otelapi.GetTracerProvider()
+
+	if after == before {
+		t.Fatalf("run registered no TracerProvider of its own; still %T", after)
+	}
+	if _, ok := after.(*sdktrace.TracerProvider); !ok {
+		t.Fatalf("run did not register an SDK TracerProvider, got %T", after)
 	}
 	fields := otelapi.GetTextMapPropagator().Fields()
 	if !slices.Contains(fields, "traceparent") {
@@ -96,21 +106,27 @@ func TestRunServerRecordsServerSpan(t *testing.T) {
 
 // TestRunServerSkipsMetricsScrapeSpan verifies the Prometheus scrape produces no
 // server span. The scrape runs on a fixed interval and would otherwise dominate
-// trace volume.
+// trace volume. The test serves an ordinary request afterwards and requires a
+// span for it, so it fails on a deleted WithSkip and not merely on a process
+// that records nothing at all.
 func TestRunServerSkipsMetricsScrapeSpan(t *testing.T) {
 	rec := oteltest.Install(t)
 	sc := newRunServer(t)
 
+	serverSpans := func() int { return len(oteltest.SpanNames(rec, trace.SpanKindServer)) }
+
 	rr := httptest.NewRecorder()
 	sc.Srv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/metrics", nil))
-
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET /metrics = %d, want 200", rr.Code)
 	}
-	for _, span := range rec.Ended() {
-		if span.SpanKind() == trace.SpanKindServer {
-			t.Fatalf("metrics scrape recorded a server span %q", span.Name())
-		}
+	if n := serverSpans(); n != 0 {
+		t.Fatalf("metrics scrape recorded %d server span(s); it must be skipped", n)
+	}
+
+	sc.Srv.Handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/debug/health", nil))
+	if n := serverSpans(); n == 0 {
+		t.Fatal("no server span for an ordinary request; the provider is inert, so the skip assertion above proved nothing")
 	}
 }
 
