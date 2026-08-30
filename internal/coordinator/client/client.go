@@ -20,8 +20,18 @@ import (
 
 	"github.com/coder/websocket"
 
+	"latere.ai/x/pkg/otel"
+
 	"latere.ai/x/wallfacer/internal/coordinator"
 )
+
+// dialClient carries the WebSocket handshake. It is otel-instrumented so the
+// upgrade request records a client span and sends traceparent, letting the
+// coordinator's accept side continue the same trace instead of starting a new
+// one. Its Timeout stays zero: coder/websocket rejects a client with a deadline
+// because the connection outlives the request, so the dial budget comes from
+// the context instead (dialTimeout).
+var dialClient = otel.HTTPClient()
 
 // ErrNotConnected is returned by Send when no live connection is held (signed
 // out, opted out, or mid-reconnect). The caller surfaces it to the browser as a
@@ -166,6 +176,7 @@ func (c *Connector) connectOnce(ctx context.Context) bool {
 	dctx, dcancel := context.WithTimeout(ctx, dialTimeout)
 	conn, resp, err := websocket.Dial(dctx, c.cfg.URL, &websocket.DialOptions{
 		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
+		HTTPClient: dialClient,
 	})
 	dcancel()
 	if err != nil {
