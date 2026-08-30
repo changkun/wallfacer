@@ -24,6 +24,7 @@ import (
 	"latere.ai/x/pkg/jwtauth"
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/otel"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/auth"
@@ -65,6 +66,10 @@ type ServerComponents struct {
 
 	// ActualPort is the TCP port the listener is bound to.
 	ActualPort int
+
+	// TelemetryShutdown flushes traces, metrics, and buffered log records.
+	// Always non-nil; it is a noop when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+	TelemetryShutdown func(context.Context) error
 }
 
 // Shutdown performs a graceful shutdown: drains HTTP connections and waits
@@ -87,6 +92,13 @@ func (sc *ServerComponents) Shutdown() {
 	logger.Main.Info("shutting down runner")
 	sc.Runner.Shutdown()
 	logger.Main.Info("shutdown complete")
+
+	// Flush telemetry last so the shutdown diagnostics above are exported too.
+	if sc.TelemetryShutdown != nil {
+		if err := sc.TelemetryShutdown(shutdownCtx); err != nil {
+			logger.Main.Error("telemetry shutdown", "error", err)
+		}
+	}
 }
 
 // initServer performs the full server initialization sequence for RunServer.
@@ -94,7 +106,22 @@ func (sc *ServerComponents) Shutdown() {
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
 func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *ServerComponents {
-	logger.Init(cfg.LogFormat)
+	// Bootstrap telemetry before anything else logs. This registers the
+	// TracerProvider and the W3C propagator for the process, which is what makes
+	// the otel.Transport-wrapped clients in the handler, github, and oauth trees
+	// emit client spans and send traceparent instead of resolving to noop. The
+	// local colored handler is handed over as Config.Stdout so terminal output is
+	// unchanged while the same records also reach the OTLP log bridge.
+	baseLogger, telShutdown, telErr := otel.Bootstrap(context.Background(), otel.Config{
+		ServiceName: "wallfacer",
+		Version:     Version,
+		Stdout:      logger.NewFormatHandler(cfg.LogFormat),
+	})
+	logger.Adopt(baseLogger)
+	if telErr != nil {
+		logger.Main.Warn("otlp logs init failed; continuing on stdout", "error", telErr)
+	}
+
 	initConfigDir(configDir, cfg.EnvFile)
 
 	// One-time rename of the legacy <configDir>/planning state directory to
@@ -507,6 +534,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		Ctx:          ctx,
 		Stop:         stop,
 		ActualPort:   actualPort,
+
+		TelemetryShutdown: telShutdown,
 	}
 }
 
