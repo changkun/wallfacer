@@ -10,6 +10,7 @@
 package oteltest
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -39,7 +40,9 @@ func Install(t *testing.T) *tracetest.SpanRecorder {
 		sdktrace.WithSpanProcessor(rec),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
-	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
+	// Shut down on a fresh context: t.Context() is already cancelled by the time
+	// cleanups run, which would abort the flush.
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
 
 	otelapi.SetTracerProvider(tp)
 	otelapi.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
