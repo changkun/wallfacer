@@ -16,7 +16,7 @@ import (
 func TestMaxConcurrentTasks_DefaultsToOne(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 
-	// Swap the real runner for a mock. The lazyval cache closes over h.runner
+	// Swap the real runner for a mock. The cache.Lazy value closes over h.runner
 	// at construction time via a method call, so replacing the field before
 	// the first Get() is sufficient.
 	h.runner = &runner.MockRunner{}

@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/cache"
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/lazyval"
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/routine"
 	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
@@ -206,8 +206,8 @@ type Handler struct {
 	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
 	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
 	// re-parse the env file on every call. Invalidate on env config update.
-	cachedMaxParallel     *lazyval.Value[int]
-	cachedMaxTestParallel *lazyval.Value[int]
+	cachedMaxParallel     *cache.Lazy[int]
+	cachedMaxTestParallel *cache.Lazy[int]
 
 	// groupLimitsMu guards groupLimits, the in-memory cache of per-workspace-
 	// group concurrency overrides loaded from workspace-groups.json. Refreshed
@@ -275,7 +275,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	oauthMgr := oauth.NewManager()
 	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)
 	h.oauthManager = oauthMgr
-	h.cachedMaxParallel = lazyval.New(func() int {
+	h.cachedMaxParallel = cache.NewLazy(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		limit := constants.DefaultMaxConcurrentTasks
 		if err == nil && cfg.MaxParallelTasks > 0 {
@@ -293,7 +293,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		}
 		return limit
 	})
-	h.cachedMaxTestParallel = lazyval.New(func() int {
+	h.cachedMaxTestParallel = cache.NewLazy(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err != nil || cfg.MaxTestParallelTasks <= 0 {
 			return constants.DefaultMaxTestConcurrentTasks

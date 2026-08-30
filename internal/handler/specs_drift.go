@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/cmdexec"
-	"latere.ai/x/pkg/sortedkeys"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
@@ -229,7 +229,7 @@ func taskCommitRange(task store.Task, ws string) (base, tip string) {
 			return b, t
 		}
 	}
-	for k := range sortedkeys.Of(task.BaseCommitHashes) {
+	for _, k := range slices.Sorted(maps.Keys(task.BaseCommitHashes)) {
 		if t, ok := task.CommitHashes[k]; ok {
 			return task.BaseCommitHashes[k], t
 		}
