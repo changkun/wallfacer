@@ -29,7 +29,7 @@ func RunWeb(args []string, frontendFS fs.FS) {
 }
 
 func runWeb(args []string, frontendFS fs.FS) error {
-	logger, shutdown, logsErr := otel.Bootstrap(context.Background(), otel.Config{ServiceName: "wallfacer-web"})
+	logger, shutdown, logsErr := otel.Bootstrap(context.Background(), otel.Config{ServiceName: "wallfacer-web", Version: Version})
 	if logsErr != nil {
 		logger.Warn("otlp logs init failed; continuing on stdout", "err", logsErr)
 	}
