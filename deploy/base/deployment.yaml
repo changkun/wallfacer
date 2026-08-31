@@ -27,8 +27,11 @@ spec:
           image: ghcr.io/changkun/wallfacerd:main
           imagePullPolicy: Always
           env:
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: http://otel-collector.observability.svc:4318
+            # No OTEL_EXPORTER_OTLP_ENDPOINT here on purpose. The Dash0 operator
+            # injects it, pointing at the node-local collector, and skips any
+            # container that already sets it, emitting only a Warning event. A
+            # value here would leave this service exporting to the retired
+            # collector while the namespace looked migrated.
             - name: AUTH_URL
               value: https://auth.latere.ai
             - name: AUTH_REDIRECT_URL
