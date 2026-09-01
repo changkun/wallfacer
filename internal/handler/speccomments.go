@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"latere.ai/x/pkg/relpath"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -386,12 +387,8 @@ func specFilePath(root, specPath string) (string, bool) {
 // "../" escape must not resolve to a file outside the workspace tree (matching
 // findSpecFile's guard); SubmitSpecComment reads the resolved file directly.
 func containedJoin(root string, parts ...string) (string, bool) {
-	p := filepath.Join(append([]string{root}, parts...)...)
-	rel, err := filepath.Rel(root, p)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", false
-	}
-	return p, true
+	p, err := relpath.Join(root, filepath.Join(parts...))
+	return p, err == nil
 }
 
 func fileExists(p string) bool {

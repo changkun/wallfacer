@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"latere.ai/x/pkg/relpath"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,28 +48,28 @@ type explorerEntry struct {
 	Modified time.Time `json:"modified"`
 }
 
-// isWithinWorkspace resolves symlinks and cleans both paths, then verifies
-// that requestedPath is equal to or a child of workspace. This is the primary
-// path-traversal guard for the file explorer: all read/write/tree operations
-// pass through this function to ensure user input cannot escape the workspace.
-// Returns the cleaned, resolved path or an error if the path escapes the workspace.
+// isWithinWorkspace verifies that requestedPath is workspace or lies inside
+// it once symlinks are resolved. This is the primary path-traversal guard for
+// the file explorer: all read/write/tree operations pass through it so user
+// input cannot escape the workspace, and a symlink inside the workspace
+// cannot redirect an operation outside it.
+//
+// The path need not exist: a file about to be written is judged by the
+// directory it will land in. It returns the symlink-resolved path when the
+// target exists and the cleaned absolute path otherwise, so callers can stat
+// or write it directly.
 func isWithinWorkspace(requestedPath, workspace string) (string, error) {
-	resolvedWS, err := filepath.EvalSymlinks(workspace)
+	inside, err := relpath.Contains(workspace, requestedPath)
 	if err != nil {
 		return "", errors.New("workspace path not accessible")
 	}
-	resolvedWS = filepath.Clean(resolvedWS)
-
-	resolvedReq, err := filepath.EvalSymlinks(requestedPath)
-	if err != nil {
-		return "", errors.New("requested path not accessible")
-	}
-	resolvedReq = filepath.Clean(resolvedReq)
-
-	if resolvedReq != resolvedWS && !strings.HasPrefix(resolvedReq, resolvedWS+string(filepath.Separator)) {
+	if !inside {
 		return "", errors.New("path is outside workspace")
 	}
-	return resolvedReq, nil
+	if resolved, err := filepath.EvalSymlinks(requestedPath); err == nil {
+		return resolved, nil
+	}
+	return filepath.Abs(requestedPath)
 }
 
 // ExplorerTree lists one level of a workspace directory.
@@ -318,17 +319,6 @@ func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
 
 	resolved, err := isWithinWorkspace(path, workspace)
 	if err != nil {
-		// isWithinWorkspace fails for non-existent paths because
-		// EvalSymlinks requires the target to exist. Distinguish a
-		// genuinely missing file from a path-escape attempt by
-		// cleaning the raw path and checking containment manually.
-		cleaned := filepath.Clean(path)
-		wsClean := filepath.Clean(workspace)
-		if cleaned == wsClean || strings.HasPrefix(cleaned, wsClean+string(filepath.Separator)) {
-			// Path is within workspace but doesn't exist.
-			http.Error(w, "file not found", http.StatusNotFound)
-			return
-		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -431,14 +421,6 @@ func (h *Handler) ExplorerFileStream(w http.ResponseWriter, r *http.Request) {
 	path = resolveSpecArchiveFallback(path, workspace)
 	resolved, err := isWithinWorkspace(path, workspace)
 	if err != nil {
-		// Distinguish a missing-but-contained path from a path-escape attempt,
-		// mirroring ExplorerReadFile (EvalSymlinks fails on non-existent paths).
-		cleaned := filepath.Clean(path)
-		wsClean := filepath.Clean(workspace)
-		if cleaned == wsClean || strings.HasPrefix(cleaned, wsClean+string(filepath.Separator)) {
-			http.Error(w, "file not found", http.StatusNotFound)
-			return
-		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -572,25 +554,13 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The target may not exist yet; isWithinWorkspace resolves the parent
+	// through symlinks, so a symlinked parent cannot redirect the write
+	// outside the tree.
 	resolved, err := isWithinWorkspace(req.Path, req.Workspace)
 	if err != nil {
-		// isWithinWorkspace fails for non-existent paths because EvalSymlinks
-		// requires the target to exist. For writes the target file may not
-		// exist yet, but its parent directory must (we do not create missing
-		// directories). Resolve the parent through symlinks and verify IT is
-		// within the workspace, so a symlinked parent cannot redirect the
-		// write outside the tree (a plain textual prefix check would not).
-		cleaned := filepath.Clean(req.Path)
-		parentResolved, perr := filepath.EvalSymlinks(filepath.Dir(cleaned))
-		if perr != nil {
-			http.Error(w, "parent directory does not exist", http.StatusBadRequest)
-			return
-		}
-		if _, werr := isWithinWorkspace(parentResolved, req.Workspace); werr != nil {
-			http.Error(w, werr.Error(), http.StatusBadRequest)
-			return
-		}
-		resolved = filepath.Join(parentResolved, filepath.Base(cleaned))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	if isGitPath(resolved) {
 		http.Error(w, "writing to .git directories is not allowed", http.StatusBadRequest)

@@ -1285,3 +1285,95 @@ func TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget(t *testing.T) {
 		t.Errorf("expected 80 runes plus ellipsis, got %q", title)
 	}
 }
+
+// symlinkedWorkspace returns a workspace path that is a symlink to a real
+// directory, the shape macOS gives every t.TempDir under /tmp.
+func symlinkedWorkspace(t *testing.T) (link, real string) {
+	t.Helper()
+	real = t.TempDir()
+	link = filepath.Join(t.TempDir(), "ws")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+	return link, real
+}
+
+func TestIsWithinWorkspace_MissingFileInsideAccepted(t *testing.T) {
+	ws := t.TempDir()
+	fp := filepath.Join(ws, "new", "file.txt")
+	got, err := isWithinWorkspace(fp, ws)
+	if err != nil {
+		t.Fatalf("not-yet-existing file under the workspace rejected: %v", err)
+	}
+	if got != fp {
+		t.Errorf("resolved = %q, want %q", got, fp)
+	}
+}
+
+func TestIsWithinWorkspace_MissingFileViaSymlinkRejected(t *testing.T) {
+	ws := t.TempDir()
+	outside := t.TempDir()
+	link := filepath.Join(ws, "escape")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+	if _, err := isWithinWorkspace(filepath.Join(link, "new.txt"), ws); err == nil {
+		t.Fatal("not-yet-existing file behind an escaping symlink accepted")
+	}
+}
+
+func TestIsWithinWorkspace_SymlinkedRoot(t *testing.T) {
+	link, real := symlinkedWorkspace(t)
+	sub := filepath.Join(real, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The workspace is configured through the link; the request names the
+	// real path, and vice versa. Both are the same directory.
+	if _, err := isWithinWorkspace(sub, link); err != nil {
+		t.Errorf("real path under linked workspace rejected: %v", err)
+	}
+	if _, err := isWithinWorkspace(filepath.Join(link, "sub"), real); err != nil {
+		t.Errorf("linked path under real workspace rejected: %v", err)
+	}
+	if _, err := isWithinWorkspace(filepath.Join(real, "missing.txt"), link); err != nil {
+		t.Errorf("missing real path under linked workspace rejected: %v", err)
+	}
+}
+
+// TestExplorerReadFile_MissingFileInSymlinkedWorkspace pins the fix for the
+// lexical fallback: a missing file named by its real path, in a workspace
+// configured through a symlink, is "not found" (404), not "outside the
+// workspace" (400).
+func TestExplorerReadFile_MissingFileInSymlinkedWorkspace(t *testing.T) {
+	link, real := symlinkedWorkspace(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, link)
+
+	fp := filepath.Join(real, "nonexistent.txt")
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+fp+"&workspace="+link, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestExplorerWriteFile_NewFileInSymlinkedWorkspace: a new file named by its
+// real path lands in a workspace configured through a symlink.
+func TestExplorerWriteFile_NewFileInSymlinkedWorkspace(t *testing.T) {
+	link, real := symlinkedWorkspace(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, link)
+
+	fp := filepath.Join(real, "brand-new.txt")
+	req := writeFileRequest(t, fp, link, "hello")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if got, err := os.ReadFile(fp); err != nil || string(got) != "hello" {
+		t.Fatalf("new file not written: %q err=%v", got, err)
+	}
+}

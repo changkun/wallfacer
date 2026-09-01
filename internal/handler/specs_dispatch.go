@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"latere.ai/x/pkg/relpath"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -579,9 +579,8 @@ func findSpecFile(workspaces []string, relPath string) string {
 	}
 	for _, ws := range workspaces {
 		for _, cand := range candidates {
-			abs := filepath.Join(ws, cand)
-			rel, err := filepath.Rel(ws, abs)
-			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			abs, err := relpath.Join(ws, cand)
+			if err != nil {
 				continue // escapes the workspace
 			}
 			if _, err := os.Stat(abs); err == nil {

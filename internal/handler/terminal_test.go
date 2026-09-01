@@ -881,3 +881,26 @@ func TestTerminalSessionCleanup_SingleReaper(t *testing.T) {
 		cancel()
 	}
 }
+
+// TestResolveTerminalCwd_SymlinkedWorkspace: a cwd given by its real path is
+// accepted when the workspace is configured through a symlink to it, which is
+// what a shell reports for a workspace under macOS /tmp.
+func TestResolveTerminalCwd_SymlinkedWorkspace(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "ws")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+	sub := filepath.Join(real, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, link)
+
+	if got := h.resolveTerminalCwd(context.Background(), sub); got != sub {
+		t.Errorf("resolveTerminalCwd(%q) = %q; want the real subdirectory", sub, got)
+	}
+	if got := h.resolveTerminalCwd(context.Background(), t.TempDir()); got != link {
+		t.Errorf("cwd outside the workspace resolved to %q; want the workspace %q", got, link)
+	}
+}

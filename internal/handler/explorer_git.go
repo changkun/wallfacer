@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"latere.ai/x/pkg/relpath"
 	"path"
 	"path/filepath"
 	"strings"
@@ -111,7 +112,14 @@ func buildExplorerCommitMessage(relPath string) string {
 // rapid saves queues on the git index instead of colliding on index.lock and
 // silently dropping a commit.
 func (h *Handler) commitExplorerWrite(workspace, resolvedFile string) {
+	if inside, err := relpath.Contains(workspace, resolvedFile); err != nil || !inside {
+		return
+	}
 	resolvedWS, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		return
+	}
+	resolvedFile, err = filepath.EvalSymlinks(resolvedFile)
 	if err != nil {
 		return
 	}

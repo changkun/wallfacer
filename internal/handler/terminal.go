@@ -7,12 +7,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"latere.ai/x/pkg/relpath"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -484,9 +484,11 @@ func (h *Handler) resolveTerminalCwd(ctx context.Context, cwd string) string {
 	if cwd != "" {
 		abs, err := filepath.Abs(cwd)
 		if err == nil {
-			// Accept if it's within any active workspace.
+			// Accept if it's within any active workspace, resolving symlinks
+			// on both sides so a workspace under a symlinked root (macOS /tmp)
+			// matches the path the shell reports for it.
 			for _, ws := range workspaces {
-				if abs == ws || strings.HasPrefix(abs, ws+string(filepath.Separator)) {
+				if inside, err := relpath.Contains(ws, abs); err == nil && inside {
 					if info, err := os.Stat(abs); err == nil && info.IsDir() {
 						return abs
 					}
