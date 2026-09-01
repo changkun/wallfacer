@@ -55,6 +55,17 @@ waive:
       detector's slowdown overruns; the deadline has to become proportional to
       the detector, not the test skipped
     until: 2026-10-31
+  tempdir:
+    reason: >-
+      the suite leaves entries under TMPDIR from three shapes of leak, each
+      of which is its own fix: os.MkdirTemp store dirs in env_test,
+      git_test and tasks_autoimplement_metrics_test (t.TempDir is the
+      replacement, applied already to stream_test and the worktree tests);
+      t.TempDir directories recreated after the test returned by the
+      auto-tester and routine-reconcile goroutines, which outlive their
+      tests; and cursor-agent-logs, written by the cursor harness process
+      under TMPDIR rather than under the task
+    until: 2026-10-31
   cover:
     reason: >-
       the tree is at 82.2% and 16 of 36 packages sit below the 90% floor;
