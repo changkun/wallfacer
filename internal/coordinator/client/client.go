@@ -11,6 +11,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"latere.ai/x/pkg/retry"
+	"latere.ai/x/pkg/wait"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -137,13 +139,14 @@ func (c *Connector) enabled() bool {
 // startup. While the gate is closed it idles; while open it holds a connection
 // and reconnects with full-jitter exponential backoff on every drop.
 func (c *Connector) Run(ctx context.Context) {
-	backoff := c.cfg.BaseBackoff
+	schedule := retry.Policy{Base: c.cfg.BaseBackoff, Max: c.cfg.MaxBackoff, Jitter: -1}
+	failures := 0
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		if !c.enabled() {
-			if !sleepCtx(ctx, disabledRecheck) {
+			if wait.Sleep(ctx, disabledRecheck) != nil {
 				return
 			}
 			continue
@@ -153,13 +156,12 @@ func (c *Connector) Run(ctx context.Context) {
 			return
 		}
 		if connected {
-			backoff = c.cfg.BaseBackoff // a real session dropped; retry promptly
+			failures = 0 // a real session dropped; retry promptly
+		} else {
+			failures++ // dial keeps failing; back off
 		}
-		if !sleepCtx(ctx, c.jitter(backoff)) {
+		if wait.Sleep(ctx, c.jitter(schedule.Delay(failures))) != nil {
 			return
-		}
-		if !connected {
-			backoff = nextBackoff(backoff, c.cfg.MaxBackoff) // dial keeps failing; back off
 		}
 	}
 }
@@ -310,14 +312,11 @@ func (c *Connector) watchGate(ctx context.Context, cancel context.CancelFunc) {
 	}
 }
 
+// jitter draws a uniform random duration in [0, d] (full jitter). It stays
+// local rather than using retry.Policy.Jitter because the random source is
+// a Config seam that tests pin to exact values.
 func (c *Connector) jitter(d time.Duration) time.Duration {
-	// Full jitter: a uniform random duration in [0, d].
 	return time.Duration(c.cfg.Rand() * float64(d))
-}
-
-// nextBackoff doubles cur, capped at limit.
-func nextBackoff(cur, limit time.Duration) time.Duration {
-	return min(cur*2, limit)
 }
 
 func writeJSON(ctx context.Context, conn *websocket.Conn, v any) error {
@@ -326,19 +325,4 @@ func writeJSON(ctx context.Context, conn *websocket.Conn, v any) error {
 		return err
 	}
 	return conn.Write(ctx, websocket.MessageText, b)
-}
-
-// sleepCtx sleeps for d, returning false if ctx is cancelled first.
-func sleepCtx(ctx context.Context, d time.Duration) bool {
-	if d <= 0 {
-		return ctx.Err() == nil
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-t.C:
-		return true
-	}
 }

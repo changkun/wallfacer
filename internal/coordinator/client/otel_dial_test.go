@@ -2,9 +2,11 @@ package client
 
 import (
 	"context"
+	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel/trace"
 
@@ -39,7 +41,7 @@ func TestDialPropagatesTraceContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan bool, 1)
 	go func() { done <- c.connectOnce(ctx) }()
-	waitFor(t, func() bool { return len(reg.Snapshot("o1")) > 0 }, "the connector to register")
+	waittest.For(t, 3*time.Second, func() bool { return len(reg.Snapshot("o1")) > 0 })
 	cancel()
 	if !<-done {
 		t.Fatal("connectOnce reported no connection")

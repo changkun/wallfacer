@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,18 +28,6 @@ func acceptHarness(t *testing.T, sub, org string) (wsURL string, reg *coordinato
 	}))
 	t.Cleanup(srv.Close)
 	return "ws" + strings.TrimPrefix(srv.URL, "http"), reg
-}
-
-func waitFor(t *testing.T, cond func() bool, msg string) {
-	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for %s", msg)
 }
 
 func manifestFor(id string) func() coordinator.Manifest {
@@ -67,7 +56,7 @@ func TestConnectorRegistersWhenEnabled(t *testing.T) {
 		Manifest: manifestFor("inst_client"),
 	})
 
-	waitFor(t, func() bool { return reg.Len() == 1 }, "connector to register")
+	waittest.For(t, 3*time.Second, func() bool { return reg.Len() == 1 })
 	snap := reg.Snapshot("org_1")
 	if len(snap) != 1 || snap[0].ID() != "inst_client" {
 		t.Fatalf("registry = %+v, want one inst_client", snap)
@@ -117,12 +106,12 @@ func TestConnectorTearsDownOnOptOut(t *testing.T) {
 		PingInterval: 100 * time.Millisecond,
 	})
 
-	waitFor(t, func() bool { return reg.Len() == 1 }, "connector to register")
+	waittest.For(t, 3*time.Second, func() bool { return reg.Len() == 1 })
 
 	// Flip the opt-in off: the live connection must tear down promptly and the
 	// instance leave the registry (clean close, not a 60 s liveness wait).
 	optedIn.Store(false)
-	waitFor(t, func() bool { return reg.Len() == 0 }, "connector to tear down on opt-out")
+	waittest.For(t, 3*time.Second, func() bool { return reg.Len() == 0 })
 }
 
 // TestConnectorFlagsAuthRejection covers the silent-failure that hid the
@@ -147,22 +136,9 @@ func TestConnectorFlagsAuthRejection(t *testing.T) {
 	t.Cleanup(cancel)
 	go c.Run(ctx)
 
-	waitFor(t, c.AuthRejected, "connector to flag auth rejection")
+	waittest.For(t, 3*time.Second, c.AuthRejected)
 	if c.Connected() {
 		t.Fatal("Connected() = true after a 401 dial")
-	}
-}
-
-func TestNextBackoff(t *testing.T) {
-	base := 1 * time.Second
-	limit := 30 * time.Second
-	cur := base
-	want := []time.Duration{2, 4, 8, 16, 30, 30}
-	for i, w := range want {
-		cur = nextBackoff(cur, limit)
-		if cur != w*time.Second {
-			t.Fatalf("step %d: backoff = %v, want %v", i, cur, w*time.Second)
-		}
 	}
 }
 
