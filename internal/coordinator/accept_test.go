@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -56,21 +57,6 @@ func writeFrame(t *testing.T, conn *websocket.Conn, v any) {
 	}
 }
 
-// waitFor polls cond up to 2 s; registration and teardown are async (the server
-// reads a frame, then mutates the registry), so tests synchronize on the
-// observable registry state rather than a sleep.
-func waitFor(t *testing.T, cond func() bool, msg string) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for %s", msg)
-}
-
 func TestAcceptRegistersManifest(t *testing.T) {
 	url, reg := acceptHarness(t, Principal{Sub: "u_1", OrgID: "org_1"})
 	conn := dial(t, url)
@@ -81,7 +67,7 @@ func TestAcceptRegistersManifest(t *testing.T) {
 		[]string{"presence", "comments"})
 	writeFrame(t, conn, m)
 
-	waitFor(t, func() bool { return reg.Len() == 1 }, "instance to register")
+	waittest.For(t, 2*time.Second, func() bool { return reg.Len() == 1 })
 
 	snap := reg.Snapshot("org_1")
 	if len(snap) != 1 {
@@ -114,7 +100,7 @@ func TestAcceptDerivesPrincipalFromContextNotManifest(t *testing.T) {
 		"org":         "org_forged",
 	})
 
-	waitFor(t, func() bool { return reg.Len() == 1 }, "instance to register")
+	waittest.For(t, 2*time.Second, func() bool { return reg.Len() == 1 })
 	snap := reg.Snapshot("org_real")
 	if len(snap) != 1 {
 		t.Fatalf("forged org leaked: Snapshot(org_real) = %d, want 1", len(snap))
@@ -133,16 +119,16 @@ func TestAcceptManifestUpdate(t *testing.T) {
 	defer closeConn(conn)
 
 	writeFrame(t, conn, NewManifest("inst_a", "laptop", "v1", nil, []string{"presence"}))
-	waitFor(t, func() bool { return reg.Len() == 1 }, "initial register")
+	waittest.For(t, 2*time.Second, func() bool { return reg.Len() == 1 })
 
 	// Workspace-set change: re-send the manifest with a new remote.
 	writeFrame(t, conn, NewManifest("inst_a", "laptop", "v1",
 		[]WorkspaceRef{{Remote: "github.com/o/r2"}}, []string{"presence"}))
 
-	waitFor(t, func() bool {
+	waittest.For(t, 2*time.Second, func() bool {
 		s := reg.Snapshot("org_1")
 		return len(s) == 1 && len(s[0].Manifest.Remotes()) == 1 && s[0].Manifest.Remotes()[0] == "github.com/o/r2"
-	}, "manifest to update with new remote")
+	})
 
 	if reg.Len() != 1 {
 		t.Fatalf("update added a second instance: Len = %d, want 1", reg.Len())
@@ -153,10 +139,10 @@ func TestAcceptLeaveOnClose(t *testing.T) {
 	url, reg := acceptHarness(t, Principal{Sub: "u_1", OrgID: "org_1"})
 	conn := dial(t, url)
 	writeFrame(t, conn, NewManifest("inst_a", "laptop", "v1", nil, nil))
-	waitFor(t, func() bool { return reg.Len() == 1 }, "register")
+	waittest.For(t, 2*time.Second, func() bool { return reg.Len() == 1 })
 
 	closeConn(conn)
-	waitFor(t, func() bool { return reg.Len() == 0 }, "instance to leave on close")
+	waittest.For(t, 2*time.Second, func() bool { return reg.Len() == 0 })
 }
 
 func TestAcceptRejectsNonManifestFirstFrame(t *testing.T) {
@@ -181,7 +167,7 @@ func TestAcceptIgnoresUnknownFrameType(t *testing.T) {
 	defer closeConn(conn)
 
 	writeFrame(t, conn, NewManifest("inst_a", "laptop", "v1", nil, nil))
-	waitFor(t, func() bool { return reg.Len() == 1 }, "register")
+	waittest.For(t, 2*time.Second, func() bool { return reg.Len() == 1 })
 
 	// An unknown frame type must not drop the connection or the registration.
 	writeFrame(t, conn, map[string]any{"type": "totally-unknown-future-type"})

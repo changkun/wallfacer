@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"latere.ai/x/pkg/wait"
+	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1059,14 +1061,11 @@ func (s *syncSSERecorder) body() string {
 
 // waitForBody polls rec until substr appears or timeout elapses.
 func waitForBody(rec *syncSSERecorder, substr string, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if strings.Contains(rec.body(), substr) {
-			return true
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	return strings.Contains(rec.body(), substr)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return wait.Until(ctx, waittest.Interval, func(context.Context) (bool, error) {
+		return strings.Contains(rec.body(), substr), nil
+	}) == nil
 }
 
 // atomicWrite replaces path's contents via temp file + rename, the way editors

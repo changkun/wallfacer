@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"latere.ai/x/pkg/wait/waittest"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -712,7 +713,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	// Poll until the watcher transitions the task out of waiting.
 	// In the test environment the container runner is not available, so the
 	// task may end up in "failed" — the important thing is it left "waiting".
-	waitForCond(t, 10*time.Second, "task left waiting after settle delay", func() bool {
+	waittest.For(t, 10*time.Second, func() bool {
 		got, _ := h.store.GetTask(ctx, task.ID)
 		return got.Status != store.TaskStatusWaiting
 	})
@@ -778,7 +779,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	}
 
 	// Poll until auto-submit transitions the task out of waiting.
-	waitForCond(t, 10*time.Second, "task submitted after settle delay", func() bool {
+	waittest.For(t, 10*time.Second, func() bool {
 		got, _ := h.store.GetTask(ctx, task.ID)
 		return got.Status != store.TaskStatusWaiting
 	})

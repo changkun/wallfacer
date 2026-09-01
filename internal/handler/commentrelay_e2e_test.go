@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -63,7 +64,7 @@ func TestCommentRoundTripThroughCoordinator(t *testing.T) {
 
 	// Wait until the instance has registered (the connector dialed and sent its
 	// manifest) before submitting; Send needs a live connection.
-	waitForCond(t, 3*time.Second, "instance to register", func() bool { return reg.Len() == 1 })
+	waittest.For(t, 3*time.Second, func() bool { return reg.Len() == 1 })
 
 	// Browser create op for a spec in the served repo.
 	if err := relay.Submit(speccomment.Event{
@@ -78,7 +79,7 @@ func TestCommentRoundTripThroughCoordinator(t *testing.T) {
 	}
 
 	// The authoritative thread must echo back down and land in the cache.
-	waitForCond(t, 3*time.Second, "create to echo back into the relay cache", func() bool { return len(relay.ThreadsForRepo(repo)) == 1 })
+	waittest.For(t, 3*time.Second, func() bool { return len(relay.ThreadsForRepo(repo)) == 1 })
 
 	got := relay.ThreadsForRepo(repo)
 	if len(got) != 1 {

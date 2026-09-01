@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -63,7 +64,7 @@ func TestCommentEndToEndCrossInstance(t *testing.T) {
 	go connA.Run(ctx)
 	go connB.Run(ctx)
 
-	waitFor(t, func() bool { return reg.Len() == 2 }, "both instances to connect")
+	waittest.For(t, 5*time.Second, func() bool { return reg.Len() == 2 })
 
 	// B subscribes to its browser SSE stream, exactly as a board would.
 	subID, events := relayB.Subscribe()
@@ -103,20 +104,8 @@ func TestCommentEndToEndCrossInstance(t *testing.T) {
 	}
 
 	// And B's cache (what a fresh GET would return) now holds the thread.
-	waitFor(t, func() bool { return len(relayB.ThreadsForRepo(repo)) == 1 }, "B's cache to hold the thread")
+	waittest.For(t, 5*time.Second, func() bool { return len(relayB.ThreadsForRepo(repo)) == 1 })
 	if got := relayB.ThreadsForRepo(repo); got[0].WorkspaceID != repo {
 		t.Fatalf("B thread repo = %q, want %q", got[0].WorkspaceID, repo)
 	}
-}
-
-func waitFor(t *testing.T, cond func() bool, what string) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for %s", what)
 }

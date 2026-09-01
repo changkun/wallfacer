@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"latere.ai/x/pkg/wait/waittest"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 	}
 
 	// Poll until the timer fires and promotes the task out of backlog.
-	waitForCond(t, 5*time.Second, "task promoted out of backlog", func() bool {
+	waittest.For(t, 5*time.Second, func() bool {
 		got, err := h.store.GetTask(ctx, task.ID)
 		return err == nil && got.Status != store.TaskStatusBacklog
 	})
