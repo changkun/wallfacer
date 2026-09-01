@@ -44,7 +44,7 @@ website doesn't need: **durable task-data storage**.
 
 | Component | State |
 |-----------|-------|
-| DOKS cluster, nginx ingress, cert-manager, Spaces, DNS, OTEL→ClickHouse→Grafana | exists (platform infrastructure) |
+| DOKS cluster, nginx ingress, cert-manager, Spaces, DNS, OTLP telemetry into Dash0 | exists (platform infrastructure) |
 | `wallfacerd` = `wallfacer web` (public site) at `wf.latere.ai` | **deployed** |
 | Deploy pattern (Deployment/Service/Ingress + TLS + OTLP into `latere` ns) | **proven by `wallfacerd`** |
 | **task-board server** (`wallfacer run`) Deployment + PVC for task data | **this spec** |
