@@ -5,7 +5,6 @@ This guide is for contributors who want to build Wallfacer from source, run test
 ## Prerequisites
 
 - **Go 1.27+**, [go.dev](https://go.dev/)
-- **`golangci-lint` 2.13.1**, pinned to match CI and local `make lint-go`
 - **`claude` CLI** (and optionally `codex`, `cursor-agent`, `opencode`, and `pi`) on your `PATH`, tasks exec the selected CLI directly as a host process
 - **Bun**, for frontend install, build, typecheck, and tests
 - **A Claude credential**, OAuth token (`claude setup-token`) or API key from [console.anthropic.com](https://console.anthropic.com/)
@@ -21,7 +20,7 @@ cd wallfacer
 make build-binary
 ```
 
-The Go binary embeds the built SPA from `frontend/dist/`, so the frontend must be built first. `make build-binary` does both; a bare `go build .` on a fresh clone fails with `pattern all:frontend/dist: no matching files found`. `make build` runs the full gate (fmt + frontend build + lint + binary).
+The Go binary embeds the built SPA from `frontend/dist/`. `make build-binary` builds the frontend first. A bare `go build .` on a fresh clone still compiles, because `frontend/dist/PLACEHOLDER.txt` is tracked, but the binary it produces serves no SPA. `make build` runs the full gate (fmt + frontend build + every lint + binary).
 
 At runtime the server execs the selected CLI directly as a host process, with the task's git worktree as the working directory; the binary per task is set via the `WALLFACER_AGENT` env var (`claude`, `codex`, `cursor`, `opencode`, or `pi`).
 
@@ -44,10 +43,13 @@ Alternatively, start the server and configure via **Settings → Sandbox** in th
 ## Run Tests
 
 ```bash
-make test           # All tests (backend + frontend)
-make test-backend   # Go unit tests: go test ./...
-make test-frontend  # Frontend tests: cd frontend && bunx vitest run
+make check          # The shared Go bar: every gate lateregate holds, reported together
+make test           # go vet and the Go suite (one gate of the bar)
+make test-frontend  # Frontend tests: cd frontend && bun run test
+make test-all       # Everything CI runs: the bar, the frontend suite and typecheck, the guardrails
 ```
+
+The Go gates live in [`latere-ai/ci-gate`](https://github.com/latere-ai/ci-gate), pinned in `go.mod` as a tool. `go tool lateregate list` prints which gates apply and which are waived, with the reason; `go tool lateregate <gate>` runs one. The decisions this repository has made about the bar are in `.lateregate.yaml`.
 
 ### Tests that skip without setup
 
@@ -71,31 +73,30 @@ WALLFACER_TEST_DATABASE_URL=postgres://user:pass@localhost:5432/wallfacer_test?s
 
 | Target | Description |
 |---|---|
-| `make build` | Full gate: fmt + lint (Go + Vue typecheck) + frontend build + binary |
+| `make build` | Full gate: fmt + every lint (Go + Vue typecheck + guardrails) + frontend build + binary |
 | `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
 | `make server` | Build and run the server natively |
-| `make fmt` | Format Go in place (alias for `make fmt-go`) |
-| `make fmt-go` | Run `gofmt -w` over the repository |
-| `make lint` | Lint only (`golangci-lint` 2.13.1 + frontend `vue-tsc` typecheck); fastest way to catch style regressions |
-| `make test` | fmt + lint + backend tests + frontend tests |
-| `make test-backend` | Go unit tests (`go test ./...`) |
+| `make fmt` | Run `gofmt -w` over the repository |
+| `make check` | The shared Go bar: `go tool lateregate` |
+| `make lint` | golangci-lint at the version lateregate pins, against the shared config it renders |
+| `make lint-all` | Every lint: Go, frontend typecheck, otel transport, UTF-8 truncation |
+| `make test` | `go vet` and the Go suite |
 | `make test-frontend` | Frontend Vitest runner (`cd frontend && bun run test`) |
+| `make test-all` | Everything CI runs: `check`, the frontend suite and typecheck, the skills mirror, the truncation guardrail |
 | `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
 | `make api-contract` | Regenerate API route artifacts from `internal/apicontract/routes.go` |
 | `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
 | `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
 | `make ui-test` | Boot against seeded demo data and assert UI invariants in a real browser (`SKIP_BUILD=1` reuses `./wallfacer`) |
-| `make fmt-check` | Fail if any Go source is not gofmt-formatted |
-| `make hooks` | Install the git hooks (pre-commit gofmt guard) via `core.hooksPath` |
+| `make hooks` | Install the git hooks via `core.hooksPath`; the pre-commit runs `lateregate hook` (gofmt and the modernizers over the staged files) |
 
-Lint sub-targets, all folded into `make lint`:
+Lint sub-targets, all folded into `make lint-all`:
 
 | Target | Description |
 |---|---|
-| `make lint-go` | `golangci-lint` at the repo-pinned version |
+| `make lint` | `golangci-lint` through lateregate |
 | `make lint-js` | Frontend type check (`vue-tsc --noEmit`) |
 | `make lint-otel` | Fail on any outbound `&http.Client{}` without the otel transport |
-| `make lint-modernize` | Fail on hand-rolled equivalents of stdlib constructs that `go fix` would rewrite |
 | `make lint-truncate` | Fail on byte-index truncation of strings, which can cut a multi-byte rune |
 
 The `wallfacerd` web-server variant and the release/skills helpers:

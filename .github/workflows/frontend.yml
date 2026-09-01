@@ -1,0 +1,30 @@
+name: frontend
+
+# This repository's own checks beside the shared bar: the Vue typecheck and
+# suite, the skills mirror, and the UTF-8 truncation guardrail. The Go gates
+# are ci.yml's job.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Install frontend deps
+        uses: ./.github/actions/bun-install
+      - name: Typecheck
+        run: make lint-js
+      - name: Test
+        run: make test-frontend
+      - name: Skills match latere-ai/agent-skills
+        run: make skills-check
+      - name: UTF-8 truncation guardrail
+        run: make lint-truncate

@@ -16,14 +16,17 @@ you only want to *use* Wallfacer, start with the [User Manual](docs/guide/usage.
 
 ## Build & test
 
-`make` targets run gofmt, golangci-lint, the `vue-tsc` typecheck, and the repo's
-otel/truncation guardrails. Raw `go build`/`go vet` skip lint and can land code
-that fails CI, so prefer the targets.
+The Go gates (gofmt, the modernizers, golangci-lint, vet, the suite, the race
+detector, coverage, govulncheck and more) live in `latere-ai/ci-gate`, pinned in
+`go.mod`; `make check` runs all of them. The `vue-tsc` typecheck and the repo's
+otel/truncation guardrails are this repository's own targets. Raw `go build`
+skips all of it and can land code that fails CI, so prefer the targets.
 
 ```bash
-make build          # Full gate: fmt + lint + frontend build + binary
-make test           # lint + backend tests + frontend tests (matches CI)
-make lint           # Lint only (fastest style check)
+make build          # Full gate: fmt + every lint + frontend build + binary
+make check          # The shared Go bar, every gate reported together
+make test-all       # check + frontend tests + typecheck + guardrails (matches CI)
+make lint-all       # Every lint (fastest style check)
 make fmt            # Format Go in place
 make server         # Build and run the Go server natively
 ```
@@ -45,7 +48,7 @@ so this is a local-macOS ergonomics issue, not a correctness one. Locally, pass
 - **Every bug fix ships with a regression test** that fails without the fix and
   passes with it. This holds across backend, frontend, and CLI.
 - **Run `make build` before committing** to catch formatting, lint, and
-  typecheck failures locally. `make test` adds the backend and frontend test
+  typecheck failures locally. `make test-all` adds the backend and frontend test
   suites and is what CI runs.
 - **Keep commits small** and scoped to one logical change. Use imperative,
   scoped messages: `internal/runner: ...`, `frontend: ...`, `docs: ...`.

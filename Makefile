@@ -4,10 +4,10 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt fmt-go fmt-check hooks lint lint-go lint-js lint-otel lint-modernize lint-truncate test test-backend test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push web-frontend web-run web-dev web-docker
+.PHONY: build build-binary server frontend-build api-contract fmt hooks check test lint lint-js lint-otel lint-truncate test-all lint-all test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push web-frontend web-run web-dev web-docker
 
-# Full build gate: fmt + frontend assets + lint + binary.
-build: fmt frontend-build lint build-binary
+# Full build gate: fmt + frontend assets + every lint + binary.
+build: fmt frontend-build lint-all build-binary
 
 # Build the wallfacer Go binary.
 # Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
@@ -16,8 +16,6 @@ LDFLAGS := -s -w
 ifneq ($(VERSION),)
 LDFLAGS += -X latere.ai/x/wallfacer/internal/cli.Version=$(VERSION)
 endif
-GOLANGCI_LINT ?= golangci-lint
-GOLANGCI_LINT_VERSION ?= 2.13.1
 
 build-binary: frontend-build
 	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .
@@ -34,91 +32,64 @@ api-contract:
 	go run scripts/gen-api-contract.go
 	go test ./internal/cli/ -run TestContractRoutes_AllRegisteredInMux -count=1
 
-# Build the Vue frontend SPA into frontend/dist/ for embedding.
+# Build the Vue frontend SPA into frontend/dist/ for embedding. The binary
+# embeds all:frontend/dist, so the tracked frontend/dist/PLACEHOLDER.txt keeps
+# a plain `go build` and `go test` compiling on a clone that has not built it.
 frontend-build:
 	cd frontend && bun install --frozen-lockfile && bun run build
 
-# Format all source files (Go).
-fmt: fmt-go
-
-# Format all Go source files
-fmt-go:
+# Format all Go source files in place.
+fmt:
 	gofmt -w .
 
-fmt-check:                                                               ## Fail if any Go source is not gofmt-formatted
-	@out=$$(gofmt -l .); if [ -n "$$out" ]; then echo "gofmt: unformatted files:"; echo "$$out"; exit 1; fi
-
-hooks:                                                                   ## Install git hooks (pre-commit gofmt guard)
+hooks:                                                                   ## Install git hooks (the pre-commit delegates to lateregate)
 	git config core.hooksPath .githooks
 	@[ -e CLAUDE.md ] || [ -L CLAUDE.md ] || ln -s AGENTS.md CLAUDE.md
 	@echo "installed git hooks (core.hooksPath=.githooks)"
 
-# Run all linters (Go + frontend)
-lint: lint-go lint-js lint-otel lint-modernize lint-truncate
+# ---- The shared bar -------------------------------------------------------
+# Every Go gate lives in lateregate, pinned as a tool in go.mod: formatting,
+# modernizers, golangci-lint against the shared config, vet and the suite, the
+# race detector, the hermetic and clean-TMPDIR runs, per-package coverage,
+# govulncheck, the cgo and outbound-client scans. `make check` is a name for
+# `go tool lateregate` and nothing else; `go tool lateregate list` prints the
+# plan, and `go tool lateregate <gate>` runs one. Decisions and dated waivers
+# live in .lateregate.yaml.
+check:
+	@go tool lateregate
 
-# Run Go linters with the repo-pinned golangci-lint version.
-lint-go: frontend-build
-	@if ! command -v $(GOLANGCI_LINT) >/dev/null 2>&1; then \
-		echo "golangci-lint $(GOLANGCI_LINT_VERSION) is required; install it or set GOLANGCI_LINT=/path/to/golangci-lint"; \
-		exit 1; \
-	fi
-	@actual="$$($(GOLANGCI_LINT) --version | sed -n 's/.* version \([^ ]*\).*/\1/p')"; \
-	if [ "$$actual" != "$(GOLANGCI_LINT_VERSION)" ]; then \
-		echo "golangci-lint $$actual found, but $(GOLANGCI_LINT_VERSION) is required"; \
-		exit 1; \
-	fi
-	$(GOLANGCI_LINT) run ./...
+test:
+	@go tool lateregate test
 
-# Type-check the Vue frontend (vue-tsc --noEmit).
-lint-js:
-	cd frontend && bun run typecheck
+lint:
+	@go tool lateregate lint
 
 # lint-otel keeps outbound HTTP instrumented so traces propagate across
-# services. It fails on two shapes: an http.Client literal that sets no
-# Transport field, and any use of http.DefaultClient. The gate parses each
-# non-test Go file, so a Transport field several lines below the opening brace
-# still counts, a comment describing this rule does not trip it, and
-# Timeout: cfg.Transport.Timeout does not pass for a Transport field.
+# services: an http.Client literal with no Transport, or http.DefaultClient,
+# calls out on the stdlib transport and the trace stops at the boundary.
 lint-otel:
 	@go tool lateregate otel-client
 
-# lint-modernize fails on code that a standard library call already covers.
-# It runs the toolchain modernizers, which overlap golangci-lint's modernize
-# linter but add three it does not carry: buildtag, hostport, and the
-# go:fix inline directives. newexpr and errorsastype are off for the reasons
-# recorded in .golangci.yml.
-# Only a non-empty patch fails the target. go fix also exits non-zero when a
-# package does not type-check, which is a build error rather than a finding,
-# so stderr is dropped and the decision rests on the patch alone.
-lint-modernize:
-	@for fixer in newexpr errorsastype; do \
-		go tool fix help 2>&1 | grep -q "^    $$fixer " || { \
-			echo "go fix no longer carries the $$fixer fixer, so -$$fixer=false is rejected and this check passes silently"; \
-			exit 1; \
-		}; \
-	done
-	@patch=$$(go fix -diff -newexpr=false -errorsastype=false ./... 2>/dev/null); \
-	if [ -n "$$patch" ]; then \
-		echo "$$patch"; \
-		echo "go fix: the diff above is already in the standard library; apply it with go fix"; \
-		exit 1; \
-	fi
+# ---- This repository's own checks ----------------------------------------
+# Type-check the Vue frontend (vue-tsc --noEmit).
+lint-js:
+	cd frontend && bun run typecheck
 
 # Guardrail against byte-index truncation of strings, which can cut inside a
 # multi-byte UTF-8 sequence and surface as U+FFFD in API responses and logs.
 lint-truncate:
 	@./scripts/lint-truncate.sh
 
-# Run all checks (fmt + lint + backend tests + frontend tests)
-test: fmt lint test-backend test-frontend
-
-# Run Go unit tests
-test-backend: frontend-build
-	go test ./...
-
 # Run Vue SPA unit tests under frontend/.
 test-frontend:
 	cd frontend && bun run test
+
+# Every lint: the shared Go lint plus the frontend typecheck and the guardrails.
+lint-all: lint lint-js lint-otel lint-truncate
+
+# Everything CI runs: the whole shared bar, the frontend suite and typecheck,
+# and the repo-specific guardrails.
+test-all: check test-frontend lint-js lint-truncate skills-check
 
 # End-to-end: task lifecycle (create, run, archive) for both Claude and Codex.
 # Requires a running wallfacer server with valid credentials.

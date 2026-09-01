@@ -1,0 +1,19 @@
+name: ci
+
+# Every Go gate lives in lateregate, pinned in go.mod. The reusable workflow
+# asks the binary which gates apply and runs one job per gate. Windows is in
+# the test matrix because the CLI ships for it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: latere-ai/ci/.github/workflows/lateregate.yml@v1
+    with:
+      test_os: '["ubuntu-latest", "macos-latest", "windows-latest"]'

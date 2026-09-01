@@ -1,0 +1,76 @@
+# The decisions this repository has made about the shared bar, each with its
+# reason. Everything lateregate can decide for a repository it decides by
+# default, so a key here is one somebody chose. `go tool lateregate` runs the
+# bar; `go tool lateregate list` prints the plan this file shapes.
+
+cover:
+  exempt:
+    # The value is the reason. lateregate rejects an empty one.
+    x/wallfacer: >-
+      main() wires the embedded SPA and docs into internal/cli and dispatches;
+      the dispatch table is tested through internal/cli directly
+    internal/store/postgres: >-
+      the migration runner needs a Postgres beside the suite; the store logic
+      it drives is covered in internal/store against the in-memory backend
+
+hermetic:
+  # git for the tests that read the tree, and bash/curl/grep for the smoke
+  # script test in release_evidence_test.go, which skips without them but
+  # then proves nothing.
+  allow: [/usr/bin, /bin]
+
+golangci:
+  sloglint:
+    # Request-path logs use the *Context slog variants so the otelslog bridge
+    # stamps TraceId/SpanId onto exported records. CLI-mode packages keep
+    # plain calls: they have no request trace to correlate.
+    context: scope
+    request_paths: internal/(auth|coordinator|webserver)/
+    exempt:
+      # The coordinator client is the CLI-side dialer, not the request path.
+      - internal/coordinator/client/
+  extra:
+    linters:
+      enable:
+        # Beyond the shared set. revive's exported rule and misspell encode
+        # facts about one repository, which is why the shared set leaves them
+        # out; this tree has held them since before the shared set existed.
+        - gocritic
+        - misspell
+        - revive
+
+waive:
+  lint:
+    reason: >-
+      the shared config holds linters this tree never ran: contextcheck (62
+      findings), errorlint (20), nilerr (15), noctx (10), errchkjson (7),
+      revive (6), errcheck (4), bodyclose, copyloopvar and govet (1 each);
+      each is a code change in handler, runner or coordinator rather than a
+      rule to turn off, and the goimports grouping it also wanted is applied
+    until: 2026-10-31
+  race:
+    reason: >-
+      TestConcurrentCompleteTaskSameRepo in internal/runner drives two real
+      commit-message generations against a 90s deadline, which the race
+      detector's slowdown overruns; the deadline has to become proportional to
+      the detector, not the test skipped
+    until: 2026-10-31
+  cover:
+    reason: >-
+      the tree is at 82.2% and 16 of 36 packages sit below the 90% floor;
+      handler (77.9%), runner (80.3%) and cli (68.0%) hold most of the gap,
+      and closing it is test work in those three rather than a threshold to
+      choose
+    until: 2026-11-30
+  spec-lint:
+    reason: >-
+      the spec tree is nested (specs/{cloud,identity,intent,local,shared} and
+      a nested .archive) and spec-lint reads only specs/*.md today; the gate
+      turns on when it reads subdirectories, which is ci-gate work
+    until: 2026-10-31
+  license:
+    reason: >-
+      LICENSE names a personal holder while the org gate expects one holder
+      per repository; which holder every file should carry is undecided, and
+      an identifier printed into 300 files is not a guess to make
+    until: 2026-10-31
