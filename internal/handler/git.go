@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,16 +44,15 @@ type workspaceMutationConflictResponse struct {
 // capping parallelism at 4 to avoid overwhelming the system with git subprocesses.
 func collectWorkspaceStatuses(workspaces []string) []gitutil.WorkspaceGitStatus {
 	results := make([]gitutil.WorkspaceGitStatus, len(workspaces))
-	sem := make(chan struct{}, 4) // cap concurrency at 4 git processes
-	var wg sync.WaitGroup
+	var g errgroup.Group
+	g.SetLimit(4) // at most 4 git processes, and at most 4 goroutines
 	for i, ws := range workspaces {
-		wg.Go(func() {
-			sem <- struct{}{}
-			defer func() { <-sem }()
+		g.Go(func() error {
 			results[i] = gitutil.WorkspaceStatus(ws)
+			return nil
 		})
 	}
-	wg.Wait()
+	_ = g.Wait() // every task returns nil
 	return results
 }
 
