@@ -16,6 +16,13 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
+// FileExists reports whether path names an existing regular file. A
+// directory at path reports false.
+func FileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 // Snapshot holds the immutable state of a workspace configuration at a point in time.
 // Callers receive copies (via cloneSnapshot) so they cannot mutate manager internals.
 type Snapshot struct {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"latere.ai/x/wallfacer/internal/workspace"
 	"os"
 	"path/filepath"
 	"slices"
@@ -115,7 +116,7 @@ func (m *Manager) migrateOrInit() error {
 	legacyMsgs := filepath.Join(m.root, messagesFile)
 	legacySess := filepath.Join(m.root, sessionFile)
 
-	hasLegacy := fileExists(legacyMsgs) || fileExists(legacySess)
+	hasLegacy := workspace.FileExists(legacyMsgs) || workspace.FileExists(legacySess)
 	id := newThreadID()
 	threadDir := filepath.Join(m.root, threadsSubdir, id)
 	if err := os.MkdirAll(threadDir, 0o755); err != nil {
@@ -565,11 +566,6 @@ func newThreadID() string {
 		return uuid.New().String()
 	}
 	return id.String()
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
 
 func copyIfExists(src, dst string) error {

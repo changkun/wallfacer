@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"latere.ai/x/wallfacer/internal/workspace"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,21 +200,15 @@ func (r *Runner) resolveEnvFile() string {
 	if r.envFile == "" {
 		return ""
 	}
-	if fileExists(r.envFile) {
+	if workspace.FileExists(r.envFile) {
 		return r.envFile
 	}
-	if r.defaultEnvFile != "" && r.defaultEnvFile != r.envFile && fileExists(r.defaultEnvFile) {
+	if r.defaultEnvFile != "" && r.defaultEnvFile != r.envFile && workspace.FileExists(r.defaultEnvFile) {
 		logger.Runner.Warn("configured env file missing; falling back to default",
 			"configured", r.envFile, "fallback", r.defaultEnvFile)
 		return r.defaultEnvFile
 	}
 	return r.envFile
-}
-
-// fileExists reports whether path names an existing regular (non-directory) file.
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
 
 func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.ID) executor.ContainerSpec {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"latere.ai/x/pkg/relpath"
+	"latere.ai/x/wallfacer/internal/workspace"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -373,10 +374,10 @@ func repositionThread(t speccomment.Thread, root string) specCommentThread {
 // omits it ("cloud/x.md"). Try the path as-is first, then under specs/. Returns
 // ok=false when neither exists.
 func specFilePath(root, specPath string) (string, bool) {
-	if p, ok := containedJoin(root, specPath); ok && fileExists(p) {
+	if p, ok := containedJoin(root, specPath); ok && workspace.FileExists(p) {
 		return p, true
 	}
-	if p, ok := containedJoin(root, "specs", specPath); ok && fileExists(p) {
+	if p, ok := containedJoin(root, "specs", specPath); ok && workspace.FileExists(p) {
 		return p, true
 	}
 	return "", false
@@ -389,11 +390,6 @@ func specFilePath(root, specPath string) (string, bool) {
 func containedJoin(root string, parts ...string) (string, bool) {
 	p, err := relpath.Join(root, filepath.Join(parts...))
 	return p, err == nil
-}
-
-func fileExists(p string) bool {
-	info, err := os.Stat(p)
-	return err == nil && !info.IsDir()
 }
 
 // gitBlobSHA returns the working-tree blob hash of an already-resolved spec file
