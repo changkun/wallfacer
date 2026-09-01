@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,10 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
 	"latere.ai/x/wallfacer/internal/prompts"

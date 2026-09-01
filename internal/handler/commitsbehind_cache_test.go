@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/cache"
+
 	"latere.ai/x/wallfacer/internal/constants"
 )
 

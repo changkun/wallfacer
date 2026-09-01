@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"latere.ai/x/topos"
+
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
 )

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/constants"
 )
 

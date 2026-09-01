@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/store"
 )

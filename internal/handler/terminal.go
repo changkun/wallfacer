@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"latere.ai/x/pkg/relpath"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,9 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"latere.ai/x/pkg/relpath"
+
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/pty"

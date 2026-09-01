@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/slugutil"
+	"latere.ai/x/pkg/sanitize"
+
 	"latere.ai/x/wallfacer/internal/agents"
 )
 
@@ -132,7 +133,7 @@ func (req agentWriteRequest) toRole() agents.Role {
 }
 
 func validateAgentWrite(req agentWriteRequest) error {
-	if !slugutil.IsValid(req.Slug) {
+	if !sanitize.IsSlug(req.Slug) {
 		return fmt.Errorf("slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", req.Slug)
 	}
 	if req.Title == "" {

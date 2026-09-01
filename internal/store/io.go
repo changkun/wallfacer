@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/tail"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
 )
@@ -19,9 +19,18 @@ import (
 // operates in-place and is a no-op when a limit is 0 or the slice is already
 // within bounds.
 func (s *Store) pruneTaskPayload(t *Task) {
-	t.RetryHistory = tail.Of(t.RetryHistory, s.retryHistoryLimit)
-	t.RefineSessions = tail.Of(t.RefineSessions, s.refineSessionsLimit)
-	t.PromptHistory = tail.Of(t.PromptHistory, s.promptHistoryLimit)
+	t.RetryHistory = lastN(t.RetryHistory, s.retryHistoryLimit)
+	t.RefineSessions = lastN(t.RefineSessions, s.refineSessionsLimit)
+	t.PromptHistory = lastN(t.PromptHistory, s.promptHistoryLimit)
+}
+
+// lastN returns the last n elements of s, sharing its backing array. A limit
+// of zero or less means unbounded, so s comes back unchanged.
+func lastN[T any](s []T, n int) []T {
+	if n <= 0 || len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
 }
 
 // saveTask stamps the schema version, prunes payload, and delegates

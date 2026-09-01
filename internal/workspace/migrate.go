@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"latere.ai/x/pkg/atomicfile"
+
 	"latere.ai/x/wallfacer/internal/prompts"
 )
 

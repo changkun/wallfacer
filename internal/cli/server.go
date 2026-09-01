@@ -26,6 +26,7 @@ import (
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/pkg/otel"
+
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/auth"

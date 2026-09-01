@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/wait/waittest"
+
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/coordinator"
 )

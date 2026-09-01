@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
 	"latere.ai/x/wallfacer/internal/logger"
 )
 

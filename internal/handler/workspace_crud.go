@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/workspace"
 )

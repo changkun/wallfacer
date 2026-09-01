@@ -19,6 +19,7 @@ import (
 	"latere.ai/x/pkg/oidc"
 
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/coordinator/client"
 	"latere.ai/x/wallfacer/internal/handler"

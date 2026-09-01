@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"gopkg.in/yaml.v3"
-
 	"latere.ai/x/pkg/atomicfile"
 	"latere.ai/x/pkg/registry"
-	"latere.ai/x/pkg/slugutil"
+	"latere.ai/x/pkg/sanitize"
+
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 )
 
@@ -53,7 +54,7 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 		if f.Slug == "" {
 			return nil, fmt.Errorf("parse %s: slug is required", path)
 		}
-		if !slugutil.IsValid(f.Slug) {
+		if !sanitize.IsSlug(f.Slug) {
 			return nil, fmt.Errorf("parse %s: slug %q is not kebab-case (2-40 chars)", path, f.Slug)
 		}
 		if f.Name == "" {
@@ -107,7 +108,7 @@ func LoadUserFlows(dir string) ([]Flow, error) {
 // WriteUserFlow persists a single user-authored flow to
 // dir/<slug>.yaml using an atomic temp-file + rename.
 func WriteUserFlow(dir string, f Flow) error {
-	if !slugutil.IsValid(f.Slug) {
+	if !sanitize.IsSlug(f.Slug) {
 		return fmt.Errorf("invalid slug %q", f.Slug)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -169,5 +170,5 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 
 // IsBuiltin reports whether slug names a built-in flow.
 func IsBuiltin(slug string) bool {
-	return registry.ContainsSlug(builtins, slug, func(f Flow) string { return f.Slug })
+	return slices.ContainsFunc(builtins, func(f Flow) bool { return f.Slug == slug })
 }

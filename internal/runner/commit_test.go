@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )

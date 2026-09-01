@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/store"
 )
 

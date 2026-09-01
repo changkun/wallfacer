@@ -2,15 +2,17 @@ package client
 
 import (
 	"context"
-	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/wait/waittest"
+
 	"go.opentelemetry.io/otel/trace"
 
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/oteltest"

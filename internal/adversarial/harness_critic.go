@@ -5,6 +5,7 @@ import (
 	"time"
 
 	toposadv "latere.ai/x/topos/adversarial"
+
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
 )

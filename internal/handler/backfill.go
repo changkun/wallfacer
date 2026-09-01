@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/store"
 )
 

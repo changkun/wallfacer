@@ -16,6 +16,7 @@ import (
 	"testing/fstest"
 
 	"latere.ai/x/pkg/metrics"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"

@@ -10,6 +10,7 @@ import (
 
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/github"
 	"latere.ai/x/wallfacer/internal/store"

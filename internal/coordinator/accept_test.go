@@ -3,16 +3,18 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
-	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/wait/waittest"
+
 	"github.com/coder/websocket"
 
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 )
 

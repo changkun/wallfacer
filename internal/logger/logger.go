@@ -13,8 +13,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"latere.ai/x/pkg/sanitize"
-	"latere.ai/x/pkg/uuidutil"
+
 	"latere.ai/x/wallfacer/internal/constants"
 )
 
@@ -282,7 +283,9 @@ func prettyValue(v slog.Value) string {
 	} else {
 		s = fmt.Sprintf("%v", v.Any())
 	}
-	if uuidutil.IsValid(s) {
+	// Only the canonical 36-character form is shortened; uuid.Validate also
+	// accepts braced, urn:, and 32-hex spellings, which s[:8] would mangle.
+	if len(s) == 36 && uuid.Validate(s) == nil {
 		return s[:8]
 	}
 	s = sanitize.Truncate(s, constants.LogValueMaxLen)

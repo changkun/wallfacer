@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )

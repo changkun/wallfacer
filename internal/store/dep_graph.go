@@ -2,6 +2,7 @@ package store
 
 import (
 	"github.com/google/uuid"
+
 	"latere.ai/x/wallfacer/internal/pkg/dagscorer"
 )
 

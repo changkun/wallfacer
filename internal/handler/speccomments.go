@@ -3,16 +3,19 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"latere.ai/x/pkg/relpath"
-	"latere.ai/x/wallfacer/internal/pkg/sse"
-	"latere.ai/x/wallfacer/internal/workspace"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"latere.ai/x/pkg/relpath"
+
+	"latere.ai/x/wallfacer/internal/pkg/sse"
+	"latere.ai/x/wallfacer/internal/workspace"
+
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/speccomment"

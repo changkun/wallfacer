@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"latere.ai/x/pkg/metrics"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"

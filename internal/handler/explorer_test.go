@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"latere.ai/x/pkg/wait"
-	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,7 +15,11 @@ import (
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/wait"
+	"latere.ai/x/pkg/wait/waittest"
+
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"

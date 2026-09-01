@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/statemachine"
+
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"

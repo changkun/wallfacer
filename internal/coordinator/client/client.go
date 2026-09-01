@@ -11,14 +11,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"latere.ai/x/pkg/retry"
-	"latere.ai/x/pkg/wait"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"latere.ai/x/pkg/retry"
+	"latere.ai/x/pkg/wait"
 
 	"github.com/coder/websocket"
 

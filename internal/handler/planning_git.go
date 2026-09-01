@@ -15,6 +15,7 @@ import (
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/sanitize"
+
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
 )

@@ -7,7 +7,8 @@ import (
 	"sync"
 
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/slugutil"
+	"latere.ai/x/pkg/sanitize"
+
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
 )
@@ -166,7 +167,7 @@ func (req flowWriteRequest) toFlow() flow.Flow {
 }
 
 func (h *Handler) validateFlowWrite(req flowWriteRequest) error {
-	if !slugutil.IsValid(req.Slug) {
+	if !sanitize.IsSlug(req.Slug) {
 		return fmt.Errorf("slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", req.Slug)
 	}
 	if req.Name == "" {

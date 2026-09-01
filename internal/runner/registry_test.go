@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
 	"latere.ai/x/wallfacer/internal/executor"
 )
 

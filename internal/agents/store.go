@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"latere.ai/x/pkg/atomicfile"
 	"latere.ai/x/pkg/registry"
-	"latere.ai/x/pkg/slugutil"
+	"latere.ai/x/pkg/sanitize"
+
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 
 	"gopkg.in/yaml.v3"
@@ -46,7 +48,7 @@ func LoadUserAgents(dir string) ([]Role, error) {
 		if a.Slug == "" {
 			return nil, fmt.Errorf("parse %s: slug is required", f.Path)
 		}
-		if !slugutil.IsValid(a.Slug) {
+		if !sanitize.IsSlug(a.Slug) {
 			return nil, fmt.Errorf("parse %s: slug %q is not kebab-case (2-40 chars, lowercase, digits, hyphens)", f.Path, a.Slug)
 		}
 		if a.Title == "" {
@@ -72,7 +74,7 @@ func LoadUserAgents(dir string) ([]Role, error) {
 // must have already validated the slug does not collide with a
 // built-in.
 func WriteUserAgent(dir string, role Role) error {
-	if !slugutil.IsValid(role.Slug) {
+	if !sanitize.IsSlug(role.Slug) {
 		return fmt.Errorf("invalid slug %q", role.Slug)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -126,5 +128,5 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 // IsBuiltin reports whether slug names a built-in agent. Used by
 // PUT/DELETE handlers to reject mutations targeting shipped roles.
 func IsBuiltin(slug string) bool {
-	return registry.ContainsSlug(BuiltinAgents, slug, func(r Role) string { return r.Slug })
+	return slices.ContainsFunc(BuiltinAgents, func(r Role) bool { return r.Slug == slug })
 }

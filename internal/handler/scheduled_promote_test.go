@@ -2,9 +2,10 @@ package handler
 
 import (
 	"context"
-	"latere.ai/x/pkg/wait/waittest"
 	"testing"
 	"time"
+
+	"latere.ai/x/pkg/wait/waittest"
 
 	"latere.ai/x/wallfacer/internal/store"
 )

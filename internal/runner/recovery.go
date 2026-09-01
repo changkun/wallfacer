@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/logger"

@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"latere.ai/x/pkg/slugutil"
+	"latere.ai/x/pkg/sanitize"
 )
 
 // File is one .yaml/.yml entry returned by ReadAll: the absolute
@@ -68,7 +68,7 @@ func ReadAll(label, dir string) ([]File, error) {
 // so callers can treat delete as a no-op when the entry is already gone.
 // Returns an error for an invalid slug or any non-"not exist" removal failure.
 func Remove(dir, slug string) error {
-	if !slugutil.IsValid(slug) {
+	if !sanitize.IsSlug(slug) {
 		return fmt.Errorf("invalid slug %q", slug)
 	}
 	if err := os.Remove(filepath.Join(dir, slug+".yaml")); err != nil && !os.IsNotExist(err) {

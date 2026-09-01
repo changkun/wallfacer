@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"latere.ai/x/topos/graph"
+
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
 )

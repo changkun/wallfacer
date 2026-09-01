@@ -18,6 +18,7 @@ import (
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/statemachine"
 	"latere.ai/x/pkg/watcher"
+
 	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"

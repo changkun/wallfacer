@@ -19,6 +19,7 @@ import (
 	"text/template"
 
 	"latere.ai/x/pkg/atomicfile"
+
 	"latere.ai/x/wallfacer/internal/logger"
 )
 

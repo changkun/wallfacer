@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 	"latere.ai/x/wallfacer/internal/store"

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/cache"
+
 	"latere.ai/x/wallfacer/internal/constants"
 )
 

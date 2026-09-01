@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"latere.ai/x/wallfacer/internal/workspace"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"latere.ai/x/wallfacer/internal/workspace"
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/atomicfile"

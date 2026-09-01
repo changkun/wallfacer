@@ -16,6 +16,7 @@ import (
 
 	"latere.ai/x/pkg/jwtauth"
 	"latere.ai/x/pkg/oidc"
+
 	"latere.ai/x/wallfacer/internal/auth"
 )
 

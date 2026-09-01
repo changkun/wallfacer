@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/github"
 )
 

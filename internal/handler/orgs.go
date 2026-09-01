@@ -28,6 +28,7 @@ import (
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/logger"
 )

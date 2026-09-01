@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/set"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
@@ -49,12 +49,12 @@ type BoardTask struct {
 // sharesWorkspace reports whether a task's worktree paths overlap with any of
 // the self task's workspace paths. Tasks with no worktrees (e.g. backlog) are
 // considered to share all workspaces so they appear in board context.
-func sharesWorkspace(worktreePaths map[string]string, selfWorkspaces set.Set[string]) bool {
+func sharesWorkspace(worktreePaths map[string]string, selfWorkspaces map[string]struct{}) bool {
 	if len(worktreePaths) == 0 {
 		return true // backlog tasks have no worktrees; include them
 	}
 	for repoPath := range worktreePaths {
-		if selfWorkspaces.Has(repoPath) {
+		if _, ok := selfWorkspaces[repoPath]; ok {
 			return true
 		}
 	}
@@ -117,11 +117,11 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 
 	// Build the set of workspace repo paths the self task is operating on.
 	// Siblings are only visible if they share at least one workspace.
-	selfWorkspaces := set.New[string]()
+	selfWorkspaces := map[string]struct{}{}
 	for _, t := range tasks {
 		if t.ID == selfTaskID {
 			for repoPath := range t.WorktreePaths {
-				selfWorkspaces.Add(repoPath)
+				selfWorkspaces[repoPath] = struct{}{}
 			}
 			break
 		}
@@ -129,11 +129,11 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 	// If the self task has no worktrees (e.g. backlog), fall back to the
 	// runner's configured workspace list so board context is still useful.
 	workspaces := r.currentWorkspaces()
-	if selfWorkspaces.Len() == 0 && len(workspaces) > 0 {
+	if len(selfWorkspaces) == 0 && len(workspaces) > 0 {
 		for _, ws := range workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws != "" {
-				selfWorkspaces.Add(ws)
+				selfWorkspaces[ws] = struct{}{}
 			}
 		}
 	}
@@ -145,7 +145,7 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		shortID := t.ID.String()[:8]
 
 		// Skip siblings that do not share any workspace with the self task.
-		if !isSelf && selfWorkspaces.Len() > 0 && !sharesWorkspace(t.WorktreePaths, selfWorkspaces) {
+		if !isSelf && len(selfWorkspaces) > 0 && !sharesWorkspace(t.WorktreePaths, selfWorkspaces) {
 			continue
 		}
 

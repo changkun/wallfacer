@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"latere.ai/x/pkg/relpath"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,10 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/relpath"
+
 	"github.com/fsnotify/fsnotify"
 	"latere.ai/x/pkg/atomicfile"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/sanitize"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/sse"

@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"latere.ai/x/pkg/statemachine"
+
 	"latere.ai/x/wallfacer/internal/logger"
 )
 

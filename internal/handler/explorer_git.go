@@ -3,15 +3,17 @@ package handler
 import (
 	"context"
 	"fmt"
-	"latere.ai/x/pkg/relpath"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"latere.ai/x/pkg/relpath"
+
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/logger"
 )
 

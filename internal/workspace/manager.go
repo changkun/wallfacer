@@ -9,7 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"latere.ai/x/pkg/set"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
@@ -448,7 +447,7 @@ func validate(paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
-	seen := set.New[string]()
+	seen := map[string]struct{}{}
 	validated := make([]string, 0, len(paths))
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
@@ -468,10 +467,10 @@ func validate(paths []string) ([]string, error) {
 		if !info.IsDir() {
 			return nil, fmt.Errorf("workspace path is not a directory: %s", path)
 		}
-		if seen.Has(path) {
+		if _, ok := seen[path]; ok {
 			continue
 		}
-		seen.Add(path)
+		seen[path] = struct{}{}
 		validated = append(validated, path)
 	}
 	slices.Sort(validated)

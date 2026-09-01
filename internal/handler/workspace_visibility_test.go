@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/workspace"
 )

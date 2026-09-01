@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/metrics"
+
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"

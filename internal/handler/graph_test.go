@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/graph"
 	"latere.ai/x/wallfacer/internal/store"

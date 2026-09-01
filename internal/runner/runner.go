@@ -14,11 +14,11 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/envutil"
-	"latere.ai/x/pkg/keyedmu"
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/pubsub"
 	"latere.ai/x/pkg/syncmap"
 	"latere.ai/x/pkg/trackedwg"
+
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -154,10 +154,10 @@ type Runner struct {
 	codexAuthPath    string
 	promptsMgr       *prompts.Manager                     // prompt template manager
 	worktreeMu       sync.Mutex                           // serializes all worktree filesystem operations on worktreesDir
-	repoMu           keyedmu.Map[string]                  // per-repo mutex for serializing rebase+merge
+	repoMu           syncmap.Map[string, *sync.Mutex]     // per-repo mutex for serializing rebase+merge
 	taskContainers   *containerRegistry                   // taskID → container name
 	liveLogs         syncmap.Map[uuid.UUID, *livelog.Log] // live log buffers for in-progress turns
-	oversightMu      keyedmu.Map[string]                  // per-task mutex for serializing oversight generation
+	oversightMu      syncmap.Map[string, *sync.Mutex]     // per-task mutex for serializing oversight generation
 	containerCB      *circuitbreaker.Breaker              // circuit breaker for container launch operations
 	backend          executor.Backend                     // pluggable sandbox backend (local podman/docker, host, future: k8s)
 	backgroundWg     trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
@@ -774,13 +774,15 @@ func isJWTExpired(jwt string, now time.Time) bool {
 // repoLock returns a per-repo mutex, creating one on first access.
 // Used to serialize rebase+merge operations on the same repository.
 func (r *Runner) repoLock(repoPath string) *sync.Mutex {
-	return r.repoMu.Get(repoPath)
+	mu, _ := r.repoMu.LoadOrStore(repoPath, &sync.Mutex{})
+	return mu
 }
 
 // oversightLock returns the per-task mutex for serialising oversight generation.
 // The mutex is created on first access and stored in oversightMu.
 func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
-	return r.oversightMu.Get(taskID.String())
+	mu, _ := r.oversightMu.LoadOrStore(taskID.String(), &sync.Mutex{})
+	return mu
 }
 
 // KillContainer sends a kill signal to the running container for a task.

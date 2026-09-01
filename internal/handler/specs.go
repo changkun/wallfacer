@@ -21,6 +21,7 @@ import (
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/statemachine"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
 	"latere.ai/x/wallfacer/internal/spec"

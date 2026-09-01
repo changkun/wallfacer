@@ -11,6 +11,7 @@ import (
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/auth"
 )
 

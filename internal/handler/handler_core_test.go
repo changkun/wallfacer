@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"

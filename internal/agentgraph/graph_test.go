@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"latere.ai/x/topos/graph"
+
 	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/flow"
 )

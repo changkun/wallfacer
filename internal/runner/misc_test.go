@@ -14,6 +14,7 @@ import (
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"

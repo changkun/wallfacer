@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/store"
 )
 

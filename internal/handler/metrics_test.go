@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/metrics"
+
 	"latere.ai/x/wallfacer/internal/store"
 )
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"latere.ai/x/pkg/atomicfile"
-	"latere.ai/x/pkg/set"
 )
 
 // Workspace is an owned, stably-identified set of folder paths. Its identity
@@ -136,7 +135,7 @@ func NormalizeGroups(groups []Workspace) []Workspace {
 		return nil
 	}
 	out := make([]Workspace, 0, len(groups))
-	seen := set.New[string]()
+	seen := map[string]struct{}{}
 	for _, group := range groups {
 		ws := normalizeGroupPaths(group.Folders)
 		// A dormant workspace may legitimately have no folders (recovered
@@ -153,10 +152,10 @@ func NormalizeGroups(groups []Workspace) []Workspace {
 		if dedupKey == "" {
 			dedupKey = "folders:" + GroupKey(ws)
 		}
-		if seen.Has(dedupKey) {
+		if _, ok := seen[dedupKey]; ok {
 			continue
 		}
-		seen.Add(dedupKey)
+		seen[dedupKey] = struct{}{}
 		normalized := group
 		normalized.Folders = ws
 		normalized.MaxParallel = sanitizeLimit(group.MaxParallel)
@@ -245,17 +244,17 @@ func normalizeGroupPaths(paths []string) []string {
 		return nil
 	}
 	out := make([]string, 0, len(paths))
-	seen := set.New[string]()
+	seen := map[string]struct{}{}
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
 		}
 		path = filepath.Clean(path)
-		if seen.Has(path) {
+		if _, ok := seen[path]; ok {
 			continue
 		}
-		seen.Add(path)
+		seen[path] = struct{}{}
 		out = append(out, path)
 	}
 	slices.Sort(out)

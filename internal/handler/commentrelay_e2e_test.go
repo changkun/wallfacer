@@ -2,14 +2,16 @@ package handler
 
 import (
 	"context"
-	"latere.ai/x/pkg/wait/waittest"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"latere.ai/x/pkg/wait/waittest"
+
 	"latere.ai/x/pkg/authkit"
+
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/coordinator"
 	coordclient "latere.ai/x/wallfacer/internal/coordinator/client"
