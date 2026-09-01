@@ -654,18 +654,15 @@ func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 // can be configured per-test.
 func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handler, *store.Store) {
 	t.Helper()
-	storeDir, err := os.MkdirTemp("", "wallfacer-mock-handler-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	// t.TempDir registers its removal first, so it runs after the compaction
+	// wait below (cleanups run last-in first-out), and it fails the test if
+	// the directory cannot be removed rather than leaving it under TMPDIR.
+	storeDir := t.TempDir()
 	s, err := storetest.NewFileStore(t, storeDir)
 	if err != nil {
-		_ = os.RemoveAll(storeDir)
-
 		t.Fatal(err)
 	}
-	// Wait for any background compaction before removing the store dir.
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	// Wait for any background compaction before the store dir is removed.
 	t.Cleanup(s.WaitCompaction)
 
 	h := &Handler{runner: mock, store: s}

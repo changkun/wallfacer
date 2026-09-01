@@ -674,11 +674,10 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "initial commit")
 
-	wtParent, err := os.MkdirTemp("", "wallfacer-test-wt-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(wtParent) })
+	// t.TempDir rather than os.MkdirTemp: the framework removes it and fails
+	// the test if it cannot, where a cleanup that swallows the error leaves
+	// the directory under TMPDIR for the life of the machine.
+	wtParent := t.TempDir()
 	wt := filepath.Join(wtParent, "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
@@ -747,11 +746,10 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "initial commit")
 
-	wtParent, err := os.MkdirTemp("", "wallfacer-test-wt-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(wtParent) })
+	// t.TempDir rather than os.MkdirTemp: the framework removes it and fails
+	// the test if it cannot, where a cleanup that swallows the error leaves
+	// the directory under TMPDIR for the life of the machine.
+	wtParent := t.TempDir()
 	wt := filepath.Join(wtParent, "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
