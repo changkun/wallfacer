@@ -112,6 +112,11 @@ func (s *Writer) writeData(data []byte) error {
 	}
 }
 
+// Flush pushes the headers and any buffered frames to the client without
+// writing a frame. Call it once after NewWriter so an EventSource sees the
+// stream open before the first event arrives.
+func (s *Writer) Flush() { s.flusher.Flush() }
+
 // Heartbeat writes a "heartbeat" event with empty data. Sent as a real
 // event (not an SSE comment) so the browser EventSource dispatches it
 // to JavaScript — the frontend uses heartbeat arrivals to detect stale

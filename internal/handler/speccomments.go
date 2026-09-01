@@ -3,8 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"latere.ai/x/pkg/relpath"
+	"latere.ai/x/wallfacer/internal/pkg/sse"
 	"latere.ai/x/wallfacer/internal/workspace"
 	"net/http"
 	"os"
@@ -263,18 +263,18 @@ func (h *Handler) SubmitSpecComment(w http.ResponseWriter, r *http.Request) {
 // without a reload.
 func (h *Handler) StreamSpecComments(w http.ResponseWriter, r *http.Request) {
 	relay := h.relay()
-	flusher, ok := w.(http.Flusher)
-	if relay == nil || !ok {
+	if relay == nil {
 		http.Error(w, "stream unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	stream := sse.NewWriter(w)
+	if stream == nil {
+		return
+	}
 
 	id, ch := relay.Subscribe()
 	defer relay.Unsubscribe(id)
-	flusher.Flush()
+	stream.Flush()
 
 	for {
 		select {
@@ -284,12 +284,9 @@ func (h *Handler) StreamSpecComments(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			data, err := json.Marshal(ev)
-			if err != nil {
-				continue
+			if err := stream.JSON("spec-comment", ev); err != nil {
+				return
 			}
-			_, _ = fmt.Fprintf(w, "event: spec-comment\ndata: %s\n\n", data)
-			flusher.Flush()
 		}
 	}
 }
