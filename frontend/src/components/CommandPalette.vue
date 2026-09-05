@@ -9,6 +9,8 @@ import type { Task } from '../api/types';
 import { commandPaletteActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import { docIndex } from '../data/docs';
 import { rankDocs } from '../lib/docSearch';
+import { statusPill } from '../lib/statusPill';
+import { specStatusPill } from '../lib/specStatus';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
@@ -460,21 +462,21 @@ onUnmounted(() => {
       @click="onOverlayClick"
       @keydown="onKeydown"
     >
-      <div class="command-palette-panel" @click.stop>
+      <div class="pop command-palette-panel" role="dialog" aria-label="Command palette" @click.stop>
         <div class="command-palette-header">
-          <span class="command-palette-label">
-            <strong>Command palette</strong>
-          </span>
-          <span class="command-palette-hints">{{ flatRows.length ? '↑↓ navigate • Enter run • Esc close' : 'Esc close' }}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.5" y2="16.5"></line>
+          </svg>
+          <input
+            ref="inputRef"
+            v-model="query"
+            type="text"
+            class="command-palette-input"
+            placeholder="Search tasks, specs, docs, or a task id"
+            autocomplete="off"
+          />
+          <kbd class="key">esc</kbd>
         </div>
-        <input
-          ref="inputRef"
-          v-model="query"
-          type="text"
-          class="command-palette-input"
-          placeholder="Search title, prompt, or task id"
-          autocomplete="off"
-        />
         <div class="command-palette-results">
           <template v-if="sections.length">
             <section
@@ -482,7 +484,7 @@ onUnmounted(() => {
               :key="section.title"
               class="command-palette-section"
             >
-              <div class="command-palette-section-title">{{ section.title }}</div>
+              <div class="eyebrow command-palette-section-title">{{ section.title }}</div>
               <div
                 v-for="task in section.tasks"
                 :key="task.id"
@@ -500,15 +502,15 @@ onUnmounted(() => {
                 <div class="command-palette-row-meta">
                   <span class="command-palette-task-id">{{ shortId(task) }}</span>
                   <span
+                    v-if="task.status"
+                    class="pill"
+                    :class="statusPill(task.status)"
+                  >{{ task.status.replace('_', ' ') }}</span>
+                  <span
                     v-if="task.matched_field"
-                    class="badge command-palette-match-field"
+                    class="pill pill-neutral command-palette-match-field"
                     :title="`Matched in ${task.matched_field}`"
                   >{{ task.matched_field }}</span>
-                  <span
-                    v-if="task.status"
-                    class="badge"
-                    :class="`badge-${task.status}`"
-                  >{{ task.status }}</span>
                   <span class="command-palette-row-hint-time">
                     {{ relativeTime(task.updated_at || task.created_at) }}
                   </span>
@@ -517,17 +519,17 @@ onUnmounted(() => {
                       v-for="a in taskActions(task)"
                       :key="a.id"
                       type="button"
-                      class="command-palette-action-btn"
+                      class="btn sm ghost command-palette-action-btn"
                       :class="{ active: actionRowIndex(task, a.id) === activeIndex }"
                       :title="a.title"
                       @click="runTaskAction(a.id, task)"
                       @mouseenter="activeIndex = actionRowIndex(task, a.id)"
-                    >{{ a.icon }} {{ a.label }}</button>
+                    >{{ a.label }}</button>
                     <button
                       v-for="j in tabJumps(task)"
                       :key="j.tab"
                       type="button"
-                      class="command-palette-action-btn"
+                      class="btn sm ghost command-palette-action-btn"
                       :class="{ active: jumpRowIndex(task, j.tab) === activeIndex }"
                       :title="j.label"
                       @click="pickJump(task, j.tab)"
@@ -547,7 +549,7 @@ onUnmounted(() => {
             </section>
           </template>
           <section v-if="specMatches.length || !query.trim()" class="command-palette-section">
-            <div class="command-palette-section-title">Plan</div>
+            <div class="eyebrow command-palette-section-title">Plan</div>
             <div v-if="!specMatches.length" class="command-palette-empty">No entries</div>
             <div
               v-for="n in specMatches"
@@ -563,12 +565,12 @@ onUnmounted(() => {
               <div class="command-palette-row-title">{{ n.spec?.title || n.path }}</div>
               <div class="command-palette-row-meta">
                 <span class="command-palette-task-id">{{ n.path }}</span>
-                <span v-if="n.spec?.status" class="badge">{{ n.spec.status }}</span>
+                <span v-if="n.spec?.status" class="pill" :class="specStatusPill(n.spec.status)">{{ n.spec.status }}</span>
               </div>
             </div>
           </section>
           <section v-if="docMatches.length" class="command-palette-section">
-            <div class="command-palette-section-title">Docs</div>
+            <div class="eyebrow command-palette-section-title">Docs</div>
             <div
               v-for="d in docMatches"
               :key="d.slug"
@@ -590,6 +592,11 @@ onUnmounted(() => {
           <div v-if="!sections.length && !specMatches.length && !docMatches.length" class="command-palette-empty">
             {{ query.trim() ? 'No matches' : 'No tasks yet' }}
           </div>
+        </div>
+        <div class="command-palette-foot" aria-hidden="true">
+          <span><kbd class="key">↑</kbd><kbd class="key">↓</kbd> move</span>
+          <span><kbd class="key">↵</kbd> open</span>
+          <span><kbd class="key">esc</kbd> close</span>
         </div>
       </div>
     </div>

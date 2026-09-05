@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 import { useToastStore } from '../stores/toast';
 import type { Task } from '../api/types';
+import { statusPill } from '../lib/statusPill';
 
 // Board-scoped trash: soft-deleted tasks are a property of the board, so this
 // lives on the board (a popup) rather than in global Settings.
@@ -80,7 +81,7 @@ function statusLabel(task: Task): string {
 }
 
 function statusBadgeClass(task: Task): string {
-  return 'badge badge-' + (task.status || 'backlog');
+  return 'pill ' + statusPill(task.status || 'backlog');
 }
 
 function deletedAgo(task: Task): string {
@@ -118,52 +119,58 @@ function remainingDays(task: Task): string {
       class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
       @click.self="close"
     >
-      <div class="trash-modal" role="dialog" aria-label="Trash">
-        <header class="trash-modal__head">
-          <div class="trash-modal__heading">
-            <h2 class="trash-modal__title">Trash</h2>
-            <p class="trash-modal__sub">Deleted tasks are recoverable for {{ TRASH_BIN_RETENTION_DAYS }} days.</p>
+      <div class="dialog dialog--wide trash-modal" role="dialog" aria-label="Trash">
+        <div class="dialog-head">
+          <div class="dialog-head__main">
+            <h2 class="dialog-title">Trash</h2>
+            <p class="dialog-sub">Deleted tasks are recoverable for {{ TRASH_BIN_RETENTION_DAYS }} days.</p>
           </div>
-          <button type="button" class="trash-modal__close" aria-label="Close" @click="close">&times;</button>
-        </header>
-
-        <div v-if="trashError" class="trash-bin-banner" role="alert">
-          <span>{{ trashError }}</span>
-          <button type="button" class="trash-bin-banner__dismiss" aria-label="Dismiss error" @click="dismissError">&times;</button>
+          <button type="button" class="icon-btn" aria-label="Close" @click="close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+          </button>
         </div>
 
-        <div class="trash-modal__body">
+        <div class="dialog-body">
+          <div v-if="trashError" class="trash-bin-banner" role="alert">
+            <span>{{ trashError }}</span>
+            <button type="button" class="trash-bin-banner__dismiss" aria-label="Dismiss error" @click="dismissError">&times;</button>
+          </div>
+
           <div v-if="trashLoading" class="trash-bin-loading">
             <span class="spinner" aria-hidden="true"></span>
             <span>Loading deleted tasks…</span>
           </div>
           <div v-else-if="deletedTasks.length === 0" class="trash-modal__empty">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
             </svg>
             <span>Trash is empty</span>
           </div>
-          <div v-else class="trash-modal__list" role="list">
-            <div
-              v-for="task in deletedTasks"
-              :key="task.id"
-              class="trash-modal__row"
-              role="listitem"
-            >
-              <div class="trash-modal__main">
-                <div class="trash-modal__row-title">{{ trashTitle(task) }}</div>
-                <div class="trash-modal__meta">
-                  <span :class="statusBadgeClass(task)">{{ statusLabel(task) }}</span>
-                  <span>{{ deletedAgo(task) }}</span>
-                  <span class="trash-modal__retention">{{ remainingDays(task) }}</span>
+          <div v-else class="card compact">
+            <div class="rows trash-modal__list" role="list">
+              <div
+                v-for="task in deletedTasks"
+                :key="task.id"
+                class="row trash-modal__row"
+                role="listitem"
+              >
+                <div class="row-main">
+                  <div class="row-title">{{ trashTitle(task) }}</div>
+                  <div class="row-meta trash-modal__meta">
+                    <span :class="statusBadgeClass(task)">{{ statusLabel(task) }}</span>
+                    <span>{{ deletedAgo(task) }}</span>
+                    <span class="trash-modal__retention">{{ remainingDays(task) }}</span>
+                  </div>
+                </div>
+                <div class="row-end">
+                  <button
+                    type="button"
+                    class="btn sm ghost trash-modal__restore"
+                    :disabled="!!restoring[task.id]"
+                    @click="restoreTask(task.id)"
+                  >{{ restoring[task.id] ? 'Restoring…' : 'Restore' }}</button>
                 </div>
               </div>
-              <button
-                type="button"
-                class="trash-modal__restore"
-                :disabled="!!restoring[task.id]"
-                @click="restoreTask(task.id)"
-              >{{ restoring[task.id] ? 'Restoring…' : 'Restore' }}</button>
             </div>
           </div>
         </div>
@@ -173,118 +180,27 @@ function remainingDays(task: Task): string {
 </template>
 
 <style scoped>
-.trash-modal {
-  width: min(560px, calc(100vw - 32px));
-  max-height: min(70vh, 640px);
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-xl);
-  box-shadow: var(--sh-pop);
-  overflow: hidden;
-}
-.trash-modal__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding: var(--sp-5) var(--sp-5) var(--sp-4);
-  border-bottom: 1px solid var(--rule);
-}
-.trash-modal__title {
-  margin: 0;
-  font-size: var(--fs-xl);
-  font-weight: 600;
-  color: var(--ink);
-}
-.trash-modal__sub {
-  margin: 2px 0 0;
-  font-size: var(--fs-base);
-  color: var(--ink-3);
-}
-.trash-modal__close {
-  background: none;
-  border: none;
-  color: var(--ink-3);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 4px;
-}
-.trash-modal__close:hover {
-  color: var(--ink);
-}
-.trash-modal__body {
-  overflow-y: auto;
-  padding: var(--sp-3) var(--sp-4) var(--sp-5);
-}
+/* The trash is the wide dialog: a card of rows, one per deleted task, with
+   the state pill, the deletion age, the days left in warn, and a ghost Restore. */
 .trash-modal__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-7) 0;
+  gap: 10px;
+  padding: 36px 0 28px;
   color: var(--ink-3);
   font-size: var(--fs-md);
-}
-.trash-modal__list {
-  display: flex;
-  flex-direction: column;
-}
-.trash-modal__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding: var(--sp-3);
-  border-radius: var(--r-md);
-  border-bottom: 1px solid var(--rule);
-}
-.trash-modal__row:last-child {
-  border-bottom: none;
-}
-.trash-modal__row:hover {
-  background: var(--bg-hover);
-}
-.trash-modal__main {
-  min-width: 0;
-}
-.trash-modal__row-title {
-  font-size: var(--fs-md);
-  color: var(--ink);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .trash-modal__meta {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  margin-top: 3px;
-  font-size: var(--fs-10);
-  color: var(--ink-3);
+  gap: 10px;
+  margin-top: 2px;
 }
 .trash-modal__retention {
   color: var(--warn);
 }
-.trash-modal__restore {
-  flex-shrink: 0;
-  font-size: var(--fs-base);
-  padding: 5px var(--sp-4);
-  background: var(--bg-input);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--ink);
-  cursor: pointer;
-}
-.trash-modal__restore:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
 .trash-modal__restore:disabled {
-  opacity: 0.6;
   cursor: progress;
 }
 </style>

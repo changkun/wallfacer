@@ -1,8 +1,10 @@
-/* --- Overlays: the scrim, the dialog card, and the task sheet ---
-   The scrim is a tint, never a blur. A dialog is a centered card; the task
-   sheet is the wide variant with a header row, an underline tab strip, a
-   scrolling main column and a 340px aside of cards.
-   See specs/shared/console-redesign/task-detail.md. */
+/* --- Overlays: the scrim, the popover, the dialog, and the task sheet ---
+   The scrim is a tint, never a blur. Three shapes float over a page: a
+   popover (.pop) anchored near its trigger or at the top of the viewport, a
+   centred dialog (.dialog) at 440 or 720 wide, and the task sheet, the wide
+   dialog variant with a header row, an underline tab strip, a scrolling main
+   column and a 340px aside of cards. See
+   specs/shared/console-redesign/panels-and-overlays.md and task-detail.md. */
 .modal-overlay {
   background: var(--glass-dim);
   animation: om-fade-in 0.16s var(--ease-fluid) both;
@@ -17,6 +19,102 @@
   overflow-y: auto;
   box-shadow: var(--sh-pop);
   animation: om-fade-up 0.2s var(--ease-fluid) both;
+}
+
+/* --- The popover: a card lifted off the page, its content in rows --- */
+.pop {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-pop);
+  overflow: hidden;
+  animation: om-fade-up 0.18s var(--ease-fluid) both;
+}
+
+/* --- The dialog: a centred card with a head, a scrolling body and a foot --- */
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  max-height: min(88vh, 900px);
+  min-height: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-main);
+  box-shadow: var(--sh-pop);
+  overflow: hidden;
+  animation: om-fade-up 0.2s var(--ease-fluid) both;
+}
+.dialog--wide {
+  max-width: 720px;
+}
+.dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  flex: none;
+}
+.dialog-head__main {
+  flex: 1;
+  min-width: 0;
+}
+.dialog-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--ink);
+}
+.dialog-sub {
+  margin: 3px 0 0;
+  font-size: var(--fs-base);
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.dialog-head .icon-btn {
+  margin: -4px -6px 0 0;
+}
+.dialog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 18px;
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.dialog-body > .card + .card,
+.dialog-body > .card + .dialog-note,
+.dialog-body > .dialog-note + .card {
+  margin-top: 12px;
+}
+.dialog-note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--rule);
+  flex: none;
+}
+.dialog-foot__status {
+  margin-right: auto;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+/* A rows card inside a dialog keeps the dialog's own padding tight. */
+.dialog-body .rows .row {
+  padding: 10px 14px;
 }
 
 /* The sheet */

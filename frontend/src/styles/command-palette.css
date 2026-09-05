@@ -1,4 +1,8 @@
-/* --- Command palette --- */
+/* --- Command palette ---
+   A popover pinned near the top of the viewport: a borderless search field in
+   the head, grouped rows below, the selected row on the sunk surface, task
+   actions as small ghost buttons under their task. The palette never blurs.
+   See specs/shared/console-redesign/panels-and-overlays.md. */
 .command-palette {
   position: fixed;
   inset: 0;
@@ -6,200 +10,157 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 10vh 12px 12px;
-  background: var(--glass-dim);
+  padding: 10vh 16px 16px;
 }
-
-.command-palette.hidden {
-  display: none;
-  pointer-events: none;
-}
-
 .command-palette-panel {
-  width: min(940px, 100%);
-  max-width: 940px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  box-shadow: var(--sh-pop);
-  padding: 10px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  max-height: 84vh;
+  width: min(640px, 100%);
+  max-height: min(72vh, 720px);
 }
-
 .command-palette-header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 16px;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
 }
-
-.command-palette-label {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+.command-palette-header > svg {
+  flex: none;
+  color: var(--ink-4);
 }
-
-.command-palette-hints {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 .command-palette-input {
-  width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  outline: none;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-family: inherit;
-}
-
-.command-palette-input:focus {
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
-  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
-}
-
-.command-palette-results {
-  overflow: auto;
-  margin-top: 8px;
-  max-height: calc(84vh - 90px);
-}
-
-.command-palette-section {
-  padding: 4px 2px 8px;
-}
-
-.command-palette-section + .command-palette-section {
-  margin-top: 6px;
-  border-top: 1px solid var(--border);
-}
-
-.command-palette-section-title {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
-
-.command-palette-row {
-  width: 100%;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: none;
   background: transparent;
-  text-align: left;
-  padding: 7px 9px;
-  margin-bottom: 3px;
-  cursor: pointer;
-  color: var(--text);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-md);
+  outline: none;
 }
-
-.command-palette-row:hover {
-  border-color: var(--border);
-  background: var(--bg-input);
+.command-palette-input::placeholder {
+  color: var(--ink-4);
 }
-
-.command-palette-row.active {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+.command-palette-results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
 }
-
-.command-palette-row-title {
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.command-palette-row-meta {
-  margin-top: 2px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.command-palette-doc-snippet {
-  margin-top: 2px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.command-palette-row-hint {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.command-palette-task-id,
-.command-palette-task-badge {
-  display: inline-block;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  padding: 1px 6px;
-  margin-right: 4px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.command-palette-task-snippet {
+.command-palette-section + .command-palette-section {
   margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: pre-wrap;
-  word-break: break-word;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+}
+.command-palette-section-title {
+  padding: 8px 10px 4px;
 }
 
-.command-palette-empty {
-  color: var(--text-muted);
-  font-size: 12px;
-  padding: 6px 4px;
+/* Rows: 12px radius, hover and the active row on the sunk surface. */
+.command-palette-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-hover);
 }
-
-@media (max-width: 900px) {
-  .command-palette {
-    padding: 8px 8px 12px;
-    align-items: stretch;
-  }
-
-  .command-palette-panel {
-    width: 100%;
-    margin-top: 22px;
-  }
-
-  .command-palette-results {
-    max-height: calc(100vh - 170px);
-  }
+.command-palette-row:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
-
-/* Inline per-task context actions in command palette rows. */
+.command-palette-row.active {
+  background: var(--bg-sunk);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.command-palette-row-title {
+  font-size: var(--fs-base);
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-palette-row-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+.command-palette-task-id {
+  font-family: var(--font-mono);
+  color: var(--ink-4);
+}
+.command-palette-row-hint-time {
+  color: var(--ink-4);
+}
 .command-palette-row-actions {
   display: inline-flex;
   gap: 4px;
   margin-left: auto;
 }
 .command-palette-action-btn {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
-  cursor: pointer;
-  white-space: nowrap;
+  height: 22px;
+  padding: 0 8px;
+  font-size: var(--fs-10);
 }
-.command-palette-action-btn:hover,
 .command-palette-action-btn.active {
-  background: var(--bg-hover);
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.command-palette-task-snippet,
+.command-palette-doc-snippet {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-3);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.command-palette-task-snippet mark {
+  background: var(--tint-amber);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.command-palette-empty {
+  padding: 10px 10px 12px;
+  font-size: 12px;
+  color: var(--ink-4);
+}
+.command-palette-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-10);
+  color: var(--ink-4);
+  flex: none;
+}
+.command-palette-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+@media (max-width: 900px) {
+  .command-palette {
+    padding: 12px 8px;
+    align-items: stretch;
+  }
+  .command-palette-panel {
+    max-height: none;
+  }
 }

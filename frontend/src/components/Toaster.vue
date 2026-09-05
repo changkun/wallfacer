@@ -9,24 +9,29 @@ const toast = useToastStore();
       <div
         v-for="t in toast.toasts"
         :key="t.id"
-        class="toast"
+        class="pop toast"
         :class="'toast--' + t.kind"
         role="status"
       >
+        <span class="toast__dot" aria-hidden="true"></span>
         <span class="toast__msg">{{ t.message }}</span>
         <button
           v-if="t.action"
           type="button"
-          class="toast__action"
+          class="btn sm toast__action"
           @click="t.action.run()"
         >{{ t.action.label }}</button>
-        <button type="button" class="toast__close" aria-label="Dismiss" @click="toast.dismiss(t.id)">&times;</button>
+        <button type="button" class="icon-btn sm toast__close" aria-label="Dismiss" @click="toast.dismiss(t.id)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+        </button>
       </div>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
+/* A bottom-right stack of popover rows: a tone dot, the message, an optional
+   ink action and a quiet dismiss. The tone lives in the dot, not a stripe. */
 .toaster {
   position: fixed;
   right: 16px;
@@ -35,46 +40,31 @@ const toast = useToastStore();
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 380px;
+  width: min(380px, calc(100vw - 32px));
 }
 .toast {
-  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  font-size: 13px;
-  color: var(--text);
-  animation: toast-in 160ms ease-out;
+  padding: 10px 8px 10px 14px;
+  font-size: var(--fs-base);
+  color: var(--ink);
 }
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+.toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--run);
 }
-.toast--success { border-left: 3px solid var(--ok); }
-.toast--error { border-left: 3px solid var(--err, #c0392b); }
-.toast--info { border-left: 3px solid var(--accent); }
-.toast__msg { flex: 1 1 auto; }
+.toast--success .toast__dot { background: var(--ok); }
+.toast--error .toast__dot { background: var(--err); }
+.toast__msg {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+}
 .toast__action {
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  border-radius: 5px;
-  padding: 3px 10px;
-  font-size: 12px;
-  cursor: pointer;
   white-space: nowrap;
 }
-.toast__close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-}
-.toast__close:hover { color: var(--text); }
 </style>

@@ -42,55 +42,60 @@ function onKeydown(e: KeyboardEvent) {
     >
       <div
         ref="cardRef"
-        class="modal-card"
-        style="max-width: 420px; width: 100%;"
+        class="dialog confirm"
+        :class="{ 'confirm--danger': dialog.active.danger }"
         role="dialog"
         aria-modal="true"
       >
-        <div class="p-6">
-          <h3 v-if="dialog.active.title" class="confirm-title">{{ dialog.active.title }}</h3>
-          <div class="confirm-body">
-            <svg
-              v-if="dialog.active.danger"
-              class="confirm-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <p class="confirm-message">{{ dialog.active.message }}</p>
+        <div v-if="dialog.active.title" class="dialog-head">
+          <div class="dialog-head__main">
+            <h3 class="dialog-title">{{ dialog.active.title }}</h3>
           </div>
-          <input
-            v-if="dialog.active.prompt"
-            ref="promptInput"
-            type="text"
-            class="confirm-input"
-            :value="promptText"
-            :placeholder="dialog.active.prompt.placeholder || ''"
-            @input="onPromptInput"
-          />
-          <div class="confirm-actions">
+        </div>
+        <div class="dialog-body confirm-body" :class="{ 'confirm-body--untitled': !dialog.active.title }">
+          <svg
+            v-if="dialog.active.danger"
+            class="confirm-icon"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div class="confirm-main">
+            <p class="confirm-message">{{ dialog.active.message }}</p>
+            <input
+              v-if="dialog.active.prompt"
+              ref="promptInput"
+              type="text"
+              class="field confirm-input"
+              :value="promptText"
+              :placeholder="dialog.active.prompt.placeholder || ''"
+              @input="onPromptInput"
+            />
+          </div>
+        </div>
+        <div class="dialog-foot confirm-actions">
           <button
             v-if="!dialog.active.alert"
             type="button"
-            class="confirm-btn confirm-btn--ghost"
+            class="btn ghost confirm-btn confirm-btn--ghost"
             @click="dialog.dismiss()"
           >{{ dialog.active.cancelLabel }}</button>
           <button
             type="button"
-            class="confirm-btn"
-            :class="dialog.active.danger ? 'confirm-btn--danger' : 'confirm-btn--primary'"
+            class="btn confirm-btn"
+            :class="dialog.active.danger ? 'ghost danger confirm-btn--danger' : 'confirm-btn--primary'"
             @click="dialog.accept()"
           >{{ dialog.active.confirmLabel }}</button>
-          </div>
         </div>
       </div>
     </div>
@@ -98,35 +103,34 @@ function onKeydown(e: KeyboardEvent) {
 </template>
 
 <style scoped>
-.confirm-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--text); }
-.confirm-body { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 16px; }
-.confirm-icon { color: #e05252; flex-shrink: 0; margin-top: 1px; }
-.confirm-message { margin: 0; font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+/* The confirm is the 440px dialog: message (with a warning glyph when the
+   action is destructive), an optional prompt field, and a foot whose forward
+   button is ink, or the danger ghost when it destroys something. */
+.confirm-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.confirm-body--untitled {
+  padding-top: 20px;
+}
+.confirm-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--err);
+}
+.confirm-main {
+  flex: 1;
+  min-width: 0;
+}
+.confirm-message {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
 .confirm-input {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  margin: 0 0 16px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-input, var(--bg-card));
-  color: var(--text);
-  font-size: 13px;
-  box-sizing: border-box;
+  margin-top: 12px;
 }
-.confirm-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.confirm-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-}
-.confirm-btn--ghost:hover { background: var(--bg-hover); }
-.confirm-btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.confirm-btn--danger { background: var(--err, #c0392b); border-color: var(--err, #c0392b); color: #fff; }
-.confirm-btn--primary:hover, .confirm-btn--danger:hover { opacity: 0.9; }
 </style>

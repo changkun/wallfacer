@@ -18,7 +18,7 @@ const ui = useUiStore();
       </p>
       <button
         type="button"
-        class="composer__btn composer__btn--primary"
+        class="btn lg ws-required__open"
         @click="ui.showWorkspaces = true"
       >Open workspace picker</button>
     </div>
@@ -40,7 +40,7 @@ const ui = useUiStore();
   width: min(560px, 100%);
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   gap: 12px;
   text-align: center;
 }

@@ -8,6 +8,7 @@ import type { ActivityRow } from '../lib/prettyNdjson';
 import type { Task, ReviewTranscript } from '../api/types';
 import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
+import { statusPill } from '../lib/statusPill';
 import { useToastStore } from '../stores/toast';
 import { useTaskStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
@@ -571,20 +572,8 @@ const budgetPct = computed(() => {
   return 0;
 });
 
-// Status → badge class, for retry-history rows (matches the board badges).
-// The pill class for a task status: ramp colour per column.
-function pillClassFor(status: string): string {
-  switch (status) {
-    case 'in_progress':
-    case 'committing': return 'pill-run';
-    case 'waiting':
-    case 'cancelling': return 'pill-warn';
-    case 'done': return 'pill-ok';
-    case 'failed': return 'pill-err';
-    case 'cancelled': return 'pill-pub';
-    default: return 'pill-neutral';
-  }
-}
+// The pill class for a task status: shared with the palette and trash dialog.
+const pillClassFor = statusPill;
 
 function timeStr(iso: string): string {
   if (!iso) return '—';

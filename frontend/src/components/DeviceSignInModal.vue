@@ -40,87 +40,88 @@ const errorMessage = computed(() => {
       @click.self="emit('cancel')"
       @keydown.esc="emit('cancel')"
     >
-      <div class="modal-card" style="max-width: 420px; width: 100%;" role="dialog" aria-modal="true">
-        <div class="p-6">
-          <h3 class="device-title">{{ t('auth.device.title') }}</h3>
+      <div class="dialog device" role="dialog" aria-modal="true">
+        <div class="dialog-head">
+          <div class="dialog-head__main">
+            <h3 class="dialog-title device-title">{{ t('auth.device.title') }}</h3>
+          </div>
+        </div>
 
-          <template v-if="status === 'pending' || status === 'starting'">
+        <template v-if="status === 'pending' || status === 'starting'">
+          <div class="dialog-body">
             <p class="device-step">{{ t('auth.device.step') }}</p>
             <div class="device-code" aria-label="verification code">{{ userCode }}</div>
             <a
-              class="device-open"
+              class="link device-open"
               :href="verificationUriComplete || verificationUri"
               target="_blank"
               rel="noopener"
             >{{ t('auth.device.open') }}</a>
-            <p class="device-waiting">{{ t('auth.device.waiting') }}</p>
-            <div class="device-actions">
-              <button type="button" class="device-btn device-btn--ghost" @click="emit('cancel')">
-                {{ t('auth.device.cancel') }}
-              </button>
-            </div>
-          </template>
+            <p class="device-waiting muted">{{ t('auth.device.waiting') }}</p>
+          </div>
+          <div class="dialog-foot device-actions">
+            <button type="button" class="btn ghost device-btn device-btn--ghost" @click="emit('cancel')">
+              {{ t('auth.device.cancel') }}
+            </button>
+          </div>
+        </template>
 
-          <template v-else-if="status === 'done'">
+        <template v-else-if="status === 'done'">
+          <div class="dialog-body">
             <p class="device-success">{{ t('auth.device.success') }}</p>
-          </template>
+          </div>
+        </template>
 
-          <template v-else-if="status === 'error'">
+        <template v-else-if="status === 'error'">
+          <div class="dialog-body">
             <p class="device-error">{{ errorMessage }}</p>
-            <div class="device-actions">
-              <button type="button" class="device-btn device-btn--ghost" @click="emit('cancel')">
-                {{ t('auth.device.close') }}
-              </button>
-              <button type="button" class="device-btn device-btn--primary" @click="emit('retry')">
-                {{ t('auth.device.retry') }}
-              </button>
-            </div>
-          </template>
-        </div>
+          </div>
+          <div class="dialog-foot device-actions">
+            <button type="button" class="btn ghost device-btn device-btn--ghost" @click="emit('cancel')">
+              {{ t('auth.device.close') }}
+            </button>
+            <button type="button" class="btn device-btn device-btn--primary" @click="emit('retry')">
+              {{ t('auth.device.retry') }}
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-.device-title { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--text); }
-.device-step { margin: 0 0 10px; font-size: 13px; color: var(--text); line-height: 1.5; }
+/* Device sign-in is the 440px dialog: the one-time code sits in a sunk mono
+   block the user can select in one gesture. */
+.device-step,
+.device-success,
+.device-error {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--ink);
+}
+.device-error {
+  color: var(--err);
+}
 .device-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 3px;
+  margin: 12px 0;
+  padding: 14px;
+  font: 700 26px / 1 var(--font-mono);
+  letter-spacing: 0.12em;
   text-align: center;
-  padding: 12px;
-  margin: 0 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-input, var(--bg-card));
-  color: var(--text);
+  color: var(--ink);
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
   user-select: all;
 }
 .device-open {
   display: inline-block;
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: var(--accent);
-  text-decoration: none;
+  font-size: var(--fs-base);
 }
-.device-open:hover { text-decoration: underline; }
-.device-waiting { margin: 0; font-size: 12px; color: var(--text-muted, #888); }
-.device-success { margin: 0; font-size: 13px; color: var(--text); }
-.device-error { margin: 0 0 16px; font-size: 13px; color: var(--err, #c0392b); line-height: 1.5; }
-.device-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.device-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
+.device-waiting {
+  margin: 10px 0 0;
+  font-size: var(--fs-10);
 }
-.device-btn--ghost:hover { background: var(--bg-hover); }
-.device-btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.device-btn--primary:hover { opacity: 0.9; }
 </style>
