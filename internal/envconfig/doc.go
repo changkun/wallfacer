@@ -20,6 +20,6 @@
 // # Usage
 //
 //	cfg, err := envconfig.Parse("/path/to/.env")
-//	model := "claude-sonnet-4-6-20250514"
+//	model := "claude-opus-5"
 //	err = envconfig.Update("/path/to/.env", envconfig.Updates{DefaultModel: &model})
 package envconfig
