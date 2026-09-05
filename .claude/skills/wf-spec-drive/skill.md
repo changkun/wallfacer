@@ -161,6 +161,6 @@ silent hang. Don't claim more autonomy than that.
 - **Don't double-manage dispatched specs** — once a spec is dispatched, the server
   drives `validated → testing → complete/stale` on task-done. Don't hand-set its
   status; let the server, then run `/wf-spec-wrapup` only to enrich the Outcome.
-- **Report, don't narrate** — the closing status line is the contract with the
-  goal evaluator; keep it accurate.
+- **End every turn with the status line** — the closing `status` line is the
+  contract with the goal evaluator; keep it accurate.
 - **Respect the gates** — autonomy stops at outward/irreversible actions.
