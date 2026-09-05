@@ -1,6 +1,6 @@
 ---
 title: Secondary Screens
-status: drafted
+status: complete
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -105,3 +105,50 @@ the ramp and the surfaces.
   opens inside the viewport), `whiteboard` (Excalidraw mounts), `artifacts`
   (grid, empty state), `docs` (nav 260, prose ≤ 76ch). Screenshots for each,
   light and dark.
+
+## Outcome
+
+**What shipped** (`0d1c2b81`, `fab2d54a`, `b84aaff0`, `384240a1`, `92fb38b2`).
+Analytics is a 1040px column: the title and lede, the three tabs as `.tabs`,
+then per tab a grid of `.card` stat tiles (eyebrow, big tabular number,
+qualifier, the spend tile with a bar) and `.card` sections each holding a
+table whose numeric cells are mono tabular and whose status cells are
+pills. The daily spend canvas reads `lib/chartPalette.ts`, which returns the
+ramp and surfaces from computed style and re-fires on a theme or palette
+change; the timing tones and legend swatches are `--ok`, `--warn` and `--err`
+classes. Routines is an 860px column with a create card (the prompt as a
+`.field`, Every and Agent graph selects, the ink button) and a `.card` of
+rows: the title, an `every N min` pill, the agent graph, the countdown and
+the last fire, then the interval select, the Off / On switch, Run now and a
+danger delete; `lib/routineTime.ts` holds the countdown wording the board
+card also uses. Mission Control's head carries the lede with `kbd.key` hints
+and a search field; the inspector is 300px of cards on `--bg-sunk` (selection
+with state and kind pills, ready and critical lists as rows, the legend as a
+two-column grid); the node popover is a `.pop`; `map/nodeColors.ts` maps
+every state to a token expression on the ramp, applied through `style` so
+`color-mix` works on SVG. The whiteboard variables, the artifact viewer, the
+local docs (a 260px nav of tree rows, the article at 76ch as the shared
+`.prose-content`) and the mermaid theme read tokens only. Tests:
+`chartPalette.test.ts`, `routineTime.test.ts`, `RoutinesPage.test.ts`, the
+rewritten `nodeColors.test.ts`; the guard covers all sixteen files. Scenes
+`analytics`, `routines`, `mission`, `whiteboard`, `artifacts` and `docs`
+replace the analytics smoke; `make ui-test` passes twenty scenes.
+
+**Decisions made during implementation.**
+- Analytics tables stay `<table>` elements styled to the rows geometry
+  rather than `.rows` divs: six numeric columns need real column alignment,
+  which the scene asserts cell by cell.
+- The routine schedule edits inline in the row. The schedule endpoint accepts
+  the interval and the enabled flag only, so a dialog would hold one field.
+- The map's colour map keeps a distinct expression per state (mixes toward a
+  neighbour where two states share a ramp hue) so the legend never shows two
+  identical dots.
+- The mission chrome moved from `docs.css` into `mission.css`; `docs.css`
+  keeps the screenshot pair rules only.
+
+**Deviations from the spec.** Artifacts keeps its preview-first layout (a
+picker, a tool bar and the iframe) instead of a grid of cards: artifacts have
+no thumbnails, so a grid would show sixteen identical placeholders. The
+inspector is 300px rather than the 272px it had; the spec set no width.
+
+**Follow-ups.** None beyond the verification child.
