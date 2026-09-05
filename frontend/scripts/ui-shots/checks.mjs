@@ -421,8 +421,118 @@ SCENES['dock'] = async (page) => {
   await page.click('.dock-panel__btn[aria-label="Restore terminal"]', { timeout: 5000 }).catch(() => {});
 };
 
+// Analytics (specs/shared/console-redesign/secondary-screens.md): stat tiles
+// as cards, tables whose numeric columns share one right edge, and every tab
+// without errors.
+SCENES['analytics'] = async (page) => {
+  await page.goto(base + '/analytics', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(900);
+  await page.click('.an-tabs [data-tab="analytics"]', { timeout: 5000 }).catch(() => {});
+  await page.waitForSelector('.an-tile', { timeout: 8000 }).catch(() => {});
+  const tiles = await boxes(page, '.an-tile');
+  expect('analytics', tiles.length >= 2, `${tiles.length} stat tiles, want at least 2`);
+  const cards = await page.$$eval('.an-tile', (els) => els.filter((e) => e.classList.contains('card')).length);
+  expect('analytics', cards === tiles.length, 'a stat tile is not a card');
+  // Numeric cells in one table share the header's right edge.
+  const misaligned = await page.$$eval('.an-table', (tables) => tables.flatMap((t) => {
+    const heads = [...t.querySelectorAll('th.num')].map((th) => th.getBoundingClientRect().right);
+    const rows = [...t.querySelectorAll('tbody tr')];
+    return rows.flatMap((r) => [...r.querySelectorAll('td.num')].map((td, i) => {
+      const cols = [...r.querySelectorAll('td.num')];
+      const head = heads[heads.length - cols.length + i];
+      return head == null ? 0 : Math.abs(td.getBoundingClientRect().right - head);
+    })).filter((d) => d > 1);
+  }));
+  expect('analytics', misaligned.length === 0, `${misaligned.length} numeric cells off their column edge`);
+  for (const tab of ['timing', 'usage']) {
+    await page.click(`.an-tabs [data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    expect('analytics', !!(await page.$('.an-body')), `${tab} tab rendered no body`);
+  }
+};
+
+// Routines: the create card, then rows with the schedule pill and the switch
+// (or the empty state when the seed has none).
+SCENES['routines'] = async (page) => {
+  await page.goto(base + '/routines', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(900);
+  expect('routines', !!(await page.$('.routine-create.card')), 'create card missing');
+  const rows = await boxes(page, '.routine-row');
+  if (rows.length) {
+    const switches = await page.$$eval('.routine-row [role="switch"]', (els) => els.length);
+    expect('routines', switches === rows.length, 'a routine row has no enabled switch');
+    expect('routines', !!(await page.$('.routine-row .pill')), 'a routine row has no schedule pill');
+  } else {
+    expect('routines', !!(await page.$('.routines-empty')), 'no rows and no empty state');
+  }
+};
+
+// Mission Control: the canvas draws nodes on the ramp, the inspector is 300
+// wide, and a spec node opens its popover inside the viewport.
+SCENES['mission'] = async (page) => {
+  await page.goto(base + '/mission', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForSelector('.gc-node', { timeout: 10000 }).catch(() => {});
+  const nodes = await boxes(page, '.gc-node');
+  expect('mission', nodes.length > 0, 'canvas rendered no nodes');
+  const insp = await firstBox(page, '.mission__inspector');
+  expect('mission', insp && Math.abs(insp.width - 300) <= 1, `inspector width ${insp && insp.width}, want 300`);
+  const fills = await page.$$eval('.gc-dot', (els) => els.map((e) => e.style.fill));
+  expect('mission', fills.length > 0 && fills.every((f) => /var\(|color-mix\(/.test(f)), 'a node fill is not a token expression');
+  const spec = await page.$('.gc-node--spec');
+  if (spec) {
+    await spec.dblclick();
+    await page.waitForSelector('.map-popup', { timeout: 5000 }).catch(() => {});
+    const pop = await firstBox(page, '.map-popup');
+    const vw = await page.evaluate(() => window.innerWidth);
+    const vh = await page.evaluate(() => window.innerHeight);
+    expect('mission', pop && pop.left >= 0 && pop.top >= 0 && pop.right <= vw + 1 && pop.bottom <= vh + 1, 'spec popover outside the viewport');
+    expect('mission', !!(await page.$('.map-popup.pop')), 'spec popover is not the pop shape');
+  }
+};
+
+// Whiteboard: Excalidraw mounts on the console theme.
+SCENES['whiteboard'] = async (page) => {
+  await page.goto(base + '/whiteboard', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForSelector('.excalidraw', { timeout: 15000 }).catch(() => {});
+  expect('whiteboard', !!(await page.$('.excalidraw')), 'Excalidraw did not mount');
+};
+
+// Artifacts: the tool bar over a preview, or the empty state.
+SCENES['artifacts'] = async (page) => {
+  await page.goto(base + '/artifacts', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(900);
+  const frame = await page.$('.af-frame');
+  const empty = await page.$('.af-empty .eyebrow');
+  expect('artifacts', !!frame || !!empty, 'neither a preview nor the empty state rendered');
+  if (frame) expect('artifacts', !!(await page.$('.af-bar .btn')), 'tool bar carries no buttons');
+};
+
+// Docs: the nav is 260 wide on the sunk surface and the reading column is at
+// most 76ch.
+SCENES['docs'] = async (page) => {
+  await page.goto(base + '/docs', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForSelector('.local-docs-body', { timeout: 10000 }).catch(() => {});
+  const nav = await firstBox(page, '.local-docs-nav');
+  expect('docs', nav && Math.abs(nav.width - 260) <= 1, `docs nav width ${nav && nav.width}, want 260`);
+  const wrap = await firstBox(page, '.local-docs-wrap');
+  const chPx = await page.evaluate(() => {
+    const el = document.querySelector('.local-docs-wrap');
+    if (!el) return 0;
+    const probe = document.createElement('span');
+    probe.textContent = '0';
+    probe.style.font = getComputedStyle(el).font;
+    probe.style.position = 'absolute';
+    document.body.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return w;
+  });
+  expect('docs', wrap && chPx > 0 && wrap.width <= 76 * chPx + 2, `reading column ${wrap && Math.round(wrap.width)}px exceeds 76ch (${Math.round(76 * chPx)}px)`);
+  expect('docs', !!(await page.$('.local-docs-link.is-active')), 'no active doc row');
+};
+
 // Routes without a scene of their own yet get the smoke.
-const SMOKE_ROUTES = { analytics: '/analytics', flows: '/flows' };
+const SMOKE_ROUTES = { flows: '/flows' };
 for (const [name, route] of Object.entries(SMOKE_ROUTES)) {
   SCENES[name] = async (page) => {
     await page.goto(base + route, { waitUntil: 'load', timeout: 20000 });

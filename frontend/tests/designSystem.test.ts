@@ -198,6 +198,11 @@ describe('primitives.css defines the shared classes', () => {
     'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue', 'src/components/KeyboardShortcutsModal.vue',
     'src/components/DeviceSignInModal.vue', 'src/components/TrashModal.vue', 'src/components/DockWorkspace.vue', 'src/components/TerminalPanel.vue',
     'src/components/ExplorerPanel.vue', 'src/components/editor/EditorTabStrip.vue', 'src/components/editor/FileEditor.vue', 'src/lib/editorTheme.ts',
+    'src/styles/analytics.css', 'src/styles/routines.css', 'src/styles/mission.css', 'src/styles/docs.css', 'src/styles/whiteboard.css',
+    'src/views/AnalyticsPage.vue', 'src/components/analytics/AnalyticsTabCost.vue', 'src/components/analytics/AnalyticsTabTiming.vue',
+    'src/components/analytics/AnalyticsTabUsage.vue', 'src/views/RoutinesPage.vue', 'src/views/MapPage.vue', 'src/components/map/GraphCanvas.vue',
+    'src/components/map/MapNodePopup.vue', 'src/components/map/nodeColors.ts', 'src/views/WhiteboardPage.vue', 'src/views/ArtifactsView.vue',
+    'src/views/LocalDocsPage.vue', 'src/lib/mermaidRender.ts', 'src/lib/chartPalette.ts',
   ];
   it.each(tokenOnly)('%s uses tokens only', (file) => {
     const whole = read(file);

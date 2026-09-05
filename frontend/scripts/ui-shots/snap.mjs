@@ -72,6 +72,7 @@ const SURFACES = {
   mission: { route: '/mission', steps: [{ wait: 1200 }] },
   whiteboard: { route: '/whiteboard', steps: [{ wait: 2000 }] },
   docs: { route: '/docs', steps: [{ wait: 800 }] },
+  artifacts: { route: '/artifacts', steps: [{ wait: 900 }] },
 };
 
 const base = arg('base', 'http://localhost:8099');
