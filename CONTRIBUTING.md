@@ -23,10 +23,10 @@ otel/truncation guardrails are this repository's own targets. Raw `go build`
 skips all of it and can land code that fails CI, so prefer the targets.
 
 ```bash
-make build          # Full gate: fmt + every lint + frontend build + binary
-make check          # The shared Go bar, every gate reported together
+make build          # Full gate: fmt + the bar + typecheck and guardrails + frontend build + binary
+make check          # The shared Go bar, every gate reported together, waivers honoured
 make test-all       # check + frontend tests + typecheck + guardrails (matches CI)
-make lint-all       # Every lint (fastest style check)
+make lint-all       # check + the frontend typecheck + the truncation guardrail
 make fmt            # Format Go in place
 make server         # Build and run the Go server natively
 ```

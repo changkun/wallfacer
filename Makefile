@@ -4,9 +4,10 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt hooks check test lint lint-js lint-otel lint-truncate test-all lint-all test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push web-frontend web-run web-dev web-docker
+.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push web-frontend web-run web-dev web-docker
 
-# Full build gate: fmt + frontend assets + every lint + binary.
+# Full build gate: fmt + frontend assets + the shared bar and the repo's own
+# checks + binary.
 build: fmt frontend-build lint-all build-binary
 
 # Build the wallfacer Go binary.
@@ -53,22 +54,11 @@ hooks:                                                                   ## Inst
 # race detector, the hermetic and clean-TMPDIR runs, per-package coverage,
 # govulncheck, the cgo and outbound-client scans. `make check` is a name for
 # `go tool lateregate` and nothing else; `go tool lateregate list` prints the
-# plan, and `go tool lateregate <gate>` runs one. Decisions and dated waivers
-# live in .lateregate.yaml.
+# plan. Decisions and dated waivers live in .lateregate.yaml, and only the
+# bar honours them: `go tool lateregate <gate>` runs one gate as if nothing
+# were waived, which is why no target here names a single gate.
 check:
 	@go tool lateregate
-
-test:
-	@go tool lateregate test
-
-lint:
-	@go tool lateregate lint
-
-# lint-otel keeps outbound HTTP instrumented so traces propagate across
-# services: an http.Client literal with no Transport, or http.DefaultClient,
-# calls out on the stdlib transport and the trace stops at the boundary.
-lint-otel:
-	@go tool lateregate otel-client
 
 # ---- This repository's own checks ----------------------------------------
 # Type-check the Vue frontend (vue-tsc --noEmit).
@@ -84,8 +74,8 @@ lint-truncate:
 test-frontend:
 	cd frontend && bun run test
 
-# Every lint: the shared Go lint plus the frontend typecheck and the guardrails.
-lint-all: lint lint-js lint-otel lint-truncate
+# The shared bar plus the frontend typecheck and the guardrails.
+lint-all: check lint-js lint-truncate
 
 # Everything CI runs: the whole shared bar, the frontend suite and typecheck,
 # and the repo-specific guardrails.

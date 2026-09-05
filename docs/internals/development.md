@@ -44,23 +44,22 @@ Alternatively, start the server and configure via **Settings → Sandbox** in th
 
 ```bash
 make check          # The shared Go bar: every gate lateregate holds, reported together
-make test           # go vet and the Go suite (one gate of the bar)
 make test-frontend  # Frontend tests: cd frontend && bun run test
 make test-all       # Everything CI runs: the bar, the frontend suite and typecheck, the guardrails
 ```
 
-The Go gates live in [`latere-ai/ci-gate`](https://github.com/latere-ai/ci-gate), pinned in `go.mod` as a tool. `go tool lateregate list` prints which gates apply and which are waived, with the reason; `go tool lateregate <gate>` runs one. The decisions this repository has made about the bar are in `.lateregate.yaml`.
+The Go gates live in [`latere-ai/ci-gate`](https://github.com/latere-ai/ci-gate), pinned in `go.mod` as a tool. `go tool lateregate list` prints which gates apply and which are waived, with the reason. `go tool lateregate <gate>` runs one gate on its own, and a single gate ignores the waivers, so the Makefile names only the whole bar. The decisions this repository has made about the bar are in `.lateregate.yaml`.
 
 ### Tests that skip without setup
 
 Some packages skip silently when their dependency is absent, so a green
-`make test` does not mean every test ran:
+`make check` does not mean every test ran:
 
 | Tests | Skipped unless | Effect |
 |---|---|---|
 | `internal/store/postgres`, the coordinator comment-store contract tests | `WALLFACER_TEST_DATABASE_URL` points at a reachable PostgreSQL | The Postgres storage backend is exercised only through the filesystem-backed contract tests |
 | Harness integration tests in `internal/harness` and `internal/executor` | `cursor-agent`, `opencode`, or `pi` is on `PATH` (and authenticated) | Real subprocess launches for those harnesses are not covered |
-| `make e2e-lifecycle`, `make e2e-dependency-dag`, `make ui-test` | Run explicitly; they are not part of `make test` | End-to-end task execution and browser invariants are not covered |
+| `make e2e-lifecycle`, `make e2e-dependency-dag`, `make ui-test` | Run explicitly; they are not part of `make check` | End-to-end task execution and browser invariants are not covered |
 
 CI runs without a database, so the Postgres tests skip there too. To run them:
 
@@ -73,14 +72,12 @@ WALLFACER_TEST_DATABASE_URL=postgres://user:pass@localhost:5432/wallfacer_test?s
 
 | Target | Description |
 |---|---|
-| `make build` | Full gate: fmt + every lint (Go + Vue typecheck + guardrails) + frontend build + binary |
+| `make build` | Full gate: fmt + the shared bar + Vue typecheck + guardrails + frontend build + binary |
 | `make build-binary` | Build just the Go binary, skipping fmt/lint (accepts optional `VERSION=`) |
 | `make server` | Build and run the server natively |
 | `make fmt` | Run `gofmt -w` over the repository |
-| `make check` | The shared Go bar: `go tool lateregate` |
-| `make lint` | golangci-lint at the version lateregate pins, against the shared config it renders |
-| `make lint-all` | Every lint: Go, frontend typecheck, otel transport, UTF-8 truncation |
-| `make test` | `go vet` and the Go suite |
+| `make check` | The shared Go bar: `go tool lateregate`, with the waivers in `.lateregate.yaml` |
+| `make lint-all` | The bar, the frontend typecheck, and the UTF-8 truncation guardrail |
 | `make test-frontend` | Frontend Vitest runner (`cd frontend && bun run test`) |
 | `make test-all` | Everything CI runs: `check`, the frontend suite and typecheck, the skills mirror, the truncation guardrail |
 | `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
@@ -90,13 +87,11 @@ WALLFACER_TEST_DATABASE_URL=postgres://user:pass@localhost:5432/wallfacer_test?s
 | `make ui-test` | Boot against seeded demo data and assert UI invariants in a real browser (`SKIP_BUILD=1` reuses `./wallfacer`) |
 | `make hooks` | Install the git hooks via `core.hooksPath`; the pre-commit runs `lateregate hook` (gofmt and the modernizers over the staged files) |
 
-Lint sub-targets, all folded into `make lint-all`:
+The repository's own checks, folded into `make lint-all` beside the bar (golangci-lint and the otel transport scan are gates of the bar):
 
 | Target | Description |
 |---|---|
-| `make lint` | `golangci-lint` through lateregate |
 | `make lint-js` | Frontend type check (`vue-tsc --noEmit`) |
-| `make lint-otel` | Fail on any outbound `&http.Client{}` without the otel transport |
 | `make lint-truncate` | Fail on byte-index truncation of strings, which can cut a multi-byte rune |
 
 The `wallfacerd` web-server variant and the release/skills helpers:
