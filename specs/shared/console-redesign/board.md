@@ -1,6 +1,6 @@
 ---
 title: Board
-status: validated
+status: complete
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -117,3 +117,46 @@ the toggle being the `.seg` two-state form.
   count at most two, no card overflows its column, composer expands on click
   and the textarea has focus. Screenshots `board` light and dark, and
   `composer` open.
+
+## Outcome
+
+**Status:** complete, 2026-09-05. Commits `d2a41f02` (tag classifier, primary
+action helper) and `1068e86a` (card, columns, composer, search, checks).
+
+**What shipped.** `TaskCard.vue` renders the badge budget: rank, one state pill
+(ramp colour, pulsing dot while running) and one qualifier chosen from
+verification, failure category, dependency state, schedule and PR state, with
+the rest as plain text on the meta line. Tags are one mono meta line ordered
+priority, impact, labels, provenance; only `high` and `critical` carry colour
+(`lib/tagBadge.ts`, `orderTags`). Actions are `.btn.sm` with the forward
+transition as the ink button (`primaryCardAction`). Column headers are
+eyebrows with quiet pill controls; the tray is 18px with 14px cards.
+`TaskComposer.vue` is a card with a borderless prompt and field controls; the
+collapsed state is a dashed ghost button. `search.css` is the field look. The
+task card class is `.task-card` (the `.card` primitive is free for cards).
+`tests/designSystem.test.ts` holds `board.css`, `search.css`, `rail.css` and
+`topbar.css` to tokens only. `checks.mjs` `board` asserts equal columns, 14px
+radii, the pill budget, no overflow and the composer focus. `make ui-test`
+passes eleven scenes.
+
+**Decisions made during implementation.**
+- The qualifier order is verification, failure category, dependency,
+  schedule, PR: the most decisive signal for the column wins the pill.
+- Waiting's primary is Done, failed's is Resume when a session exists and
+  Retry otherwise; a card never carries two ink buttons.
+- Column controls stay visible but quiet (ink-3 text pills) rather than
+  hover-only: Show archived and Archive all are the only way to reach those
+  states and hiding them costs discoverability.
+- `--accent-fg`, `--r-xs` and `--r-row` were added to the ladder for text on
+  an accent fill, nested 6px controls and 12px rows; no literal remains.
+- `.composer__btn` stays as a global alias in `board.css` for the task-detail
+  edit form and the workspace-required prompt until their specs land.
+
+**Deviations from the spec.** The automation menu keeps its toggle switch
+rather than a two-state `.seg`; the switch already reads through tokens and a
+seg would widen every row for no gain.
+
+**Surprises.** The command palette bound `CardActionDef.cls` to a class; the
+field is gone and the binding with it.
+
+**Follow-ups.** None beyond the sibling specs.
