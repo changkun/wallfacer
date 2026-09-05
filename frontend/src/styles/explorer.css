@@ -1,4 +1,8 @@
-/* ===== Explorer Panel ===== */
+/* --- Explorer panel ---
+   A docked file tree beside the board on the sunk surface: an eyebrow head,
+   an optional Task prompts group, then tree rows built to the plan tree's
+   geometry (34px, 12px radius, the active row lifted onto the card surface).
+   See specs/shared/console-redesign/panels-and-overlays.md. */
 
 /* Flex wrapper: explorer panel + board grid side by side */
 .board-with-explorer {
@@ -7,8 +11,7 @@
   min-height: 0;
 }
 /* Collapsed rail: persistent left-edge affordance to reopen the explorer when
-   it is hidden. Occupies the same left slot the panel would, so the reopen
-   control always lives where the panel lives. */
+   it is hidden. Occupies the same left slot the panel would. */
 .explorer-rail {
   flex-shrink: 0;
   width: 28px;
@@ -18,14 +21,15 @@
   gap: 7px;
   padding: 9px 0;
   border: none;
-  border-right: 1px solid var(--border);
-  background: var(--bg-sunk, var(--bg-raised, var(--bg)));
-  color: var(--text-muted);
+  border-right: 1px solid var(--rule);
+  background: var(--bg-sunk);
+  color: var(--ink-3);
   cursor: pointer;
+  transition: color var(--dur-hover), background var(--dur-hover);
 }
 .explorer-rail:hover {
   color: var(--accent);
-  background: var(--accent-tint, var(--bg-hover));
+  background: var(--accent-soft);
 }
 .explorer-rail__chevron {
   opacity: 0.55;
@@ -47,7 +51,7 @@
   width: 240px;
   min-width: 200px;
   max-width: 50vw;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--rule);
   background: var(--bg-sunk);
   flex-shrink: 0;
   overflow: hidden;
@@ -57,24 +61,30 @@
 .explorer-panel__header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  padding: 8px 12px;
+  height: 36px;
+  padding: 0 6px 0 14px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-}
-.explorer-panel__title {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
+  border-bottom: 1px solid var(--rule);
 }
 
 /* Scrollable tree container */
 .explorer-panel__tree {
   flex: 1;
   overflow-y: auto;
-  padding: 6px 4px;
+  padding: 6px 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.explorer-panel__empty {
+  padding: 12px 10px;
+  font-size: 12px;
+  color: var(--ink-4);
+}
+.explorer-panel__empty--error {
+  color: var(--err);
 }
 
 /* Vertical resize handle on right edge */
@@ -86,48 +96,119 @@
   height: 100%;
   cursor: col-resize;
   z-index: 5;
+  transition: background var(--dur-hover);
 }
 .explorer-panel__resize-handle:hover,
 .explorer-panel__resize-handle--active {
-  background: var(--accent);
-  opacity: 0.4;
+  background: var(--accent-line);
 }
 
-/* --- Tree node styles --- */
-.explorer-node {
+/* --- Task prompts group above the tree --- */
+.explorer-task-prompts {
+  flex: none;
+  padding: 6px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.explorer-task-prompts__header {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--text-muted);
+  min-height: 30px;
+  padding: 0 6px 0 4px;
+  border-radius: var(--r-row);
+  cursor: pointer;
+  user-select: none;
+}
+.explorer-task-prompts__header:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+.explorer-task-prompts__label {
+  flex: 1;
+}
+.explorer-task-prompts__waiting-toggle {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink-3);
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  cursor: pointer;
+}
+.explorer-task-prompts__waiting-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.explorer-task-prompts__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-base);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover);
+}
+.explorer-task-prompts__entry:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+.explorer-task-prompts__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-task-prompts__time {
+  font-size: var(--fs-10);
+  color: var(--ink-4);
+  flex: none;
+}
+
+/* --- Tree rows --- */
+.explorer-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-row);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--ink-2);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
 .explorer-node:hover {
-  background: var(--bg-hover, var(--bg-raised));
-  color: var(--text);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
 }
 .explorer-node:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .explorer-node--active,
 .explorer-node.active {
-  background: var(--accent-tint, rgba(37, 99, 235, 0.12));
-  color: var(--text);
-}
-.explorer-node--active .explorer-node__icon,
-.explorer-node.active .explorer-node__icon {
-  color: var(--accent);
-}
-.explorer-node--dir {
-  font-weight: 500;
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--sh-card);
 }
 .explorer-node--file {
   font-weight: 400;
@@ -136,7 +217,7 @@
   opacity: 0.55;
 }
 
-/* Disclosure chevron — SVG mask in currentColor, matching the spec tree's
+/* Disclosure chevron: an SVG mask in currentColor, matching the plan tree's
    .stp-chev so the two trees read as one component. Files render an empty
    box of the same size for alignment. */
 .explorer-node__toggle {
@@ -150,7 +231,8 @@
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
-.explorer-node:hover .explorer-node__toggle.is-dir {
+.explorer-node:hover .explorer-node__toggle.is-dir,
+.explorer-task-prompts__header:hover .explorer-node__toggle.is-dir {
   background-color: var(--ink);
 }
 .explorer-node__toggle.is-open {
@@ -158,16 +240,7 @@
   background-color: var(--ink-2);
 }
 .explorer-node--loading .explorer-node__toggle {
-  animation: explorer-pulse 1s infinite;
-}
-@keyframes explorer-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
+  animation: om-pulse-soft 1s infinite;
 }
 
 /* File/folder icon */

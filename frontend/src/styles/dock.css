@@ -1,6 +1,10 @@
-/* Dockable panel workspace. The center editor (RouterView page) fills the
-   space; dockable panels occupy resizable regions on the four edges, or
-   eclipse everything when maximized. See DockWorkspace.vue. */
+/* --- Docked panels ---
+   The center editor (RouterView page) fills the main card; dockable panels
+   occupy resizable regions on the four edges on the sunk surface, split from
+   the editor by a hairline and a 4px gutter, or eclipse the editor when
+   maximized. The terminal is the one live panel; its tab bar is the underline
+   tab strip. See DockWorkspace.vue and
+   specs/shared/console-redesign/panels-and-overlays.md. */
 
 .dock-ws {
   flex: 1;
@@ -20,8 +24,7 @@
   flex-direction: row;
 }
 
-/* Center editor: hosts the page (board / plan). Mirrors how .app-main used to
-   host the slot, one level deeper, so board-grid's flex:1 still fills. */
+/* Center editor: hosts the page (board / plan). */
 .dock-editor {
   flex: 1;
   min-width: 0;
@@ -37,12 +40,16 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--terminal-bg);
+  background: var(--bg-sunk);
 }
 .dock-region--left,
 .dock-region--right {
   height: 100%;
 }
+.dock-region--top { border-bottom: 1px solid var(--rule); }
+.dock-region--bottom { border-top: 1px solid var(--rule); }
+.dock-region--left { border-right: 1px solid var(--rule); }
+.dock-region--right { border-left: 1px solid var(--rule); }
 .dock-region__mount {
   flex: 1;
   min-width: 0;
@@ -50,24 +57,23 @@
   display: flex;
 }
 
-/* Drag gutters between a region and the editor. */
+/* Drag gutters between a region and the editor: invisible until hovered,
+   then the accent hairline. */
 .dock-gutter {
   flex-shrink: 0;
   background: transparent;
-  transition: background 0.15s;
+  transition: background var(--dur-hover);
 }
 .dock-gutter--h {
   height: 4px;
   cursor: ns-resize;
-  border-block: 1px solid var(--rule);
 }
 .dock-gutter--v {
   width: 4px;
   cursor: ew-resize;
-  border-inline: 1px solid var(--rule);
 }
 .dock-gutter:hover {
-  background: var(--accent);
+  background: var(--accent-line);
 }
 
 /* Drag-to-dock drop-zone overlay. Edge bands light up as the pointer nears. */
@@ -83,12 +89,12 @@
 }
 .dock-drop__zone {
   position: absolute;
-  background: color-mix(in oklab, var(--accent) 14%, transparent);
-  border: 1px dashed color-mix(in oklab, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  border: 1px dashed var(--accent-line);
   transition: background 0.1s;
 }
 .dock-drop__zone--active {
-  background: color-mix(in oklab, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
   border-style: solid;
 }
 .dock-drop__zone--left { left: 0; top: 0; bottom: 0; width: 30%; }
@@ -104,19 +110,16 @@
   cursor: grabbing;
 }
 
-/* Maximized-panel overlay. */
+/* Maximized-panel overlay: fills the main card below the topbar. */
 .dock-max {
   position: absolute;
   inset: 0;
   z-index: 50;
   display: flex;
-  background: var(--terminal-bg);
-  /* Maximized panel eclipses the workspace — float it with a deep shadow. */
-  box-shadow: var(--sh-pop);
+  background: var(--bg-sunk);
 }
 
-/* A docked panel body fills its region/overlay (no fixed height like the old
-   bottom drawer). */
+/* A docked panel body fills its region or the overlay. */
 .dock-panel {
   flex: 1;
   min-width: 0;
@@ -130,34 +133,147 @@
   font-size: 12px;
 }
 
+/* --- The terminal's tab strip: underline tabs, a New session control and the
+   dock controls at the right edge. --- */
+.terminal-tab-bar {
+  display: flex;
+  align-items: flex-end;
+  height: 36px;
+  padding: 0 6px 0 8px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--bg-sunk);
+  font-family: var(--font-sans);
+  flex: none;
+}
+#terminal-tab-list {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#terminal-tab-list::-webkit-scrollbar {
+  display: none;
+}
+.terminal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 4px 0 10px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: color var(--dur-hover), border-color var(--dur-hover);
+}
+.terminal-tab:hover {
+  color: var(--ink);
+}
+.terminal-tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.terminal-tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--r-xs);
+  background: none;
+  color: var(--ink-4);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-hover), color var(--dur-hover), background var(--dur-hover);
+}
+.terminal-tab:hover .terminal-tab__close,
+.terminal-tab[aria-selected="true"] .terminal-tab__close {
+  opacity: 1;
+}
+.terminal-tab__close:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.terminal-tab-add {
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--ink-3);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+  margin-left: 4px;
+}
+.terminal-tab-add:hover {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+#terminal-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 12px 0;
+}
+.terminal-panel .xterm {
+  height: 100%;
+  padding: 0;
+}
+.terminal-panel .xterm-viewport {
+  overflow-y: auto;
+  background: var(--terminal-bg) !important;
+}
+
 /* Dock controls cluster on the right of the panel's tab bar. */
 .dock-panel__controls {
   display: flex;
   align-items: center;
-  gap: 1px;
+  align-self: center;
+  gap: 2px;
   margin-left: auto;
-  padding-right: 4px;
+  padding-left: 8px;
   flex-shrink: 0;
 }
 .dock-panel__btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
   background: none;
-  border: none;
-  color: var(--terminal-ink-dim);
-  cursor: pointer;
+  color: var(--ink-4);
   font-size: 12px;
   line-height: 1;
-  padding: 3px 6px;
-  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: color var(--dur-hover), background var(--dur-hover), border-color var(--dur-hover);
 }
 .dock-panel__btn:hover {
-  color: var(--terminal-fg);
-  background: var(--terminal-tab-hover);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .dock-panel__btn--active {
-  color: var(--terminal-fg);
-  background: var(--terminal-tab-active);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
 }
 .dock-panel__btn--close:hover {
-  color: var(--terminal-fg);
-  background: color-mix(in oklab, var(--danger, #c0392b) 60%, transparent);
+  color: var(--err);
+  background: var(--tint-red);
 }

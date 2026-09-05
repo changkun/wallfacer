@@ -138,19 +138,23 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </template>
 
 <style scoped>
+/* The open editors strip: underline tabs on the sunk surface. A file tab
+   shows its glyph, name and a close control on hover; a dirty file swaps the
+   close for a warn dot. With only the pinned Board tab open the strip hides. */
 .editor-tabs {
   flex: none;
   min-width: 0;
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
+  gap: 2px;
   height: 36px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--rule);
   background: var(--bg-sunk);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
 }
-/* With only the pinned Board tab open the strip has nothing to say. */
 .editor-tabs:has(.editor-tab:only-child) {
   display: none;
 }
@@ -166,47 +170,34 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   flex: 0 0 auto;
   max-width: 180px;
   height: 100%;
-  padding: 0 8px 0 11px;
+  padding: 0 6px 0 10px;
+  margin-bottom: -1px;
   border: none;
-  border-right: 1px solid var(--border);
+  border-bottom: 2px solid transparent;
   background: transparent;
-  color: var(--text-muted, var(--ink-3));
-  font-size: 12.5px;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
+  transition: color var(--dur-hover), border-color var(--dur-hover);
 }
-
 .editor-tab:hover {
-  background: color-mix(in oklab, var(--bg) 55%, var(--bg-card));
-  color: var(--ink-2, var(--text-secondary));
+  color: var(--ink);
 }
-
-/* Active tab matches the editor surface and grows a top accent rule — the
-   signature VS Code "this tab owns the pane below" cue. */
 .editor-tab--active {
-  background: var(--bg);
-  color: var(--ink, var(--text));
+  color: var(--ink);
+  border-bottom-color: var(--accent);
 }
-.editor-tab--active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 1.5px;
-  /* Muted toward the surface so the active cue reads as a calm rule, not a
-     saturated clay bar. */
-  background: color-mix(in oklab, var(--accent) 72%, var(--bg));
+.editor-tab--preview .editor-tab__label {
+  font-style: italic;
 }
 
 .editor-tab__icon {
   flex: 0 0 auto;
 }
-
 .editor-tab__label {
-  /* min-width:0 lets the flex child shrink so text-overflow can ellipsis even
-     an unbreakable long name, instead of hard-clipping it mid-character. */
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -217,7 +208,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   flex: 0 0 auto;
   width: 11px;
   height: 11px;
-  border: 2px solid color-mix(in oklab, var(--accent) 28%, transparent);
+  border: 2px solid var(--accent-ring);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: editor-tab-spin 0.7s linear infinite;
@@ -227,8 +218,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--col-waiting, #e0a52e);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--col-waiting, #e0a52e) 22%, transparent);
+  background: var(--warn);
+  box-shadow: 0 0 0 2px var(--tint-amber);
 }
 @keyframes editor-tab-spin {
   to { transform: rotate(360deg); }
@@ -240,19 +231,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 .editor-tab__close {
   position: relative;
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  color: var(--ink-3, var(--text-muted));
+  border-radius: var(--r-xs);
+  color: var(--ink-4);
+  transition: color var(--dur-hover), background var(--dur-hover);
 }
 .editor-tab__close:hover {
-  background: color-mix(in oklab, var(--ink, #000) 12%, transparent);
-  color: var(--ink, var(--text));
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
 }
-
 .editor-tab__x {
   font-size: 15px;
   line-height: 1;
@@ -262,7 +253,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--warn);
   display: none;
 }
 .editor-tab--dirty .editor-tab__dot {

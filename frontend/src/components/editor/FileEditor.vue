@@ -12,7 +12,7 @@ import { basicSetup } from 'codemirror';
 import { indentWithTab } from '@codemirror/commands';
 import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { consoleTheme } from '../../lib/editorTheme';
 import { useEditorTabsStore } from '../../stores/editorTabs';
 
 const props = defineProps<{ path: string }>();
@@ -30,9 +30,11 @@ const themeConf = new Compartment();
 let applyingExternal = false;
 let themeObserver: MutationObserver | null = null;
 
-// The app writes the resolved theme to <html data-theme>; mirror it into CM.
+// The app writes the resolved theme to <html data-theme>; the console theme
+// reads tokens, so only the dark flag (CodeMirror's own light/dark class)
+// needs to follow it.
 function activeTheme() {
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? oneDark : [];
+  return consoleTheme(document.documentElement.getAttribute('data-theme') === 'dark');
 }
 
 function onSave() {
@@ -68,10 +70,6 @@ onMounted(() => {
         if (u.docChanged && !applyingExternal) {
           tabs.setContent(props.path, u.state.doc.toString());
         }
-      }),
-      EditorView.theme({
-        '&': { height: '100%' },
-        '.cm-scroller': { fontFamily: 'var(--font-mono)', fontSize: '13px' },
       }),
     ],
   });
@@ -114,7 +112,7 @@ onBeforeUnmount(() => {
       <span v-if="tab.saveError" class="file-editor__error" :title="tab.saveError">save failed</span>
       <button
         type="button"
-        class="file-editor__save"
+        class="btn sm file-editor__save"
         :disabled="tab.saving || !dirty"
         :title="dirty ? 'Save (Cmd/Ctrl+S)' : 'No unsaved changes'"
         @click="onSave"
@@ -140,17 +138,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: var(--bg);
 }
-
 .file-editor__toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 5px 12px;
+  height: 36px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--rule);
-  background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
+  background: var(--bg-sunk);
   font-size: 12px;
 }
-
 .file-editor__path {
   font-family: var(--font-mono);
   color: var(--ink-3);
@@ -159,40 +156,19 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   min-width: 0;
 }
-
 .file-editor__spacer {
   flex: 1;
 }
-
 .file-editor__error {
-  color: var(--danger, #e5534b);
-  font-size: 11px;
+  color: var(--err);
+  font-size: var(--fs-10);
 }
-
-.file-editor__save {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 3px 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md, 6px);
-  background: var(--accent);
-  color: #fff;
-  cursor: pointer;
-}
-.file-editor__save:disabled {
-  opacity: 0.5;
-  cursor: default;
-  background: var(--bg-card);
-  color: var(--ink-3);
-}
-
 .file-editor__body {
   position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
 }
-
 .file-editor__cm {
   flex: 1;
   min-width: 0;
@@ -205,7 +181,6 @@ onBeforeUnmount(() => {
 .file-editor__cm :deep(.cm-editor.cm-focused) {
   outline: none;
 }
-
 .file-editor__overlay {
   position: absolute;
   inset: 0;
@@ -214,9 +189,9 @@ onBeforeUnmount(() => {
   justify-content: center;
   background: var(--bg);
   color: var(--ink-4);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .file-editor__overlay--error {
-  color: var(--danger, #e5534b);
+  color: var(--err);
 }
 </style>

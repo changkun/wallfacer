@@ -6,6 +6,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useEditorTabsStore } from '../stores/editorTabs';
 import { mapEntries, type RawExplorerEntry, type TreeEntry } from '../lib/explorerTree';
 import { fileIcon, type FileIcon } from '../lib/fileIcon';
+import { statusPill } from '../lib/statusPill';
 
 // Collapsible file-explorer side panel. Lives inside BoardPage to the left of
 // the board grid (see specs/foundations/file-explorer.md) so browsing files
@@ -334,14 +335,16 @@ watch(() => [...expanded.value].sort().join(','), () => {
 <template>
   <aside class="explorer-panel" :style="{ width: panelWidth + 'px' }">
     <div class="explorer-panel__header">
-      <span class="explorer-panel__title">Explorer</span>
+      <span class="eyebrow explorer-panel__title">Explorer</span>
       <button
         type="button"
-        class="explorer-panel__close"
+        class="icon-btn sm explorer-panel__close"
         title="Close explorer"
         aria-label="Close explorer"
         @click="emit('close')"
-      >&times;</button>
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+      </button>
     </div>
     <div v-if="taskPrompts.length" class="explorer-task-prompts">
       <div
@@ -353,8 +356,8 @@ watch(() => [...expanded.value].sort().join(','), () => {
         @keydown.enter.prevent="taskPromptsExpanded = !taskPromptsExpanded"
         @keydown.space.prevent="taskPromptsExpanded = !taskPromptsExpanded"
       >
-        <span class="explorer-node__toggle">{{ taskPromptsExpanded ? '▼' : '▶' }}</span>
-        <span class="explorer-task-prompts__label">Task Prompts</span>
+        <span class="explorer-node__toggle is-dir" :class="{ 'is-open': taskPromptsExpanded }" aria-hidden="true"></span>
+        <span class="eyebrow explorer-task-prompts__label">Task prompts</span>
         <button
           type="button"
           class="explorer-task-prompts__waiting-toggle"
@@ -372,7 +375,7 @@ watch(() => [...expanded.value].sort().join(','), () => {
           :title="entry.title"
           @click="openTaskPrompt(entry)"
         >
-          <span class="explorer-task-prompts__badge" :class="`explorer-task-prompts__badge--${entry.status}`">{{ entry.status }}</span>
+          <span class="pill" :class="statusPill(entry.status)">{{ entry.status.replace('_', ' ') }}</span>
           <span class="explorer-task-prompts__title">{{ entry.title || entry.task_id.slice(0, 8) }}</span>
           <span v-if="entry.updated_at" class="explorer-task-prompts__time">{{ entryDate(entry.updated_at) }}</span>
         </button>
@@ -431,23 +434,3 @@ watch(() => [...expanded.value].sort().join(','), () => {
     ></div>
   </aside>
 </template>
-
-<style scoped>
-.explorer-panel__header { justify-content: space-between; }
-.explorer-panel__close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 0 2px;
-  color: var(--text-muted);
-}
-.explorer-panel__close:hover { color: var(--text); }
-.explorer-panel__empty {
-  padding: 12px 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.explorer-panel__empty--error { color: var(--err, #c0392b); }
-</style>
