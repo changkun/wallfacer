@@ -112,6 +112,11 @@
   padding: 0 8px;
   font-size: var(--fs-10);
 }
+/* On the selected row the ghost sits on the sunk surface it is made of, so it
+   lifts onto the card surface to stay a button. */
+.command-palette-row.active .command-palette-action-btn {
+  background: var(--bg-card);
+}
 .command-palette-action-btn.active {
   border-color: var(--accent-line);
   color: var(--accent);
@@ -131,7 +136,7 @@
 .command-palette-task-snippet mark {
   background: var(--tint-amber);
   color: var(--ink);
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   padding: 0 2px;
 }
 .command-palette-empty {

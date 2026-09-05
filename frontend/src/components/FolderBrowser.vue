@@ -51,7 +51,8 @@ const currentAdded = computed(() => props.added.includes(b.browsePath.value));
 
     <nav class="fb__crumb ws-picker__breadcrumb" aria-label="Current folder">
       <template v-for="(seg, i) in b.breadcrumbSegments()" :key="seg.path">
-        <span v-if="i > 0" class="fb__crumb-sep" aria-hidden="true">/</span>
+        <!-- The first segment is the root "/" itself, so the separator starts after it. -->
+        <span v-if="i > 1" class="fb__crumb-sep" aria-hidden="true">/</span>
         <button
           type="button"
           class="fb__crumb-seg"

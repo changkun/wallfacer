@@ -27,6 +27,7 @@ function arg(name, fallback) {
 
 const base = arg('base', 'http://localhost:8099');
 const only = arg('only', '');
+const BOOT = { mode: 'local', serverApiKey: '', version: 'dev' };
 
 // ---- geometry helpers (run client-side and return plain boxes) ------------
 async function boxes(page, sel) {
@@ -50,9 +51,13 @@ function fail(scene, msg) { failures.push(`[${scene}] ${msg}`); }
 // A scene: a named navigation + a set of assertions. Page errors (uncaught
 // exceptions) are always treated as failures — they are the "a region
 // vanished" class. Console errors are reported but not fatal (app noise).
-async function scene(ctx, name, fn) {
+// Every scene gets its own browser context so nothing one scene persists
+// (the last route, an open popup, a dock layout) leaks into the next.
+async function scene(browser, name, fn) {
   const pageErrors = [];
   const consoleErrors = [];
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  await ctx.addInitScript((boot) => { window.__WALLFACER__ = boot; }, BOOT);
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -66,6 +71,7 @@ async function scene(ctx, name, fn) {
   if (pageErrors.length) fail(name, `uncaught page error(s): ${pageErrors.join(' | ')}`);
   if (consoleErrors.length) notes.push(`[${name}] console.error: ${consoleErrors.slice(0, 3).join(' | ')}`);
   await page.close();
+  await ctx.close();
 }
 
 // assert helper bound to a scene name
@@ -155,6 +161,7 @@ const SCENES = {
     const card = await firstBox(page, '.ws-picker');
     expect('picker', !!card, 'workspace picker did not open');
     if (!card) return;
+    expect('picker', Math.abs(card.width - 720) <= 1, `picker dialog width ${Math.round(card.width)}, want 720`);
 
     // List view present (vs the wizard) and at least one row.
     const listView = await page.$('.ws-picker__list-view');
@@ -347,6 +354,73 @@ SCENES['agents'] = async (page) => {
   }
 };
 
+// The command palette (specs/shared/console-redesign/panels-and-overlays.md):
+// ⌘K opens a 640px popover near the top of the viewport, inside it, with the
+// first row selected and no blur anywhere on the page.
+SCENES['palette'] = async (page) => {
+  await page.keyboard.press('Meta+k');
+  await page.waitForSelector('.command-palette-panel', { state: 'visible', timeout: 5000 }).catch(() => {});
+  const panel = await firstBox(page, '.command-palette-panel');
+  expect('palette', !!panel, 'command palette did not open on Meta+k');
+  if (!panel) return;
+  const vw = await page.evaluate(() => window.innerWidth);
+  const vh = await page.evaluate(() => window.innerHeight);
+  expect('palette', Math.abs(panel.width - 640) <= 1, `palette width ${Math.round(panel.width)}, want 640`);
+  expect('palette', panel.left >= 0 && panel.right <= vw && panel.top >= 0 && panel.bottom <= vh, 'palette leaves the viewport');
+  expect('palette', panel.top < vh * 0.2, `palette top ${Math.round(panel.top)} is not near the top of the viewport`);
+  const focused = await page.evaluate(() => document.activeElement?.classList.contains('command-palette-input'));
+  expect('palette', focused === true, 'palette input is not focused');
+  const active = await boxes(page, '.command-palette-row.active');
+  expect('palette', active.length === 1, `${active.length} selected rows, want 1`);
+  const rows = await boxes(page, '.command-palette-row');
+  expect('palette', rows.length > 0 && rows[0].top >= panel.top, 'no rows rendered in the palette');
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(100);
+  const moved = await page.$$eval('.command-palette-row.active, .command-palette-action-btn.active', (els) => els.length);
+  expect('palette', moved === 1, `${moved} selections after ArrowDown, want 1`);
+};
+
+// The dock (specs/shared/console-redesign/panels-and-overlays.md): the
+// terminal toggles into the bottom region flush with the main card's bottom
+// edge, the gutter drag changes its height, and maximize fills the workspace.
+SCENES['dock'] = async (page) => {
+  await page.click('.topbar [data-action="terminal"]', { timeout: 5000 }).catch(() => {});
+  await page.waitForSelector('.dock-region--bottom', { state: 'visible', timeout: 5000 }).catch(() => {});
+  const region = await firstBox(page, '.dock-region--bottom');
+  const ws = await firstBox(page, '.dock-ws');
+  const main = await firstBox(page, '.app-main');
+  expect('dock', !!region, 'terminal did not dock into the bottom region');
+  if (!region || !ws || !main) return;
+  expect('dock', Math.abs(region.bottom - main.bottom) <= 2, `region bottom ${Math.round(region.bottom)} != main card bottom ${Math.round(main.bottom)}`);
+  expect('dock', Math.abs(region.left - ws.left) <= 1 && Math.abs(region.right - ws.right) <= 1, 'bottom region does not span the workspace');
+  const bar = await firstBox(page, '.terminal-tab-bar');
+  expect('dock', bar && Math.abs(bar.height - 36) <= 1, `terminal tab bar height ${bar && bar.height}, want 36`);
+  // Drag the gutter up 80px: the region grows by about that much.
+  const gutter = await firstBox(page, '.dock-gutter--h');
+  expect('dock', !!gutter, 'no horizontal gutter above the bottom region');
+  if (gutter) {
+    const x = gutter.left + gutter.width / 2;
+    const y = gutter.top + gutter.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 40);
+    await page.mouse.move(x, y - 80);
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+    const grown = await firstBox(page, '.dock-region--bottom');
+    expect('dock', grown && grown.height > region.height + 60, `region height ${Math.round(grown ? grown.height : 0)} after an 80px drag from ${Math.round(region.height)}`);
+  }
+  await page.click('.dock-panel__btn[aria-label="Maximize terminal"]', { timeout: 5000 }).catch(() => {});
+  // The panel teleports into the overlay on the next tick; wait for it there.
+  await page.waitForSelector('.dock-max .terminal-panel', { state: 'attached', timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(150);
+  const max = await firstBox(page, '.dock-max');
+  const ws2 = await firstBox(page, '.dock-ws');
+  expect('dock', max && ws2 && Math.abs(max.width - ws2.width) <= 1 && Math.abs(max.height - ws2.height) <= 1, 'maximized terminal does not fill the workspace');
+  expect('dock', !!(await page.$('.dock-max .terminal-panel')), 'terminal did not move into the maximized overlay');
+  await page.click('.dock-panel__btn[aria-label="Restore terminal"]', { timeout: 5000 }).catch(() => {});
+};
+
 // Routes without a scene of their own yet get the smoke.
 const SMOKE_ROUTES = { analytics: '/analytics', flows: '/flows' };
 for (const [name, route] of Object.entries(SMOKE_ROUTES)) {
@@ -364,14 +438,11 @@ if (arg('list', false) === true) {
 }
 
 const names = only && only !== true ? String(only).split(',').map((s) => s.trim()) : Object.keys(SCENES);
-const BOOT = { mode: 'local', serverApiKey: '', version: 'dev' };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
-await ctx.addInitScript((boot) => { window.__WALLFACER__ = boot; }, BOOT);
 
 for (const name of names) {
   if (!SCENES[name]) { fail(name, 'unknown scene'); continue; }
-  await scene(ctx, name, SCENES[name]);
+  await scene(browser, name, SCENES[name]);
 }
 await browser.close();
 

@@ -37,6 +37,11 @@ const SURFACES = {
   // chrome changes (e.g. backdrop-filter establishing a new containing block).
   switcher: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 400 }] },
   palette: { route: '/', steps: [{ key: 'Meta+k' }, { wait: 700 }] },
+  // The workspace picker list, opened from the rail's workspace popover.
+  picker: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 300 }, { click: '.sb-ws-popover__add' }, { waitFor: '.ws-picker' }, { wait: 400 }] },
+  // Docked panels: the terminal in the bottom region, the explorer beside the board.
+  terminal: { route: '/', steps: [{ click: '.topbar [data-action="terminal"]' }, { waitFor: '.dock-region--bottom' }, { wait: 900 }] },
+  explorer: { route: '/', steps: [{ click: '.explorer-rail' }, { waitFor: '.explorer-panel' }, { wait: 900 }] },
   'task-detail': {
     route: '/',
     // Open the first board card (.card is the root) to render the detail drawer.
