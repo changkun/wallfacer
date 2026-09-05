@@ -1,151 +1,280 @@
-/* Analytics page chrome. Moved verbatim out of modal.css; the
-   secondary-screens spec rebuilds it on the primitives. */
-/* ===== Analytics tab pill group =====
-   Segmented control: a single rounded track that holds all tabs; the
-   active tab is a raised pill within it. Designed to sit on the right
-   side of the mode header. */
-.analytics-tabs {
-  display: inline-flex;
+/* --- Analytics ---
+   A reading column of cards: stat tiles in the boundary-card shape (eyebrow,
+   big tabular number, one-line qualifier, a bar), then sections that hold a
+   table of rows with mono tabular numbers. Charts take their colours from the
+   ramp through lib/chartPalette. See
+   specs/shared/console-redesign/secondary-screens.md. */
+.analytics-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px 48px;
+}
+.analytics-page__inner {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.an-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.an-title {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.an-lede {
+  margin: 4px 0 0;
+  font-size: var(--fs-md);
+  color: var(--ink-3);
+}
+.an-tools {
+  display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 9px;
-  background: var(--bg-sunk, var(--bg-raised));
-  border: 1px solid var(--border);
+  gap: 8px;
+  font-size: var(--fs-base);
+  color: var(--ink-3);
 }
-.analytics-tab {
-  appearance: none;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  padding: 5px 11px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    box-shadow 0.12s ease;
+.an-state {
+  padding: 40px 0;
+  text-align: center;
+  font-size: var(--fs-base);
+  color: var(--ink-4);
 }
-.analytics-tab:hover {
-  color: var(--text);
+.an-error {
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--tint-red);
+  color: var(--err);
+  font: 12px / 1.5 var(--font-mono);
+  white-space: pre-wrap;
 }
-.analytics-tab.active {
-  background: var(--bg-card, var(--bg));
-  color: var(--text);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
+.an-note {
+  font-size: var(--fs-base);
+  color: var(--ink-3);
 }
-[data-theme="dark"] .analytics-tab.active {
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-.analytics-tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.an-note strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
-/* ===== Analytics mode (inline page, not modal) =====
-   When the analytics view is active, the three legacy modal partials live
-   inside #analytics-panels and are rendered as a page. The .modal-overlay
-   chrome (fixed positioning, backdrop, centred card) is neutralised here. */
-.analytics-mode {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+/* Stat tiles */
+.an-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.an-tile {
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  gap: 6px;
+  padding: 14px 16px;
+}
+.an-tile__num {
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.an-tile__sub {
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+.an-tile .bar {
+  height: 3px;
+  margin-top: 4px;
+  background: var(--bg-sunk);
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
-.analytics-mode__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 20px 28px 18px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+.an-tile .bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--r-pill);
 }
-.analytics-mode__heading {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+.an-tile--wide {
+  grid-column: span 2;
 }
-.analytics-mode__eyebrow {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
+
+/* Sections: a card with an eyebrow head and a table or chart body */
+.an-section .card-head {
+  min-height: 40px;
 }
-.analytics-mode__title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+.an-section__body {
+  padding: 12px 16px 14px;
 }
-.analytics-mode__panels {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
+.an-table-wrap {
+  overflow-x: auto;
 }
-.analytics-mode__panels > .modal-overlay {
-  position: static;
-  inset: auto;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  padding: 0;
-  background: transparent;
-  z-index: auto;
-  align-items: stretch;
-  justify-content: stretch;
-  /* Neutralise the backdrop click-to-close: the overlay itself must not
-     receive pointer events in this inline layout, otherwise clicking
-     empty space inside the analytics page closes the panel via the
-     bindModalBackdropClose handler registered in each module's init. */
-  pointer-events: none;
-}
-.analytics-mode__panels > .modal-overlay > * {
-  pointer-events: auto;
-}
-.analytics-mode__panels > .modal-overlay.hidden {
-  display: none;
-}
-.analytics-mode__panels > .modal-overlay > .modal-card {
+.an-table {
   width: 100%;
-  max-width: none;
-  max-height: none;
-  box-shadow: none;
-  border: none;
-  background: transparent;
-  border-radius: 0;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
 }
-/* Hide the redundant close (×) button and inner title inside each panel. */
-.analytics-mode__panels .modal-overlay h3 {
-  display: none;
+.an-table th {
+  padding: 8px 14px;
+  text-align: left;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
 }
-.analytics-mode__panels
-  .modal-overlay
-  .p-6
-  > div:first-child
-  > button:last-child,
-.analytics-mode__panels
-  .modal-overlay
-  .p-6
-  > div:first-child
-  > div
-  > button:last-child {
-  display: none;
+.an-table td {
+  padding: 9px 14px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink);
+  vertical-align: top;
+}
+.an-table tbody tr:first-child td {
+  border-top: none;
+}
+.an-table .num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.an-table .strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.an-table .accent {
+  color: var(--accent);
+  font-weight: 600;
+}
+.an-table .sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+.an-table .total td {
+  background: var(--bg-sunk);
+  font-weight: 600;
+}
+.an-table .clickable {
+  cursor: pointer;
+}
+.an-table .clickable:hover td {
+  background: var(--bg-sunk);
+}
+.an-table .clip {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.an-table .empty {
+  text-align: center;
+  color: var(--ink-4);
+  padding: 16px;
+}
+.an-table .an-ok { color: var(--ok); }
+.an-table .an-warn { color: var(--warn); }
+.an-table .an-err { color: var(--err); }
+
+/* Charts */
+.an-chart {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  height: 120px;
+}
+.an-bars {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 36px;
+}
+.an-bars__col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.an-bar {
+  width: 100%;
+  background: var(--rule);
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+.an-bar--on {
+  background: var(--accent);
+}
+.an-track {
+  width: 72px;
+  height: 4px;
+  margin: 4px 0 0 auto;
+  background: var(--bg-sunk);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.an-track > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--r-pill);
+}
+.an-spark {
+  display: block;
+  margin-left: auto;
+}
+.an-spark polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.an-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+.an-legend strong {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.an-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.an-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-xs);
+  display: inline-block;
+}
+.an-swatch--ok { background: var(--ok); }
+.an-swatch--warn { background: var(--warn); }
+.an-swatch--err { background: var(--err); }
+
+/* Tab bodies stack their cards; a tab's own tool row sits above them. */
+.an-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.an-head--tab {
+  align-items: center;
 }

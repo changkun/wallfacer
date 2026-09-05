@@ -59,11 +59,12 @@ function fmtSeconds(s?: number) {
   return (s / 60).toFixed(1) + 'm';
 }
 
-function colorStyleForMs(ms?: number) {
+// Tail latency reads on the ramp: under 5s ok, under 30s warn, above err.
+function toneForMs(ms?: number) {
   if (ms == null) return '';
-  if (ms < 5000) return 'color:#22863a;';
-  if (ms < 30000) return 'color:#d97706;';
-  return 'color:#dc2626;';
+  if (ms < 5000) return 'an-ok';
+  if (ms < 30000) return 'an-warn';
+  return 'an-err';
 }
 
 const sortedPhaseKeys = computed(() => Object.keys(data.value?.phases || {}).sort());
@@ -136,185 +137,85 @@ onMounted(() => fetchStats());
 </script>
 
 <template>
-  <div>
-    <div
-      style="
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        margin-bottom: 16px;
-      "
-    >
-      <div>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px">
-          Per-phase latency aggregated across all tasks
+  <div class="an-body">
+    <div v-if="state === 'loading'" class="an-state">Loading…</div>
+    <div v-else-if="state === 'error'" class="an-error">{{ errorMsg }}</div>
+    <div v-else-if="state === 'empty'" class="an-state">No span data yet. Run a task to collect timing data.</div>
+    <template v-else-if="state === 'table' && data">
+      <div class="an-tiles">
+        <div v-for="tile in tiles" :key="tile.label" class="card an-tile">
+          <span class="eyebrow">{{ tile.label }}</span>
+          <span class="an-tile__num">{{ tile.value }}</span>
         </div>
-      </div>
-    </div>
-
-    <div style="flex: 1; min-height: 0; overflow-y: auto">
-      <div
-        v-if="state === 'loading'"
-        style="
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 32px;
-          color: var(--text-muted);
-          font-size: 13px;
-        "
-      >Loading…</div>
-      <div
-        v-else-if="state === 'error'"
-        style="
-          padding: 12px;
-          background: #f5d5d5;
-          border-radius: 6px;
-          font-size: 12px;
-          color: #8c2020;
-          font-family: monospace;
-          white-space: pre-wrap;
-        "
-      >{{ errorMsg }}</div>
-      <div
-        v-else-if="state === 'empty'"
-        style="
-          text-align: center;
-          padding: 32px;
-          color: var(--text-muted);
-          font-size: 13px;
-        "
-      >No span data yet. Run a task to collect timing data.</div>
-      <div v-else-if="state === 'table' && data">
-        <div
-          style="
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            padding: 10px 0 14px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 12px;
-          "
-        >
-          <div
-            v-for="tile in tiles"
-            :key="tile.label"
-            style="display: flex; flex-direction: column; gap: 2px; min-width: 72px;"
-          >
-            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">{{ tile.label }}</span>
-            <span style="font-size: 20px; font-weight: 700; line-height: 1.2;">{{ tile.value }}</span>
-          </div>
-          <div
-            v-if="(data.throughput?.daily_completions || []).length"
-            style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px;"
-          >
-            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Daily completions (30d)</span>
-            <div style="display: flex; gap: 2px; align-items: flex-end; height: 36px;">
-              <div
-                v-for="d in (data.throughput?.daily_completions || [])"
-                :key="d.date"
-                :title="d.date + ': ' + d.count"
-                style="flex: 1; height: 32px; display: flex; align-items: flex-end;"
-              >
-                <div
-                  :style="{
-                    width: '100%',
-                    height: dailyBarHeight(d.count) + '%',
-                    background: d.count > 0 ? 'var(--accent)' : 'var(--border)',
-                    borderRadius: '2px 2px 0 0',
-                  }"
-                />
-              </div>
+        <div v-if="(data.throughput?.daily_completions || []).length" class="card an-tile an-tile--wide">
+          <span class="eyebrow">Daily completions</span>
+          <div class="an-bars">
+            <div
+              v-for="d in (data.throughput?.daily_completions || [])"
+              :key="d.date"
+              class="an-bars__col"
+              :title="d.date + ': ' + d.count"
+            >
+              <div class="an-bar" :class="{ 'an-bar--on': d.count > 0 }" :style="{ height: dailyBarHeight(d.count) + '%' }" />
             </div>
           </div>
+          <span class="an-tile__sub">Last 30 days</span>
         </div>
+      </div>
 
-        <div style="padding: 8px 0 12px; font-size: 12px; color: var(--text-muted);">
-          <strong>{{ data.tasks_scanned }}</strong> tasks scanned ·
-          <strong>{{ data.spans_total }}</strong> spans across
-          <strong>{{ sortedPhaseKeys.length }}</strong> phase{{ sortedPhaseKeys.length === 1 ? '' : 's' }}
-        </div>
+      <p class="an-note">
+        <strong>{{ data.tasks_scanned }}</strong> tasks scanned,
+        <strong>{{ data.spans_total }}</strong> spans across
+        <strong>{{ sortedPhaseKeys.length }}</strong> phase{{ sortedPhaseKeys.length === 1 ? '' : 's' }}.
+        Per-phase latency is aggregated across all tasks.
+      </p>
 
-        <div style="overflow-x: auto">
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px">
+      <section class="card an-section">
+        <div class="card-head"><span class="eyebrow">Phases</span></div>
+        <div class="an-table-wrap">
+          <table class="an-table">
             <thead>
-              <tr style="border-bottom: 1px solid var(--border)">
-                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="Execution phase and what it measures">Phase</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="Number of times this phase ran">Runs</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="Fastest recorded duration">Min</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="Median (p50): half of runs completed within this time. Bar shows proportion relative to the slowest phase.">Median</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="Mean (average) duration across all runs for this phase">Mean</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="95th percentile: 95% of runs completed within this time. Indicates tail latency.">95th %</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="99th percentile: 99% of runs completed within this time. Highlights worst-case outliers.">99th %</th>
-                <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;" title="Slowest recorded duration">Max</th>
+              <tr>
+                <th title="Execution phase and what it measures">Phase</th>
+                <th class="num" title="Number of times this phase ran">Runs</th>
+                <th class="num" title="Fastest recorded duration">Min</th>
+                <th class="num" title="Median (p50): half of runs completed within this time. Bar shows proportion relative to the slowest phase.">Median</th>
+                <th class="num" title="Mean (average) duration across all runs for this phase">Mean</th>
+                <th class="num" title="95th percentile: 95% of runs completed within this time. Indicates tail latency.">95th %</th>
+                <th class="num" title="99th percentile: 99% of runs completed within this time. Highlights worst-case outliers.">99th %</th>
+                <th class="num" title="Slowest recorded duration">Max</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="phase in sortedPhaseKeys" :key="phase">
-                <td style="padding: 8px 10px;">
-                  <div style="font-weight: 500; font-size: 12px;">{{ phaseLabel(phase) }}</div>
-                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">{{ phaseDesc(phase) }}</div>
+                <td>
+                  <span class="strong">{{ phaseLabel(phase) }}</span>
+                  <span class="sub">{{ phaseDesc(phase) }}</span>
                 </td>
-                <td style="padding: 8px 10px; text-align: right; color: var(--text-muted); font-size: 12px;">{{ (data.phases || {})[phase].count }}</td>
-                <td style="padding: 8px 10px; text-align: right; color: var(--text-muted); font-size: 12px;">{{ fmtMs((data.phases || {})[phase].min_ms) }}</td>
-                <td style="padding: 8px 10px; text-align: right; font-size: 12px;">
-                  <div style="font-weight: 600;">{{ fmtMs((data.phases || {})[phase].p50_ms) }}</div>
-                  <div
-                    v-if="globalMaxMs && (data.phases || {})[phase].p50_ms != null"
-                    style="background: var(--border); border-radius: 2px; height: 4px; width: 72px; margin-top: 4px; overflow: hidden;"
-                  >
-                    <div
-                      :style="{
-                        background: 'var(--accent)',
-                        height: '100%',
-                        width: barPct((data.phases || {})[phase].p50_ms) + '%',
-                        borderRadius: '2px',
-                      }"
-                    />
-                  </div>
+                <td class="num">{{ (data.phases || {})[phase].count }}</td>
+                <td class="num">{{ fmtMs((data.phases || {})[phase].min_ms) }}</td>
+                <td class="num strong">
+                  {{ fmtMs((data.phases || {})[phase].p50_ms) }}
+                  <span v-if="globalMaxMs && (data.phases || {})[phase].p50_ms != null" class="an-track">
+                    <i :style="{ width: barPct((data.phases || {})[phase].p50_ms) + '%' }"></i>
+                  </span>
                 </td>
-                <td style="padding: 8px 10px; text-align: right; font-size: 12px; color: var(--text-muted);">{{ meanMs((data.phases || {})[phase]) }}</td>
-                <td
-                  :style="'padding: 8px 10px; text-align: right; font-size: 12px; font-weight: 500;' + colorStyleForMs((data.phases || {})[phase].p95_ms)"
-                >{{ fmtMs((data.phases || {})[phase].p95_ms) }}</td>
-                <td
-                  :style="'padding: 8px 10px; text-align: right; font-size: 12px;' + colorStyleForMs((data.phases || {})[phase].p99_ms)"
-                >{{ fmtMs((data.phases || {})[phase].p99_ms) }}</td>
-                <td style="padding: 8px 10px; text-align: right; color: var(--text-muted); font-size: 12px;">{{ fmtMs((data.phases || {})[phase].max_ms) }}</td>
+                <td class="num">{{ meanMs((data.phases || {})[phase]) }}</td>
+                <td class="num strong" :class="toneForMs((data.phases || {})[phase].p95_ms)">{{ fmtMs((data.phases || {})[phase].p95_ms) }}</td>
+                <td class="num" :class="toneForMs((data.phases || {})[phase].p99_ms)">{{ fmtMs((data.phases || {})[phase].p99_ms) }}</td>
+                <td class="num">{{ fmtMs((data.phases || {})[phase].max_ms) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-
-        <div
-          style="
-            margin-top: 12px;
-            padding-top: 10px;
-            border-top: 1px solid var(--border);
-            font-size: 11px;
-            color: var(--text-muted);
-            display: flex;
-            gap: 14px;
-            flex-wrap: wrap;
-            align-items: center;
-          "
-        >
+        <div class="an-legend">
           <span><strong>Median</strong> = typical duration</span>
           <span><strong>95th/99th %</strong> = tail latency</span>
-          <span style="display: flex; align-items: center; gap: 4px">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #22863a;" />
-            &lt;5s
-          </span>
-          <span style="display: flex; align-items: center; gap: 4px">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #d97706;" />
-            5–30s
-          </span>
-          <span style="display: flex; align-items: center; gap: 4px">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #dc2626;" />
-            &gt;30s
-          </span>
+          <span class="an-legend__item"><span class="an-swatch an-swatch--ok"></span>&lt;5s</span>
+          <span class="an-legend__item"><span class="an-swatch an-swatch--warn"></span>5–30s</span>
+          <span class="an-legend__item"><span class="an-swatch an-swatch--err"></span>&gt;30s</span>
         </div>
-      </div>
-    </div>
+      </section>
+    </template>
   </div>
 </template>

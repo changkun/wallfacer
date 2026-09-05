@@ -43,40 +43,43 @@ watch(() => route.query.tab, (raw) => {
 </script>
 
 <template>
-  <div class="analytics-mode" style="display: flex">
-    <div class="analytics-mode__header">
-      <div class="analytics-mode__heading">
-        <span class="analytics-mode__eyebrow">Workspace</span>
-        <h1 class="analytics-mode__title">Analytics</h1>
+  <div class="analytics-page">
+    <div class="analytics-page__inner">
+      <div class="an-head">
+        <div>
+          <h1 class="an-title">Analytics</h1>
+          <p class="an-lede">Usage, spend, and execution timing across the workspace.</p>
+        </div>
+        <div class="tabs an-tabs" role="tablist">
+          <button
+            type="button"
+            class="tab"
+            :class="{ on: activeTab === 'usage' }"
+            role="tab"
+            :aria-selected="activeTab === 'usage'"
+            data-tab="usage"
+            @click="selectTab('usage')"
+          >Usage</button>
+          <button
+            type="button"
+            class="tab"
+            :class="{ on: activeTab === 'analytics' }"
+            role="tab"
+            :aria-selected="activeTab === 'analytics'"
+            data-tab="analytics"
+            @click="selectTab('analytics')"
+          >Tokens &amp; cost</button>
+          <button
+            type="button"
+            class="tab"
+            :class="{ on: activeTab === 'timing' }"
+            role="tab"
+            :aria-selected="activeTab === 'timing'"
+            data-tab="timing"
+            @click="selectTab('timing')"
+          >Execution timing</button>
+        </div>
       </div>
-      <div class="analytics-tabs" role="tablist">
-        <button
-          type="button"
-          class="analytics-tab"
-          :class="{ active: activeTab === 'usage' }"
-          role="tab"
-          :aria-selected="activeTab === 'usage'"
-          @click="selectTab('usage')"
-        >Usage</button>
-        <button
-          type="button"
-          class="analytics-tab"
-          :class="{ active: activeTab === 'analytics' }"
-          role="tab"
-          :aria-selected="activeTab === 'analytics'"
-          @click="selectTab('analytics')"
-        >Tokens &amp; cost</button>
-        <button
-          type="button"
-          class="analytics-tab"
-          :class="{ active: activeTab === 'timing' }"
-          role="tab"
-          :aria-selected="activeTab === 'timing'"
-          @click="selectTab('timing')"
-        >Execution timing</button>
-      </div>
-    </div>
-    <div class="analytics-mode__panels">
       <AnalyticsTabUsage v-if="activeTab === 'usage'" />
       <AnalyticsTabCost v-else-if="activeTab === 'analytics'" />
       <AnalyticsTabTiming v-else-if="activeTab === 'timing'" />

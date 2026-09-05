@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, useTemplateRef, nextTick } from 'vue';
+import { ref, onMounted, watch, useTemplateRef, nextTick, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../../api/client';
 import { basename } from '../../lib/workspaceLabel';
 import AppSelect from '../AppSelect.vue';
+import { chartPalette, watchPalette } from '../../lib/chartPalette';
+import { statusPill } from '../../lib/statusPill';
 
 const WINDOW_OPTIONS = [
   { value: 7, label: 'Last 7 days' },
@@ -69,6 +71,20 @@ const ACTIVITY_ORDER = [
 ];
 
 function fmt(n?: number) { return (n || 0).toLocaleString(); }
+
+// Today's share of the busiest day in the window, for the spend tile's bar.
+function todayShare(): number {
+  const daily = data.value?.daily_usage || [];
+  if (!daily.length) return 0;
+  const max = Math.max(...daily.map((d) => d.cost_usd || 0));
+  const today = new Date().toISOString().slice(0, 10);
+  const t = daily.find((d) => d.date === today)?.cost_usd || 0;
+  return max > 0 ? Math.round((t / max) * 100) : 0;
+}
+function windowLabel(): string {
+  const days = data.value?.daily_usage?.length || 0;
+  return days ? `last ${days} day${days === 1 ? '' : 's'}` : 'no daily data';
+}
 function fmtCost(c?: number) { return '$' + (c || 0).toFixed(4); }
 
 function sortedStatusKeys() {
@@ -133,13 +149,11 @@ function drawDailyChart() {
 
   const today = new Date().toISOString().slice(0, 10);
   const barW = daily.length ? W / daily.length : 0;
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const barColor = isDark ? '#475569' : '#94a3b8';
-  const accentVar = typeof getComputedStyle !== 'undefined'
-    ? getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
-    : '';
-  const todayColor = accentVar || (isDark ? '#e07a51' : '#c45a33');
-  const labelColor = isDark ? '#64748b' : '#94a3b8';
+  // Past days on the strong rule, today on the accent, labels on the quiet ink.
+  const p = chartPalette();
+  const barColor = p.rule2;
+  const todayColor = p.accent;
+  const labelColor = p.ink4;
 
   ctx.clearRect(0, 0, W, H);
 
@@ -192,238 +206,177 @@ async function seedAgentSessionPeriod() {
   } catch { /* ignore */ }
 }
 
+let stopPalette: (() => void) | null = null;
 onMounted(async () => {
+  stopPalette = watchPalette(drawDailyChart);
   await seedAgentSessionPeriod();
   fetchAndRender();
 });
+onBeforeUnmount(() => { stopPalette?.(); });
 
 watch(agentSessionWindowDays, () => fetchAndRender());
 </script>
 
 <template>
-  <div>
-    <div style="flex: 1; min-height: 0; overflow-y: auto">
-      <div
-        v-if="state === 'loading'"
-        style="
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 32px;
-          color: var(--text-muted);
-          font-size: 13px;
-        "
-      >Loading…</div>
-      <div
-        v-else-if="state === 'error'"
-        style="
-          padding: 12px;
-          background: #f5d5d5;
-          border-radius: 6px;
-          font-size: 12px;
-          color: #8c2020;
-          font-family: monospace;
-          white-space: pre-wrap;
-        "
-      >{{ errorMsg }}</div>
-      <div v-else-if="state === 'content' && data">
-        <div>
-          <div style="display: flex; gap: 24px; flex-wrap: wrap; padding: 4px 0 20px;">
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Total Cost</div>
-              <div style="font-size:22px;font-weight:600;">{{ fmtCost(data.total_cost_usd) }}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Input Tokens</div>
-              <div style="font-size:22px;font-weight:600;">{{ fmt(data.total_input_tokens) }}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Output Tokens</div>
-              <div style="font-size:22px;font-weight:600;">{{ fmt(data.total_output_tokens) }}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Cache Tokens</div>
-              <div style="font-size:22px;font-weight:600;">{{ fmt(data.total_cache_tokens) }}</div>
-            </div>
-          </div>
+  <div class="an-body">
+    <div v-if="state === 'loading'" class="an-state">Loading…</div>
+    <div v-else-if="state === 'error'" class="an-error">{{ errorMsg }}</div>
+    <template v-else-if="state === 'content' && data">
+      <div class="an-tiles">
+        <div class="card an-tile">
+          <span class="eyebrow">Total cost</span>
+          <span class="an-tile__num">{{ fmtCost(data.total_cost_usd) }}</span>
+          <span class="an-tile__sub">Today is {{ todayShare() }}% of the busiest day, {{ windowLabel() }}</span>
+          <span class="bar"><i :style="{ width: todayShare() + '%' }"></i></span>
         </div>
-
-        <div style="margin-bottom: 20px">
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-            Daily Spend (last 30 days)
-          </div>
-          <canvas
-            ref="dailyChart"
-            width="600"
-            height="120"
-            style="width: 100%; max-width: 600px; height: 120px; display: block;"
-          />
+        <div class="card an-tile">
+          <span class="eyebrow">Input tokens</span>
+          <span class="an-tile__num">{{ fmt(data.total_input_tokens) }}</span>
+          <span class="an-tile__sub">Prompt and context sent to the model</span>
         </div>
-
-        <div style="margin-bottom: 20px">
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">By Status</div>
-          <div style="overflow-x: auto">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border)">
-                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Status</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost USD</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="k in sortedStatusKeys()" :key="k">
-                  <td style="padding: 6px 10px; font-weight: 500;">{{ k }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_status || {})[k].input_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_status || {})[k].output_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; font-weight: 500;">{{ fmtCost((data.by_status || {})[k].cost_usd) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="card an-tile">
+          <span class="eyebrow">Output tokens</span>
+          <span class="an-tile__num">{{ fmt(data.total_output_tokens) }}</span>
+          <span class="an-tile__sub">Generated by the model</span>
         </div>
-
-        <div style="margin-bottom: 20px">
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">By Activity</div>
-          <div style="overflow-x: auto">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border)">
-                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Activity</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost USD</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="k in sortedActivityKeys()" :key="k">
-                  <td style="padding: 6px 10px; font-weight: 500;">{{ k }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_activity || {})[k].input_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_activity || {})[k].output_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; font-weight: 500;">{{ fmtCost((data.by_activity || {})[k].cost_usd) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div v-if="sortedWorkspaceKeys().length" style="margin-bottom: 20px">
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">By Workspace</div>
-          <div style="overflow-x: auto">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border)">
-                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Workspace</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Tasks</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost USD</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="path in sortedWorkspaceKeys()" :key="path">
-                  <td style="padding: 6px 10px; font-weight: 500;">
-                    <span :title="path" style="cursor: default;">{{ basename(path) }}</span>
-                  </td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_workspace || {})[path].count) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_workspace || {})[path].input_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.by_workspace || {})[path].output_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; font-weight: 500;">{{ fmtCost((data.by_workspace || {})[path].cost_usd) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div v-if="sortedAgentSessionKeys().length" style="margin-bottom: 20px">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Agent Sessions</div>
-            <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-              Window
-              <AppSelect
-                v-model="agentSessionWindowDays"
-                :options="WINDOW_OPTIONS"
-                aria-label="Agent session cost window"
-              />
-            </label>
-          </div>
-          <div style="overflow-x: auto">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border)">
-                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Group</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Rounds</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output Tokens</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost USD</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="key in sortedAgentSessionKeys()" :key="key">
-                  <td style="padding: 6px 10px; font-weight: 500;">
-                    <span
-                      :title="((data.agent_sessions || {})[key].paths || []).join('\n') || key"
-                      style="cursor: default;"
-                    >{{ (data.agent_sessions || {})[key].label || key }}</span>
-                  </td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.agent_sessions || {})[key].round_count) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.agent_sessions || {})[key].usage?.input_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; color: var(--text-muted);">{{ fmt((data.agent_sessions || {})[key].usage?.output_tokens) }}</td>
-                  <td style="padding: 6px 10px; text-align: right; font-weight: 500;">{{ fmtCost((data.agent_sessions || {})[key].usage?.cost_usd) }}</td>
-                  <td style="padding: 6px 10px; text-align: right;">
-                    <svg
-                      v-if="((data.agent_sessions || {})[key].timeline || []).length"
-                      width="80"
-                      height="20"
-                      viewBox="0 0 80 20"
-                      style="display: block;"
-                    >
-                      <polyline
-                        fill="none"
-                        stroke="var(--accent,#3b82f6)"
-                        stroke-width="1.5"
-                        :points="sparklinePoints((data.agent_sessions || {})[key].timeline)"
-                      />
-                    </svg>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div>
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Top 10 Tasks by Cost</div>
-          <div style="overflow-x: auto">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border)">
-                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Title</th>
-                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Status</th>
-                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost USD</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="t in (data.top_tasks || [])"
-                  :key="t.id"
-                  class="top-task-row"
-                  style="cursor: pointer;"
-                  @click="openTask(t.id)"
-                >
-                  <td style="padding: 6px 10px; max-width: 360px;">
-                    <span style="display: block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent);">{{ t.title }}</span>
-                  </td>
-                  <td style="padding: 6px 10px; color: var(--text-muted); white-space: nowrap;">{{ t.status }}</td>
-                  <td style="padding: 6px 10px; text-align: right; font-weight: 500; white-space: nowrap;">{{ fmtCost(t.cost_usd) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="card an-tile">
+          <span class="eyebrow">Cache tokens</span>
+          <span class="an-tile__num">{{ fmt(data.total_cache_tokens) }}</span>
+          <span class="an-tile__sub">Served from the prompt cache</span>
         </div>
       </div>
-    </div>
+
+      <section class="card an-section">
+        <div class="card-head"><span class="eyebrow">Daily spend</span><span class="muted">{{ windowLabel() }}</span></div>
+        <div class="an-section__body">
+          <canvas ref="dailyChart" class="an-chart" width="600" height="120" />
+        </div>
+      </section>
+
+      <section class="card an-section">
+        <div class="card-head"><span class="eyebrow">By status</span></div>
+        <div class="an-table-wrap">
+          <table class="an-table">
+            <thead>
+              <tr><th>Status</th><th class="num">Input tokens</th><th class="num">Output tokens</th><th class="num">Cost USD</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="k in sortedStatusKeys()" :key="k">
+                <td><span class="pill" :class="statusPill(k)">{{ k.replace('_', ' ') }}</span></td>
+                <td class="num">{{ fmt((data.by_status || {})[k].input_tokens) }}</td>
+                <td class="num">{{ fmt((data.by_status || {})[k].output_tokens) }}</td>
+                <td class="num strong">{{ fmtCost((data.by_status || {})[k].cost_usd) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card an-section">
+        <div class="card-head"><span class="eyebrow">By activity</span></div>
+        <div class="an-table-wrap">
+          <table class="an-table">
+            <thead>
+              <tr><th>Activity</th><th class="num">Input tokens</th><th class="num">Output tokens</th><th class="num">Cost USD</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="k in sortedActivityKeys()" :key="k">
+                <td class="strong">{{ k }}</td>
+                <td class="num">{{ fmt((data.by_activity || {})[k].input_tokens) }}</td>
+                <td class="num">{{ fmt((data.by_activity || {})[k].output_tokens) }}</td>
+                <td class="num strong">{{ fmtCost((data.by_activity || {})[k].cost_usd) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section v-if="sortedWorkspaceKeys().length" class="card an-section">
+        <div class="card-head"><span class="eyebrow">By workspace</span></div>
+        <div class="an-table-wrap">
+          <table class="an-table">
+            <thead>
+              <tr><th>Workspace</th><th class="num">Tasks</th><th class="num">Input tokens</th><th class="num">Output tokens</th><th class="num">Cost USD</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="path in sortedWorkspaceKeys()" :key="path">
+                <td class="strong"><span class="clip" :title="path">{{ basename(path) }}</span></td>
+                <td class="num">{{ fmt((data.by_workspace || {})[path].count) }}</td>
+                <td class="num">{{ fmt((data.by_workspace || {})[path].input_tokens) }}</td>
+                <td class="num">{{ fmt((data.by_workspace || {})[path].output_tokens) }}</td>
+                <td class="num strong">{{ fmtCost((data.by_workspace || {})[path].cost_usd) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section v-if="sortedAgentSessionKeys().length" class="card an-section">
+        <div class="card-head">
+          <span class="eyebrow">Agent sessions</span>
+          <label class="an-tools">
+            Window
+            <AppSelect
+              v-model="agentSessionWindowDays"
+              :options="WINDOW_OPTIONS"
+              aria-label="Agent session cost window"
+            />
+          </label>
+        </div>
+        <div class="an-table-wrap">
+          <table class="an-table">
+            <thead>
+              <tr><th>Group</th><th class="num">Rounds</th><th class="num">Input tokens</th><th class="num">Output tokens</th><th class="num">Cost USD</th><th class="num">Trend</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="key in sortedAgentSessionKeys()" :key="key">
+                <td class="strong">
+                  <span :title="((data.agent_sessions || {})[key].paths || []).join('\n') || key">{{ (data.agent_sessions || {})[key].label || key }}</span>
+                </td>
+                <td class="num">{{ fmt((data.agent_sessions || {})[key].round_count) }}</td>
+                <td class="num">{{ fmt((data.agent_sessions || {})[key].usage?.input_tokens) }}</td>
+                <td class="num">{{ fmt((data.agent_sessions || {})[key].usage?.output_tokens) }}</td>
+                <td class="num strong">{{ fmtCost((data.agent_sessions || {})[key].usage?.cost_usd) }}</td>
+                <td class="num">
+                  <svg
+                    v-if="((data.agent_sessions || {})[key].timeline || []).length"
+                    class="an-spark"
+                    width="80"
+                    height="20"
+                    viewBox="0 0 80 20"
+                    aria-hidden="true"
+                  >
+                    <polyline :points="sparklinePoints((data.agent_sessions || {})[key].timeline)" />
+                  </svg>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card an-section">
+        <div class="card-head"><span class="eyebrow">Top 10 tasks by cost</span></div>
+        <div class="an-table-wrap">
+          <table class="an-table">
+            <thead>
+              <tr><th>Title</th><th>Status</th><th class="num">Cost USD</th></tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="t in (data.top_tasks || [])"
+                :key="t.id"
+                class="clickable top-task-row"
+                @click="openTask(t.id)"
+              >
+                <td><span class="clip link">{{ t.title }}</span></td>
+                <td><span class="pill" :class="statusPill(t.status)">{{ t.status.replace('_', ' ') }}</span></td>
+                <td class="num strong">{{ fmtCost(t.cost_usd) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </template>
   </div>
 </template>
