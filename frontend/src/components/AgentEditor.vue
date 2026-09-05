@@ -253,35 +253,35 @@ async function deleteAgent(slug: string) {
       <div>
         <h3 class="agents-detail__title">{{ draft.title || draft.slug || '(untitled)' }}</h3>
         <div class="agents-detail__subtitle">
-          <span class="agents-detail__badge agents-detail__badge--user">user</span>
+          <span class="pill pill-brand agents-detail__badge">user</span>
           <code>{{ draft.slug }}</code>
         </div>
       </div>
     </div>
     <form class="agents-detail__editor" @submit.prevent="saveAgent">
       <label class="agents-detail__field">
-        <span class="agents-detail__field-label">Slug</span>
-        <input v-model="draft.slug" type="text" title="kebab-case, 2-40 chars" />
+        <span class="eyebrow agents-detail__field-label">Slug</span>
+        <input v-model="draft.slug" type="text" class="field mono" title="kebab-case, 2-40 chars" />
         <span class="agents-detail__field-hint">kebab-case, 2-40 chars</span>
       </label>
       <label class="agents-detail__field">
-        <span class="agents-detail__field-label">Title</span>
-        <input v-model="draft.title" type="text" />
+        <span class="eyebrow agents-detail__field-label">Title</span>
+        <input v-model="draft.title" type="text" class="field" />
       </label>
       <label class="agents-detail__field">
-        <span class="agents-detail__field-label">Description</span>
-        <input v-model="draft.description" type="text" />
+        <span class="eyebrow agents-detail__field-label">Description</span>
+        <input v-model="draft.description" type="text" class="field" />
       </label>
 
       <div class="agents-detail__field">
-        <span class="agents-detail__field-label">Harness</span>
-        <div class="agents-detail__segment">
+        <span class="eyebrow agents-detail__field-label">Harness</span>
+        <div class="seg agents-detail__segment">
           <button
             v-for="opt in harnessOptions"
             :key="opt.value"
             type="button"
-            class="agents-detail__segment-btn"
-            :class="{ 'agents-detail__segment-btn--active': draft.harness === opt.value }"
+            class="seg-btn agents-detail__segment-btn"
+            :class="{ on: draft.harness === opt.value, 'agents-detail__segment-btn--active': draft.harness === opt.value }"
             @click="draft.harness = opt.value"
           >{{ opt.label }}</button>
         </div>
@@ -292,7 +292,7 @@ async function deleteAgent(slug: string) {
       </div>
 
       <div class="agents-detail__field">
-        <span class="agents-detail__field-label">Capabilities</span>
+        <span class="eyebrow agents-detail__field-label">Capabilities</span>
         <div class="agents-detail__checks">
           <label v-for="cap in capabilityOptions" :key="cap.value" class="agents-detail__check">
             <input
@@ -314,8 +314,8 @@ async function deleteAgent(slug: string) {
       </label>
 
       <div class="agents-detail__field agents-detail__field--prompt">
-        <span class="agents-detail__field-label">System Prompt</span>
-        <textarea v-model="draft.prompt_tmpl" rows="14" name="prompt_tmpl"></textarea>
+        <span class="eyebrow agents-detail__field-label">System Prompt</span>
+        <textarea v-model="draft.prompt_tmpl" rows="14" name="prompt_tmpl" class="field mono"></textarea>
         <span class="agents-detail__field-hint">
           Optional preamble prepended to every invocation of this agent
           through the flow engine. The agent sees this text first, then
@@ -330,8 +330,8 @@ async function deleteAgent(slug: string) {
       <p v-if="saveError" class="agents-detail__editor-err">{{ saveError }}</p>
 
       <div class="agents-detail__editor-actions">
-        <button type="button" class="agents-detail__btn-ghost" @click="cancelEdit">Cancel</button>
-        <button type="submit" class="agents-detail__btn-primary" :disabled="saving">
+        <button type="button" class="btn sm ghost agents-detail__btn-ghost" @click="cancelEdit">Cancel</button>
+        <button type="submit" class="btn sm agents-detail__btn-primary" :disabled="saving">
           {{ saving ? 'Creating...' : 'Create' }}
         </button>
       </div>
@@ -345,8 +345,8 @@ async function deleteAgent(slug: string) {
         <h3 class="agents-detail__title">{{ agent.title || agent.slug }}</h3>
         <div class="agents-detail__subtitle">
           <span
-            class="agents-detail__badge"
-            :class="{ 'agents-detail__badge--user': !agent.builtin }"
+            class="pill agents-detail__badge"
+            :class="agent.builtin ? 'pill-neutral' : 'pill-brand'"
           >{{ agent.builtin ? 'built-in' : 'user' }}</span>
           <code>{{ agent.slug }}</code>
         </div>
@@ -355,13 +355,13 @@ async function deleteAgent(slug: string) {
         <button
           v-if="agent.builtin"
           type="button"
-          class="agents-detail__btn-primary"
+          class="btn sm agents-detail__btn-primary"
           @click="emit('clone', agent)"
         >Clone</button>
         <button
           v-else
           type="button"
-          class="agents-detail__btn-danger"
+          class="btn sm ghost danger agents-detail__btn-danger"
           @click="deleteAgent(agent.slug)"
         >Delete</button>
       </div>
@@ -374,27 +374,27 @@ async function deleteAgent(slug: string) {
       @submit.prevent="saveEdit"
     >
       <label class="agents-detail__field">
-        <span class="agents-detail__field-label">Slug</span>
-        <input v-model="editingDraft.slug" type="text" disabled />
+        <span class="eyebrow agents-detail__field-label">Slug</span>
+        <input v-model="editingDraft.slug" type="text" class="field mono" disabled />
         <span class="agents-detail__field-hint">kebab-case, 2-40 chars</span>
       </label>
       <label class="agents-detail__field">
-        <span class="agents-detail__field-label">Title</span>
-        <input v-model="editingDraft.title" type="text" />
+        <span class="eyebrow agents-detail__field-label">Title</span>
+        <input v-model="editingDraft.title" type="text" class="field" />
       </label>
       <label class="agents-detail__field">
-        <span class="agents-detail__field-label">Description</span>
-        <input v-model="editingDraft.description" type="text" />
+        <span class="eyebrow agents-detail__field-label">Description</span>
+        <input v-model="editingDraft.description" type="text" class="field" />
       </label>
       <div class="agents-detail__field">
-        <span class="agents-detail__field-label">Harness</span>
-        <div class="agents-detail__segment">
+        <span class="eyebrow agents-detail__field-label">Harness</span>
+        <div class="seg agents-detail__segment">
           <button
             v-for="opt in harnessOptions"
             :key="opt.value"
             type="button"
-            class="agents-detail__segment-btn"
-            :class="{ 'agents-detail__segment-btn--active': editingDraft.harness === opt.value }"
+            class="seg-btn agents-detail__segment-btn"
+            :class="{ on: editingDraft.harness === opt.value, 'agents-detail__segment-btn--active': editingDraft.harness === opt.value }"
             @click="editingDraft.harness = opt.value"
           >{{ opt.label }}</button>
         </div>
@@ -404,7 +404,7 @@ async function deleteAgent(slug: string) {
         </span>
       </div>
       <div class="agents-detail__field">
-        <span class="agents-detail__field-label">Capabilities</span>
+        <span class="eyebrow agents-detail__field-label">Capabilities</span>
         <div class="agents-detail__checks">
           <label v-for="cap in capabilityOptions" :key="cap.value" class="agents-detail__check">
             <input
@@ -424,8 +424,8 @@ async function deleteAgent(slug: string) {
         </span>
       </label>
       <div class="agents-detail__field agents-detail__field--prompt">
-        <span class="agents-detail__field-label">System Prompt</span>
-        <textarea v-model="editingDraft.prompt_tmpl" rows="14" name="prompt_tmpl"></textarea>
+        <span class="eyebrow agents-detail__field-label">System Prompt</span>
+        <textarea v-model="editingDraft.prompt_tmpl" rows="14" name="prompt_tmpl" class="field mono"></textarea>
         <span class="agents-detail__field-hint">
           Optional preamble prepended to every invocation of this agent
           through the flow engine. The agent sees this text first, then
@@ -438,8 +438,8 @@ async function deleteAgent(slug: string) {
       </div>
       <p v-if="saveError" class="agents-detail__editor-err">{{ saveError }}</p>
       <div class="agents-detail__editor-actions">
-        <button type="button" class="agents-detail__btn-ghost" @click="cancelUserEdit">Cancel</button>
-        <button type="submit" class="agents-detail__btn-primary" :disabled="saving">
+        <button type="button" class="btn sm ghost agents-detail__btn-ghost" @click="cancelUserEdit">Cancel</button>
+        <button type="submit" class="btn sm agents-detail__btn-primary" :disabled="saving">
           {{ saving ? 'Saving...' : 'Save' }}
         </button>
       </div>
@@ -465,7 +465,7 @@ async function deleteAgent(slug: string) {
       </div>
 
       <div class="agents-detail__section">
-        <div class="agents-detail__section-label">System prompt</div>
+        <div class="eyebrow agents-detail__section-label">System prompt</div>
         <pre v-if="detailLoading" class="agents-detail__tmpl">Loading...</pre>
         <pre
           v-else-if="selectedDetail?.prompt_tmpl"

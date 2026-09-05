@@ -300,7 +300,7 @@ onMounted(async () => {
       <header class="ag-mode__header">
         <div class="ag-mode__header-row">
           <div>
-            <h2 class="ag-mode__title">Agent Fleets</h2>
+            <h2 class="ag-mode__title">Agent fleets</h2>
             <p class="ag-mode__subtitle">
               A fleet assembles agents to work a task to an outcome. The palette
               lists the agent registry; the canvas shows the selected fleet, with
@@ -313,14 +313,14 @@ onMounted(async () => {
           <div class="ag-mode__header-actions">
             <button
               type="button"
-              class="ag-mode__new-fleet"
+              class="btn sm ag-mode__new-fleet"
               :disabled="!!draft"
               title="Start a new empty fleet"
               @click="startNewFleet"
             >+ New fleet</button>
             <label class="ag-mode__flow-pick">
-              <span class="ag-mode__flow-pick-label">Fleet</span>
-              <select v-model="selectedSlug" class="ag-mode__flow-select" aria-label="Fleet">
+              <span class="eyebrow ag-mode__flow-pick-label">Fleet</span>
+              <select v-model="selectedSlug" class="field ag-mode__flow-select" aria-label="Fleet">
                 <option v-if="!flowOptions.length" :value="null">No fleets</option>
                 <option v-for="f in flowOptions" :key="f.slug" :value="f.slug">
                   {{ f.name || f.slug }}
@@ -337,11 +337,12 @@ onMounted(async () => {
             <input
               v-model="search"
               type="search"
+              class="field"
               placeholder="Search agents..."
               aria-label="Search agents"
               autocomplete="off"
             />
-            <button type="button" class="ag-mode__new-agent" @click="openNewAgent" title="Create an agent">
+            <button type="button" class="btn sm ghost ag-mode__new-agent" @click="openNewAgent" title="Create an agent">
               + New agent
             </button>
           </div>
@@ -363,8 +364,8 @@ onMounted(async () => {
               >
                 <div class="ag-card__head">
                   <span class="ag-card__name">{{ a.title || a.slug }}</span>
-                  <span v-if="a.harness" class="ag-card__role">{{ a.harness }}</span>
-                  <span v-else-if="a.builtin" class="ag-card__role">built-in</span>
+                  <span v-if="a.harness" class="pill pill-neutral ag-card__role">{{ a.harness }}</span>
+                  <span v-else-if="a.builtin" class="pill pill-neutral ag-card__role">built-in</span>
                 </div>
                 <p v-if="a.description" class="ag-card__desc">{{ a.description }}</p>
                 <code class="ag-card__slug">{{ a.slug }}</code>
@@ -384,15 +385,15 @@ onMounted(async () => {
             <div v-if="!draft && selectedFlow" class="ag-detail__head">
               <h3 class="ag-detail__title">{{ selectedFlow.name || selectedFlow.slug }}</h3>
               <span
-                class="ag-detail__badge"
-                :class="{ 'ag-detail__badge--user': !selectedFlow.builtin }"
+                class="pill ag-detail__badge"
+                :class="selectedFlow.builtin ? 'pill-neutral' : 'pill-brand'"
               >{{ selectedFlow.builtin ? 'built-in' : 'user' }}</span>
               <code class="ag-detail__slug">{{ selectedFlow.slug }}</code>
               <label v-if="runs.length" class="ag-detail__run">
                 <span>Run</span>
                 <select
                   :value="selectedRunId"
-                  class="ag-detail__run-select"
+                  class="field ag-detail__run-select"
                   aria-label="Run overlay"
                   @change="onSelectRun(($event.target as HTMLSelectElement).value || null)"
                 >
@@ -402,22 +403,22 @@ onMounted(async () => {
                   </option>
                 </select>
               </label>
-              <button type="button" class="ag-detail__edit" @click="startEdit">
+              <button type="button" class="btn sm ghost ag-detail__edit" @click="startEdit">
                 {{ selectedFlow.builtin ? 'Clone & edit' : 'Edit' }}
               </button>
               <template v-if="!selectedFlow.builtin">
                 <button
                   v-if="!confirmingDelete"
                   type="button"
-                  class="ag-detail__edit ag-detail__delete"
+                  class="btn sm ghost danger ag-detail__edit ag-detail__delete"
                   @click="confirmingDelete = true"
                 >Delete</button>
                 <template v-else>
                   <span class="ag-detail__confirm-label">Delete this fleet?</span>
-                  <button type="button" class="ag-detail__edit ag-detail__delete" :disabled="deleting" @click="deleteFleet">
+                  <button type="button" class="btn sm ghost danger ag-detail__edit ag-detail__delete" :disabled="deleting" @click="deleteFleet">
                     {{ deleting ? 'Deleting...' : 'Confirm' }}
                   </button>
-                  <button type="button" class="ag-detail__edit" :disabled="deleting" @click="confirmingDelete = false">Keep</button>
+                  <button type="button" class="btn sm ghost ag-detail__edit" :disabled="deleting" @click="confirmingDelete = false">Keep</button>
                 </template>
               </template>
             </div>
@@ -429,13 +430,13 @@ onMounted(async () => {
               <div class="ag-edit__fields">
                 <input
                   v-model="draft.name"
-                  class="ag-edit__name"
+                  class="field ag-edit__name"
                   placeholder="Fleet name"
                   aria-label="Fleet name"
                 />
                 <input
                   v-model="draft.slug"
-                  class="ag-edit__slug"
+                  class="field mono ag-edit__slug"
                   :readonly="!draft.isClone"
                   placeholder="fleet-slug"
                   aria-label="Fleet slug"
@@ -450,8 +451,8 @@ onMounted(async () => {
                    produce durable commits (spike S NO-GO) -- so they are marked
                    experimental until the worktree-sandbox adapter lands. -->
               <div class="ag-edit__topo">
-                <label class="ag-edit__field-label">Coordination</label>
-                <select v-model="coordination" class="ag-edit__topo-select" aria-label="Coordination">
+                <label class="eyebrow ag-edit__field-label">Coordination</label>
+                <select v-model="coordination" class="field ag-edit__topo-select" aria-label="Coordination">
                   <option value="sequence">Fixed sequence</option>
                   <option value="lead">Lead delegates (experimental)</option>
                   <option value="mesh">Open mesh (experimental)</option>
@@ -462,7 +463,7 @@ onMounted(async () => {
                     type="number"
                     min="0"
                     v-model.number="draft.max_handoff_depth"
-                    class="ag-edit__depth-input"
+                    class="field ag-edit__depth-input"
                     aria-label="Max handoff depth"
                   />
                 </label>
@@ -474,8 +475,8 @@ onMounted(async () => {
               </p>
 
               <div class="ag-edit__actions">
-                <button type="button" class="ag-edit__btn" @click="cancelEdit" :disabled="saving">Cancel</button>
-                <button type="button" class="ag-edit__btn ag-edit__btn--save" @click="saveDraft" :disabled="saving">
+                <button type="button" class="btn sm ghost ag-edit__btn" @click="cancelEdit" :disabled="saving">Cancel</button>
+                <button type="button" class="btn sm ag-edit__btn ag-edit__btn--save" @click="saveDraft" :disabled="saving">
                   {{ saving ? 'Saving...' : 'Save' }}
                 </button>
               </div>
@@ -515,7 +516,7 @@ onMounted(async () => {
          definition lives on the same surface as graph composition. -->
     <div v-if="agentEditorOpen" class="ag-agent-modal" @click.self="closeAgentEditor">
       <div class="ag-agent-modal__panel">
-        <button type="button" class="ag-agent-modal__close" aria-label="Close agent editor" @click="closeAgentEditor">&#215;</button>
+        <button type="button" class="icon-btn ag-agent-modal__close" aria-label="Close agent editor" @click="closeAgentEditor"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         <AgentEditor
           :agent="agentEditorAgent"
           :is-new="agentEditorIsNew"
@@ -530,68 +531,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.ag-mode__rail-head {
-  display: flex;
-  gap: 0.4rem;
-  padding: 0.6rem;
-  border-bottom: 1px solid var(--border);
-}
-.ag-mode__rail-head input {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  padding: 0.4rem 0.55rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
-}
-.ag-mode__new-agent {
-  flex-shrink: 0;
-  font: inherit;
-  font-size: 0.74rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.ag-agent-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 3rem 1rem;
-  background: var(--glass-dim);
-  overflow: auto;
-}
-.ag-agent-modal__panel {
-  position: relative;
-  width: min(720px, 100%);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.25rem 1.4rem;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-}
-.ag-agent-modal__close {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.7rem;
-  font-size: 1.1rem;
-  line-height: 1;
-  width: 1.7rem;
-  height: 1.7rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
+/* Agent fleets: a 280px sunk list of agent rows, a canvas card, and the
+   editor as a dialog. See specs/shared/console-redesign/agent-graph.md. */
 .ag-mode-container {
   height: 100%;
   overflow: hidden;
@@ -603,376 +544,325 @@ onMounted(async () => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  padding: 1.1rem 1.25rem;
-  gap: 1rem;
+  padding: 20px 24px;
+  gap: 16px;
 }
 .ag-mode__header-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 16px;
 }
 .ag-mode__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 .ag-mode__subtitle {
-  margin: 0.3rem 0 0;
-  max-width: 46rem;
-  font-size: 0.84rem;
-  color: var(--text-secondary);
+  margin: 6px 0 0;
+  max-width: 68ch;
+  font-size: var(--fs-base);
+  color: var(--ink-2);
+  line-height: 1.5;
 }
 .ag-mode__header-actions {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-}
-.ag-mode__new-fleet {
-  flex-shrink: 0;
-  font: inherit;
-  font-size: 0.78rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.ag-mode__new-fleet:disabled {
-  opacity: 0.5;
-  cursor: default;
+  gap: 8px;
+  flex: none;
 }
 .ag-mode__flow-pick {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
+  gap: 8px;
 }
 .ag-mode__flow-select {
-  font: inherit;
-  padding: 0.35rem 0.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
+  width: auto;
+  min-width: 180px;
 }
 .ag-mode__split {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: 280px 1fr;
-  gap: 1rem;
+  gap: 16px;
 }
+/* The agent list */
 .ag-mode__rail {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-elevated);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xl);
+  background: var(--bg-sunk);
   overflow: hidden;
 }
-.ag-mode__search {
-  padding: 0.6rem;
-  border-bottom: 1px solid var(--border);
+.ag-mode__rail-head {
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--rule);
 }
-.ag-mode__search input {
-  width: 100%;
-  font: inherit;
-  padding: 0.4rem 0.55rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
+.ag-mode__rail-head .field {
+  flex: 1;
+  min-width: 0;
+}
+.ag-mode__new-agent {
+  flex: none;
 }
 .ag-mode__rail-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0.6rem;
+  padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1px;
 }
 .ag-mode__empty {
-  margin: 0.5rem 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  margin: 8px 6px;
+  font-size: 12px;
+  color: var(--ink-3);
 }
 .ag-card {
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-sunk);
-  padding: 0.55rem 0.65rem;
+  padding: 8px 10px;
+  border-radius: var(--r-row);
+  border: 1px solid transparent;
+  transition: background var(--dur-hover), border-color var(--dur-hover);
 }
 .ag-card--linkable {
   cursor: pointer;
 }
+.ag-card--linkable:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
 .ag-card--draggable {
   cursor: grab;
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--bg-card);
+  border-color: var(--rule);
+  box-shadow: var(--sh-card);
 }
 .ag-card--draggable:active {
   cursor: grabbing;
 }
 .ag-card__head {
   display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
+  align-items: center;
+  gap: 8px;
 }
 .ag-card__name {
-  font-size: 0.84rem;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-base);
   font-weight: 600;
-  color: var(--text);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ag-card__role {
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
+  flex: none;
 }
 .ag-card__desc {
-  margin: 0.25rem 0 0;
-  font-size: 0.76rem;
-  color: var(--text-secondary);
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.4;
 }
 .ag-card__slug {
   display: inline-block;
-  margin-top: 0.3rem;
-  font-size: 0.7rem;
-  color: var(--text-muted);
+  margin-top: 4px;
+  font: 400 var(--fs-9) / 1 var(--font-mono);
+  color: var(--ink-4);
 }
+/* The fleet detail */
 .ag-mode__detail {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-elevated);
-  padding: 0.9rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xl);
+  background: var(--bg-card);
+  padding: 14px 16px;
   overflow: hidden;
+  box-shadow: var(--sh-card);
 }
 .ag-mode__empty-detail {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
 }
 .ag-detail__head {
   display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .ag-detail__title {
   margin: 0;
-  font-size: 1.02rem;
-}
-.ag-detail__badge {
-  font-size: 0.64rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  color: var(--text-muted);
-  background: var(--bg-hover);
-}
-.ag-detail__badge--user {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-size: var(--fs-xl);
+  font-weight: 600;
 }
 .ag-detail__slug {
-  font-size: 0.72rem;
-  color: var(--text-muted);
+  font: 400 var(--fs-10) / 1 var(--font-mono);
+  color: var(--ink-4);
 }
 .ag-detail__run {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.74rem;
-  color: var(--text-secondary);
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
 }
 .ag-detail__run-select {
-  font: inherit;
-  font-size: 0.74rem;
-  padding: 0.22rem 0.4rem;
-  border-radius: 7px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
+  width: auto;
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12px;
 }
 .ag-detail__run + .ag-detail__edit {
   margin-left: 0;
 }
 .ag-detail__edit {
   margin-left: auto;
-  font: inherit;
-  font-size: 0.74rem;
-  padding: 0.28rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
-  cursor: pointer;
 }
-.ag-detail__edit:hover {
-  border-color: var(--accent);
-}
-.ag-detail__delete:hover {
-  border-color: var(--danger, #d2453f);
-  color: var(--danger, #d2453f);
+.ag-detail__edit ~ .ag-detail__edit {
+  margin-left: 0;
 }
 .ag-detail__confirm-label {
-  font-size: 0.76rem;
-  color: var(--danger, #d2453f);
+  font-size: 12px;
+  color: var(--err);
 }
 .ag-detail__desc {
-  margin: 0.45rem 0 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  margin: 8px 0 0;
+  font-size: var(--fs-base);
+  color: var(--ink-2);
 }
+/* Editing toolbar */
 .ag-edit {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .ag-edit__fields {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 6px;
   flex-wrap: wrap;
 }
-.ag-edit__name,
-.ag-edit__slug {
-  font: inherit;
-  padding: 0.32rem 0.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
-}
 .ag-edit__name {
-  font-size: 0.95rem;
+  width: 220px;
   font-weight: 600;
 }
 .ag-edit__slug {
-  font-size: 0.78rem;
-  font-family: var(--font-mono, monospace);
-  max-width: 13rem;
+  width: 180px;
 }
 .ag-edit__slug[readonly] {
-  color: var(--text-muted);
-  opacity: 0.8;
+  color: var(--ink-3);
 }
 .ag-edit__hint {
-  font-size: 0.7rem;
-  color: var(--text-muted);
+  font: 400 var(--fs-9) / 1 var(--font-mono);
+  color: var(--ink-4);
 }
 .ag-edit__topo {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
+  font-size: 12px;
+  color: var(--ink-2);
 }
-.ag-edit__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  cursor: pointer;
-}
-.ag-edit__field-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
+.ag-edit__topo-select {
+  width: auto;
 }
 .ag-edit__experimental {
   flex-basis: 100%;
-  margin: 0.3rem 0 0;
-  font-size: 0.74rem;
-  color: var(--warning, #c98a00);
-}
-.ag-edit__topo-select {
-  font: inherit;
-  font-size: 0.76rem;
-  padding: 0.25rem 0.4rem;
-  border-radius: 7px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
+  margin: 4px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--tint-amber);
+  font-size: 12px;
+  color: var(--warn);
 }
 .ag-edit__depth {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 6px;
 }
 .ag-edit__depth-input {
-  width: 3.2rem;
-  font: inherit;
-  font-size: 0.76rem;
-  padding: 0.25rem 0.35rem;
-  border-radius: 7px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
+  width: 64px;
+  text-align: center;
 }
 .ag-edit__actions {
   display: flex;
-  gap: 0.45rem;
-}
-.ag-edit__btn {
-  font: inherit;
-  font-size: 0.78rem;
-  padding: 0.32rem 0.85rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-sunk);
-  color: var(--text);
-  cursor: pointer;
-}
-.ag-edit__btn--save {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
-  font-weight: 600;
-}
-.ag-edit__btn:disabled {
-  opacity: 0.55;
-  cursor: default;
+  gap: 6px;
 }
 .ag-edit__error {
-  margin: 0.45rem 0 0;
-  font-size: 0.78rem;
-  color: var(--danger, #d2453f);
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--tint-red);
+  font-size: 12px;
+  color: var(--err);
 }
 .ag-edit__tip {
-  margin: 0.45rem 0 0;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ink-3);
 }
+/* The canvas well */
 .ag-detail__canvas {
   flex: 1;
   min-height: 0;
-  margin-top: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  margin-top: 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
   background: var(--bg-sunk);
   overflow: auto;
+  transition: border-color var(--dur-hover), background var(--dur-hover);
 }
 .ag-detail__canvas--editing {
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-color: var(--accent-line);
 }
 .ag-detail__canvas--drop {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg-sunk));
+  background: var(--accent-soft);
+}
+/* The agent editor dialog */
+.ag-agent-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  background: var(--glass-dim);
+  overflow: auto;
+  animation: om-fade-in 0.16s var(--ease-fluid) both;
+}
+.ag-agent-modal__panel {
+  position: relative;
+  width: min(720px, 100%);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-main);
+  padding: 20px 22px;
+  box-shadow: var(--sh-pop);
+  animation: om-fade-up 0.2s var(--ease-fluid) both;
+}
+.ag-agent-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
 }
 </style>

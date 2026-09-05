@@ -192,6 +192,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/styles/settings-page.css', 'src/views/SettingsPage.vue', 'src/components/settings/SettingsTabExecution.vue', 'src/components/settings/SettingsTabAppearance.vue',
     'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabGithub.vue', 'src/components/settings/SettingsTabAbout.vue',
     'src/components/settings/SettingToggle.vue', 'src/components/AppSelect.vue', 'src/components/HarnessSelect.vue',
+    'src/views/AgentGraphPage.vue', 'src/components/AgentGraphCanvas.vue', 'src/components/AgentEditor.vue', 'src/styles/agents.css', 'src/components/SystemPromptsManager.vue',
   ];
   it.each(tokenOnly)('%s uses tokens only', (file) => {
     const whole = read(file);

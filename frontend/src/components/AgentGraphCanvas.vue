@@ -360,7 +360,7 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
               :y="node.y"
               :width="NODE_W"
               :height="NODE_H"
-              rx="10"
+              rx="14"
             />
             <text
               class="agc-node-text"
@@ -425,8 +425,8 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
   justify-content: center;
   height: 100%;
   min-height: 8rem;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
 }
 .agc__meta {
   display: flex;
@@ -437,40 +437,40 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
 }
 .agc__mode {
   display: inline-block;
-  font-size: 0.68rem;
-  font-weight: 600;
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  color: var(--text-muted);
-  background: var(--bg-hover);
+  letter-spacing: 0.07em;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  background: var(--tint-neutral);
+  border: 1px solid var(--rule-2);
 }
 .agc__mode--lead,
 .agc__mode--mesh {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: var(--accent-soft);
+  border-color: transparent;
 }
 .agc__experimental-tag {
-  font-size: 0.62rem;
-  font-weight: 600;
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  color: var(--warning, #c98a00);
-  background: color-mix(in srgb, var(--warning, #c98a00) 14%, transparent);
+  letter-spacing: 0.07em;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  color: var(--warn);
+  background: var(--tint-amber);
 }
 .agc__hint {
-  font-size: 0.74rem;
-  color: var(--text-secondary);
+  font-size: 12px;
+  color: var(--ink-3);
 }
 .agc__svg {
   display: block;
   max-width: none;
 }
 .agc-edge {
-  stroke: var(--border-strong, var(--border));
+  stroke: var(--rule-2);
   stroke-width: 1.5;
 }
 .agc-edge--delegate {
@@ -484,10 +484,11 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
 .agc-arrow-head {
   fill: var(--accent);
 }
+/* A node is a card: the card surface, a hairline, the card radius. */
 .agc-node-box {
-  fill: var(--bg-elevated);
-  stroke: var(--border);
-  stroke-width: 1.2;
+  fill: var(--bg-card);
+  stroke: var(--rule-2);
+  stroke-width: 1;
 }
 .agc-node--task .agc-node-box,
 .agc-node--outcome .agc-node-box {
@@ -495,39 +496,38 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
   stroke-dasharray: 4 3;
 }
 .agc-node--lead .agc-node-box {
-  stroke: var(--accent);
-  stroke-width: 1.8;
+  stroke: var(--accent-line);
+  stroke-width: 1.5;
 }
-/* Run overlay: status colours for the agent that ran. */
+/* Run overlay: the ramp colour of the agent that ran. */
 .agc-node--run-running .agc-node-box {
-  stroke: var(--warning, #c98a00);
-  stroke-width: 2;
-  fill: color-mix(in srgb, var(--warning, #c98a00) 12%, var(--bg-elevated));
+  stroke: var(--run);
+  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--run) 12%, var(--bg-card));
 }
 .agc-node--run-done .agc-node-box {
-  stroke: var(--success, #2e9e5b);
-  stroke-width: 2;
-  fill: color-mix(in srgb, var(--success, #2e9e5b) 12%, var(--bg-elevated));
+  stroke: var(--ok);
+  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--ok) 12%, var(--bg-card));
 }
 .agc-node--run-failed .agc-node-box {
-  stroke: var(--danger, #d2453f);
-  stroke-width: 2;
-  fill: color-mix(in srgb, var(--danger, #d2453f) 12%, var(--bg-elevated));
+  stroke: var(--err);
+  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--err) 12%, var(--bg-card));
 }
 .agc-node-text {
-  fill: var(--text);
-  font-size: 0.8rem;
+  fill: var(--ink);
+  font-size: var(--fs-base);
   font-weight: 600;
 }
 .agc-node--task .agc-node-text,
 .agc-node--outcome .agc-node-text {
-  fill: var(--text-secondary);
+  fill: var(--ink-2);
 }
 .agc-lead-tag {
   fill: var(--accent);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font: 700 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: 0.12em;
 }
 .agc-node--editable {
   cursor: pointer;
@@ -554,17 +554,17 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
   opacity: 1;
 }
 .agc-corner-bg {
-  fill: var(--bg-elevated);
+  fill: var(--bg-card);
   stroke-width: 1.2;
 }
 .agc-corner-bg--remove {
-  stroke: var(--danger, #d2453f);
+  stroke: var(--err);
 }
 .agc-corner-bg--lead {
   stroke: var(--accent);
 }
 .agc-node-remove:hover .agc-corner-bg--remove {
-  fill: var(--danger, #d2453f);
+  fill: var(--err);
 }
 .agc-node-lead-btn:hover .agc-corner-bg--lead {
   fill: var(--accent);
@@ -575,13 +575,13 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
   pointer-events: none;
 }
 .agc-corner-icon--remove {
-  fill: var(--danger, #d2453f);
+  fill: var(--err);
 }
 .agc-corner-icon--lead {
   fill: var(--accent);
 }
 .agc-node-remove:hover .agc-corner-icon--remove,
 .agc-node-lead-btn:hover .agc-corner-icon--lead {
-  fill: #fff;
+  fill: var(--accent-fg);
 }
 </style>

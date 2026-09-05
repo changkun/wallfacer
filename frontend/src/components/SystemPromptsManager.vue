@@ -257,7 +257,7 @@ watch(
             >
               <div
                 v-if="loadError"
-                style="font-size: 11px; color: var(--color-error, #e53e3e); padding: 6px"
+                style="font-size: 11px; color: var(--err); padding: 6px"
               >
                 Error loading templates: {{ loadError }}
               </div>
@@ -275,7 +275,7 @@ watch(
                   padding: '5px 8px',
                   border: '1px solid ' + (currentName === tmpl.name ? 'var(--border)' : 'transparent'),
                   borderRadius: '5px',
-                  background: currentName === tmpl.name ? 'var(--bg-active, rgba(128,128,128,0.15))' : 'none',
+                  background: currentName === tmpl.name ? 'var(--bg-sunk)' : 'none',
                   cursor: 'pointer',
                   fontSize: '12px',
                   color: 'var(--text-secondary)',
@@ -289,8 +289,8 @@ watch(
                     height: '6px',
                     borderRadius: '50%',
                     flexShrink: 0,
-                    background: tmpl.has_override ? 'var(--accent, #c45a33)' : 'transparent',
-                    border: '1px solid ' + (tmpl.has_override ? 'var(--accent, #c45a33)' : 'var(--border, #ccc)'),
+                    background: tmpl.has_override ? 'var(--accent)' : 'transparent',
+                    border: '1px solid ' + (tmpl.has_override ? 'var(--accent)' : 'var(--rule-2)'),
                   }"
                 ></span>
                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ decorateName(tmpl.name) }}</span>
@@ -392,7 +392,7 @@ watch(
                 <span
                   :style="{
                     fontSize: '12px',
-                    color: statusIsError ? 'var(--color-error, #e53e3e)' : 'var(--text-muted)',
+                    color: statusIsError ? 'var(--err)' : 'var(--text-muted)',
                     marginLeft: 'auto',
                     minHeight: '1em',
                   }"

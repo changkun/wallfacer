@@ -327,8 +327,28 @@ SCENES['settings'] = async (page) => {
   }
 };
 
-// plan and settings have their own scenes above; the smoke covers the rest.
-const SMOKE_ROUTES = { analytics: '/analytics', agents: '/agents', flows: '/flows' };
+// Agent fleets (specs/shared/console-redesign/agent-graph.md): a 280px list
+// column, nodes drawn at the card radius, and the editor dialog inside the
+// main card when an agent is opened.
+SCENES['agents'] = async (page) => {
+  await page.goto(base + '/agent-graph', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(900);
+  const rail = await firstBox(page, '.ag-mode__rail');
+  expect('agents', rail && Math.abs(rail.width - 280) <= 1, `list column ${rail && rail.width}, want 280`);
+  const rx = await page.$$eval('.agc-node--agent .agc-node-box', (els) => els.map((e) => e.getAttribute('rx')));
+  expect('agents', rx.length > 0 && rx.every((r) => r === '14'), `node radii: ${[...new Set(rx)].join(',')}`);
+  const card = await page.$('.ag-card');
+  if (card) {
+    await card.dblclick();
+    await page.waitForSelector('.ag-agent-modal__panel', { timeout: 5000 }).catch(() => {});
+    const panel = await firstBox(page, '.ag-agent-modal__panel');
+    const main = await firstBox(page, '.app-main');
+    expect('agents', panel && main && panel.left >= main.left && panel.right <= main.right + 1, 'agent editor dialog outside the main card');
+  }
+};
+
+// Routes without a scene of their own yet get the smoke.
+const SMOKE_ROUTES = { analytics: '/analytics', flows: '/flows' };
 for (const [name, route] of Object.entries(SMOKE_ROUTES)) {
   SCENES[name] = async (page) => {
     await page.goto(base + route, { waitUntil: 'load', timeout: 20000 });

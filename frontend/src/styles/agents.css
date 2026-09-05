@@ -1,148 +1,77 @@
-/* Agent editor detail pane. Tokens match the rest of the Wallfacer UI
- * (paper-ink palette, clay accent); rendered by AgentEditor.vue. The
- * former /agents split-pane shell is gone; /agent-graph superseded it. */
-
+/* Agent editor: the dialog body. Labels are eyebrows, controls are fields,
+   the harness is a segmented control, buttons are the primitives. */
 .agents-detail__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-5);
-  padding-bottom: var(--sp-4);
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--rule);
 }
 .agents-detail__title {
-  margin: 0 0 var(--sp-1);
-  font-family: var(--font-display);
+  margin: 0 0 6px;
   font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--ink);
 }
 .agents-detail__subtitle {
-  font-size: var(--fs-10);
-  color: var(--ink-3);
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: 8px;
 }
 .agents-detail__subtitle code {
-  font-family: var(--font-mono);
-  font-size: var(--fs-10);
-  padding: 1px var(--sp-2);
-  background: var(--bg-sunk);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--ink-2);
-}
-.agents-detail__badge {
-  font-size: var(--fs-9);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px var(--sp-2);
-  background: var(--tint-neutral);
-  color: var(--tint-neutral-ink);
-  border-radius: var(--r-sm);
-}
-.agents-detail__badge--user {
-  background: var(--tint-plum);
-  color: var(--tint-plum-ink);
-}
-
-.agents-detail__actions {
-  display: flex;
-  gap: var(--sp-3);
-  flex-shrink: 0;
-}
-
-.agents-detail__btn-primary,
-.agents-detail__btn-ghost,
-.agents-detail__btn-danger {
-  font-family: inherit;
-  font-size: var(--fs-base);
-  padding: var(--sp-2) var(--sp-4);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  border: 1px solid var(--rule);
-  background: var(--bg-card);
-  color: var(--ink);
-  transition:
-    background 0.1s ease,
-    border-color 0.1s ease;
-}
-.agents-detail__btn-primary {
-  background: var(--accent);
-  color: var(--bg-card);
-  border-color: var(--accent);
-  font-weight: 500;
-}
-.agents-detail__btn-primary:hover {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
-}
-.agents-detail__btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.agents-detail__btn-ghost:hover {
-  background: var(--bg-hover);
-  border-color: var(--rule-2);
-}
-.agents-detail__btn-danger {
+  font: 400 var(--fs-10) / 1 var(--font-mono);
   color: var(--ink-3);
 }
-.agents-detail__btn-danger:hover {
-  color: var(--err);
-  border-color: var(--err);
-  background: var(--bg-card);
+.agents-detail__actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
 }
 
 /* Read-only detail body */
-
 .agents-detail__body {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: 8px;
 }
 .agents-detail__kv {
   display: grid;
   grid-template-columns: 140px 1fr;
-  gap: var(--sp-5);
+  gap: 16px;
   font-size: var(--fs-base);
-  padding: var(--sp-2) 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--rule);
   align-items: baseline;
 }
+.agents-detail__kv:first-child {
+  border-top: none;
+}
 .agents-detail__kv-key {
-  color: var(--ink-3);
-  font-weight: 500;
-  font-size: var(--fs-10);
+  font: 600 var(--fs-9) / 1.4 var(--font-mono);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--ink-3);
 }
 .agents-detail__kv-value {
   color: var(--ink);
   word-break: break-word;
 }
-
 .agents-detail__section {
-  margin-top: var(--sp-4);
+  margin-top: 12px;
 }
 .agents-detail__section-label {
-  font-size: var(--fs-10);
-  color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--sp-2);
-  font-weight: 500;
+  margin-bottom: 6px;
 }
 .agents-detail__tmpl {
   font-family: var(--font-mono);
-  font-size: var(--fs-10);
+  font-size: 12px;
   line-height: 1.55;
-  padding: var(--sp-4);
+  padding: 12px 14px;
   background: var(--bg-sunk);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 420px;
@@ -157,115 +86,48 @@
 }
 
 /* Editor */
-
 .agents-detail__editor {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  gap: 14px;
 }
 .agents-detail__field {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: 4px;
 }
 .agents-detail__field--check {
   flex-direction: row;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-1) 0;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--fs-base);
 }
-.agents-detail__field-label {
-  font-size: var(--fs-10);
-  color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 500;
+.agents-detail__field--check input {
+  accent-color: var(--accent);
 }
 .agents-detail__field-hint {
-  font-size: var(--fs-10);
-  color: var(--ink-4);
+  font-size: 12px;
+  color: var(--ink-3);
   line-height: 1.5;
 }
-.agents-detail__editor input[type="text"],
-.agents-detail__editor textarea,
-.agents-detail__editor select {
-  font-family: inherit;
-  font-size: var(--fs-base);
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-card);
-  color: var(--ink);
-  transition:
-    border-color 0.1s ease,
-    box-shadow 0.1s ease;
-}
-.agents-detail__editor input[type="text"]:focus,
-.agents-detail__editor textarea:focus,
-.agents-detail__editor select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-tint);
-}
-.agents-detail__editor input[type="text"]:disabled {
-  background: var(--bg-sunk);
-  color: var(--ink-3);
-  cursor: not-allowed;
-}
 .agents-detail__editor textarea[name="prompt_tmpl"] {
-  font-family: var(--font-mono);
-  font-size: var(--fs-base);
   line-height: 1.55;
   resize: vertical;
   min-height: 260px;
-  background: var(--bg-sunk);
 }
-
-/* Harness segmented control */
-
 .agents-detail__segment {
-  display: inline-flex;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--bg-card);
   align-self: flex-start;
 }
-.agents-detail__segment-btn {
-  font-family: inherit;
-  font-size: var(--fs-base);
-  padding: var(--sp-2) var(--sp-5);
-  background: transparent;
-  border: none;
-  border-right: 1px solid var(--rule);
-  color: var(--ink-3);
-  cursor: pointer;
-  transition:
-    background 0.1s ease,
-    color 0.1s ease;
-}
-.agents-detail__segment-btn:last-child {
-  border-right: none;
-}
-.agents-detail__segment-btn:hover {
-  background: var(--bg-hover);
-  color: var(--ink);
-}
-.agents-detail__segment-btn--active,
-.agents-detail__segment-btn--active:hover {
-  background: var(--accent);
-  color: var(--bg-card);
-}
-
 .agents-detail__checks {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: 6px;
 }
 .agents-detail__check {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: 8px;
   font-size: var(--fs-base);
   color: var(--ink);
   cursor: pointer;
@@ -274,25 +136,21 @@
   accent-color: var(--accent);
 }
 .agents-detail__check span {
-  font-family: var(--font-mono);
-  font-size: var(--fs-10);
+  font: 500 var(--fs-10) / 1.4 var(--font-mono);
   color: var(--ink-2);
 }
-
 .agents-detail__editor-err {
-  font-size: var(--fs-base);
+  font-size: 12px;
   color: var(--err);
   background: var(--tint-red);
-  border: 1px solid var(--tint-red);
   border-radius: var(--r-sm);
-  padding: var(--sp-2) var(--sp-3);
+  padding: 6px 10px;
   margin: 0;
 }
-
 .agents-detail__editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--sp-3);
-  padding-top: var(--sp-4);
+  gap: 6px;
+  padding-top: 12px;
   border-top: 1px solid var(--rule);
 }
