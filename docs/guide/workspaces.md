@@ -21,7 +21,7 @@ When the startup migration finds task history on disk that no longer matches any
 
 ### Switching
 
-The switcher at the top of the sidebar lists every workspace. The active one is marked; rows show running and waiting task badges so workspaces with live work stand out. Click a row to switch: the board, streams, and stores swap over within a few seconds. Tasks in the previous workspace keep running in the background.
+The workspace chip at the top of the sidebar names the active workspace and shows its connection state; open it to list every workspace. The active one is marked; rows show running and waiting task counts so workspaces with live work stand out. Click a row to switch: the board, streams, and stores swap over within a few seconds. Tasks in the previous workspace keep running in the background. The chip also lists the workspace's branches with Sync, Push, and Rebase actions.
 
 ### Creating
 

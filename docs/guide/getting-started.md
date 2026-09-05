@@ -61,7 +61,7 @@ Sign-in is available but never required; the board is fully functional anonymous
 - The GitHub connection, borrowed from the latere.ai account, which enables opening pull requests from the board.
 - Identity attribution on tasks and events, plus organization switching.
 
-To sign in, open the account menu at the bottom of the sidebar and choose **Sign in via latere.ai**. A modal shows a short device code and a verification URL; confirm the code in the browser and the session completes automatically. Where the device flow is unavailable, the UI falls back to a browser redirect through `/login`. On headless machines, run `wallfacer auth login` instead; the token is stored at the shared latere location and carries over to the web UI.
+To sign in, open the account menu at the bottom of the sidebar (below Docs and Settings) and choose **Sign in via latere.ai**. A modal shows a short device code and a verification URL; confirm the code in the browser and the session completes automatically. Where the device flow is unavailable, the UI falls back to a browser redirect through `/login`. On headless machines, run `wallfacer auth login` instead; the token is stored at the shared latere location and carries over to the web UI.
 
 ## First task, end to end
 

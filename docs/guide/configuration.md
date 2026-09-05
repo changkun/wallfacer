@@ -4,7 +4,7 @@ Wallfacer is configured through the Settings page, environment variables in `~/.
 
 ## Settings page
 
-Open Settings from the sidebar gear icon or press `Cmd+,` (or `Ctrl+,`). The page has five tabs.
+Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The page has five tabs.
 
 ### Execution tab
 
@@ -251,9 +251,9 @@ Press `?` anywhere to open this reference in the app. Shortcuts without modifier
 |---|---|
 | `Cmd+K` / `Ctrl+K` | Command palette (tasks, specs, docs) |
 | `Cmd+,` / `Ctrl+,` | Open Settings |
-| `` Ctrl+` `` | Toggle terminal panel |
+| `` Ctrl+` `` | Toggle the terminal panel (also the terminal button at the right of the top bar) |
 | `/` | Focus search |
-| `?` | Show keyboard shortcuts |
+| `?` | Show keyboard shortcuts (also the keyboard button at the right of the top bar) |
 | `n` | New task |
 | `e` | Toggle file explorer |
 | `p` | Switch to Plan mode |
