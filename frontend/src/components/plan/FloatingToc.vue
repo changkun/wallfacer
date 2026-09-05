@@ -149,8 +149,9 @@ function jumpTo(ev: Event, id: string) {
   color: var(--ink-3);
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 4px;
-  opacity: 0.85;
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-card);
+  opacity: 0.9;
   pointer-events: auto;
   z-index: 2;
 }
@@ -165,10 +166,9 @@ function jumpTo(ev: Event, id: string) {
 }
 
 .floating-toc__title {
-  font-weight: 600;
-  font-size: 10px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--tracking-label);
   color: var(--ink-3);
 }
 
@@ -180,9 +180,9 @@ function jumpTo(ev: Event, id: string) {
   font-size: 13px;
   line-height: 1;
   padding: 0 2px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
 }
-.floating-toc__collapse:hover { color: var(--ink); background: var(--bg-hover); }
+.floating-toc__collapse:hover { color: var(--ink); background: var(--bg-sunk); }
 
 /* Collapsed tab: same top-right anchor as the panel, shrunk to an icon. */
 .floating-toc__reveal {
@@ -198,9 +198,9 @@ function jumpTo(ev: Event, id: string) {
   color: var(--ink-3);
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  opacity: 0.85;
+  opacity: 0.9;
   z-index: 2;
 }
 .floating-toc__reveal:hover { opacity: 1; color: var(--ink); }
@@ -224,7 +224,7 @@ function jumpTo(ev: Event, id: string) {
 .floating-toc__entry:hover { color: var(--ink); }
 
 .floating-toc__entry--active {
-  color: var(--ink);
+  color: var(--accent);
   font-weight: 500;
 }
 

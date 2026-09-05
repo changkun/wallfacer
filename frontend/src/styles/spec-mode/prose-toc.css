@@ -98,7 +98,7 @@
   font-family: var(--font-mono);
   font-size: 0.9em;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
 }
 .prose-content pre {
   background: var(--bg-sunk);
@@ -166,7 +166,7 @@
 
 .prose-content img {
   max-width: 100%;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
 }
 
 .prose-content hr {

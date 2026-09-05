@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { specStatusTone } from '../../lib/specStatus';
 import { storeToRefs } from 'pinia';
 import { api } from '../../api/client';
 import { useAgentStore } from '../../stores/agentSession';
@@ -134,15 +135,6 @@ function persistExpanded() {
   localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expandedPaths.value]));
 }
 
-const STATUS_ICONS: Record<string, string> = {
-  complete: '✅',
-  testing: '🧪',
-  validated: '✔',
-  drafted: '📝',
-  vague: '💭',
-  stale: '⚠️',
-  archived: '📦',
-};
 
 // ── Filtering ──────────────────────────────────────────────────────
 
@@ -493,7 +485,7 @@ onUnmounted(() => {
         />
         <button
           type="button"
-          class="stp-collapse"
+          class="icon-btn sm stp-collapse"
           title="Collapse spec tree"
           aria-label="Collapse spec tree"
           @click="emit('collapse')"
@@ -509,7 +501,7 @@ onUnmounted(() => {
       </label>
       <button
         type="button"
-        class="stp-rescan"
+        class="btn sm ghost stp-rescan"
         :disabled="rescanning"
         title="Rescan completed specs for code drift in their affects files"
         @click="onRescanStaleness"
@@ -517,7 +509,7 @@ onUnmounted(() => {
       <button
         v-if="staleCandidateCount > 0"
         type="button"
-        class="stp-rescan"
+        class="btn sm ghost stp-rescan"
         :disabled="rescanning"
         title="Mark all flagged specs reviewed (bumps their updated date; status unchanged)"
         @click="onDismissAllStaleness"
@@ -532,13 +524,13 @@ onUnmounted(() => {
       <div class="stp-migrate-actions">
         <button
           type="button"
-          class="stp-migrate-adopt"
+          class="btn sm stp-migrate-adopt"
           :disabled="migratePending"
           @click="adoptDocNodes"
         >{{ migratePending ? 'Adopting…' : 'Adopt frontmatter' }}</button>
         <button
           type="button"
-          class="stp-migrate-dismiss"
+          class="icon-btn sm stp-migrate-dismiss"
           title="Dismiss"
           aria-label="Dismiss"
           @click="dismissMigrate"
@@ -558,7 +550,7 @@ onUnmounted(() => {
           @keydown.space.prevent="toggleTaskPromptsExpanded"
         >
           <span class="stp-chev" :class="{ open: taskPromptsExpanded }" />
-          <span class="stp-task-prompts-label">Task Prompts</span>
+          <span class="eyebrow stp-task-prompts-label">Task prompts</span>
           <button
             type="button"
             class="stp-task-prompts-waiting"
@@ -599,17 +591,17 @@ onUnmounted(() => {
           @keydown.enter.prevent="selectIndex"
           @keydown.space.prevent="selectIndex"
         >
-          <span class="stp-pinned-icon">📋</span> Roadmap
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Roadmap
         </div>
 
         <template v-for="group in renderedGroups" :key="group.key">
           <div v-if="group.showHeader" class="stp-group-header" :title="group.key">
-            <span class="stp-group-icon">📁</span>{{ group.label }}
+{{ group.label }}
           </div>
           <div v-for="track in group.tracks" :key="track.key" class="stp-track">
             <div class="stp-track-header" @click="toggleTrack(track.key)">
               <span class="stp-chev" :class="{ open: track.expanded }" />
-              <span class="stp-track-name">{{ track.name }}</span>
+              <span class="eyebrow stp-track-name">{{ track.name }}</span>
             </div>
             <template v-if="track.expanded">
               <div
@@ -642,7 +634,7 @@ onUnmounted(() => {
                   @click.stop
                   @change="onCheckboxChange($event, rn.node)"
                 />
-                <span class="stp-icon">{{ rn.node.spec?.doc ? '📄' : (STATUS_ICONS[rn.node.spec?.status ?? ''] ?? '') }}</span>
+                <span class="stp-dot" :class="'stp-dot--' + specStatusTone(rn.node.spec?.status, !!rn.node.spec?.doc)" :title="rn.node.spec?.doc ? 'no frontmatter' : (rn.node.spec?.status ?? '')" />
                 <span class="stp-title">{{ rn.node.spec?.title || rn.node.path }}</span>
                 <span
                   v-if="staleCandidates[rn.node.path]"
@@ -665,7 +657,7 @@ onUnmounted(() => {
     <div v-if="selectedPaths.size > 0" class="stp-dispatch-bar">
       <button
         type="button"
-        class="stp-dispatch-btn"
+        class="btn block stp-dispatch-btn"
         :disabled="dispatchPending"
         @click="dispatchSelected"
       >
@@ -676,33 +668,31 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* The spec tree: a sunk column of nav rows. A row is the rail's row (34px,
+   radius 12), the focused one sits on the card surface, and a 5px ramp dot
+   carries the lifecycle status. See specs/shared/console-redesign/plan.md. */
 .spec-tree-panel {
-  /* Width is driven by PlanPage's resize splitter via --stp-width; falls
-     back to the default when unset. */
   width: var(--stp-width, 280px);
   min-width: 200px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--rule);
-  background: var(--bg-card);
+  background: var(--bg-sunk);
   overflow: hidden;
 }
-
 .stp-toolbar {
-  padding: 8px;
+  padding: 10px 8px 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-bottom: 1px solid var(--rule);
 }
-
 .stp-head {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-/* Status filter fills the row; the collapse button sits at the end (same line). */
 .stp-head .stp-status {
   flex: 1;
   min-width: 0;
@@ -710,273 +700,200 @@ onUnmounted(() => {
 .stp-head .stp-collapse {
   flex: none;
 }
-
-.stp-head .stp-search {
-  flex: 1;
-  min-width: 0;
-}
-
-.stp-collapse {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.stp-collapse:hover {
-  color: var(--accent);
-  background: var(--bg-hover);
-}
-
-.stp-search,
 .stp-status :deep(.app-select__trigger) {
-  font-size: 12px;
-  padding: 5px 8px;
+  min-height: 32px;
+  font-size: var(--fs-base);
+  padding: 4px 10px;
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg);
+  border-radius: var(--r-md);
+  background: var(--bg-card);
   color: var(--ink);
-}
-
-.stp-status :deep(.app-select__trigger) {
   cursor: pointer;
 }
-
-.stp-search:focus,
 .stp-status :deep(.app-select__trigger:focus-visible) {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
-
 .stp-archived-toggle {
-  font-size: 11px;
+  font-size: var(--fs-10);
   color: var(--ink-3);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  padding: 0 2px;
   cursor: pointer;
 }
-
+.stp-archived-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
 .stp-rescan {
-  font-size: 11px;
-  color: var(--ink-3);
-  background: transparent;
-  border: 1px solid var(--line-2);
-  border-radius: 4px;
-  padding: 2px 7px;
-  cursor: pointer;
+  align-self: flex-start;
 }
-
-.stp-rescan:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .stp-stale-candidate {
-  font-size: 10px;
-  color: var(--tint-amber-ink);
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--warn);
   background: var(--tint-amber);
-  border-radius: 4px;
-  padding: 0 5px;
+  border-radius: var(--r-pill);
+  padding: 0 7px;
   white-space: nowrap;
 }
-
 .stp-migrate-banner {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  font-size: 11px;
+  margin: 8px;
+  padding: 8px 10px;
+  font-size: var(--fs-10);
   color: var(--ink-2);
-  background: var(--bg-2);
-  border-bottom: 1px solid var(--rule);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
 }
-
 .stp-migrate-text {
   flex: 1;
   line-height: 1.4;
 }
-
 .stp-migrate-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
 }
-
-.stp-migrate-adopt {
-  font-size: 11px;
-  padding: 4px 8px;
-  border: 1px solid var(--accent);
-  border-radius: var(--r-sm);
-  background: var(--accent);
-  color: var(--on-accent, #fff);
-  cursor: pointer;
-}
-
-.stp-migrate-adopt:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.stp-migrate-dismiss {
-  font-size: 12px;
-  line-height: 1;
-  padding: 4px 6px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
 .stp-body {
   flex: 1;
   overflow-y: auto;
-  font-size: 12px;
+  padding: 6px 6px 12px;
+  font-size: var(--fs-base);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
-
 .stp-empty {
   padding: 16px 12px;
   color: var(--ink-4);
   text-align: center;
   font-size: 12px;
 }
-
-.stp-pinned {
-  padding: 8px 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border-bottom: 1px solid var(--rule);
+.stp-pinned,
+.stp-node,
+.stp-task-prompt-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.35;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
-
-.stp-pinned:hover {
-  background: var(--bg-hover);
+.stp-pinned:hover,
+.stp-node:hover,
+.stp-task-prompt-item:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
 }
-
-.stp-pinned--focused {
-  background: var(--bg-active);
+.stp-pinned--focused,
+.stp-node--focused,
+.stp-task-prompt-item--focused {
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--sh-card);
 }
-
-.stp-pinned-icon {
-  font-size: 13px;
+.stp-pinned {
+  margin-bottom: 4px;
 }
-
-/* Folder group header — shown only when the workspace spans multiple folders
-   that each have specs/, separating one folder's spec tree from the next. */
+.stp-pinned svg {
+  color: var(--ink-3);
+  flex: none;
+}
 .stp-group-header {
-  padding: 8px 10px 4px;
-  font-weight: 700;
-  font-size: 11px;
+  padding: 12px 10px 4px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
   color: var(--ink-2);
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 6px;
   border-top: 1px solid var(--rule);
-  background: var(--bg-2, var(--bg-card));
 }
-.stp-group-icon {
-  font-size: 12px;
-}
-
 .stp-track-header {
-  padding: 6px 10px;
-  cursor: pointer;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10px;
-  color: var(--ink-3);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.stp-track-header:hover {
-  background: var(--bg-hover);
-}
-
-.stp-track-name {
-  flex: 1;
-}
-
-.stp-node {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  min-height: 28px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  line-height: 1.4;
+  margin-top: 6px;
 }
-
-.stp-node:hover {
-  background: var(--bg-hover);
+.stp-track-header:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
-
-.stp-node--focused {
-  background: var(--bg-active);
+.stp-track-name {
+  flex: 1;
+  letter-spacing: 0.12em;
 }
-
 .stp-node--archived {
   opacity: 0.55;
 }
-
-/* Doc nodes are free-form, frontmatter-less files: render-only, slightly
-   muted to signal they have no lifecycle status. */
 .stp-node--doc .stp-title {
   font-style: italic;
   color: var(--ink-2);
 }
-
 .stp-chev,
 .stp-chev-spacer {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
-
-/* Crisp chevron drawn via an SVG mask in currentColor. The old unicode glyph
-   (▸ at 10px) rasterised blurry and read as low quality at any colour. */
+/* Crisp chevron drawn via an SVG mask in currentColor. */
 .stp-chev {
   background-color: var(--ink-3);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition: transform 0.15s var(--ease-fluid), background-color var(--dur-hover);
 }
-
 .stp-chev:hover {
   background-color: var(--ink);
 }
-
 .stp-chev.open {
   transform: rotate(90deg);
   background-color: var(--ink-2);
 }
-
 .stp-checkbox {
   margin-right: 2px;
   flex-shrink: 0;
+  accent-color: var(--accent);
 }
-
-.stp-icon {
-  flex-shrink: 0;
-  font-size: 11px;
-  width: 14px;
-  text-align: center;
+/* The status dot: one ramp colour per lifecycle status. */
+.stp-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-4);
 }
-
+.stp-dot--neutral { background: var(--ink-3); }
+.stp-dot--run { background: var(--run); }
+.stp-dot--warn { background: var(--warn); }
+.stp-dot--ok { background: var(--ok); }
+.stp-dot--err { background: var(--err); }
+.stp-dot--muted { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-4); }
 .stp-title {
   flex: 1;
   min-width: 0;
@@ -984,89 +901,61 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .stp-progress {
   flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font: 500 var(--fs-10) / 1 var(--font-mono);
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
-
 .stp-task-prompts {
   border-bottom: 1px solid var(--rule);
-  padding-bottom: 4px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
 }
-
 .stp-task-prompts-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
+  min-height: 28px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   user-select: none;
 }
-
 .stp-task-prompts-header:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
-
 .stp-task-prompts-label {
   flex: 1;
+  letter-spacing: 0.12em;
 }
-
 .stp-task-prompts-waiting {
   background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  font-size: 9px;
-  font-weight: 700;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-xs);
+  font: 700 var(--fs-9) / 1 var(--font-mono);
   width: 18px;
   height: 16px;
   cursor: pointer;
   color: var(--ink-3);
   padding: 0;
-  font-family: var(--font-mono);
 }
-
 .stp-task-prompts-waiting:hover { color: var(--ink); }
-
 .stp-task-prompts-waiting.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
   border-color: var(--accent);
 }
-
 .stp-task-prompts-empty {
   padding: 6px 14px;
   color: var(--ink-4);
-  font-size: 11px;
+  font-size: var(--fs-10);
   font-style: italic;
 }
-
 .stp-task-prompt-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   width: 100%;
-  padding: 4px 10px 4px 26px;
-  font-size: 12px;
-  background: transparent;
-  border: none;
-  color: var(--ink-2);
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
+  padding-left: 26px;
 }
-
-.stp-task-prompt-item:hover { background: var(--bg-hover); }
-
-.stp-task-prompt-item--focused { background: var(--bg-active); color: var(--ink); }
-
 .stp-task-prompt-status {
   width: 6px;
   height: 6px;
@@ -1074,10 +963,8 @@ onUnmounted(() => {
   background: var(--ink-4);
   flex-shrink: 0;
 }
-
-.stp-task-prompt-status--backlog { background: #8e8a80; }
-.stp-task-prompt-status--waiting { background: #c87b1c; }
-
+.stp-task-prompt-status--backlog { background: var(--col-backlog); }
+.stp-task-prompt-status--waiting { background: var(--warn); }
 .stp-task-prompt-title {
   flex: 1;
   min-width: 0;
@@ -1085,26 +972,8 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .stp-dispatch-bar {
   padding: 8px;
   border-top: 1px solid var(--rule);
-}
-
-.stp-dispatch-btn {
-  width: 100%;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-}
-
-.stp-dispatch-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

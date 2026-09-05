@@ -274,9 +274,36 @@ SCENES['chat'] = async (page) => {
   expect('chat', win && win.left >= 0 && win.top >= 0 && win.right <= vw + 1 && win.bottom <= vh + 1, 'chat popup outside the viewport');
 };
 
+// The plan surface (specs/shared/console-redesign/plan.md): tree rows on the
+// nav-row geometry, a reading column no wider than 76ch, the tree folds to a
+// 28px strip, and the focused view's status is a pill.
+SCENES['plan'] = async (page) => {
+  await page.goto(base + '/plan', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(900);
+  // Tracks start folded; open the first one to get spec rows.
+  await page.click('.stp-track-header', { timeout: 5000 }).catch(() => {});
+  await page.waitForSelector('.stp-node', { timeout: 5000 }).catch(() => {});
+  const rows = await boxes(page, '.stp-node');
+  expect('plan', rows.length > 0, 'spec tree rendered no rows');
+  expect('plan', rows.every((r) => Math.abs(r.height - 34) <= 1), `tree row heights: ${[...new Set(rows.map((r) => Math.round(r.height)))].join(',')}`);
+  await page.click('.stp-node', { timeout: 5000 }).catch(() => {});
+  await page.waitForSelector('.sf-content--spec', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const pill = await page.$('.sf-status.pill');
+  expect('plan', !!pill, 'focused view status is not a pill');
+  const col = await firstBox(page, '.sf-content--spec');
+  const ch = await page.$eval('.sf-content--spec', (el) => parseFloat(getComputedStyle(el).fontSize));
+  expect('plan', col && col.width <= 76 * ch * 0.62 + 40, `reading column ${col && Math.round(col.width)}px wider than 76ch`);
+  await page.click('.stp-collapse', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  const rail = await firstBox(page, '.spec-tree-rail');
+  expect('plan', rail && Math.abs(rail.width - 28) <= 1, `collapsed rail width ${rail && rail.width}, want 28`);
+};
+
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
-const SMOKE_ROUTES = { settings: '/settings', plan: '/plan', analytics: '/analytics', agents: '/agents', flows: '/flows' };
+// plan has its own scene above; the smoke covers the routes without one yet.
+const SMOKE_ROUTES = { settings: '/settings', analytics: '/analytics', agents: '/agents', flows: '/flows' };
 for (const [name, route] of Object.entries(SMOKE_ROUTES)) {
   SCENES[name] = async (page) => {
     await page.goto(base + route, { waitUntil: 'load', timeout: 20000 });

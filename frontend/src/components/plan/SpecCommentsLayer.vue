@@ -728,24 +728,24 @@ defineExpose({ openCount, showResolved, available });
   gap: 0.75rem;
   margin: 0 0 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  border-radius: var(--r-md);
+  font-size: 12.5px;
   line-height: 1.4;
 }
 .sc-banner--optin {
-  background: var(--color-surface-2, #f3f4f6);
-  border: 1px solid var(--color-border, #d1d5db);
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
 }
 .sc-banner--warn {
-  background: color-mix(in srgb, #f59e0b 12%, transparent);
-  border: 1px solid color-mix(in srgb, #f59e0b 45%, transparent);
+  background: var(--tint-amber);
+  color: var(--warn);
 }
 .sc-banner span { flex: 1; }
 .sc-banner-link {
   background: none;
   border: none;
   padding: 0;
-  color: var(--color-accent, #2563eb);
+  color: var(--accent);
   cursor: pointer;
   font: inherit;
   text-decoration: underline;
@@ -753,13 +753,13 @@ defineExpose({ openCount, showResolved, available });
 /* Connection indicator: muted by default, amber while connecting, green synced. */
 .sc-conn {
   margin-left: auto;
-  font-size: 0.72rem;
-  color: var(--color-text-muted, #9ca3af);
+  font: 500 var(--fs-9) / 1 var(--font-mono);
+  color: var(--ink-4);
 }
-.sc-conn--connected { color: #16a34a; }
-.sc-conn--connecting { color: #d97706; }
+.sc-conn--connected { color: var(--ok); }
+.sc-conn--connecting { color: var(--warn); }
 .sc-conn--opted-out,
-.sc-conn--signed-out { color: var(--color-text-muted, #9ca3af); }
+.sc-conn--signed-out { color: var(--ink-4); }
 
 /* Header strip sits at the top of the body, before the prose (order lifts it
    above the content in the flex-column host; banners sit above it at order:-2). */
@@ -778,17 +778,18 @@ defineExpose({ openCount, showResolved, available });
   align-items: center;
   gap: 4px;
   padding: 2px 9px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--accent) 14%, var(--bg-card));
-  border: 1px solid color-mix(in oklab, var(--accent) 35%, var(--rule));
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
   color: var(--accent);
-  font-weight: 600;
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .sc-count--zero {
-  background: var(--bg-card);
-  border-color: var(--rule);
-  color: var(--ink-3);
-  font-weight: 500;
+  background: var(--tint-neutral);
+  border-color: var(--rule-2);
+  color: var(--ink-2);
 }
 .sc-toggle {
   display: inline-flex;
@@ -799,27 +800,28 @@ defineExpose({ openCount, showResolved, available });
 }
 .sc-toggle input { cursor: pointer; }
 .sc-fold {
-  padding: 2px 8px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-card);
-  color: var(--ink-3);
-  font-size: 11px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  font: 500 var(--fs-10) / 1 var(--font-sans);
   cursor: pointer;
 }
-.sc-fold:hover { background: var(--bg-hover); color: var(--ink-2); }
+.sc-fold:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
 .sc-triage-btn {
   margin-left: auto;
-  padding: 3px 10px;
-  border: 1px solid color-mix(in oklab, var(--warn) 40%, var(--rule));
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--warn) 12%, var(--bg-card));
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--tint-amber);
   color: var(--warn);
-  font-size: 11px;
-  font-weight: 500;
+  font: 600 var(--fs-10) / 1 var(--font-sans);
   cursor: pointer;
 }
-.sc-triage-btn:hover { filter: brightness(0.96); }
+.sc-triage-btn:hover { border-color: var(--warn); }
 
 /* Markers float in the left gutter of the scrolling body. The body content has
    max-width: 52em so this gutter sits to its left without overlapping prose. */
@@ -838,19 +840,20 @@ defineExpose({ openCount, showResolved, available });
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 1px 5px 1px 4px;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  background: var(--bg-card);
+  min-height: 18px;
+  padding: 1px 6px 1px 4px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
   color: var(--accent);
   cursor: pointer;
   pointer-events: auto;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 .sc-marker:hover,
 .sc-marker--open {
   border-color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 12%, var(--bg-card));
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 .sc-marker--resolved { color: var(--ink-4); opacity: 0.7; }
 .sc-marker-n { font-size: 10px; font-weight: 600; }
@@ -867,16 +870,18 @@ defineExpose({ openCount, showResolved, available });
   z-index: 50;
 }
 .sc-float-btn {
-  padding: 5px 12px;
+  height: 26px;
+  padding: 0 12px;
   border: none;
-  border-radius: var(--r-md);
-  background: var(--accent);
-  color: #fff;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--sh-pop);
 }
+.sc-float-btn:hover { background: var(--accent); color: var(--accent-fg); }
 
 /* Popovers. */
 .sc-popover {
@@ -887,8 +892,8 @@ defineExpose({ openCount, showResolved, available });
 .sc-card--compose {
   z-index: 4;
   padding: 10px;
-  border-color: var(--accent);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  border-color: var(--accent-line);
+  box-shadow: var(--sh-pop);
 }
 .sc-card--compose .sc-quote { margin-top: 0; }
 .sc-popover--triage {
@@ -899,7 +904,7 @@ defineExpose({ openCount, showResolved, available });
   align-items: flex-start;
   justify-content: center;
   padding: 60px 16px 16px;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--glass-dim);
 }
 
 /* Margin comment rail: cards float in the right gutter of the scrolling body,
@@ -923,13 +928,13 @@ defineExpose({ openCount, showResolved, available });
   pointer-events: auto;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-card);
   transition: top 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 .sc-card--open {
-  border-color: var(--accent);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  border-color: var(--accent-line);
+  box-shadow: var(--sh-pop);
   z-index: 3;
 }
 .sc-card--resolved { opacity: 0.78; }
@@ -946,7 +951,7 @@ defineExpose({ openCount, showResolved, available });
   cursor: pointer;
   color: inherit;
 }
-.sc-card-collapsed:hover { background: var(--bg-hover); border-radius: var(--r-md); }
+.sc-card-collapsed:hover { background: var(--bg-sunk); border-radius: var(--r-lg); }
 .sc-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .sc-card-preview {
   color: var(--ink-2);
@@ -961,11 +966,10 @@ defineExpose({ openCount, showResolved, available });
   flex: none;
   align-self: center;
   padding: 0 6px;
-  border-radius: 999px;
-  background: var(--bg-sunk);
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 600;
+  border-radius: var(--r-pill);
+  background: var(--tint-neutral);
+  color: var(--ink-2);
+  font: 600 var(--fs-9) / 1.6 var(--font-mono);
 }
 
 .sc-card-open { display: flex; flex-direction: column; max-height: 60vh; }
@@ -979,8 +983,8 @@ defineExpose({ openCount, showResolved, available });
   overflow: hidden;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-lg, 14px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-pop);
 }
 .sc-thread-head {
   display: flex;
@@ -1023,7 +1027,7 @@ defineExpose({ openCount, showResolved, available });
   font-size: 10px;
   font-weight: 600;
 }
-.sc-avatar--me { background: var(--accent); color: #fff; }
+.sc-avatar--me { background: var(--accent-soft); color: var(--accent); }
 .sc-comment-main { flex: 1; min-width: 0; }
 .sc-comment-meta { font-size: 12px; margin-bottom: 2px; }
 .sc-author { color: var(--ink); font-weight: 600; }
@@ -1036,7 +1040,7 @@ defineExpose({ openCount, showResolved, available });
   font-size: 0.9em;
   background: var(--bg-sunk);
   padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
 }
 
 .sc-reply {
@@ -1069,26 +1073,27 @@ defineExpose({ openCount, showResolved, available });
 }
 .sc-textarea:focus-visible {
   outline: none;
-  border-color: color-mix(in oklab, var(--accent) 50%, var(--rule));
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .sc-actions { display: flex; gap: 8px; margin-top: 8px; }
 .sc-btn {
-  padding: 5px 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  background: var(--bg-card);
-  color: var(--ink-2);
-  font-size: 12px;
-  font-weight: 500;
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font: 500 var(--fs-10) / 1 var(--font-sans);
   cursor: pointer;
 }
-.sc-btn:hover:not(:disabled) { background: var(--bg-hover); }
-.sc-btn:disabled { opacity: 0.5; cursor: default; }
-.sc-btn--primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-.sc-btn--primary:hover:not(:disabled) { filter: brightness(0.96); background: var(--accent); }
-.sc-btn--ghost { background: transparent; }
-.sc-btn--sm { padding: 3px 9px; font-size: 11px; }
+.sc-btn:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+.sc-btn:disabled { opacity: 0.45; cursor: default; }
+.sc-btn--primary { background: var(--ink); color: var(--bg); border-color: transparent; font-weight: 600; }
+.sc-btn--primary:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); }
+.sc-btn--ghost { background: transparent; border-color: transparent; }
+.sc-btn--sm { height: 22px; padding: 0 9px; font-size: var(--fs-9); }
 
 /* Triage. */
 .sc-triage-hint {
@@ -1111,18 +1116,17 @@ defineExpose({ openCount, showResolved, available });
 }
 .sc-triage-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .sc-triage-status {
-  padding: 1px 7px;
-  border-radius: var(--r-sm);
-  font-size: 10px;
-  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.07em;
 }
 .sc-triage-status--orphaned {
   color: var(--warn);
-  background: color-mix(in oklab, var(--warn) 14%, var(--bg-card));
+  background: var(--tint-amber);
 }
-.sc-triage-status--outdated { color: var(--ink-4); background: var(--bg-sunk); }
+.sc-triage-status--outdated { color: var(--ink-3); background: var(--tint-neutral); }
 .sc-triage-spec {
   font-family: var(--font-mono);
   font-size: 11px;

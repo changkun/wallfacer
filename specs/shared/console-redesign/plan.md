@@ -1,6 +1,6 @@
 ---
 title: Plan
-status: drafted
+status: validated
 depends_on:
   - specs/shared/console-redesign/chat.md
 affects:

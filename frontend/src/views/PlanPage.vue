@@ -362,7 +362,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 }
 
 .plan-resize-handle:hover {
-  background: var(--rule);
+  background: var(--accent-line);
 }
 
 /* Collapsed rail: persistent left-edge strip that reopens the spec tree,
@@ -377,14 +377,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   padding: 9px 0;
   border: none;
   border-right: 1px solid var(--rule);
-  background: var(--bg-card);
+  background: var(--bg-sunk);
   color: var(--ink-3);
   cursor: pointer;
 }
 
 .spec-tree-rail:hover {
   color: var(--accent);
-  background: var(--bg-hover);
+  background: var(--accent-soft);
 }
 
 .spec-tree-rail__chevron {

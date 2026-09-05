@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
+import { specStatusPill } from '../../lib/specStatus';
 import { storeToRefs } from 'pinia';
 import { api, authHeaders, withAuthToken } from '../../api/client';
 import { renderMarkdown, renderMarkdownWithSourceLines } from '../../lib/markdown';
@@ -518,23 +519,23 @@ defineExpose({ dispatchFocused, breakdownFocused });
     <header class="sf-header">
       <div class="sf-chrome">
         <span class="sf-path">{{ displayPath }}</span>
-        <span v-if="status" class="sf-status" :class="'sf-status--' + status">{{ status }}</span>
+        <span v-if="status" class="pill sf-status" :class="specStatusPill(status)" data-role="status">{{ status }}</span>
         <span
           v-if="!focusedIsIndex && focusedSpecPath"
-          class="sf-kind"
+          class="pill pill-neutral sf-kind"
           :class="'sf-kind--' + (isLeaf ? 'impl' : 'design')"
         >{{ kindLabel }}</span>
         <span v-if="effort" class="sf-effort">{{ effort }}</span>
         <button
           v-if="dispatchedTaskId"
           type="button"
-          class="sf-dispatched-pill"
+          class="pill pill-brand sf-dispatched-pill"
           :title="`Linked task ${dispatchedTaskId} — click to open on board`"
           @click="openDispatchedTask"
         >→ task {{ dispatchedTaskId.slice(0, 8) }}</button>
         <a
           v-if="specPr"
-          class="sf-dispatched-pill"
+          class="pill pill-brand sf-dispatched-pill"
           :href="specPr.html_url"
           target="_blank"
           rel="noopener"
@@ -544,7 +545,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <button
           v-if="showUnstale"
           type="button"
-          class="sf-action"
+          class="btn sm ghost sf-action"
           :disabled="actionBusy"
           title="Move this spec back to drafted"
           @click="onUnstale"
@@ -552,7 +553,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <button
           v-if="canArchive"
           type="button"
-          class="sf-action"
+          class="btn sm ghost sf-action"
           :disabled="actionBusy"
           title="Archive this spec (hide from live graph)"
           @click="onArchive"
@@ -560,7 +561,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <button
           v-if="isArchived"
           type="button"
-          class="sf-action"
+          class="btn sm ghost sf-action"
           :disabled="actionBusy"
           title="Unarchive this spec"
           @click="onUnarchive"
@@ -568,14 +569,14 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <button
           v-if="showBreakdown"
           type="button"
-          class="sf-action"
+          class="btn sm ghost sf-action"
           :disabled="actionBusy"
           @click="onBreakdown"
         >Break Down</button>
         <button
           v-if="chatEnabled"
           type="button"
-          class="sf-action sf-chat-toggle"
+          class="btn sm ghost sf-action sf-chat-toggle"
           :class="{ 'sf-chat-toggle--folded': !chatVisible }"
           :aria-pressed="chatVisible"
           :title="chatVisible ? 'Hide chat pane (C)' : 'Show chat pane (C)'"
@@ -584,7 +585,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <button
           v-if="showValidate"
           type="button"
-          class="sf-action"
+          class="btn sm ghost sf-action"
           :disabled="actionBusy"
           title="Mark this spec validated (design settled, ready to execute)"
           @click="onValidate"
@@ -592,7 +593,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
         <button
           v-if="showDispatch"
           type="button"
-          class="sf-action sf-dispatch"
+          class="btn sm sf-action sf-dispatch"
           :disabled="actionBusy"
           @click="onDispatch"
         >Dispatch</button>
@@ -631,7 +632,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
     <div v-if="isArchived" class="sf-archived-banner" role="status">
       <span aria-hidden="true">⊘</span>
       <span>Archived — read-only. Hidden from the live graph and drift checks.</span>
-      <button type="button" class="sf-action" @click="onUnarchive">Unarchive</button>
+      <button type="button" class="btn sm ghost sf-action" @click="onUnarchive">Unarchive</button>
     </div>
 
     <div v-if="staleCandidate && !isArchived" class="sf-stale-banner" role="status">
@@ -644,13 +645,13 @@ defineExpose({ dispatchFocused, breakdownFocused });
       </span>
       <button
         type="button"
-        class="sf-action"
+        class="btn sm ghost sf-action"
         :disabled="actionBusy"
         @click="onStaleCandidateAction('stale')"
       >Mark Stale</button>
       <button
         type="button"
-        class="sf-action"
+        class="btn sm ghost sf-action"
         :disabled="actionBusy"
         @click="onStaleCandidateAction('dismiss-stale')"
       >Dismiss</button>
@@ -661,7 +662,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
       <span>Drift check needs attention: {{ testingPending }}</span>
       <button
         type="button"
-        class="sf-action"
+        class="btn sm ghost sf-action"
         :disabled="actionBusy"
         @click="onForceComplete"
       >Mark Complete Without Drift Check</button>
@@ -714,7 +715,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
     <div class="sf-toasts" role="status" aria-live="polite">
       <div v-for="t in toasts" :key="t.id" class="sf-toast">
         <span class="sf-toast-text">{{ t.text }}</span>
-        <button type="button" class="sf-action" @click="undoToast(t)">Undo</button>
+        <button type="button" class="btn sm ghost sf-action" @click="undoToast(t)">Undo</button>
         <button
           type="button"
           class="sf-toast-close"
@@ -729,8 +730,8 @@ defineExpose({ dispatchFocused, breakdownFocused });
 
 <style scoped>
 /* Focused-view crossfade (mirrors spec-mode.js _scheduleFocusedCrossfade). */
-.sf-crossfade-leave-active { transition: opacity 140ms cubic-bezier(0.3, 0, 0.8, 0.15); }
-.sf-crossfade-enter-active { transition: opacity 180ms cubic-bezier(0.2, 0, 0, 1); }
+.sf-crossfade-leave-active { transition: opacity 140ms ease-in; }
+.sf-crossfade-enter-active { transition: opacity 180ms var(--ease-fluid); }
 .sf-crossfade-enter-from,
 .sf-crossfade-leave-to { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
@@ -748,16 +749,17 @@ defineExpose({ dispatchFocused, breakdownFocused });
 }
 
 .sf-header {
-  padding: 12px 20px 8px;
+  padding: 14px 24px 12px;
   border-bottom: 1px solid var(--rule);
 }
 
 .sf-chrome {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: var(--fs-10);
   flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 
 .sf-path {
@@ -769,86 +771,13 @@ defineExpose({ dispatchFocused, breakdownFocused });
   min-width: 0;
 }
 
-.sf-status,
-.sf-kind {
-  padding: 2px 7px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg-card);
-  color: var(--ink-2);
-  font-weight: 500;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-/* Subtle filled tint per semantic colour — readable, less flat than a bare
-   outline. */
-.sf-status--validated,
-.sf-status--complete {
-  color: var(--ok);
-  border-color: color-mix(in oklab, var(--ok) 40%, var(--rule));
-  background: color-mix(in oklab, var(--ok) 12%, var(--bg-card));
-}
-.sf-status--drafted {
-  color: var(--info);
-  border-color: color-mix(in oklab, var(--info) 40%, var(--rule));
-  background: color-mix(in oklab, var(--info) 12%, var(--bg-card));
-}
-.sf-status--stale {
-  color: var(--warn);
-  border-color: color-mix(in oklab, var(--warn) 40%, var(--rule));
-  background: color-mix(in oklab, var(--warn) 12%, var(--bg-card));
-}
-.sf-status--archived { color: var(--ink-4); border-color: var(--ink-4); }
-.sf-status--vague { color: var(--ink-3); border-color: var(--ink-3); }
-
 .sf-effort {
-  font-family: var(--font-mono);
+  font: 500 var(--fs-10) / 1 var(--font-mono);
   color: var(--ink-3);
 }
 
 .sf-spacer {
   flex: 1;
-}
-
-.sf-action {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 5px 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  background: var(--bg-card);
-  color: var(--ink-2);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.sf-action:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: color-mix(in oklab, var(--accent) 35%, var(--rule));
-}
-
-.sf-action:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
-}
-
-.sf-action:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.sf-dispatch {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.sf-dispatch:hover:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
-  filter: brightness(0.96);
 }
 
 .sf-chat-toggle--folded {
@@ -859,17 +788,17 @@ defineExpose({ dispatchFocused, breakdownFocused });
   display: block;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 36px;
-  line-height: 1.1;
-  letter-spacing: -0.015em;
+  font-size: var(--fs-3xl);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   color: var(--ink);
-  max-width: 52em;
+  max-width: 76ch;
   word-break: break-word;
 }
 
 .sf-meta {
-  padding: 4px 20px 6px;
-  font-size: 11px;
+  padding: 6px 24px;
+  font: 400 var(--fs-10) / 1.4 var(--font-mono);
   color: var(--ink-3);
   border-bottom: 1px solid var(--rule);
 }
@@ -877,8 +806,8 @@ defineExpose({ dispatchFocused, breakdownFocused });
 .sf-relations {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 20px 8px;
+  gap: 6px;
+  padding: 8px 24px 10px;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -890,27 +819,27 @@ defineExpose({ dispatchFocused, breakdownFocused });
 }
 
 .sf-rel-label {
-  font-size: 10px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ink-4);
-  min-width: 5.5em;
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-3);
+  min-width: 6.5em;
 }
 
 .sf-rel-chip {
-  font-family: var(--font-mono, monospace);
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--line-2);
-  background: var(--bg-sunk);
-  color: var(--ink-3);
+  font: 500 var(--fs-9) / 1.5 var(--font-mono);
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--rule-2);
+  background: var(--tint-neutral);
+  color: var(--ink-2);
 }
 
 .sf-rel-chip--dep {
   cursor: pointer;
-  color: var(--tint-blue-ink);
-  border-color: var(--tint-blue-ink);
+  color: var(--run);
+  border-color: transparent;
+  background: var(--tint-blue);
 }
 /* A cross-repo / out-of-tree dependency cannot be opened here: mute it and
    disable navigation so it never focuses an empty spec. */
@@ -927,20 +856,21 @@ defineExpose({ dispatchFocused, breakdownFocused });
 }
 
 .sf-rel-chip--dep:hover {
-  background: var(--tint-blue);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .sf-rel-chip--changed {
-  color: var(--tint-amber-ink);
+  color: var(--warn);
   background: var(--tint-amber);
-  border-color: var(--tint-amber-ink);
+  border-color: transparent;
 }
 
 .sf-archived-banner {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 20px;
+  padding: 8px 24px;
   background: var(--bg-sunk);
   font-size: 12px;
   color: var(--ink-3);
@@ -951,17 +881,17 @@ defineExpose({ dispatchFocused, breakdownFocused });
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 20px;
+  padding: 8px 24px;
   background: var(--tint-amber);
   font-size: 12px;
-  color: var(--tint-amber-ink);
+  color: var(--warn);
   border-bottom: 1px solid var(--rule);
 }
 
 .sf-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 28px 80px;
+  padding: 24px 28px 80px;
   animation: sf-fade-in 0.18s ease-out;
 }
 
@@ -991,8 +921,8 @@ defineExpose({ dispatchFocused, breakdownFocused });
 }
 
 .sf-content--spec {
-  max-width: 52em;
-  font-size: 14px;
+  max-width: 76ch;
+  font-size: var(--fs-md);
   line-height: 1.7;
 }
 
@@ -1008,27 +938,17 @@ defineExpose({ dispatchFocused, breakdownFocused });
   font-size: 13px;
 }
 .sf-dispatched-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent-tint, transparent);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-family: var(--font-mono);
   cursor: pointer;
+  text-decoration: none;
 }
-.sf-dispatched-pill:hover { background: var(--accent); color: #fff; }
+.sf-dispatched-pill:hover { background: var(--accent); color: var(--accent-fg); }
 .sf-frontmatter-warning {
   margin: 0 0 12px;
   padding: 8px 12px;
-  background: color-mix(in oklab, var(--warn, #c87b1c) 18%, var(--bg-card));
-  border: 1px solid color-mix(in oklab, var(--warn, #c87b1c) 35%, var(--border));
-  border-radius: 6px;
+  background: var(--tint-amber);
+  border-radius: var(--r-md);
   font-size: 12px;
-  color: var(--ink);
+  color: var(--warn);
 }
 
 .sf-content :deep(h1),
@@ -1071,9 +991,9 @@ defineExpose({ dispatchFocused, breakdownFocused });
   font-family: var(--font-mono);
   font-size: 0.92em;
   background: var(--bg-sunk);
-  border: 1px solid color-mix(in oklab, var(--rule) 60%, transparent);
+  border: 1px solid var(--rule);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
 }
 .sf-content :deep(pre) {
   font-family: var(--font-mono);
@@ -1109,20 +1029,19 @@ defineExpose({ dispatchFocused, breakdownFocused });
    on the prose it annotates, not only as a gutter badge. Tinted background plus
    an accent underline; the open thread reads brighter; resolved is muted. */
 .sf-content :deep(mark.sc-mark) {
-  background: color-mix(in oklab, var(--accent) 16%, transparent);
-  border-bottom: 1px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent-line);
   color: inherit;
-  border-radius: 2px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background var(--dur-hover);
 }
 .sf-content :deep(mark.sc-mark:hover),
 .sf-content :deep(mark.sc-mark.sc-mark--open) {
-  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  background: var(--accent-ring);
 }
 .sf-content :deep(mark.sc-mark.sc-mark--resolved) {
-  background: color-mix(in oklab, var(--ink-4) 14%, transparent);
-  border-bottom-color: color-mix(in oklab, var(--ink-4) 45%, transparent);
+  background: var(--tint-neutral);
+  border-bottom-color: var(--rule-2);
 }
 .sf-content :deep(table) {
   border-collapse: collapse;
@@ -1153,8 +1072,8 @@ defineExpose({ dispatchFocused, breakdownFocused });
   padding: 8px 12px;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   font-size: 12px;
   pointer-events: auto;
 }
