@@ -21,3 +21,14 @@ describe('codexModelsFor', () => {
     expect(codexModelsFor('http://localhost:8000')).toEqual([]);
   });
 });
+
+describe('CLAUDE_MODELS', () => {
+  it('lists only current-generation IDs in their canonical, undated form', () => {
+    // The picker seeds the model field, so a retired alias or a dotted 3.x
+    // name here becomes a 404 from the API. IDs are claude-<tier>-<major>
+    // with an optional minor, nothing else.
+    for (const id of CLAUDE_MODELS) {
+      expect(id).toMatch(/^claude-(opus|sonnet|haiku)-\d(-\d)?$/);
+    }
+  });
+});
