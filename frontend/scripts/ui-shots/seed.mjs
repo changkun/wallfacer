@@ -87,6 +87,7 @@ const ID = {
   failed: '55555555-5555-4555-8555-555555555555',
   back1: '66666666-6666-4666-8666-666666666666',
   back2: '77777777-7777-4777-8777-777777777777',
+  routine: '88888888-8888-4888-8888-888888888888',
 };
 
 // Rich content for the OAuth task — drives the task-detail Prompt tab and the
@@ -371,7 +372,49 @@ const tasks = [
     created_at: iso(15),
     updated_at: iso(15),
   },
+  // A routine: a scheduled card that spawns a fresh task every hour. Drives
+  // the Routines page row (schedule pill, countdown, switch).
+  {
+    schema_version: 2,
+    id: ID.routine,
+    kind: 'routine',
+    title: 'Nightly dependency audit',
+    prompt: 'Audit go.mod and package.json for outdated or vulnerable dependencies and open one task per fix.',
+    status: 'backlog',
+    result: null,
+    stop_reason: null,
+    turns: 0,
+    timeout: 900,
+    usage: usage(0, 0, 0, 0, 0),
+    sandbox: 'claude',
+    flow_id: 'implement',
+    tags: ['chore'],
+    routine_interval_seconds: 3600,
+    routine_enabled: true,
+    routine_spawn_flow: 'implement',
+    routine_next_run: iso(-45),
+    routine_last_fired_at: iso(15),
+    position: 2,
+    created_at: iso(300),
+    updated_at: iso(15),
+  },
 ];
+
+// Artifacts are self-contained pages under <workspace>/artifacts; one deck
+// gives the Artifacts surface a preview instead of the empty state.
+const ARTIFACT_HTML = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Q3 roadmap</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f4f2ee; color: #1b1916; }
+  section { min-height: 100vh; display: grid; place-items: center; padding: 48px; box-sizing: border-box; }
+  h1 { font-size: 56px; margin: 0 0 12px; letter-spacing: -0.02em; }
+  p { font-size: 22px; color: #4c4842; max-width: 40ch; text-align: center; }
+  .k { color: #c45a33; }
+</style></head>
+<body>
+<section><div><h1>Q3 <span class="k">roadmap</span></h1><p>Three bets: device sign-in everywhere, the redesigned console, and routines that keep the backlog honest.</p></div></section>
+</body></html>
+`;
 
 // A minimal ready oversight summary, attached to terminal-state tasks so the
 // task-detail oversight panel renders representative content.
@@ -420,6 +463,10 @@ if (existsSync(specsSrc)) {
   rmSync(join(wsDir, 'specs'), { recursive: true, force: true });
   cpSync(specsSrc, join(wsDir, 'specs'), { recursive: true });
 }
+
+// The artifact lives beside the specs in the workspace.
+mkdirSync(join(wsDir, 'artifacts'), { recursive: true });
+writeFileSync(join(wsDir, 'artifacts', 'q3-roadmap.html'), ARTIFACT_HTML);
 
 // Wipe and rewrite the group dir so state is idempotent/regenerable.
 rmSync(groupDir, { recursive: true, force: true });

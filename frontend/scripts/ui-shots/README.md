@@ -59,9 +59,11 @@ node snap.mjs --base http://localhost:5173 --only board,palette,settings # subse
 node snap.mjs --list                                                     # surface names
 ```
 
-Surfaces: `board`, `palette`, `task-detail`, `settings`, `analytics`,
-`plan`, `routines`, `agents`, `flows`, `docs`. Prints JSON
-`[{name, file, errors}]` so callers can detect page errors.
+Surfaces: `board`, `switcher`, `palette`, `picker`, `terminal`, `explorer`,
+`task-detail`, `settings`, `analytics`, `overview-spec`, `oversight`, `plan`,
+`chat`, `routines`, `agents`, `flows`, `mission`, `whiteboard`, `docs`,
+`artifacts`. Prints JSON `[{name, file, errors}]` so callers can detect page
+errors.
 
 Works against any local-mode origin: the embedded SPA on the booted server
 (`:8099`), the golden UI (`:8092`), or the Vite dev server (`:5173`).
@@ -103,18 +105,35 @@ node checks.mjs --base http://localhost:8099 --only picker,board   # against an 
 node checks.mjs --list        # scene names
 ```
 
-Scenes: `board` (app shell + sidebar present), `switcher` (popover open doesn't
-drop the sidebar), `picker` (Select Workspace list is a full-width,
-non-overlapping, in-bounds column), plus `settings` / `plan` / `analytics` /
-`agents` / `flows` smoke (route renders, no uncaught error). Add a scene by
-appending to the `SCENES` table in `checks.mjs`. Playwright runs from the same
-throwaway `/tmp` sandbox as `snap.mjs` (never under `frontend/`, which would
-break the vite-ssg build).
+Scenes, one per console surface, each asserting the geometry its design
+promises (rail and topbar sizes, card radii, column widths, dialog widths,
+reading-column width) and the material (no `backdrop-filter`, meta text
+contrast in both themes): `board`, `shell`, `switcher`, `picker`, `no-glass`,
+`contrast`, `task-detail`, `chat`, `plan`, `settings`, `agents`, `palette`,
+`dock`, `analytics`, `routines`, `mission`, `whiteboard`, `artifacts`,
+`docs`, plus a `flows` smoke. Every scene runs in its own browser context so
+nothing one scene persists (a route, a popup, a dock layout) reaches the next.
+Add a scene by appending to the `SCENES` table in `checks.mjs`. Playwright runs
+from the same throwaway `/tmp` sandbox as `snap.mjs` (never under `frontend/`,
+which would break the vite-ssg build).
+
+The gate runs in CI as the `ui-test` job of `.github/workflows/frontend.yml`
+(`PW_WITH_DEPS=1 make ui-test`, which also installs Chromium's system libraries).
 
 ## Docs screenshots
 
 Guide images live in `docs/guide/images/` as a `foo.png` (light) + `foo-dark.png`
 (dark) pair. Reference only the light name in markdown: `![alt](images/foo.png)`.
 The docs renderer (`frontend/src/lib/markdown.ts`) emits both variants toggled by
-`[data-theme]`, served via the `/api/docs-asset/<category>/<path>` route. Downscale
-the 2x captures to a doc-friendly width first, e.g. `sips --resampleWidth 1600`.
+`[data-theme]`, served via the `/api/docs-asset/<category>/<path>` route.
+
+One command regenerates every committed screenshot (the guide pairs, the
+landing-page pairs under `frontend/public/static/`, and the README images under
+`assets/`) from the seed, in both themes, downscaled to 1600px wide:
+
+```bash
+./frontend/scripts/ui-shots/regen.sh
+```
+
+The seed gives each surface content: tasks in every state with traces and an
+oversight summary, a routine, an artifact, and the repo's own spec tree.

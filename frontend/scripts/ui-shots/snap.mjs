@@ -44,8 +44,8 @@ const SURFACES = {
   explorer: { route: '/', steps: [{ click: '.explorer-rail' }, { waitFor: '.explorer-panel' }, { wait: 900 }] },
   'task-detail': {
     route: '/',
-    // Open the first board card (.card is the root) to render the detail drawer.
-    steps: [{ click: '.card' }, { wait: 800 }],
+    // Open the OAuth card (the richest seeded task) to render the task sheet.
+    steps: [{ click: '.task-card[aria-label*="OAuth"] .task-card__title' }, { waitFor: '.sheet' }, { wait: 800 }],
   },
   settings: { route: '/settings', steps: [{ wait: 600 }] },
   analytics: { route: '/analytics', steps: [{ wait: 900 }] },
@@ -53,19 +53,21 @@ const SURFACES = {
   // overview-spec focuses a real spec so the three-pane Plan view is populated;
   // oversight opens the rich OAuth task on its diff (Changes) tab.
   'overview-spec': {
-    route: '/plan?spec=specs/spec-coordination/spec-coordination.md',
-    steps: [{ wait: 1200 }],
+    route: '/plan?spec=specs/shared/console-redesign.md',
+    steps: [{ waitFor: '.sf-content--spec' }, { wait: 1200 }],
   },
   oversight: {
     route: '/',
     steps: [
-      { click: '.card[aria-label*="OAuth"]' },
-      { wait: 700 },
-      { click: '.main-tab:has-text("Changes")' },
+      { click: '.task-card[aria-label*="OAuth"] .task-card__title' },
+      { waitFor: '.sheet' },
+      { click: '.sheet-tabs .tab:has-text("Changes")' },
       { wait: 1000 },
     ],
   },
-  plan: { route: '/plan', steps: [{ wait: 800 }] },
+  // The plan with a spec focused, so the three panes carry content.
+  plan: { route: '/plan?spec=specs/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
+  chat: { route: '/chat', steps: [{ wait: 900 }] },
   routines: { route: '/routines', steps: [{ wait: 800 }] },
   agents: { route: '/agents', steps: [{ wait: 800 }] },
   flows: { route: '/flows', steps: [{ wait: 800 }] },

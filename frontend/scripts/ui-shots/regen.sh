@@ -46,10 +46,11 @@ for _ in $(seq 1 30); do
   curl -sf "$BASE/" >/dev/null 2>&1 && break || sleep 1
 done
 
-# Surfaces this script owns end to end with the current seed. Other docs
-# surfaces (agents/flows/routines/plan/task-detail) need their own demo data
-# and are regenerated separately, so they are intentionally not touched here.
-SURFACES="board,analytics,overview-spec,oversight"
+# Every surface the docs, the landing page, or the README embed. The seed
+# gives each one content (tasks in every state, a routine, an artifact, the
+# repo's own spec tree), so one run refreshes the whole set.
+DOC_SURFACES="board,task-detail,plan,routines,agents,mission,whiteboard,analytics"
+SURFACES="$DOC_SURFACES,overview-spec,oversight"
 snap() { node "$PW/snap.mjs" --base "$BASE" --out "$OUT" --only "$SURFACES" "$@"; }
 
 echo "==> Capturing light + dark"
@@ -58,9 +59,13 @@ snap >/dev/null
 snap --theme dark >/dev/null
 
 echo "==> Distributing to committed locations"
-# docs/guide/images — the board pair (markdown auto-derives the -dark variant).
-cp "$OUT/board.png"      docs/guide/images/board.png
-cp "$OUT/board-dark.png" docs/guide/images/board-dark.png
+# docs/guide/images: a light + dark pair per surface, downscaled from the 2x
+# capture to a doc-friendly width (the markdown renderer derives -dark).
+for name in ${DOC_SURFACES//,/ }; do
+  for variant in "" "-dark"; do
+    sips --resampleWidth 1600 "$OUT/$name$variant.png" --out "docs/guide/images/$name$variant.png" >/dev/null
+  done
+done
 
 # Landing (frontend/public/static) — light + dark pairs, theme-swapped in
 # ProductPage.vue. Source surface differs from the destination name.
