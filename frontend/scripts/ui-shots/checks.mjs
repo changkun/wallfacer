@@ -85,6 +85,32 @@ const SCENES = {
     expect('board', main && main.width > 0, 'app-main not rendered');
   },
 
+  // The shell geometry (specs/shared/console-redesign/shell.md): rail 236 open
+  // and 64 folded on the deep ground, the main card inset 8px on three sides
+  // starting at the rail's edge, a 52px topbar, and no status bar anywhere.
+  shell: async (page) => {
+    const rail = await firstBox(page, '.app-rail');
+    const main = await firstBox(page, '.app-main');
+    const topbar = await firstBox(page, '.topbar');
+    expect('shell', rail && Math.abs(rail.width - 236) <= 1, `rail width ${rail && rail.width}, want 236`);
+    expect('shell', main && Math.abs(main.left - rail.right) <= 1, `main left ${main && main.left} != rail right ${rail && rail.right}`);
+    expect('shell', main && Math.abs(main.top - 8) <= 1, `main top inset ${main && main.top}, want 8`);
+    const vw = await page.evaluate(() => window.innerWidth);
+    const vh = await page.evaluate(() => window.innerHeight);
+    expect('shell', main && Math.abs(vw - main.right - 8) <= 1, `main right inset ${main && vw - main.right}, want 8`);
+    expect('shell', main && Math.abs(vh - main.bottom - 8) <= 1, `main bottom inset ${main && vh - main.bottom}, want 8`);
+    expect('shell', topbar && Math.abs(topbar.height - 52) <= 1, `topbar height ${topbar && topbar.height}, want 52`);
+    expect('shell', !(await page.$('.status-bar')), 'a .status-bar is still in the DOM');
+    expect('shell', !!(await page.$('#topbar-actions .task-search-input')), 'board search is not in the topbar actions slot');
+    expect('shell', !!(await page.$('.board-grid .card')), 'board grid rendered no cards');
+    // Fold the rail and check the icon width.
+    await page.click('.rail-fold-btn', { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const folded = await firstBox(page, '.app-rail');
+    expect('shell', folded && Math.abs(folded.width - 64) <= 1, `folded rail width ${folded && folded.width}, want 64`);
+    await page.click('.rail-fold-btn', { timeout: 5000 }).catch(() => {});
+  },
+
   // Opening the sidebar workspace popover must not crash the layout: the
   // sidebar switcher stays present afterward. Guards the null-folders crash.
   switcher: async (page) => {

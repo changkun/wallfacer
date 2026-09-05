@@ -20,13 +20,3 @@
   background-image: var(--accent-gradient) !important;
 }
 
-/* latere-ui console sidebar renders its own serif-italic brand row
-   (console.css .lu-cs-*); the [data-theme] prefix outranks it no matter
-   which order Vite emits the two stylesheets in. */
-[data-theme] .lu-cs-brand-name,
-[data-theme] .lu-cs-brand-mark {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: 0;
-}

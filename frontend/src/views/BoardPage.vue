@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, markRaw } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import draggable from 'vuedraggable';
 import { useTaskStore } from '../stores/tasks';
@@ -8,14 +8,12 @@ import { api } from '../api/client';
 import TaskCard from '../components/TaskCard.vue';
 import TaskComposer from '../components/TaskComposer.vue';
 import TaskDetail from '../components/TaskDetail.vue';
-import SearchBar from '../components/SearchBar.vue';
+import BoardActions from '../components/BoardActions.vue';
 import ExplorerPanel from '../components/ExplorerPanel.vue';
 import EditorTabStrip from '../components/editor/EditorTabStrip.vue';
 import FileEditor from '../components/editor/FileEditor.vue';
-import AutomationMenu from '../components/AutomationMenu.vue';
 import TrashModal from '../components/TrashModal.vue';
 import { useEditorTabsStore, BOARD_TAB_ID } from '../stores/editorTabs';
-import { useAutomationToggles } from '../composables/useAutomationToggles';
 import { sortBacklog, loadBacklogSortMode, saveBacklogSortMode, type BacklogSortMode } from '../lib/backlogSort';
 import type { Task } from '../api/types';
 
@@ -35,26 +33,17 @@ function dismissComposer() {
 
 const store = useTaskStore();
 const ui = useUiStore();
+
+// The board's topbar controls live in BoardActions; the bar renders them while
+// this page is on screen.
+const boardActions = markRaw(BoardActions);
+onMounted(() => ui.setTopbarActions(boardActions));
+onUnmounted(() => ui.clearTopbarActions(boardActions));
 const editorTabs = useEditorTabsStore();
 const route = useRoute();
 const router = useRouter();
 
 // Board automation popover (restores the legacy on-board toggle menu).
-const { anyOn: automationAnyOn } = useAutomationToggles();
-const automationOpen = ref(false);
-const automationAnchor = ref<{ top: number; right: number } | null>(null);
-function toggleAutomationMenu(e: MouseEvent) {
-  if (automationOpen.value) {
-    automationOpen.value = false;
-    return;
-  }
-  const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  automationAnchor.value = {
-    top: btn.bottom + 6,
-    right: Math.max(8, window.innerWidth - btn.right),
-  };
-  automationOpen.value = true;
-}
 // Track the open task by id, not by a held object reference. A `task-updated`
 // SSE delta replaces the task object in the store (stores/tasks.ts updateTask),
 // so a captured reference goes stale and the detail panel would keep rendering
@@ -242,80 +231,11 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
 </script>
 
 <template>
-  <header class="app-header">
-    <div class="app-header__spacer">
-      <EditorTabStrip />
-    </div>
-    <div class="app-header__actions">
-      <SearchBar />
-      <div class="app-header__button-row">
-        <button
-          type="button"
-          class="settings-btn"
-          :class="{ 'settings-btn--active': ui.showExplorer }"
-          :title="ui.showExplorer ? 'Close Explorer' : 'Open Explorer'"
-          :aria-pressed="ui.showExplorer"
-          @click="ui.toggleExplorer()"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            <line x1="9" y1="9" x2="9" y2="21"></line>
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="settings-btn automation-btn"
-          :class="{ 'settings-btn--active': automationOpen, 'automation-btn--on': automationAnyOn() }"
-          title="Automation"
-          :aria-pressed="automationOpen"
-          @click="toggleAutomationMenu"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="settings-btn"
-          title="Trash"
-          @click="ui.openTrash()"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </header>
 
-  <AutomationMenu v-model="automationOpen" :anchor="automationAnchor" />
+  <!-- Open editors: the pinned Board tab plus any files. Sits at the top edge
+       of the page body, under the topbar. -->
+  <EditorTabStrip />
+
   <TrashModal v-model="ui.showTrash" />
 
   <div class="board-with-explorer">

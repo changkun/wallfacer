@@ -113,7 +113,7 @@ function onKeydown(e: KeyboardEvent) {
 
 function onOutsideClick(e: MouseEvent) {
   const t = e.target as HTMLElement;
-  if (!t.closest('.branch-dropdown') && !t.closest('.status-bar-branch')) close();
+  if (!t.closest('.branch-dropdown') && !t.closest('.ws-branch')) close();
 }
 
 watch(

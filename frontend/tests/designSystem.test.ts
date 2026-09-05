@@ -176,9 +176,20 @@ describe('primitives.css defines the shared classes', () => {
     expect(css).toMatch(/\.pill \{[^}]*var\(--font-mono\)/s);
   });
 
-  it('the replaced stylesheets are gone', () => {
-    for (const f of ['src/styles/buttons.css', 'src/styles/badges.css', 'src/styles/forms.css']) {
+  it('the replaced stylesheets and shell components are gone', () => {
+    for (const f of [
+      'src/styles/buttons.css', 'src/styles/badges.css', 'src/styles/forms.css',
+      'src/styles/status-bar.css', 'src/styles/header.css', 'src/styles/header',
+      'src/components/Sidebar.vue', 'src/components/StatusBar.vue',
+    ]) {
       expect(existsSync(resolve(root, f)), f).toBe(false);
+    }
+  });
+
+  it('the rail is wallfacer\'s own: no ConsoleSidebar or console stylesheet import', () => {
+    for (const f of walk(resolve(root, 'src'), '.vue').concat(walk(resolve(root, 'src'), '.ts'))) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, rel(f)).not.toMatch(/ConsoleSidebar|latere-ui\/console/);
     }
   });
 });

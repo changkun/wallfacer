@@ -1,0 +1,593 @@
+/* --- Rail ---
+   The console rail sits on the deep ground with no border; the main card
+   beside it carries the depth. Rows are the nav-row primitive (34px, radius
+   12): the current destination is the one sheet of paper in the rail, the
+   same material the content is. See specs/shared/console-redesign/shell.md. */
+.app-rail {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: var(--rail-w);
+  height: 100%;
+  padding: 14px 10px 12px;
+  box-sizing: border-box;
+  background: var(--bg-deep);
+  color: var(--ink);
+  flex: none;
+  transition: width 0.16s var(--ease-fluid);
+}
+.app-rail--fold {
+  width: var(--rail-w-fold);
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* head: mark, wordmark, product switcher, fold */
+.rail-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 4px;
+}
+.rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+.rail-mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.rail-name {
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rail-products {
+  flex: none;
+}
+.rail-fold-btn {
+  flex: none;
+}
+.app-rail--fold .rail-head {
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+.app-rail--fold .rail-name,
+.app-rail--fold .rail-products,
+.app-rail--fold .rail-search-label,
+.app-rail--fold .rail-search-hint,
+.app-rail--fold .rail-eyebrow,
+.app-rail--fold .nav-label,
+.app-rail--fold .nav-count,
+.app-rail--fold .rail-presence {
+  display: none;
+}
+
+/* palette trigger: a field-shaped button */
+.rail-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--bg-sunk);
+  color: var(--ink-3);
+  font: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover),
+    color var(--dur-hover);
+}
+.rail-search:hover {
+  border-color: var(--rule-2);
+  background: var(--bg-card);
+  color: var(--ink);
+}
+.rail-search svg {
+  flex: none;
+}
+.rail-search-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-rail--fold .rail-search {
+  justify-content: center;
+  padding: 0;
+}
+
+/* nav */
+.rail-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 0;
+}
+.rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rail-group--bottom {
+  margin-top: auto;
+}
+.rail-eyebrow {
+  letter-spacing: 0.16em;
+  padding: 0 8px 8px;
+}
+.nav-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-hover) var(--ease-fluid),
+    color var(--dur-hover);
+}
+.nav-btn:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+.nav-btn.active {
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--sh-card), 0 6px 14px -10px rgba(20, 19, 17, 0.24);
+}
+.nav-ico {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  transition: background var(--dur-hover);
+}
+.nav-btn.active .nav-ico {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-count {
+  margin-left: auto;
+}
+.nav-dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+.app-rail--fold .nav-btn {
+  justify-content: center;
+  padding: 0;
+}
+.app-rail--fold .nav-dot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  margin: 0;
+}
+
+/* presence */
+.rail-presence {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rail-presence-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: var(--fs-10);
+  color: var(--ink-2);
+  min-width: 0;
+}
+.rail-presence-item .pill-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--ink-4);
+}
+.rail-presence-item--agent .pill-dot {
+  background: var(--ok);
+  animation: om-pulse-soft 1.6s ease-in-out infinite;
+}
+.rail-presence-item--self .pill-dot {
+  background: var(--accent);
+}
+.rail-presence-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+/* foot */
+.rail-foot {
+  flex: none;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.rail-foot:empty {
+  display: none;
+}
+
+/* --- Workspace chip --- */
+.ws-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sb-ws-switch-wrap {
+  position: relative;
+  width: 100%;
+}
+.sb-ws-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: var(--sh-card);
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover);
+}
+.sb-ws-switch:hover {
+  border-color: var(--rule-2);
+}
+.sb-ws-switch .ws-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex: none;
+  background: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font: 700 9px/1 var(--font-mono);
+}
+.sb-ws-switch .ws-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.sb-ws-switch .ws-caret {
+  color: var(--ink-3);
+  flex: none;
+  display: inline-flex;
+  transition: transform var(--dur-hover);
+}
+.sb-ws-switch[aria-expanded="true"] .ws-caret {
+  transform: rotate(180deg);
+}
+/* The live-connection dot: ok / reconnecting / closed. */
+.ws-conn {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ink-4);
+  transition: background 0.3s;
+}
+.ws-conn--ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
+}
+.ws-conn--reconnecting {
+  background: var(--warn);
+  animation: om-pulse-soft 1.2s ease-in-out infinite;
+}
+.ws-conn--closed {
+  background: var(--err);
+}
+.ws-conn--fold {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+.sb-ws-switch-wrap--collapsed {
+  display: flex;
+  justify-content: center;
+}
+.sb-ws-switch--icon {
+  position: relative;
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* popover of workspace groups */
+.sb-ws-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 65;
+  max-height: 50vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
+  padding: 4px;
+}
+/* Collapsed: the popover flies out to the right of the rail. Both anchors
+   would squeeze it to a sliver, so the right anchor is cleared and a real
+   width is set. */
+.sb-ws-switch-wrap--collapsed .sb-ws-popover--inline {
+  position: absolute;
+  left: calc(100% + 4px);
+  right: auto;
+  top: 0;
+  width: 240px;
+  z-index: 200;
+}
+.sb-ws-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+.sb-ws-popover__item:hover,
+.sb-ws-popover__item:focus-visible {
+  background: var(--bg-sunk);
+  color: var(--ink);
+  outline: none;
+}
+.sb-ws-popover__item.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+.sb-ws-popover__check {
+  width: 14px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.sb-ws-popover__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-ws-popover__counts {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+.sb-ws-popover__switching {
+  font-size: var(--fs-9);
+  flex: none;
+}
+.sb-ws-popover__row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  flex: none;
+  opacity: 0;
+  transition: opacity var(--dur-hover);
+}
+.sb-ws-popover__item:hover .sb-ws-popover__row-actions,
+.sb-ws-popover__item:focus-within .sb-ws-popover__row-actions {
+  opacity: 1;
+}
+.sb-ws-popover__row-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: var(--fs-10);
+  line-height: 1;
+}
+.sb-ws-popover__row-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+.sb-ws-popover__row-btn--edit {
+  font-weight: 600;
+}
+.sb-ws-popover__divider {
+  height: 1px;
+  background: var(--rule);
+  margin: 4px 2px;
+}
+.sb-ws-popover__add {
+  color: var(--ink-3);
+}
+.sb-ws-popover__add .sb-ws-popover__check {
+  color: var(--ink-3);
+}
+.sb-ws-popover__add:hover .sb-ws-popover__check {
+  color: var(--accent);
+}
+
+/* branch rows under the switcher */
+.ws-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+.ws-branch-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.ws-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font: 500 var(--fs-10) / 1 var(--font-mono);
+  cursor: pointer;
+  text-align: left;
+}
+.ws-branch:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+.ws-branch__glyph {
+  color: var(--accent);
+  flex: none;
+}
+.ws-branch__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-branch__count {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-9);
+  background: var(--tint-neutral);
+  color: var(--ink-2);
+}
+.ws-branch__count--behind {
+  background: var(--tint-amber);
+  color: var(--warn);
+}
+.ws-branch__count--ahead {
+  background: var(--tint-green);
+  color: var(--ok);
+}
+.ws-branch-actions {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+.ws-branch-action {
+  height: 22px;
+  padding: 0 8px;
+  font-size: var(--fs-9);
+}
+
+/* --- Drawer below the phone breakpoint --- */
+@media (max-width: 860px) {
+  .app-rail,
+  .app-rail--fold {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--rail-w);
+    padding-left: 10px;
+    padding-right: 10px;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.2s var(--ease-fluid);
+    box-shadow: none;
+  }
+  .app-rail--open {
+    transform: none;
+    box-shadow: var(--sh-pop);
+  }
+  .app-rail--fold .rail-name,
+  .app-rail--fold .rail-products,
+  .app-rail--fold .rail-search-label,
+  .app-rail--fold .rail-search-hint,
+  .app-rail--fold .rail-eyebrow,
+  .app-rail--fold .nav-label,
+  .app-rail--fold .nav-count,
+  .app-rail--fold .rail-presence {
+    display: initial;
+  }
+  .app-rail--fold .rail-head {
+    flex-direction: row;
+    padding: 0 4px;
+  }
+  .app-rail--fold .nav-btn {
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+  .rail-fold-btn {
+    display: none;
+  }
+}

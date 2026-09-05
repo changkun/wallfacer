@@ -1,0 +1,77 @@
+/* --- Topbar ---
+   One 52px row at the top of the main card: crumb left, actions right. The
+   trail yields to the controls: every crumb segment stays on one line and
+   ellipsises, the actions never shrink. */
+.topbar {
+  height: var(--h-topbar);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+}
+.topbar .topbar-menu {
+  display: none;
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--fs-base);
+  color: var(--ink-2);
+}
+.crumb > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crumb > :first-child,
+.crumb .sep {
+  flex: none;
+}
+.crumb .sep {
+  color: var(--ink-4);
+}
+.crumb .leaf {
+  color: var(--ink);
+  font-weight: 500;
+  max-width: 420px;
+}
+.topbar-actions {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-page-actions:not(:empty) {
+  padding-right: 6px;
+  margin-right: 2px;
+  border-right: 1px solid var(--rule);
+}
+/* A page's search field sits in the actions row at a fixed comfortable width. */
+.topbar-page-actions .task-search-wrapper {
+  width: 280px;
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .topbar .topbar-menu {
+    display: inline-flex;
+  }
+  .topbar-page-actions .task-search-wrapper {
+    width: 160px;
+  }
+}

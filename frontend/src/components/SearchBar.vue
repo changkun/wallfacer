@@ -53,7 +53,7 @@ onUnmounted(() => document.removeEventListener('keydown', onGlobalKeydown));
 </script>
 
 <template>
-  <div class="task-search-wrapper app-header__search">
+  <div class="task-search-wrapper">
     <span class="task-search-icon">
       <svg
         width="14"

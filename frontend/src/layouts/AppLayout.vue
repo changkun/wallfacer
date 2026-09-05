@@ -2,8 +2,8 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useHead } from '@unhead/vue';
 import { useRoute, useRouter } from 'vue-router';
-import Sidebar from '../components/Sidebar.vue';
-import StatusBar from '../components/StatusBar.vue';
+import AppRail from '../components/AppRail.vue';
+import Topbar from '../components/Topbar.vue';
 import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import WorkspaceEditModal from '../components/WorkspaceEditModal.vue';
@@ -161,13 +161,17 @@ useKeyboard({
 
 <template>
   <div class="app-shell">
-    <Sidebar
+    <AppRail
       :collapsed="sidebarCollapsed"
+      :conn-state="connState"
       @toggle="sidebarCollapsed = !sidebarCollapsed"
       @palette="ui.showPalette = true"
       @workspaces="ui.showWorkspaces = true"
     />
+    <!-- Drawer scrim below the phone breakpoint; hidden on the desktop shell. -->
+    <div v-if="ui.railOpen" class="rail-scrim" aria-hidden="true" @click="ui.closeRail()" />
     <div class="app-main">
+      <Topbar />
       <div
         v-if="showDisconnectBanner"
         class="app-disconnected-banner"
@@ -180,7 +184,6 @@ useKeyboard({
       <DockWorkspace>
         <slot :connected="connected" :conn-state="connState" />
       </DockWorkspace>
-      <StatusBar :connected="connected" :conn-state="connState" @shortcuts="ui.openShortcuts()" />
     </div>
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
@@ -211,24 +214,55 @@ useKeyboard({
 </template>
 
 <style scoped>
+/* The rail is the desk and the content is paper on it: the shell paints the
+ * deep ground, the rail sits on it with no border, and .app-main is a card
+ * inset by 8px with the main radius, a hairline and a shadow. Below the phone
+ * breakpoint the inset is dropped; the drawer already separates the two. */
 .app-shell {
   display: flex;
   height: 100vh;
-  background: var(--bg);
+  background: var(--bg-deep);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .app-main {
   display: flex;
   flex-direction: column;
   flex: 1;
-  /* Scroll overflowing page content instead of clipping it. Height-constrained
-   * pages (flex:1 + min-height:0 chains down to their own overflow-y:auto body)
-   * don't overflow this column, so they get no second scrollbar; a page that
-   * spills past the viewport becomes reachable instead of being clipped. */
+  min-width: 0;
+  margin: 8px 8px 8px 0;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-main);
+  box-shadow: var(--sh-main);
+  /* The card clips its corners; page content scrolls inside its own column. */
+  overflow: hidden;
+}
+/* Everything under the topbar scrolls as one column when a page spills past
+ * the viewport; height-constrained pages own their scroll and never overflow. */
+.app-main > :deep(.dock-ws) {
   overflow-y: auto;
   overflow-x: hidden;
+}
+.rail-scrim {
+  display: none;
+}
+@media (max-width: 860px) {
+  .app-main {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .rail-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: var(--glass-dim);
+    animation: om-fade-in 0.18s var(--ease-fluid) both;
+  }
 }
 .app-disconnected-banner {
   display: flex;

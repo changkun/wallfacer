@@ -130,11 +130,10 @@ describe('BoardPage Open Explorer toggle', () => {
     expect(host.querySelector('.explorer-panel')).toBeNull();
     expect(ui.showExplorer).toBe(false);
 
-    // The toggle is a button, not a navigating link.
-    const btn = host.querySelector<HTMLButtonElement>('button.settings-btn');
-    expect(btn).not.toBeNull();
-
-    btn!.click();
+    // The page registers its controls on the ui store for the topbar; the
+    // explorer toggle flips the store flag without navigating.
+    expect(ui.topbarActions).not.toBeNull();
+    ui.toggleExplorer();
     await nextTick();
     await nextTick();
 
@@ -145,7 +144,7 @@ describe('BoardPage Open Explorer toggle', () => {
     expect(router.currentRoute.value.path).toBe('/');
 
     // Toggling again hides the panel; board still there.
-    btn!.click();
+    ui.toggleExplorer();
     await nextTick();
     expect(ui.showExplorer).toBe(false);
     expect(host.querySelector('.explorer-panel')).toBeNull();

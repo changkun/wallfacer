@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// VS Code-style tab strip in the board's top-bar spacer. The first tab is the
+// VS Code-style tab strip at the top edge of the board page. The first tab is the
 // pinned Board (which surfaces in-progress / waiting task status); the rest are
 // open files from the editorTabs store. Single-click focuses; double-click pins
 // a preview tab; the active file tab closes via its ×, middle-click, or
@@ -139,18 +139,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 <style scoped>
 .editor-tabs {
-  flex: 1 1 0;
+  flex: none;
   min-width: 0;
   display: flex;
   align-items: stretch;
-  /* Fill the header band and bleed past its vertical padding so tabs read as a
-     VS Code tab bar rather than floating pills. The bleed matches .app-header's
-     3px vertical padding. */
-  height: calc(100% + 6px);
-  margin: -3px 0;
+  height: 36px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--bg-sunk);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+}
+/* With only the pinned Board tab open the strip has nothing to say. */
+.editor-tabs:has(.editor-tab:only-child) {
+  display: none;
 }
 .editor-tabs::-webkit-scrollbar {
   display: none;
@@ -174,9 +176,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   cursor: pointer;
   white-space: nowrap;
 }
-.editor-tab:first-child {
-  border-left: 1px solid var(--border);
-}
+
 .editor-tab:hover {
   background: color-mix(in oklab, var(--bg) 55%, var(--bg-card));
   color: var(--ink-2, var(--text-secondary));

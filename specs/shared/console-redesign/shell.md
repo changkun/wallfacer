@@ -1,6 +1,6 @@
 ---
 title: Shell
-status: drafted
+status: validated
 depends_on:
   - specs/shared/console-redesign/tokens-and-primitives.md
 affects:

@@ -238,37 +238,6 @@ pre.result-entry-body {
     scroll-snap-align: start;
   }
 
-  /* --- Header: compact on mobile --- */
-  .app-header {
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 14px;
-  }
-  .app-header__actions {
-    width: 100%;
-    flex: 0 0 auto;
-    align-items: stretch;
-    align-content: flex-start;
-    justify-content: flex-start;
-    gap: 8px;
-  }
-  .app-header__search {
-    width: 100%;
-    flex: 0 0 100%;
-    max-width: none;
-  }
-  .task-search-input,
-  .task-search-input:focus {
-    min-width: 0;
-    max-width: none;
-    width: 100%;
-  }
-  .app-header__button-row {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-    gap: 8px;
-  }
   .automation-menu {
     right: -4px;
     min-width: min(280px, calc(100vw - 28px));
