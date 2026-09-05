@@ -1,6 +1,6 @@
 ---
 title: Panels and Overlays
-status: drafted
+status: complete
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -106,3 +106,52 @@ with a dirty dot in `--warn` and a close `.icon-btn` on hover.
   (toggle terminal, region on the bottom edge of the main card, gutter drag
   changes height, maximize fills the main card). Screenshots `palette`,
   `picker`, `terminal`, `explorer`, light and dark.
+
+## Outcome
+
+**What shipped** (`6d45e5ac`, `a47db930`, `fdc3daad`, `53ebaac8`). `modal.css`
+defines the two floating shapes beside the sheet: `.pop` (a lifted card with
+`--sh-pop`, radius `--r-xl`) and `.dialog` (centred, 440 wide, `.dialog--wide`
+720, with `.dialog-head`, `.dialog-body` and `.dialog-foot`). The command
+palette is a 640px `.pop` at the top of the viewport: a borderless field with
+an `esc` key in the head, sections under `.eyebrow` titles, rows at the row
+radius with the selected one on `--bg-sunk`, task actions as small ghost
+buttons and a key legend in the foot. Toasts are `.pop` rows with a tone dot.
+Confirm, keyboard shortcuts and device sign-in are 440 dialogs; the trash and
+the workspace picker and editor are 720 dialogs of `.rows` cards. The folder
+browser the picker and editor duplicated is one `FolderBrowser.vue` fed the
+parent's `useFolderBrowser` state. The dock regions sit on `--bg-sunk` with a
+hairline toward the editor and accent gutters; the terminal tab bar is the
+underline tab strip (its styles had been lost with the status bar); the
+explorer reuses the plan tree row; editor tabs are underline tabs with a warn
+dot for dirty files; `FileEditor` reads `lib/editorTheme.ts`, a CodeMirror
+theme and highlight style on the tokens, and `@codemirror/theme-one-dark` is
+gone. `lib/statusPill.ts` is the one status to pill map for the sheet, the
+palette, the trash and the explorer. Tests: `CommandPalette.test.ts`,
+`ConfirmDialog.test.ts`, `editorTheme.test.ts`, `statusPill.test.ts`; the
+guard covers every listed file. Scenes `palette` and `dock` are new, `picker`
+asserts the 720 width, and every scene now runs in its own browser context.
+Snapshots gain `picker`, `terminal` and `explorer`.
+
+**Decisions made during implementation.**
+- The kbd hints are `kbd.key` from the primitives rather than `.pill-neutral`:
+  a key cap is a glyph, not a state.
+- The confirm dialog keeps no head when the request carries no title; the
+  message is then the first thing in the card.
+- The scene runner isolates every scene in a fresh browser context. The dock
+  scene had failed only after the chat scene, whose persisted popup covered
+  the terminal controls. Isolation is the root fix rather than closing that
+  popup.
+- The `e` shortcut is guarded by focus, so the explorer snapshot clicks the
+  collapsed explorer rail instead.
+
+**Deviations from the spec.** `WorkspaceEditModal` stays at the wide dialog
+with cards of rows, as specified, but the picker's list view keeps its rows
+in a card rather than bare `.rows` so it reads like the editor beside it.
+
+**Surprises.** `frontend/package-lock.json` is stale since the switch to bun
+and still pins latere-ui 1.9.12; running `npm` against it downgraded
+`node_modules/latere-ui` and broke the typecheck until `bun install` restored
+it. The lockfile is a leftover for a follow-up.
+
+**Follow-ups.** Delete `frontend/package-lock.json` in a housekeeping commit.
