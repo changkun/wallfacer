@@ -1,6 +1,6 @@
 ---
 title: Console Redesign
-status: drafted
+status: complete
 depends_on:
   - specs/shared/visual-identity/theme-system.md
 affects:
@@ -15,7 +15,7 @@ affects:
   - docs/guide/
 effort: xlarge
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-06
 author: changkun
 dispatched_task_id: null
 ---
@@ -282,3 +282,37 @@ Three tiers, each child adds to all three:
   8, card radius, no element with a computed `backdrop-filter`), no page
   errors, and a light and dark screenshot. `regen.sh` distributes the
   screenshots to their committed locations.
+
+## Outcome
+
+**What shipped** (2026-09-05 to 2026-09-06, thirty-five commits on main).
+All eleven children are complete, each with its own outcome. The console
+now runs on one token set (`tokens.css`, six palettes with the clay accent on
+a neutral canvas as the default and the cream canvas as `paper`), one
+primitive sheet (`primitives.css`: buttons, icon buttons, pills, cards, rows,
+segmented controls, fields, tabs, popovers, dialogs), and a matte material
+with no `backdrop-filter` and no latere-ui glass or sidebar. The shell is
+wallfacer's own rail on the deep ground with the content as an inset card
+under a 52px topbar; the status bar is gone. Every surface was rebuilt on
+the primitives: the board and task sheet, chat and plan, settings, agent
+fleets, the panels and overlays, and the six secondary screens. The
+compatibility aliases the early children left are deleted. Verification is
+three tiers: `tests/designSystem.test.ts` (no glass, no hex in any `.vue`
+style block or console stylesheet, no literal radii, no aliases, contrast
+floors for six palettes in both themes), the component tests each child
+added, and twenty Playwright scenes in `checks.mjs` that run locally via
+`make ui-test` and in CI. Every committed screenshot was regenerated from one
+seed in both themes.
+
+**Design evolution.** Two shapes joined the primitives after the umbrella
+was written: `.pop` and `.dialog` (panels child) and the tree row shared by
+the plan tree, the explorer and the docs nav. Colour for canvas and SVG code
+moved behind `lib/chartPalette.ts` and token expressions rather than a
+per-component theme map. The routines editor became inline row controls
+because the API edits one field; the artifacts viewer kept its preview-first
+layout; the agent editor stayed a dialog rather than a drawer.
+
+**Follow-ups.** Delete `frontend/package-lock.json` (stale since the bun
+switch). The board card's routine footer still uses a native checkbox where
+the routines page uses the segmented switch.
+
