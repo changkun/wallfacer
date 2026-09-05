@@ -67,6 +67,18 @@ describe('prefs palette axis', () => {
     const names = PALETTES.map((p) => p.name);
     expect(new Set(names).size).toBe(names.length);
     expect(names[0]).toBe('clay');
+    expect(names).toContain('paper');
     for (const p of PALETTES) expect(p.swatches).toHaveLength(4);
+  });
+
+  // The no-flash script in index.html applies the attribute before the store
+  // loads. Its allow-list must name every non-default palette, or a returning
+  // reader gets a flash of the default palette on cold load.
+  it('index.html no-flash allow-list matches the roster', async () => {
+    const { PALETTES } = await freshStore();
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    for (const p of PALETTES.slice(1)) expect(html).toContain(`p === '${p.name}'`);
   });
 });

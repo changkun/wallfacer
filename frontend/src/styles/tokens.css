@@ -2,50 +2,53 @@
 
 /* =======================================================================
    Wallfacer — Design Tokens
-   Default palette: paper-ink with clay accent (the original identity).
-   Alternative palettes live in palettes.css and are selected via
-   <html data-palette>; see specs/shared/visual-identity/theme-system.md.
-   Existing CSS reads legacy aliases (--text, --border, --accent-hover, ...)
-   which are defined alongside the new canonical tokens.
+
+   Ink carries the text; colour carries the meaning. One accent hue (clay)
+   marks what the operator can act on: the primary control, the current page,
+   a focus ring. A five-tone semantic ramp marks what the system reports:
+   running, passed, needs attention, failed, published. Everything else is ink
+   on a neutral canvas, so the colour that is there always means something.
+
+   The default palette is `clay` on a neutral canvas and carries no
+   data-palette attribute. Alternative palettes live in palettes.css and are
+   selected via <html data-palette>; a palette sets surfaces, ink, rules, the
+   accent family and the semantic ramp only. Tint pairs, shadows and every
+   non-colour token derive from those, so a palette cannot drift from the
+   system. Existing CSS reads legacy aliases (--text, --border, --accent-hover,
+   --sh-1..3) which are defined alongside the canonical tokens.
+   See specs/shared/console-redesign.md.
    ======================================================================= */
 
 :root,
 [data-theme="light"] {
-  /* Typography — mirrors the Latere platform type system: Inter for body and
-     headings, Instrument Serif (italic) for the wordmark and display emphasis,
-     and the system monospace stack for data and code. */
+  /* Typography — Inter for UI, the system monospace stack for data and code.
+     Instrument Serif is only used by the shared latere-ui footer wordmark on
+     the cloud landing. */
   --font-sans:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-sans);
   --font-serif: "Instrument Serif", Georgia, serif;
-  --font-mono: ui-monospace, "SF Mono", "Fira Code", Menlo, monospace;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
+  /* Type scale. Body is 13px: the board is a dense four-column tool, one step
+     below replichai's 14px reading surfaces. */
   --fs-9: 10px;
   --fs-10: 11px;
-  --fs-base: 12px;
-  --fs-md: 13px;
-  --fs-lg: 14px;
-  --fs-xl: 16px;
-  --fs-2xl: 20px;
-  --fs-3xl: 28px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 15px;
+  --fs-xl: 17px;
+  --fs-2xl: 22px;
+  --fs-3xl: 30px;
 
-  /* Radii */
-  --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 10px;
-  --r-xl: 14px;
-
-  /* Liquid Glass v2 geometry ladder — the concentric radii the shared
-     latere-ui glass chrome (floating rail, palette, cards) consumes via
-     var(--radius-*). Theme-independent, so declared once in the root scope. */
-  --radius-xs: 8px;
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --radius-xl: 28px;
-  --radius-2xl: 36px;
-  --radius-pill: 999px;
+  /* Radii. Concentric: a control nested in a surface takes the surface radius
+     minus the padding between them (14px card, 8px padding, 6px control). */
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-main: 20px;
+  --r-pill: 999px;
 
   /* Space */
   --sp-1: 4px;
@@ -55,232 +58,222 @@
   --sp-5: 16px;
   --sp-6: 20px;
   --sp-7: 28px;
+  /* Row rhythm: --gap-row separates the two sides of a row (a label from its
+     value), --gap-inline separates things that sit together on one side. */
+  --gap-row: 18px;
+  --gap-inline: 10px;
 
-  /* Chrome height */
-  --h-status: 24px;
+  /* Motion */
+  --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-hover: 0.16s;
 
-  /* Sidebar widths */
-  --sb-w: 240px;
-  --sb-w-icon: 56px;
+  /* Chrome geometry */
+  --rail-w: 236px;
+  --rail-w-fold: 64px;
+  --sb-w: var(--rail-w);
+  --sb-w-icon: var(--rail-w-fold);
+  --h-topbar: 52px;
 
-  /* Surfaces (paper-ink) */
-  --bg: #f4f1ea; /* canvas */
-  --bg-deep: #e6e1d5; /* deepest layer behind floating glass chrome */
-  --bg-sunk: #ebe7de; /* recessed (inputs, empty zones) */
-  --bg-elevated: #faf8f3; /* slightly raised */
-  --bg-card: #ffffff; /* cards / popovers */
-  --bg-sidebar: #ece8de; /* sidebar chrome */
-  --bg-hover: rgba(31, 29, 26, 0.045);
-  --bg-active: rgba(31, 29, 26, 0.08);
-
-  /* Legacy --bg-raised held "recessed" semantics in existing CSS;
-     keep that meaning so badges/buttons/mentions don't invert. */
+  /* Surfaces (neutral canvas) */
+  --bg-deep: #f0efec; /* window ground behind the rail */
+  --bg: #fafaf9; /* main card canvas */
+  --bg-sunk: #f3f2ef; /* inputs, ghost buttons, wells */
+  --bg-elevated: #fdfdfc; /* hover rows, raised fills */
+  --bg-card: #ffffff; /* cards, popovers, the active nav row */
+  --bg-sidebar: var(--bg-deep);
+  --bg-hover: rgba(20, 19, 17, 0.05);
+  --bg-active: rgba(20, 19, 17, 0.08);
   --bg-raised: var(--bg-sunk);
   --bg-input: var(--bg-sunk);
 
-  /* Ink */
-  --ink: #1b1916;
-  --ink-2: #4c4842;
-  /* --ink-3 is the "muted" role used for labels, metadata and secondary
-     content. Kept dark enough to clear WCAG AA (~5:1) on both the paper
-     canvas (--bg) and white cards; the previous #7a766e dipped to ~4:1
-     on the paper surface. */
-  --ink-3: #6b6760;
-  --ink-4: #97928a;
+  /* Ink. --ink-3 clears WCAG AA (5.0:1) on --bg; the design-system test
+     holds every palette to that line. */
+  --ink: #141311;
+  --ink-2: #55524c;
+  --ink-3: #6f6c66;
+  --ink-4: #9a978f;
 
   /* Rules */
-  --rule: #d9d3c5;
-  --rule-2: #c7c0af;
+  --rule: rgba(20, 19, 17, 0.08);
+  --rule-2: rgba(20, 19, 17, 0.14);
 
-  /* Accent — clay */
+  /* Accent — clay. The one hue for what the operator acts on. */
   --accent: #c45a33;
   --accent-2: #a84e2e;
-  --accent-soft: #f3dccf;
+  --accent-soft: rgba(196, 90, 51, 0.1);
   --accent-tint: rgba(196, 90, 51, 0.08);
+  --accent-line: rgba(196, 90, 51, 0.28);
+  --accent-ring: rgba(196, 90, 51, 0.3);
   --accent-gradient: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%);
 
-  /* Semantic */
-  --ok: #3f7a4a;
-  --warn: #a56a12;
-  --info: #3a6db3;
-  --err: #a32d2d;
-  --purple: #6a4aa3;
+  /* Semantic ramp. Muted rather than saturated: five states appear together
+     on one board and must rank themselves rather than compete. These also
+     drive syntax highlighting, so they stay legible as body-sized text. */
+  --ok: #3f7a55;
+  --warn: #96631f;
+  --run: #0f766e;
+  --err: #a9373b;
+  --purple: #6b4fa8;
+  --info: var(--run);
 
-  /* Status column chips */
-  --col-backlog: #8e8a80;
-  --col-progress: #3a6db3;
-  --col-waiting: #a56a12;
-  --col-done: #3f7a4a;
+  /* Status column chips read the ramp. */
+  --col-backlog: #8a8780;
+  --col-progress: var(--run);
+  --col-waiting: var(--warn);
+  --col-done: var(--ok);
 
-  /* Elevation ladder — layered ambient + key light, warm-tinted from the
-     paper-ink shadow color. Each rung adds a softer, wider penumbra so
-     surfaces read as physically stacked rather than outlined. */
-  --sh-1: 0 1px 1px rgba(27, 25, 22, 0.04), 0 1px 2px rgba(27, 25, 22, 0.05);
-  --sh-2:
-    0 1px 2px rgba(27, 25, 22, 0.05), 0 3px 8px -1px rgba(27, 25, 22, 0.09);
-  --sh-3:
-    0 2px 4px rgba(27, 25, 22, 0.05), 0 10px 24px -6px rgba(27, 25, 22, 0.14);
-  --sh-pop:
-    0 4px 10px rgba(27, 25, 22, 0.07), 0 22px 50px -12px rgba(27, 25, 22, 0.24);
+  /* Elevation — matte. A card carries one hairline shadow; only floating
+     chrome (popovers, the main card) gets a penumbra. No inset highlights. */
+  --sh-card: 0 1px 2px rgba(20, 19, 17, 0.04);
+  --sh-main:
+    0 1px 2px rgba(20, 19, 17, 0.04), 0 18px 40px -30px rgba(20, 19, 17, 0.3);
+  --sh-pop: 0 10px 30px rgba(20, 19, 17, 0.13), 0 1px 2px rgba(20, 19, 17, 0.06);
+  --sh-1: var(--sh-card);
+  --sh-2: 0 1px 2px rgba(20, 19, 17, 0.05), 0 3px 8px -1px rgba(20, 19, 17, 0.09);
+  --sh-3: 0 2px 4px rgba(20, 19, 17, 0.05), 0 10px 24px -6px rgba(20, 19, 17, 0.14);
 
-  /* Inset well — recessed trays/inputs read as carved into the surface. */
-  --sh-inset: inset 0 1px 2px rgba(27, 25, 22, 0.05);
-  /* Top-edge highlight — the macOS "light from above" bevel on raised chrome. */
-  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* Overlay scrim behind dialogs and the command palette. Tint only, no blur. */
+  --glass-dim: rgba(20, 19, 17, 0.28);
 
-  /* Translucent chrome — frosted material over scrolling content. Needs the
-     blur filter to read; falls back to a near-opaque tint without it. */
-  --glass-bg: rgba(244, 241, 234, 0.72);
-  --glass-sidebar: rgba(236, 232, 222, 0.7);
-  --glass-elevated: rgba(250, 248, 243, 0.78);
-  /* Full backdrop-filter shorthand for wallfacer's own frosted surfaces.
-     Renamed off --glass-blur: latere-ui/glass v2 owns --glass-blur as a bare
-     length (blur(var(--glass-blur))), so the two grammars must not collide. */
-  --glass-filter: saturate(180%) blur(20px);
-
-  /* Chart / badge tints */
-  --tint-blue: #e4eaf4;
-  --tint-blue-ink: #2d538a;
-  --tint-amber: #f1e7cf;
-  --tint-amber-ink: #7a5418;
-  --tint-green: #d9e6d6;
-  --tint-green-ink: #2d5a36;
-  --tint-plum: #e6dde9;
-  --tint-plum-ink: #573f77;
-  --tint-red: #f0d9d5;
-  --tint-red-ink: #822020;
-  --tint-neutral: #e7e2d4;
-  --tint-neutral-ink: #5c574d;
+  /* Tint pairs derive from the ramp: a badge is its own state colour on a
+     wash of itself. Palettes never set these. */
+  --tint-blue: color-mix(in srgb, var(--run) 14%, transparent);
+  --tint-blue-ink: var(--run);
+  --tint-amber: color-mix(in srgb, var(--warn) 16%, transparent);
+  --tint-amber-ink: var(--warn);
+  --tint-green: color-mix(in srgb, var(--ok) 14%, transparent);
+  --tint-green-ink: var(--ok);
+  --tint-plum: color-mix(in srgb, var(--purple) 14%, transparent);
+  --tint-plum-ink: var(--purple);
+  --tint-purple: var(--tint-plum);
+  --tint-purple-ink: var(--tint-plum-ink);
+  --tint-red: color-mix(in srgb, var(--err) 14%, transparent);
+  --tint-red-ink: var(--err);
+  --tint-neutral: color-mix(in srgb, var(--ink) 6%, transparent);
+  --tint-neutral-ink: var(--ink-2);
 
   /* Legacy aliases consumed by existing CSS */
   --text: var(--ink);
   --text-secondary: var(--ink-2);
   --text-muted: var(--ink-3);
   --border: var(--rule);
+  --border-strong: var(--rule-2);
   --accent-hover: var(--accent-2);
   --shadow: var(--sh-2);
   --shadow-lg: var(--sh-pop);
+  --shadow-pop: var(--sh-pop);
 
-  /* Cloud-page tokens (used by landing/docs styles in app.css) */
-  --bg-surface: var(--bg-elevated);
+  /* Cloud-page tokens (landing/docs styles in app.css) */
+  --bg-surface: var(--bg-card);
   --bg-sunken: var(--bg-sunk);
   --accent-subtle: var(--accent-tint);
   --accent-glow: rgba(196, 90, 51, 0.15);
   --accent-glow-strong: rgba(196, 90, 51, 0.3);
-  --border-strong: var(--rule-2);
   --grid-color: rgba(0, 0, 0, 0.035);
 
-  /* Sandbox-aligned typography helpers */
-  --fs-eyebrow: 11px;
-  --fs-micro: 12px;
+  /* Typography helpers */
+  --fs-eyebrow: 10px;
+  --fs-micro: 11px;
   --fs-body-sm: 13px;
   --fs-body: 14px;
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
-  --tracking-label: 0.06em;
+  --tracking-label: 0.14em;
 
-  /* Terminal surface — follows the active theme (light values here). */
-  --terminal-bg: #faf8f3;
-  --terminal-fg: #2a2720;
-  --terminal-rule: #d9d3c5;
-  --terminal-ink-muted: rgba(27, 25, 22, 0.55);
-  --terminal-ink-dim: rgba(27, 25, 22, 0.45);
-  --terminal-tab-hover: #ece8de;
-  --terminal-tab-active: #ffffff;
+  /* Terminal surface follows the active theme. */
+  --terminal-bg: var(--bg-sunk);
+  --terminal-fg: var(--ink);
+  --terminal-rule: var(--rule);
+  --terminal-ink-muted: rgba(20, 19, 17, 0.55);
+  --terminal-ink-dim: rgba(20, 19, 17, 0.45);
+  --terminal-tab-hover: var(--bg-elevated);
+  --terminal-tab-active: var(--bg-card);
+
+  /* Shared latere-ui components (AccountMenu, SiteFooter) still read the
+     glass ladder. Pinned to opaque, blur-free values so they render matte:
+     the package documents these as its reduce-transparency fallback. */
+  --glass-bg: var(--bg-card);
+  --glass-bg-ultrathin: var(--bg-card);
+  --glass-bg-thin: var(--bg-card);
+  --glass-bg-thick: var(--bg-card);
+  --glass-smoke: var(--ink);
+  --glass-smoke-strong: var(--ink);
+  --glass-smoke-ink: var(--bg);
+  --glass-blur: 0;
+  --glass-blur-ultrathin: 0;
+  --glass-blur-thin: 0;
+  --glass-blur-thick: 0;
+  --glass-saturate: 100%;
+  --glass-brightness: 1;
+  --glass-border: var(--rule);
+  --glass-highlight: transparent;
+  --glass-edge-top: none;
+  --glass-pill-fill: var(--bg-sunk);
+  --shadow-glass: var(--sh-pop);
+  --shadow-glass-hover: var(--sh-pop);
+  --glass-edge: var(--sh-pop);
+  --glass-edge-thick: var(--sh-pop);
+  --glass-radius: var(--r-xl);
+  --radius-pill: var(--r-pill);
+  --canvas: var(--bg);
+  --canvas-gradient: none;
 }
 
 [data-theme="dark"] {
-  --bg: #15140f;
-  --bg-deep: #0c0b08; /* deepest layer behind floating glass chrome */
-  --bg-sunk: #100f0c;
-  --bg-elevated: #1c1a15;
-  --bg-card: #1e1c17;
-  --bg-sidebar: #100f0c;
-  --bg-hover: rgba(244, 241, 234, 0.04);
-  --bg-active: rgba(244, 241, 234, 0.08);
-  --bg-raised: var(--bg-sunk);
-  --bg-input: #191712;
+  /* Lifted off pure black: the surfaces rise into a soft charcoal and the
+     ink drops just below white, so the page carries the same hierarchy at a
+     contrast the eye can sit with. */
+  --bg-deep: #101012;
+  --bg: #17171a;
+  --bg-sunk: #141416;
+  --bg-elevated: #1c1c20;
+  --bg-card: #1f1f24;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.09);
 
-  --ink: #ece6d6;
-  --ink-2: #b9b2a0;
-  --ink-3: #857f6f;
-  --ink-4: #5a5449;
+  --ink: #e9e8e4;
+  --ink-2: #a9a8a2;
+  --ink-3: #8a8983;
+  --ink-4: #63625d;
 
-  --rule: #2a2720;
-  --rule-2: #3a362c;
+  --rule: rgba(255, 255, 255, 0.09);
+  --rule-2: rgba(255, 255, 255, 0.15);
 
   --accent: #e07a51;
-  --accent-2: #f08961;
-  --accent-soft: #3a1f14;
+  --accent-2: #ec8f69;
+  --accent-soft: rgba(224, 122, 81, 0.16);
   --accent-tint: rgba(224, 122, 81, 0.12);
+  --accent-line: rgba(224, 122, 81, 0.4);
+  --accent-ring: rgba(224, 122, 81, 0.42);
   --accent-gradient: linear-gradient(135deg, #e07a51 0%, #ec8a5f 55%, #f5a07a 100%);
 
-  --ok: #6fb37f;
-  --warn: #d4a050;
-  --info: #7aa3d9;
-  --err: #dc7878;
-  --purple: #a389d4;
+  --ok: #8fb894;
+  --warn: #e0bb8c;
+  --run: #45b8ab;
+  --err: #db8385;
+  --purple: #b9a6e6;
 
-  --col-backlog: #858070;
-  --col-progress: #7aa3d9;
-  --col-waiting: #d4a050;
-  --col-done: #6fb37f;
+  --col-backlog: #7c7b75;
 
-  /* Dark elevation: shadows nearly vanish on near-black, so depth leans on
-     the top-edge highlight + lighter elevated surfaces. Shadows still anchor
-     floating chrome. */
-  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-main: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -30px rgba(0, 0, 0, 0.8);
+  --sh-pop: 0 14px 38px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.38);
   --sh-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 10px -2px rgba(0, 0, 0, 0.5);
   --sh-3: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 0, 0, 0.6);
-  --sh-pop: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 56px -12px rgba(0, 0, 0, 0.75);
 
-  --sh-inset: inset 0 1px 2px rgba(0, 0, 0, 0.35);
-  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-dim: rgba(0, 0, 0, 0.55);
 
-  --glass-bg: rgba(21, 20, 15, 0.7);
-  --glass-sidebar: rgba(16, 15, 12, 0.72);
-  --glass-elevated: rgba(30, 28, 23, 0.8);
-  --glass-filter: saturate(160%) blur(20px);
+  --tint-neutral: color-mix(in srgb, var(--ink) 8%, transparent);
 
-  --tint-blue: #1a2638;
-  --tint-blue-ink: #9bbce8;
-  --tint-amber: #2e2412;
-  --tint-amber-ink: #d9a868;
-  --tint-green: #1a2a1e;
-  --tint-green-ink: #8bc78f;
-  --tint-plum: #261e33;
-  --tint-plum-ink: #b49de0;
-  --tint-red: #2e1818;
-  --tint-red-ink: #e09090;
-  --tint-neutral: #2a2620;
-  --tint-neutral-ink: #a39e90;
-
-  --text: var(--ink);
-  --text-secondary: var(--ink-2);
-  --text-muted: var(--ink-3);
-  --border: var(--rule);
-  --accent-hover: var(--accent-2);
-  --shadow: var(--sh-2);
-  --shadow-lg: var(--sh-pop);
-
-  --bg-surface: var(--bg-elevated);
-  --bg-sunken: var(--bg-sunk);
-  --accent-subtle: var(--accent-tint);
-  --accent-glow: rgba(224, 122, 81, 0.10);
-  --accent-glow-strong: rgba(224, 122, 81, 0.20);
-  --border-strong: var(--rule-2);
+  --accent-glow: rgba(224, 122, 81, 0.1);
+  --accent-glow-strong: rgba(224, 122, 81, 0.2);
   --grid-color: rgba(255, 255, 255, 0.025);
 
-  /* Terminal surface — dark values for the dark theme. */
-  --terminal-bg: #1b1916;
-  --terminal-fg: #f4f1ea;
-  --terminal-rule: #2a2720;
-  --terminal-ink-muted: rgba(244, 241, 234, 0.55);
-  --terminal-ink-dim: rgba(244, 241, 234, 0.45);
-  --terminal-tab-hover: #24221d;
-  --terminal-tab-active: #2a2823;
+  --terminal-bg: var(--bg-deep);
+  --terminal-ink-muted: rgba(233, 232, 228, 0.55);
+  --terminal-ink-dim: rgba(233, 232, 228, 0.45);
 }
 
 .mono {

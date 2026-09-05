@@ -1,36 +1,3 @@
-/* --- Tag palette ---
-   All task-tag slots cycle through the design-system's 6 tint pairs
-   (blue / amber / green / plum / red / neutral) defined in tokens.css.
-   Dark-mode values come from the same token definitions automatically. */
-:root,
-[data-theme="light"],
-[data-theme="dark"] {
-  --tag-bg-0: var(--tint-blue);
-  --tag-text-0: var(--tint-blue-ink);
-  --tag-bg-1: var(--tint-amber);
-  --tag-text-1: var(--tint-amber-ink);
-  --tag-bg-2: var(--tint-green);
-  --tag-text-2: var(--tint-green-ink);
-  --tag-bg-3: var(--tint-plum);
-  --tag-text-3: var(--tint-plum-ink);
-  --tag-bg-4: var(--tint-red);
-  --tag-text-4: var(--tint-red-ink);
-  --tag-bg-5: var(--tint-neutral);
-  --tag-text-5: var(--tint-neutral-ink);
-  --tag-bg-6: var(--tint-blue);
-  --tag-text-6: var(--tint-blue-ink);
-  --tag-bg-7: var(--tint-amber);
-  --tag-text-7: var(--tint-amber-ink);
-  --tag-bg-8: var(--tint-green);
-  --tag-text-8: var(--tint-green-ink);
-  --tag-bg-9: var(--tint-plum);
-  --tag-text-9: var(--tint-plum-ink);
-  --tag-bg-10: var(--tint-red);
-  --tag-text-10: var(--tint-red-ink);
-  --tag-bg-11: var(--tint-neutral);
-  --tag-text-11: var(--tint-neutral-ink);
-}
-
 /* --- Focus rings ---
  * Suppress the browser's default focus outline when focus did NOT arrive from
  * the keyboard — i.e. mouse clicks and programmatic focus. Keyboard navigation
@@ -43,12 +10,15 @@
   outline: none;
 }
 
-::selection {
-  background: rgba(80, 130, 190, 0.3);
-  color: inherit;
+/* One focus ring for every control, accent-coloured, so keyboard travel is
+ * traceable across the app instead of each widget inventing its own. */
+:where(input, button, select, textarea, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
-[data-theme="dark"] ::selection {
-  background: rgba(100, 160, 220, 0.35);
+::selection {
+  background: var(--accent-soft);
   color: inherit;
 }
 
@@ -61,10 +31,29 @@
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  line-height: 1.6;
+  color: var(--ink);
+  font: var(--fs-base) / 1.5 var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+/* Colour and decoration are inherited by default: a link looks like a link
+ * because it opted in (.link), never because an author forgot a class. */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 h1,
@@ -93,30 +82,23 @@ h6 {
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-    border-top-color: var(--accent);
-    opacity: 0.7;
-  }
-}
 
 /* --- Utility --- */
 .text-v-primary {
-  color: var(--text);
+  color: var(--ink);
 }
 .text-v-secondary {
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 .text-v-muted {
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 .border-v {
-  border-color: var(--border);
+  border-color: var(--rule);
 }
 .section-title {
-  font-size: 16px;
+  font-size: var(--fs-xl);
   font-weight: 600;
-  color: var(--text);
+  color: var(--ink);
   margin-bottom: 8px;
 }

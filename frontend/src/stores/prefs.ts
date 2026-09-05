@@ -5,11 +5,12 @@ export type Theme = 'light' | 'dark' | 'auto';
 export type Locale = 'en' | 'zh';
 
 // Color palettes are a separate axis from light/dark: a palette defines the
-// hues, the theme picks the mode. `clay` is the default and needs no
-// data-palette attribute (its tokens are tokens.css's :root values); the
-// others override in palettes.css. Keep this list, PALETTES, palettes.css,
-// and the index.html no-flash script in sync.
-export type PaletteName = 'clay' | 'indigo' | 'amber' | 'rose' | 'copper';
+// hues, the theme picks the mode. `clay` (clay accent on a neutral canvas) is
+// the default and needs no data-palette attribute (its tokens are tokens.css's
+// :root values); the others override in palettes.css. `paper` is the original
+// cream canvas. Keep this list, PALETTES, palettes.css, and the index.html
+// no-flash script in sync.
+export type PaletteName = 'clay' | 'paper' | 'indigo' | 'amber' | 'rose' | 'copper';
 
 export interface PaletteInfo {
   name: PaletteName;
@@ -20,7 +21,8 @@ export interface PaletteInfo {
 }
 
 export const PALETTES: PaletteInfo[] = [
-  { name: 'clay', label: 'Clay', swatches: ['#c45a33', '#f4f1ea', '#e07a51', '#15140f'] },
+  { name: 'clay', label: 'Clay', swatches: ['#c45a33', '#fafaf9', '#e07a51', '#17171a'] },
+  { name: 'paper', label: 'Paper', swatches: ['#c45a33', '#f4f1ea', '#e07a51', '#15140f'] },
   { name: 'indigo', label: 'Indigo', swatches: ['#5b5bd6', '#fafafa', '#7c6cf0', '#0b0b0f'] },
   { name: 'amber', label: 'Amber', swatches: ['#d97706', '#fafaf7', '#f59e0b', '#12100d'] },
   { name: 'rose', label: 'Rose', swatches: ['#c22a56', '#fafaf8', '#e5487f', '#110e0f'] },

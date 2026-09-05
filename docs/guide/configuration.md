@@ -18,7 +18,7 @@ Open Settings from the sidebar gear icon or press `Cmd+,` (or `Ctrl+,`). The pag
 ### Appearance tab
 
 - **Mode**: Light, Dark, or Auto (follow the operating system). Also cycled from the account menu; stored at `wallfacer-theme` in browser storage.
-- **Color theme**: named palettes applied to the whole workspace in both light and dark mode. `Clay` is the default; `Indigo`, `Amber`, `Rose`, and `Copper` are alternatives. Stored at `wallfacer-palette`; the choice is per browser.
+- **Color theme**: named palettes applied to the whole workspace in both light and dark mode. `Clay` (the clay accent on a neutral canvas) is the default; `Paper` is the original cream canvas, and `Indigo`, `Amber`, `Rose`, and `Copper` are alternatives. Stored at `wallfacer-palette`; the choice is per browser.
 
 ### Harness tab
 
