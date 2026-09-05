@@ -1,6 +1,6 @@
 ---
 title: Shell
-status: validated
+status: complete
 depends_on:
   - specs/shared/console-redesign/tokens-and-primitives.md
 affects:
@@ -151,3 +151,48 @@ buttons as its topbar actions.
   and bottom, topbar height 52, no `.status-bar` in the DOM, no element with
   a computed `backdrop-filter`. Screenshots `board` light and dark and a
   folded variant.
+
+## Outcome
+
+**Status:** complete, 2026-09-05. Commits `423962f4` (nav model, ui store
+slice) and `b90fff5f` (rail, workspace chip, topbar, layout, deletions).
+
+**What shipped.** `AppRail.vue` (with `NavIcon.vue` and `lib/nav.ts` as the one
+nav model for rail and crumb) replaces `Sidebar.vue`; `WorkspaceChip.vue`
+carries the switcher, the connection dot and the branch rows with Sync / Push
+/ Rebase; `Topbar.vue` carries the crumb, the page's actions and the terminal
+and shortcuts buttons; `AppLayout.vue` paints `--bg-deep` and insets
+`.app-main` as the 20px card. `StatusBar.vue`, `status-bar.css`, `header.css`
+and the five `header/` partials are deleted; the board grid rules moved to
+`board.css`. `checks.mjs` gained the `shell` scene (rail 236/64, inset 8,
+topbar 52, no status bar, search in the topbar slot, cards rendered) and
+`make ui-test` passes eleven scenes. Tests: `appRail`, `workspaceChip`,
+`topbar`, `nav`.
+
+**Decisions made during implementation.**
+- Page actions are a component the page registers on the ui store
+  (`setTopbarActions` / `clearTopbarActions`), rendered by `Topbar` with
+  `<component :is>`. A first pass used `<Teleport to="#topbar-actions">`; it
+  tripped a Vue patch error during hydration in the built app and needed the
+  test DOM to fake the target. `BoardActions.vue` holds the board's controls
+  and the automation menu state.
+- The crumb is derived: workspace from the stores, page from `lib/nav.ts`, a
+  leaf a page sets with `setCrumbLeaf`. Pages do not write the whole crumb.
+- The product switcher stays in the brand row (latere-ui `ProductSwitcher`
+  used directly, styled by its own scoped CSS); the rail no longer imports
+  `latere-ui/console`.
+- Below 860px the rail is a fixed drawer opened by the topbar's menu button
+  with a scrim in `AppLayout`; the fold button hides there.
+- The editor tab strip renders at the top edge of the board body and hides
+  itself when only the pinned Board tab is open.
+
+**Deviations from the spec.** The Map button had no replacement to add:
+Mission Control is already a nav row. The unread dot only shows when the
+Board count is zero, as specified.
+
+**Surprises.** `board.css` styles the task card as `.card`, the same name as
+the primitive; the workspace popover borrowed `position: relative` from it
+and pushed the rail down. The popover now carries its own class and the board
+spec renames the task card.
+
+**Follow-ups.** None beyond the sibling specs.
