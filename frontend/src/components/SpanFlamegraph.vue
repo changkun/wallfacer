@@ -210,7 +210,7 @@ const detailRows = computed(() => {
 .flamegraph__empty {
   padding: 16px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--ink-3);
   text-align: center;
 }
 .flamegraph__track { position: relative; width: 100%; }
@@ -224,7 +224,7 @@ const detailRows = computed(() => {
   position: absolute;
   top: 2px;
   font-size: 9px;
-  color: var(--text-muted);
+  color: var(--ink-3);
   font-family: var(--font-mono);
   white-space: nowrap;
   pointer-events: none;
@@ -235,15 +235,15 @@ const detailRows = computed(() => {
     120deg,
     transparent,
     transparent 3px,
-    var(--border) 3px,
-    var(--border) 4px
+    var(--rule) 3px,
+    var(--rule) 4px
   );
   opacity: 0.4;
   pointer-events: none;
 }
 .flamegraph__block {
   position: absolute;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -253,7 +253,7 @@ const detailRows = computed(() => {
 }
 .flamegraph__label {
   font-size: 10px;
-  color: #fff;
+  color: var(--accent-fg);
   font-family: var(--font-sans);
   white-space: nowrap;
   overflow: hidden;
@@ -264,15 +264,15 @@ const detailRows = computed(() => {
   position: fixed;
   z-index: 200;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
   padding: 6px 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--sh-pop);
   font-size: 11px;
   pointer-events: none;
 }
-.flamegraph__tip-label { font-weight: 600; color: var(--text); }
-.flamegraph__tip-range { color: var(--text-muted); font-family: var(--font-mono); }
+.flamegraph__tip-label { font-weight: 600; color: var(--ink); }
+.flamegraph__tip-range { color: var(--ink-3); font-family: var(--font-mono); }
 
 .flamegraph__cost {
   position: relative;
@@ -299,7 +299,7 @@ const detailRows = computed(() => {
   right: 0;
   font-size: 10px;
   font-family: var(--font-mono);
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 
 .flamegraph__table {
@@ -311,23 +311,23 @@ const detailRows = computed(() => {
 .flamegraph__table th {
   padding: 3px 6px;
   font-weight: 500;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
 }
 .flamegraph__th-left { text-align: left; }
 .flamegraph__th-right { text-align: right; }
 .flamegraph__table td {
   padding: 3px 6px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule);
   white-space: nowrap;
 }
 .flamegraph__td-right { text-align: right; font-family: var(--font-mono); }
-.flamegraph__td-muted { color: var(--text-muted); }
+.flamegraph__td-muted { color: var(--ink-3); }
 .flamegraph__swatch {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   margin-right: 4px;
 }
 </style>

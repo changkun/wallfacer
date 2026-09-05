@@ -223,6 +223,33 @@ SCENES['contrast'] = async (page) => {
   }
 };
 
+// The task sheet (specs/shared/console-redesign/task-detail.md): open the
+// first card, the sheet fits the viewport, the aside is 340 wide, the tabs
+// row is present, the Actions card carries one ink button, and the Changes
+// and Verification tabs switch without page errors.
+SCENES['task-detail'] = async (page) => {
+  await page.click('.board-grid .task-card .task-card__title', { timeout: 5000 }).catch(() => {});
+  await page.waitForSelector('.sheet', { state: 'visible', timeout: 8000 }).catch(() => {});
+  const sheet = await firstBox(page, '.sheet');
+  expect('task-detail', !!sheet, 'sheet did not open');
+  if (!sheet) return;
+  const vw = await page.evaluate(() => window.innerWidth);
+  expect('task-detail', sheet.width <= Math.min(vw * 0.96, 1440) + 1, `sheet width ${Math.round(sheet.width)}`);
+  const aside = await firstBox(page, '.sheet-aside');
+  expect('task-detail', aside && Math.abs(aside.width - 340) <= 1, `aside width ${aside && aside.width}, want 340`);
+  const tabs = await firstBox(page, '.sheet-tabs');
+  expect('task-detail', tabs && tabs.height >= 30, 'tabs row missing');
+  const inks = await page.$$eval('.sheet-actions .btn:not(.ghost)', (els) => els.length);
+  expect('task-detail', inks <= 1, `${inks} ink buttons in the Actions card`);
+  const mainBox = await firstBox(page, '.sheet-main');
+  const overflow = await page.$eval('.sheet-main', (el) => el.scrollWidth > el.clientWidth + 1);
+  expect('task-detail', mainBox && !overflow, 'sheet main column overflows horizontally');
+  for (const tab of ['changes', 'verification', 'events']) {
+    await page.click(`[data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(250);
+  }
+};
+
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
 const SMOKE_ROUTES = { settings: '/settings', plan: '/plan', analytics: '/analytics', agents: '/agents', flows: '/flows' };

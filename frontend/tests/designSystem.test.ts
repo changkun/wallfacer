@@ -179,11 +179,23 @@ describe('primitives.css defines the shared classes', () => {
   // Surface stylesheets rebuilt on the system carry no hex literal and no
   // radius literal: colour and geometry come from tokens. Each surface spec
   // adds its files here as it lands.
-  it.each(['src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css'])('%s uses tokens only', (file) => {
-    const src = read(file);
+  const tokenOnly = [
+    'src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css',
+    'src/styles/modal.css', 'src/styles/task-detail.css', 'src/styles/diffs.css', 'src/styles/syntax.css', 'src/styles/mermaid.css',
+    'src/components/TaskDetail.vue', 'src/components/TaskPrPanel.vue', 'src/components/AgentTrace.vue',
+    'src/components/ReviewVerification.vue', 'src/components/SpanFlamegraph.vue', 'src/components/TaskCard.vue',
+    'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue',
+  ];
+  it.each(tokenOnly)('%s uses tokens only', (file) => {
+    const whole = read(file);
+    const src = file.endsWith('.vue') ? whole.split(/<style[^>]*>/).slice(1).join('\n') : whole;
     expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    // 50% is a circle, not a radius on the ladder.
-    expect(src.replace(/border-radius:\s*50%/g, '')).not.toMatch(/border-radius:\s*\d/);
+    // 50% is a circle and 0 removes a radius; neither is a rung on the ladder.
+    expect(src.replace(/border-radius:\s*(50%|0)(?=[;\s])/g, '')).not.toMatch(/border-radius:\s*\d/);
+  });
+
+  it('modal.css addresses the sheet by class, not id', () => {
+    expect(read('src/styles/modal.css')).not.toMatch(/#modal-/);
   });
 
   it('the replaced stylesheets and shell components are gone', () => {

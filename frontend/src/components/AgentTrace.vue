@@ -183,11 +183,11 @@ function renderTurn(text: string): string {
 
 <style scoped>
 .trace {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-elevated);
-  padding: 0.85rem;
-  margin-bottom: 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  padding: 12px 14px;
+  margin-bottom: 16px;
 }
 .trace__header {
   display: flex;
@@ -203,13 +203,13 @@ function renderTurn(text: string): string {
 .trace__powered {
   font-weight: 400;
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin-left: 0.15rem;
 }
 .trace__note {
   margin: 0.55rem 0 0;
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 .trace__note--error {
   color: var(--warn);
@@ -229,34 +229,34 @@ function renderTurn(text: string): string {
   gap: 0.15rem;
   min-width: 8rem;
   padding: 0.45rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-2);
   background: var(--bg-sunk);
 }
 .trace__node--running {
-  border-left-color: var(--accent);
+  border-left-color: var(--run);
 }
 .trace__node--done {
   border-left-color: var(--ok);
 }
 .trace__node--failed {
-  border-left-color: var(--warn);
+  border-left-color: var(--err);
 }
 .trace__node-name {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--ink);
 }
 .trace__node-role {
   font-size: 0.72rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 .trace__node-status {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 
 .trace__edges {
@@ -272,10 +272,10 @@ function renderTurn(text: string): string {
   align-items: center;
   gap: 0.45rem;
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 .trace__edge-end {
-  color: var(--text);
+  color: var(--ink);
 }
 .trace__edge-kind {
   font-size: 0.66rem;
@@ -283,8 +283,8 @@ function renderTurn(text: string): string {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  color: var(--text-muted);
+  border-radius: var(--r-pill);
+  color: var(--ink-3);
   background: var(--bg-hover);
 }
 .trace__edge-kind--delegate {
@@ -300,7 +300,7 @@ function renderTurn(text: string): string {
   list-style: none;
   margin: 0.8rem 0 0;
   padding: 0.7rem 0 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -317,16 +317,16 @@ function renderTurn(text: string): string {
 }
 .trace__turn-body {
   font-size: 0.82rem;
-  color: var(--text);
+  color: var(--ink);
 }
 .trace__turn-meta {
   font-size: 0.76rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 .trace__turn--delegate .trace__turn-agent {
   color: var(--ok);
 }
 .trace__turn--tool .trace__turn-agent {
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 </style>

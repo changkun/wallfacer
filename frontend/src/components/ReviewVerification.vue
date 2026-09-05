@@ -129,11 +129,11 @@ function toggleFork(i: number) {
 
 <style scoped>
 .review {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-elevated);
-  padding: 0.85rem;
-  margin-bottom: 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  padding: 12px 14px;
+  margin-bottom: 16px;
 }
 .review__header {
   display: flex;
@@ -156,29 +156,29 @@ function toggleFork(i: number) {
   font-size: 0.72rem;
   font-weight: 600;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
 }
-.review__status--running { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.review__status--clean { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); }
-.review__status--issues { color: var(--warn); background: color-mix(in srgb, var(--warn) 18%, transparent); }
-.review__status--idle { color: var(--text-muted); background: var(--bg-hover); }
+.review__status--running { color: var(--run); background: var(--tint-blue); }
+.review__status--clean { color: var(--ok); background: var(--tint-green); }
+.review__status--issues { color: var(--warn); background: var(--tint-amber); }
+.review__status--idle { color: var(--ink-3); background: var(--tint-neutral); }
 .review__dot { font-size: 0.6rem; animation: review-pulse 1.4s ease-in-out infinite; }
 @keyframes review-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 .review__config {
   margin: 0.55rem 0 0;
   font-size: 0.74rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   line-height: 1.5;
 }
-.review__config strong { color: var(--text); font-weight: 600; }
+.review__config strong { color: var(--ink); font-weight: 600; }
 
 .review__outcome {
   margin-top: 0.75rem;
   padding: 0.6rem 0.7rem;
-  border-radius: 8px;
-  border-left: 3px solid var(--border);
+  border-radius: var(--r-sm);
+  border-left: 3px solid var(--rule-2);
   background: var(--bg-sunk);
 }
 .review__outcome--clean { border-left-color: var(--ok); }
@@ -191,13 +191,13 @@ function toggleFork(i: number) {
   gap: 0.3rem 0.75rem;
   margin-top: 0.45rem;
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 
 .review__forks { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .review-fork {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
   overflow: hidden;
   background: var(--bg-card);
 }
@@ -211,22 +211,22 @@ function toggleFork(i: number) {
   border: 0;
   cursor: pointer;
   font: inherit;
-  color: var(--text);
+  color: var(--ink);
   text-align: left;
 }
 .review-fork__chevron {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--ink-3);
   transition: transform 0.15s ease;
   line-height: 1;
 }
 .review-fork__chevron.is-collapsed { transform: rotate(-90deg); }
 .review-fork__name { font-weight: 600; font-size: 0.8rem; }
-.review-fork__count { font-size: 0.72rem; color: var(--text-muted); }
+.review-fork__count { font-size: 0.72rem; color: var(--ink-3); }
 
 .review-fork__thread { padding: 0.55rem 0.6rem; display: flex; flex-direction: column; gap: 0.55rem; }
 .review-msg {
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--rule-2);
   padding-left: 0.6rem;
 }
 .review-msg--critic { border-left-color: var(--err); }
@@ -245,7 +245,7 @@ function toggleFork(i: number) {
 }
 .review-msg--critic .review-msg__role { color: var(--err); }
 .review-msg--proposer .review-msg__role { color: var(--ok); }
-.review-msg__round { font-size: 0.7rem; color: var(--text-muted); }
+.review-msg__round { font-size: 0.7rem; color: var(--ink-3); }
 .review-msg__body { font-size: 0.82rem; }
 
 /* Round bodies are full markdown documents; tame their headings so a leading
@@ -265,6 +265,6 @@ function toggleFork(i: number) {
 .review__empty {
   margin-top: 0.7rem;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 </style>

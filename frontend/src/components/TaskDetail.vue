@@ -572,8 +572,18 @@ const budgetPct = computed(() => {
 });
 
 // Status → badge class, for retry-history rows (matches the board badges).
-function badgeClassFor(status: string): string {
-  return `badge-${status}`;
+// The pill class for a task status: ramp colour per column.
+function pillClassFor(status: string): string {
+  switch (status) {
+    case 'in_progress':
+    case 'committing': return 'pill-run';
+    case 'waiting':
+    case 'cancelling': return 'pill-warn';
+    case 'done': return 'pill-ok';
+    case 'failed': return 'pill-err';
+    case 'cancelled': return 'pill-pub';
+    default: return 'pill-neutral';
+  }
 }
 
 function timeStr(iso: string): string {
@@ -971,94 +981,89 @@ async function submitReview() {
     class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
     @click="onBackdrop"
   >
-    <div id="modal" ref="modalRoot" class="modal-card modal-wide" role="dialog" aria-modal="true" :data-main-tab="mainTab">
-      <div class="p-6">
-        <!-- Header row: badge / id / time / close -->
-        <div class="flex items-start justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <span class="badge" :class="'badge-' + status">{{ status }}</span>
-            <span v-if="task.sandbox" class="badge badge-priority">{{ task.sandbox }}</span>
-            <span v-if="task.review_unresolved === 0" class="badge badge-pass" title="Review: no unresolved attacks">Review: clean</span>
-            <span v-else-if="task.review_unresolved !== undefined" class="badge badge-fail" :title="task.review_headline || ''" style="cursor: default;">Review: {{ task.review_unresolved }} unresolved</span>
-            <span class="text-xs text-v-muted">{{ relativeTime(task.updated_at) }}</span>
-            <span class="text-xs text-v-muted font-mono" title="Task ID">{{ task.id.slice(0, 8) }}</span>
-          </div>
-          <button
-            type="button"
-            class="modal-close-btn"
-            aria-label="Close"
-            @click="emit('close')"
-          >&times;</button>
+    <div id="modal" ref="modalRoot" class="modal-card sheet" role="dialog" aria-modal="true" :data-main-tab="mainTab">
+      <!-- Head: state, qualifiers, meta; close -->
+      <div class="sheet-head">
+        <div class="sheet-head__pills">
+          <span class="pill" :class="pillClassFor(status)" data-role="state">{{ status }}</span>
+          <span v-if="task.sandbox" class="pill pill-neutral">{{ task.sandbox }}</span>
+          <span v-if="task.review_unresolved === 0" class="pill pill-ok" title="Review: no unresolved attacks">Review: clean</span>
+          <span v-else-if="task.review_unresolved !== undefined" class="pill pill-err" :title="task.review_headline || ''">Review: {{ task.review_unresolved }} unresolved</span>
+          <span class="sheet-head__meta">{{ relativeTime(task.updated_at) }}</span>
+          <span class="sheet-head__meta" title="Task ID">{{ task.id.slice(0, 8) }}</span>
         </div>
+        <button type="button" class="icon-btn" aria-label="Close" @click="emit('close')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
 
-        <h2 v-if="task.title" class="modal-title">{{ task.title }}</h2>
+      <h2 v-if="task.title" class="sheet-title">{{ task.title }}</h2>
 
-        <div id="modal-body">
-          <!-- Main tabs -->
-          <div id="main-tabs" class="main-tabs" role="tablist" aria-label="Task detail sections">
+      <div class="tabs sheet-tabs" role="tablist" aria-label="Task detail sections">
             <button
               type="button"
-              class="main-tab"
-              :class="{ active: mainTab === 'spec' }"
+              class="tab"
+              :class="{ on: mainTab === 'spec' }"
               role="tab"
               :aria-selected="mainTab === 'spec'"
-              aria-controls="modal-row"
+              aria-controls="sheet-body"
+              data-tab="spec"
               @click="mainTab = 'spec'"
             >Spec</button>
             <button
               type="button"
-              class="main-tab"
-              :class="{ active: mainTab === 'activity' }"
+              class="tab"
+              :class="{ on: mainTab === 'activity' }"
               role="tab"
               :aria-selected="mainTab === 'activity'"
-              aria-controls="modal-row"
+              aria-controls="sheet-body"
+              data-tab="activity"
               @click="mainTab = 'activity'"
-            >
-              Activity
-              <span v-if="streaming" class="pulse-dot" />
-            </button>
+            >Activity<span v-if="streaming" class="pill-dot sheet-tab-dot" /></button>
             <button
               type="button"
-              class="main-tab"
-              :class="{ active: mainTab === 'changes' }"
+              class="tab"
+              :class="{ on: mainTab === 'changes' }"
               role="tab"
               :aria-selected="mainTab === 'changes'"
-              aria-controls="modal-row"
+              aria-controls="sheet-body"
+              data-tab="changes"
               @click="mainTab = 'changes'"
             >Changes</button>
             <button
               type="button"
-              class="main-tab"
-              :class="{ active: mainTab === 'verification' }"
+              class="tab"
+              :class="{ on: mainTab === 'verification' }"
               role="tab"
               :aria-selected="mainTab === 'verification'"
-              aria-controls="modal-row"
+              aria-controls="sheet-body"
+              data-tab="verification"
               @click="mainTab = 'verification'"
             >Verification</button>
             <button
               type="button"
-              class="main-tab"
-              :class="{ active: mainTab === 'events' }"
+              class="tab"
+              :class="{ on: mainTab === 'events' }"
               role="tab"
               :aria-selected="mainTab === 'events'"
-              aria-controls="modal-row"
+              aria-controls="sheet-body"
+              data-tab="events"
               @click="mainTab = 'events'"
             >Events</button>
             <button
               type="button"
-              class="main-tab"
-              :class="{ active: mainTab === 'timeline' }"
+              class="tab"
+              :class="{ on: mainTab === 'timeline' }"
               role="tab"
               :aria-selected="mainTab === 'timeline'"
-              aria-controls="modal-row"
+              aria-controls="sheet-body"
+              data-tab="timeline"
               @click="mainTab = 'timeline'"
             >Timeline</button>
-          </div>
+      </div>
 
-          <div id="modal-row" role="tabpanel" :aria-labelledby="`main-tab-${mainTab}`">
-            <!-- Main pane -->
-            <div id="modal-main-pane">
-              <div id="modal-main-content">
+      <div id="sheet-body" class="sheet-body" role="tabpanel">
+        <div class="sheet-main">
                 <!-- SPEC tab -->
                 <div data-main-tab-section="spec">
                   <div class="md-section-head">
@@ -1118,7 +1123,7 @@ async function submitReview() {
                     <div class="flex items-center gap-2 mt-2">
                       <button
                         type="button"
-                        class="btn btn-yellow"
+                        class="btn"
                         :disabled="!feedback.trim() || submittingFeedback"
                         @click="submitFeedback"
                       >
@@ -1163,7 +1168,7 @@ async function submitReview() {
                         <span class="spinner" aria-hidden="true"></span>
                         <span class="wf-shimmer-text">Generating oversight summary…</span>
                       </div>
-                      <div v-else-if="oversightStatus === 'failed'" class="text-xs" style="color: var(--err, #c0392b);">Oversight generation failed{{ oversightError ? `: ${oversightError}` : '' }}</div>
+                      <div v-else-if="oversightStatus === 'failed'" class="text-xs text-err">Oversight generation failed{{ oversightError ? `: ${oversightError}` : '' }}</div>
 
                       <!-- Transcript: a rendered trajectory + answer (default),
                            toggleable to the raw harness-native JSON stream. The
@@ -1314,7 +1319,7 @@ async function submitReview() {
                       <label class="dc-general-label" for="dc-general">General feedback</label>
                       <textarea id="dc-general" v-model="reviewGeneral" class="dc-editor-input" rows="3" placeholder="Optional overall feedback…" />
                       <div class="dc-panel-foot">
-                        <button type="button" class="btn btn-yellow" :disabled="!canSubmitReview" @click="submitReview">
+                        <button type="button" class="btn" :disabled="!canSubmitReview" @click="submitReview">
                           {{ submittingReview ? 'Sending…' : reviewComments.length ? `Submit ${reviewComments.length} comment${reviewComments.length === 1 ? '' : 's'}` : 'Submit feedback' }}
                         </button>
                       </div>
@@ -1412,7 +1417,7 @@ async function submitReview() {
                     <h3 class="ta-events__h">Retry history</h3>
                     <div v-for="(r, i) in retryHistory" :key="i" class="retry-record">
                       <div class="retry-record__head">
-                        <span class="badge" :class="badgeClassFor(r.status)">{{ r.status }}</span>
+                        <span class="pill" :class="pillClassFor(r.status)">{{ r.status }}</span>
                         <span v-if="r.failure_category" class="retry-record__cat">{{ r.failure_category }}</span>
                         <span class="retry-record__meta">{{ r.turns }} turn{{ r.turns === 1 ? '' : 's' }} · ${{ r.cost_usd.toFixed(4) }} · {{ timeStr(r.retired_at) }}</span>
                       </div>
@@ -1446,7 +1451,7 @@ async function submitReview() {
                   <section class="ta-verify-sec">
                     <h3 class="ta-events__h">Test agent</h3>
                     <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading…</div>
-                    <div v-else-if="resultsError" class="text-xs" style="color: var(--err, #c0392b);">{{ resultsError }}</div>
+                    <div v-else-if="resultsError" class="text-xs text-err">{{ resultsError }}</div>
                     <div v-else-if="!testResults.length" class="text-xs text-v-muted">No test-agent run for this task yet.</div>
                     <template v-else>
                       <details
@@ -1477,404 +1482,192 @@ async function submitReview() {
                 <div data-main-tab-section="timeline">
                   <h3 class="section-title">Timeline</h3>
                   <div v-if="spansLoading" class="text-xs text-v-secondary">Loading spans…</div>
-                  <div v-else-if="spansError" class="text-xs" style="color: var(--err, #c0392b);">{{ spansError }}</div>
+                  <div v-else-if="spansError" class="text-xs text-err">{{ spansError }}</div>
                   <SpanFlamegraph v-else :spans="spans" :turn-usages="turnUsages" />
+                </div>
+        </div>
+
+        <!-- Right aside -->
+        <aside class="sheet-aside">
+          <!-- Actions: the forward transition is the ink button; the rest are
+               ghosts; the destructive one lives in the card's foot. -->
+          <div class="card compact">
+            <div class="card-head"><span class="eyebrow">Actions</span></div>
+            <div class="sheet-actions">
+              <button v-if="isBacklog" type="button" class="btn" :class="{ pending: busyAction === 'start' }" :disabled="busy" data-action="start" @click="runAction('start', startTask)">Start task</button>
+              <button v-if="isWaiting" type="button" class="btn" :class="{ pending: busyAction === 'done' }" :disabled="busy" data-action="done" @click="runAction('done', completeTask)">Mark as Done</button>
+              <button v-if="isFailed && task.session_id" type="button" class="btn" :class="{ pending: busyAction === 'resume' }" :disabled="busy" data-action="resume" @click="runAction('resume', resumeTask)">Resume</button>
+
+              <div class="sheet-actions__row">
+                <button v-if="isBacklog && !editingBacklog" type="button" class="btn ghost" data-action="edit" @click="openBacklogEdit">Edit task</button>
+                <button v-if="isWaiting || isDone || isFailed" type="button" class="btn ghost" :class="{ pending: busyAction === 'test' }" :disabled="busy" data-action="test" @click="runAction('test', testTask)">Test</button>
+                <button v-if="isWaiting && task.session_id" type="button" class="btn ghost" :class="{ pending: busyAction === 'review' }" :disabled="busy" data-action="review" title="Adversarial verification" @click="runAction('review', reviewTask)">Review</button>
+                <button v-if="budgetExceeded && (isWaiting || isFailed)" type="button" class="btn ghost" :class="{ pending: busyAction === 'budget' }" :disabled="busy" data-action="budget" title="Unblock and resume" @click="runAction('budget', raiseBudget)">Raise budget</button>
+                <button v-if="isWaiting || isFailed" type="button" class="btn ghost" :class="{ pending: busyAction === 'sync' }" :disabled="busy" data-action="sync" title="Rebase onto the default branch" @click="runAction('sync', syncTask)">Sync</button>
+                <button v-if="isFailed || isCancelled" type="button" class="btn ghost" :class="{ pending: busyAction === 'retry' }" :disabled="busy" data-action="retry" title="Move back to Backlog" @click="runAction('retry', retryTask)">Retry</button>
+                <button v-if="(isDone || isCancelled) && !isArchived" type="button" class="btn ghost" :class="{ pending: busyAction === 'archive' }" :disabled="busy" data-action="archive" title="Hide from board" @click="runAction('archive', archiveTask)">Archive</button>
+                <button v-if="isArchived" type="button" class="btn ghost" :class="{ pending: busyAction === 'unarchive' }" :disabled="busy" data-action="unarchive" title="Restore to board" @click="runAction('unarchive', unarchiveTask)">Unarchive</button>
+                <button v-if="isInProgress || isWaiting" type="button" class="btn ghost danger" :class="{ pending: cancelling }" :disabled="cancelling || busy" data-action="cancel" title="Stop the process and discard changes" @click="cancelTask">{{ cancelling ? 'Shutting down…' : 'Cancel' }}</button>
+              </div>
+
+              <div v-if="editingBacklog" class="backlog-edit">
+                <div class="backlog-edit__field">
+                  <div class="backlog-edit__prompt-tabs">
+                    <span>Prompt</span>
+                    <div class="seg compact">
+                      <button type="button" class="seg-btn" :class="{ on: !editPromptPreview }" @click="editPromptPreview = false">Edit</button>
+                      <button type="button" class="seg-btn" :class="{ on: editPromptPreview }" @click="editPromptPreview = true">Preview</button>
+                    </div>
+                  </div>
+                  <textarea v-if="!editPromptPreview" v-model="editPrompt" class="field backlog-edit__prompt" rows="6" placeholder="Task prompt (Markdown)"></textarea>
+                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                  <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
+                </div>
+                <label class="backlog-edit__field">
+                  <span>Test criteria</span>
+                  <textarea v-model="editCriteria" class="field backlog-edit__prompt" rows="3" placeholder="What the test agent and review critics should verify (optional)"></textarea>
+                </label>
+                <label class="backlog-edit__field">
+                  <span>Timeout (min)</span>
+                  <input v-model.number="editTimeout" class="field" type="number" min="1" placeholder="15" />
+                </label>
+                <label class="backlog-edit__field">
+                  <span>Model</span>
+                  <input v-model="editModel" class="field" type="text" placeholder="override model" />
+                </label>
+                <label class="backlog-edit__field">
+                  <span>Harness</span>
+                  <AppSelect v-model="editSandbox" :options="EDIT_SANDBOX_OPTIONS" aria-label="Harness" block />
+                </label>
+                <div class="backlog-edit__field">
+                  <span>Depends on</span>
+                  <DependencyPicker v-model="editDeps" :exclude-id="props.task.id" />
+                </div>
+                <label class="backlog-edit__field">
+                  <span>Scheduled</span>
+                  <input v-model="editScheduledAt" class="field" type="datetime-local" />
+                </label>
+                <label class="backlog-edit__field">
+                  <span>Tags</span>
+                  <input v-model="editTags" class="field" type="text" placeholder="comma,separated" />
+                </label>
+                <label class="backlog-edit__field">
+                  <span>Max $</span>
+                  <input v-model.number="editMaxCost" class="field" type="number" min="0" step="0.5" placeholder="USD (0 = unlimited)" />
+                </label>
+                <label class="backlog-edit__field">
+                  <span>Max tokens</span>
+                  <input v-model.number="editMaxTokens" class="field" type="number" min="0" step="1000" placeholder="0 = unlimited" />
+                </label>
+                <div class="backlog-edit__actions">
+                  <button type="button" class="btn sm ghost" :disabled="editSaving" @click="editingBacklog = false">Cancel</button>
+                  <button type="button" class="btn sm" :disabled="editSaving" @click="saveBacklogEdit">{{ editSaving ? 'Saving…' : 'Save' }}</button>
                 </div>
               </div>
             </div>
-
-            <!-- Right aside -->
-            <aside class="modal-aside">
-              <div v-if="blockedBy.length" class="mdl-section modal-aside__deps">
-                <div class="mdl-h">
-                  Blocked by
-                  <span v-if="blockedByUnmet > 0" class="deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
-                  <span v-else class="deps-summary deps-summary--ready">all satisfied</span>
-                </div>
-                <button
-                  v-for="d in blockedBy"
-                  :key="d.id"
-                  type="button"
-                  class="dep-row"
-                  :title="`Open ${d.label}`"
-                  @click="openDep(d.id)"
-                >
-                  <span class="badge" :class="badgeClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
-                  <span class="dep-row__label">{{ d.label }}</span>
-                </button>
-              </div>
-
-              <div class="mdl-section modal-aside__pr">
-                <TaskPrPanel :task="props.task" />
-              </div>
-
-              <div class="mdl-section modal-aside__actions">
-                <div class="mdl-h">Actions</div>
-
-                <div v-if="isBacklog" class="aside-action-group">
-                  <button type="button" class="aside-action aside-action--primary" :class="{ 'is-busy': busyAction === 'start' }" :disabled="busy" @click="runAction('start', startTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Start task</span>
-                      <span class="aside-action__hint">move to In Progress</span>
-                    </span>
-                  </button>
-                  <button v-if="!editingBacklog" type="button" class="aside-action" @click="openBacklogEdit">
-                    <span class="aside-action__icon" aria-hidden="true">&#9998;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Edit task</span>
-                      <span class="aside-action__hint">prompt, deps, schedule, budget</span>
-                    </span>
-                  </button>
-                  <div v-if="editingBacklog" class="backlog-edit">
-                    <div class="backlog-edit__field">
-                      <div class="backlog-edit__prompt-tabs">
-                        <span>Prompt</span>
-                        <button type="button" :class="{ active: !editPromptPreview }" @click="editPromptPreview = false">Edit</button>
-                        <button type="button" :class="{ active: editPromptPreview }" @click="editPromptPreview = true">Preview</button>
-                      </div>
-                      <textarea v-if="!editPromptPreview" v-model="editPrompt" class="backlog-edit__prompt" rows="6" placeholder="Task prompt (Markdown)"></textarea>
-                      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                      <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
-                    </div>
-                    <label class="backlog-edit__field">
-                      <span>Test criteria</span>
-                      <textarea v-model="editCriteria" class="backlog-edit__prompt" rows="3" placeholder="What the test agent and review critics should verify (optional)"></textarea>
-                    </label>
-                    <label class="backlog-edit__field">
-                      <span>Timeout (min)</span>
-                      <input v-model.number="editTimeout" type="number" min="1" placeholder="15" />
-                    </label>
-                    <label class="backlog-edit__field">
-                      <span>Model</span>
-                      <input v-model="editModel" type="text" placeholder="override model" />
-                    </label>
-                    <label class="backlog-edit__field">
-                      <span>Harness</span>
-                      <AppSelect v-model="editSandbox" :options="EDIT_SANDBOX_OPTIONS" aria-label="Harness" block />
-                    </label>
-                    <div class="backlog-edit__field">
-                      <span>Depends on</span>
-                      <DependencyPicker v-model="editDeps" :exclude-id="props.task.id" />
-                    </div>
-                    <label class="backlog-edit__field">
-                      <span>Scheduled</span>
-                      <input v-model="editScheduledAt" type="datetime-local" />
-                    </label>
-                    <label class="backlog-edit__field">
-                      <span>Tags</span>
-                      <input v-model="editTags" type="text" placeholder="comma,separated" />
-                    </label>
-                    <label class="backlog-edit__field">
-                      <span>Max $</span>
-                      <input v-model.number="editMaxCost" type="number" min="0" step="0.5" placeholder="USD (0 = unlimited)" />
-                    </label>
-                    <label class="backlog-edit__field">
-                      <span>Max tokens</span>
-                      <input v-model.number="editMaxTokens" type="number" min="0" step="1000" placeholder="0 = unlimited" />
-                    </label>
-                    <div class="backlog-edit__actions">
-                      <button type="button" class="composer__btn composer__btn--ghost" :disabled="editSaving" @click="editingBacklog = false">Cancel</button>
-                      <button type="button" class="composer__btn composer__btn--primary" :disabled="editSaving" @click="saveBacklogEdit">{{ editSaving ? 'Saving…' : 'Save' }}</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="isWaiting" class="aside-action-group">
-                  <button type="button" class="aside-action aside-action--success" :class="{ 'is-busy': busyAction === 'done' }" :disabled="busy" @click="runAction('done', completeTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#10003;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Mark as Done</span>
-                      <span class="aside-action__hint">commit and close</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isFailed && task.session_id" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'resume' }" :disabled="busy" @click="runAction('resume', resumeTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#8635;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Resume</span>
-                      <span class="aside-action__hint">continue existing session</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isWaiting || isDone || isFailed" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'test' }" :disabled="busy" @click="runAction('test', testTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Test</span>
-                      <span class="aside-action__hint">run test verification</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isWaiting && task.session_id" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" @click="runAction('review', reviewTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#9878;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Review</span>
-                      <span class="aside-action__hint">adversarial verification</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="budgetExceeded && (isWaiting || isFailed)" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'budget' }" :disabled="busy" @click="runAction('budget', raiseBudget)">
-                    <span class="aside-action__icon" aria-hidden="true">&#36;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Raise budget</span>
-                      <span class="aside-action__hint">unblock and resume</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isWaiting || isFailed" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'sync' }" :disabled="busy" @click="runAction('sync', syncTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#8645;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Sync</span>
-                      <span class="aside-action__hint">rebase onto default branch</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isFailed || isCancelled" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'retry' }" :disabled="busy" @click="runAction('retry', retryTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#8634;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Retry</span>
-                      <span class="aside-action__hint">move back to Backlog</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="(isDone || isCancelled) && !isArchived" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'archive' }" :disabled="busy" @click="runAction('archive', archiveTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Archive</span>
-                      <span class="aside-action__hint">hide from board</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isArchived" class="aside-action-group">
-                  <button type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'unarchive' }" :disabled="busy" @click="runAction('unarchive', unarchiveTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Unarchive</span>
-                      <span class="aside-action__hint">restore to board</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div v-if="isInProgress || isWaiting" class="aside-action-group">
-                  <button
-                    type="button"
-                    class="aside-action aside-action--warn"
-                    :disabled="cancelling || busy"
-                    @click="cancelTask"
-                  >
-                    <span class="aside-action__icon" aria-hidden="true">{{ cancelling ? '…' : '⏹' }}</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">{{ cancelling ? 'Shutting down…' : 'Cancel' }}</span>
-                      <span class="aside-action__hint">{{ cancelling ? 'stopping process' : 'discard changes' }}</span>
-                    </span>
-                  </button>
-                </div>
-
-                <div class="aside-action-group">
-                  <button type="button" class="aside-action aside-action--danger" :class="{ 'is-busy': busyAction === 'delete' }" :disabled="busy" @click="runAction('delete', deleteTask)">
-                    <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
-                    <span class="aside-action__body">
-                      <span class="aside-action__label">Delete</span>
-                      <span class="aside-action__hint">remove permanently</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              <div class="mdl-section">
-                <div class="mdl-h">Agent</div>
-                <div class="row">
-                  <span class="k">harness</span>
-                  <span class="v">{{ task.sandbox || '—' }}</span>
-                </div>
-                <div class="row">
-                  <span class="k">model</span>
-                  <span class="v">{{ task.model || '—' }}</span>
-                </div>
-                <div class="row">
-                  <span class="k">status</span>
-                  <span class="v">{{ status }}</span>
-                </div>
-                <div class="row">
-                  <span class="k">elapsed</span>
-                  <span class="v">{{ elapsedDisplay }}</span>
-                </div>
-              </div>
-
-              <div class="mdl-section">
-                <div class="mdl-h">Budget</div>
-                <div class="row">
-                  <span class="k">tokens</span>
-                  <span class="v mono">{{ tokenCount((task.usage?.input_tokens || 0) + (task.usage?.output_tokens || 0)) }}</span>
-                </div>
-                <div class="row">
-                  <span class="k">cost</span>
-                  <span class="v mono">{{ costDisplay }}</span>
-                </div>
-                <div class="row">
-                  <span class="k">timeout</span>
-                  <span class="v">{{ task.timeout ? task.timeout + ' min' : '—' }}</span>
-                </div>
-                <div v-if="budgetPct > 0" class="bar" style="margin-top: 6px">
-                  <i :style="{ width: budgetPct.toFixed(1) + '%' }"></i>
-                </div>
-              </div>
-
-              <div class="mdl-section">
-                <div class="mdl-h">Git</div>
-                <div class="row">
-                  <span class="k">branches</span>
-                  <span class="v">{{ gitBranches }}</span>
-                </div>
-                <div class="row">
-                  <span class="k">worktrees</span>
-                  <span class="v">{{ gitWorktrees }}</span>
-                </div>
-              </div>
-
-              <div class="mdl-section">
-                <div class="mdl-h">Links</div>
-                <div class="row">
-                  <span class="k">spec</span>
-                  <span class="v">
-                    <a v-if="specSourcePath" href="#" :title="specSourcePath" @click.prevent="openSpec">{{ specSourceLabel }}</a>
-                    <template v-else>—</template>
-                  </span>
-                </div>
-                <div class="row">
-                  <span class="k">depends on</span>
-                  <span class="v">{{ dependsOnDisplay }}</span>
-                </div>
-              </div>
-
-              <div v-if="envRows.length" class="mdl-section">
-                <div class="mdl-h">Environment</div>
-                <dl class="env-provenance">
-                  <template v-for="row in envRows" :key="row.label">
-                    <dt>{{ row.label }}</dt>
-                    <dd :class="{ 'env-provenance__mono': row.mono }">{{ row.value }}</dd>
-                  </template>
-                </dl>
-              </div>
-            </aside>
+            <div class="card-foot">
+              <button type="button" class="btn ghost danger" :class="{ pending: busyAction === 'delete' }" :disabled="busy" data-action="delete" title="Remove permanently" @click="runAction('delete', deleteTask)">Delete</button>
+            </div>
           </div>
-        </div>
+
+          <TaskPrPanel :task="props.task" />
+
+          <div class="card compact">
+            <div class="card-head"><span class="eyebrow">Agent</span></div>
+            <div class="rows">
+              <div class="row"><span class="k">Harness</span><span class="v">{{ task.sandbox || '—' }}</span></div>
+              <div class="row"><span class="k">Model</span><span class="v mono">{{ task.model || '—' }}</span></div>
+              <div class="row"><span class="k">Status</span><span class="v">{{ status }}</span></div>
+              <div class="row"><span class="k">Elapsed</span><span class="v mono">{{ elapsedDisplay }}</span></div>
+              <div class="row">
+                <span class="k">Spec</span>
+                <span class="v">
+                  <a v-if="specSourcePath" href="#" :title="specSourcePath" @click.prevent="openSpec">{{ specSourceLabel }}</a>
+                  <template v-else>—</template>
+                </span>
+              </div>
+              <div class="row"><span class="k">Depends on</span><span class="v">{{ dependsOnDisplay }}</span></div>
+            </div>
+          </div>
+
+          <div class="card compact">
+            <div class="card-head"><span class="eyebrow">Budget</span></div>
+            <div class="rows">
+              <div class="row"><span class="k">Tokens</span><span class="v mono">{{ tokenCount((task.usage?.input_tokens || 0) + (task.usage?.output_tokens || 0)) }}</span></div>
+              <div class="row"><span class="k">Cost</span><span class="v mono">{{ costDisplay }}</span></div>
+              <div class="row"><span class="k">Timeout</span><span class="v">{{ task.timeout ? task.timeout + ' min' : '—' }}</span></div>
+            </div>
+            <div v-if="budgetPct > 0" class="bar" :title="budgetPct.toFixed(0) + '% of budget'">
+              <i :style="{ width: budgetPct.toFixed(1) + '%' }"></i>
+            </div>
+          </div>
+
+          <div class="card compact">
+            <div class="card-head">
+              <span class="eyebrow">Git</span>
+              <span v-if="blockedBy.length && blockedByUnmet > 0" class="pill pill-warn deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
+              <span v-else-if="blockedBy.length" class="pill pill-ok deps-summary">deps satisfied</span>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="k">Branches</span><span class="v mono">{{ gitBranches }}</span></div>
+              <div class="row"><span class="k">Worktrees</span><span class="v mono">{{ gitWorktrees }}</span></div>
+              <button
+                v-for="d in blockedBy"
+                :key="d.id"
+                type="button"
+                class="row clickable dep-row"
+                :title="`Open ${d.label}`"
+                @click="openDep(d.id)"
+              >
+                <span class="pill" :class="pillClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
+                <span class="dep-row__label">{{ d.label }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="envRows.length" class="card compact">
+            <div class="card-head"><span class="eyebrow">Environment</span></div>
+            <div class="rows">
+              <div v-for="row in envRows" :key="row.label" class="row">
+                <span class="k">{{ row.label }}</span>
+                <span class="v" :class="{ mono: row.mono }">{{ row.value }}</span>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.ta-verify-sec { margin-top: 0.25rem; }
-.ta-verify-sec .ta-events__h { margin-bottom: 0.5rem; }
-
 .modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 50;
 }
-.modal-close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--text-muted);
-  padding: 0 4px;
+.sheet-tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  background: var(--run);
+  animation: om-pulse 1.6s ease-in-out infinite;
 }
-.modal-close-btn:hover { color: var(--text); }
-
-.modal-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  margin: 0 0 12px 0;
-  line-height: 1.4;
-}
-
-.text-v-muted { color: var(--text-muted); }
-.text-xs { font-size: 11px; }
+.text-v-muted { color: var(--ink-3); }
+.text-v-secondary { color: var(--ink-2); }
+.text-err { color: var(--err); }
+.text-xs { font-size: var(--fs-10); }
 .font-mono { font-family: var(--font-mono); }
-
 .flex { display: flex; }
 .items-center { align-items: center; }
-.items-start { align-items: flex-start; }
-.justify-between { justify-content: space-between; }
 .gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
 .mb-4 { margin-bottom: 16px; }
 .mt-2 { margin-top: 8px; }
 .fixed { position: fixed; }
 .inset-0 { inset: 0; }
 .z-50 { z-index: 50; }
 .p-4 { padding: 16px; }
-.p-6 { padding: 24px; }
-
-.field {
-  width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  outline: none;
-  resize: vertical;
-  box-sizing: border-box;
-}
-.field:focus { border-color: var(--accent); }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.btn:hover { background: var(--bg-hover); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-yellow {
-  background: var(--warn);
-  border-color: var(--warn);
-  color: #fff;
-}
-.btn-yellow:hover { opacity: 0.9; background: var(--warn); }
-
-.pulse-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ok);
-  margin-left: 6px;
-  animation: pulse-anim 1.5s infinite;
-}
-@keyframes pulse-anim {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
 
 /* Feedback @-mention dropdown. */
 .fb-wrap { position: relative; }
@@ -1888,442 +1681,264 @@ async function submitReview() {
   max-height: 200px;
   overflow-y: auto;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
 }
 .fb-mention {
-  padding: 4px 8px;
+  padding: 5px 8px;
   font-size: 12px;
   font-family: var(--font-mono);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.fb-mention.active, .fb-mention:hover { background: var(--bg-hover); }
+.fb-mention.active, .fb-mention:hover { background: var(--bg-sunk); }
 
-/* Oversight summary phases. */
+/* Oversight summary phases: a card of rows. */
 .ta-oversight {
   margin-bottom: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-input);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  overflow: hidden;
 }
 .ta-oversight__label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
-  font-weight: 700;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule);
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
+  color: var(--ink-3);
 }
-.ta-oversight__label::before {
-  content: '';
-  width: 3px;
-  height: 11px;
-  border-radius: 2px;
-  background: color-mix(in oklab, var(--accent) 70%, transparent);
-  flex-shrink: 0;
-}
-.ta-oversight__phase { padding: 6px 0; border-top: 1px solid var(--border); }
+.ta-oversight__phase { padding: 10px 14px; border-top: 1px solid var(--rule); }
 .ta-oversight__phase:first-of-type { border-top: none; }
-.ta-oversight__title { font-size: 13px; font-weight: 600; color: var(--text); }
-.ta-oversight__summary { font-size: 12px; color: var(--text); margin-top: 2px; line-height: 1.5; }
-.ta-oversight__tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ta-oversight__title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.ta-oversight__summary { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; line-height: 1.5; }
+.ta-oversight__tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .ta-oversight__tool {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  font: 500 var(--fs-9) / 1.5 var(--font-mono);
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--tint-neutral);
+  border: 1px solid var(--rule-2);
+  color: var(--ink-2);
 }
+.ta-oversight__generating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+}
+.ta-oversight__generating .spinner { width: 12px; height: 12px; border-width: 1.5px; }
 
-/* Activity tab search bar + truncation notice. */
+/* Activity search + truncation notice. */
 .ta-activity-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 4px 0 6px;
+  margin: 4px 0 8px;
 }
 .ta-activity-search__input {
   box-sizing: border-box;
   flex: 1;
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: var(--r-md, 6px);
-  padding: 7px 12px;
-  font-size: 13px;
-  line-height: 1.4;
+  min-height: 32px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  border-radius: var(--r-md);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: var(--fs-base);
   outline: none;
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s,
-    background 0.12s;
+  transition: border-color var(--dur-hover), box-shadow var(--dur-hover), background var(--dur-hover);
 }
-.ta-activity-search__input::placeholder {
-  color: var(--text-muted);
-}
-.ta-activity-search__input:hover {
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
-}
+.ta-activity-search__input::placeholder { color: var(--ink-4); }
+.ta-activity-search__input:hover { border-color: var(--rule-2); }
 .ta-activity-search__input:focus,
 .ta-activity-search__input:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
+  border-color: var(--accent-line);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
-.ta-activity-search__count {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-}
+.ta-activity-search__count { font: 500 var(--fs-10) / 1 var(--font-mono); color: var(--ink-3); }
 .ta-activity-truncated {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: var(--fs-10);
+  color: var(--ink-3);
   font-style: italic;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
-.ta-activity-truncated a {
-  margin-left: 6px;
-  color: var(--accent);
-  text-decoration: underline;
-  font-style: normal;
-}
+.ta-activity-truncated a { margin-left: 6px; color: var(--accent); text-decoration: underline; font-style: normal; }
 .ta-activity-truncated--warn {
   font-style: normal;
-  color: var(--warn, #b8860b);
-  background: rgba(217, 119, 87, 0.08);
-  border: 1px solid rgba(217, 119, 87, 0.25);
-  border-radius: 6px;
-  padding: 6px 8px;
+  color: var(--warn);
+  background: var(--tint-amber);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
 }
 
-/* Spec/Result markdown section header with toggle + copy actions. */
-.md-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
+/* Spec/Result section header actions. */
+.md-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .md-section-actions { display: inline-flex; gap: 6px; }
 
-/* Execution-environment provenance list in the right aside. */
-.env-provenance {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 3px 10px;
-  margin: 0;
-  font-size: 11px;
-  align-items: baseline;
-}
-.env-provenance dt {
-  color: var(--text-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.env-provenance dd {
-  margin: 0;
-  min-width: 0;
-  color: var(--text-secondary);
-  overflow-wrap: anywhere;
-}
-.env-provenance__mono { font-family: var(--font-mono, monospace); font-size: 10px; }
-
-/* Dissolve the per-state action wrappers so each button is a direct flex
-   child of .modal-aside__actions and inherits its 6px gap (matches old UI). */
-.aside-action-group { display: contents; }
-
-/* Backlog edit form inside the right aside. */
+/* Backlog edit form inside the actions card. */
 .backlog-edit {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 6px;
-  border-top: 1px solid var(--border);
-  margin-top: 6px;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--rule);
 }
 .backlog-edit__field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 11px;
-  color: var(--text-muted);
+  gap: 4px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
-.backlog-edit__field input,
-.backlog-edit__field :deep(.app-select__trigger),
-.backlog-edit__prompt {
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-family: var(--font-sans);
-}
+.backlog-edit__field .field { font-family: var(--font-sans); letter-spacing: 0; text-transform: none; }
 .backlog-edit__prompt { resize: vertical; line-height: 1.5; }
 .backlog-edit__prompt-tabs {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
 }
-.backlog-edit__prompt-tabs span { margin-right: auto; }
-.backlog-edit__prompt-tabs button {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-.backlog-edit__prompt-tabs button.active { color: var(--accent); background: rgba(217, 119, 87, 0.1); }
 .backlog-edit__preview {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+  font-size: 12.5px;
   max-height: 240px;
   overflow-y: auto;
-}
-.backlog-edit__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-/* "Blocked by" dependency list in the aside. */
-.modal-aside__deps .deps-summary {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-left: 6px;
   text-transform: none;
   letter-spacing: 0;
+  font-family: var(--font-sans);
+  font-weight: 400;
 }
-.modal-aside__deps .deps-summary--ready { color: var(--green, #22c55e); }
-.dep-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 4px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: left;
-  color: var(--text);
-}
-.dep-row:hover { background: var(--bg-hover); }
-.dep-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.backlog-edit__actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
 
-/* Usage-by-agent breakdown table. */
-.usage-breakdown { width: 100%; border-collapse: collapse; font-size: 12px; }
+/* Blocked-by rows in the Git card. */
+.deps-summary { margin-left: auto; }
+.dep-row { width: 100%; border: none; border-top: 1px solid var(--rule); background: transparent; text-align: left; font: inherit; color: var(--ink); }
+.dep-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+
+/* Usage-by-agent table. */
+.usage-breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .usage-breakdown th {
-  text-align: right; padding: 5px 10px; color: var(--text-muted);
-  font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10px;
-  border-bottom: 1px solid var(--border);
+  text-align: right; padding: 6px 10px; color: var(--ink-3);
+  font: 600 var(--fs-9) / 1 var(--font-mono); letter-spacing: var(--tracking-label); text-transform: uppercase;
+  border-bottom: 1px solid var(--rule);
 }
 .usage-breakdown th:first-child, .usage-breakdown td:first-child { text-align: left; }
-.usage-breakdown td {
-  padding: 5px 10px; text-align: right; font-variant-numeric: tabular-nums;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
-}
+.usage-breakdown td { padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--rule); }
 .usage-breakdown tbody tr:last-child td { border-bottom: none; }
 
-/* Retry + prompt history records in the Events tab. */
-.retry-record { border-top: 1px solid var(--border); padding: 6px 0; }
-.retry-record__head { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-.retry-record__cat { color: var(--err, #c0392b); font-family: var(--font-mono); font-size: 10px; }
-.retry-record__meta { margin-left: auto; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Retry + prompt history records. */
+.retry-record { border-top: 1px solid var(--rule); padding: 8px 0; }
+.retry-record__head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-10); }
+.retry-record__cat { color: var(--err); font-family: var(--font-mono); font-size: var(--fs-9); }
+.retry-record__meta { margin-left: auto; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .retry-record__detail pre, .prompt-record pre {
-  white-space: pre-wrap; font-size: 11px; margin: 4px 0 0; color: var(--text-secondary);
+  white-space: pre-wrap; font-size: var(--fs-10); margin: 4px 0 0; color: var(--ink-2);
   max-height: 220px; overflow: auto;
 }
-.prompt-record { border-top: 1px solid var(--border); padding: 6px 0; font-size: 11px; }
-.prompt-record summary, .retry-record__detail summary { cursor: pointer; color: var(--text-muted); }
+.prompt-record { border-top: 1px solid var(--rule); padding: 8px 0; font-size: var(--fs-10); }
+.prompt-record summary, .retry-record__detail summary { cursor: pointer; color: var(--ink-3); }
 
-/* --- Events tab: readable sectioned layout --- */
-/* Each section is separated by a hairline rule for clear visual grouping. */
-.ta-events__sec { padding: 14px 0; border-top: 1px solid var(--border); }
+/* Events tab sections. */
+.ta-events__sec { padding: 14px 0; border-top: 1px solid var(--rule); }
 .ta-events__sec:first-child { padding-top: 0; border-top: none; }
+.ta-verify-sec { margin-top: 4px; }
 .ta-events__h {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  font-weight: 700;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text);
+  color: var(--ink-3);
   margin: 0 0 10px;
 }
-.ta-events__h::before {
-  content: '';
-  width: 3px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--accent);
-  flex-shrink: 0;
-}
-
-/* Event timeline rows: taller rows + a colour-coded type pill. */
-.event-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.event-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--bg-card); overflow: hidden; }
 .event-row {
   display: grid;
-  grid-template-columns: 116px 1fr auto;
+  grid-template-columns: 120px 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 6px 8px 6px 10px;
-  font-size: 12px;
-  /* A type-coloured left rail makes the stream scannable at a glance. */
-  border-left: 2px solid var(--border);
-  border-radius: 0 var(--r-md, 6px) var(--r-md, 6px) 0;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  border-top: 1px solid var(--rule);
 }
-.event-row[data-event-type="state_change"] { border-left-color: color-mix(in oklab, var(--accent) 55%, transparent); }
-.event-row[data-event-type="error"] { border-left-color: var(--err, #c0392b); }
-.event-row[data-event-type="output"] { border-left-color: color-mix(in oklab, var(--ok, #3f7a4a) 55%, transparent); }
-.event-row:hover { background: var(--bg-hover); }
+.event-row:first-child { border-top: none; }
+.event-row:hover { background: var(--bg-sunk); }
 .event-row__type {
   justify-self: start;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  color: var(--ink-2);
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--tint-neutral);
   white-space: nowrap;
 }
-.event-row[data-event-type="error"] .event-row__type {
-  color: var(--err, #c0392b);
-  border-color: color-mix(in oklab, var(--err, #c0392b) 40%, var(--border));
-  background: color-mix(in oklab, var(--err, #c0392b) 8%, transparent);
-}
-.event-row[data-event-type="state_change"] .event-row__type {
-  color: var(--accent);
-  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
-  background: color-mix(in oklab, var(--accent) 8%, transparent);
-}
-.event-row__summary {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-}
+.event-row[data-event-type="error"] .event-row__type { color: var(--err); background: var(--tint-red); }
+.event-row[data-event-type="state_change"] .event-row__type { color: var(--accent); background: var(--accent-soft); }
+.event-row[data-event-type="output"] .event-row__type { color: var(--ok); background: var(--tint-green); }
+.event-row__summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .event-row__count {
   margin-left: 6px;
   padding: 0 6px;
-  border-radius: 999px;
-  background: var(--bg-sunk);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 10px;
+  border-radius: var(--r-pill);
+  background: var(--tint-neutral);
+  color: var(--ink-2);
+  font-size: var(--fs-9);
   font-variant-numeric: tabular-nums;
 }
-.event-row__time {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  text-align: right;
-}
+.event-row__time { color: var(--ink-3); font-family: var(--font-mono); font-size: var(--fs-10); white-space: nowrap; text-align: right; }
 
-/* Usage / Timeline stat grids: roomy two-column key/value rows. */
-.ta-stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 28px;
-}
-.ta-stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  font-size: 13px;
-  padding: 2px 0;
-}
-.ta-stat__label { color: var(--text-muted); }
-.ta-stat__value {
-  color: var(--text);
-  font-family: var(--font-mono, "SF Mono", monospace);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.ta-stat--total {
-  grid-column: span 2;
-  margin-top: 6px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-  font-weight: 600;
-}
-.ta-stat--total .ta-stat__label { color: var(--text); font-weight: 600; }
+/* Usage / Timeline stat grids. */
+.ta-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; }
+.ta-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: var(--fs-base); padding: 2px 0; }
+.ta-stat__label { color: var(--ink-3); }
+.ta-stat__value { color: var(--ink); font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.ta-stat--total { grid-column: span 2; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--rule); font-weight: 600; }
+.ta-stat--total .ta-stat__label { color: var(--ink); font-weight: 600; }
 
-/* Pretty agent-activity rows (mirrors the agent chat's pcp-activity). */
+/* Agent-activity rows: a card of rows with a glyph, mono label and summary. */
 .ta-activity-log {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   font-family: var(--font-mono);
   font-size: 12px;
   max-height: 60vh;
   overflow-y: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
 }
-/* The assistant answer prose under the rendered trajectory, separated from the
-   steps above it. */
-.ta-transcript-answer {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-}
+.ta-transcript-answer { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
 .ta-activity-row {
   display: grid;
-  grid-template-columns: 16px auto 1fr;
+  grid-template-columns: 18px auto 1fr;
   align-items: baseline;
-  gap: 6px;
-  padding: 2px 4px 2px 8px;
-  /* A kind-colored left rail gives the otherwise-flat monospace stream a
-     scannable structure: tool calls, results and thinking each read as their
-     own track down the left edge. */
-  border-left: 2px solid transparent;
-  border-radius: 0 4px 4px 0;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--rule);
 }
-.ta-activity-row:hover { background: var(--bg-hover); }
-
-/* While the task is running, rows ease in instead of popping, and the most
-   recent one shimmers so it's clear new work is still arriving. Uses the shared
-   wf-* keyframes (styles/animations.css). */
-.ta-activity-log--streaming .ta-activity-row {
-  animation: wf-content-in 240ms ease-out both;
-}
+.ta-activity-row:first-child { border-top: none; }
+.ta-activity-row:hover { background: var(--bg-sunk); }
+.ta-activity-log--streaming .ta-activity-row { animation: wf-content-in 240ms ease-out both; }
 .ta-activity-log--streaming .ta-activity-row:last-child .ta-activity-summary {
-  background: linear-gradient(
-    90deg,
-    var(--ink-4) 0%,
-    var(--ink-4) 38%,
-    var(--ink) 50%,
-    var(--ink-4) 62%,
-    var(--ink-4) 100%
-  );
+  background: linear-gradient(90deg, var(--ink-4) 0%, var(--ink-4) 38%, var(--ink) 50%, var(--ink-4) 62%, var(--ink-4) 100%);
   background-size: 220% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -2340,37 +1955,16 @@ async function submitReview() {
     color: inherit;
   }
 }
-
-.ta-oversight__generating {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ta-oversight__generating .spinner {
-  width: 12px;
-  height: 12px;
-  border-width: 1.5px;
-}
-
 .ta-activity-icon { text-align: center; opacity: 0.8; }
-.ta-activity-label { font-weight: 600; color: var(--text); }
-.ta-activity-row--tool { border-left-color: color-mix(in oklab, var(--accent) 55%, transparent); }
-.ta-activity-row--tool .ta-activity-label { color: var(--accent); }
-.ta-activity-row--tool_result { border-left-color: color-mix(in oklab, var(--ok) 45%, transparent); }
+.ta-activity-label { font-weight: 600; color: var(--ink); }
+.ta-activity-row--tool .ta-activity-label { color: var(--run); }
 .ta-activity-row--tool_result .ta-activity-label { color: var(--ok); }
-.ta-activity-row--thinking { border-left-color: color-mix(in oklab, var(--warn) 45%, transparent); }
 .ta-activity-row--thinking .ta-activity-label { color: var(--warn); font-style: italic; }
-.ta-activity-summary {
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.ta-activity-summary { color: var(--ink-3); font-size: var(--fs-10); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ta-activity-preview {
   grid-column: 2 / -1;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-10);
   color: var(--ink-4);
   white-space: nowrap;
   overflow: hidden;
@@ -2378,12 +1972,12 @@ async function submitReview() {
   min-width: 0;
 }
 .ta-activity-detail { grid-column: 2 / -1; }
-.ta-activity-detail summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
+.ta-activity-detail summary { cursor: pointer; color: var(--ink-3); font-size: var(--fs-10); }
 .ta-activity-detail pre {
   margin: 4px 0 0;
   padding: 6px 8px;
-  background: var(--bg-input);
-  border-radius: 4px;
+  background: var(--bg-sunk);
+  border-radius: var(--r-sm);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 240px;

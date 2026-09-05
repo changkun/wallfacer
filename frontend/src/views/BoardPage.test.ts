@@ -171,8 +171,8 @@ describe('BoardPage detail panel reflects live SSE updates', () => {
     for (let i = 0; i < 5; i++) await nextTick();
 
     const labels = () =>
-      Array.from(host.querySelectorAll('.aside-action__label')).map((n) => n.textContent?.trim());
-    const badgeText = () => host.querySelector('#modal .badge')?.textContent?.trim();
+      Array.from(host.querySelectorAll('.sheet-actions .btn')).map((n) => n.textContent?.trim());
+    const badgeText = () => host.querySelector('#modal [data-role="state"]')?.textContent?.trim();
 
     // Backlog state: "Start task" action is offered, badge reads "backlog".
     expect(labels()).toContain('Start task');
