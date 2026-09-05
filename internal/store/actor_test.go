@@ -48,33 +48,6 @@ func TestInsertEvent_StampsActorFromContext(t *testing.T) {
 	}
 }
 
-// TestInsertEvent_SystemActor covers background writers: runner
-// goroutines and schedulers that decorate ctx with WithSystemActor
-// should surface as ActorType="system", empty ActorSub.
-func TestInsertEvent_SystemActor(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "data")
-	s, err := storetest.NewFileStore(t, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(s.WaitCompaction)
-
-	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "p", Timeout: 60})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx := store.WithSystemActor(context.Background())
-	if err := s.InsertEvent(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "bg"}); err != nil {
-		t.Fatal(err)
-	}
-	events, _ := s.GetEvents(context.Background(), task.ID)
-	last := events[len(events)-1]
-	if last.ActorType != "system" || last.ActorSub != "" {
-		t.Errorf("got actor=(%q,%q), want (\"\",\"system\")", last.ActorSub, last.ActorType)
-	}
-}
-
 // TestInsertEvent_NoActorCtx covers legacy / anonymous writes: an
 // unannotated ctx produces empty attribution, indistinguishable on
 // disk from pre-Phase-2 records.

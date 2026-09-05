@@ -1,9 +1,9 @@
 // Actor context carries the identity of the caller who triggered a
 // store mutation. Handlers at the request boundary stamp the context
 // via WithActorPrincipal; background writers (runner goroutines,
-// scheduler callbacks) stamp "system" via WithSystemActor. Keeping
-// the carrier in the store package avoids a circular auth → store →
-// auth import chain.
+// scheduler callbacks) carry no principal and write empty attribution.
+// Keeping the carrier in the store package avoids a circular auth →
+// store → auth import chain.
 
 package store
 
@@ -19,7 +19,6 @@ const (
 	ActorUser      ActorType = "user"    // human user, JWT principal_type="user"
 	ActorService   ActorType = "service" // service account JWT
 	ActorAPIKey    ActorType = "apikey"  // WALLFACER_SERVER_API_KEY gated request
-	ActorSystem    ActorType = "system"  // background goroutine, no request ctx
 	ActorAnonymous ActorType = ""        // local anonymous call (legacy / default)
 )
 
@@ -39,14 +38,6 @@ type actorInfo struct {
 // was gated only by the static server key).
 func WithActorPrincipal(ctx context.Context, sub string, t ActorType) context.Context {
 	return context.WithValue(ctx, actorCtxKey{}, actorInfo{Sub: sub, Type: t})
-}
-
-// WithSystemActor marks ctx as a background / system-level writer.
-// Used by the runner and scheduler goroutines that don't have a
-// request principal but still want events to be attributable rather
-// than empty (which a reader might misread as legacy anonymous data).
-func WithSystemActor(ctx context.Context) context.Context {
-	return WithActorPrincipal(ctx, "", ActorSystem)
 }
 
 // actorFromContext returns (sub, type) strings ready for stamping
