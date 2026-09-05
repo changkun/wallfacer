@@ -1447,3 +1447,14 @@ func TestExplorerWriteFile_NewFileResolvesParentBeforeTraversal(t *testing.T) {
 		t.Errorf("write used the lexically cleaned path: %v", err)
 	}
 }
+
+func TestIsWithinWorkspace_UnresolvableSymlinkRejected(t *testing.T) {
+	ws := t.TempDir()
+	target := filepath.Join(ws, "loop")
+	if err := os.Symlink("loop", target); err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := isWithinWorkspace(target, ws); err == nil || resolved != "" {
+		t.Fatalf("symlink loop accepted: %q, %v", resolved, err)
+	}
+}
