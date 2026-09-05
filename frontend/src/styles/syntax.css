@@ -1,16 +1,18 @@
-/* --- Global syntax highlighting for highlight.js tokens (GitHub-inspired) --- */
-
+/* --- Syntax highlighting (highlight.js tokens) on the semantic ramp ---
+   One block for both themes: the ramp swaps per theme, so a keyword is the
+   same "err" red in light and its lifted twin in dark. Applies everywhere
+   code renders: prose, diffs, the explorer preview. */
 .hljs-keyword,
 .hljs-template-tag,
 .hljs-type,
 .hljs-variable.language_ {
-  color: #d73a49;
+  color: var(--err);
 }
 .hljs-title,
 .hljs-title.class_,
 .hljs-title.class_.inherited__,
 .hljs-title.function_ {
-  color: #6f42c1;
+  color: var(--purple);
 }
 .hljs-attr,
 .hljs-attribute,
@@ -22,85 +24,33 @@
 .hljs-selector-class,
 .hljs-selector-id,
 .hljs-variable {
-  color: #005cc5;
+  color: var(--run);
 }
 .hljs-meta .hljs-string,
 .hljs-regexp,
 .hljs-string {
-  color: #032f62;
+  color: color-mix(in srgb, var(--run) 60%, var(--ink));
 }
 .hljs-built_in,
 .hljs-symbol {
-  color: #e36209;
+  color: var(--warn);
 }
 .hljs-code,
 .hljs-comment,
 .hljs-formula {
-  color: #6a737d;
+  color: var(--ink-3);
+  font-style: italic;
 }
 .hljs-name,
 .hljs-quote,
 .hljs-selector-pseudo,
 .hljs-selector-tag {
-  color: #22863a;
+  color: var(--ok);
 }
 .hljs-section {
-  color: #005cc5;
+  color: var(--run);
   font-weight: 700;
 }
 .hljs-bullet {
-  color: #735c0f;
-}
-
-/* Dark theme overrides */
-[data-theme="dark"] .hljs-keyword,
-[data-theme="dark"] .hljs-template-tag,
-[data-theme="dark"] .hljs-type,
-[data-theme="dark"] .hljs-variable.language_ {
-  color: #ff7b72;
-}
-[data-theme="dark"] .hljs-title,
-[data-theme="dark"] .hljs-title.class_,
-[data-theme="dark"] .hljs-title.class_.inherited__,
-[data-theme="dark"] .hljs-title.function_ {
-  color: #d2a8ff;
-}
-[data-theme="dark"] .hljs-attr,
-[data-theme="dark"] .hljs-attribute,
-[data-theme="dark"] .hljs-literal,
-[data-theme="dark"] .hljs-meta,
-[data-theme="dark"] .hljs-number,
-[data-theme="dark"] .hljs-operator,
-[data-theme="dark"] .hljs-selector-attr,
-[data-theme="dark"] .hljs-selector-class,
-[data-theme="dark"] .hljs-selector-id,
-[data-theme="dark"] .hljs-variable {
-  color: #79c0ff;
-}
-[data-theme="dark"] .hljs-meta .hljs-string,
-[data-theme="dark"] .hljs-regexp,
-[data-theme="dark"] .hljs-string {
-  color: #a5d6ff;
-}
-[data-theme="dark"] .hljs-built_in,
-[data-theme="dark"] .hljs-symbol {
-  color: #ffa657;
-}
-[data-theme="dark"] .hljs-code,
-[data-theme="dark"] .hljs-comment,
-[data-theme="dark"] .hljs-formula {
-  color: #8b949e;
-}
-[data-theme="dark"] .hljs-name,
-[data-theme="dark"] .hljs-quote,
-[data-theme="dark"] .hljs-selector-pseudo,
-[data-theme="dark"] .hljs-selector-tag {
-  color: #7ee787;
-}
-[data-theme="dark"] .hljs-section {
-  color: #1f6feb;
-  font-weight: 700;
-}
-[data-theme="dark"] .hljs-bullet {
-  color: #f2cc60;
+  color: var(--warn);
 }

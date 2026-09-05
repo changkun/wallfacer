@@ -21,15 +21,15 @@
 .mermaid-rendered {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-lg);
   padding: 12px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-hover), box-shadow var(--dur-hover);
 }
 /* Subtle, neutral hover affordance (the diagram is click-to-expand). Replaces
    the previous bold accent outline. */
 .mermaid-rendered:hover {
-  border-color: color-mix(in oklab, var(--accent) 35%, var(--border));
-  box-shadow: 0 2px 12px -8px rgba(0, 0, 0, 0.3);
+  border-color: var(--accent-line);
+  box-shadow: var(--sh-2);
 }
 .mermaid-rendered svg {
   max-width: 100%;
@@ -46,8 +46,8 @@
    deliberate fallback rather than broken output. */
 .mermaid-error .mermaid-src {
   background: var(--bg-sunk);
-  border: 1px dashed var(--border);
-  border-radius: 6px;
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-md);
   padding: 12px;
   overflow-x: auto;
 }
@@ -86,16 +86,19 @@
   flex-shrink: 0;
 }
 .diagram-overlay__toolbar button {
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-input);
-  color: var(--text);
-  font-size: 13px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font-size: 12px;
   cursor: pointer;
 }
 .diagram-overlay__toolbar button:hover {
-  background: var(--bg-raised);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
 }
 .diagram-overlay__hint {
   flex: 1;

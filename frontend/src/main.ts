@@ -13,6 +13,7 @@ import './styles/dock.css';
 import './styles/primitives.css';
 import './styles/board.css';
 import './styles/modal.css';
+import './styles/analytics.css';
 import './styles/settings-modal.css';
 import './styles/settings-page.css';
 import './styles/task-detail.css';

@@ -1,4 +1,4 @@
-/* --- Dependency Picker --- */
+/* --- Dependency picker (composer, backlog edit) --- */
 .dep-picker {
   position: relative;
 }
@@ -7,27 +7,27 @@
   align-items: center;
   gap: 6px;
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: 8px;
-  padding: 6px 10px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
   cursor: pointer;
   text-align: left;
-  font-size: 13px;
-  font-family: inherit;
-  transition: border-color 0.15s;
-  min-height: 36px;
+  font: inherit;
+  font-size: var(--fs-base);
+  transition: border-color var(--dur-hover), background var(--dur-hover);
 }
 .dep-picker-trigger:hover {
-  border-color: var(--text-muted);
+  border-color: var(--rule-2);
 }
-.dep-picker-trigger:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+.dep-picker-trigger:focus-visible,
 .dep-picker.open .dep-picker-trigger {
-  border-color: var(--accent);
+  outline: none;
+  border-color: var(--accent-line);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .dep-picker-chips {
   flex: 1;
@@ -38,27 +38,24 @@
 }
 .dep-picker-placeholder {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--ink-4);
 }
 .dep-picker-chip {
-  background: rgba(217, 119, 87, 0.15);
+  background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid rgba(217, 119, 87, 0.3);
-  border-radius: 4px;
-  padding: 1px 7px;
-  font-size: 11px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-pill);
+  padding: 1px 8px;
+  font: 500 var(--fs-9) / 1.5 var(--font-mono);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-[data-theme="dark"] .dep-picker-chip {
-  background: rgba(217, 119, 87, 0.12);
-}
 .dep-picker-chevron {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  transition: transform 0.15s;
+  flex: none;
+  color: var(--ink-3);
+  transition: transform var(--dur-hover);
 }
 .dep-picker.open .dep-picker-chevron {
   transform: rotate(180deg);
@@ -70,26 +67,27 @@
   right: 0;
   z-index: 200;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   padding: 8px;
 }
 .dep-picker-search {
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 6px 8px;
+  min-height: 30px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+  font: inherit;
   font-size: 12px;
   outline: none;
   box-sizing: border-box;
   margin-bottom: 6px;
-  font-family: inherit;
 }
 .dep-picker-search:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 .dep-picker-list {
   max-height: 220px;
@@ -100,24 +98,21 @@
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background var(--dur-hover);
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   user-select: none;
 }
 .dep-picker-item:hover {
-  background: var(--bg-raised);
+  background: var(--bg-sunk);
 }
 .dep-picker-item.selected {
-  background: rgba(217, 119, 87, 0.07);
-}
-[data-theme="dark"] .dep-picker-item.selected {
-  background: rgba(217, 119, 87, 0.1);
+  background: var(--accent-tint);
 }
 .dep-picker-item input[type="checkbox"] {
-  flex-shrink: 0;
+  flex: none;
   accent-color: var(--accent);
   cursor: pointer;
 }
@@ -131,53 +126,42 @@
 .dep-picker-empty {
   padding: 12px 8px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--ink-3);
   text-align: center;
 }
 
-/* --- Pretty NDJSON log stream: empty-result placeholder --- */
+/* --- Log stream --- */
 .cc-result-empty {
-  color: #6e7681;
+  color: var(--terminal-ink-dim);
   font-style: italic;
 }
-
-/* --- Log mode tabs (Oversight / Pretty / Raw) --- */
 .logs-tabs {
   display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  overflow: hidden;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
 }
 .logs-tab {
   background: none;
   border: none;
-  border-right: 1px solid var(--border);
-  color: var(--text-muted);
-  padding: 2px 8px;
-  font-size: 11px;
+  color: var(--ink-3);
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-10);
   cursor: pointer;
   line-height: 1.6;
-  transition:
-    background 0.1s,
-    color 0.1s;
-}
-.logs-tab:last-child {
-  border-right: none;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
 .logs-tab:hover {
-  color: var(--text);
-  background: var(--bg-input);
+  color: var(--ink);
 }
 .logs-tab.active {
-  background: var(--bg-input);
-  color: var(--text);
+  background: var(--bg-card);
+  color: var(--ink);
   font-weight: 600;
+  box-shadow: var(--sh-card);
 }
-
-/* Markdown prose rendering is defined canonically in spec-mode.css
-   as `.prose-content`. Scoped overrides for display-scale docs live in
-   docs.css. Keep this file free of prose-content rules to avoid cascade
-   conflicts. */
 
 /* --- Code / log blocks --- */
 pre {
@@ -185,33 +169,26 @@ pre {
   word-break: break-word;
 }
 .code-block {
-  background: var(--bg-input);
-  border-radius: 8px;
-  padding: 16px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-#modal-logs-section,
-#modal-test-logs-section {
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  background: var(--bg-sunk);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  font-size: var(--fs-md);
+  color: var(--ink-2);
 }
 .logs-block {
-  background: #1a1917;
-  border-radius: 8px;
-  padding: 16px;
+  background: var(--terminal-bg);
+  border: 1px solid var(--terminal-rule);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
   font-size: 12px;
-  color: #cdd1d6;
-  flex: 1;
+  color: var(--terminal-fg);
   min-height: 0;
+  max-height: 420px;
   overflow-y: auto;
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
 }
-#log-search-bar + #modal-logs {
-  border-radius: 0 0 8px 8px;
+.activity-oversight-box {
+  display: block;
 }
 
 /* --- Editable preview (rendered markdown next to a textarea) --- */
@@ -221,31 +198,24 @@ pre {
   padding: 8px 10px;
 }
 
-/* --- Icon buttons (toggle/copy) --- */
+/* --- Small ghost buttons in section heads (Copy / Raw) --- */
 .btn-icon {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: 5px;
-  padding: 2px 7px;
-  font-size: 11px;
-  cursor: pointer;
+  height: 24px;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  line-height: 1.6;
+  gap: 4px;
+  padding: 0 9px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  font: 500 var(--fs-10) / 1 var(--font-sans);
+  cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover);
 }
-.btn-icon:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
-}
+.btn-icon:hover,
 .btn-icon.active {
-  color: var(--text);
-  border-color: #c6a7fb;
-  background: linear-gradient(180deg, #f4eeff 0%, #eadfff 100%);
-}
-[data-theme="dark"] .btn-icon.active {
-  border-color: #4b3c74;
-  background: linear-gradient(180deg, #2b2345 0%, #211638 100%);
-  color: #ccb0ff;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
 }
