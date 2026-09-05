@@ -14,7 +14,8 @@ import { useUiStore } from '../stores/ui';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
-import { useFolderBrowser, type BrowseEntry } from '../composables/useFolderBrowser';
+import { useFolderBrowser } from '../composables/useFolderBrowser';
+import FolderBrowser from './FolderBrowser.vue';
 import { workspaceLabel } from '../lib/workspaceLabel';
 
 const wsStore = useWorkspacesStore();
@@ -40,10 +41,8 @@ watch(() => ui.editWorkspaceId, () => { nameDraft.value = ws.value?.name ?? ''; 
 // If the workspace vanishes (deleted elsewhere) while open, close cleanly.
 watch(ws, (w) => { if (!w && ui.editWorkspaceId) close(); });
 
-const {
-  browsePath, pathInput, browseEntries, browseLoading, browseError, filter, showHidden,
-  browse, navigateUp, navigateInto, goToPath, onPathKeydown, shortenPath, breadcrumbSegments,
-} = useFolderBrowser();
+const browser = useFolderBrowser();
+const { browseEntries, browseError, browse, shortenPath } = browser;
 
 const showBrowser = ref(false);
 
@@ -160,15 +159,6 @@ async function remove() {
   }
 }
 
-function filteredEntries() {
-  let entries = browseEntries.value;
-  if (!showHidden.value) entries = entries.filter(e => !e.name.startsWith('.'));
-  const f = filter.value.trim().toLowerCase();
-  if (f) entries = entries.filter(e => e.name.toLowerCase().includes(f));
-  const added = (e: BrowseEntry) => ws.value?.folders.includes(e.path) ?? false;
-  return [...entries].sort((a, b) => Number(added(a)) - Number(added(b)));
-}
-
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') close();
 }
@@ -188,76 +178,95 @@ function onBackdrop(e: MouseEvent) {
   >
     <div
       ref="cardRef"
-      class="modal-card ws-picker ws-edit"
+      class="dialog dialog--wide ws-picker ws-edit"
       role="dialog"
       aria-modal="true"
       aria-label="Workspace settings"
     >
-      <div class="ws-picker__header">
-        <div style="flex: 1; min-width: 0">
-          <h3 class="ws-picker__title">Workspace settings</h3>
-          <p class="ws-picker__subtitle">{{ workspaceLabel(ws.name, ws.folders) }}</p>
+      <div class="dialog-head ws-picker__header">
+        <div class="dialog-head__main">
+          <h3 class="dialog-title ws-picker__title">Workspace settings</h3>
+          <p class="dialog-sub">{{ workspaceLabel(ws.name, ws.folders) }}</p>
         </div>
-        <span class="ws-picker__apply-status">{{ status }}</span>
-        <button type="button" class="btn-ghost ws-picker__close" @click="close">&times;</button>
+        <span class="ws-edit__status ws-picker__apply-status">{{ status }}</span>
+        <button type="button" class="icon-btn ws-picker__close" aria-label="Close" @click="close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+        </button>
       </div>
 
-      <div class="ws-edit__body">
-        <!-- Name: a single labeled field (no duplicated label/input pair). -->
-        <div class="ws-edit__field">
-          <label class="ws-edit__label" for="ws-edit-name">Name</label>
-          <input
-            id="ws-edit-name"
-            v-model="nameDraft"
-            class="field"
-            type="text"
-            :placeholder="workspaceLabel('', ws.folders)"
-            autocomplete="off"
-            @keydown.enter.prevent="saveName"
-            @blur="saveName"
-          />
-        </div>
-
-        <!-- Parallel caps: empty input clears (global default), a number sets. -->
-        <div class="ws-edit__field">
-          <span class="ws-edit__label">Parallel limits</span>
-          <div class="ws-edit__caps">
-            <label>
-              <span>Max parallel</span>
-              <input
-                type="number"
-                min="0"
-                :value="ws.max_parallel ?? ''"
-                placeholder="default"
-                :disabled="busy"
-                @change="saveCap('max_parallel', $event)"
-              />
-            </label>
-            <label>
-              <span>Max test parallel</span>
-              <input
-                type="number"
-                min="0"
-                :value="ws.max_test_parallel ?? ''"
-                placeholder="default"
-                :disabled="busy"
-                @change="saveCap('max_test_parallel', $event)"
-              />
-            </label>
+      <div class="dialog-body ws-edit__body">
+        <!-- Name and parallel caps: one card of rows, each with its field at
+             the end. An empty cap clears it so the global default applies. -->
+        <div class="card compact">
+          <div class="rows">
+            <div class="row">
+              <label class="row-main" for="ws-edit-name">
+                <span class="row-title">Name</span>
+                <span class="row-help">Shown in the rail and the picker.</span>
+              </label>
+              <div class="row-end ws-edit__end">
+                <input
+                  id="ws-edit-name"
+                  v-model="nameDraft"
+                  class="field"
+                  type="text"
+                  :placeholder="workspaceLabel('', ws.folders)"
+                  autocomplete="off"
+                  @keydown.enter.prevent="saveName"
+                  @blur="saveName"
+                />
+              </div>
+            </div>
+            <div class="row ws-edit__caps">
+              <div class="row-main">
+                <span class="row-title">Max parallel</span>
+                <span class="row-help">Tasks running at once. Empty uses the global limit.</span>
+              </div>
+              <div class="row-end ws-edit__end ws-edit__end--num">
+                <input
+                  class="field"
+                  type="number"
+                  min="0"
+                  :value="ws.max_parallel ?? ''"
+                  placeholder="default"
+                  :disabled="busy"
+                  aria-label="Max parallel"
+                  @change="saveCap('max_parallel', $event)"
+                />
+              </div>
+            </div>
+            <div class="row ws-edit__caps">
+              <div class="row-main">
+                <span class="row-title">Max test parallel</span>
+                <span class="row-help">Test runs at once. Empty uses the global limit.</span>
+              </div>
+              <div class="row-end ws-edit__end ws-edit__end--num">
+                <input
+                  class="field"
+                  type="number"
+                  min="0"
+                  :value="ws.max_test_parallel ?? ''"
+                  placeholder="default"
+                  :disabled="busy"
+                  aria-label="Max test parallel"
+                  @change="saveCap('max_test_parallel', $event)"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Folders: list with remove + a reveal-on-demand browser to add more. -->
-        <div class="ws-edit__field">
-          <div class="ws-edit__folders-head">
-            <span class="ws-edit__label">Folders</span>
+        <!-- Folders: the list with remove, and a reveal-on-demand browser. -->
+        <div class="card compact ws-edit__folders">
+          <div class="card-head">
+            <span class="eyebrow">Folders</span>
             <button
               type="button"
-              class="btn-ghost ws-picker__add-folder-btn"
+              class="btn sm ghost ws-picker__add-folder-btn"
               @click="toggleBrowser"
             >{{ showBrowser ? 'Done adding' : '+ Add folder' }}</button>
           </div>
-          <div class="ws-edit__folder-list">
+          <div class="card-pad ws-edit__folder-list">
             <div
               v-for="path in ws.folders"
               :key="path"
@@ -266,124 +275,38 @@ function onBackdrop(e: MouseEvent) {
               <span class="ws-selected-item__path" :title="path">{{ shortenPath(path) }}</span>
               <button
                 type="button"
-                class="btn-ghost ws-selected-item__remove"
+                class="icon-btn sm ws-selected-item__remove"
                 :disabled="ws.folders.length <= 1 || busy"
                 :title="ws.folders.length <= 1 ? 'A workspace needs at least one folder' : 'Remove folder'"
+                aria-label="Remove folder"
                 @click="removeFolder(path)"
-              >&times;</button>
-            </div>
-            <div
-              v-if="ws.folders.length === 0"
-              style="font-size: 11px; color: var(--text-muted); padding: 4px 2px"
-            >No folders. Add one below.</div>
-          </div>
-
-          <!-- Reveal-on-demand folder browser (shared with the picker). Capped
-               height so it never grows the modal past a normal centered card. -->
-          <div v-if="showBrowser" class="ws-edit__browser">
-            <div class="ws-picker__path-row">
-              <input
-                v-model="pathInput"
-                class="field ws-picker__path-input"
-                type="text"
-                placeholder="/absolute/path"
-                autocomplete="off"
-                @keydown="onPathKeydown"
-              />
-              <button type="button" class="btn-icon ws-picker__go-btn" @click="goToPath">Go</button>
-            </div>
-            <div class="ws-picker__breadcrumb">
-              <template v-for="(seg, i) in breadcrumbSegments()" :key="seg.path">
-                <span v-if="seg.label === '/'" style="color: var(--text-muted)">/</span>
-                <template v-else>
-                  <span v-if="i > 1" style="color: var(--text-muted)">/</span>
-                  <button
-                    type="button"
-                    :style="{
-                      border: 'none', background: 'none',
-                      color: i === breadcrumbSegments().length - 1 ? 'var(--text)' : 'var(--accent)',
-                      cursor: 'pointer', fontSize: '12px', padding: 0,
-                      fontWeight: i === breadcrumbSegments().length - 1 ? 600 : 400,
-                    }"
-                    @click="browse(seg.path)"
-                  >{{ seg.label }}</button>
-                </template>
-              </template>
-            </div>
-            <div class="ws-picker__browser-toolbar">
-              <label class="ws-picker__toggle">
-                <input v-model="showHidden" type="checkbox" />
-                Show hidden
-              </label>
-              <button
-                type="button"
-                class="btn-ghost ws-picker__add-folder-btn"
-                :disabled="ws.folders.includes(browsePath) || busy"
-                @click="addFolder(browsePath)"
-              >+ Add current folder</button>
-            </div>
-            <div class="ws-picker__status">
-              <span v-if="browseLoading">Loading...</span>
-              <span v-else-if="browseError" style="color: #c44">{{ browseError }}</span>
-            </div>
-            <div class="ws-picker__list ws-edit__list">
-              <div class="ws-picker__filter-wrap">
-                <input
-                  v-model="filter"
-                  class="field ws-picker__filter"
-                  type="search"
-                  placeholder="Filter..."
-                  autocomplete="off"
-                />
-              </div>
-              <button
-                v-if="browsePath !== '/'"
-                type="button"
-                class="ws-entry--parent"
-                @click="navigateUp"
-              ><span>..</span></button>
-              <div
-                v-for="entry in filteredEntries()"
-                :key="entry.path"
-                class="ws-entry"
               >
-                <button
-                  type="button"
-                  class="ws-entry__name"
-                  :title="entry.path"
-                  @click="navigateInto(entry)"
-                >
-                  <span style="overflow: hidden; text-overflow: ellipsis">{{ entry.name }}</span>
-                  <span v-if="entry.is_git_repo" class="ws-entry__badge">git</span>
-                </button>
-                <button
-                  v-if="!ws.folders.includes(entry.path)"
-                  type="button"
-                  class="btn-ghost ws-entry__add"
-                  :disabled="busy"
-                  @click="addFolder(entry.path)"
-                >+ Add</button>
-                <span v-else class="ws-entry__added">added</span>
-              </div>
-              <div
-                v-if="!browseLoading && filteredEntries().length === 0 && browsePath !== '/'"
-                style="padding: 8px; font-size: 11px; color: var(--text-muted)"
-              >{{ filter.trim() ? 'No matches.' : 'Empty.' }}</div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+              </button>
             </div>
+            <div v-if="ws.folders.length === 0" class="ws-picker__empty">No folders. Add one below.</div>
+            <FolderBrowser
+              v-if="showBrowser"
+              class="ws-edit__browser"
+              :browser="browser"
+              :added="ws.folders"
+              :busy="busy"
+              @add="addFolder"
+            />
           </div>
         </div>
 
-        <!-- Delete: the server 409s on the active workspace; disable + explain. -->
+        <!-- Delete: the server 409s on the active workspace; explain the switch. -->
         <div class="ws-edit__danger">
           <button
             type="button"
-            class="btn ws-edit__delete"
+            class="btn ghost danger ws-edit__delete"
             :disabled="busy"
             title="Permanently delete this workspace and wipe its data"
             @click="remove"
           >Delete workspace</button>
-          <span class="ws-edit__danger-note">
-            Wipes all task history + session data.{{ ws && wsStore.isActive(ws.id) ? ' Switches the board to another workspace.' : '' }}
+          <span class="dialog-note ws-edit__danger-note">
+            Wipes all task history and session data.{{ ws && wsStore.isActive(ws.id) ? ' Switches the board to another workspace.' : '' }}
           </span>
         </div>
       </div>
@@ -392,57 +315,19 @@ function onBackdrop(e: MouseEvent) {
 </template>
 
 <style scoped>
-/* A normal centered modal, not the picker's 1000px two-column grid. Override
-   .ws-picker's width/padding (scoped wins over the global single-class rule),
-   keeping its button/entry polish. */
-.ws-edit {
-  max-width: 560px;
-  padding: 0;
+.ws-edit__status {
+  align-self: center;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
 }
-.ws-edit__body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  max-height: 70vh;
-  overflow-y: auto;
+.ws-edit__end {
+  width: 240px;
 }
-.ws-edit__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.ws-edit__end--num {
+  width: 120px;
 }
-.ws-edit__label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.ws-edit__caps {
-  display: flex;
-  gap: 12px;
-}
-.ws-edit__caps label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.ws-edit__caps input {
-  width: 110px;
-  padding: 5px 8px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-input);
-  color: var(--text);
-}
-.ws-edit__folders-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.ws-edit__folders {
+  margin-top: 12px;
 }
 .ws-edit__folder-list {
   display: flex;
@@ -450,50 +335,18 @@ function onBackdrop(e: MouseEvent) {
   gap: 6px;
 }
 .ws-edit__browser {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-elevated);
+  margin-top: 6px;
 }
-/* Cap the browse list so the reveal never blows out the modal height. */
-.ws-edit__list {
-  max-height: 220px;
-}
-.ws-picker__close {
-  font-size: 18px;
-  line-height: 1;
-  padding: 4px 9px;
-  flex-shrink: 0;
-  border-radius: 8px;
+/* Cap the browse list so the reveal never grows the dialog past a normal card. */
+.ws-edit__browser :deep(.fb__list) {
+  max-height: 240px;
 }
 .ws-edit__danger {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-top: 1px solid var(--border);
+  gap: 12px;
+  margin-top: 16px;
   padding-top: 14px;
-}
-.ws-edit__delete {
-  font-size: 12px;
-  padding: 6px 12px;
-  border: 1px solid color-mix(in oklab, #c44 50%, var(--border));
-  color: #c44;
-  background: transparent;
-  border-radius: 8px;
-}
-.ws-edit__delete:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.ws-edit__delete:not(:disabled):hover {
-  background: color-mix(in oklab, #c44 12%, transparent);
-}
-.ws-edit__danger-note {
-  font-size: 11px;
-  color: var(--text-muted);
+  border-top: 1px solid var(--rule);
 }
 </style>

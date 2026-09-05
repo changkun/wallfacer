@@ -1,57 +1,49 @@
-/* --- Workspace picker --- */
-.ws-picker {
-  max-width: 1000px;
-  width: 100%;
-  padding: 0;
-}
-.ws-picker__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-}
-.ws-picker__title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-.ws-picker__subtitle {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.ws-picker__body {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 0;
-  font-size: 12px;
-  height: 520px;
-}
-/* Single pane per wizard step: instruction, the pane, then a step footer. */
+/* --- Workspace picker and editor ---
+   Both are the wide dialog. The picker lists workspaces as rows, or runs a
+   two-step wizard (choose folders, then name and activate); the editor is a
+   card of rows for name and limits plus a folders card. The folder browser
+   (FolderBrowser.vue) is shared: a path field, a breadcrumb, a toolbar and
+   entry rows on the sunk surface.
+   See specs/shared/console-redesign/panels-and-overlays.md. */
+
+/* The list body and each wizard step share one height so the dialog does not
+   jump between views. */
+.ws-picker__list-view,
 .ws-picker__body--step {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  height: 520px;
+  gap: 12px;
+  height: 480px;
+  padding-top: 4px;
 }
-/* The workspace list is a single column, NOT the wizard's 2-column grid.
-   Without this override it inherits .ws-picker__body's grid and the list gets
-   crammed into the narrow right cell with collapsed, overlapping rows. */
-.ws-picker__list-view {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  height: 520px;
+.ws-list__main {
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  padding: 0;
 }
-.ws-picker__browser {
+.ws-list__main:disabled {
+  cursor: default;
+}
+.ws-list__item--active {
+  background: var(--bg-sunk);
+}
+.ws-list__name {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  min-height: 0;
-  flex: 1;
+  white-space: normal;
+}
+.ws-list__paths {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 /* --- Wizard stepper --- */
@@ -59,8 +51,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 0 20px 12px;
+  flex: none;
 }
 .ws-step {
   display: flex;
@@ -70,11 +62,17 @@
   background: none;
   padding: 2px;
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: var(--fs-base);
+  border-radius: var(--r-sm);
 }
 .ws-step:disabled {
   cursor: default;
+}
+.ws-step:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .ws-step__circle {
   display: inline-flex;
@@ -82,12 +80,11 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  border-radius: 50%;
+  border: 1px solid var(--rule-2);
   background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
+  color: var(--ink-3);
+  font: 600 var(--fs-10) / 1 var(--font-mono);
   flex-shrink: 0;
 }
 .ws-step__label {
@@ -97,363 +94,293 @@
 .ws-step--done .ws-step__circle {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .ws-step--active .ws-step__label {
-  color: var(--text);
-  font-weight: 700;
+  color: var(--ink);
+  font-weight: 600;
 }
 .ws-step--done .ws-step__label {
-  color: var(--text);
-}
-.ws-step--upcoming .ws-step__circle {
-  border-color: var(--border);
-  color: var(--text-muted);
+  color: var(--ink);
 }
 .ws-step__connector {
   flex: 1;
   height: 1px;
   max-width: 120px;
-  background: var(--border);
+  background: var(--rule-2);
 }
 .ws-step__connector--done {
   background: var(--accent);
 }
-.ws-step__instruction {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-.ws-step__footer {
+
+/* --- Step 1: native pick row, then the browser --- */
+.ws-picker__pick-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
+  gap: 12px;
+  flex: none;
 }
-.ws-step__count {
-  font-size: 11px;
-  color: var(--text-muted);
+.ws-picker__pick-hint {
+  font-size: var(--fs-10);
+  color: var(--ink-3);
 }
-.ws-step__footer-right {
+.ws-picker__browser {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- Step 2: name and the reviewed selection --- */
+.ws-picker__name-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ws-picker__path-row {
-  display: flex;
+  flex-direction: column;
   gap: 6px;
-  align-items: center;
-}
-.ws-picker__path-input {
-  font-family: monospace;
-  font-size: 11px;
-  padding: 5px 8px;
-  border-radius: 5px;
-  flex: 1;
-}
-.ws-picker__go-btn {
-  font-size: 11px;
-  padding: 4px 10px;
-  flex-shrink: 0;
-}
-.ws-picker__breadcrumb {
-  font-size: 12px;
-  min-height: 1.2em;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1px;
-}
-.ws-picker__status {
-  font-size: 11px;
-  color: var(--text-muted);
-  min-height: 1em;
-}
-.ws-picker__list {
-  flex: 1;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px;
-  background: var(--bg-elevated);
-}
-.ws-picker__filter-wrap {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 0 0 4px;
-  background: var(--bg-elevated);
-}
-.ws-picker__filter {
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 5px;
-  width: 100%;
-}
-.ws-picker__browser-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-muted);
-  padding-top: 2px;
-}
-.ws-picker__toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.ws-picker__toggle input {
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.ws-picker__toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ws-picker__new-folder-btn,
-.ws-picker__add-folder-btn {
-  font-size: 11px;
-  padding: 2px 6px;
+  flex: none;
 }
 .ws-picker__selection {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
-  min-height: 0;
-}
-/* Review step: selection pane fills the single-pane body, no extra padding. */
-.ws-picker__selection--review {
   flex: 1;
-  padding: 0;
-}
-.ws-picker__selection-footer--review {
-  justify-content: space-between;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
+  min-height: 0;
 }
 .ws-picker__selection-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.ws-picker__selection-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-.ws-picker__clear-btn {
-  font-size: 11px;
-  padding: 2px 6px;
-}
 .ws-picker__selection-list {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.ws-picker__selection-footer {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding-top: 4px;
-}
-.ws-picker__apply-status {
-  font-size: 11px;
-  color: var(--text-muted);
+.ws-picker__empty {
+  font-size: var(--fs-10);
+  color: var(--ink-4);
+  padding: 4px 2px;
 }
 
-/* Workspace picker: browser entries (rendered by JS) */
-.ws-entry {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 2px 2px 0;
-  border-radius: 4px;
-}
-.ws-entry__name {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-entry__name:hover {
-  background: var(--bg-input);
-}
-.ws-entry__badge {
-  font-size: 9px;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  padding: 0 4px;
-  flex-shrink: 0;
-  line-height: 1.4;
-}
-.ws-entry__rename {
-  font-size: 10px;
-  padding: 2px 4px;
-  flex-shrink: 0;
-  opacity: 0.5;
-}
-.ws-entry__rename:hover {
-  opacity: 1;
-}
-.ws-entry__add {
-  font-size: 11px;
-  padding: 2px 8px;
-  flex-shrink: 0;
-}
-.ws-entry__added {
-  font-size: 10px;
-  color: var(--text-muted);
-  padding: 2px 8px;
-  flex-shrink: 0;
-}
-.ws-entry--parent {
-  padding: 4px 6px;
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 12px;
-  width: 100%;
-  text-align: left;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ws-entry--parent:hover {
-  background: var(--bg-input);
-}
-
-/* Workspace picker: selection items (rendered by JS) */
+/* A selected folder: mono path with a quiet remove at the end. */
 .ws-selected-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 8px;
-  background: var(--bg-elevated);
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-row);
+  background: var(--bg-sunk);
 }
 .ws-selected-item__path {
-  font-family: monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-selected-item__remove {
-  font-size: 11px;
-  padding: 1px 6px;
-  flex-shrink: 0;
-}
 
-/* --- Control polish ---------------------------------------------------------
-   The shared btn-ghost/btn-icon rendered as flat, washed-out boxes inside the
-   modal. Give the picker controls a clean, consistent secondary-button look
-   with a soft focus ring (not the global bold accent outline box). Prefixed
-   with .ws-picker to win over the single-class global button rules. */
-.ws-picker .ws-picker__go-btn,
-.ws-picker .ws-picker__new-folder-btn,
-.ws-picker .ws-picker__add-folder-btn,
-.ws-picker .ws-entry__add,
-.ws-picker .ws-picker__clear-btn,
-.ws-picker .ws-selected-item__remove {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--text);
-  font-weight: 500;
-  line-height: 1.4;
-  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+/* --- The folder browser (FolderBrowser.vue) --- */
+.fb {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
 }
-.ws-picker .ws-picker__go-btn,
-.ws-picker .ws-picker__new-folder-btn,
-.ws-picker .ws-picker__add-folder-btn {
-  padding: 5px 12px;
+.fb__path {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: none;
 }
-.ws-picker .ws-entry__add,
-.ws-picker .ws-picker__clear-btn {
-  padding: 3px 10px;
+.fb__path-input {
+  flex: 1;
 }
-.ws-picker .ws-picker__go-btn:hover:not(:disabled),
-.ws-picker .ws-picker__new-folder-btn:hover:not(:disabled),
-.ws-picker .ws-picker__add-folder-btn:hover:not(:disabled),
-.ws-picker .ws-entry__add:hover:not(:disabled),
-.ws-picker .ws-picker__clear-btn:hover:not(:disabled),
-.ws-picker .ws-selected-item__remove:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
-  color: var(--text);
+.fb__crumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 1.2em;
+  font-size: 12px;
+  flex: none;
 }
-.ws-picker .ws-picker__go-btn:disabled,
-.ws-picker .ws-picker__new-folder-btn:disabled,
-.ws-picker .ws-picker__add-folder-btn:disabled,
-.ws-picker .ws-entry__add:disabled,
-.ws-picker .ws-picker__clear-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
+.fb__crumb-sep {
+  color: var(--ink-4);
 }
-.ws-picker .ws-picker__go-btn:focus-visible,
-.ws-picker .ws-picker__new-folder-btn:focus-visible,
-.ws-picker .ws-picker__add-folder-btn:focus-visible,
-.ws-picker .ws-entry__add:focus-visible,
-.ws-picker .ws-picker__clear-btn:focus-visible,
-.ws-picker .ws-selected-item__remove:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 16%, transparent);
-}
-
-/* Rename stays a quiet inline icon, not a filled button. */
-.ws-picker .ws-entry__rename {
+.fb__crumb-seg {
   border: none;
   background: none;
-  border-radius: 4px;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: var(--r-xs);
 }
-.ws-picker .ws-entry__rename:hover {
-  background: var(--bg-hover);
+.fb__crumb-seg:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.fb__crumb-seg--leaf {
+  color: var(--ink);
+  font-weight: 600;
+}
+.fb__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+  flex: none;
+}
+.fb__toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.fb__toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.fb__status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fb__error {
+  color: var(--err);
 }
 
-/* Inputs: soft, diffuse focus glow rather than a hard accent ring. */
-.ws-picker .ws-picker__path-input:focus,
-.ws-picker .ws-picker__filter:focus {
-  outline: none;
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
-  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
+/* The entry list: rows on the sunk surface with the filter pinned on top. */
+.fb__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--bg-sunk);
+}
+.fb__filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0 0 4px;
+  background: var(--bg-sunk);
+}
+.fb__filter-input {
+  min-height: 30px;
+  background: var(--bg-card);
+}
+.fb__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 4px 0 0;
+  border-radius: var(--r-row);
+  transition: background var(--dur-hover);
+}
+.fb__row:hover {
+  background: var(--bg-card);
+}
+.fb__row--added {
+  color: var(--ink-3);
+}
+.fb__row--parent {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0 10px;
+  gap: 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-3);
+  cursor: pointer;
+  text-align: left;
+}
+.fb__row--parent:hover {
+  color: var(--ink);
+}
+.fb__name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 4px 0 10px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--r-row);
+}
+.fb__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fb__chev {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  background-color: var(--ink-4);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+}
+.fb__chev--up {
+  transform: rotate(-90deg);
+}
+.fb__row:hover .fb__chev {
+  background-color: var(--ink-2);
+}
+.fb__git {
+  flex: none;
+}
+.fb__rename {
+  opacity: 0;
+}
+.fb__row:hover .fb__rename,
+.fb__rename:focus-visible {
+  opacity: 1;
+}
+.fb__add {
+  flex: none;
+}
+.fb__added {
+  flex: none;
+  padding: 0 10px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.fb__empty {
+  padding: 10px 12px;
+  font-size: var(--fs-10);
+  color: var(--ink-4);
 }
 
-/* Stepper: replace the global bold accent focus box with a soft ring on the
-   numbered circle (the active step already reads via its filled circle). */
-.ws-picker .ws-step:focus-visible {
-  outline: none;
-}
-.ws-picker .ws-step:focus-visible .ws-step__circle {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+/* Below the phone breakpoint the fixed heights yield to the viewport. */
+@media (max-width: 640px) {
+  .ws-picker__list-view,
+  .ws-picker__body--step {
+    height: auto;
+    max-height: 60vh;
+  }
 }

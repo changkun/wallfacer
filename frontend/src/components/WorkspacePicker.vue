@@ -7,7 +7,8 @@ import { useUiStore } from '../stores/ui';
 import { useDialogStore } from '../stores/dialog';
 import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
-import { useFolderBrowser, type BrowseEntry } from '../composables/useFolderBrowser';
+import { useFolderBrowser } from '../composables/useFolderBrowser';
+import FolderBrowser from './FolderBrowser.vue';
 import { workspaceLabel } from '../lib/workspaceLabel';
 import type { Workspace } from '../api/types';
 
@@ -47,10 +48,8 @@ const editingId = ref<string | null>(null);
 const wsName = ref('');
 
 const folders = ref<string[]>([]);
-const {
-  browsePath, pathInput, browseEntries, browseLoading, browseError, filter, showHidden,
-  browse, navigateUp, navigateInto, goToPath, onPathKeydown, shortenPath, breadcrumbSegments,
-} = useFolderBrowser();
+const browser = useFolderBrowser();
+const { browsePath, pathInput, browseError, filter, browse, shortenPath } = browser;
 const saving = ref(false);
 const applyStatus = ref('');
 const activatingId = ref<string | null>(null);
@@ -242,20 +241,6 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && dismissable.value) close();
 }
 
-function filteredEntries() {
-  let entries = browseEntries.value;
-  if (!showHidden.value) {
-    entries = entries.filter((e) => !e.name.startsWith('.'));
-  }
-  const f = filter.value.trim().toLowerCase();
-  if (f) {
-    entries = entries.filter((e) => e.name.toLowerCase().includes(f));
-  }
-  // Already-added folders sink to the bottom so the list stays a queue of
-  // things still left to add; relative order within each group is preserved.
-  const added = (e: BrowseEntry) => folders.value.includes(e.path);
-  return [...entries].sort((a, b) => Number(added(a)) - Number(added(b)));
-}
 </script>
 
 <template>
@@ -264,65 +249,74 @@ function filteredEntries() {
     class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
     @click="onBackdrop"
   >
-    <div ref="cardRef" class="modal-card ws-picker" role="dialog" aria-modal="true" aria-label="Workspace Picker">
-      <div class="ws-picker__header">
-        <div style="flex: 1; min-width: 0">
-          <h3 class="ws-picker__title">
-            {{ view === 'list' ? 'Select Workspace' : editingId ? 'Edit Workspace' : 'New Workspace' }}
+    <div ref="cardRef" class="dialog dialog--wide ws-picker" role="dialog" aria-modal="true" aria-label="Workspace Picker">
+      <div class="dialog-head ws-picker__header">
+        <div class="dialog-head__main">
+          <h3 class="dialog-title ws-picker__title">
+            {{ view === 'list' ? 'Select workspace' : editingId ? 'Edit workspace' : 'New workspace' }}
           </h3>
+          <p class="dialog-sub">
+            <template v-if="view === 'list'">Click a workspace to switch the board to it. Editing folders never loses history.</template>
+            <template v-else-if="step === 1">Pick the project folders this workspace spans. Each one appears in the list below.</template>
+            <template v-else>Name this workspace and review its folders. The name is stable across folder edits.</template>
+          </p>
         </div>
         <button
           v-if="dismissable"
           type="button"
-          class="btn-ghost ws-picker__close"
+          class="icon-btn ws-picker__close"
+          aria-label="Close"
           @click="close"
         >
-          &times;
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
         </button>
       </div>
 
       <!-- List view: pick an existing workspace to activate. -->
-      <div v-if="view === 'list'" class="ws-picker__body ws-picker__list-view">
-        <p class="ws-step__instruction">
-          Click a workspace to switch the board to it. Editing folders never loses history.
-        </p>
-        <div class="ws-list">
-          <div
-            v-for="ws in existing"
-            :key="ws.id"
-            class="ws-list__item"
-            :class="{ 'ws-list__item--active': wsStore.isActive(ws.id) }"
-          >
-            <button
-              type="button"
-              class="ws-list__main"
-              :disabled="activatingId !== null"
-              @click="activateExisting(ws)"
-            >
-              <span class="ws-list__name">
-                {{ workspaceLabel(ws.name, ws.folders) }}
-                <span v-if="wsStore.isActive(ws.id)" class="ws-list__badge ws-list__badge--active">active</span>
-                <span v-if="ws.dormant" class="ws-list__badge ws-list__badge--dormant">recovered</span>
-              </span>
-              <span class="ws-list__paths" :title="ws.folders.join('\n')">
-                {{ ws.folders.length ? ws.folders.map(shortenPath).join('  ·  ') : 'No folders — re-point to use' }}
-              </span>
-            </button>
-            <button
-              type="button"
-              class="btn-ghost ws-list__edit"
-              title="Edit name, folders, and limits"
-              @click="close(); ui.openWorkspaceEdit(ws.id)"
-            >Edit</button>
+      <template v-if="view === 'list'">
+        <div class="dialog-body ws-picker__body ws-picker__list-view">
+          <div class="card compact">
+            <div class="rows ws-list">
+              <div
+                v-for="ws in existing"
+                :key="ws.id"
+                class="row ws-list__item"
+                :class="{ 'ws-list__item--active': wsStore.isActive(ws.id) }"
+              >
+                <button
+                  type="button"
+                  class="row-main ws-list__main"
+                  :disabled="activatingId !== null"
+                  @click="activateExisting(ws)"
+                >
+                  <span class="row-title ws-list__name">
+                    {{ workspaceLabel(ws.name, ws.folders) }}
+                    <span v-if="wsStore.isActive(ws.id)" class="pill pill-brand ws-list__badge ws-list__badge--active">active</span>
+                    <span v-if="ws.dormant" class="pill pill-warn ws-list__badge ws-list__badge--dormant">recovered</span>
+                  </span>
+                  <span class="row-meta ws-list__paths" :title="ws.folders.join('\n')">
+                    {{ ws.folders.length ? ws.folders.map(shortenPath).join('  ·  ') : 'No folders. Re-point to use.' }}
+                  </span>
+                </button>
+                <div class="row-end">
+                  <button
+                    type="button"
+                    class="btn sm ghost ws-list__edit"
+                    title="Edit name, folders, and limits"
+                    @click="close(); ui.openWorkspaceEdit(ws.id)"
+                  >Edit</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="ws-step__footer">
-          <span class="ws-picker__apply-status">{{ applyStatus }}</span>
-          <button type="button" class="btn btn-accent" @click="enterNewWorkspace">
+        <div class="dialog-foot ws-step__footer">
+          <span class="dialog-foot__status ws-picker__apply-status">{{ applyStatus }}</span>
+          <button type="button" class="btn" @click="enterNewWorkspace">
             + New workspace
           </button>
         </div>
-      </div>
+      </template>
 
       <template v-else>
         <div class="ws-stepper" role="tablist" aria-label="Workspace setup steps">
@@ -348,355 +342,105 @@ function filteredEntries() {
           </button>
         </div>
 
-        <div v-show="step === 1" class="ws-picker__body ws-picker__body--step">
-        <p class="ws-step__instruction">
-          Pick your project folders with the system file browser. Add as many as
-          you want — each appears in the list below.
-        </p>
-        <div class="ws-picker__pick-row">
-          <button type="button" class="btn btn-accent ws-picker__pick-btn" @click="pickFolderNative">
-            📁 Choose folder…
-          </button>
-          <span class="ws-picker__pick-hint">Opens your system file browser</span>
-        </div>
-        <p class="ws-picker__manual-label">Or browse manually:</p>
-        <div class="ws-picker__browser">
-          <div class="ws-picker__path-row">
-            <input
-              v-model="pathInput"
-              class="field ws-picker__path-input"
-              type="text"
-              placeholder="/absolute/path"
-              autocomplete="off"
-              @keydown="onPathKeydown"
-            />
-            <button type="button" class="btn-icon ws-picker__go-btn" @click="goToPath">
-              Go
+        <div v-show="step === 1" class="dialog-body ws-picker__body ws-picker__body--step">
+          <div class="ws-picker__pick-row">
+            <button type="button" class="btn ws-picker__pick-btn" @click="pickFolderNative">
+              Choose folder…
             </button>
+            <span class="ws-picker__pick-hint">Opens the system file browser, or browse below.</span>
           </div>
-
-          <div class="ws-picker__breadcrumb">
-            <template v-for="(seg, i) in breadcrumbSegments()" :key="seg.path">
-              <span v-if="seg.label === '/'" style="color: var(--text-muted)">/</span>
-              <template v-else>
-                <span v-if="i > 1" style="color: var(--text-muted)">/</span>
-                <button
-                  type="button"
-                  :style="{
-                    border: 'none',
-                    background: 'none',
-                    color: i === breadcrumbSegments().length - 1 ? 'var(--text)' : 'var(--accent)',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    padding: 0,
-                    fontWeight: i === breadcrumbSegments().length - 1 ? 600 : 400,
-                  }"
-                  @click="browse(seg.path)"
-                >
-                  {{ seg.label }}
-                </button>
-              </template>
-            </template>
-          </div>
-
-          <div class="ws-picker__browser-toolbar">
-            <label class="ws-picker__toggle">
-              <input v-model="showHidden" type="checkbox" />
-              Show hidden
-            </label>
-            <button
-              type="button"
-              class="btn-ghost ws-picker__add-folder-btn"
-              :disabled="folders.includes(browsePath)"
-              @click="addFolder(browsePath)"
-            >
-              + Add this folder
-            </button>
-          </div>
-
-          <div class="ws-picker__status">
-            <span v-if="browseLoading">Loading...</span>
-            <span v-else-if="browseError" style="color: #c44">{{ browseError }}</span>
-          </div>
-
-          <div class="ws-picker__list">
-            <div class="ws-picker__filter-wrap">
-              <input
-                v-model="filter"
-                class="field ws-picker__filter"
-                type="search"
-                placeholder="Filter..."
-                autocomplete="off"
-              />
-            </div>
-            <div>
-              <button
-                v-if="browsePath !== '/'"
-                type="button"
-                class="ws-entry--parent"
-                @click="navigateUp"
-              >
-                <span>..</span>
-              </button>
-              <div
-                v-for="entry in filteredEntries()"
-                :key="entry.path"
-                class="ws-entry"
-              >
-                <button
-                  type="button"
-                  class="ws-entry__name"
-                  :title="entry.path"
-                  @click="navigateInto(entry)"
-                >
-                  <span style="overflow: hidden; text-overflow: ellipsis">{{ entry.name }}</span>
-                  <span v-if="entry.is_git_repo" class="ws-entry__badge">git</span>
-                </button>
-                <button
-                  type="button"
-                  class="btn-ghost ws-entry__rename"
-                  title="Rename folder"
-                  @click="renameEntry(entry)"
-                >✎</button>
-                <button
-                  v-if="!folders.includes(entry.path)"
-                  type="button"
-                  class="btn-ghost ws-entry__add"
-                  @click="addFolder(entry.path)"
-                >
-                  + Add
-                </button>
-                <span v-else class="ws-entry__added">added</span>
-              </div>
-              <div
-                v-if="!browseLoading && filteredEntries().length === 0 && browsePath !== '/'"
-                style="padding: 8px; font-size: 11px; color: var(--text-muted)"
-              >
-                {{ filter.trim() ? 'No matches.' : 'Empty.' }}
-              </div>
-            </div>
-          </div>
+          <FolderBrowser
+            class="ws-picker__browser"
+            :browser="browser"
+            :added="folders"
+            renamable
+            @add="addFolder"
+            @rename="renameEntry"
+          />
         </div>
-
-        <div class="ws-step__footer">
+        <div v-show="step === 1" class="dialog-foot ws-step__footer">
           <button
             v-if="existing.length > 0"
             type="button"
-            class="btn btn-ghost"
+            class="btn ghost"
             @click="backToList"
           >
             &larr; Back to list
           </button>
-          <span class="ws-step__count">
+          <span class="dialog-foot__status ws-step__count">
             {{ folders.length }} {{ folders.length === 1 ? 'folder' : 'folders' }} added
           </span>
           <button
             type="button"
-            class="btn btn-accent"
+            class="btn"
             :disabled="!canProceed"
             @click="goNext"
           >
             Next: Name &rarr;
           </button>
         </div>
-      </div>
 
-        <div v-show="step === 2" class="ws-picker__body ws-picker__body--step">
-        <p class="ws-step__instruction">
-          Name this workspace and review its folders. The name is stable across folder edits.
-        </p>
-        <div class="ws-picker__name-row">
-          <label class="ws-picker__name-label" for="ws-name-input">Workspace name</label>
-          <input
-            id="ws-name-input"
-            v-model="wsName"
-            class="field ws-picker__name-input"
-            type="text"
-            :placeholder="basenames(folders) || 'My workspace'"
-            autocomplete="off"
-          />
-        </div>
-        <div class="ws-picker__selection ws-picker__selection--review">
-          <div class="ws-picker__selection-header">
-            <span class="ws-picker__selection-label">Folders</span>
-            <button
-              type="button"
-              class="btn-ghost ws-picker__clear-btn"
-              :disabled="folders.length === 0"
-              @click="clearSelection"
-            >
-              Clear all
-            </button>
+        <div v-show="step === 2" class="dialog-body ws-picker__body ws-picker__body--step">
+          <div class="ws-picker__name-row">
+            <label class="eyebrow ws-picker__name-label" for="ws-name-input">Workspace name</label>
+            <input
+              id="ws-name-input"
+              v-model="wsName"
+              class="field ws-picker__name-input"
+              type="text"
+              :placeholder="basenames(folders) || 'My workspace'"
+              autocomplete="off"
+            />
           </div>
-          <div class="ws-picker__selection-list">
-            <div
-              v-if="folders.length === 0"
-              style="font-size: 11px; color: var(--text-muted); padding: 4px 2px"
-            >
-              No folders selected. Go back to step 1 to add some.
-            </div>
-            <div
-              v-for="(f, i) in folders"
-              :key="f"
-              class="ws-selected-item"
-            >
-              <span class="ws-selected-item__path" :title="f">{{ shortenPath(f) }}</span>
+          <div class="ws-picker__selection ws-picker__selection--review">
+            <div class="ws-picker__selection-header">
+              <span class="eyebrow ws-picker__selection-label">Folders</span>
               <button
                 type="button"
-                class="btn-ghost ws-selected-item__remove"
-                @click="removeFolder(i)"
+                class="btn sm ghost ws-picker__clear-btn"
+                :disabled="folders.length === 0"
+                @click="clearSelection"
               >
-                &times;
+                Clear all
               </button>
             </div>
-          </div>
-          <div class="ws-picker__selection-footer ws-picker__selection-footer--review">
-            <button type="button" class="btn btn-ghost" @click="goBack">
-              &larr; Back
-            </button>
-            <div class="ws-step__footer-right">
-              <span class="ws-picker__apply-status">{{ applyStatus }}</span>
-              <button
-                type="button"
-                class="btn btn-accent"
-                :disabled="saving || folders.length === 0"
-                @click="confirm"
+            <div class="ws-picker__selection-list">
+              <div v-if="folders.length === 0" class="ws-picker__empty">
+                No folders selected. Go back to step 1 to add some.
+              </div>
+              <div
+                v-for="(f, i) in folders"
+                :key="f"
+                class="ws-selected-item"
               >
-                {{ saving ? 'Applying...' : 'Activate' }}
-              </button>
+                <span class="ws-selected-item__path" :title="f">{{ shortenPath(f) }}</span>
+                <button
+                  type="button"
+                  class="icon-btn sm ws-selected-item__remove"
+                  aria-label="Remove folder"
+                  @click="removeFolder(i)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+        <div v-show="step === 2" class="dialog-foot ws-picker__selection-footer ws-picker__selection-footer--review">
+          <button type="button" class="btn ghost" @click="goBack">
+            &larr; Back
+          </button>
+          <span class="dialog-foot__status ws-picker__apply-status">{{ applyStatus }}</span>
+          <button
+            type="button"
+            class="btn"
+            :disabled="saving || folders.length === 0"
+            @click="confirm"
+          >
+            {{ saving ? 'Applying...' : 'Activate' }}
+          </button>
+        </div>
       </template>
     </div>
   </div>
 </template>
-
-<style scoped>
-.ws-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-  flex: 1;
-}
-.ws-list__item {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-elevated);
-  overflow: hidden;
-}
-.ws-list__item--active {
-  border-color: var(--accent);
-}
-.ws-list__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-start;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px 10px;
-  color: var(--text);
-}
-.ws-list__main:hover:not(:disabled) {
-  background: var(--bg-hover, rgba(127, 127, 127, 0.08));
-}
-.ws-list__name {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ws-list__paths {
-  font-size: 11px;
-  /* Without an explicit line-height the single-line box collapses to the font
-   * size and overflow:hidden clips the descenders ("half visible" paths). */
-  line-height: 1.6;
-  color: var(--text-muted);
-  font-family: monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-.ws-list__badge {
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  padding: 1px 5px;
-  border-radius: 999px;
-}
-.ws-list__badge--active {
-  background: var(--accent);
-  color: var(--accent-contrast, #fff);
-}
-.ws-list__badge--dormant {
-  background: #b8860b;
-  color: #fff;
-}
-.ws-list__edit {
-  flex-shrink: 0;
-  align-self: center;
-  /* Proper button height (was padding:0 → cramped, mis-aligned with the
-   * two-line content) and breathing room from the row's right edge. */
-  padding: 6px 14px;
-  margin-right: 10px;
-  font-size: 11px;
-  line-height: 1;
-}
-/* The close button must be a rounded square so its focus ring isn't a sharp
- * rectangle (the outline follows border-radius). */
-.ws-picker__close {
-  font-size: 18px;
-  line-height: 1;
-  padding: 4px 9px;
-  flex-shrink: 0;
-  border-radius: 8px;
-}
-.ws-picker__name-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-.ws-picker__name-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.ws-picker__name-input {
-  width: 100%;
-}
-.ws-picker__pick-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.ws-picker__pick-btn {
-  font-size: 13px;
-}
-.ws-picker__pick-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.ws-picker__manual-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 6px 0 4px;
-}
-</style>
