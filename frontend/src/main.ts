@@ -25,6 +25,7 @@ import './styles/workspace-picker.css';
 import './styles/explorer.css';
 import './styles/spec-mode.css';
 import './styles/docs.css';
+import './styles/mission.css';
 import './styles/agents.css';
 import './styles/syntax.css';
 import './styles/utilities.css';

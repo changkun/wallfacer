@@ -240,11 +240,11 @@ defineExpose({ resetView });
             v-if="isRunning(n.status) || isWaiting(n.status)"
             class="gc-pulse"
             :class="isWaiting(n.status) ? 'gc-pulse--waiting' : 'gc-pulse--running'"
-            :stroke="stateColor(n.status)"
+            :style="{ stroke: stateColor(n.status) }"
             :r="n.kind === 'task' ? 9 : 11"
             fill="none"
           />
-          <circle class="gc-dot" :fill="stateColor(n.status)" :r="n.kind === 'task' ? 9 : 11" />
+          <circle class="gc-dot" :style="{ fill: stateColor(n.status) }" :r="n.kind === 'task' ? 9 : 11" />
           <text class="gc-node__label" text-anchor="middle">
             <tspan v-for="(ln, i) in labelLines(n.label)" :key="i" x="0" :y="24 + i * 13">{{ ln }}</tspan>
           </text>
@@ -264,8 +264,8 @@ defineExpose({ resetView });
   user-select: none;
   -webkit-user-select: none;
   background:
-    radial-gradient(circle, var(--rule, #d9d3c5) 1px, transparent 1px) 0 0 / 24px 24px;
-  background-color: var(--bg, #f4f1ea);
+    radial-gradient(circle, var(--rule) 1px, transparent 1px) 0 0 / 24px 24px;
+  background-color: var(--bg);
 }
 .gc-canvas--panning {
   cursor: grab;
@@ -278,25 +278,25 @@ defineExpose({ resetView });
 }
 /* Network-style node: a state-colored disc with the title below it. */
 .gc-dot {
-  stroke: var(--bg, #f4f1ea);
+  stroke: var(--bg);
   stroke-width: 2;
   transition: r 80ms ease;
 }
 .gc-node__label {
   font-size: 11px;
   font-weight: 600;
-  fill: var(--ink, #1b1916);
+  fill: var(--ink);
   /* Halo so the label stays legible over edges and the dot grid. */
   paint-order: stroke;
-  stroke: var(--bg, #f4f1ea);
+  stroke: var(--bg);
   stroke-width: 3px;
   stroke-linejoin: round;
 }
 
 .gc-node--selected .gc-dot {
-  stroke: var(--accent, #c45a33);
+  stroke: var(--accent);
   stroke-width: 3;
-  filter: drop-shadow(0 0 5px var(--accent-soft, #f3dccf));
+  filter: drop-shadow(0 0 5px var(--accent-soft));
 }
 .gc-node--blocked {
   opacity: 0.45;
@@ -304,7 +304,7 @@ defineExpose({ resetView });
 /* "Actionable now": a node the backend marked with an available action gets an
    accent ring so the operator can spot what's ready to dispatch/start. */
 .gc-node--ready .gc-dot {
-  stroke: var(--accent, #c45a33);
+  stroke: var(--accent);
   stroke-width: 3;
 }
 
@@ -344,7 +344,7 @@ defineExpose({ resetView });
 /* "You are here": the running node on the critical path gets a bold accent ring
    plus the breathing disc, so the eye lands on where the pipeline is now. */
 .gc-node--here .gc-dot {
-  stroke: var(--accent, #c45a33);
+  stroke: var(--accent);
   stroke-width: 3;
 }
 
@@ -361,17 +361,17 @@ defineExpose({ resetView });
 }
 
 .gc-edge {
-  stroke: var(--border-strong, #c7c0af);
+  stroke: var(--rule-2);
   stroke-width: 1.5;
 }
 .gc-edge--containment { stroke-dasharray: 2 3; opacity: 0.55; }
-.gc-edge--dispatch { stroke: var(--col-progress, #3a6db3); }
-.gc-edge--spec_dep { stroke: var(--col-backlog, #8e8a80); }
-.gc-edge--task_dep { stroke: var(--ink-4, #97928a); }
+.gc-edge--dispatch { stroke: var(--run); }
+.gc-edge--spec_dep { stroke: var(--ink-4); }
+.gc-edge--task_dep { stroke: var(--ink-4); }
 .gc-edge--critical {
   stroke-width: 2.5;
-  stroke: var(--accent, #c45a33);
+  stroke: var(--accent);
 }
-.gc-arrowhead { fill: var(--border-strong, #c7c0af); }
-.gc-arrowhead--dispatch { fill: var(--col-progress, #3a6db3); }
+.gc-arrowhead { fill: var(--rule-2); }
+.gc-arrowhead--dispatch { fill: var(--run); }
 </style>

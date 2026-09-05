@@ -75,15 +75,16 @@ function onDragUp() {
 </script>
 
 <template>
-  <div class="map-popup" :style="{ left: geom.x + 'px', top: geom.y + 'px' }" role="dialog">
+  <div class="pop map-popup" :style="{ left: geom.x + 'px', top: geom.y + 'px' }" role="dialog" :aria-label="title">
     <header class="map-popup__header" @pointerdown="onDragDown">
+      <span class="pill pill-neutral">spec</span>
       <span class="map-popup__title">{{ title }}</span>
       <span class="map-popup__actions">
-        <button type="button" class="map-popup__btn" @pointerdown.stop @click="emit('discuss')">
+        <button type="button" class="btn sm ghost map-popup__btn" @pointerdown.stop @click="emit('discuss')">
           Refine / discuss
         </button>
-        <button type="button" class="map-popup__close" aria-label="Close" @pointerdown.stop @click="emit('close')">
-          ✕
+        <button type="button" class="icon-btn sm map-popup__close" aria-label="Close" @pointerdown.stop @click="emit('close')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
         </button>
       </span>
     </header>
@@ -96,6 +97,7 @@ function onDragUp() {
 </template>
 
 <style scoped>
+/* A draggable, resizable popover over the map with the spec rendered inside. */
 .map-popup {
   position: fixed;
   z-index: 50;
@@ -105,31 +107,25 @@ function onDragUp() {
   min-height: 200px;
   max-width: 96vw;
   max-height: 92vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card, #fff);
-  border: 1px solid var(--rule-2, #c7c0af);
-  border-radius: var(--r-lg, 10px);
-  box-shadow: var(--sh-4, 0 12px 40px rgba(0, 0, 0, 0.22));
-  overflow: hidden; /* required for the resize handle below */
-  resize: both; /* native bottom-right resize grip */
+  resize: both;
 }
 .map-popup__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px 8px 14px;
-  background: var(--bg-elevated, #faf8f3);
-  border-bottom: 1px solid var(--rule, #d9d3c5);
+  padding: 8px 8px 8px 14px;
+  background: var(--bg-sunk);
+  border-bottom: 1px solid var(--rule);
   cursor: grab;
   user-select: none;
   flex: 0 0 auto;
 }
 .map-popup__title {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
-  font-size: var(--fs-md, 13px);
-  color: var(--ink, #1b1916);
+  font-size: var(--fs-base);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -137,41 +133,17 @@ function onDragUp() {
 .map-popup__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: 0 0 auto;
-}
-.map-popup__btn {
-  border: 1px solid var(--rule, #d9d3c5);
-  background: var(--bg-card, #fff);
-  color: var(--ink-2, #4c4842);
-  cursor: pointer;
-  font-size: var(--fs-10, 11px);
-  padding: 3px 8px;
-  border-radius: var(--r-sm, 4px);
-}
-.map-popup__btn:hover {
-  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
-}
-.map-popup__close {
-  border: none;
-  background: transparent;
-  color: var(--ink-3, #6b6760);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 2px 6px;
-  border-radius: var(--r-sm, 4px);
-}
-.map-popup__close:hover {
-  background: var(--bg-hover, rgba(31, 29, 26, 0.045));
-  color: var(--ink, #1b1916);
 }
 .map-popup__body {
   flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 14px 18px;
 }
 .map-popup__muted {
-  color: var(--ink-3, #6b6760);
-  font-size: var(--fs-md, 13px);
+  color: var(--ink-3);
+  font-size: var(--fs-base);
 }
 </style>

@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { stateColor } from './nodeColors';
+import { stateColor, STATE_COLORS } from './nodeColors';
 
 describe('stateColor', () => {
-  it('distinguishes the common pipeline states', () => {
-    const distinct = new Set(
-      ['backlog', 'in_progress', 'done', 'failed', 'drafted', 'validated', 'complete', 'stale'].map(stateColor),
-    );
-    expect(distinct.size).toBeGreaterThanOrEqual(6);
+  it('gives every state its own colour expression on the ramp', () => {
+    const values = Object.values(STATE_COLORS);
+    expect(new Set(values).size).toBe(values.length);
+    for (const v of values) expect(v).toMatch(/^(var\(--|color-mix\()/);
+    expect(stateColor('in_progress')).toBe('var(--run)');
+    expect(stateColor('failed')).toBe('var(--err)');
   });
-
-  it('falls back to a neutral color for an unknown state', () => {
-    expect(stateColor('something-else')).toMatch(/^#[0-9a-f]{6}$/i);
+  it('falls back to the backlog tone for an unknown state', () => {
+    expect(stateColor('something-else')).toBe(STATE_COLORS.backlog);
   });
 });

@@ -1,0 +1,125 @@
+/* --- Mission Control ---
+   The dependency map: a head with the title, the lede and the filter tools,
+   then the canvas beside a 300px inspector of cards on the sunk surface. The
+   graph itself is drawn by components/map/GraphCanvas.vue on the ramp.
+   See specs/shared/console-redesign/secondary-screens.md. */
+.mission {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg);
+}
+.mission__inner {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mission__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--rule);
+  flex-shrink: 0;
+}
+.mission__titles {
+  min-width: 0;
+}
+.mission__title {
+  margin: 0 0 4px;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.mission__lede {
+  margin: 0;
+  max-width: 720px;
+  font-size: var(--fs-base);
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+.mission__lede .key {
+  vertical-align: middle;
+}
+.mission__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.mission__search .field {
+  min-width: 200px;
+  min-height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.mission__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+  cursor: pointer;
+  user-select: none;
+}
+.mission__option input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.mission__body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+}
+.mission__mount {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.mission__empty {
+  padding: 24px;
+  max-width: 520px;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.mission__empty p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mission__inspector {
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--rule);
+  background: var(--bg-sunk);
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mission__inspector > .card {
+  flex: none;
+}
+.mission__muted {
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
