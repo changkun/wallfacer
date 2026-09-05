@@ -37,39 +37,33 @@ onMounted(() => {
 <template>
   <div class="settings-page">
     <div class="settings-page-inner">
-      <div class="settings-page-head">
-        <div class="settings-page-eyebrow">Settings</div>
-        <h1 class="settings-page-title">Workspace settings</h1>
+      <h1 class="settings-page-title">Settings</h1>
+
+      <div class="tabs" role="tablist" aria-label="Settings tabs">
+        <button
+          v-for="t in tabs"
+          :key="t.key"
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ on: activeTab === t.key }"
+          :aria-selected="activeTab === t.key"
+          :data-tab="t.key"
+          @click="selectTab(t.key)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path :d="t.icon"></path>
+          </svg>
+          <span>{{ t.label }}</span>
+        </button>
       </div>
 
-      <div class="set-grid">
-        <div class="set-side" role="tablist" aria-label="Settings tabs">
-          <button
-            v-for="t in tabs"
-            :key="t.key"
-            type="button"
-            role="tab"
-            class="set-tab"
-            :class="{ 'is-active': activeTab === t.key }"
-            :aria-selected="activeTab === t.key"
-            @click="selectTab(t.key)"
-          >
-            <span class="set-tab-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path :d="t.icon"></path>
-              </svg>
-            </span>
-            <span>{{ t.label }}</span>
-          </button>
-        </div>
-
-        <div class="set-body">
-          <SettingsTabExecution v-if="activeTab === 'execution'" />
-          <SettingsTabAppearance v-else-if="activeTab === 'appearance'" />
-          <SettingsTabSandbox v-else-if="activeTab === 'sandbox'" />
-          <SettingsTabGithub v-else-if="activeTab === 'github'" />
-          <SettingsTabAbout v-else-if="activeTab === 'about'" />
-        </div>
+      <div class="settings-body">
+        <SettingsTabExecution v-if="activeTab === 'execution'" />
+        <SettingsTabAppearance v-else-if="activeTab === 'appearance'" />
+        <SettingsTabSandbox v-else-if="activeTab === 'sandbox'" />
+        <SettingsTabGithub v-else-if="activeTab === 'github'" />
+        <SettingsTabAbout v-else-if="activeTab === 'about'" />
       </div>
     </div>
   </div>

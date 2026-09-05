@@ -302,8 +302,33 @@ SCENES['plan'] = async (page) => {
 
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
-// plan has its own scene above; the smoke covers the routes without one yet.
-const SMOKE_ROUTES = { settings: '/settings', analytics: '/analytics', agents: '/agents', flows: '/flows' };
+// Settings (specs/shared/console-redesign/settings.md): a column no wider
+// than 760, an underline tab strip, right-aligned controls, every tab without
+// page errors, and six swatches on Appearance.
+SCENES['settings'] = async (page) => {
+  await page.goto(base + '/settings', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(800);
+  const col = await firstBox(page, '.settings-page-inner');
+  expect('settings', col && col.width <= 761, `settings column ${col && Math.round(col.width)}px, want <= 760`);
+  expect('settings', !!(await page.$('.settings-page .tabs .tab.on')), 'no active underline tab');
+  // Hidden rows (v-show) report a zero box; only laid-out controls align.
+  const ends = (await boxes(page, '.set-row:not(.set-row--stack) .set-row__end')).filter((e) => e.width > 0);
+  if (ends.length > 1) {
+    const rights = ends.map((e) => Math.round(e.right));
+    expect('settings', Math.max(...rights) - Math.min(...rights) <= 1, `row controls not right-aligned: ${[...new Set(rights)].join(',')}`);
+  }
+  for (const tab of ['appearance', 'sandbox', 'github', 'about', 'execution']) {
+    await page.click(`[data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(250);
+    if (tab === 'appearance') {
+      const swatches = await page.$$eval('.ap-palette', (els) => els.length);
+      expect('settings', swatches === 6, `${swatches} palette swatches, want 6`);
+    }
+  }
+};
+
+// plan and settings have their own scenes above; the smoke covers the rest.
+const SMOKE_ROUTES = { analytics: '/analytics', agents: '/agents', flows: '/flows' };
 for (const [name, route] of Object.entries(SMOKE_ROUTES)) {
   SCENES[name] = async (page) => {
     await page.goto(base + route, { waitUntil: 'load', timeout: 20000 });

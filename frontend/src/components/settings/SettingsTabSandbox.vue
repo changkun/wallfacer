@@ -418,457 +418,239 @@ const defaultSandboxOptions = computed(() => [
 </script>
 
 <template>
-  <div class="settings-tab-content active" data-settings-tab="sandbox">
-    <!-- First-launch: no credentials configured for either provider. -->
-    <div
-      v-if="noCredentials"
-      class="settings-card"
-      style="border-color: var(--warn, #c87b1c); background: color-mix(in oklab, var(--warn, #c87b1c) 12%, var(--bg-card));"
-    >
-      <strong>⚠ No API credentials configured.</strong>
-      Sign in below or enter a Claude OAuth token / Anthropic API key (or an
-      OpenAI key for Codex) to start running tasks.
+  <div v-if="noCredentials" class="set-notice" data-settings-tab="sandbox">
+    <strong>No API credentials configured.</strong>
+    Sign in below or enter a Claude OAuth token / Anthropic API key (or an OpenAI key for Codex) to start running tasks.
+  </div>
+
+  <div class="card compact">
+    <div class="card-head">
+      <span class="eyebrow">Harness configuration</span>
+      <span class="set-row__help sb-head-help">Written to <code>~/.wallfacer/.env</code>; takes effect on the next task run. Leave token fields blank to keep the existing value.</span>
     </div>
+  </div>
 
-    <!-- Harness Configuration -->
-    <div class="settings-card">
-      <div class="settings-card-head">
-        <h4>Harness Configuration</h4>
-        <p>
-          Changes are written to
-          <code style="font-family: monospace">~/.wallfacer/.env</code>
-          and take effect on the next task run. Leave token fields blank to keep
-          the existing value.
-        </p>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 12px">
-        <!-- Claude block -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="claude" :size="18" /></div>
-
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">OAuth Token (CLAUDE_CODE_OAUTH_TOKEN)</label>
-              <input
-                id="env-oauth-token"
-                v-model="oauthToken"
-                type="password"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                :placeholder="oauthTokenPlaceholder"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                From
-                <code style="font-family: monospace">claude setup-token</code>
-                (takes precedence if both are set). Leave blank to keep the
-                current value.
-              </div>
-              <div style="margin-top: 6px; display: flex; align-items: center; gap: 8px;">
-                <button
-                  v-if="showClaudeOauthBtn"
-                  type="button"
-                  id="claude-oauth-signin-btn"
-                  class="btn btn-sm btn-accent"
-                  :class="{ 'btn-primary': !claudeHasCreds }"
-                  style="font-size: 12px"
-                  :disabled="claudeOauthBusy"
-                  @click="startOauthFlow('claude')"
-                >
-                  Sign in with Claude
-                </button>
-                <span id="claude-oauth-status" style="font-size: 11px; color: var(--text-muted)">
-                  {{ claudeOauthStatus }}
-                  <a
-                    v-if="claudeOauthBusy && claudeOauthStatus.startsWith('Waiting')"
-                    href="#"
-                    style="color: var(--accent); font-size: 11px; margin-left: 4px;"
-                    @click.prevent="cancelOauthFlow('claude')"
-                  >Cancel</a>
-                </span>
-              </div>
-              <div
-                v-if="!claudeHasCreds"
-                id="claude-no-creds-hint"
-                style="font-size: 11px; color: var(--accent); margin-top: 4px;"
-              >
-                No token configured, sign in to get started
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key (ANTHROPIC_API_KEY)</label>
-              <input
-                id="env-api-key"
-                v-model="apiKey"
-                type="password"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                :placeholder="apiKeyPlaceholder"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Direct API key. If both are set, the OAuth token takes precedence.
-                Leave blank to keep the current value.
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Base URL (ANTHROPIC_BASE_URL)</label>
-              <input
-                id="env-claude-base-url"
-                v-model="claudeBaseUrl"
-                type="url"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="https://api.anthropic.com"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Custom API endpoint. Clear to use the provider default.
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Default Model (CLAUDE_DEFAULT_MODEL)</label>
-              <input
-                id="env-default-model"
-                v-model="defaultModel"
-                type="text"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="e.g. claude-sonnet-4.6"
-                autocomplete="off"
-                list="env-claude-model-list"
-              />
-              <datalist id="env-claude-model-list">
-                <option v-for="m in claudeModels" :key="m" :value="m" />
-              </datalist>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Default model for Claude tasks. Clear to use the provider
-                default.
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Title Model (CLAUDE_TITLE_MODEL)</label>
-              <input
-                id="env-title-model"
-                v-model="titleModel"
-                type="text"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="e.g. claude-haiku-4.5"
-                autocomplete="off"
-                list="env-claude-model-list"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Model for auto-generating task titles. Falls back to the default
-                model.
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-              <button
-                type="button"
-                class="btn-icon"
-                style="font-size: 12px; padding: 4px 10px"
-                @click="testSandbox('claude')"
-              >
-                Test
-              </button>
-              <span id="env-claude-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
-                {{ claudeTestStatus }}
-                <button
-                  v-if="claudeTestReauth"
-                  type="button"
-                  class="btn btn-sm"
-                  style="font-size: 11px; margin-left: 8px;"
-                  @click="startOauthFlow('claude')"
-                >Sign in again</button>
-              </span>
-            </div>
-          </div>
+  <!-- Claude -->
+  <div class="card compact">
+    <div class="card-head"><HarnessBadge harness="claude" :size="16" /></div>
+    <div class="rows">
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">OAuth token <code>CLAUDE_CODE_OAUTH_TOKEN</code></span>
+          <span class="set-row__help">From <code>claude setup-token</code>; takes precedence if both are set.</span>
         </div>
-
-        <!-- Codex block -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="codex" :size="18" /></div>
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key (OPENAI_API_KEY)</label>
-              <input
-                id="env-openai-api-key"
-                v-model="openaiApiKey"
-                type="password"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                :placeholder="openaiApiKeyPlaceholder"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Optional for Codex tasks when host
-                <code style="font-family: monospace">~/.codex/auth.json</code>
-                is mounted. Leave blank to keep the current value.
-              </div>
-              <div style="margin-top: 6px; display: flex; align-items: center; gap: 8px;">
-                <button
-                  v-if="showCodexOauthBtn"
-                  type="button"
-                  id="codex-oauth-signin-btn"
-                  class="btn btn-sm"
-                  :class="{ 'btn-primary': !codexHasCreds }"
-                  style="font-size: 12px; background: #000; color: #fff; border-color: #000;"
-                  :disabled="codexOauthBusy"
-                  @click="startOauthFlow('codex')"
-                >
-                  Sign in with OpenAI
-                </button>
-                <span id="codex-oauth-status" style="font-size: 11px; color: var(--text-muted)">
-                  {{ codexOauthStatus }}
-                  <a
-                    v-if="codexOauthBusy && codexOauthStatus.startsWith('Waiting')"
-                    href="#"
-                    style="color: var(--accent); font-size: 11px; margin-left: 4px;"
-                    @click.prevent="cancelOauthFlow('codex')"
-                  >Cancel</a>
-                </span>
-              </div>
-              <div
-                v-if="!codexHasCreds"
-                id="codex-no-creds-hint"
-                style="font-size: 11px; color: var(--accent); margin-top: 4px;"
-              >
-                No API key configured, sign in to get started
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Base URL (OPENAI_BASE_URL)</label>
-              <input
-                id="env-openai-base-url"
-                v-model="openaiBaseUrl"
-                type="url"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="https://api.openai.com/v1"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Optional OpenAI-compatible endpoint. Clear to use the provider
-                default.
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Default Model (CODEX_DEFAULT_MODEL)</label>
-              <input
-                id="env-codex-default-model"
-                v-model="codexDefaultModel"
-                type="text"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="e.g. gpt-5-codex"
-                autocomplete="off"
-                list="env-codex-model-list"
-              />
-              <datalist id="env-codex-model-list">
-                <option v-for="m in codexModels" :key="m" :value="m" />
-              </datalist>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Default model for Codex tasks.
-              </div>
-            </div>
-
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Title Model (CODEX_TITLE_MODEL)</label>
-              <input
-                id="env-codex-title-model"
-                v-model="codexTitleModel"
-                type="text"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                placeholder="e.g. gpt-5-codex"
-                autocomplete="off"
-                list="env-codex-model-list"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Model for auto-generating task titles. Falls back to Codex default
-                model.
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-              <button
-                type="button"
-                class="btn-icon"
-                style="font-size: 12px; padding: 4px 10px"
-                @click="testSandbox('codex')"
-              >
-                Test
-              </button>
-              <span id="env-codex-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
-                {{ codexTestStatus }}
-                <button
-                  v-if="codexTestReauth"
-                  type="button"
-                  class="btn btn-sm"
-                  style="font-size: 11px; margin-left: 8px;"
-                  @click="startOauthFlow('codex')"
-                >Sign in again</button>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Cursor block -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="cursor" :size="18" /></div>
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key (CURSOR_API_KEY)</label>
-              <input
-                id="env-cursor-api-key"
-                v-model="cursorApiKey"
-                type="password"
-                class="field"
-                style="font-family: monospace; font-size: 12px"
-                :placeholder="cursorApiKeyPlaceholder"
-                autocomplete="off"
-              />
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px">
-                Headless key for
-                <code style="font-family: monospace">cursor-agent</code>. Create
-                one in Cursor under Settings → API Keys, or run
-                <code style="font-family: monospace">cursor-agent login</code>
-                interactively. Leave blank to keep the current value.
-              </div>
-              <div
-                v-if="!cursorHasCreds"
-                id="cursor-no-creds-hint"
-                style="font-size: 11px; color: var(--accent); margin-top: 4px;"
-              >
-                No API key configured, add one to run Cursor tasks
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-              <button
-                type="button"
-                class="btn-icon"
-                style="font-size: 12px; padding: 4px 10px"
-                @click="testSandbox('cursor')"
-              >
-                Test
-              </button>
-              <span id="env-cursor-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
-                {{ cursorTestStatus }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Pi block -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="pi" :size="18" /></div>
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <div style="font-size: 11px; color: var(--text-muted)">
-              The
-              <code style="font-family: monospace">pi</code>
-              coding agent from earendil-works (Armin Ronacher's Pi). This is
-              <strong>not</strong> Inflection's Pi chatbot. Pi has no dedicated
-              key: it reads provider credentials (Anthropic, OpenAI, etc.) from
-              the keys configured in the Claude and Codex blocks above. Model
-              selection uses a two-flag form,
-              <code style="font-family: monospace">--provider</code>
-              plus
-              <code style="font-family: monospace">--model</code>; pass a
-              <code style="font-family: monospace">provider/model</code>
-              string as the task model.
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-              <button
-                type="button"
-                class="btn-icon"
-                style="font-size: 12px; padding: 4px 10px"
-                @click="testSandbox('pi')"
-              >
-                Test
-              </button>
-              <span id="env-pi-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
-                {{ piTestStatus }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- OpenCode block -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <div style="color: var(--text-secondary); margin-bottom: 10px;"><HarnessBadge harness="opencode" :size="18" /></div>
-          <div style="display: flex; flex-direction: column; gap: 12px">
-            <div style="font-size: 11px; color: var(--text-muted)">
-              The
-              <code style="font-family: monospace">opencode</code>
-              CLI manages provider credentials itself. Run
-              <code style="font-family: monospace">opencode auth login</code>
-              once and pick a provider (Anthropic, OpenAI, OpenRouter, etc.);
-              the credential lives in OpenCode's own config, so
-              <strong>no API key is needed here</strong> in
-              <code style="font-family: monospace">~/.wallfacer/.env</code>.
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-              <button
-                type="button"
-                class="btn-icon"
-                style="font-size: 12px; padding: 4px 10px"
-                @click="testSandbox('opencode')"
-              >
-                Test
-              </button>
-              <span id="env-opencode-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em">
-                {{ opencodeTestStatus }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Global Harness Routing -->
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-          <label style="display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px;">Global Harness Routing</label>
-          <div style="display: flex; flex-direction: column; gap: 10px">
-            <div>
-              <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Default Harness (WALLFACER_DEFAULT_SANDBOX)</label>
-              <AppSelect
-                v-model="defaultSandbox"
-                :options="defaultSandboxOptions"
-                aria-label="Default Harness"
-              />
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); line-height: 1.5; margin: 0 0 4px;">
-              Activity-specific harness routing (Implementation, Testing, etc.) now
-              lives on the <strong>agent</strong> definition: clone a built-in
-              from the Agents tab and set its <strong>Harness</strong> field to
-              pin that step to Claude or Codex. Workspace-wide fallbacks still
-              come from <code>WALLFACER_DEFAULT_SANDBOX</code> above.
-            </p>
-          </div>
+        <div class="set-row__end">
+          <input id="env-oauth-token" v-model="oauthToken" type="password" class="field mono" :placeholder="oauthTokenPlaceholder" autocomplete="off" />
         </div>
       </div>
+      <div class="set-row">
+        <div class="set-row__main">
+          <span id="claude-oauth-status" class="set-row__help">
+            {{ claudeOauthStatus }}
+            <a v-if="claudeOauthBusy && claudeOauthStatus.startsWith('Waiting')" href="#" class="set-link" @click.prevent="cancelOauthFlow('claude')">Cancel</a>
+          </span>
+          <span v-if="!claudeHasCreds" id="claude-no-creds-hint" class="set-status set-status--warn">No token configured, sign in to get started</span>
+        </div>
+        <div class="set-row__end">
+          <button v-if="showClaudeOauthBtn" id="claude-oauth-signin-btn" type="button" class="btn sm" :class="{ ghost: claudeHasCreds }" :disabled="claudeOauthBusy" @click="startOauthFlow('claude')">Sign in with Claude</button>
+        </div>
+      </div>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">API key <code>ANTHROPIC_API_KEY</code></span>
+          <span class="set-row__help">Direct API key. If both are set, the OAuth token takes precedence.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-api-key" v-model="apiKey" type="password" class="field mono" :placeholder="apiKeyPlaceholder" autocomplete="off" />
+        </div>
+      </div>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Base URL <code>ANTHROPIC_BASE_URL</code></span>
+          <span class="set-row__help">Custom API endpoint. Clear to use the provider default.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-claude-base-url" v-model="claudeBaseUrl" type="url" class="field mono" placeholder="https://api.anthropic.com" autocomplete="off" />
+        </div>
+      </div>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Default model <code>CLAUDE_DEFAULT_MODEL</code></span>
+          <span class="set-row__help">Default model for Claude tasks. Clear to use the provider default.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-default-model" v-model="defaultModel" type="text" class="field mono" placeholder="e.g. claude-sonnet-4.6" autocomplete="off" list="env-claude-model-list" />
+        </div>
+      </div>
+      <datalist id="env-claude-model-list">
+        <option v-for="m in claudeModels" :key="m" :value="m" />
+      </datalist>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Title model <code>CLAUDE_TITLE_MODEL</code></span>
+          <span class="set-row__help">Model for auto-generating task titles. Falls back to the default model.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-title-model" v-model="titleModel" type="text" class="field mono" placeholder="e.g. claude-haiku-4.5" autocomplete="off" list="env-claude-model-list" />
+        </div>
+      </div>
+    </div>
+    <div class="card-foot">
+      <button type="button" class="btn sm ghost" @click="testSandbox('claude')">Test</button>
+      <span id="env-claude-test-status" class="set-status">
+        {{ claudeTestStatus }}
+        <button v-if="claudeTestReauth" type="button" class="btn sm ghost" @click="startOauthFlow('claude')">Sign in again</button>
+      </span>
+    </div>
+  </div>
 
-      <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px">
-        <button type="button" class="btn btn-accent" @click="saveConfig">
-          Save Harness Configuration
-        </button>
-        <button type="button" class="btn-ghost" @click="revertConfig">
-          Revert
-        </button>
-        <span id="env-config-status" style="font-size: 12px; color: var(--text-muted); margin-left: auto">
-          {{ saveStatus }}
+  <!-- Codex -->
+  <div class="card compact">
+    <div class="card-head"><HarnessBadge harness="codex" :size="16" /></div>
+    <div class="rows">
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">API key <code>OPENAI_API_KEY</code></span>
+          <span class="set-row__help">Optional for Codex tasks when host <code>~/.codex/auth.json</code> is mounted.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-openai-api-key" v-model="openaiApiKey" type="password" class="field mono" :placeholder="openaiApiKeyPlaceholder" autocomplete="off" />
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-row__main">
+          <span id="codex-oauth-status" class="set-row__help">
+            {{ codexOauthStatus }}
+            <a v-if="codexOauthBusy && codexOauthStatus.startsWith('Waiting')" href="#" class="set-link" @click.prevent="cancelOauthFlow('codex')">Cancel</a>
+          </span>
+          <span v-if="!codexHasCreds" id="codex-no-creds-hint" class="set-status set-status--warn">No API key configured, sign in to get started</span>
+        </div>
+        <div class="set-row__end">
+          <button v-if="showCodexOauthBtn" id="codex-oauth-signin-btn" type="button" class="btn sm" :class="{ ghost: codexHasCreds }" :disabled="codexOauthBusy" @click="startOauthFlow('codex')">Sign in with OpenAI</button>
+        </div>
+      </div>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Base URL <code>OPENAI_BASE_URL</code></span>
+          <span class="set-row__help">Optional OpenAI-compatible endpoint. Clear to use the provider default.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-openai-base-url" v-model="openaiBaseUrl" type="url" class="field mono" placeholder="https://api.openai.com/v1" autocomplete="off" />
+        </div>
+      </div>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Default model <code>CODEX_DEFAULT_MODEL</code></span>
+          <span class="set-row__help">Default model for Codex tasks.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-codex-default-model" v-model="codexDefaultModel" type="text" class="field mono" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-codex-model-list" />
+        </div>
+      </div>
+      <datalist id="env-codex-model-list">
+        <option v-for="m in codexModels" :key="m" :value="m" />
+      </datalist>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Title model <code>CODEX_TITLE_MODEL</code></span>
+          <span class="set-row__help">Model for auto-generating task titles. Falls back to the Codex default model.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-codex-title-model" v-model="codexTitleModel" type="text" class="field mono" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-codex-model-list" />
+        </div>
+      </div>
+    </div>
+    <div class="card-foot">
+      <button type="button" class="btn sm ghost" @click="testSandbox('codex')">Test</button>
+      <span id="env-codex-test-status" class="set-status">
+        {{ codexTestStatus }}
+        <button v-if="codexTestReauth" type="button" class="btn sm ghost" @click="startOauthFlow('codex')">Sign in again</button>
+      </span>
+    </div>
+  </div>
+
+  <!-- Cursor -->
+  <div class="card compact">
+    <div class="card-head"><HarnessBadge harness="cursor" :size="16" /></div>
+    <div class="rows">
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">API key <code>CURSOR_API_KEY</code></span>
+          <span class="set-row__help">Headless key for <code>cursor-agent</code>. Create one in Cursor under Settings → API Keys, or run <code>cursor-agent login</code> interactively.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-cursor-api-key" v-model="cursorApiKey" type="password" class="field mono" :placeholder="cursorApiKeyPlaceholder" autocomplete="off" />
+        </div>
+      </div>
+      <div v-if="!cursorHasCreds" class="set-row">
+        <span id="cursor-no-creds-hint" class="set-status set-status--warn">No API key configured, add one to run Cursor tasks</span>
+      </div>
+    </div>
+    <div class="card-foot">
+      <button type="button" class="btn sm ghost" @click="testSandbox('cursor')">Test</button>
+      <span id="env-cursor-test-status" class="set-status">{{ cursorTestStatus }}</span>
+    </div>
+  </div>
+
+  <!-- Pi -->
+  <div class="card compact">
+    <div class="card-head"><HarnessBadge harness="pi" :size="16" /></div>
+    <div class="rows">
+      <div class="set-row">
+        <span class="set-row__help">
+          The <code>pi</code> coding agent from earendil-works (Armin Ronacher's Pi), not Inflection's Pi chatbot. Pi has no dedicated key: it reads the provider credentials configured in the Claude and Codex blocks above. Model selection uses <code>--provider</code> plus <code>--model</code>; pass a <code>provider/model</code> string as the task model.
         </span>
       </div>
     </div>
+    <div class="card-foot">
+      <button type="button" class="btn sm ghost" @click="testSandbox('pi')">Test</button>
+      <span id="env-pi-test-status" class="set-status">{{ piTestStatus }}</span>
+    </div>
+  </div>
+
+  <!-- OpenCode -->
+  <div class="card compact">
+    <div class="card-head"><HarnessBadge harness="opencode" :size="16" /></div>
+    <div class="rows">
+      <div class="set-row">
+        <span class="set-row__help">
+          The <code>opencode</code> CLI manages provider credentials itself. Run <code>opencode auth login</code> once and pick a provider; the credential lives in OpenCode's own config, so no API key is needed in <code>~/.wallfacer/.env</code>.
+        </span>
+      </div>
+    </div>
+    <div class="card-foot">
+      <button type="button" class="btn sm ghost" @click="testSandbox('opencode')">Test</button>
+      <span id="env-opencode-test-status" class="set-status">{{ opencodeTestStatus }}</span>
+    </div>
+  </div>
+
+  <!-- Routing -->
+  <div class="card compact">
+    <div class="card-head"><span class="eyebrow">Harness routing</span></div>
+    <div class="rows">
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Default harness <code>WALLFACER_DEFAULT_SANDBOX</code></span>
+          <span class="set-row__help">Activity-specific routing (Implementation, Testing, …) lives on the agent definition: clone a built-in from the Agents tab and set its Harness field. This is the workspace-wide fallback.</span>
+        </div>
+        <div class="set-row__end">
+          <AppSelect v-model="defaultSandbox" :options="defaultSandboxOptions" aria-label="Default Harness" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="set-foot">
+    <button type="button" class="btn" @click="saveConfig">Save harness configuration</button>
+    <button type="button" class="btn ghost" @click="revertConfig">Revert</button>
+    <span id="env-config-status" class="set-status">{{ saveStatus }}</span>
   </div>
 </template>
+
+<style scoped>
+.sb-head-help {
+  margin-left: auto;
+  text-align: right;
+  max-width: 60%;
+}
+</style>

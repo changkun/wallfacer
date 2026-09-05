@@ -153,18 +153,24 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  padding: 3px 7px;
-  border-radius: 6px;
-  transition: background 120ms ease;
+  min-height: 30px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  transition: background var(--dur-hover), border-color var(--dur-hover);
 }
 .harness-select__trigger:hover {
-  background: var(--bg-hover, rgba(127, 127, 127, 0.12));
+  background: var(--bg-sunk);
+  border-color: var(--rule-2);
 }
 .harness-select__default {
   font-weight: 600;
 }
 .harness-select__caret {
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 .harness-select__menu {
   position: absolute;
@@ -175,10 +181,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: var(--bg-card, var(--bg-input));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   outline: none;
   max-height: 50vh;
   overflow-y: auto;
@@ -192,16 +198,16 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--fs-base);
 }
 .harness-select__opt.is-active {
-  background: var(--bg-hover, rgba(127, 127, 127, 0.14));
+  background: var(--bg-sunk);
 }
 .harness-select__opt.is-selected {
-  font-weight: 700;
+  font-weight: 600;
 }
 </style>

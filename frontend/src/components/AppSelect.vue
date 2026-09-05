@@ -175,19 +175,26 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   align-items: center;
   gap: 8px;
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-family: inherit;
+  min-height: 32px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  border-radius: var(--r-md);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--fs-base);
   cursor: pointer;
   text-align: left;
+  transition: border-color var(--dur-hover), background var(--dur-hover), box-shadow var(--dur-hover);
+}
+.app-select__trigger:hover {
+  border-color: var(--rule-2);
 }
 .app-select__trigger:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .app-select__trigger:disabled {
   opacity: 0.6;
@@ -201,12 +208,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   white-space: nowrap;
 }
 .app-select__value--placeholder {
-  color: var(--text-muted);
+  color: var(--ink-4);
 }
 .app-select__caret {
   flex-shrink: 0;
   margin-left: auto;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 .app-select__menu {
   position: absolute;
@@ -219,25 +226,25 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocPointer));
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: var(--bg-card, var(--bg-input));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   outline: none;
 }
 .app-select__opt {
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   white-space: nowrap;
-  font-size: 12px;
-  color: var(--text);
+  font-size: var(--fs-base);
+  color: var(--ink);
 }
 .app-select__opt.is-active {
-  background: var(--bg-hover, rgba(127, 127, 127, 0.14));
+  background: var(--bg-sunk);
 }
 .app-select__opt.is-selected {
-  font-weight: 700;
+  font-weight: 600;
 }
 .app-select__opt.is-disabled {
   opacity: 0.5;

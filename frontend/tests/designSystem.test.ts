@@ -189,6 +189,9 @@ describe('primitives.css defines the shared classes', () => {
     'src/components/plan/ChatMessageList.css', 'src/components/plan/ChatComposer.css', 'src/components/plan/AgentChatPanel.css', 'src/styles/multi-turn.css',
     'src/views/PlanPage.vue', 'src/components/plan/SpecTreePanel.vue', 'src/components/plan/SpecFocusedView.vue', 'src/components/plan/SpecCommentsLayer.vue',
     'src/components/plan/FloatingToc.vue', 'src/styles/spec-mode/prose-toc.css',
+    'src/styles/settings-page.css', 'src/views/SettingsPage.vue', 'src/components/settings/SettingsTabExecution.vue', 'src/components/settings/SettingsTabAppearance.vue',
+    'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabGithub.vue', 'src/components/settings/SettingsTabAbout.vue',
+    'src/components/settings/SettingToggle.vue', 'src/components/AppSelect.vue', 'src/components/HarnessSelect.vue',
   ];
   it.each(tokenOnly)('%s uses tokens only', (file) => {
     const whole = read(file);
@@ -205,7 +208,7 @@ describe('primitives.css defines the shared classes', () => {
   it('the replaced stylesheets and shell components are gone', () => {
     for (const f of [
       'src/styles/buttons.css', 'src/styles/badges.css', 'src/styles/forms.css',
-      'src/styles/status-bar.css', 'src/styles/header.css', 'src/styles/header',
+      'src/styles/status-bar.css', 'src/styles/header.css', 'src/styles/header', 'src/styles/settings-modal.css',
       'src/components/Sidebar.vue', 'src/components/StatusBar.vue',
     ]) {
       expect(existsSync(resolve(root, f)), f).toBe(false);

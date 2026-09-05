@@ -218,3 +218,41 @@
 .sheet-aside .card-foot .btn {
   width: 100%;
 }
+
+/* --- Trash dialog banner and loading row (TrashModal) --- */
+.trash-bin-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-lg);
+  background: var(--tint-red);
+  color: var(--err);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.trash-bin-banner.hidden {
+  display: none;
+}
+.trash-bin-banner__dismiss {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.trash-bin-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 0;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
+}
+.trash-bin-loading.hidden {
+  display: none;
+}

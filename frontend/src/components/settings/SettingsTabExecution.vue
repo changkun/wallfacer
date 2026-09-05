@@ -5,6 +5,7 @@ import { useEnvConfig } from '../../composables/useEnvConfig';
 import { useTaskStore } from '../../stores/tasks';
 import { useAutomationToggles } from '../../composables/useAutomationToggles';
 import AppSelect from '../AppSelect.vue';
+import SettingToggle from './SettingToggle.vue';
 
 const LIMIT_OPTIONS = [
   { value: '5', label: '5 tasks' },
@@ -187,266 +188,107 @@ async function generateMissingOversight() {
 </script>
 
 <template>
-  <div class="settings-tab-content active" data-settings-tab="execution">
-    <div
-      style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-    >
-      Automation
+  <div class="card compact" data-settings-tab="execution">
+    <div class="card-head"><span class="eyebrow">Automation</span></div>
+    <div class="rows">
+      <div v-for="k in AUTOMATION_KEYS" :key="k" class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">{{ automationLabels[k] }}</span>
+          <span class="set-row__help">{{ automationHints[k] }}<template v-if="automationBusy(k)"> · saving…</template></span>
+        </div>
+        <div class="set-row__end">
+          <SettingToggle :model-value="automationOn(k)" :disabled="automationBusy(k)" :label="automationLabels[k]" @update:model-value="toggleAutomation(k)" />
+        </div>
+      </div>
     </div>
-    <div class="automation-grid">
-      <label
-        v-for="k in AUTOMATION_KEYS"
-        :key="k"
-        class="automation-row"
-      >
-        <input
-          type="checkbox"
-          :checked="automationOn(k)"
-          :disabled="automationBusy(k)"
-          @change="toggleAutomation(k)"
-        />
-        <span class="automation-label">{{ automationLabels[k] }}</span>
-        <span class="automation-hint">— {{ automationHints[k] }}</span>
-        <span v-if="automationBusy(k)" class="automation-hint">saving…</span>
-      </label>
-    </div>
-    <div
-      style="margin: 4px 0 14px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-    >
-      Each toggle drives one server-side watcher; see docs/guide/automation.md
-      for the full lifecycle and budgets.
-    </div>
+    <div class="card-foot"><span class="set-row__help">Each toggle drives one server-side watcher; see the automation guide for the full lifecycle and budgets.</span></div>
+  </div>
 
-    <div
-      style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-    >
-      Parallel Tasks
+  <div class="card compact">
+    <div class="card-head"><span class="eyebrow">Limits</span></div>
+    <div class="rows">
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Parallel tasks</span>
+          <span class="set-row__help">Max tasks running concurrently in the In Progress column.</span>
+        </div>
+        <div class="set-row__end">
+          <span id="max-parallel-status" class="set-status">{{ maxParallelStatus }}</span>
+          <input id="max-parallel-input" v-model.number="maxParallel" type="number" min="1" max="20" class="field set-num" autocomplete="off" @change="saveMaxParallel" />
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Archived tasks per page</span>
+          <span class="set-row__help">When archived tasks are visible, load this many items per scroll page.</span>
+        </div>
+        <div class="set-row__end">
+          <span id="archived-page-size-status" class="set-status">{{ archivedStatus }}</span>
+          <input id="archived-page-size-input" v-model.number="archivedPerPage" type="number" min="1" max="200" class="field set-num" autocomplete="off" @change="saveArchivedPerPage" />
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Oversight interval</span>
+          <span class="set-row__help">Generate oversight summaries every N minutes while a task runs. 0 = only at task completion.</span>
+        </div>
+        <div class="set-row__end">
+          <span id="oversight-interval-status" class="set-status">{{ oversightStatus }}</span>
+          <input id="oversight-interval-input" v-model.number="oversightInterval" type="number" min="0" max="120" class="field set-num" autocomplete="off" @change="saveOversightInterval" />
+          <span class="set-unit">min</span>
+        </div>
+      </div>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px">
-      <input
-        id="max-parallel-input"
-        v-model.number="maxParallel"
-        type="number"
-        min="1"
-        max="20"
-        class="field"
-        style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center"
-        autocomplete="off"
-        @change="saveMaxParallel"
-      />
-      <span
-        id="max-parallel-status"
-        style="font-size: 11px; color: var(--text-muted)"
-        >{{ maxParallelStatus }}</span
-      >
-    </div>
-    <div
-      style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-    >
-      Max tasks running concurrently in the In Progress column.
-    </div>
+  </div>
 
-    <div class="settings-section">
-      <div
-        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-      >
-        Archived Tasks
+  <div class="card compact">
+    <div class="card-head"><span class="eyebrow">Auto push</span></div>
+    <div class="rows">
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Push after the commit pipeline</span>
+          <span class="set-row__help">Automatically push when the workspace is at least N commits ahead of upstream.</span>
+        </div>
+        <div class="set-row__end">
+          <span id="auto-push-status" class="set-status">{{ autoPushStatus }}</span>
+          <SettingToggle id="auto-push-enabled" v-model="autoPushEnabled" label="Auto push" @update:model-value="saveAutoPush" />
+        </div>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px">
-        <input
-          id="archived-page-size-input"
-          v-model.number="archivedPerPage"
-          type="number"
-          min="1"
-          max="200"
-          class="field"
-          style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveArchivedPerPage"
-        />
-        <span style="font-size: 12px; color: var(--text-muted)">per page</span>
-        <span
-          id="archived-page-size-status"
-          style="font-size: 11px; color: var(--text-muted)"
-          >{{ archivedStatus }}</span
-        >
-      </div>
-      <div
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-      >
-        When archived tasks are visible, load this many items per scroll page.
+      <div v-show="showThresholdRow" id="auto-push-threshold-row" class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Push when ahead by</span>
+        </div>
+        <div class="set-row__end">
+          <input id="auto-push-threshold" v-model.number="autoPushThreshold" type="number" min="1" class="field set-num" autocomplete="off" @change="saveAutoPush" />
+          <span class="set-unit">commit(s)</span>
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="settings-section">
-      <div
-        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-      >
-        Oversight Interval
+  <div class="card compact">
+    <div class="card-head"><span class="eyebrow">Maintenance</span></div>
+    <div class="rows">
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Task titles</span>
+          <span id="generate-titles-status" class="set-row__help">{{ titlesStatus || 'Generate a title for tasks that have none.' }}</span>
+        </div>
+        <div class="set-row__end">
+          <AppSelect v-model="titlesLimit" :options="LIMIT_OPTIONS" aria-label="Max tasks to generate titles for" title="Max tasks to generate titles for" />
+          <button type="button" class="btn sm ghost" :disabled="titlesBusy" @click="generateMissingTitles">Generate missing</button>
+        </div>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px">
-        <input
-          id="oversight-interval-input"
-          v-model.number="oversightInterval"
-          type="number"
-          min="0"
-          max="120"
-          class="field"
-          style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveOversightInterval"
-        />
-        <span style="font-size: 12px; color: var(--text-muted)">min</span>
-        <span
-          id="oversight-interval-status"
-          style="font-size: 11px; color: var(--text-muted)"
-          >{{ oversightStatus }}</span
-        >
-      </div>
-      <div
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-      >
-        Generate oversight summaries every N minutes while a task runs. 0 = only
-        at task completion.
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div
-        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-      >
-        Auto Push
-      </div>
-      <div style="display: flex; align-items: center; gap: 8px">
-        <label
-          style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted)"
-        >
-          <input
-            id="auto-push-enabled"
-            v-model="autoPushEnabled"
-            type="checkbox"
-            @change="saveAutoPush"
-          />
-          Enable
-        </label>
-        <span
-          id="auto-push-status"
-          style="font-size: 11px; color: var(--text-muted)"
-          >{{ autoPushStatus }}</span
-        >
-      </div>
-      <div
-        v-show="showThresholdRow"
-        id="auto-push-threshold-row"
-        style="margin-top: 8px; display: flex; align-items: center; gap: 8px"
-      >
-        <span style="font-size: 12px; color: var(--text-muted)">Push when</span>
-        <input
-          id="auto-push-threshold"
-          v-model.number="autoPushThreshold"
-          type="number"
-          min="1"
-          class="field"
-          style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center"
-          autocomplete="off"
-          @change="saveAutoPush"
-        />
-        <span style="font-size: 12px; color: var(--text-muted)"
-          >commit(s) ahead</span
-        >
-      </div>
-      <div
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4"
-      >
-        Automatically push after the commit pipeline when the workspace is at
-        least N commits ahead of upstream.
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div
-        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-      >
-        Task Titles
-      </div>
-      <div style="display: flex; gap: 6px; align-items: center">
-        <AppSelect
-          v-model="titlesLimit"
-          :options="LIMIT_OPTIONS"
-          aria-label="Max tasks to generate titles for"
-          title="Max tasks to generate titles for"
-        />
-        <button
-          type="button"
-          class="btn-icon"
-          style="font-size: 12px; padding: 4px 12px"
-          :disabled="titlesBusy"
-          @click="generateMissingTitles"
-        >
-          Generate Missing
-        </button>
-      </div>
-      <div
-        id="generate-titles-status"
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em"
-      >
-        {{ titlesStatus }}
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div
-        style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px"
-      >
-        Trace Oversight
-      </div>
-      <div style="display: flex; gap: 6px; align-items: center">
-        <AppSelect
-          v-model="oversightLimit"
-          :options="LIMIT_OPTIONS"
-          aria-label="Max tasks to generate oversight for"
-          title="Max tasks to generate oversight for"
-        />
-        <button
-          type="button"
-          class="btn-icon"
-          style="font-size: 12px; padding: 4px 12px"
-          :disabled="oversightGenBusy"
-          @click="generateMissingOversight"
-        >
-          Generate Missing
-        </button>
-      </div>
-      <div
-        id="generate-oversight-status"
-        style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em"
-      >
-        {{ oversightGenStatus }}
+      <div class="set-row">
+        <div class="set-row__main">
+          <span class="set-row__label">Trace oversight</span>
+          <span id="generate-oversight-status" class="set-row__help">{{ oversightGenStatus || 'Generate oversight summaries for tasks that have none.' }}</span>
+        </div>
+        <div class="set-row__end">
+          <AppSelect v-model="oversightLimit" :options="LIMIT_OPTIONS" aria-label="Max tasks to generate oversight for" title="Max tasks to generate oversight for" />
+          <button type="button" class="btn sm ghost" :disabled="oversightGenBusy" @click="generateMissingOversight">Generate missing</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.automation-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.automation-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text);
-  cursor: pointer;
-}
-.automation-row input[type="checkbox"] { margin: 0; accent-color: var(--accent); }
-.automation-label { flex: 1; }
-.automation-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-}
-</style>
