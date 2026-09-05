@@ -63,18 +63,20 @@ func commitExplorerEdit(ctx context.Context, ws, relPath string) error {
 	if !gitutil.IsGitRepo(ws) {
 		return nil
 	}
+	// All commands use literal pathspecs: a filename may contain wildcards
+	// or Git's :(...) syntax, which must never select unrelated files.
 	relPath = filepath.ToSlash(relPath)
 
 	// Skip the no-op case (identical content) so saves that change nothing do
 	// not produce empty commits, and bail when the status probe itself fails.
-	out, err := cmdexec.Git(ws, "status", "--porcelain", "--", relPath).WithContext(ctx).Output()
+	out, err := cmdexec.Git(ws, "--literal-pathspecs", "status", "--porcelain", "--", relPath).WithContext(ctx).Output()
 	if err != nil || strings.TrimSpace(out) == "" {
 		return nil
 	}
 
 	// Stage the file: a partial `git commit -- <path>` rejects an untracked
 	// path, so a newly created file must be added first.
-	if err := cmdexec.Git(ws, "add", "--", relPath).WithContext(ctx).Run(); err != nil {
+	if err := cmdexec.Git(ws, "--literal-pathspecs", "add", "--", relPath).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("git add %s: %w", relPath, err)
 	}
 
@@ -88,7 +90,7 @@ func commitExplorerEdit(ctx context.Context, ws, relPath string) error {
 	// The trailing `-- <path>` pathspec makes this a partial commit: only
 	// relPath's staged content is recorded, leaving any other staged or
 	// working-tree changes (a concurrent task, a planning round) untouched.
-	args = append(args, "commit", "-m", msg, "--no-verify", "--", relPath)
+	args = append(args, "--literal-pathspecs", "commit", "-m", msg, "--no-verify", "--", relPath)
 	if err := cmdexec.Git(ws, args...).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("git commit: %w", err)
 	}

@@ -156,3 +156,38 @@ func TestBuildExplorerCommitMessage(t *testing.T) {
 		t.Fatalf("buildExplorerCommitMessage:\n got %q\nwant %q", got, want)
 	}
 }
+
+func TestCommitExplorerEdit_LiteralPathspec(t *testing.T) {
+	for _, saved := range []string{"*.md", ":(glob)*.md", "[ab].md"} {
+		t.Run(saved, func(t *testing.T) {
+			ws := initGitTestRepo(t)
+			writeExplorerFile(t, ws, "a.md", "staged\n")
+			runGit(t, ws, "add", "a.md")
+			writeExplorerFile(t, ws, "b.md", "unstaged\n")
+			writeExplorerFile(t, ws, saved, "saved\n")
+			if err := commitExplorerEdit(context.Background(), ws, saved); err != nil {
+				t.Fatalf("commitExplorerEdit: %v", err)
+			}
+			if files := gitHeadFiles(t, ws); len(files) != 1 || files[0] != saved {
+				t.Errorf("commit must contain only %q, got %v", saved, files)
+			}
+			if staged := gitStaged(t, ws); len(staged) != 1 || staged[0] != "a.md" {
+				t.Errorf("unrelated staged file changed: %v", staged)
+			}
+			got, err := exec.Command("git", "-C", ws, "ls-files", "--", "b.md").Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.TrimSpace(string(got)) != "" {
+				t.Errorf("unrelated untracked file became tracked: %q", got)
+			}
+			before := gitHeadMessage(t, ws)
+			if err := commitExplorerEdit(context.Background(), ws, saved); err != nil {
+				t.Fatalf("identical re-save: %v", err)
+			}
+			if after := gitHeadMessage(t, ws); after != before {
+				t.Errorf("identical re-save created a commit: %q", after)
+			}
+		})
+	}
+}
