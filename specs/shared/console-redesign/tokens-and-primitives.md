@@ -1,6 +1,6 @@
 ---
 title: Tokens and Primitives
-status: validated
+status: complete
 depends_on:
   - specs/shared/visual-identity/theme-system.md
 affects:
@@ -161,3 +161,44 @@ the rest.
   computed `--ink-3`/`--bg` per theme.
 - Screenshots: board light and dark, to eyeball the retint before the shell
   child moves geometry.
+
+## Outcome
+
+**Status:** complete, 2026-09-05. Commits `2098e4dd` (tokens, palettes, paper
+preset, roster) and `327139ca` (primitives, glass removal, guards).
+
+**What shipped.** `tokens.css` carries palette P2 with the additions the parent
+spec lists, derived tint pairs, the 8/10/14/18/20 radii ladder, the 13px type
+scale and matte shadows; the glass ladder names are pinned opaque so latere-ui
+`AccountMenu` and `SiteFooter` render matte. `palettes.css` holds `paper` (the
+previous default verbatim) and the four presets reduced to surfaces, ink,
+rules, accent family and ramp. `primitives.css` replaces `buttons.css`,
+`badges.css` and `forms.css` with the primitive set plus the compatibility
+aliases. `main.ts` no longer imports `latere-ui/glass`; `App.vue` no longer
+calls `useLiquidGlass`; every `backdrop-filter` under `src/styles/` and in
+`AppLayout`, `AgentGraphPage` and `Sidebar` is gone. `tests/designSystem.test.ts`
+replaces `glassV2Surfaces.test.ts`; `checks.mjs` gained `no-glass` and
+`contrast` scenes and `make ui-test` passes ten scenes. The configuration guide
+names `Paper`.
+
+**Decisions made during implementation.**
+- The `.vue` no-glass assertion runs on every component now rather than
+  starting as `it.todo`: only three components carried blur and all three were
+  trivial to flip, so the guard is live from day one.
+- `backdrop-filter: none` is allowed by the guard. It is how a shared latere-ui
+  surface's own filter is switched off; the browser-side `no-glass` scene is
+  what proves nothing renders blurred.
+- `.field` keeps its name for the 23 templates that already use it, at the new
+  32px sans geometry; `textarea.field` keeps a taller minimum. `.select` stays
+  as a compatibility alias.
+- `--sh-1/2/3` stay as aliases so the 40 consumers in scoped CSS keep a shadow
+  until their surface spec lands.
+- Body background stays `--bg`; the shell spec paints `--bg-deep` on the app
+  shell so the cloud marketing pages are unaffected.
+
+**Surprises.** latere-ui's `ConsoleSidebar` computes `blur(0) saturate(100%)
+brightness(1)` from the pinned tokens, which is not `none` to the browser; the
+gate caught it and `Sidebar.vue` sets `backdrop-filter: none` until the shell
+spec replaces the component.
+
+**Follow-ups.** None beyond the sibling specs.
