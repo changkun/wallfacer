@@ -486,14 +486,6 @@ func Update(path string, u Updates) error {
 	return updateFile(path, updates)
 }
 
-// UpdateWorkspaces replaces or clears WALLFACER_WORKSPACES in the env file.
-func UpdateWorkspaces(path string, workspaces []string) error {
-	encoded := FormatWorkspaces(workspaces)
-	return updateFile(path, map[string]*string{
-		"WALLFACER_WORKSPACES": &encoded,
-	})
-}
-
 // UpdateSandboxSettings merges global sandbox-routing settings into the env file.
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
 // sandboxByActivity supports keys: implementation, testing, title,

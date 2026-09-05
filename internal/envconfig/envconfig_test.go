@@ -759,46 +759,6 @@ func TestFormatWorkspaces_RoundTrip(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// UpdateWorkspaces
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestUpdateWorkspaces_WritesAndReads verifies that UpdateWorkspaces writes the key to the file.
-func TestUpdateWorkspaces_WritesAndReads(t *testing.T) {
-	path := writeEnvFile(t, "ANTHROPIC_API_KEY=sk-test\n")
-
-	workspaces := []string{"/workspace/proj1", "/workspace/proj2"}
-	if err := envconfig.UpdateWorkspaces(path, workspaces); err != nil {
-		t.Fatalf("UpdateWorkspaces: %v", err)
-	}
-
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if !strings.Contains(string(content), "WALLFACER_WORKSPACES") {
-		t.Error("expected WALLFACER_WORKSPACES in updated file")
-	}
-}
-
-// TestUpdateWorkspaces_ClearsWithEmpty verifies that passing nil clears the workspace path.
-func TestUpdateWorkspaces_ClearsWithEmpty(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_WORKSPACES=/old/path\nANTHROPIC_API_KEY=sk-test\n")
-
-	if err := envconfig.UpdateWorkspaces(path, nil); err != nil {
-		t.Fatalf("UpdateWorkspaces clear: %v", err)
-	}
-
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	// The value should now be empty.
-	if strings.Contains(string(content), "/old/path") {
-		t.Error("expected old workspace path to be cleared")
-	}
-}
-
 // TestParseTerminalEnabledDefaultsToTrue verifies that TerminalEnabled is true when the key is absent.
 func TestParseTerminalEnabledDefaultsToTrue(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
