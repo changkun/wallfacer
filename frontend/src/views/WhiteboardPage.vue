@@ -269,8 +269,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
-  font-size: 13px;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
   pointer-events: none;
 }
 </style>

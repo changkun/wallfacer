@@ -30,38 +30,45 @@ function cssVar(name: string): string {
 }
 
 function themeConfig() {
+  // Every diagram colour is a console token: nodes on the sunk surface with a
+  // rule stroke, text in ink, lines in the quiet ink, clusters on the card.
+  const ink = cssVar('--ink');
+  const ink3 = cssVar('--ink-3');
+  const rule = cssVar('--rule');
+  const card = cssVar('--bg-card');
+  const sunk = cssVar('--bg-sunk');
   return {
     theme: 'base' as const,
     themeVariables: {
-      primaryColor: cssVar('--bg-input') || cssVar('--bg-sunk'),
-      primaryTextColor: cssVar('--text') || cssVar('--ink'),
-      primaryBorderColor: cssVar('--border') || cssVar('--rule'),
-      lineColor: cssVar('--text-muted') || cssVar('--ink-3'),
-      secondaryColor: cssVar('--bg-card'),
-      tertiaryColor: cssVar('--bg-raised') || cssVar('--bg-sunk'),
-      background: cssVar('--bg-card'),
-      mainBkg: cssVar('--bg-input') || cssVar('--bg-sunk'),
-      nodeBorder: cssVar('--border') || cssVar('--rule'),
-      clusterBkg: cssVar('--bg-card'),
-      clusterBorder: cssVar('--border') || cssVar('--rule'),
-      titleColor: cssVar('--text') || cssVar('--ink'),
-      edgeLabelBackground: cssVar('--bg-card'),
-      nodeTextColor: cssVar('--text') || cssVar('--ink'),
-      actorTextColor: cssVar('--text') || cssVar('--ink'),
-      actorBkg: cssVar('--bg-input') || cssVar('--bg-sunk'),
-      actorBorder: cssVar('--border') || cssVar('--rule'),
-      signalColor: cssVar('--text') || cssVar('--ink'),
-      signalTextColor: cssVar('--text') || cssVar('--ink'),
-      labelBoxBkgColor: cssVar('--bg-input') || cssVar('--bg-sunk'),
-      labelBoxBorderColor: cssVar('--border') || cssVar('--rule'),
-      labelTextColor: cssVar('--text') || cssVar('--ink'),
-      loopTextColor: cssVar('--text') || cssVar('--ink'),
-      noteBkgColor: cssVar('--bg-input') || cssVar('--bg-sunk'),
-      noteTextColor: cssVar('--text') || cssVar('--ink'),
-      noteBorderColor: cssVar('--border') || cssVar('--rule'),
-      activationBkgColor: cssVar('--bg-input') || cssVar('--bg-sunk'),
-      activationBorderColor: cssVar('--border') || cssVar('--rule'),
-      sequenceNumberColor: cssVar('--text') || cssVar('--ink'),
+      primaryColor: sunk,
+      primaryTextColor: ink,
+      primaryBorderColor: rule,
+      lineColor: ink3,
+      secondaryColor: card,
+      tertiaryColor: sunk,
+      background: card,
+      mainBkg: sunk,
+      nodeBorder: rule,
+      clusterBkg: card,
+      clusterBorder: rule,
+      titleColor: ink,
+      edgeLabelBackground: card,
+      nodeTextColor: ink,
+      actorTextColor: ink,
+      actorBkg: sunk,
+      actorBorder: rule,
+      signalColor: ink,
+      signalTextColor: ink,
+      labelBoxBkgColor: sunk,
+      labelBoxBorderColor: rule,
+      labelTextColor: ink,
+      loopTextColor: ink,
+      noteBkgColor: sunk,
+      noteTextColor: ink,
+      noteBorderColor: rule,
+      activationBkgColor: sunk,
+      activationBorderColor: rule,
+      sequenceNumberColor: ink,
       fontFamily: 'inherit',
       fontSize: '13px',
     },
@@ -94,7 +101,16 @@ function fixNodeContrast(container: Element) {
     const node = shape.closest('.node');
     if (!node) continue;
     const labels = node.querySelectorAll<HTMLElement>('.nodeLabel, foreignObject span');
-    const colour = lum > 0.5 ? '#1a1a1a' : '#f0f0f0';
+    // A diagram may colour its own nodes; the label takes whichever of ink
+    // and the page surface contrasts with that fill, so it reads in both
+    // themes without a literal colour.
+    const ink = cssVar('--ink');
+    const bg = cssVar('--bg');
+    const inkLum = hexLuminance(ink);
+    const bgLum = hexLuminance(bg);
+    const darker = inkLum >= 0 && bgLum >= 0 ? (inkLum < bgLum ? ink : bg) : ink;
+    const lighter = inkLum >= 0 && bgLum >= 0 ? (inkLum < bgLum ? bg : ink) : bg;
+    const colour = lum > 0.5 ? darker : lighter;
     for (const label of labels) label.style.color = colour;
   }
 }

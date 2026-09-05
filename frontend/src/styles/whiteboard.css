@@ -1,5 +1,5 @@
 /* =======================================================================
-   Whiteboard — wallfacer-native theming for the embedded Excalidraw island.
+   Whiteboard: console theming for the embedded Excalidraw island.
 
    Excalidraw is themed entirely through CSS custom properties. Here those
    variables are remapped onto wallfacer design tokens (tokens.css), which
@@ -29,18 +29,18 @@
   --color-primary: var(--accent) !important;
   --color-primary-darker: var(--accent-2) !important;
   --color-primary-darkest: var(--accent-2) !important;
-  --color-primary-hover: var(--accent-hover) !important;
-  --color-primary-light: var(--accent-tint) !important;
+  --color-primary-hover: var(--accent-2) !important;
+  --color-primary-light: var(--accent-soft) !important;
   --color-primary-light-darker: var(--accent-soft) !important;
-  --color-brand-hover: var(--accent-hover) !important;
+  --color-brand-hover: var(--accent-2) !important;
   --color-brand-active: var(--accent-2) !important;
   --color-selection: var(--accent) !important;
   --select-highlight-color: var(--accent) !important;
-  --color-surface-primary-container: var(--accent-tint) !important;
+  --color-surface-primary-container: var(--accent-soft) !important;
   --color-on-primary-container: var(--accent) !important;
 
   /* Range sliders (opacity, font size, …) */
-  --color-slider-track: var(--accent-tint) !important;
+  --color-slider-track: var(--accent-soft) !important;
   --color-slider-thumb: var(--accent) !important;
 
   /* Surfaces — islands/toolbar/dialogs read as elevated cards; recessed
@@ -54,33 +54,33 @@
   --color-surface-mid: var(--bg-elevated) !important;
   --color-surface-low: var(--bg-sunk) !important;
   --color-surface-lowest: var(--bg-sunk) !important;
-  --color-on-surface: var(--text) !important;
+  --color-on-surface: var(--ink) !important;
 
   /* Text */
-  --text-primary-color: var(--text) !important;
-  --color-muted: var(--text-muted) !important;
-  --color-muted-darker: var(--text-muted) !important;
-  --color-muted-darkest: var(--text) !important;
-  --input-label-color: var(--text-muted) !important;
+  --text-primary-color: var(--ink) !important;
+  --color-muted: var(--ink-3) !important;
+  --color-muted-darker: var(--ink-3) !important;
+  --color-muted-darkest: var(--ink) !important;
+  --input-label-color: var(--ink-3) !important;
 
   /* Borders */
-  --default-border-color: var(--border) !important;
-  --dialog-border-color: var(--border) !important;
-  --sidebar-border-color: var(--border) !important;
-  --color-border-outline: var(--border) !important;
-  --color-border-outline-variant: var(--border) !important;
+  --default-border-color: var(--rule) !important;
+  --dialog-border-color: var(--rule) !important;
+  --sidebar-border-color: var(--rule) !important;
+  --color-border-outline: var(--rule) !important;
+  --color-border-outline-variant: var(--rule) !important;
 
   /* Inputs */
-  --input-bg-color: var(--bg-input) !important;
-  --input-border-color: var(--border) !important;
-  --input-hover-bg-color: var(--bg-hover) !important;
+  --input-bg-color: var(--bg-sunk) !important;
+  --input-border-color: var(--rule) !important;
+  --input-hover-bg-color: color-mix(in srgb, var(--ink) 6%, transparent) !important;
 
   /* Buttons */
-  --button-color: var(--text) !important;
-  --button-hover-bg: var(--bg-hover) !important;
-  --button-active-bg: var(--bg-active) !important;
-  --button-hover-border: var(--border) !important;
-  --button-active-border: var(--border) !important;
+  --button-color: var(--ink) !important;
+  --button-hover-bg: color-mix(in srgb, var(--ink) 6%, transparent) !important;
+  --button-active-bg: color-mix(in srgb, var(--ink) 10%, transparent) !important;
+  --button-hover-border: var(--rule) !important;
+  --button-active-border: var(--rule) !important;
 
   /* Semantic */
   --color-danger: var(--err) !important;
