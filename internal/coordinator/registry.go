@@ -28,28 +28,6 @@ type Instance struct {
 // ID returns the instance's stable, persisted id (the registry key).
 func (i Instance) ID() string { return i.Manifest.InstanceID }
 
-// EventKind classifies a registry change emitted to subscribers.
-type EventKind int
-
-const (
-	// EventJoin is a new instance registering for the first time.
-	EventJoin EventKind = iota
-	// EventLeave is an instance disconnecting (close or liveness timeout).
-	EventLeave
-	// EventManifest is an existing instance re-registering (reconnect or a
-	// workspace-set change), replacing its prior manifest.
-	EventManifest
-)
-
-// Event is a registry change broadcast to subscribers so presence and
-// remote-control learn of membership changes without polling.
-type Event struct {
-	Kind       EventKind
-	Org        string
-	Principal  Principal
-	InstanceID string
-}
-
 // Registration identifies the exact registry entry created by Join. It lets the
 // connection that joined later leave only its own generation, not a replacement
 // connection that reused the same persisted instance id.
@@ -78,55 +56,39 @@ type Registration struct {
 type Registry struct {
 	mu         sync.RWMutex
 	byInstance map[string]Instance // instance_id -> instance
-	subs       map[int]chan Event
-	nextSub    int
 	nextGen    uint64
 }
 
 // NewRegistry returns an empty registry.
 func NewRegistry() *Registry {
-	return &Registry{
-		byInstance: make(map[string]Instance),
-		subs:       make(map[int]chan Event),
-	}
+	return &Registry{byInstance: make(map[string]Instance)}
 }
 
 // Join registers an instance. A connection whose instance_id already has a
 // (stale) entry replaces it rather than adding a second, so a restart that
 // reconnects before the prior socket times out does not briefly show two
-// instances. The replace path emits EventManifest, a fresh id emits EventJoin.
+// instances.
 func (r *Registry) Join(inst Instance) Registration {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	id := inst.ID()
-	_, existed := r.byInstance[id]
 	r.nextGen++
 	inst.generation = r.nextGen
 	r.byInstance[id] = inst
-	kind := EventJoin
-	if existed {
-		kind = EventManifest
-	}
-	ev := Event{Kind: kind, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: id}
-	reg := Registration{InstanceID: id, generation: inst.generation}
-	r.mu.Unlock()
-	r.broadcast(ev)
-	return reg
+	return Registration{InstanceID: id, generation: inst.generation}
 }
 
 // UpdateManifest replaces the manifest for an existing instance (a reconnect or
 // workspace-set change). No-op if the instance is unknown.
 func (r *Registry) UpdateManifest(instanceID string, m Manifest) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	inst, ok := r.byInstance[instanceID]
 	if !ok {
-		r.mu.Unlock()
 		return
 	}
 	inst.Manifest = m
 	r.byInstance[instanceID] = inst
-	ev := Event{Kind: EventManifest, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: instanceID}
-	r.mu.Unlock()
-	r.broadcast(ev)
 }
 
 // LeaveRegistration removes an instance (socket close or liveness timeout), but
@@ -135,15 +97,12 @@ func (r *Registry) UpdateManifest(instanceID string, m Manifest) {
 // an unknown instance id.
 func (r *Registry) LeaveRegistration(reg Registration) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	inst, ok := r.byInstance[reg.InstanceID]
 	if !ok || inst.generation != reg.generation {
-		r.mu.Unlock()
 		return
 	}
 	delete(r.byInstance, reg.InstanceID)
-	ev := Event{Kind: EventLeave, Org: inst.Principal.OrgID, Principal: inst.Principal, InstanceID: reg.InstanceID}
-	r.mu.Unlock()
-	r.broadcast(ev)
 }
 
 // Snapshot returns every instance currently registered in the given org.
@@ -187,42 +146,4 @@ func (r *Registry) Len() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.byInstance)
-}
-
-// Subscribe returns a channel of registry events and an unsubscribe function.
-// The channel is buffered; a subscriber that falls behind may miss events and
-// should resync via Snapshot (presence already broadcasts full snapshots, so a
-// missed delta is self-healing). The unsubscribe function is idempotent.
-func (r *Registry) Subscribe() (<-chan Event, func()) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	id := r.nextSub
-	r.nextSub++
-	ch := make(chan Event, 64)
-	r.subs[id] = ch
-	var once sync.Once
-	cancel := func() {
-		once.Do(func() {
-			r.mu.Lock()
-			defer r.mu.Unlock()
-			if c, ok := r.subs[id]; ok {
-				delete(r.subs, id)
-				close(c)
-			}
-		})
-	}
-	return ch, cancel
-}
-
-// broadcast sends an event to all subscribers without blocking: a full
-// subscriber buffer drops the event (the subscriber resyncs via Snapshot).
-func (r *Registry) broadcast(ev Event) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	for _, ch := range r.subs {
-		select {
-		case ch <- ev:
-		default:
-		}
-	}
 }

@@ -82,40 +82,6 @@ func TestRegistryInstancesForRemote(t *testing.T) {
 	}
 }
 
-func TestRegistrySubscribe(t *testing.T) {
-	r := NewRegistry()
-	ch, cancel := r.Subscribe()
-	defer cancel()
-
-	r.Join(inst("i1", "alice", "org1"))
-	ev := <-ch
-	if ev.Kind != EventJoin || ev.InstanceID != "i1" || ev.Org != "org1" {
-		t.Fatalf("join event = %+v", ev)
-	}
-
-	reg := r.Join(inst("i1", "alice", "org1")) // reconnect -> EventManifest
-	if ev := <-ch; ev.Kind != EventManifest {
-		t.Fatalf("reconnect event kind = %v, want EventManifest", ev.Kind)
-	}
-
-	r.LeaveRegistration(reg)
-	if ev := <-ch; ev.Kind != EventLeave {
-		t.Fatalf("leave event kind = %v, want EventLeave", ev.Kind)
-	}
-}
-
-func TestRegistrySubscribeCancelIdempotent(t *testing.T) {
-	defer func() {
-		if p := recover(); p != nil {
-			t.Fatalf("double cancel panicked: %v", p)
-		}
-	}()
-	r := NewRegistry()
-	_, cancel := r.Subscribe()
-	cancel()
-	cancel() // must not panic on double close
-}
-
 func TestRegistryUpdateManifest(t *testing.T) {
 	r := NewRegistry()
 	r.Join(inst("i1", "alice", "org1", "github.com/a/b"))
