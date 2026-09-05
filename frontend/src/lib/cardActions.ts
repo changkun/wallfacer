@@ -11,17 +11,16 @@ export interface CardActionDef {
   label: string;
   icon: string;
   title: string;
-  cls: string;
 }
 
 export const CARD_ACTION_DEFS: Record<CardAction, CardActionDef> = {
-  plan: { id: 'plan', label: 'Plan', icon: '✎', title: 'Send to Plan', cls: 'card-action-plan' },
-  start: { id: 'start', label: 'Start', icon: '▶', title: 'Move to In Progress', cls: 'card-action-start' },
-  resume: { id: 'resume', label: 'Resume', icon: '↻', title: 'Resume in existing session', cls: 'card-action-resume' },
-  test: { id: 'test', label: 'Test', icon: '▶', title: 'Run test agent', cls: 'card-action-test' },
-  done: { id: 'done', label: 'Done', icon: '✓', title: 'Mark done and commit', cls: 'card-action-done' },
-  retry: { id: 'retry', label: 'Retry', icon: '↩', title: 'Move back to Backlog', cls: 'card-action-retry' },
-  sync: { id: 'sync', label: 'Sync with default', icon: '⟳', title: 'Rebase worktrees onto the default branch', cls: 'card-action-sync' },
+  plan: { id: 'plan', label: 'Plan', icon: '✎', title: 'Send to Plan' },
+  start: { id: 'start', label: 'Start', icon: '▶', title: 'Move to In Progress' },
+  resume: { id: 'resume', label: 'Resume', icon: '↻', title: 'Resume in existing session' },
+  test: { id: 'test', label: 'Test', icon: '▶', title: 'Run test agent' },
+  done: { id: 'done', label: 'Done', icon: '✓', title: 'Mark done and commit' },
+  retry: { id: 'retry', label: 'Retry', icon: '↩', title: 'Move back to Backlog' },
+  sync: { id: 'sync', label: 'Sync with default', icon: '⟳', title: 'Rebase worktrees onto the default branch' },
 };
 
 // Returns the ordered list of quick actions for a task's current status.
@@ -41,6 +40,21 @@ export function cardActionsFor(task: Pick<Task, 'status' | 'archived' | 'kind' |
       return ['retry'];
     default:
       return [];
+  }
+}
+
+// The one action that moves the task forward from its column; the card renders
+// it as the ink button and everything else as a ghost. Waiting moves forward
+// by Done, failed by Resume when a session exists (Retry otherwise), backlog by
+// Start, and a finished task can only be reopened.
+export function primaryCardAction(task: Pick<Task, 'status' | 'archived' | 'kind' | 'session_id'>): CardAction | null {
+  const actions = cardActionsFor(task);
+  if (actions.length === 0) return null;
+  switch (task.status) {
+    case 'backlog': return 'start';
+    case 'waiting': return 'done';
+    case 'failed': return actions.includes('resume') ? 'resume' : 'retry';
+    default: return actions[0];
   }
 }
 

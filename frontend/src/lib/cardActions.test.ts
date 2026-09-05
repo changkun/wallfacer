@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cardActionsFor, commandPaletteActionsFor } from './cardActions';
+import { primaryCardAction, cardActionsFor, commandPaletteActionsFor } from './cardActions';
 
 type T = Parameters<typeof cardActionsFor>[0];
 const task = (over: Partial<T>): T => ({ status: 'backlog', archived: false, kind: 'task', session_id: null, ...over });
@@ -49,5 +49,19 @@ describe('commandPaletteActionsFor', () => {
   it('does not add Sync for other statuses', () => {
     expect(commandPaletteActionsFor(task({ status: 'backlog' }))).toEqual(['plan', 'start']);
     expect(commandPaletteActionsFor(task({ status: 'done' }))).toEqual(['retry']);
+  });
+});
+
+describe('primaryCardAction', () => {
+  it('names the forward transition per column', () => {
+    expect(primaryCardAction({ status: 'backlog', session_id: '' } as never)).toBe('start');
+    expect(primaryCardAction({ status: 'waiting', session_id: 's' } as never)).toBe('done');
+    expect(primaryCardAction({ status: 'failed', session_id: 's' } as never)).toBe('resume');
+    expect(primaryCardAction({ status: 'failed', session_id: '' } as never)).toBe('retry');
+    expect(primaryCardAction({ status: 'done', session_id: '' } as never)).toBe('retry');
+  });
+  it('is null when the card has no actions', () => {
+    expect(primaryCardAction({ status: 'in_progress', session_id: '' } as never)).toBeNull();
+    expect(primaryCardAction({ status: 'backlog', archived: true } as never)).toBeNull();
   });
 });
