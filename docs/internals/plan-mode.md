@@ -166,9 +166,9 @@ The write path uses `os.OpenFile(..., O_CREATE|O_EXCL|O_WRONLY, 0o644)` by defau
 
 `TreeProgress(tree)` returns a map keyed by spec path for all non-leaf nodes. Used by the explorer to render per-track progress bars.
 
-### Impact Analysis
+### Dependency Graph
 
-`internal/spec/impact.go` computes the "blast radius" of a proposed change. `Adjacency(tree)` builds the forward `depends_on` graph with archived specs stripped. `ComputeImpact(tree, specPath)` returns `{Direct, Transitive}`, the immediate dependents of the target (plus, for non-leaf targets, dependents of any leaf in its subtree) and the transitive closure beyond them. Used by the `/impact` slash command and the dependency minimap in the UI. `UnblockedSpecs(tree, completedPath)` returns specs whose `depends_on` just became fully satisfied; archived dependencies count as satisfied by construction.
+`internal/spec/adjacency.go` builds the forward `depends_on` graph. `Adjacency(tree)` maps each spec path to its dependency targets with archived specs stripped from both ends, so validation (cycle detection, dangling targets) and status propagation see only the live graph.
 
 ### Roadmap Index
 
