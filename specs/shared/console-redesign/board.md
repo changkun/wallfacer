@@ -1,6 +1,6 @@
 ---
 title: Board
-status: drafted
+status: validated
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:

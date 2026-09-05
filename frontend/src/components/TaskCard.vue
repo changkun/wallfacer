@@ -7,9 +7,10 @@ import { api } from '../api/client';
 import type { Task } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
 import { highlightMatch } from '../lib/highlight';
-import { classifyTag, type RenderedTag } from '../lib/tagBadge';
-import { cardActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
+import { orderTags } from '../lib/tagBadge';
+import { cardActionsFor, primaryCardAction, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import AppSelect from './AppSelect.vue';
+import HarnessLogo from './HarnessLogo.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useGithubPrStore } from '../stores/githubPr';
 import { useBehindCounts } from '../composables/useBehindCounts';
@@ -53,16 +54,13 @@ let pulseHandle: ReturnType<typeof setTimeout> | null = null;
 
 const prStore = useGithubPrStore();
 
-// PR badge for the card's Row 1: shows the task branch's PR state at a glance.
-// Reads the per-task PR cache; populated by the fetch below for branched tasks.
+// PR signal: the task branch's PR state. Reads the per-task PR cache;
+// populated by the fetch below for branched tasks.
 const prBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
   const pr = prStore.prFor(props.task.id);
   if (!pr) return null;
-  return {
-    label: `#${pr.number} ${pr.state}`,
-    cls: `badge-pr-${pr.state}`,
-    title: `Pull request #${pr.number} (${pr.state})`,
-  };
+  const cls = pr.state === 'open' ? 'pill-ok' : pr.state === 'merged' ? 'pill-pub' : 'pill-err';
+  return { label: `#${pr.number} ${pr.state}`, cls, title: `Pull request #${pr.number} (${pr.state})` };
 });
 
 onMounted(() => {
@@ -154,19 +152,26 @@ function statusLabel(task: Task): string {
   return task.status;
 }
 
-function badgeClass(task: Task): string {
-  if (task.archived) return 'badge-archived';
-  return `badge-${task.status}`;
-}
+// The state pill: one ramp colour per column, a dot on the live states.
+const statePill = computed<{ cls: string; dot: boolean; pulse: boolean }>(() => {
+  const t = props.task;
+  if (t.archived) return { cls: 'pill-neutral', dot: false, pulse: false };
+  switch (t.status) {
+    case 'in_progress':
+    case 'committing': return { cls: 'pill-run', dot: true, pulse: true };
+    case 'waiting': return { cls: 'pill-warn', dot: true, pulse: false };
+    case 'done': return { cls: 'pill-ok', dot: false, pulse: false };
+    case 'failed': return { cls: 'pill-err', dot: true, pulse: false };
+    default: return { cls: 'pill-neutral', dot: false, pulse: false };
+  }
+});
 
 function cardClasses(task: Task): Record<string, boolean> {
   return {
-    card: true,
-    [`card-${task.status}`]: true,
-    'card-failed-waiting': task.status === 'failed',
-    'card-cancelled-done': task.status === 'cancelled',
-    'card-routine': task.kind === 'routine',
-    'card--just-created': justDispatched.value,
+    'task-card': true,
+    [`task-card--${task.archived ? 'archived' : task.status}`]: true,
+    'task-card--routine': task.kind === 'routine',
+    'task-card--just-created': justDispatched.value,
   };
 }
 
@@ -200,13 +205,6 @@ function waitingSnippet(task: Task): string {
   return snippet(task.result);
 }
 
-function tagStyle(tag: string): string {
-  let sum = 0;
-  for (let i = 0; i < tag.length; i++) sum += tag.charCodeAt(i);
-  const n = sum % 12;
-  return `background:var(--tag-bg-${n});color:var(--tag-text-${n});`;
-}
-
 // Behind-upstream chip: fetched lazily via the shared composable, only
 // for statuses where falling behind matters. Routine cards opt out.
 const showsBehind = computed(() =>
@@ -230,24 +228,19 @@ async function syncFromCard(e: Event) {
 const testBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
   const t = props.task;
   switch (t.last_test_result) {
-    case 'pass': return { label: '✓ verified', cls: 'badge-test-pass', title: 'Verification passed' };
-    case 'fail': return { label: '✗ verify failed', cls: 'badge-test-fail', title: 'Verification failed' };
-    case 'unknown': return { label: 'no verdict', cls: 'badge-test-none', title: 'Tested — no clear verdict detected' };
+    case 'pass': return { label: 'verified', cls: 'pill-ok', title: 'Verification passed' };
+    case 'fail': return { label: 'verify failed', cls: 'pill-err', title: 'Verification failed' };
+    case 'unknown': return { label: 'no verdict', cls: 'pill-neutral', title: 'Tested — no clear verdict detected' };
     default:
       if (t.status === 'waiting') {
-        return { label: 'unverified', cls: 'badge-test-none', title: 'Not yet verified' };
+        return { label: 'unverified', cls: 'pill-neutral', title: 'Not yet verified' };
       }
       return null;
   }
 });
 
-function renderedTag(rawTag: string): RenderedTag {
-  return classifyTag(rawTag);
-}
-
-function showSpinner(task: Task): boolean {
-  return task.status === 'in_progress' || task.status === 'committing';
-}
+// Tags as one meta line: priority, impact, labels, provenance.
+const tags = computed(() => orderTags(props.task.tags ?? []));
 
 function formatCost(usd: number): string {
   if (!usd || usd <= 0) return '';
@@ -295,6 +288,7 @@ const showResultPreview = computed(() => {
 const cardActions = computed(() =>
   cardActionsFor(props.task).map((id) => CARD_ACTION_DEFS[id]),
 );
+const primaryAction = computed(() => primaryCardAction(props.task));
 
 const router = useRouter();
 const taskStore = useTaskStore();
@@ -312,9 +306,9 @@ const depBadge = computed(() => {
 });
 const depBadgeClass = computed(() => {
   switch (depBadge.value?.kind) {
-    case 'blocked': return 'badge-blocked';
-    case 'ready': return 'badge-deps-met';
-    case 'cancelled': return 'badge-dep-cancelled';
+    case 'blocked': return 'pill-warn';
+    case 'ready': return 'pill-ok';
+    case 'cancelled': return 'pill-warn';
     default: return '';
   }
 });
@@ -336,6 +330,22 @@ const depBadgeTitle = computed(() => {
 // Friendly failure-category label (Timeout/Budget/…) for failed cards.
 const failureBadge = computed(() => failureLabel(props.task.failure_category));
 
+// The card's colour budget: one state pill and one qualifier pill on the first
+// row. The qualifier is the most decisive signal available; the rest become
+// plain text on the meta line so nothing is lost, only de-emphasised.
+interface Signal { label: string; cls: string; title: string }
+const signals = computed<Signal[]>(() => {
+  const out: Signal[] = [];
+  if (testBadge.value) out.push(testBadge.value);
+  if (failureBadge.value) out.push({ label: failureBadge.value, cls: 'pill-err', title: 'Failure reason: ' + props.task.failure_category });
+  if (depBadge.value) out.push({ label: depBadgeText.value, cls: depBadgeClass.value, title: depBadgeTitle.value });
+  if (scheduledLabel.value) out.push({ label: scheduledLabel.value, cls: 'pill-neutral', title: 'Scheduled start' });
+  if (prBadge.value) out.push(prBadge.value);
+  return out;
+});
+const qualifier = computed(() => signals.value[0] ?? null);
+const extraSignals = computed(() => signals.value.slice(1));
+
 // Cost budget progress bar on running/waiting cards.
 const costBar = computed(() => {
   const t = props.task;
@@ -343,7 +353,7 @@ const costBar = computed(() => {
   if (!(max > 0) || !(t.status === 'in_progress' || t.status === 'waiting')) return null;
   const spent = t.usage?.cost_usd ?? 0;
   const pct = Math.min(100, (spent / max) * 100);
-  const color = pct >= 90 ? 'var(--red,#ef4444)' : pct >= 70 ? 'var(--yellow,#f59e0b)' : 'var(--green,#22c55e)';
+  const color = pct >= 90 ? 'var(--err)' : pct >= 70 ? 'var(--warn)' : 'var(--ok)';
   return { pct, color, title: `Cost: $${spent.toFixed(4)} of $${max.toFixed(2)} budget` };
 });
 
@@ -391,10 +401,9 @@ function focusSibling(direction: 'next' | 'prev' | 'left' | 'right') {
   // For vertical nav we walk siblings in the same column; for horizontal
   // we walk by position across columns. Use a flat DOM query and find
   // ourselves in it — simple, side-effect-free.
-  // Match the actual card class — `card` is the root (see cardClasses()),
-  // not `task-card`. A wrong selector here silently breaks card-to-card
-  // keyboard nav (the focusSibling never finds any peers).
-  const all = Array.from(document.querySelectorAll<HTMLElement>('.card[tabindex="0"]'));
+  // `.task-card` is the root (see cardClasses()); a wrong selector here
+  // silently breaks card-to-card keyboard nav.
+  const all = Array.from(document.querySelectorAll<HTMLElement>('.task-card[tabindex="0"]'));
   const idx = all.indexOf(root);
   if (idx < 0 || all.length === 0) return;
   let nextIdx = idx;
@@ -471,134 +480,90 @@ function onCardKeydown(e: KeyboardEvent) {
     :aria-label="`Task: ${props.task.title || props.task.prompt || props.task.id}`"
     @keydown="onCardKeydown"
   >
-    <!-- Row 1: status badge + meta-right (harness, timeout, time) -->
-    <div class="flex items-center mb-1 card-row1">
-      <div class="flex items-center gap-1.5 card-badge-row">
-        <span v-if="props.rank" class="card-rank" title="Backlog position">#{{ props.rank }}</span>
-        <span :class="['badge', badgeClass(props.task)]">{{ statusLabel(props.task) }}</span>
-        <span v-if="showSpinner(props.task)" class="spinner"></span>
-        <span
-          v-if="failureBadge"
-          class="badge badge-failure-category"
-          :title="'Failure reason: ' + props.task.failure_category"
-        >{{ failureBadge }}</span>
-        <span
-          v-if="depBadge"
-          :class="['badge', depBadgeClass]"
-          :title="depBadgeTitle"
-        >{{ depBadgeText }}</span>
-        <span
-          v-if="scheduledLabel"
-          class="badge badge-scheduled"
-          title="Scheduled start"
-        >{{ scheduledLabel }}</span>
-        <span
-          v-if="testBadge"
-          :class="['badge', testBadge.cls]"
-          :title="testBadge.title"
-        >{{ testBadge.label }}</span>
-        <span
-          v-if="prBadge"
-          :class="['badge', prBadge.cls]"
-          :title="prBadge.title"
-        >{{ prBadge.label }}</span>
+    <!-- Row 1: rank, state, one qualifier; harness · timeout · age on the right -->
+    <div class="task-card__row">
+      <div class="task-card__pills">
+        <span v-if="props.rank" class="pill pill-neutral task-card__rank" title="Backlog position">#{{ props.rank }}</span>
+        <span :class="['pill', statePill.cls, { pulse: statePill.pulse }]" data-role="state">
+          <span v-if="statePill.dot" class="pill-dot" aria-hidden="true" />{{ statusLabel(props.task) }}
+        </span>
+        <span v-if="qualifier" :class="['pill', qualifier.cls]" :title="qualifier.title" data-role="qualifier">{{ qualifier.label }}</span>
       </div>
-      <div class="flex items-center gap-1.5 card-meta-right">
-        <span
-          class="text-xs text-v-muted"
-          :title="'Harness: ' + sandboxLabel(props.task)"
-        >{{ sandboxLabel(props.task) }}</span>
-        <span class="text-xs text-v-muted" title="Timeout">{{ formatTimeout(props.task.timeout) }}</span>
-        <span class="text-xs text-v-muted" :title="'Created ' + props.task.created_at">{{ timeAgo(props.task.created_at) }}</span>
+      <div class="task-card__meta">
+        <span class="task-card__harness" :title="'Harness: ' + sandboxLabel(props.task)">
+          <HarnessLogo :harness="props.task.sandbox || 'claude'" :size="12" />{{ sandboxLabel(props.task) }}
+        </span>
+        <span title="Timeout">{{ formatTimeout(props.task.timeout) }}</span>
+        <span :title="'Created ' + props.task.created_at">{{ timeAgo(props.task.created_at) }}</span>
       </div>
     </div>
 
     <!-- Row 2: title -->
-    <div v-if="props.task.title" class="card-title" :title="props.task.title" v-html="titleHtml"></div>
+    <div v-if="props.task.title" class="task-card__title" :title="props.task.title" v-html="titleHtml"></div>
 
-    <!-- Row 3: tags (priority:*/impact:* get dedicated badges).
-         Click a tag to filter the board to that tag. -->
-    <div v-if="props.task.tags?.length" class="tag-chip-row">
-      <button
-        v-for="tag in props.task.tags"
-        :key="tag"
-        type="button"
-        :class="renderedTag(tag).cls"
-        :data-tag="tag"
-        :style="renderedTag(tag).styled ? tagStyle(tag) : ''"
-        :title="`Filter board by tag: ${tag}`"
-        @click="filterByTag(tag, $event)"
-      >{{ renderedTag(tag).label }}</button>
+    <!-- Row 3: the meta line. priority · impact · labels · provenance · the
+         signals that did not fit the first row. A label filters the board. -->
+    <div v-if="tags.length || extraSignals.length" class="task-card__tags">
+      <template v-for="t in tags" :key="t.rawTag">
+        <button
+          v-if="t.kind === 'label'"
+          type="button"
+          class="task-card__tag task-card__tag--link"
+          :data-tag="t.rawTag"
+          :title="`Filter board by tag: ${t.rawTag}`"
+          @click="filterByTag(t.rawTag, $event)"
+        >{{ t.label }}</button>
+        <span v-else class="task-card__tag" :class="t.tone ? 'task-card__tag--' + t.tone : ''" :data-tag="t.rawTag">{{ t.label }}</span>
+      </template>
+      <span v-for="sig in extraSignals" :key="sig.label" class="task-card__tag" :title="sig.title">{{ sig.label }}</span>
     </div>
 
     <!-- Row 4: prompt preview (markdown) -->
-    <div
-      v-if="showPromptPreview"
-      class="text-xs card-prose overflow-hidden"
-      style="max-height:4.5em;"
-      v-html="promptHtml"
-    ></div>
+    <div v-if="showPromptPreview" class="task-card__prose card-prose" v-html="promptHtml"></div>
 
-    <!-- Row 5 (failed): error block + stop reason -->
+    <!-- Row 5 (failed): error well + stop reason -->
     <template v-if="props.task.status === 'failed' && props.task.result">
-      <div class="card-error-reason">
-        <span class="card-error-label">Error</span><span class="card-error-text">{{ errorSnippet(props.task) }}</span>
+      <div class="task-card__out task-card__out--err">
+        <span class="task-card__out-label">Error</span>{{ errorSnippet(props.task) }}
       </div>
-      <div v-if="props.task.stop_reason" style="margin-top:4px;">
-        <span class="badge badge-failed" style="font-size:9px;">{{ props.task.stop_reason }}</span>
+      <div v-if="props.task.stop_reason" class="task-card__tags">
+        <span class="task-card__tag task-card__tag--err">{{ props.task.stop_reason }}</span>
       </div>
     </template>
 
-    <!-- Row 5 (waiting): output block -->
-    <div v-else-if="props.task.status === 'waiting' && props.task.result" class="card-output-reason">
-      <span class="card-output-label">Output</span><span class="card-output-text">{{ waitingSnippet(props.task) }}</span>
+    <!-- Row 5 (waiting): output well -->
+    <div v-else-if="props.task.status === 'waiting' && props.task.result" class="task-card__out">
+      <span class="task-card__out-label">Output</span>{{ waitingSnippet(props.task) }}
     </div>
 
     <!-- Row 5 (done/cancelled): result preview (markdown) -->
-    <div
-      v-else-if="showResultPreview"
-      class="text-xs text-v-secondary mt-1 card-prose overflow-hidden"
-      style="max-height:3.2em;"
-      v-html="resultHtml"
-    ></div>
+    <div v-else-if="showResultPreview" class="task-card__prose task-card__prose--result card-prose" v-html="resultHtml"></div>
 
-    <!-- Behind-upstream banner (waiting/failed only). Mirrors the legacy
-         applyDiffToCard() warning; clicking Sync fires POST /api/git/sync
-         for this task without opening the card. -->
-    <div
-      v-if="showsBehind && behind.total.value > 0"
-      class="diff-behind-warning"
-      @click.stop
-    >
-      <span>⚠ {{ behind.total.value }} commit{{ behind.total.value === 1 ? '' : 's' }} behind</span>
-      <button type="button" class="diff-sync-btn" @click="syncFromCard">Sync</button>
+    <!-- Behind-upstream: clicking Sync fires POST /api/git/sync for this task. -->
+    <div v-if="showsBehind && behind.total.value > 0" class="task-card__behind" @click.stop>
+      <span>{{ behind.total.value }} commit{{ behind.total.value === 1 ? '' : 's' }} behind</span>
+      <button type="button" class="btn sm ghost" @click="syncFromCard">Sync</button>
     </div>
 
-    <!-- Cost budget progress bar (running/waiting with a max_cost_usd). -->
-    <div
-      v-if="costBar"
-      class="card-cost-bar"
-      :title="costBar.title"
-      style="margin-top:4px;height:3px;border-radius:2px;background:var(--border);overflow:hidden;"
-    >
-      <div :style="{ height:'100%', width: costBar.pct + '%', background: costBar.color, transition:'width 0.3s' }" />
+    <!-- Cost budget bar (running/waiting with a max_cost_usd). -->
+    <div v-if="costBar" class="task-card__bar" :title="costBar.title">
+      <div class="task-card__bar-fill" :style="{ width: costBar.pct + '%', background: costBar.color }" />
     </div>
 
-    <!-- Row 7: meta footer (turns, cost, session id) -->
+    <!-- Row 7: turns · cost -->
     <div
       v-if="showCostMeta(props.task) && (props.task.status === 'in_progress' || props.task.status === 'waiting' || props.task.status === 'done')"
-      class="card-meta"
-      style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:10px;color:var(--ink-4);"
+      class="task-card__foot"
     >
-      <span v-if="props.task.turns > 0" class="card-meta-time" :title="'Turns: ' + props.task.turns">{{ props.task.turns }} turn{{ props.task.turns === 1 ? '' : 's' }}</span>
-      <span class="card-meta-cost" title="Total cost">{{ formatCost(props.task.usage.cost_usd) }}</span>
+      <span v-if="props.task.turns > 0" :title="'Turns: ' + props.task.turns">{{ props.task.turns }} turn{{ props.task.turns === 1 ? '' : 's' }}</span>
+      <span title="Total cost">{{ formatCost(props.task.usage.cost_usd) }}</span>
     </div>
 
     <!-- Row 8a: routine footer (replaces action buttons for routine cards) -->
     <div v-if="isRoutine" class="routine-footer" @click.stop>
       <div class="routine-footer-row">
-        <span class="badge badge-routine" title="Routine schedule">routine</span>
-        <span class="badge badge-routine-spawn" :title="'Spawns ' + routineSpawnLabel + ' tasks'">{{ routineSpawnLabel }}</span>
+        <span class="pill pill-brand" title="Routine schedule">routine</span>
+        <span class="pill pill-neutral" :title="'Spawns ' + routineSpawnLabel + ' tasks'">{{ routineSpawnLabel }}</span>
         <span class="routine-next-run" title="Next scheduled fire">{{ routineCountdown }}</span>
       </div>
       <div class="routine-footer-row">
@@ -622,26 +587,22 @@ function onCardKeydown(e: KeyboardEvent) {
           />
           <span>Enabled</span>
         </label>
-        <button
-          type="button"
-          class="routine-trigger-btn"
-          title="Spawn an instance task now"
-          @click="onRoutineTrigger"
-        >Run now</button>
+        <button type="button" class="btn sm ghost routine-trigger-btn" title="Spawn an instance task now" @click="onRoutineTrigger">Run now</button>
       </div>
       <div v-if="routineLastFired" class="routine-footer-row routine-last-fired">{{ routineLastFired }}</div>
     </div>
 
-    <!-- Row 8b: action buttons (non-routine) -->
-    <div v-else-if="cardActions.length" class="card-actions">
+    <!-- Row 8b: actions. The forward transition is the ink button. -->
+    <div v-else-if="cardActions.length" class="task-card__actions">
       <button
         v-for="a in cardActions"
         :key="a.id"
         type="button"
-        :class="['card-action-btn', a.cls]"
+        :class="['btn', 'sm', a.id === primaryAction ? '' : 'ghost']"
         :title="a.title"
+        :data-action="a.id"
         @click="(e) => runCardAction(a.id, e)"
-      >{{ a.icon }} {{ a.label }}</button>
+      >{{ a.label }}</button>
     </div>
   </div>
 </template>

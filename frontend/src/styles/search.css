@@ -1,15 +1,11 @@
 /* --- Task search highlight --- */
 mark.search-highlight {
-  background: rgba(255, 195, 0, 0.35);
+  background: var(--tint-amber);
   color: inherit;
-  border-radius: 2px;
   padding: 0 1px;
 }
-[data-theme="dark"] mark.search-highlight {
-  background: rgba(255, 195, 0, 0.25);
-}
 
-/* --- Task search bar --- */
+/* --- Task search: a field with the search glyph and a clear button --- */
 .task-search-wrapper {
   position: relative;
   display: flex;
@@ -18,8 +14,8 @@ mark.search-highlight {
 }
 .task-search-icon {
   position: absolute;
-  left: 9px;
-  color: var(--text-muted);
+  left: 10px;
+  color: var(--ink-4);
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -28,51 +24,50 @@ mark.search-highlight {
   box-sizing: border-box;
   flex: 1;
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: var(--r-md, 6px);
-  /* Left pad clears the absolutely-positioned search icon; right pad clears
-     the × clear button at right: 7px. */
+  min-height: 32px;
   padding: 5px 28px 5px 30px;
-  font-size: 13px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-base);
   line-height: 1.4;
   outline: none;
-  font-family: inherit;
   transition:
-    border-color 0.12s,
-    box-shadow 0.12s,
-    background 0.12s;
+    border-color var(--dur-hover),
+    box-shadow var(--dur-hover),
+    background var(--dur-hover);
 }
 .task-search-input:hover {
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+  border-color: var(--rule-2);
 }
 .task-search-input:focus,
 .task-search-input:focus-visible {
   outline: none;
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
-  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
+  border-color: var(--accent-line);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .task-search-input::placeholder {
-  color: var(--text-muted);
+  color: var(--ink-4);
 }
-/* Hide webkit search cancel button since we have our own */
 .task-search-input::-webkit-search-cancel-button {
   display: none;
 }
 .task-search-clear {
   display: none;
   position: absolute;
-  right: 7px;
+  right: 8px;
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--ink-4);
   font-size: 17px;
   line-height: 1;
   padding: 0;
-  transition: color 0.1s;
+  transition: color var(--dur-hover);
 }
 .task-search-clear:hover {
-  color: var(--text-secondary);
+  color: var(--ink);
 }

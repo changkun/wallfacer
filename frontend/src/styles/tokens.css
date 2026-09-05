@@ -43,8 +43,10 @@
 
   /* Radii. Concentric: a control nested in a surface takes the surface radius
      minus the padding between them (14px card, 8px padding, 6px control). */
+  --r-xs: 6px; /* controls nested in a 14px card with 8px padding */
   --r-sm: 8px;
   --r-md: 10px;
+  --r-row: 12px; /* nav rows and chips */
   --r-lg: 14px;
   --r-xl: 18px;
   --r-main: 20px;
@@ -100,6 +102,7 @@
   /* Accent — clay. The one hue for what the operator acts on. */
   --accent: #c45a33;
   --accent-2: #a84e2e;
+  --accent-fg: #ffffff; /* text on an accent fill, both themes */
   --accent-soft: rgba(196, 90, 51, 0.1);
   --accent-tint: rgba(196, 90, 51, 0.08);
   --accent-line: rgba(196, 90, 51, 0.28);

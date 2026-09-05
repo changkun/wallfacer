@@ -296,7 +296,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       </p>
       <button
         type="button"
-        class="composer__btn composer__btn--primary"
+        class="btn"
         @click="ui.showWorkspaces = true"
       >Open workspace picker</button>
     </div>
@@ -352,7 +352,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
         <span class="col-dot" aria-hidden="true" />
         <span class="col-name">In Progress</span>
         <span class="col-count">{{ store.inProgress.length }}</span>
-        <span class="max-parallel-tag" title="Max parallel tasks for this workspace group">max {{ maxParallel }}</span>
+        <span class="pill pill-neutral" title="Max parallel tasks for this workspace group">max {{ maxParallel }}</span>
       </div>
       <div class="column col-bg">
         <draggable :list="store.inProgress" :group="{ name: 'board', pull: false, put: true }" item-key="id" class="col-list" :animation="150" :sort="false" @change="onInProgressAdd">

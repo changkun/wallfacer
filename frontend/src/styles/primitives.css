@@ -94,7 +94,7 @@ button {
 }
 .btn:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .btn:active {
   transform: scale(0.96);
@@ -576,7 +576,7 @@ kbd.key {
 .btn-accent:hover,
 .btn-green:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .btn-yellow,
 .btn-ghost,

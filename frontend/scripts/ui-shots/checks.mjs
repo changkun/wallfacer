@@ -83,6 +83,27 @@ const SCENES = {
     expect('board', sw && sw.width > 0 && sw.height > 0, 'sidebar workspace switcher missing/zero-size (sidebar gone?)');
     const main = await firstBox(page, '.app-main');
     expect('board', main && main.width > 0, 'app-main not rendered');
+
+    // The board geometry (specs/shared/console-redesign/board.md): four equal
+    // columns, 14px cards, at most two pills on a card's first row, no card
+    // wider than its column, and a composer that expands on click.
+    const cols = await boxes(page, '.board-grid > .col');
+    expect('board', cols.length === 4, `expected 4 columns, got ${cols.length}`);
+    if (cols.length === 4) {
+      const w = cols.map((c) => Math.round(c.width));
+      expect('board', Math.max(...w) - Math.min(...w) <= 1, `column widths differ: ${w.join(', ')}`);
+    }
+    const radii = await page.$$eval('.task-card', (els) => els.map((e) => getComputedStyle(e).borderTopLeftRadius));
+    expect('board', radii.length > 0 && radii.every((r) => r === '14px'), `card radii: ${[...new Set(radii)].join(', ')}`);
+    const pillCounts = await page.$$eval('.task-card', (els) => els.map((e) => e.querySelectorAll('.task-card__pills .pill').length));
+    expect('board', pillCounts.every((n) => n <= 3), `a card carries more than rank + state + qualifier: ${pillCounts.join(',')}`);
+    const overflow = await page.$$eval('.board-grid > .col', (cols) =>
+      cols.flatMap((col) => [...col.querySelectorAll('.task-card')].filter((c) => c.getBoundingClientRect().right > col.getBoundingClientRect().right + 1).length));
+    expect('board', overflow.every((n) => n === 0), 'a card overflows its column');
+    await page.click('.composer-add', { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(200);
+    const focused = await page.evaluate(() => document.activeElement?.classList.contains('composer__prompt'));
+    expect('board', focused === true, 'composer did not expand with the prompt focused');
   },
 
   // The shell geometry (specs/shared/console-redesign/shell.md): rail 236 open
@@ -102,7 +123,7 @@ const SCENES = {
     expect('shell', topbar && Math.abs(topbar.height - 52) <= 1, `topbar height ${topbar && topbar.height}, want 52`);
     expect('shell', !(await page.$('.status-bar')), 'a .status-bar is still in the DOM');
     expect('shell', !!(await page.$('#topbar-actions .task-search-input')), 'board search is not in the topbar actions slot');
-    expect('shell', !!(await page.$('.board-grid .card')), 'board grid rendered no cards');
+    expect('shell', !!(await page.$('.board-grid .task-card')), 'board grid rendered no cards');
     // Fold the rail and check the icon width.
     await page.click('.rail-fold-btn', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(300);

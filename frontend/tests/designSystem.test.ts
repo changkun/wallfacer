@@ -176,6 +176,16 @@ describe('primitives.css defines the shared classes', () => {
     expect(css).toMatch(/\.pill \{[^}]*var\(--font-mono\)/s);
   });
 
+  // Surface stylesheets rebuilt on the system carry no hex literal and no
+  // radius literal: colour and geometry come from tokens. Each surface spec
+  // adds its files here as it lands.
+  it.each(['src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css'])('%s uses tokens only', (file) => {
+    const src = read(file);
+    expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    // 50% is a circle, not a radius on the ladder.
+    expect(src.replace(/border-radius:\s*50%/g, '')).not.toMatch(/border-radius:\s*\d/);
+  });
+
   it('the replaced stylesheets and shell components are gone', () => {
     for (const f of [
       'src/styles/buttons.css', 'src/styles/badges.css', 'src/styles/forms.css',

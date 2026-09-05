@@ -34,7 +34,10 @@
   padding: 0 4px 8px;
 }
 
-/* Board grid: 4 equal columns on desktop */
+/* --- Columns ---
+   Four equal columns; each header is an eyebrow with the column's state dot,
+   its count, and quiet controls. The column body is a soft tray on the sunk
+   surface; cards float on it. See specs/shared/console-redesign/board.md. */
 .board-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -44,7 +47,6 @@
   flex: 1;
   min-height: 0;
 }
-
 .col {
   display: flex;
   flex-direction: column;
@@ -53,109 +55,89 @@
 .col-hd {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 2px 6px var(--sp-3);
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 4px var(--sp-3);
 }
 .col-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
 }
-.col-backlog .col-dot {
-  background: var(--col-backlog);
-}
-.col-progress .col-dot {
-  background: var(--col-progress);
-}
-.col-waiting .col-dot {
-  background: var(--col-waiting);
-}
-.col-done .col-dot {
-  background: var(--col-done);
-}
+.col-backlog .col-dot { background: var(--col-backlog); }
+.col-progress .col-dot { background: var(--col-progress); }
+.col-waiting .col-dot { background: var(--col-waiting); }
+.col-done .col-dot { background: var(--col-done); }
 .col-name {
-  font-size: 11px;
-  font-weight: 600;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink);
+  color: var(--ink-2);
 }
 .col-count {
-  font-size: 10px;
-  color: var(--ink-4);
-  padding: 0 5px;
-  border-radius: var(--r-sm);
-  background: var(--bg-sunk);
+  font: 500 var(--fs-10) / 1 var(--font-mono);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
-  line-height: 16px;
 }
 .col-stats {
   min-width: 0;
   overflow: hidden;
-  font-size: 10px;
+  font: 400 var(--fs-9) / 1 var(--font-mono);
   color: var(--ink-4);
   white-space: nowrap;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
+/* Column controls sit at the right edge, quiet until the pointer is near. */
 .col-btn {
   margin-left: auto;
-  flex-shrink: 0;
-  border: none;
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--ink-3);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: var(--r-sm);
+  font: 500 var(--fs-10) / 1 var(--font-sans);
   cursor: pointer;
   white-space: nowrap;
-  line-height: 16px;
+  transition:
+    color var(--dur-hover),
+    background var(--dur-hover),
+    border-color var(--dur-hover);
 }
-.col-btn:hover {
-  background: var(--bg-hover);
-  color: var(--ink);
+.col-btn + .col-btn {
+  margin-left: 0;
 }
+.col-btn:hover,
 .col-btn--on {
   color: var(--accent);
-  background: var(--accent-tint);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
 }
-.col-btn--on:hover {
-  color: var(--accent);
+.col-hd .pill {
+  margin-left: 2px;
 }
-.col-btn.hidden,
-.col-stats.hidden {
-  display: none;
-}
-
 .column {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  contain: layout paint style;
-  /* Reserve equal gutter on both sides so the 6px scrollbar doesn't
-     eat into the right padding when content overflows — keeps cards
-     visually centred within the column regardless of scroll state. */
+  gap: var(--sp-3);
   scrollbar-gutter: stable both-edges;
 }
-/* Each column body reads as a soft tray — subtle enough to not compete
-   with cards, distinct enough that an empty column still reads as a
-   column rather than empty canvas. */
+/* The tray: 18px radius with an 8px gutter keeps 14px cards concentric. */
 .col-bg {
   background: var(--bg-sunk);
   border-radius: var(--r-xl);
-  /* Uniform gutter so a card's corners (--r-md = 6) stay concentric with the
-     tray (--r-xl = 14) on all four sides: 14 − 8 = 6. A larger top inset
-     would leave the top corners non-concentric with the sides. */
   padding: var(--sp-3);
-  gap: var(--sp-2);
 }
 .col-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   min-height: 40px;
 }
 
@@ -178,200 +160,245 @@
     font-size: 11px;
     padding: 6px 4px;
     border: 1px solid var(--rule);
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     background: var(--bg-card);
     color: var(--text-secondary);
     cursor: pointer;
   }
   .board-mobile-nav__btn.active {
-    color: #fff;
+    color: var(--accent-fg);
     background: var(--accent);
     border-color: var(--accent);
   }
 }
 
-/* --- Cards --- */
-/* One-shot pulse for cards freshly dispatched from Plan mode
-   (mirrors ui/js/dispatch-toast.js). */
-.card--just-created {
+/* --- Cards ---
+   One state pill and one qualifier on the first row, the title, then a mono
+   meta line for tags. Colour on a card means state; everything else is ink. */
+.task-card--just-created {
   animation: card-just-created 1.2s ease-out;
 }
 @keyframes card-just-created {
-  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.55); }
-  30% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.35); }
-  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+  0% { box-shadow: 0 0 0 0 var(--accent-ring); }
+  30% { box-shadow: 0 0 0 6px var(--accent-soft); }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .card--just-created { animation: none; }
-}
-.card {
-  cursor: grab;
+.task-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
   box-shadow: var(--sh-card);
-  position: relative;
+  cursor: grab;
   transition:
-    box-shadow 0.12s,
-    border-color 0.12s;
+    box-shadow 0.15s var(--ease-fluid),
+    border-color var(--dur-hover);
   contain: layout paint style;
   content-visibility: auto;
-  contain-intrinsic-size: 240px;
+  contain-intrinsic-size: 200px;
 }
-.card:hover {
-  box-shadow: var(--sh-2);
+.task-card:hover {
   border-color: var(--rule-2);
+  box-shadow: var(--sh-2);
 }
-.card:active {
+.task-card:active {
   cursor: grabbing;
 }
-.card.sortable-ghost {
+.task-card:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+.task-card.sortable-ghost,
+.card-drag-ghost {
   opacity: 0.4;
 }
-.card.sortable-chosen {
+.task-card.sortable-chosen,
+.card-drag-chosen {
   box-shadow: var(--sh-pop);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
-.card-actions {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-  opacity: 0.7;
-  transition: opacity 0.12s;
+.task-card--done,
+.task-card--cancelled,
+.task-card--archived {
+  opacity: 0.78;
 }
-.card:hover .card-actions {
-  opacity: 1;
-}
-/* Row 1 wraps as a whole: when the badge group + meta don't fit, the meta
-   drops to its own line (pushed right by margin-left:auto) instead of the two
-   groups overlapping. */
-.card-row1 {
-  flex-wrap: wrap;
-  row-gap: 2px;
-}
-/* The badge group is the variable-width part; it wraps its own badges and may
-   shrink, but its badges stay intact (each badge is nowrap via .badge). */
-.card-badge-row {
-  flex: 0 1 auto;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 4px 6px;
-}
-/* Meta (harness · timeout · age) hugs the right, never wraps mid-token, and
-   sits at the top so it can't land on the middle of a tall wrapped badge row. */
-.card-meta-right {
-  flex: 0 0 auto;
-  margin-left: auto;
-  align-self: flex-start;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-  color: var(--ink-4);
-  font-size: 10px;
-}
-.card-meta-right > span {
-  color: var(--ink-4) !important;
-  white-space: nowrap;
-}
-.card-action-btn {
-  padding: 2px 8px;
-  border-radius: var(--r-sm);
-  font-size: 10px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  line-height: 1.5;
-  transition:
-    background 0.1s,
-    color 0.1s,
-    opacity 0.1s;
-}
-.card-action-btn:hover {
-  filter: brightness(1.04);
-}
-.card-action-btn:disabled {
-  background: var(--bg-sunk);
-  color: var(--ink-4);
-  border-color: var(--rule);
-  cursor: not-allowed;
-  opacity: 1;
-  filter: none;
-}
-.card-action-start,
-.card-action-done {
-  background: var(--tint-green);
-  color: var(--tint-green-ink);
-  border-color: color-mix(in oklab, var(--tint-green-ink), transparent 70%);
-}
-.card-action-resume {
-  background: var(--tint-blue);
-  color: var(--tint-blue-ink);
-  border-color: color-mix(in oklab, var(--tint-blue-ink), transparent 70%);
-}
-.card-action-retry {
-  background: var(--bg-sunk);
-  color: var(--ink-2);
-  border-color: var(--rule);
-}
-.card-action-test {
-  background: var(--tint-plum);
-  color: var(--tint-plum-ink);
-  border-color: color-mix(in oklab, var(--tint-plum-ink), transparent 70%);
-}
-/* Send to Plan: neutral warm tint, distinct from Start (green) and
-   Resume (blue) since it is a sibling action on the backlog card. */
-.card-action-send-to-plan,
-.card-action-plan {
-  background: var(--tint-amber);
-  color: var(--tint-amber-ink);
-  border-color: color-mix(in oklab, var(--tint-amber-ink), transparent 70%);
-}
-/* --- Status accents (left border) ---
-   Applied per task.status so every card reads its state at a glance. */
-.card-in_progress {
-  border-left: 3px solid var(--col-progress);
-}
-.card-committing {
-  border-left: 3px solid var(--col-progress);
-}
-.card-waiting {
-  border-left: 3px solid var(--col-waiting);
-}
-.card-done,
-.card-cancelled {
-  opacity: 0.82;
-}
-.card-done .card-title,
-.card-cancelled .card-title,
-.card-cancelled-done .card-title {
+.task-card--done .task-card__title,
+.task-card--cancelled .task-card__title {
   text-decoration: line-through;
-  text-decoration-color: var(--ink-2);
-  text-decoration-thickness: 2px;
+  text-decoration-color: var(--ink-3);
 }
-.card-failed {
-  border-left: 3px solid var(--err);
-  background: color-mix(in oklab, var(--bg-card) 94%, var(--err));
+.task-card--failed {
+  border-color: color-mix(in srgb, var(--err) 30%, var(--rule));
+}
+.task-card--routine {
+  border-color: var(--accent-line);
 }
 
-/* --- Status accents (scoped secondary signals) --- */
-.card-idea-agent {
-  border-left: 3px solid var(--ok);
+.task-card__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
 }
-.card-routine {
-  border-left: 3px solid var(--info, var(--accent));
-  background: color-mix(in oklab, var(--bg-card) 96%, var(--accent));
+.task-card__pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
 }
+.task-card__rank {
+  font-variant-numeric: tabular-nums;
+}
+.task-card__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font: 400 var(--fs-9) / 1.4 var(--font-mono);
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.task-card__harness {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+}
+.task-card__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The meta line: mono, ink-3, dots between items. A label is a button that
+   filters the board; it reads as text until hovered. */
+.task-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 0;
+  font: 500 var(--fs-9) / 1.5 var(--font-mono);
+  color: var(--ink-3);
+}
+.task-card__tag {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-card__tag + .task-card__tag::before {
+  content: "·";
+  margin: 0 6px;
+  color: var(--ink-4);
+}
+.task-card__tag--link {
+  cursor: pointer;
+}
+.task-card__tag--link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.task-card__tag--warn {
+  color: var(--warn);
+}
+.task-card__tag--err {
+  color: var(--err);
+}
+.task-card__prose {
+  font-size: var(--fs-10);
+  color: var(--ink-2);
+  line-height: 1.45;
+  max-height: 4.5em;
+  overflow: hidden;
+}
+.task-card__prose--result {
+  max-height: 3.2em;
+}
+/* Output and error wells. */
+.task-card__out {
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  font: 400 var(--fs-10) / 1.45 var(--font-mono);
+  word-break: break-word;
+}
+.task-card__out--err {
+  background: var(--tint-red);
+  color: var(--err);
+}
+.task-card__out-label {
+  font-weight: 700;
+  font-size: var(--fs-9);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-right: 6px;
+  color: var(--ink-3);
+}
+.task-card__out--err .task-card__out-label {
+  color: var(--err);
+}
+.task-card__behind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  background: var(--tint-amber);
+  color: var(--warn);
+  font: 500 var(--fs-10) / 1.4 var(--font-mono);
+}
+.task-card__bar {
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--rule);
+  overflow: hidden;
+}
+.task-card__bar-fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+.task-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 var(--fs-9) / 1 var(--font-mono);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.task-card__actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* Routine footer: schedule controls in place of the actions. */
 .routine-footer {
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 2px;
+  padding-top: 8px;
   border-top: 1px dashed var(--rule);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  /* One shared font-size across all footer rows keeps the metadata
-     row, selector, toggle, and button visually balanced with the rest
-     of the card meta. */
+  gap: 6px;
   font-size: var(--fs-10);
   color: var(--ink-3);
 }
@@ -383,6 +410,7 @@
 }
 .routine-next-run {
   color: var(--ink-3);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 .routine-interval-label,
@@ -394,121 +422,24 @@
 }
 .routine-interval-select .app-select__trigger {
   font-size: var(--fs-10);
-  padding: 1px 4px;
-  background: var(--bg-card);
+  padding: 1px 6px;
+  background: var(--bg-sunk);
   color: var(--ink);
   border: 1px solid var(--rule);
   border-radius: var(--r-sm);
 }
 .routine-enabled-toggle {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   accent-color: var(--accent);
   cursor: pointer;
 }
 .routine-trigger-btn {
-  /* Calm secondary style — matches the existing card-action-retry /
-     neutral button chrome so it doesn't fight Start / Refine for
-     attention. Routine cards don't render those standard actions, but
-     the visual vocabulary stays consistent with the rest of the UI. */
-  font-size: var(--fs-10);
-  font-weight: 500;
-  padding: 2px 8px;
-  background: var(--bg-sunk);
-  color: var(--ink-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  line-height: 1.5;
   margin-left: auto;
-}
-.routine-trigger-btn:hover {
-  background: var(--tint-blue, var(--bg-sunk));
-  color: var(--tint-blue-ink, var(--ink));
-  border-color: color-mix(in oklab, var(--accent) 40%, var(--rule));
 }
 .routine-last-fired {
   color: var(--ink-4);
   font-size: var(--fs-9);
-}
-.badge-routine {
-  background: color-mix(in oklab, var(--accent) 20%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
-}
-.badge-routine-spawn {
-  background: var(--bg-sunk);
-  color: var(--ink-3);
-  border: 1px solid var(--rule);
-  font-family: var(--font-mono);
-  font-size: var(--fs-9);
-}
-.card-failed-waiting {
-  border-left: 3px solid var(--err);
-  background: color-mix(in oklab, var(--bg-card) 94%, var(--err));
-}
-.card-cancelled-done {
-  border-left: 3px solid var(--purple);
-}
-.card-cancelling {
-  border-left: 3px solid var(--warn);
-  opacity: 0.8;
-}
-.card-error-reason {
-  margin-top: 6px;
-  padding: 4px 6px;
-  background: var(--tint-red);
-  border-radius: var(--r-sm);
-  font-size: var(--fs-10);
-  line-height: 1.4;
-  font-family: var(--font-mono);
-  word-break: break-word;
-}
-.card-error-label {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--tint-red-ink);
-  margin-right: 6px;
-}
-.card-error-text {
-  color: var(--tint-red-ink);
-}
-
-/* --- Output reason (waiting tasks) --- */
-.card-output-reason {
-  margin-top: 6px;
-  padding: 4px 6px;
-  background: var(--bg-sunk);
-  border-radius: var(--r-sm);
-  font-size: var(--fs-10);
-  line-height: 1.4;
-  font-family: var(--font-mono);
-  word-break: break-word;
-}
-.card-output-label {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  margin-right: 6px;
-}
-.card-output-text {
-  color: var(--ink-2);
-}
-
-/* --- Task title (auto-generated 2-5 word summary) --- */
-.card-title {
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  line-height: 1.35;
-  margin: 0 0 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* --- Markdown in card previews (compact overrides) --- */
@@ -546,223 +477,61 @@
   margin: 0 !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .badge-pulse {
-    animation: none;
-  }
-}
 /* Highlight animation for task cards navigated from spec mode. */
 .card-highlight {
   animation: card-glow 2s ease-out;
 }
 @keyframes card-glow {
-  0% {
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.6);
+  0% { box-shadow: 0 0 0 3px var(--accent-ring); }
+  100% { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-card--just-created,
+  .card-highlight {
+    animation: none;
   }
-  100% {
-    box-shadow: none;
-  }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   New-task composer (inline, backlog column)
-
-   Goal: high information density in a narrow column. One flat surface
-   instead of stacked rounded cards, a single font size rhythm (11px),
-   thin chevron disclosures for advanced sections, and a right-aligned
-   action row. The IDs inside are referenced by ui/js/tasks.js; only the
-   visual chrome changes here.
-   ──────────────────────────────────────────────────────────────────── */
-.composer {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  /* Concentric with the column tray (.col-bg, --r-xl) given the ~8px gutter:
-     14 − 8 = 6 (--r-md), so the composer's corners nest with the tray's
-     instead of two equal radii sitting offset. Matches the regular .card. */
-  border-radius: var(--r-md);
-  font-size: var(--fs-10);
-  color: var(--ink-2);
-  box-shadow: var(--sh-2);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-}
-/* Ember focus glow — the composer warms up when active, matching the chat
-   composer so the two surfaces read as one product. A soft, diffuse shadow
-   rather than a hard accent ring. */
-.composer:focus-within {
-  border-color: color-mix(in oklab, var(--accent) 25%, var(--rule));
-  box-shadow: 0 8px 30px color-mix(in oklab, var(--accent) 15%, transparent),
-              0 2px 8px rgba(0, 0, 0, 0.08);
-}
-/* .composer sets display:flex which comes later in the cascade than
-   tailwind.css's .hidden { display: none }, so without this specific
-   override the form stays visible after hideNewTaskForm(). */
-.composer.hidden {
-  display: none;
-}
-
-.composer__prompt {
-  width: 100%;
-  resize: vertical;
-  min-height: 72px;
-  padding: 8px 10px;
-  background: var(--bg-card);
-  color: var(--ink);
-  border: 1px solid var(--rule);
-  /* One step tighter than the composer card (--r-md) so the field reads as
-     nested inside it rather than echoing the same corner radius. */
-  border-radius: var(--r-sm);
-  font-size: var(--fs-md);
-  line-height: 1.45;
-  font-family: inherit;
-}
-.composer__prompt:focus {
-  outline: none;
-  /* The card's :focus-within ring carries the glow; the field itself just
-     warms its border so we don't stack two rings. */
-  border-color: color-mix(in oklab, var(--accent) 45%, var(--rule));
-}
-.composer__prompt::placeholder {
-  color: var(--ink-4);
-}
-
-.composer__tags {
-  /* Tag widget sits flush with the prompt — no extra header row. The
-     widget itself renders its placeholder input; we just tighten the
-     outer spacing. */
-  min-height: 22px;
-}
-
-.composer__input {
-  font-size: var(--fs-10);
-  color: var(--ink);
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  padding: 4px 8px;
-  min-width: 0;
-  width: 100%;
-  font-family: inherit;
-}
-.composer__input:focus {
-  outline: none;
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
-  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
-}
-.composer__input--num {
-  width: 56px;
-  text-align: right;
-}
-select.composer__input {
-  padding-right: 22px;
-  appearance: none;
-  cursor: pointer;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
-    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
-  background-position:
-    calc(100% - 12px) 50%,
-    calc(100% - 8px) 50%;
-  background-size:
-    4px 4px,
-    4px 4px;
-  background-repeat: no-repeat;
-}
-
-.composer__more {
-  border-top: 1px dashed var(--rule);
-  padding-top: 6px;
-  margin-top: 2px;
-}
-.composer__more > summary {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  list-style: none;
-  font-size: var(--fs-10);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  color: var(--ink-3);
-  padding: 2px 0;
-  user-select: none;
-}
-.composer__more > summary::-webkit-details-marker {
-  display: none;
-}
-.composer__more > summary:hover {
-  color: var(--ink);
-}
-.composer__actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  row-gap: 6px;
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--rule);
-}
+/* --- Composer buttons ---
+   .composer__btn is still rendered by the task-detail edit form and the
+   workspace-required prompt; the task-detail and panels specs move those to
+   .btn and delete this block. */
 .composer__btn {
-  font-size: var(--fs-10);
-  font-weight: 500;
-  padding: 5px 14px;
-  border-radius: var(--r-md);
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
   border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-10);
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  line-height: 1.4;
   font-family: inherit;
-}
-.composer__btn--ghost {
-  background: transparent;
-  color: var(--ink-3);
-  border-color: transparent;
-}
-.composer__btn--ghost:hover {
-  color: var(--ink);
-  background: var(--bg-sunk);
-  border-color: var(--rule);
+  white-space: nowrap;
 }
 .composer__btn--primary {
-  background: var(--accent);
-  color: var(--accent-fg, white);
-  border-color: var(--accent);
+  background: var(--ink);
+  color: var(--bg);
 }
 .composer__btn--primary:hover {
-  filter: brightness(1.04);
+  background: var(--accent);
+  color: var(--accent-fg);
 }
-
-/* Backlog position number + drag affordances. */
-.card-rank {
-  background: var(--tint-blue);
-  color: var(--tint-blue-ink);
-  padding: 1px 7px;
-  border-radius: var(--r-sm);
-  font-size: 10px;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+.composer__btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
-/* Backlog "+ New Task" affordance (mirrors old .btn-dashed). */
-.composer-add {
-  width: 100%;
-  border: 1px dashed var(--rule-2);
-  border-radius: var(--r-md);
-  padding: 6px 10px;
-  font-size: var(--fs-md);
-  color: var(--ink-3);
-  background: transparent;
-  cursor: pointer;
-}
-.composer-add:hover {
+.composer__btn--ghost {
+  background: var(--bg-sunk);
   color: var(--ink);
-  border-color: var(--ink-3);
-  background: var(--bg-hover);
+  border-color: var(--rule-2);
+  font-weight: 500;
 }
-.card-drag-ghost { opacity: 0.4; }
-.card-drag-chosen { box-shadow: 0 0 0 2px var(--accent); }
+.composer__btn--ghost:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}

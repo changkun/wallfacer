@@ -518,7 +518,7 @@ onUnmounted(() => {
                       :key="a.id"
                       type="button"
                       class="command-palette-action-btn"
-                      :class="[a.cls, { active: actionRowIndex(task, a.id) === activeIndex }]"
+                      :class="{ active: actionRowIndex(task, a.id) === activeIndex }"
                       :title="a.title"
                       @click="runTaskAction(a.id, task)"
                       @mouseenter="activeIndex = actionRowIndex(task, a.id)"

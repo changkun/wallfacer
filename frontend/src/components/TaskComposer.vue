@@ -293,10 +293,11 @@ function onInput(e: Event) {
   <button
     v-if="!expanded"
     type="button"
-    class="composer-add"
+    class="btn ghost block composer-add"
     @click="expand"
   >
-    + New Task
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    New task
   </button>
   <form v-else class="composer" @submit.prevent="submit">
     <div class="composer__prompt-wrap">
@@ -356,7 +357,7 @@ function onInput(e: Event) {
       <label class="composer__opt">
         <span class="composer__opt-label">Timeout</span>
         <div class="composer__opt-controls">
-          <select v-model="timeoutPreset" class="composer__select" aria-label="Timeout preset">
+          <select v-model="timeoutPreset" class="field composer__select" aria-label="Timeout preset">
             <option value="">—</option>
             <option value="15">15 min</option>
             <option value="30">30 min</option>
@@ -368,7 +369,7 @@ function onInput(e: Event) {
           <input
             v-if="timeoutPreset === 'custom'"
             v-model.number="timeoutCustomMin"
-            class="composer__input composer__input--num"
+            class="field composer__input composer__input--num"
             type="number"
             min="1"
             placeholder="min"
@@ -390,19 +391,19 @@ function onInput(e: Event) {
     <div v-if="showMore" class="composer__opts">
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Test criteria</span>
-        <input v-model="criteria" class="composer__input" type="text" placeholder="what the test agent should verify (optional)" aria-label="Test criteria" />
+        <input v-model="criteria" class="field composer__input" type="text" placeholder="what the test agent should verify (optional)" aria-label="Test criteria" />
       </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Model</span>
-        <input v-model="model" class="composer__input" type="text" placeholder="override model" aria-label="Model override" />
+        <input v-model="model" class="field composer__input" type="text" placeholder="override model" aria-label="Model override" />
       </label>
       <label class="composer__opt">
         <span class="composer__opt-label">Max $</span>
-        <input v-model.number="maxCostUsd" class="composer__input composer__input--num" type="number" min="0" step="0.5" placeholder="USD" aria-label="Max cost USD" />
+        <input v-model.number="maxCostUsd" class="field composer__input composer__input--num" type="number" min="0" step="0.5" placeholder="USD" aria-label="Max cost USD" />
       </label>
       <label class="composer__opt">
         <span class="composer__opt-label">Max tokens</span>
-        <input v-model.number="maxInputTokens" class="composer__input composer__input--num" type="number" min="0" step="1000" placeholder="input" aria-label="Max input tokens" />
+        <input v-model.number="maxInputTokens" class="field composer__input composer__input--num" type="number" min="0" step="1000" placeholder="input" aria-label="Max input tokens" />
       </label>
       <div v-if="depCandidates.length" class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Depends on</span>
@@ -431,7 +432,7 @@ function onInput(e: Event) {
         <input
           v-if="scheduled"
           v-model.number="intervalMinutes"
-          class="composer__input composer__input--num"
+          class="field composer__input composer__input--num"
           type="number"
           min="1"
           placeholder="min"
@@ -442,14 +443,14 @@ function onInput(e: Event) {
       <div class="composer__btn-group">
         <button
           type="button"
-          class="composer__btn composer__btn--ghost"
+          class="btn sm ghost composer__btn composer__btn--ghost"
           @click="collapse"
         >
           Cancel
         </button>
         <button
           type="submit"
-          class="composer__btn composer__btn--primary"
+          class="btn sm composer__btn composer__btn--primary"
           :disabled="
             !prompt.trim() ||
             submitting ||
@@ -473,7 +474,51 @@ function onInput(e: Event) {
 </template>
 
 <style scoped>
+/* The composer is a card: the prompt sits borderless inside it, the options
+   are fields, and the actions row is its foot. */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-card);
+  font-size: var(--fs-10);
+  color: var(--ink-2);
+  transition: border-color 160ms var(--ease-fluid), box-shadow 160ms var(--ease-fluid);
+}
+.composer:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: var(--sh-2);
+}
+.composer-add {
+  gap: 6px;
+  color: var(--ink-3);
+  border-style: dashed;
+  background: transparent;
+}
+.composer-add:hover {
+  color: var(--accent);
+}
 .composer__prompt-wrap { position: relative; }
+.composer__prompt {
+  width: 100%;
+  resize: vertical;
+  min-height: 72px;
+  padding: 2px 0;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  font-family: inherit;
+  outline: none;
+}
+.composer__prompt::placeholder {
+  color: var(--ink-4);
+}
 .composer__mentions {
   position: absolute;
   left: 0;
@@ -486,30 +531,29 @@ function onInput(e: Event) {
   max-height: 220px;
   overflow-y: auto;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
 }
 .composer__mention {
-  padding: 4px 8px;
+  padding: 5px 8px;
   font-size: 12px;
   font-family: var(--font-mono);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .composer__mention.active,
-.composer__mention:hover { background: var(--bg-hover); }
+.composer__mention:hover { background: var(--bg-sunk); }
 .composer__opts {
   display: flex;
-  gap: 10px 12px;
-  margin-top: 10px;
-  /* Align every option at the TOP so labels line up in a row and each control
-     sits at the same y. (Was flex-end, which bottom-aligned the boxes — the
-     Agent-graph "Fixed sequence" sublabel made that column taller and shoved its
-     select upward, misaligning the row.) */
+  gap: 8px 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+  /* Align every option at the top so labels line up and each control sits at
+     the same y, whatever a sublabel below it does. */
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -520,49 +564,35 @@ function onInput(e: Event) {
   min-width: 0;
 }
 /* Growable text fields share one flex basis and a max width so no single field
-   (e.g. Depends on) balloons far wider than its neighbours when a row wraps. */
+   balloons far wider than its neighbours when a row wraps. */
 .composer__opt--grow { flex: 1 1 200px; min-width: 150px; max-width: 380px; }
-/* Keep the timeout preset select and its "Custom…" minutes input on one row
-   beneath the label, rather than letting the input drop to a new line (the
-   parent .composer__opt is a vertical column). */
+/* The timeout preset select and its "Custom…" minutes input stay on one row. */
 .composer__opt-controls { display: flex; align-items: center; gap: 4px; }
 .composer__opt-label {
-  font-size: 10px;
-  line-height: 14px;
-  color: var(--text-muted);
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--ink-3);
+  padding-top: 2px;
 }
-/* The coordination hint hangs BELOW the Agent-graph select without affecting the
-   row's alignment (align-items: flex-start), so neighbouring controls stay level. */
 .composer__coord {
   margin-top: 3px;
-  font-size: 10px;
+  font-size: var(--fs-9);
   line-height: 14px;
-  color: var(--text-secondary);
+  color: var(--ink-3);
   cursor: help;
 }
 .composer__coord--experimental {
-  color: var(--warning, #c98a00);
+  color: var(--warn);
 }
 .composer__select,
 .composer__input {
-  box-sizing: border-box;
-  height: 30px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
+  min-height: 30px;
   padding: 4px 8px;
   font-size: 12px;
-  font-family: var(--font-sans);
-  outline: none;
 }
 .composer__input--num { width: 88px; }
-/* Match the custom pickers (AppSelect, HarnessSelect, DependencyPicker) to the
-   native control height and let them fill their column, so every control on a
-   row lines up in height and left edge. HarnessSelect's trigger already reuses
-   .composer__select above. */
+/* Custom pickers match the field height and fill their column. */
 .composer__opt :deep(.app-select),
 .composer__opt :deep(.harness-select),
 .composer__opt :deep(.dep-picker) { width: 100%; }
@@ -577,9 +607,9 @@ function onInput(e: Event) {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
   padding: 3px 6px;
   box-sizing: border-box;
   min-height: 30px;
@@ -588,49 +618,54 @@ function onInput(e: Event) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: var(--bg-hover);
-  border-radius: 4px;
-  padding: 1px 4px 1px 6px;
-  font-size: 11px;
+  background: var(--tint-neutral);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  padding: 1px 4px 1px 8px;
+  font: 500 var(--fs-9) / 1.5 var(--font-mono);
+  color: var(--ink-2);
 }
-.composer__tag-x { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 13px; line-height: 1; padding: 0 2px; }
-.composer__tag-x:hover { color: var(--text); }
-.composer__tag-input { flex: 1; min-width: 60px; background: none; border: none; outline: none; color: var(--text); font-size: 12px; }
-.composer__select:focus,
-.composer__input:focus {
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
-  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
-}
+.composer__tag-x { background: none; border: none; cursor: pointer; color: var(--ink-3); font-size: 13px; line-height: 1; padding: 0 2px; }
+.composer__tag-x:hover { color: var(--ink); }
+.composer__tag-input { flex: 1; min-width: 60px; background: none; border: none; outline: none; color: var(--ink); font-size: 12px; }
+.composer__tag-input::placeholder { color: var(--ink-4); }
 .composer__more {
-  /* Labels add ~18px (10px label + 4px gap) above each control; these label-less
-     utility buttons get the same offset so they align with the control row rather
-     than floating up at the label line. */
+  /* Labels add ~18px above each control; these label-less utility buttons get
+     the same offset so they align with the control row. */
   margin-top: 18px;
   align-self: flex-start;
   background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--ink-3);
+  font-size: var(--fs-10);
   cursor: pointer;
   padding: 4px 6px;
   line-height: 20px;
+  border-radius: var(--r-sm);
 }
-.composer__more:hover { color: var(--text); }
+.composer__more:hover { color: var(--ink); background: var(--bg-sunk); }
+.composer__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
 .composer__toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: var(--fs-10);
+  color: var(--ink-3);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
 }
 .composer__toggle input { margin: 0; accent-color: var(--accent); }
-.composer__toggle-hint { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
+.composer__toggle-hint { color: var(--ink-4); font-family: var(--font-mono); font-size: var(--fs-9); }
 .composer__spacer { flex: 1 1 auto; }
-/* Cancel + Save move as a unit so a wrap of the actions row never strands
-   one button on a different line from the other; they stay right-aligned
-   and adjacent (Cancel left of Save). */
+/* Cancel + Save move as a unit so a wrap never strands one on another line. */
 .composer__btn-group { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
 </style>
