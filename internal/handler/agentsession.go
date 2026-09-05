@@ -101,9 +101,9 @@ func archivedSpecGuard(workspaces []string, focusedSpec string) string {
 	if s.Status != spec.StatusArchived {
 		return ""
 	}
-	return "\u26A0 This spec is archived (read-only). Do NOT write to or modify " +
-		"this spec. If the user requests changes, tell them to unarchive " +
-		"the spec first using the Unarchive button in the focused view.\n\n"
+	return "This spec is archived and read-only, so do not write to or modify it. " +
+		"If the user asks for changes, tell them to unarchive the spec first " +
+		"(Unarchive button in the focused view).\n\n"
 }
 
 // applyTaskPromptRound writes the assistant's output as the new task.Prompt
