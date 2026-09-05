@@ -64,7 +64,7 @@ Shared Design - 6 complete
   ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
   ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
   ✅ Spec Workflow Plugin (spec@latere-ai; mirrored here behind a drift gate)
-  ◐ Console Redesign (replichai system: neutral canvas, clay accent, matte; 5/11 children shipped)
+  ◐ Console Redesign (replichai system: neutral canvas, clay accent, matte; 6/11 children shipped)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -259,7 +259,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [console-redesign/board.md](shared/console-redesign/board.md) | **Complete** | Both | Eyebrow column headers, 14px cards with a two-pill badge budget and a mono meta line for tags, primary/ghost card actions, composer as a card, search as a field; `--tag-bg-N` slots deleted. |
 | ↳ [console-redesign/task-detail.md](shared/console-redesign/task-detail.md) | **Complete** | Both | `TaskDetail` as a sheet (header row, underline tabs, main column, 340px aside of cards with rows), `modal.css` id selectors replaced, `diffs.css`/`syntax.css`/`AgentTrace` on the ramp, one primary button instead of three action tiles. |
 | ↳ [console-redesign/chat.md](shared/console-redesign/chat.md) | **Complete** | Both | One message list, composer card, session rows and popup shared by `/chat`, Plan and the floating popup; tool calls read like agent-trace rows. |
-| ↳ [console-redesign/plan.md](shared/console-redesign/plan.md) | Drafted | Both | Spec tree on nav-row geometry with ramp status dots, focused view as a 76ch reading column with a frontmatter card and lifecycle buttons, comments layer on cards; 1,300 scoped lines rebuilt. |
+| ↳ [console-redesign/plan.md](shared/console-redesign/plan.md) | **Complete** | Both | Spec tree on nav-row geometry with ramp status dots, focused view as a 76ch reading column with a frontmatter card and lifecycle buttons, comments layer on cards; 1,300 scoped lines rebuilt. |
 | ↳ [console-redesign/settings.md](shared/console-redesign/settings.md) | Drafted | Both | Underline tabs and one card per section with label/help/control rows; Appearance picks mode and the six-palette roster including `paper`; `settings-modal.css` and `forms.css` deleted. |
 | ↳ [console-redesign/agent-graph.md](shared/console-redesign/agent-graph.md) | Drafted | Both | Agent list rows, SVG nodes drawn to card geometry from tokens, 420px editor drawer with rows; zero hex literals. |
 | ↳ [console-redesign/panels-and-overlays.md](shared/console-redesign/panels-and-overlays.md) | Drafted | Both | Three shapes (`.pop`, `.dialog`, docked panel) for the command palette, workspace picker/editor, confirm, toasts, shortcuts, device sign-in, trash, dock, terminal, explorer, editor tabs and file editor; blur-free scrims. |
