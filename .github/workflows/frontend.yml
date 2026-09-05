@@ -28,3 +28,28 @@ jobs:
         run: make skills-check
       - name: UTF-8 truncation guardrail
         run: make lint-truncate
+
+  # The browser gate: boot the built app against seeded demo data and assert
+  # the geometry every console surface promises (frontend/scripts/ui-shots).
+  # Runs beside the unit suite because it needs a Go build and Chromium.
+  ui-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install frontend deps
+        uses: ./.github/actions/bun-install
+      - name: Cache the Playwright sandbox
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/ui-shots-pw/node_modules
+            ~/.cache/ms-playwright
+          key: ui-shots-pw-${{ runner.os }}-${{ hashFiles('frontend/scripts/ui-shots/ui-test.sh') }}
+      - name: UI regression checks
+        env:
+          PW_WITH_DEPS: "1"
+        run: make ui-test

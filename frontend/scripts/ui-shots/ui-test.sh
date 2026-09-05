@@ -6,6 +6,7 @@
 #
 #   ./frontend/scripts/ui-shots/ui-test.sh            # full: build, seed, boot, check
 #   SKIP_BUILD=1 ./frontend/scripts/ui-shots/ui-test.sh   # reuse an existing ./wallfacer + dist
+#   PW_WITH_DEPS=1 make ui-test                         # CI: also install Chromium's system libs
 #
 # Playwright lives in a throwaway /tmp sandbox (never under frontend/, which
 # would break the vite-ssg build), mirroring regen.sh.
@@ -36,7 +37,12 @@ if [ ! -d "$PW/node_modules/playwright" ]; then
   (cd "$PW" && npm install --silent playwright@latest >/dev/null)
 fi
 # Idempotent: installs the chromium browser binary if missing, no-op otherwise.
-(cd "$PW" && npx --yes playwright install chromium >/dev/null 2>&1 || true)
+# PW_WITH_DEPS=1 (CI) also installs the system libraries Chromium needs.
+if [ "${PW_WITH_DEPS:-}" = "1" ]; then
+  (cd "$PW" && npx --yes playwright install --with-deps chromium)
+else
+  (cd "$PW" && npx --yes playwright install chromium >/dev/null 2>&1 || true)
+fi
 cp frontend/scripts/ui-shots/checks.mjs "$PW/checks.mjs"
 
 echo "==> Booting wallfacer on :$PORT"
