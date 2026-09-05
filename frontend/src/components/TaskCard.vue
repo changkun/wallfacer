@@ -15,12 +15,12 @@ import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useGithubPrStore } from '../stores/githubPr';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { useNow } from '../composables/useNow';
+import { routineCountdown as routineCountdownFor, routineLastFired as routineLastFiredFor } from '../lib/routineTime';
 import { toRef } from 'vue';
 
 const props = defineProps<{ task: Task; rank?: number }>();
 
 const ROUTINE_INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
-const ROUTINE_STOPPED_STATUSES = new Set(['cancelled', 'done', 'failed']);
 
 const isRoutine = computed(() => props.task.kind === 'routine');
 
@@ -82,41 +82,8 @@ onBeforeUnmount(() => {
   if (pulseHandle !== null) clearTimeout(pulseHandle);
 });
 
-const routineCountdown = computed(() => {
-  const t = props.task;
-  if (t.archived) return 'stopped (archived)';
-  if (t.status && ROUTINE_STOPPED_STATUSES.has(t.status)) return 'stopped';
-  if (!routineEnabled.value) return 'paused';
-  const nextRun = t.routine_next_run;
-  if (!nextRun) return 're-arming...';
-  const next = new Date(nextRun).getTime();
-  if (Number.isNaN(next)) return '-';
-  const diffMs = next - now.value;
-  if (diffMs <= 0) return 'fired just now';
-  const total = Math.floor(diffMs / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `in ${h}h ${m}m`;
-  if (m > 0) return `in ${m}m ${s}s`;
-  return `in ${s}s`;
-});
-
-const routineLastFired = computed(() => {
-  const iso = props.task.routine_last_fired_at;
-  if (!iso) return '';
-  const fired = new Date(iso).getTime();
-  if (Number.isNaN(fired)) return '';
-  const diffMs = now.value - fired;
-  if (diffMs < 0) return '';
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `fired ${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `fired ${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `fired ${hr}h ago`;
-  return `fired ${Math.floor(hr / 24)}d ago`;
-});
+const routineCountdown = computed(() => routineCountdownFor(props.task, now.value));
+const routineLastFired = computed(() => routineLastFiredFor(props.task, now.value));
 
 async function onRoutineIntervalChange(minutes: number) {
   if (!Number.isFinite(minutes) || minutes < 1) return;

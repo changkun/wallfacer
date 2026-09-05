@@ -1,175 +1,124 @@
-/* --- Routines page --- */
+/* --- Routines ---
+   One reading column: a create card, then a card of rows, one per routine.
+   See specs/shared/console-redesign/secondary-screens.md. */
 .routines-page {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 24px 16px;
+  padding: 24px 28px 48px;
 }
 .routines-page__inner {
   width: 100%;
-  max-width: 600px;
+  max-width: 860px;
   margin: 0 auto;
-}
-
-/* Empty state: a centered hero (icon + line + the create form). */
-.routines-page--empty {
-  justify-content: center;
-}
-.routines-hero {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 14px;
+  gap: 16px;
 }
-.routines-hero__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: var(--accent-tint);
-  color: var(--accent);
-}
-.routines-hero__title {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 0;
-  color: var(--text);
-}
-.routines-hero__sub {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin: -8px 0 2px;
-  max-width: 380px;
-}
-
-/* Header (shown when routines exist). */
 .routines-head {
-  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .routines-title {
-  font-size: 18px;
-  font-weight: 600;
   margin: 0;
-  color: var(--text);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--ink);
 }
 .routines-sub {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin: 4px 0 0;
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--ink-3);
 }
 
-/* Create form: compact textarea + inline controls row. */
-.routine-create {
-  width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
+/* Create card: the prompt field, then the schedule controls and the ink button. */
+.routine-create__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .routine-create__prompt {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 52px;
+  min-height: 56px;
   max-height: 220px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
-  font-family: var(--font-sans);
-  resize: none;
-  outline: none;
-  overflow-y: auto;
-}
-.routine-create__prompt:focus {
-  border-color: var(--accent);
-}
-.routine-create__example {
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px 10px;
-  cursor: pointer;
-}
-.routine-create__example:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  font-size: var(--fs-md);
 }
 .routine-create__row {
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  margin-top: 10px;
+  flex-wrap: wrap;
 }
 .routine-create__opt {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--text-muted);
+  gap: 6px;
 }
-.routine-create__select .app-select__trigger {
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 8px;
-  color: var(--text);
-  font-size: 12px;
+.routine-create__example {
+  align-self: flex-end;
 }
 .routine-create__btn {
   margin-left: auto;
 }
 
-/* List of existing routines. */
-.routines-list {
+/* The list */
+.routine-row {
+  align-items: center;
+}
+.routine-row__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.routine-row__flow {
+  color: var(--ink-2);
+}
+.routine-row__end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.routine-row__interval {
+  width: 100px;
+}
+.routines-empty {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 0;
+  text-align: center;
 }
-.routine-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.routine-row > :first-child {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.routine-delete {
-  font-size: 11px;
-  color: var(--text-muted);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-.routine-delete:hover {
-  color: var(--err);
-  border-color: var(--err);
+.routines-empty p {
+  margin: 0;
+  font-size: var(--fs-base);
+  color: var(--ink-3);
 }
 .routines-loading {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--text-muted);
-  font-size: 13px;
+  padding: 36px 0;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
 }
 .routines-loading .spinner {
   width: 13px;
   height: 13px;
   border-width: 1.5px;
+}
+@media (max-width: 720px) {
+  .routine-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .routine-row__end {
+    justify-content: flex-end;
+  }
 }
