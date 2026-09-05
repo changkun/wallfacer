@@ -1,19 +1,15 @@
-// Authorization primitives: RequireSuperadmin and RequireScope. Both
-// are thin wrappers that inspect the validated principal already in
-// context (placed there by OptionalAuth / Auth / CookieAuth) and
-// short-circuit the request with 403 when the caller lacks the
-// required privilege.
+// Authorization primitive: RequireSuperadmin is a thin wrapper that
+// inspects the validated principal already in context (placed there
+// by OptionalAuth / Auth / CookieAuth) and short-circuits the request
+// with 403 when the caller is not a superadmin.
 //
-// Local mode deployments never install these wrappers, so anonymous
+// Local mode deployments never install this wrapper, so anonymous
 // callers continue to reach every handler. Cloud-mode wiring decides
-// on a per-route basis which ones to apply.
+// on a per-route basis where to apply it.
 
 package auth
 
-import (
-	"net/http"
-	"slices"
-)
+import "net/http"
 
 // RequireSuperadmin returns 403 when the caller is not a superadmin,
 // 401 when there are no claims in context. The 401 branch is defensive:
@@ -33,29 +29,6 @@ func RequireSuperadmin(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-// RequireScope returns an http.Handler-wrapper factory that enforces
-// a given scope name on the claim set's `scp` array. 403 when the
-// claim set does not include the scope; 401 when no claims are present.
-//
-// Downstream handlers opt in as scopes are assigned. This task
-// scaffolds the wrapper only; no route applies it yet.
-func RequireScope(scope string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			c, ok := PrincipalFromContext(r.Context())
-			if !ok {
-				writeUnauthorized(w, "authentication required")
-				return
-			}
-			if !slices.Contains(c.Scopes, scope) {
-				writeForbidden(w, "scope "+scope+" required")
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
 }
 
 func writeForbidden(w http.ResponseWriter, msg string) {
