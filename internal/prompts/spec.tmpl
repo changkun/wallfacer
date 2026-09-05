@@ -20,7 +20,7 @@ affects:
 effort: medium
 created: 2026-01-01
 updated: 2026-01-01
-author: changkun
+author: <author>
 dispatched_task_id: null
 ---
 ```
@@ -30,8 +30,10 @@ dispatched_task_id: null
 - `vague` — initial idea, not enough detail to implement
 - `drafted` — design written but not reviewed
 - `validated` — reviewed and ready for implementation
+- `testing` — implementation landed, drift verdict pending
 - `complete` — fully implemented
 - `stale` — outdated, needs refresh
+- `archived` — deliberately retired; read-only
 
 ### Rules
 
@@ -42,13 +44,9 @@ dispatched_task_id: null
 
 ## Track Organization
 
-Specs are organized by track:
-- `specs/foundations/` — completed abstraction interfaces
-- `specs/local/` — local product and UX
-- `specs/cloud/` — cloud platform
-- `specs/shared/` — cross-track specs
-
-Place new specs in the appropriate track directory.
+Specs are organized by track, one directory per track under `specs/`. Read the
+live set of tracks and their meaning from the section headings in
+`specs/README.md`; place a new spec in the track it belongs to.
 
 ## Entry-Point Maintenance
 
@@ -56,4 +54,4 @@ When you change a spec's status, also update the corresponding status in `specs/
 
 ## Output Style
 
-Be concise. When creating or editing spec files, use proper YAML frontmatter matching the schema above. Use descriptive filenames without numeric prefixes.
+Be concise. When creating or editing spec files, use YAML frontmatter matching the schema above. Follow the file-naming convention of the sibling specs in the same directory (numbered `NNN-` prefix or bare name).

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/prompts"
+	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // TestNewManager_OverrideRendered verifies that a valid override file in
@@ -396,6 +397,46 @@ func TestRenderSpec(t *testing.T) {
 	for _, phrase := range []string{"spec", "planning", "specs/"} {
 		if !strings.Contains(strings.ToLower(got), phrase) {
 			t.Errorf("Spec output missing expected phrase %q", phrase)
+		}
+	}
+}
+
+// TestRenderSpec_StatusesMatchModel pins the spec prompt to the lifecycle
+// the code enforces: every status the parser knows is listed, so the agent
+// never learns a five-state machine while the server runs a seven-state one.
+func TestRenderSpec_StatusesMatchModel(t *testing.T) {
+	got := prompts.NewManager(t.TempDir()).Spec()
+	for _, st := range []spec.Status{
+		spec.StatusVague, spec.StatusDrafted, spec.StatusValidated, spec.StatusTesting,
+		spec.StatusComplete, spec.StatusStale, spec.StatusArchived,
+	} {
+		if !strings.Contains(got, "`"+string(st)+"`") {
+			t.Errorf("spec prompt does not list status %q", st)
+		}
+	}
+}
+
+// TestRenderSpec_NoHardcodedTracks: track directories come and go, so the
+// prompt points the agent at specs/README.md instead of naming a fixed set.
+func TestRenderSpec_NoHardcodedTracks(t *testing.T) {
+	got := prompts.NewManager(t.TempDir()).Spec()
+	if strings.Contains(got, "specs/foundations/") {
+		t.Errorf("spec prompt still hardcodes a track directory:\n%s", got)
+	}
+	if !strings.Contains(got, "specs/README.md") {
+		t.Errorf("spec prompt should point at specs/README.md for the live tracks")
+	}
+}
+
+// TestTestVerification_VerdictMarkersStatedOnce: the verdict contract names
+// each marker exactly once. Bare example lines duplicating the markers read
+// as output the agent should reproduce, and the parser accepts the marker
+// anywhere, so the single instruction is the whole contract.
+func TestTestVerification_VerdictMarkersStatedOnce(t *testing.T) {
+	got := prompts.NewManager(t.TempDir()).TestVerification(prompts.TestData{OriginalPrompt: "build widget"})
+	for _, marker := range []string{"**PASS**", "**FAIL**"} {
+		if n := strings.Count(got, marker); n != 1 {
+			t.Errorf("%s appears %d times, want 1", marker, n)
 		}
 	}
 }

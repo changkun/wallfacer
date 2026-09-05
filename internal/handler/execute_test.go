@@ -255,8 +255,8 @@ func TestBuildTestPrompt(t *testing.T) {
 		if !strings.Contains(p, fakeDiff) {
 			t.Error("prompt should contain the diff text")
 		}
-		if !strings.Contains(p, "restrict your review to those files") {
-			t.Error("prompt should tell agent to restrict review to changed files when diff is present")
+		if !strings.Contains(p, "The diff above is the change set") {
+			t.Error("prompt should point the agent at the diff as the change set when diff is present")
 		}
 	})
 

@@ -24,24 +24,12 @@ The implementation agent reported:
 {{end}}
 ## Instructions
 
-You are running directly in the task's own workspace — the code changes are already present.
+You are running directly in the task's own workspace, so the code changes are already present.
 
-Your verification must be fast and focused. Do NOT explore the entire codebase or run unrelated checks. Follow these steps strictly:
+Scope the review to the changed files and their direct callers and callees. {{if .Diff}}The diff above is the change set.{{else}}Run `git diff HEAD~1` to see the change set.{{end}} Check each requirement from the original task and the acceptance criteria above; when a requirement is ambiguous, verify its most obvious reading. Run the tests for the packages that changed (for example `go test ./internal/handler/`, not `go test ./...`). If the changed code has no tests, say so in the report; do not write new ones.
 
-1. **Read only the changed files.** {{if .Diff}}The diff above shows exactly what was changed — restrict your review to those files and their direct callers/callees.{{else}}Run `git diff HEAD~1` to see what changed, then restrict your review to those files.{{end}}
-2. **Check acceptance criteria.** Verify each requirement from the original task and any explicit acceptance criteria above. If a requirement is ambiguous, check only the most obvious interpretation.
-3. **Run only the relevant tests.** Run tests for the packages/files that were modified (e.g. `go test ./internal/handler/` not `go test ./...`). If no tests exist for the changed code, note it but do not write or run unrelated tests.
-4. **Stop as soon as you have a verdict.** Do not investigate further once you can determine PASS or FAIL.
+Do not modify code, and do not run linters, formatters, or full-project builds unless the acceptance criteria require them.
 
-Do not modify any code. Do not run linters, formatters, or full-project builds unless the acceptance criteria explicitly require them.
+If the verdict is FAIL, state the unmet requirement in one sentence before the verdict.
 
-If failing, state the specific unmet requirement in one sentence before the verdict.
-
-CRITICAL — VERDICT REQUIREMENT:
-You MUST output exactly `**PASS**` or `**FAIL**` on a line by itself as your very last line. Do not include any other text on that line.
-
-**PASS**
-
-**FAIL**
-
-Nothing else may follow the verdict — no explanation, no summary, no trailing text after the verdict line. The automated system parses only this final line. If you omit it or bury it mid-response, the result defaults to FAIL regardless of your analysis. Always emit the verdict, even when the answer is obvious.
+End your response with the verdict on its own line, as the last line: `**PASS**` or `**FAIL**`. The harness reads the verdict from that marker.
