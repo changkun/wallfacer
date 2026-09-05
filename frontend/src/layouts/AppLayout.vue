@@ -248,9 +248,7 @@ useKeyboard({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in oklab, var(--bg) 55%, transparent);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: var(--glass-dim);
 }
 .ws-switch-overlay__panel {
   display: flex;

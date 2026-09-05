@@ -145,7 +145,7 @@ HTML file at artifacts/deck.html</pre>
   color: var(--ink);
   background: var(--bg-input);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
+  border-radius: var(--r-lg);
   padding: 0.35rem 1.9rem 0.35rem 0.7rem;
   max-width: 46ch;
   text-overflow: ellipsis;
@@ -227,7 +227,7 @@ HTML file at artifacts/deck.html</pre>
   font-size: 0.82rem;
   background: var(--bg-sunk);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
+  border-radius: var(--r-lg);
   padding: 0.8rem 1rem;
   color: var(--ink-2);
   margin: 0.8rem 0;
@@ -239,7 +239,7 @@ HTML file at artifacts/deck.html</pre>
   font: inherit;
   font-size: 0.84rem;
   padding: 0.38rem 0.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--r-lg);
   border: 1px solid var(--rule);
   background: var(--bg-elevated);
   color: var(--ink-2);

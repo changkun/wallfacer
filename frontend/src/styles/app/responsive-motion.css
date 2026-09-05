@@ -52,11 +52,9 @@
         /* v2 thick-tier overlay: the open mobile menu floats below the nav
            capsule over page content, so it takes the near-opaque overlay fill
            from the shared glass ladder (occludes rather than reveals). */
-        background: var(--glass-bg-thick);
-        backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
-        -webkit-backdrop-filter: blur(var(--glass-blur-thick)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
-        border: 1px solid var(--glass-border);
-        border-radius: var(--radius-lg);
+        background: var(--bg-card);
+        border: 1px solid var(--rule);
+        border-radius: var(--r-lg);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
         padding: 16px 20px;
         gap: 12px;

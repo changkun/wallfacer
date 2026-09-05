@@ -1,6 +1,6 @@
 ---
 title: Tokens and Primitives
-status: drafted
+status: validated
 depends_on:
   - specs/shared/visual-identity/theme-system.md
 affects:

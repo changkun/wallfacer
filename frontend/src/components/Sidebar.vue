@@ -381,15 +381,10 @@ onUnmounted(removeWsOutsideHandler);
 .wf-cs.collapsed {
   width: var(--sb-w-icon) !important;
 }
-/* macOS 27 "split panel" rail. The stock latere-ui rail is a FLOATING rounded
- * glass capsule (radius + drop shadow + margin on all four sides, detached from
- * the content). wallfacer instead splits the window: the frosted rail runs flush
- * to the top / left / bottom edges and shares one continuous surface with the
- * content, divided only by a hairline right edge — no gap, no capsule shadow.
- * Kill the margin / radius / four-side border / drop shadow the package sets and
- * restore the package's full-height stretch; keep the frosted material (glass
- * background + backdrop-filter) so the rail still reads as vibrant chrome beside
- * the opaque content column. */
+/* Split-panel rail. The stock latere-ui rail is a floating rounded glass
+ * capsule; wallfacer runs it flush to the window edges on a matte surface and
+ * switches the package's backdrop filter off (the material is matte; see
+ * specs/shared/console-redesign.md). The shell spec replaces this component. */
 .wf-cs {
   height: 100%;
   margin: 0;
@@ -397,6 +392,9 @@ onUnmounted(removeWsOutsideHandler);
   border-right: 1px solid var(--rule);
   border-radius: 0;
   box-shadow: none;
+  background: var(--bg-deep);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 /* Match the workspace switcher to the search bar below it: full width + the
  * same height/radius, so they read as one consistent stack. */

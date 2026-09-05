@@ -7,15 +7,7 @@
      editor tab strip reads compact rather than full-height. */
   padding: 3px 16px;
   border-bottom: 1px solid var(--border);
-  /* Frosted toolbar chrome floating over the board canvas. Consumes the shared
-     latere-ui glass ladder (thin-tier blur + saturate + --glass-edge-top
-     specular rim) so the material matches every Latere console; keeps
-     wallfacer's tuned --glass-bg fill for legibility over the busy board.
-     Chrome only — the board content scrolls beneath, never frosted. */
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
-  backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
-  box-shadow: var(--glass-edge-top);
+  background: var(--bg);
 }
 
 /* Spacer holds the editor tab strip (and keeps the search + action buttons
@@ -58,10 +50,8 @@
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--glass-elevated);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-  box-shadow: var(--hairline-top), var(--sh-pop);
+  background: var(--bg-card);
+  box-shadow: var(--sh-pop);
   z-index: 30;
 }
 
@@ -191,8 +181,6 @@
      would leave the top corners non-concentric with the sides. */
   padding: var(--sp-3);
   gap: var(--sp-2);
-  /* Recessed well: cards sit visibly above the tray floor. */
-  box-shadow: var(--sh-inset);
 }
 .col-list {
   display: flex;

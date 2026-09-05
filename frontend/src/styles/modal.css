@@ -1,11 +1,6 @@
 /* --- Modal --- */
 .modal-overlay {
-  background: rgba(0, 0, 0, 0.3);
-  -webkit-backdrop-filter: saturate(120%) blur(8px);
-  backdrop-filter: saturate(120%) blur(8px);
-}
-[data-theme="dark"] .modal-overlay {
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--glass-dim);
 }
 .modal-card {
   background: var(--bg-card);
@@ -15,7 +10,7 @@
   width: 100%;
   max-height: 95vh;
   overflow-y: auto;
-  box-shadow: var(--hairline-top), var(--shadow-lg);
+  box-shadow: var(--sh-pop);
 }
 .modal-card.modal-wide {
   max-width: min(96vw, 1600px);
@@ -664,7 +659,6 @@
   min-height: 0;
   padding: 0;
   background: transparent;
-  backdrop-filter: none;
   z-index: auto;
   align-items: stretch;
   justify-content: stretch;

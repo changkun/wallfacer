@@ -1,0 +1,831 @@
+/* =======================================================================
+   Wallfacer — Primitives
+   The shared classes every surface is composed from. Styled through tokens
+   only; the geometry table lives in specs/shared/console-redesign.md. Class
+   names follow replichai so a reader can move between the two codebases.
+
+   The compatibility block at the end maps the class names older templates
+   still use (.badge-*, .btn-accent, .tag-chip, .select) onto these
+   primitives. Surface specs swap templates to the primitives and delete the
+   aliases they no longer need; the verification spec deletes what is left.
+   ======================================================================= */
+
+/* ---- reset: a bare <button> matches an <a> ---- */
+button {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  -webkit-appearance: button;
+}
+
+/* ---- text helpers ---- */
+.eyebrow {
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.eyebrow-ico {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.eyebrow-ico svg {
+  flex: none;
+}
+.muted {
+  color: var(--ink-3);
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.link:hover {
+  color: var(--accent-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.count {
+  margin-left: auto;
+  font: 500 var(--fs-10) / 1 var(--font-mono);
+  color: var(--ink-3);
+}
+
+/* ---- buttons ----
+   Ink, not accent: the accent marks what the operator acts on within a
+   screen; the one control that starts work is the darkest thing on the bar.
+   It inverts in dark because both halves are tokens that swap. */
+.btn {
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 0.14s var(--ease-fluid),
+    background var(--dur-hover),
+    color var(--dur-hover),
+    border-color var(--dur-hover),
+    opacity 0.14s;
+}
+.btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.btn:active {
+  transform: scale(0.96);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: var(--ink);
+  color: var(--bg);
+  transform: none;
+}
+.btn.ghost {
+  background: var(--bg-sunk);
+  color: var(--ink);
+  border-color: var(--rule-2);
+  font-weight: 500;
+}
+.btn.ghost:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+.btn.ghost:disabled {
+  background: var(--bg-sunk);
+  color: var(--ink-4);
+  border-color: var(--rule);
+}
+/* Destructive controls are named in the tone of what they do only once the
+   pointer is on them. */
+.btn.danger:hover {
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 35%, transparent);
+}
+/* A control that is waiting on work keeps its place and breathes. */
+.btn.pending,
+.btn.pending:hover {
+  cursor: progress;
+  background: var(--bg-sunk);
+  color: var(--ink);
+  border-color: var(--rule-2);
+  animation: om-pulse-soft 1.5s ease-in-out infinite;
+}
+.btn.dashed {
+  background: transparent;
+  color: var(--ink-3);
+  border: 1px dashed var(--rule-2);
+  font-weight: 500;
+}
+.btn.dashed:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+  background: var(--bg-hover);
+}
+.btn svg {
+  flex: none;
+}
+.btn.lg {
+  height: 38px;
+  padding: 0 18px;
+  font-size: var(--fs-base);
+}
+.btn.sm {
+  height: 26px;
+  padding: 0 11px;
+  font-size: var(--fs-10);
+}
+.btn.block {
+  width: 100%;
+}
+
+/* Borderless and unfilled at rest: a row can carry three of these without
+   turning into chrome. The affordance arrives on hover. */
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    color var(--dur-hover),
+    border-color var(--dur-hover),
+    background var(--dur-hover);
+}
+.icon-btn:hover,
+.icon-btn.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+.icon-btn.danger:hover {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  border-color: color-mix(in srgb, var(--err) 35%, transparent);
+}
+.icon-btn.sm {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+}
+
+/* ---- pills: state as a small mono capsule on a wash of its own colour ---- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.pill svg {
+  margin-left: -1px;
+}
+.pill-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.pill.pulse .pill-dot {
+  animation: om-pulse 1.6s ease-in-out infinite;
+}
+.pill-neutral {
+  background: var(--tint-neutral);
+  border-color: var(--rule-2);
+  color: var(--ink-2);
+}
+.pill-brand {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pill-ok {
+  background: var(--tint-green);
+  color: var(--ok);
+}
+.pill-warn {
+  background: var(--tint-amber);
+  color: var(--warn);
+}
+.pill-run {
+  background: var(--tint-blue);
+  color: var(--run);
+}
+.pill-err {
+  background: var(--tint-red);
+  color: var(--err);
+}
+.pill-pub {
+  background: var(--tint-plum);
+  color: var(--purple);
+}
+
+/* ---- cards and rows ---- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--sh-card);
+}
+.card.compact {
+  border-radius: var(--r-lg);
+}
+.card-pad {
+  padding: 14px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--rule);
+}
+.head-ico {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+}
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-row);
+  padding: 13px 14px;
+  border-top: 1px solid var(--rule);
+  transition: background 0.15s var(--ease-fluid);
+}
+.rows > .row:first-child {
+  border-top: none;
+}
+.row.clickable {
+  cursor: pointer;
+}
+.row.clickable:hover {
+  background: var(--bg-sunk);
+}
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.row-title {
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-meta {
+  font-size: var(--fs-10);
+  color: var(--ink-3);
+}
+.row-help {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.row-end {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+}
+
+/* ---- segmented control: a pill track with a pill thumb ---- */
+.seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+}
+.seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 11px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--dur-hover),
+    color var(--dur-hover);
+}
+.seg-btn:hover {
+  color: var(--ink);
+}
+.seg-btn.on {
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--sh-card);
+}
+.seg.compact .seg-btn {
+  height: 20px;
+  padding: 0 8px;
+  font-size: var(--fs-10);
+}
+
+/* ---- fields ---- */
+.field {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: 1.4;
+  outline: none;
+  resize: none;
+  transition:
+    border-color var(--dur-hover),
+    background var(--dur-hover),
+    box-shadow var(--dur-hover);
+}
+textarea.field {
+  min-height: 84px;
+  overflow-y: auto;
+  resize: vertical;
+}
+.field.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.field::placeholder {
+  color: var(--ink-4);
+}
+.field:hover {
+  border-color: var(--rule-2);
+}
+.field:focus,
+.field:focus-visible {
+  border-color: var(--accent-line);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+  outline: none;
+}
+.field:disabled {
+  color: var(--ink-4);
+  background: var(--bg-sunk);
+  cursor: not-allowed;
+}
+.field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.field-wrap > svg {
+  position: absolute;
+  left: 10px;
+  color: var(--ink-4);
+  pointer-events: none;
+}
+.field-wrap > .field {
+  padding-left: 30px;
+}
+.field-wrap > kbd {
+  position: absolute;
+  right: 8px;
+}
+kbd.key {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--rule-2);
+  background: var(--bg-card);
+  color: var(--ink-3);
+  font: 500 var(--fs-9) / 1 var(--font-mono);
+}
+
+/* ---- underline tabs ---- */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--dur-hover),
+    border-color var(--dur-hover);
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tab .count {
+  margin-left: 0;
+}
+
+/* ---- keyframes ---- */
+@keyframes om-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+}
+@keyframes om-pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes om-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes om-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* =======================================================================
+   Compatibility aliases. Every selector below is a name an older template
+   still renders; each maps onto a primitive above. Surface specs delete
+   their share; specs/shared/console-redesign/verification-and-docs.md
+   deletes the block.
+   ======================================================================= */
+
+/* buttons */
+.btn-accent,
+.btn-green {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-accent:hover,
+.btn-green:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-yellow,
+.btn-ghost,
+.btn-dashed {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-yellow:hover,
+.btn-ghost:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-3);
+}
+.btn-dashed {
+  width: 100%;
+  background: transparent;
+  border-style: dashed;
+  color: var(--ink-3);
+}
+.btn-dashed:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+  background: var(--bg-hover);
+}
+.btn-danger {
+  background: none;
+  border: none;
+  color: var(--err);
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+.btn-danger:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn-accent:disabled,
+.btn-green:disabled,
+.btn-yellow:disabled,
+.btn-ghost:disabled,
+.btn-dashed:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* badges: the old status classes on pill geometry */
+.badge,
+.tag-chip,
+.max-parallel-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  background: var(--tint-neutral);
+  color: var(--ink-2);
+}
+.badge-backlog,
+.badge-archived,
+.badge-cancelled,
+.badge-test-none,
+.badge-failure-category,
+.badge-unverified {
+  background: var(--tint-neutral);
+  color: var(--ink-2);
+  border-color: var(--rule-2);
+}
+.badge-archived {
+  font-style: italic;
+}
+.badge-in_progress,
+.badge-testing,
+.badge-scheduled,
+.max-parallel-tag {
+  background: var(--tint-blue);
+  color: var(--run);
+}
+.badge-waiting,
+.badge-committing,
+.badge-cancelling,
+.badge-blocked,
+.badge-dep-cancelled {
+  background: var(--tint-amber);
+  color: var(--warn);
+}
+.badge-done,
+.badge-verified,
+.badge-test-pass,
+.badge-pr-open,
+.badge-deps-met,
+.badge-deps-ok {
+  background: var(--tint-green);
+  color: var(--ok);
+}
+.badge-failed,
+.badge-test-fail,
+.badge-pr-closed,
+.badge-verify-failed {
+  background: var(--tint-red);
+  color: var(--err);
+}
+.badge-pr-merged,
+.badge-spec,
+.badge-impact {
+  background: var(--tint-plum);
+  color: var(--purple);
+}
+.badge-priority {
+  background: var(--tint-neutral);
+  color: var(--ink-2);
+  border-color: var(--rule-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 20px;
+  justify-content: center;
+}
+.badge-priority.badge-priority-high {
+  color: var(--warn);
+  background: var(--tint-amber);
+  border-color: transparent;
+}
+.badge-priority.badge-priority-critical {
+  color: var(--err);
+  background: var(--tint-red);
+  border-color: transparent;
+}
+.max-parallel-tag {
+  cursor: pointer;
+}
+
+/* tag chips (task labels) */
+.tag-chip {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 1px 2px;
+  cursor: default;
+}
+.tag-chip-overflow {
+  cursor: pointer;
+}
+.tag-chip-overflow:hover {
+  color: var(--ink);
+}
+.tag-chip-extra {
+  display: none;
+}
+.tag-chip-row.expanded .tag-chip-extra {
+  display: inline-flex;
+}
+.tag-chip-row.expanded .tag-chip-overflow {
+  display: none;
+}
+.tag-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 2px 0 3px;
+  min-height: 0;
+}
+.tag-chip-edit {
+  position: relative;
+  padding-right: 18px;
+  max-width: 100px;
+}
+.tag-chip-remove {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: currentColor;
+  opacity: 0.7;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.tag-chip-remove:hover {
+  opacity: 1;
+}
+.tag-chip-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 4px 6px;
+  background: var(--bg-sunk);
+  min-height: 32px;
+}
+.tag-chip-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  min-width: 80px;
+  flex: 1;
+  padding: 0;
+}
+.tag-chip-input::placeholder {
+  color: var(--ink-4);
+}
+
+/* forms */
+.select {
+  min-height: 28px;
+  padding: 3px 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+  max-width: 160px;
+}
+.select:focus-visible {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+#new-prompt {
+  font-family: inherit;
+  font-size: var(--fs-base);
+}

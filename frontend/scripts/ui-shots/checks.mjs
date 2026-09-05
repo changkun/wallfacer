@@ -143,6 +143,39 @@ const SCENES = {
   },
 };
 
+// The material is matte: no element on the board may carry a computed
+// backdrop-filter. Guards the console-redesign contract end to end, including
+// third-party and latere-ui chrome that reads the pinned glass tokens.
+SCENES['no-glass'] = async (page) => {
+  const glassy = await page.$$eval('*', (els) =>
+    els.filter((e) => {
+      const f = getComputedStyle(e).backdropFilter;
+      return f && f !== 'none';
+    }).map((e) => `${e.tagName.toLowerCase()}.${String(e.className).split(' ')[0]}`).slice(0, 8));
+  expect('no-glass', glassy.length === 0, `elements with backdrop-filter: ${glassy.join(', ')}`);
+};
+
+// Meta text must clear WCAG AA on the canvas in both themes. Reads the resolved
+// tokens from the live page so a palette edit that only looks right in one
+// theme is caught here.
+SCENES['contrast'] = async (page) => {
+  const lum = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme);
+    const [bg, ink3] = await page.evaluate(() => {
+      const cs = getComputedStyle(document.documentElement);
+      return [cs.getPropertyValue('--bg').trim(), cs.getPropertyValue('--ink-3').trim()];
+    });
+    const [l1, l2] = [lum(bg), lum(ink3)].sort((a, b) => b - a);
+    const ratio = (l1 + 0.05) / (l2 + 0.05);
+    expect('contrast', ratio >= 4.5, `${theme}: --ink-3 ${ink3} on --bg ${bg} is ${ratio.toFixed(2)}:1`);
+  }
+};
+
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
 const SMOKE_ROUTES = { settings: '/settings', plan: '/plan', analytics: '/analytics', agents: '/agents', flows: '/flows' };

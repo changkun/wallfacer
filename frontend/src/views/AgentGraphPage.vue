@@ -566,8 +566,7 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: center;
   padding: 3rem 1rem;
-  background: color-mix(in srgb, var(--bg-sunk) 70%, transparent);
-  backdrop-filter: blur(2px);
+  background: var(--glass-dim);
   overflow: auto;
 }
 .ag-agent-modal__panel {

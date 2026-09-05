@@ -1,11 +1,7 @@
-/* ===== Navbar — v2 floating capsule =====
-   Matches the Latere platform nav: a transparent, full-bleed sticky wrapper
-   detaches the capsule from the top edge, and the glass material lives on
-   .nav-container so it reads as a centered thin-glass pill. Consumes the shared
-   latere-ui glass ladder (--glass-bg-thin / --glass-blur-thin / --glass-
-       saturate / --glass-border / --glass-edge-top) so wallfacer's navbar
-   matches every Latere site; glass.css flattens these tokens under
-   reduce-transparency / increase-contrast / no-backdrop-filter. */
+/* ===== Navbar — floating capsule =====
+   A transparent, full-bleed sticky wrapper detaches the capsule from the top
+   edge; the matte card material lives on .nav-container so it reads as a
+   centered pill. */
 .site-header {
     position: sticky;
     top: 0;
@@ -23,15 +19,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: var(--glass-bg-thin);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-pill);
-    backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
-    -webkit-backdrop-filter: blur(var(--glass-blur-thin)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness, 1));
-    box-shadow:
-        var(--glass-edge-top),
-        0 8px 32px rgba(0, 0, 0, 0.10),
-        0 2px 8px rgba(0, 0, 0, 0.05);
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pill);
+    box-shadow: var(--sh-pop);
 }
 .logo-link {
     display: flex;
@@ -66,19 +57,16 @@
     font-weight: 500;
     color: var(--text-muted);
     padding: 5px 12px;
-    /* v2 capsule nav pill: hover + active fill from the shared --glass-pill-fill,
-       specular top edge on the active pill from --glass-edge-top. */
-    border-radius: var(--radius-pill);
+    border-radius: var(--r-pill);
     transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .nav-link:hover {
     color: var(--text);
-    background: var(--glass-pill-fill);
+    background: var(--bg-sunk);
 }
 .nav-link.router-link-exact-active {
     color: var(--text);
-    background: var(--glass-pill-fill);
-    box-shadow: var(--glass-edge-top);
+    background: var(--bg-sunk);
 }
 .nav-mobile-toggle {
     display: none;
