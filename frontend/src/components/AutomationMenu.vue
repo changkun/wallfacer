@@ -176,7 +176,7 @@ onUnmounted(() => {
   border-color: var(--accent);
 }
 .automation-switch--on .automation-switch__thumb {
-  background: #fff;
+  background: var(--accent-fg);
   transform: translateX(12px);
 }
 </style>

@@ -1058,8 +1058,8 @@ async function submitReview() {
                   <div class="md-section-head">
                     <h3 class="section-title">Spec</h3>
                     <span class="md-section-actions">
-                      <button type="button" class="btn-icon" @click="copyText(task.prompt)">Copy</button>
-                      <button type="button" class="btn-icon" @click="specShowRaw = !specShowRaw">{{ specShowRaw ? 'Rendered' : 'Raw' }}</button>
+                      <button type="button" class="btn sm ghost" @click="copyText(task.prompt)">Copy</button>
+                      <button type="button" class="btn sm ghost" @click="specShowRaw = !specShowRaw">{{ specShowRaw ? 'Rendered' : 'Raw' }}</button>
                     </span>
                   </div>
                   <pre v-if="specShowRaw" class="code-block mb-4">{{ task.prompt }}</pre>
@@ -1070,8 +1070,8 @@ async function submitReview() {
                     <div class="md-section-head">
                       <h3 class="section-title">Result</h3>
                       <span class="md-section-actions">
-                        <button type="button" class="btn-icon" @click="copyText(task.result || '')">Copy</button>
-                        <button type="button" class="btn-icon" @click="resultShowRaw = !resultShowRaw">{{ resultShowRaw ? 'Rendered' : 'Raw' }}</button>
+                        <button type="button" class="btn sm ghost" @click="copyText(task.result || '')">Copy</button>
+                        <button type="button" class="btn sm ghost" @click="resultShowRaw = !resultShowRaw">{{ resultShowRaw ? 'Rendered' : 'Raw' }}</button>
                       </span>
                     </div>
                     <pre v-if="resultShowRaw" class="code-block mb-4">{{ task.result }}</pre>
@@ -1169,7 +1169,7 @@ async function submitReview() {
                         <span class="md-section-actions">
                           <button
                             type="button"
-                            class="btn-icon"
+                            class="btn sm ghost"
                             @click="transcriptView = transcriptView === 'raw' ? 'rendered' : 'raw'"
                           >{{ transcriptView === 'raw' ? 'Rendered' : 'Raw' }}</button>
                         </span>
@@ -1456,8 +1456,8 @@ async function submitReview() {
                           </div>
                         </summary>
                         <div class="result-entry-actions flex items-center gap-1.5">
-                          <button type="button" class="btn-icon" @click="copyResult(entry)">Copy</button>
-                          <button type="button" class="btn-icon" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
+                          <button type="button" class="btn sm ghost" @click="copyResult(entry)">Copy</button>
+                          <button type="button" class="btn sm ghost" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
                         </div>
                         <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
                         <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->

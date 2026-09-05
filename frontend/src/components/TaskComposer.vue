@@ -443,14 +443,14 @@ function onInput(e: Event) {
       <div class="composer__btn-group">
         <button
           type="button"
-          class="btn sm ghost composer__btn composer__btn--ghost"
+          class="btn sm ghost"
           @click="collapse"
         >
           Cancel
         </button>
         <button
           type="submit"
-          class="btn sm composer__btn composer__btn--primary"
+          class="btn sm"
           :disabled="
             !prompt.trim() ||
             submitting ||

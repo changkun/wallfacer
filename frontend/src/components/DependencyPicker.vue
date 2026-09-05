@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusPill } from '../lib/statusPill';
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { dependencyCandidates, filterCandidates } from '../lib/depPicker';
@@ -72,7 +73,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         <span v-if="selectedChips.length === 0" class="dep-picker-placeholder">No dependencies</span>
         <span v-for="chip in selectedChips" :key="chip.id" class="dep-picker-chip">
           {{ chip.label }}
-          <button type="button" class="tag-chip-remove" title="Remove dependency" @click="remove(chip.id, $event)">×</button>
+          <button type="button" class="dep-picker-chip__remove" title="Remove dependency" aria-label="Remove dependency" @click="remove(chip.id, $event)">×</button>
         </span>
       </span>
       <svg class="dep-picker-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
@@ -96,7 +97,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         >
           <input type="checkbox" :checked="isSelected(c.id)" @change="toggle(c.id)" />
           <span class="dep-picker-item-text">{{ c.label }}</span>
-          <span :class="`badge badge-${c.status}`">{{ statusLabel(c.status) }}</span>
+          <span :class="['pill', statusPill(c.status)]">{{ statusLabel(c.status) }}</span>
         </label>
       </div>
     </div>

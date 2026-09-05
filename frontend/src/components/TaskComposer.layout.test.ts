@@ -67,8 +67,8 @@ describe('TaskComposer layout', () => {
 
     const group = host.querySelector('.composer__btn-group');
     expect(group).not.toBeNull();
-    const ghost = group!.querySelector('.composer__btn--ghost');
-    const primary = group!.querySelector('.composer__btn--primary');
+    const ghost = group!.querySelector('.btn.ghost');
+    const primary = group!.querySelector('.btn:not(.ghost)');
     expect(ghost?.textContent?.trim()).toBe('Cancel');
     expect(primary).not.toBeNull();
     // Cancel comes before Save in document order (left of it).

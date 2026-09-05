@@ -104,7 +104,7 @@ function copyInstall() {
             <p class="install-rec__caption" v-html="t('wf.dl.cli.desc')"></p>
 
             <div class="install-rec__actions" v-if="known">
-              <a class="btn btn-accent btn-lg" :href="downloadURL(os, arch)" target="_blank" rel="noopener">
+              <a class="btn lg" :href="downloadURL(os, arch)" target="_blank" rel="noopener">
                 {{ t('wf.dl.download', { label: recLabel }) }}
               </a>
               <a v-if="macAltArch" class="install-rec__alt" :href="downloadURL('darwin', macAltArch)" target="_blank" rel="noopener">

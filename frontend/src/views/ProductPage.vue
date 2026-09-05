@@ -371,7 +371,7 @@ function copyInstall() {
   margin: 0 auto 44px;
   max-width: 48ch;
   text-align: center;
-  color: var(--text-secondary, #555);
+  color: var(--ink-2);
   line-height: 1.6;
 }
 

@@ -1,10 +1,6 @@
-/* Minimal Tailwind-style utility classes used by ported partials.
-   The old UI had Tailwind in its build pipeline; the Vue port reuses
-   the partial markup directly, so we declare the small subset of
-   utilities those partials actually rely on instead of pulling in
-   the full Tailwind runtime. Only utilities that appear in a rendered
-   class attribute live here — the rest were dropped with the markup
-   that used them. */
+/* The handful of layout utilities the overlays still spell out in markup:
+   the fixed, centred scrim and a few spacing steps. Everything else reads
+   from the primitives. */
 
 /* Layout */
 .fixed { position: fixed; }
@@ -12,35 +8,20 @@
 .hidden { display: none !important; }
 .flex { display: flex; }
 .items-center { align-items: center; }
-.items-start { align-items: flex-start; }
 .justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
 
 /* Z-index */
 .z-50 { z-index: 50; }
 
-/* Spacing — gap */
+/* Spacing */
 .gap-1\.5 { gap: 6px; }
 .gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
-
-/* Padding */
 .p-4 { padding: 16px; }
 .p-6 { padding: 24px; }
-
-/* Margin */
-.mt-1 { margin-top: 4px; }
 .mt-2 { margin-top: 8px; }
-.mb-1 { margin-bottom: 4px; }
 .mb-4 { margin-bottom: 16px; }
 
 /* Typography */
-.font-mono { font-family: var(--font-mono); }
-.text-xs { font-size: 11px; }
-
-/* Color helpers used by ported partials. */
-.text-v-muted { color: var(--text-muted); }
-.text-v-secondary { color: var(--text-secondary); }
-
-/* Misc */
-.overflow-hidden { overflow: hidden; }
+.text-xs { font-size: var(--fs-10); }
+.text-v-muted { color: var(--ink-3); }
+.text-v-secondary { color: var(--ink-2); }

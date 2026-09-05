@@ -373,7 +373,7 @@ watch(
               >
                 <button
                   type="button"
-                  class="btn btn-accent"
+                  class="btn sm"
                   :disabled="!currentName"
                   @click="saveOverride"
                 >
@@ -381,14 +381,13 @@ watch(
                 </button>
                 <button
                   type="button"
-                  class="btn-icon"
+                  class="btn sm ghost"
                   :disabled="resetDisabled"
-                  :style="{ fontSize: '12px', padding: '4px 10px', opacity: resetDisabled ? 0.4 : 1 }"
                   @click="resetToDefault"
                 >
                   Reset to default
                 </button>
-                <button type="button" class="btn-ghost" @click="close">Close</button>
+                <button type="button" class="btn sm ghost" @click="close">Close</button>
                 <span
                   :style="{
                     fontSize: '12px',

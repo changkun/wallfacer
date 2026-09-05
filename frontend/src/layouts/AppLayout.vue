@@ -269,7 +269,7 @@ useKeyboard({
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  background: color-mix(in oklab, var(--warn, #c87b1c) 18%, var(--bg-card));
+  background: var(--tint-amber);
   color: var(--ink);
   border-bottom: 1px solid var(--border);
   font-size: 12px;

@@ -52,6 +52,27 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The chip's remove control: a quiet glyph that reads on hover. */
+.dep-picker-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.dep-picker-chip__remove:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
 .dep-picker-chevron {
   flex: none;
   color: var(--ink-3);
@@ -198,24 +219,3 @@ pre {
   padding: 8px 10px;
 }
 
-/* --- Small ghost buttons in section heads (Copy / Raw) --- */
-.btn-icon {
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 9px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-pill);
-  background: var(--bg-sunk);
-  color: var(--ink-2);
-  font: 500 var(--fs-10) / 1 var(--font-sans);
-  cursor: pointer;
-  transition: background var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover);
-}
-.btn-icon:hover,
-.btn-icon.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-}

@@ -221,6 +221,26 @@ describe('primitives.css defines the shared classes', () => {
     expect(read('src/styles/modal.css')).not.toMatch(/#modal-/);
   });
 
+  it('the compatibility aliases are gone and no template renders one', () => {
+    const prim = read('src/styles/primitives.css');
+    for (const sel of ['.btn-accent', '.btn-green', '.btn-yellow', '.btn-ghost', '.btn-dashed', '.btn-danger', '.badge', '.tag-chip', '.max-parallel-tag', '.select']) {
+      expect(prim, sel).not.toMatch(new RegExp('^\\' + sel + '\\b', 'm'));
+    }
+    expect(read('src/styles/board.css')).not.toMatch(/\.composer__btn\b/);
+    expect(read('src/styles/task-detail.css')).not.toMatch(/\.btn-icon\b/);
+    for (const f of walk(resolve(root, 'src'), '.vue')) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, rel(f)).not.toMatch(/[\s"'`](badge-[a-z]|btn-(accent|green|yellow|ghost|dashed|danger|icon)|tag-chip|composer__btn--)/);
+    }
+  });
+
+  it('no .vue style block carries a hex literal', () => {
+    for (const f of walk(resolve(root, 'src'), '.vue')) {
+      const styles = readFileSync(f, 'utf8').split(/<style[^>]*>/).slice(1).join('\n');
+      expect(styles, rel(f)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  });
+
   it('the replaced stylesheets and shell components are gone', () => {
     for (const f of [
       'src/styles/buttons.css', 'src/styles/badges.css', 'src/styles/forms.css',
@@ -234,7 +254,7 @@ describe('primitives.css defines the shared classes', () => {
   it('the rail is wallfacer\'s own: no ConsoleSidebar or console stylesheet import', () => {
     for (const f of walk(resolve(root, 'src'), '.vue').concat(walk(resolve(root, 'src'), '.ts'))) {
       const src = readFileSync(f, 'utf8');
-      expect(src, rel(f)).not.toMatch(/ConsoleSidebar|latere-ui\/console/);
+      expect(src, rel(f)).not.toMatch(/ConsoleSidebar|latere-ui\/console|latere-ui\/glass|useLiquidGlass/);
     }
   });
 });
