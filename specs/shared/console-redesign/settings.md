@@ -1,6 +1,6 @@
 ---
 title: Settings
-status: validated
+status: complete
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -86,3 +86,37 @@ diagnostics as `.rows` with state pills, links as `.link`s.
   `.row` control right edge aligned within 1px, switch each tab without page
   errors, Appearance shows six swatches. Screenshots `settings` light and
   dark, `settings-appearance`.
+
+## Outcome
+
+**Status:** complete, 2026-09-05. Commit `7ca61208`.
+
+**What shipped.** `SettingsPage.vue` is a 760px column with a title, the
+`.tab` strip and one tab body at a time; the side tab list and
+`settings-modal.css` are gone (the trash banner rules it held moved to
+`modal.css` on tokens). Every tab is cards of `.set-row`s: label, help and
+a right-aligned control. Execution groups Automation (a `SettingToggle`
+per watcher), Limits, Auto push and Maintenance. Appearance is one card: the
+mode as a `.seg` with glyphs and the six-palette roster as 44px swatch cards
+read from the prefs store, so `paper` appears without a template change.
+Harness is one card per harness with mono `.field`s, the sign-in as the ink
+button (a ghost once credentials exist), Test in the card foot, a routing
+card and a Save / Revert foot. GitHub and About are cards with rows and
+pills. `AppSelect` and `HarnessSelect` triggers are fields with popover-card
+menus. `SettingsTabAppearance.test.ts` and `SettingsPage.test.ts` cover the
+roster, the picks, the query-driven tab and the single body; the `settings`
+scene asserts the column width, the active tab, control alignment, every tab
+without errors and six swatches. `make ui-test` passes thirteen scenes.
+
+**Decisions made during implementation.**
+- Rows carry no per-setting glyph: 30 settings would need 30 icons for a
+  cue the label already gives.
+- A two-state toggle is a segmented Off / On with `role="switch"`, in
+  `SettingToggle.vue`, rather than a checkbox or a custom switch.
+- The harness cards keep every field id (`env-*`) so nothing that targets
+  them by id changes.
+
+**Deviations from the spec.** None material; the glyph column is dropped as
+above.
+
+**Follow-ups.** None beyond the sibling specs.
