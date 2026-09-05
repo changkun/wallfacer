@@ -64,7 +64,7 @@ Shared Design - 6 complete
   ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
   ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
   ✅ Spec Workflow Plugin (spec@latere-ai; mirrored here behind a drift gate)
-  ◐ Console Redesign (replichai system: neutral canvas, clay accent, matte; 3/11 children shipped)
+  ◐ Console Redesign (replichai system: neutral canvas, clay accent, matte; 4/11 children shipped)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -257,7 +257,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [console-redesign/tokens-and-primitives.md](shared/console-redesign/tokens-and-primitives.md) | **Complete** | Both | P2 values in `tokens.css`, `paper` preset, derived tint pairs, type and radii ladders, matte shadows, glass tokens pinned opaque, `primitives.css` (`.btn .icon-btn .pill .card .rows .row .seg .field .eyebrow`) with aliases for the old `.badge-*`/`.btn-*` classes, `designSystem.test.ts` guards. |
 | ↳ [console-redesign/shell.md](shared/console-redesign/shell.md) | **Complete** | Both | Own `AppRail` (replaces latere-ui `ConsoleSidebar`), `WorkspaceChip` (switcher + connection dot + branch actions), inset `.app-main` card, 52px `Topbar` with a per-page crumb and actions slot; `StatusBar` and `content-header.css` deleted. |
 | ↳ [console-redesign/board.md](shared/console-redesign/board.md) | **Complete** | Both | Eyebrow column headers, 14px cards with a two-pill badge budget and a mono meta line for tags, primary/ghost card actions, composer as a card, search as a field; `--tag-bg-N` slots deleted. |
-| ↳ [console-redesign/task-detail.md](shared/console-redesign/task-detail.md) | Drafted | Both | `TaskDetail` as a sheet (header row, underline tabs, main column, 340px aside of cards with rows), `modal.css` id selectors replaced, `diffs.css`/`syntax.css`/`AgentTrace` on the ramp, one primary button instead of three action tiles. |
+| ↳ [console-redesign/task-detail.md](shared/console-redesign/task-detail.md) | **Complete** | Both | `TaskDetail` as a sheet (header row, underline tabs, main column, 340px aside of cards with rows), `modal.css` id selectors replaced, `diffs.css`/`syntax.css`/`AgentTrace` on the ramp, one primary button instead of three action tiles. |
 | ↳ [console-redesign/chat.md](shared/console-redesign/chat.md) | Drafted | Both | One message list, composer card, session rows and popup shared by `/chat`, Plan and the floating popup; tool calls read like agent-trace rows. |
 | ↳ [console-redesign/plan.md](shared/console-redesign/plan.md) | Drafted | Both | Spec tree on nav-row geometry with ramp status dots, focused view as a 76ch reading column with a frontmatter card and lifecycle buttons, comments layer on cards; 1,300 scoped lines rebuilt. |
 | ↳ [console-redesign/settings.md](shared/console-redesign/settings.md) | Drafted | Both | Underline tabs and one card per section with label/help/control rows; Appearance picks mode and the six-palette roster including `paper`; `settings-modal.css` and `forms.css` deleted. |

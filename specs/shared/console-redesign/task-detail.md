@@ -1,6 +1,6 @@
 ---
 title: Task Detail
-status: validated
+status: complete
 depends_on:
   - specs/shared/console-redesign/board.md
 affects:
@@ -112,3 +112,43 @@ bottom of the card. Every label/value pair is a `.row` with the label
   present in the Actions card, no overflow of the main column, switch to
   Changes and Verification without page errors. Screenshots `task-detail`
   light and dark, `task-detail-changes`.
+
+## Outcome
+
+**Status:** complete, 2026-09-05. Commits `b8f37f69` (sheet, diff and syntax
+styles) and `dc412d4a` (TaskDetail sheet, sub-components, tests, scene).
+
+**What shipped.** `modal.css` is the overlay, the dialog card and the `.sheet`
+(head row, `.tabs` strip, `.sheet-body` grid of a scrolling main column and a
+340px aside), addressed by class; the analytics rules it carried moved
+verbatim to `analytics.css` for the secondary-screens spec. `TaskDetail.vue`
+renders the head as pills, the tabs as the `.tab` primitive, and the aside as
+cards: Actions (one ink button for the forward transition, a ghost row, Delete
+in the foot), Pull request, Agent (with the spec and dependency links),
+Budget, Git (with the blocked-by rows), Environment. The backlog edit form
+sits inside the Actions card on `.field`s and a `.seg`. `diffs.css` washes
+added and removed lines in ok and err, hunks in run, and frames each file as
+a card; `syntax.css` is one ramp mapping for both themes and the diff- and
+explorer-scoped copies are gone. `task-detail.css` holds the dependency
+picker, the log stream and the `.btn-icon` ghost on tokens. `TaskPrPanel`,
+`AgentTrace`, `ReviewVerification` and `SpanFlamegraph` carry no literal.
+`TaskDetail.sheet.test.ts` asserts the ink/ghost split per status and the tab
+sections; the `task-detail` scene asserts the sheet width, the 340px aside,
+one ink button and tab switching. `make ui-test` passes twelve scenes.
+
+**Decisions made during implementation.**
+- Links (spec, depends on) joined the Agent card and Blocked-by rows the Git
+  card, as specified; the PR panel is its own card because it carries a form.
+- Cancel is a ghost `danger` in the action row rather than the foot: it is
+  reversible work-stopping, Delete is not.
+- `.btn-icon` (Copy / Raw) stays as a class styled like `.btn.sm.ghost`; the
+  eleven call sites read the same and the alias is one rule.
+- The mermaid theme map in `lib/mermaidRender.ts` is left for the
+  secondary-screens spec, which owns that file.
+
+**Surprises.** The aside cards shrank under the column's `overflow: auto` and
+clipped their feet; `flex: none` on the aside children fixed it. A Vue
+`<template v-else>` inside the Links row matched the first `</template>` the
+rewrite searched for, so the old aside briefly survived after the new one.
+
+**Follow-ups.** None beyond the sibling specs.
