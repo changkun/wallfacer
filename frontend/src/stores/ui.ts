@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, shallowRef, type Component } from 'vue';
 import { useDockStore } from './dock';
 
 const SHOW_ARCHIVED_KEY = 'wallfacer-show-archived';
@@ -31,6 +31,28 @@ export const useUiStore = defineStore('ui', () => {
   // blocking overlay (above every modal) so the user never sees the new active
   // state painted over stale old content mid-switch.
   const switchingWorkspace = ref(false);
+
+  // The topbar crumb. AppLayout derives the first segment from the route; a
+  // page that shows a leaf (an open spec, a file) appends it here and clears
+  // it on unmount.
+  const crumbLeaf = ref('');
+  function setCrumbLeaf(leaf: string) { crumbLeaf.value = leaf; }
+  function clearCrumbLeaf() { crumbLeaf.value = ''; }
+
+  // The page's own controls in the topbar (search, toggles). A page registers
+  // a component on mount and clears it on unmount; Topbar renders it. Held
+  // shallow so the component definition is never made reactive.
+  const topbarActions = shallowRef<Component | null>(null);
+  function setTopbarActions(c: Component | null) { topbarActions.value = c; }
+  function clearTopbarActions(c?: Component) {
+    if (!c || topbarActions.value === c) topbarActions.value = null;
+  }
+
+  // Below the phone breakpoint the rail is a drawer; this is its open state.
+  const railOpen = ref(false);
+  function openRail() { railOpen.value = true; }
+  function closeRail() { railOpen.value = false; }
+  function toggleRail() { railOpen.value = !railOpen.value; }
 
   // Task ids freshly dispatched from Plan mode; a TaskCard consumes its own id
   // on mount to play a one-shot "just created" pulse, even after navigating to
@@ -74,6 +96,9 @@ export const useUiStore = defineStore('ui', () => {
     showSystemPrompts, showTerminal,
     showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
     switchingWorkspace,
+    crumbLeaf, setCrumbLeaf, clearCrumbLeaf,
+    topbarActions, setTopbarActions, clearTopbarActions,
+    railOpen, openRail, closeRail, toggleRail,
     dispatchedIds, markDispatched, consumeDispatched,
     paletteSeed,
     openWorkspaces,
