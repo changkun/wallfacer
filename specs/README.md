@@ -64,7 +64,7 @@ Shared Design - 6 complete
   ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
   ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
   ✅ Spec Workflow Plugin (spec@latere-ai; mirrored here behind a drift gate)
-  ◐ Console Redesign (replichai system: neutral canvas, clay accent, matte; 7/11 children shipped)
+  ◐ Console Redesign (replichai system: neutral canvas, clay accent, matte; 8/11 children shipped)
 
 Cloud Platform - two axes (consume Latere services, don't absorb)
   Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
@@ -261,7 +261,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [console-redesign/chat.md](shared/console-redesign/chat.md) | **Complete** | Both | One message list, composer card, session rows and popup shared by `/chat`, Plan and the floating popup; tool calls read like agent-trace rows. |
 | ↳ [console-redesign/plan.md](shared/console-redesign/plan.md) | **Complete** | Both | Spec tree on nav-row geometry with ramp status dots, focused view as a 76ch reading column with a frontmatter card and lifecycle buttons, comments layer on cards; 1,300 scoped lines rebuilt. |
 | ↳ [console-redesign/settings.md](shared/console-redesign/settings.md) | **Complete** | Both | Underline tabs and one card per section with label/help/control rows; Appearance picks mode and the six-palette roster including `paper`; `settings-modal.css` and `forms.css` deleted. |
-| ↳ [console-redesign/agent-graph.md](shared/console-redesign/agent-graph.md) | Drafted | Both | Agent list rows, SVG nodes drawn to card geometry from tokens, 420px editor drawer with rows; zero hex literals. |
+| ↳ [console-redesign/agent-graph.md](shared/console-redesign/agent-graph.md) | **Complete** | Both | Agent list rows, SVG nodes drawn to card geometry from tokens, 420px editor drawer with rows; zero hex literals. |
 | ↳ [console-redesign/panels-and-overlays.md](shared/console-redesign/panels-and-overlays.md) | Drafted | Both | Three shapes (`.pop`, `.dialog`, docked panel) for the command palette, workspace picker/editor, confirm, toasts, shortcuts, device sign-in, trash, dock, terminal, explorer, editor tabs and file editor; blur-free scrims. |
 | ↳ [console-redesign/secondary-screens.md](shared/console-redesign/secondary-screens.md) | Drafted | Both | Analytics boundary cards and a `chartPalette()` helper, routine rows, Mission Control canvas on the ramp (48 hex literals to zero), whiteboard frame, artifact grid, local docs on the shared prose column. |
 | ↳ [console-redesign/verification-and-docs.md](shared/console-redesign/verification-and-docs.md) | Drafted | Both | Delete the alias block, `make ui-test` in CI, seed and snapshot every surface light+dark via `regen.sh`, regenerate guide and README images, configuration guide roster and status-bar references updated. |

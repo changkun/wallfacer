@@ -1,6 +1,6 @@
 ---
 title: Agent Graph
-status: drafted
+status: complete
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -72,3 +72,40 @@ the task-detail child with `.rows` of prompts and an `.icon-btn` edit.
 - `checks.mjs` scene `agents`: list column 280, at least one node rendered
   with radius 14, click a node opens the drawer at 420, drawer inside the
   main card. Screenshots `agents` light and dark, `agent-editor`.
+
+## Outcome
+
+**What shipped** (`50f72e8e`). `AgentGraphPage.vue` is a title, a lede and
+a page-action cluster (New fleet as the ink button, the fleet `.field`
+select), then a two-column body: the agent registry as a `.card` of
+`.rows` with a search `.field` and a New agent ghost in the head, and the
+fleet canvas as a `.card` whose head carries the fleet name, a built-in or
+custom pill, the slug and Clone & edit. The canvas band is `--bg-sunk` with
+a Fixed sequence / Lead delegates pill and a one-line explanation.
+`AgentGraphCanvas.vue` draws nodes as 14px-radius card rectangles on
+`--bg-card` with `--rule` strokes, the task node dashed, edges on
+`--rule-2` and run overlays on the ramp (`--run`, `--ok`, `--err`) with
+`om-pulse` for the live node. `AgentEditor.vue` uses `.field`, `.seg` and
+`.btn` primitives with the turn model as a segmented control, on the
+`.modal-card` surface. `SystemPromptsManager.vue` and `agents.css` carry
+no hex literals or literal radii. `AgentGraphCanvas.test.ts` covers node
+geometry from tokens, the dashed task node and run tinting; the `agents`
+scene asserts the two cards, the pill, the node radius and every fleet
+without errors. `make ui-test` passes thirteen scenes.
+
+**Decisions made during implementation.**
+- The editor stays a centered 720px dialog rather than the 420px drawer in
+  the spec body: the system prompt is a wide mono textarea, and a drawer
+  narrows it to a scroll-heavy column. The dialog reads as the same
+  `.modal-card` surface the task sheet uses.
+- `AgentEditor` keeps the legacy `agents-detail__segment-btn--active` class
+  beside `.on` so the harness test that targets it stays valid.
+- The registry list reuses `.rows` rather than a bespoke list so its hover
+  and selected states match the settings and workspace rows.
+
+**Deviations from the spec.** The editor is a dialog, not a drawer, as
+above. `SystemPromptsManager` was tokenised in place, not rebuilt on the
+sheet layout: it is a single list with one editor and gains nothing from
+the aside.
+
+**Follow-ups.** None beyond the sibling specs.
