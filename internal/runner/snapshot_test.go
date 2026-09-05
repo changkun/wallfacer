@@ -18,6 +18,22 @@ import (
 // setupNonGitSnapshot
 // ---------------------------------------------------------------------------
 
+func TestExtractSnapshotCreatesMissingWorkspaceWithoutExternalTools(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	snapshot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(snapshot, "notes.txt"), []byte("snapshot data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "restored")
+	if err := extractSnapshotToWorkspace(snapshot, target); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(target, "notes.txt"))
+	if err != nil || string(got) != "snapshot data" {
+		t.Fatalf("restored file = %q, %v", got, err)
+	}
+}
+
 // TestSetupNonGitSnapshotCopiesFiles verifies that setupNonGitSnapshot copies
 // workspace files (including nested directories) into the snapshot path and
 // initialises a git repo there.

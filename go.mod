@@ -19,7 +19,7 @@ require (
 	golang.org/x/text v0.39.0
 	google.golang.org/grpc v1.83.1
 	gopkg.in/yaml.v3 v3.0.1
-	latere.ai/x/pkg v0.50.0
+	latere.ai/x/pkg v0.50.1-0.20260905122732-8add66b8b7d1
 	latere.ai/x/topos v0.4.0
 )
 
@@ -51,7 +51,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	latere.ai/x/ci-gate v0.26.0 // indirect
+	latere.ai/x/ci-gate v0.27.0 // indirect
 )
 
 tool latere.ai/x/ci-gate/cmd/lateregate
