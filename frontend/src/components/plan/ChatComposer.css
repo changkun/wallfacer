@@ -13,8 +13,8 @@
   font-size: 12px;
   padding: 8px 10px;
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bg);
+  border-radius: var(--r-md);
+  background: var(--bg-sunk);
   color: var(--ink);
   resize: none;
   line-height: 1.4;
@@ -24,8 +24,8 @@
 
 .pcp-textarea:focus {
   outline: none;
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--rule));
-  box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 12%, transparent);
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .pcp-dropdown {
@@ -37,8 +37,9 @@
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
+  padding: 4px;
   z-index: 5;
 }
 
@@ -47,6 +48,7 @@
   width: 100%;
   flex-direction: column;
   padding: 6px 10px;
+  border-radius: var(--r-sm);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -57,7 +59,7 @@
 
 .pcp-dropdown-item:hover,
 .pcp-dropdown-item--active {
-  background: var(--bg-hover);
+  background: var(--bg-sunk);
 }
 
 .pcp-dropdown-name {
@@ -86,17 +88,21 @@
 }
 
 .pcp-composer-action {
-  font-size: 13px;
-  width: 24px;
-  height: 24px;
+  font: 600 13px / 1 var(--font-mono);
+  width: 26px;
+  height: 26px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
   color: var(--ink-3);
   cursor: pointer;
+  transition: color var(--dur-hover), background var(--dur-hover);
 }
 
 .pcp-composer-action:hover {
-  color: var(--ink);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
 }
 
 .pcp-composer-right {
@@ -145,12 +151,12 @@
   }
 }
 
+/* The send is the ink button; the shortcut toggle rides its right edge. */
 .pcp-send-group {
   display: inline-flex;
   align-items: stretch;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-pill);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .pcp-send,
@@ -158,34 +164,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent);
-  color: #fff;
+  background: var(--ink);
+  color: var(--bg);
   border: none;
   cursor: pointer;
-  transition: background 120ms ease, filter 120ms ease;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
 .pcp-send:hover,
-.pcp-send-toggle:hover { background: var(--accent-hover); }
+.pcp-send-toggle:hover { background: var(--accent); color: var(--accent-fg); }
 
 .pcp-send {
   min-width: 36px;
   height: 30px;
-  padding: 0 11px;
+  padding: 0 12px;
 }
 
 .pcp-send-toggle {
-  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  border-left: 1px solid color-mix(in srgb, var(--bg) 25%, transparent);
   width: 24px;
   height: 30px;
 }
 
 .pcp-send:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.pcp-interrupt { background: var(--warn, #c87b1c); }
-.pcp-interrupt:hover { background: var(--warn, #c87b1c); filter: brightness(1.08); }
+/* Stop reads as the danger ghost: quiet until hovered. */
+.pcp-interrupt { background: var(--bg-sunk); color: var(--ink); border: 1px solid var(--rule-2); }
+.pcp-interrupt:hover { background: var(--tint-red); color: var(--err); border-color: var(--err); }
 
 /* ── Variants ──────────────────────────────────────────────────────── */
 
@@ -197,20 +204,18 @@
   border-top: none;
   padding: 12px 14px 12px;
   border: 1px solid var(--rule);
-  border-radius: var(--r-xl, 14px);
+  border-radius: var(--r-xl);
   background: var(--bg-card);
-  box-shadow: var(--sh-2);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  box-shadow: var(--sh-card);
+  transition: border-color var(--dur-hover), box-shadow var(--dur-hover);
 }
 
-/* Ember focus glow — the composer warms up when active. A soft, diffuse
-   shadow rather than a hard accent ring, so the edge stays gentle. */
+/* The composer card lifts when active: an accent hairline and a soft lift. */
 .pcp-composer--hero:focus-within,
 .pcp-composer--docked:focus-within,
 .pcp-composer--panel:focus-within {
-  border-color: color-mix(in oklab, var(--accent) 25%, var(--rule));
-  box-shadow: 0 8px 30px color-mix(in oklab, var(--accent) 15%, transparent),
-              0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: var(--accent-line);
+  box-shadow: var(--sh-2);
 }
 
 .pcp-composer--hero .pcp-textarea,

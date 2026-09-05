@@ -110,3 +110,23 @@ describe('ChatMessageList — trajectory placement', () => {
     expect(occurrences).toBe(1);
   });
 });
+
+describe('ChatMessageList — turn shapes', () => {
+  it('shows the running pill while a turn streams and the summary once it is done', () => {
+    mount([assistant({ isStreaming: true, contentHtml: '' })]);
+    const live = host.querySelector('.pcp-activity--live .pcp-activity-live');
+    expect(live).not.toBeNull();
+    expect(live!.classList.contains('pill-run')).toBe(true);
+    expect(live!.classList.contains('pulse')).toBe(true);
+    app?.unmount(); app = null; host.remove();
+    mount([assistant({})]);
+    expect(host.querySelector('.pcp-activity-live')).toBeNull();
+    expect(host.querySelector('.pcp-activity-title')!.textContent).toMatch(/Read/);
+  });
+
+  it('renders a user turn as a block and an error in the err tint class', () => {
+    mount([{ role: 'user', rawText: 'hello', contentHtml: '', planRound: 0, reverted: false, activity: [], hasActivity: false, isStreaming: false, errorText: 'boom' } as never]);
+    expect(host.querySelector('.pcp-turn--user .pcp-usermsg')!.textContent).toBe('hello');
+    expect(host.querySelector('.pcp-bubble-error')!.textContent).toBe('boom');
+  });
+});

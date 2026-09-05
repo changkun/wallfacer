@@ -338,37 +338,39 @@ defineExpose({
 </template>
 
 <style scoped>
+/* The launcher is the ink button, round: it inverts in dark like every
+   primary control. */
 .scp-launcher {
   position: fixed;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--ink);
+  color: var(--bg);
   border: none;
   cursor: grab;
   touch-action: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--sh-pop);
   z-index: 40;
-  transition: transform 120ms ease;
+  transition: transform 120ms var(--ease-fluid), background var(--dur-hover), color var(--dur-hover);
 }
-.scp-launcher:hover { transform: scale(1.06); }
+.scp-launcher:hover { transform: scale(1.06); background: var(--accent); color: var(--accent-fg); }
 .scp-launcher:active { cursor: grabbing; }
 
 .scp-window {
   position: fixed;
   display: flex;
   flex-direction: column;
-  background: var(--bg-card);
+  background: var(--bg);
   border: 1px solid var(--rule);
-  border-radius: var(--r-lg, 14px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-pop);
   overflow: hidden;
   z-index: 41;
-  animation: scp-pop 200ms cubic-bezier(0.2, 0, 0, 1);
+  animation: scp-pop 200ms var(--ease-fluid);
 }
 
 @keyframes scp-pop {
@@ -408,16 +410,19 @@ defineExpose({
   gap: 4px;
   min-width: 0;
   max-width: 100%;
-  padding: 3px 8px;
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  height: 26px;
+  padding: 0 10px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
   color: var(--ink);
   font-size: 12px;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
+  transition: background var(--dur-hover), border-color var(--dur-hover);
 }
-.scp-session-switch:hover { background: var(--bg-hover); }
+.scp-session-switch:hover { background: var(--bg-card); border-color: var(--accent-line); }
 
 .scp-session-name {
   overflow: hidden;
@@ -435,8 +440,8 @@ defineExpose({
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   z-index: 5;
   padding: 4px;
 }
@@ -455,8 +460,8 @@ defineExpose({
   text-align: left;
   cursor: pointer;
 }
-.scp-session-item:hover { background: var(--bg-hover); color: var(--ink); }
-.scp-session-item--active { background: var(--bg-active); color: var(--ink); }
+.scp-session-item:hover { background: var(--bg-sunk); color: var(--ink); }
+.scp-session-item--active { background: var(--bg-sunk); color: var(--ink); font-weight: 600; }
 
 .scp-session-item-name {
   flex: 1;
@@ -489,13 +494,14 @@ defineExpose({
   width: 24px;
   height: 24px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--ink-3);
   font-size: 13px;
   cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
-.scp-iconbtn:hover { background: var(--bg-hover); color: var(--ink); }
+.scp-iconbtn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
 
 /* The new-chat button sits in the title cluster, beside the session switcher;
    keep it from shrinking when a long session name fills the row. */

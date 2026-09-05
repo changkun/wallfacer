@@ -57,6 +57,7 @@ function turnModelLabel(model?: string): string {
               :open="m.isStreaming"
             >
               <summary>
+                <span v-if="m.isStreaming" class="pill pill-run pulse pcp-activity-live"><span class="pill-dot" aria-hidden="true" />working</span>
                 <span class="pcp-activity-title">{{
                   m.isStreaming ? 'Working…' : activitySummary(m.activity)
                 }}</span>

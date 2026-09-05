@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--rule);
-  background: var(--bg-card);
+  background: var(--bg);
 }
 
 .pcp-header {
@@ -17,10 +17,9 @@
 }
 
 .pcp-title {
-  font-size: 11px;
-  font-weight: 600;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--ink-3);
 }
 
@@ -35,19 +34,22 @@
 
 .pcp-clear,
 .pcp-fold {
-  font-size: 11px;
-  padding: 2px 8px;
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--ink-3);
+  height: 24px;
+  font: 500 var(--fs-10) / 1 var(--font-sans);
+  padding: 0 9px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
   cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover);
 }
 
 .pcp-clear:hover,
 .pcp-fold:hover {
-  background: var(--bg-hover);
-  color: var(--ink);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .pcp-tabs {
@@ -59,36 +61,42 @@
   align-items: center;
 }
 
+/* Thread tabs are pills; the current one is the sheet of paper. */
 .pcp-tab {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
+  height: 24px;
+  padding: 0 9px;
+  font-size: var(--fs-10);
+  font-weight: 500;
   background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
   color: var(--ink-3);
   cursor: pointer;
   font-family: inherit;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
 
 .pcp-tab:hover {
-  background: var(--bg-hover);
+  background: var(--bg-sunk);
   color: var(--ink);
 }
 
 .pcp-tab--active {
-  background: var(--bg-active);
+  background: var(--bg-card);
   color: var(--ink);
-  border-color: var(--accent);
+  border-color: var(--rule);
+  box-shadow: var(--sh-card);
 }
 
 .pcp-tab-rename {
-  font-size: 11px;
-  padding: 1px 4px;
-  border: 1px solid var(--accent);
-  background: var(--bg);
+  font-size: var(--fs-10);
+  padding: 1px 6px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-xs);
+  background: var(--bg-card);
   color: var(--ink);
   outline: none;
   width: 120px;
@@ -124,20 +132,22 @@
 
 .pcp-tab-new,
 .pcp-tab-archive-trigger {
+  height: 24px;
   font-size: 14px;
   padding: 0 8px;
   background: transparent;
-  border: 1px dashed var(--rule);
-  border-radius: var(--r-sm);
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r-pill);
   color: var(--ink-3);
   cursor: pointer;
-  line-height: 1.5;
+  line-height: 1;
 }
 
 .pcp-tab-new:hover,
 .pcp-tab-archive-trigger:hover {
-  background: var(--bg-hover);
-  color: var(--ink);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .pcp-archived-menu {
@@ -147,17 +157,18 @@
   margin-top: 4px;
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   z-index: 10;
   min-width: 180px;
+  padding: 4px;
 }
 
 .pcp-archived-menu-header {
   padding: 6px 10px;
-  font-size: 10px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-label);
   color: var(--ink-3);
   border-bottom: 1px solid var(--rule);
 }
@@ -174,6 +185,9 @@
   cursor: pointer;
 }
 
+.pcp-archived-menu-item {
+  border-radius: var(--r-sm);
+}
 .pcp-archived-menu-item:hover {
-  background: var(--bg-hover);
+  background: var(--bg-sunk);
 }

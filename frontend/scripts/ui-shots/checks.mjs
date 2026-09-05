@@ -250,6 +250,30 @@ SCENES['task-detail'] = async (page) => {
   }
 };
 
+// The chat surface (specs/shared/console-redesign/chat.md): the session list
+// and the hero composer render on /chat, the entry column stays narrow, and
+// the floating popup on another route opens inside the viewport.
+SCENES['chat'] = async (page) => {
+  await page.goto(base + '/chat', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(900);
+  const sessions = await firstBox(page, '.chat-sessions');
+  expect('chat', !!sessions, 'session list did not render');
+  const composer = await firstBox(page, '.pcp-composer');
+  expect('chat', !!composer, 'composer did not render');
+  const entry = await firstBox(page, '.chat-entry-inner');
+  expect('chat', entry && entry.width <= 681, `entry column ${entry && Math.round(entry.width)}px, want <= 680`);
+  const vw = await page.evaluate(() => window.innerWidth);
+  const vh = await page.evaluate(() => window.innerHeight);
+  await page.goto(base + '/routines', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(700);
+  const launcher = await firstBox(page, '.scp-launcher');
+  expect('chat', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
+  await page.click('.scp-launcher', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  const win = await firstBox(page, '.scp-window');
+  expect('chat', win && win.left >= 0 && win.top >= 0 && win.right <= vw + 1 && win.bottom <= vh + 1, 'chat popup outside the viewport');
+};
+
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
 const SMOKE_ROUTES = { settings: '/settings', plan: '/plan', analytics: '/analytics', agents: '/agents', flows: '/flows' };

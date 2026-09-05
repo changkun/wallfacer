@@ -188,7 +188,7 @@ function applyQuick(insert: string) {
         <!-- Conversation -->
         <div v-else key="conversation" class="chat-conversation">
           <header class="chat-conversation-head">
-            <span class="chat-conversation-title">Chat</span>
+            <span class="eyebrow chat-conversation-title">Chat</span>
             <ChatModelBadge class="chat-head-model" :model="chat.primaryModel.value" />
             <div v-if="usage.rounds > 0" class="chat-usage" :title="usageTooltip">
               <span class="chat-usage-item">{{ usage.rounds }} {{ usage.rounds === 1 ? 'round' : 'rounds' }}</span>
@@ -241,7 +241,7 @@ function applyQuick(insert: string) {
 }
 
 .chat-sessions-resize:hover {
-  background: var(--rule);
+  background: var(--accent-line);
 }
 
 /* Collapsed rail: persistent left-edge strip that reopens the session list,
@@ -256,14 +256,14 @@ function applyQuick(insert: string) {
   padding: 9px 0;
   border: none;
   border-right: 1px solid var(--rule);
-  background: var(--bg-card);
+  background: var(--bg-sunk);
   color: var(--ink-3);
   cursor: pointer;
 }
 
 .chat-sessions-rail:hover {
   color: var(--accent);
-  background: var(--bg-hover);
+  background: var(--accent-soft);
 }
 
 .chat-sessions-rail__chevron {
@@ -289,32 +289,12 @@ function applyQuick(insert: string) {
   position: relative;
 }
 
-/* Soft ember glow behind the entry, the signature "shine". */
-.chat-entry-inner::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: -40px;
-  width: 460px;
-  height: 320px;
-  transform: translateX(-50%);
-  background: radial-gradient(
-    ellipse at center,
-    color-mix(in oklab, var(--accent) 16%, transparent),
-    transparent 70%
-  );
-  filter: blur(8px);
-  pointer-events: none;
-  z-index: 0;
-}
-
 .chat-entry-mark {
   position: relative;
   z-index: 1;
   display: flex;
   justify-content: center;
   margin-bottom: 16px;
-  filter: drop-shadow(0 4px 12px color-mix(in oklab, var(--accent) 35%, transparent));
 }
 
 .chat-entry-greeting {
@@ -322,11 +302,11 @@ function applyQuick(insert: string) {
   z-index: 1;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 42px;
+  font-size: var(--fs-3xl);
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.02em;
   color: var(--ink);
-  margin: 0 0 26px;
+  margin: 0 0 22px;
 }
 
 .chat-entry-inner :deep(.pcp-composer) {
@@ -348,19 +328,22 @@ function applyQuick(insert: string) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  font-size: 13px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink-2);
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill);
+  color: var(--ink);
   cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover);
 }
 
 .chat-entry-chip:hover {
-  background: var(--bg-hover);
-  color: var(--ink);
-  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .chat-entry-chip-icon {
@@ -377,7 +360,8 @@ function applyQuick(insert: string) {
 }
 
 .chat-conversation-head {
-  padding: 10px 16px;
+  min-height: 40px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -385,9 +369,7 @@ function applyQuick(insert: string) {
 }
 
 .chat-conversation-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
+  color: var(--ink-2);
 }
 
 /* The model badge sits next to the title; margin-left gives the brand mark room
@@ -399,7 +381,7 @@ function applyQuick(insert: string) {
 .chat-usage {
   display: flex;
   gap: 10px;
-  font-size: 11px;
+  font: 400 var(--fs-10) / 1 var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink-4);
   cursor: default;
@@ -410,14 +392,14 @@ function applyQuick(insert: string) {
 .chat-usage-cost { color: var(--ink-3); font-weight: 500; }
 
 .chat-conversation :deep(.pcp-stream) {
-  max-width: 820px;
+  max-width: 760px;
   width: 100%;
   margin: 0 auto;
 }
 
 .chat-conversation-composer {
   padding: 8px 16px 16px;
-  max-width: 820px;
+  max-width: 760px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -427,7 +409,7 @@ function applyQuick(insert: string) {
 
 .chat-morph-enter-active,
 .chat-morph-leave-active {
-  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity 180ms ease, transform 240ms var(--ease-fluid);
 }
 
 .chat-morph-enter-from {

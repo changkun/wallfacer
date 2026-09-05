@@ -72,7 +72,7 @@ onUnmounted(() => {
 <template>
   <aside class="chat-sessions">
     <div class="chat-sessions-bar">
-      <span class="chat-sessions-bar-title">Chats</span>
+      <span class="eyebrow chat-sessions-bar-title">Chats</span>
       <button
         type="button"
         class="chat-sessions-collapse"
@@ -88,19 +88,19 @@ onUnmounted(() => {
 
     <button
       type="button"
-      class="chat-session-new"
+      class="btn ghost block chat-session-new"
       :class="{ 'chat-session-new--active': s.draft.value }"
       @click="s.createThread"
     >
-      <span class="chat-session-new-icon" aria-hidden="true">+</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
       <span>New chat</span>
     </button>
 
     <div v-scrollfade class="chat-session-scroll">
       <template v-for="group in sessionGroups" :key="group.key">
         <div class="chat-sessions-head" :class="'chat-sessions-head--' + group.key">
-          <span class="chat-sessions-title">{{ group.label }}</span>
-          <span class="chat-sessions-count">{{ group.ids.length }}</span>
+          <span class="eyebrow chat-sessions-title">{{ group.label }}</span>
+          <span class="count chat-sessions-count">{{ group.ids.length }}</span>
         </div>
         <div
           v-for="id in group.ids"
@@ -199,28 +199,18 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  gap: 6px;
   border-right: 1px solid var(--rule);
-  background: var(--bg-card);
-  padding: 8px;
+  background: var(--bg-sunk);
+  padding: 10px 8px;
 }
-
-/* Top bar: a section label plus the collapse chevron that folds the list to a
-   rail (the rail itself lives in ChatPage). Mirrors SpecTreePanel's collapse. */
 .chat-sessions-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 6px 6px 10px;
+  padding: 0 4px 0 10px;
+  min-height: 24px;
 }
-
-.chat-sessions-bar-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-4);
-}
-
 .chat-sessions-collapse {
   display: inline-flex;
   align-items: center;
@@ -233,73 +223,31 @@ onUnmounted(() => {
   color: var(--ink-3);
   cursor: pointer;
 }
-
 .chat-sessions-collapse:hover {
   color: var(--accent);
-  background: var(--bg-hover);
+  background: var(--accent-soft);
 }
-
-/* New chat — a clean, borderless row aligned with the session list, with a
-   muted leading +; matches the row geometry below rather than a boxed button. */
 .chat-session-new {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-weight: 500;
+  justify-content: flex-start;
+  gap: 8px;
   background: transparent;
-  border: none;
-  border-radius: var(--r-md);
-  color: var(--ink);
-  cursor: pointer;
-  text-align: left;
-}
-
-.chat-session-new:hover {
-  background: var(--bg-hover);
-}
-
-/* Active while an unsent "New chat" draft is open. */
-.chat-session-new--active {
-  background: var(--bg-active);
-  font-weight: 500;
-}
-
-.chat-session-new-icon {
-  font-size: 16px;
-  line-height: 1;
+  border-style: dashed;
   color: var(--ink-3);
-  width: 16px;
-  text-align: center;
 }
-
+.chat-session-new:hover,
+.chat-session-new--active {
+  color: var(--accent);
+  border-style: solid;
+}
 .chat-sessions-head {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 12px 10px 4px;
 }
-
-.chat-sessions-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-4);
-}
-
 .chat-sessions-count {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--ink-3);
-  background: var(--bg-sunk);
-  border-radius: 999px;
-  padding: 0 6px;
-  min-width: 16px;
-  text-align: center;
+  margin-left: 0;
 }
-
 .chat-session-scroll {
   flex: 1;
   overflow-y: auto;
@@ -307,36 +255,37 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 1px;
 }
-
+/* A session row is the rail's nav row: 34px, radius 12, the active one on
+   the card surface. */
 .chat-session-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
-  border-radius: var(--r-md);
-  font-size: 13px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-row);
+  font-size: var(--fs-base);
+  font-weight: 500;
   color: var(--ink-2);
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition: background var(--dur-hover), color var(--dur-hover);
 }
-
 .chat-session-row:hover {
-  background: var(--bg-hover);
-}
-
-.chat-session-row--active {
-  background: var(--bg-active);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
-  font-weight: 500;
 }
-
+.chat-session-row--active {
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--sh-card);
+}
 .chat-session-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .chat-session-unread {
   width: 6px;
   height: 6px;
@@ -344,34 +293,28 @@ onUnmounted(() => {
   background: var(--accent);
   flex-shrink: 0;
 }
-
 .chat-session-spinner {
   width: 11px;
   height: 11px;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 2px solid color-mix(in oklab, var(--accent) 30%, transparent);
-  border-top-color: var(--accent);
+  border: 2px solid var(--tint-blue);
+  border-top-color: var(--run);
   animation: chat-session-spin 0.7s linear infinite;
 }
-
 @keyframes chat-session-spin {
   to { transform: rotate(360deg); }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .chat-session-spinner { animation-duration: 2s; }
 }
-
 .chat-session-actions {
   display: none;
   gap: 2px;
 }
-
 .chat-session-row:hover .chat-session-actions {
   display: inline-flex;
 }
-
 .chat-session-btn {
   display: inline-flex;
   align-items: center;
@@ -382,60 +325,53 @@ onUnmounted(() => {
   font-size: 12px;
   padding: 0 2px;
 }
-
 .chat-session-btn:hover {
   color: var(--ink);
 }
-
 .chat-session-rename {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--fs-base);
   padding: 2px 6px;
-  border: 1px solid var(--accent);
-  background: var(--bg);
+  border: 1px solid var(--accent-line);
+  background: var(--bg-card);
   color: var(--ink);
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   outline: none;
 }
-
 .chat-sessions-archived {
   border-top: 1px solid var(--rule);
   margin: 6px -8px 0;
   padding: 8px 8px 0;
 }
-
 .chat-sessions-archived-trigger {
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
+  padding: 6px 10px;
   background: transparent;
   border: none;
-  font-size: 11px;
+  border-radius: var(--r-sm);
+  font: 500 var(--fs-10) / 1 var(--font-mono);
   color: var(--ink-3);
   cursor: pointer;
 }
-
 .chat-sessions-archived-trigger:hover {
   color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
-
 .chat-sessions-archived-list {
   display: flex;
   flex-direction: column;
 }
-
 .chat-sessions-archived-row {
   display: flex;
   align-items: center;
   border-radius: var(--r-sm);
 }
-
 .chat-sessions-archived-row:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
-
 .chat-sessions-archived-item {
   flex: 1;
   min-width: 0;
@@ -451,11 +387,9 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .chat-sessions-archived-row:hover .chat-sessions-archived-item {
   color: var(--ink);
 }
-
 .chat-sessions-archived-delete {
   display: none;
   align-items: center;
@@ -466,12 +400,10 @@ onUnmounted(() => {
   color: var(--ink-4);
   cursor: pointer;
 }
-
 .chat-sessions-archived-row:hover .chat-sessions-archived-delete {
   display: inline-flex;
 }
-
 .chat-sessions-archived-delete:hover {
-  color: var(--danger, #c0392b);
+  color: var(--err);
 }
 </style>

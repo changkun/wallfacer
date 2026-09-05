@@ -7,7 +7,7 @@
   border-radius: 0;
   margin-bottom: 18px;
   padding-bottom: 18px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule);
 }
 .result-entry:last-child {
   margin-bottom: 0;
@@ -24,11 +24,11 @@
   cursor: pointer;
   list-style: none;
   user-select: none;
-  border-radius: 4px;
-  transition: background 0.12s;
+  border-radius: var(--r-sm);
+  transition: background var(--dur-hover);
 }
 .result-entry-summary:hover {
-  background: var(--bg-hover);
+  background: var(--bg-sunk);
 }
 .result-entry-summary::-webkit-details-marker {
   display: none;
@@ -41,7 +41,7 @@
   margin-right: 8px;
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
-  border-left: 5px solid var(--text-muted);
+  border-left: 5px solid var(--ink-3);
   transition: transform 0.15s ease;
   flex-shrink: 0;
   align-self: center;
@@ -51,8 +51,8 @@ details.result-entry[open] .result-entry-summary .result-entry-labels::before {
 }
 .result-entry-summary::after {
   content: "Click to expand";
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: var(--fs-9);
+  color: var(--ink-3);
   opacity: 0;
   transition: opacity 0.12s;
   margin-left: 8px;
@@ -77,14 +77,14 @@ details.result-entry[open] .result-entry-summary {
 }
 .result-entry-body {
   padding: 0;
-  font-size: 13px;
-  color: var(--text);
+  font-size: var(--fs-base);
+  color: var(--ink);
   line-height: 1.55;
 }
 pre.result-entry-body {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-family: var(--font-mono);
 }
 .result-entry-labels {
   display: flex;
@@ -92,32 +92,29 @@ pre.result-entry-body {
   gap: 6px;
 }
 
-/* Result type badge */
+/* Result type pill */
 .result-type-badge {
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font: 600 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 .result-type-plan {
-  background: #e8ddf5;
-  color: #5a3d8a;
-}
-[data-theme="dark"] .result-type-plan {
-  background: #2a1e3d;
-  color: #a07ad4;
+  background: var(--tint-plum);
+  color: var(--purple);
 }
 .result-turn-label {
-  font-size: 11px;
-  color: var(--text-muted);
+  font: 500 var(--fs-10) / 1 var(--font-mono);
+  color: var(--ink-3);
 }
 
 /* ===== Branch Switcher ===== */
 .branch-dropdown {
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
   min-width: 240px;
   max-width: 320px;
   max-height: 360px;
@@ -127,28 +124,30 @@ pre.result-entry-body {
 }
 .branch-dropdown-header {
   padding: 8px 12px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  color: var(--ink-3);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--tracking-label);
 }
 .branch-dropdown-search {
   padding: 4px 8px 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule);
 }
 .branch-search-input {
   width: 100%;
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-input);
-  color: var(--text-primary);
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font: inherit;
   font-size: 12px;
   outline: none;
 }
 .branch-search-input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .branch-dropdown-list {
   overflow-y: auto;
@@ -163,17 +162,17 @@ pre.result-entry-body {
   padding: 5px 12px;
   border: none;
   background: none;
-  color: var(--text-secondary);
-  font-size: 12px;
+  color: var(--ink-2);
+  font: 500 12px / 1.4 var(--font-mono);
   cursor: pointer;
   text-align: left;
 }
 .branch-dropdown-item:hover {
-  background: var(--bg-hover);
+  background: var(--bg-sunk);
 }
 .branch-dropdown-item.current {
-  color: var(--text-primary);
-  font-weight: 500;
+  color: var(--ink);
+  font-weight: 600;
 }
 .branch-dropdown-item-name {
   overflow: hidden;
@@ -181,7 +180,7 @@ pre.result-entry-body {
   white-space: nowrap;
 }
 .branch-dropdown-footer {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rule);
 }
 .branch-dropdown-footer:empty,
 .branch-dropdown-footer:not(:has(button[style*="display"])),
@@ -204,13 +203,13 @@ pre.result-entry-body {
   text-align: left;
 }
 .branch-dropdown-create:hover {
-  background: var(--bg-hover);
+  background: var(--accent-soft);
 }
 .branch-dropdown-loading {
   padding: 16px;
   text-align: center;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--ink-3);
 }
 
 /* ===== Mobile Responsive ===== */
@@ -243,49 +242,26 @@ pre.result-entry-body {
     min-width: min(280px, calc(100vw - 28px));
   }
 
-  /* --- Modals: bottom-sheet on mobile --- */
+  /* --- The sheet and dialogs become bottom sheets --- */
   .modal-overlay {
     align-items: flex-end !important;
     padding: 0 !important;
   }
   .modal-card {
-    border-radius: 16px 16px 0 0 !important;
+    border-radius: var(--r-main) var(--r-main) 0 0 !important;
     max-height: 92vh !important;
     max-width: 100% !important;
     width: 100% !important;
   }
-  .modal-card.modal-wide {
-    max-width: 100% !important;
-    overflow-y: auto !important;
+  .sheet {
+    height: 92vh;
   }
-
-  /* Reduce modal inner padding on mobile */
-  .modal-card .p-6 {
-    padding: 16px !important;
-  }
-
-  /* Modal content stays a single column on narrow screens */
-  .modal-wide #modal-body {
-    flex-direction: column !important;
-  }
-  .modal-wide #modal-main-content,
-  .modal-wide #modal-backlog-right {
-    max-height: none !important;
-    overflow-y: visible !important;
-  }
-  .modal-wide .logs-block {
+  .sheet .logs-block {
     max-height: 300px;
   }
 
-  /* Larger touch targets for interactive elements */
-  .btn,
-  .btn-ghost,
-  .btn-dashed {
-    min-height: 36px;
-  }
-  .btn-yellow,
-  .btn-green,
-  .btn-accent {
+  /* Larger touch targets */
+  .btn {
     min-height: 36px;
   }
 }

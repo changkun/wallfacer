@@ -185,6 +185,8 @@ describe('primitives.css defines the shared classes', () => {
     'src/components/TaskDetail.vue', 'src/components/TaskPrPanel.vue', 'src/components/AgentTrace.vue',
     'src/components/ReviewVerification.vue', 'src/components/SpanFlamegraph.vue', 'src/components/TaskCard.vue',
     'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue',
+    'src/views/ChatPage.vue', 'src/components/plan/SessionList.vue', 'src/components/plan/SpecChatPopup.vue', 'src/components/plan/ChatModelBadge.vue',
+    'src/components/plan/ChatMessageList.css', 'src/components/plan/ChatComposer.css', 'src/components/plan/AgentChatPanel.css', 'src/styles/multi-turn.css',
   ];
   it.each(tokenOnly)('%s uses tokens only', (file) => {
     const whole = read(file);
