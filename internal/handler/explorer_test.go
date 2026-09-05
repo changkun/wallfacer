@@ -1378,3 +1378,72 @@ func TestExplorerWriteFile_NewFileInSymlinkedWorkspace(t *testing.T) {
 		t.Fatalf("new file not written: %q err=%v", got, err)
 	}
 }
+
+func TestExplorerWriteFile_NewGitFileViaSymlinkRejected(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	gitDir := filepath.Join(ws, ".git")
+	if err := os.MkdirAll(filepath.Join(gitDir, "hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(ws, "meta")
+	if err := os.Symlink(gitDir, alias); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(alias, "hooks", "new-hook")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, writeFileRequest(t, target, ws, "must not enter git metadata"))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400: %s", w.Code, w.Body.String())
+	}
+	if _, err := os.Lstat(filepath.Join(gitDir, "hooks", "new-hook")); !os.IsNotExist(err) {
+		t.Errorf("new Git metadata file was created: %v", err)
+	}
+}
+
+func TestExplorerReadFile_SymlinkParentTraversalRejected(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	outside := t.TempDir()
+	if err := os.Mkdir(filepath.Join(outside, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "secret"), []byte("outside secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(ws, "link")
+	if err := os.Symlink(filepath.Join(outside, "sub"), link); err != nil {
+		t.Fatal(err)
+	}
+	target := link + "/../secret"
+	query := url.Values{"workspace": {ws}, "path": {target}}
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?"+query.Encode(), nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "outside secret") {
+		t.Error("response exposed an outside file")
+	}
+}
+
+func TestExplorerWriteFile_NewFileResolvesParentBeforeTraversal(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	if err := os.MkdirAll(filepath.Join(ws, "real", "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(ws, "alias")
+	if err := os.Symlink(filepath.Join(ws, "real", "sub"), link); err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, writeFileRequest(t, link+"/../new.txt", ws, "saved"))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	if got, err := os.ReadFile(filepath.Join(ws, "real", "new.txt")); err != nil || string(got) != "saved" {
+		t.Errorf("actual destination = %q, %v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(ws, "new.txt")); !os.IsNotExist(err) {
+		t.Errorf("write used the lexically cleaned path: %v", err)
+	}
+}

@@ -58,20 +58,32 @@ type explorerEntry struct {
 //
 // The path need not exist: a file about to be written is judged by the
 // directory it will land in. It returns the symlink-resolved path when the
-// target exists and the cleaned absolute path otherwise, so callers can stat
-// or write it directly.
+// target or its parent exists, and the cleaned absolute path otherwise.
+// Callers can stat or write the returned path directly.
 func isWithinWorkspace(requestedPath, workspace string) (string, error) {
-	inside, err := relpath.Contains(workspace, requestedPath)
+	// Resolve before checking containment: cleaning link/.. first changes
+	// which file the filesystem addresses. For a new file, resolve its parent
+	// so downstream restrictions (including .git protection) see the real path.
+	resolved, err := filepath.EvalSymlinks(requestedPath)
+	if err != nil {
+		parent, name := filepath.Split(requestedPath)
+		if dir, parentErr := filepath.EvalSymlinks(parent); parentErr == nil {
+			resolved = filepath.Join(dir, name)
+		} else {
+			resolved, err = filepath.Abs(requestedPath)
+			if err != nil {
+				return "", errors.New("workspace path not accessible")
+			}
+		}
+	}
+	inside, err := relpath.Contains(workspace, resolved)
 	if err != nil {
 		return "", errors.New("workspace path not accessible")
 	}
 	if !inside {
 		return "", errors.New("path is outside workspace")
 	}
-	if resolved, err := filepath.EvalSymlinks(requestedPath); err == nil {
-		return resolved, nil
-	}
-	return filepath.Abs(requestedPath)
+	return resolved, nil
 }
 
 // ExplorerTree lists one level of a workspace directory.
