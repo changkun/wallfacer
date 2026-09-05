@@ -18,7 +18,7 @@ The integration is deliberately experimental and opt-in. The built-in `implement
 
 Only the curated root package `latere.ai/x/topos` is a supported surface. `TestWallfacerImportsOnlyRootTopos` (`internal/agentgraph/boundary_test.go`) runs `go list` over every package and fails if any wallfacer package imports a topos engine subpackage (`latere.ai/x/topos/...`). This keeps the runtime an implementation detail: the engine can restructure internally without touching wallfacer, and no second seam can grow by accident.
 
-Consumers on the wallfacer side read the seam's exported entrypoints: `RunFlowWithModel` (multi-agent), `RunAgent` (single agent), `RunFlowFake` (explicit fake-model entrypoint for tests), and the assertion helpers `ModelOptions` / `RunOptions` that expose the option mapping without running a model.
+Consumers on the wallfacer side read the seam's exported entrypoints: `RunFlowWithModel` (multi-agent) and `RunAgent` (single agent). An unconfigured `ModelConfig` selects the deterministic fake model, which is how tests run flows without a credential.
 
 ## Model Resolution
 

@@ -143,14 +143,6 @@ type Event struct {
 	PayloadJSON json.RawMessage
 }
 
-// RunFlowFake runs a flow through the agent-graph runtime with the deterministic,
-// network-free fake model, returning a topos-free Result. sessionID seeds the
-// run id so trace node ids (<session>/<agent>) are stable. It is the explicit
-// fake entrypoint, equivalent to RunFlowWithModel with an unconfigured config.
-func RunFlowFake(ctx context.Context, sessionID string, f flow.Flow, reg *agents.Registry, prompt string) (Result, error) {
-	return RunFlowWithModel(ctx, sessionID, ModelConfig{}, f, reg, prompt, "", nil)
-}
-
 // toResult converts a topos.RunResult into the topos-free host Result.
 func toResult(in topos.RunResult) Result {
 	out := Result{Final: in.Final}

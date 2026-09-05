@@ -79,13 +79,6 @@ func modelOptions(c ModelConfig) topos.ModelOptions {
 	}
 }
 
-// ModelOptions builds the topos model options a ModelConfig selects, exposed so
-// the mapping can be asserted without running a model. It returns a
-// topos.ModelOptions value: a caller can read its fields (Kind, BaseURL, APIKey)
-// structurally without importing topos, keeping this seam the only place that
-// names the topos type.
-func ModelOptions(c ModelConfig) topos.ModelOptions { return modelOptions(c) }
-
 // runOptions builds the topos.Options for an agentic run from the session id,
 // the model config, and the flow. It is the single place that names
 // topos.Options: the model selection comes from the config and the recursion
@@ -97,14 +90,6 @@ func runOptions(sessionID string, c ModelConfig, f flow.Flow) topos.Options {
 		Model:           modelOptions(c),
 		MaxHandoffDepth: f.MaxHandoffDepth,
 	}
-}
-
-// RunOptions builds the topos.Options a run will use, exposed so the mapping
-// (notably MaxHandoffDepth threading) can be asserted without running a model.
-// A caller can read the returned value's fields structurally without importing
-// topos, keeping this seam the only place that names the topos type.
-func RunOptions(sessionID string, c ModelConfig, f flow.Flow) topos.Options {
-	return runOptions(sessionID, c, f)
 }
 
 // RunFlowWithModel runs a flow through the agent-graph runtime using the model
