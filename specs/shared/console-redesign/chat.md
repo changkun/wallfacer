@@ -1,6 +1,6 @@
 ---
 title: Chat
-status: validated
+status: complete
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -83,3 +83,39 @@ composer inside, close as `.icon-btn`.
   composer card is at the bottom of the main card, message column max width
   ≤ 760px, popup opens on `/routines` and stays inside the viewport.
   Screenshots `chat` light and dark, `chat-popup`.
+
+## Outcome
+
+**Status:** complete, 2026-09-05. Commit `65e802a3`.
+
+**What shipped.** `ChatMessageList.css` renders a user turn as a block on the
+sunk surface with a "You" eyebrow, the finished trajectory as a card of rows
+(the agent-trace shape), a `pill-run pulse` "working" pill beside the live
+title, errors on the err tint, and code on the radii ladder.
+`ChatComposer.css` makes the composer a card with a borderless prompt, the
+send as the ink button, the stop as the quiet danger ghost, the `/` and `@`
+actions as small icon buttons, and the dropdown a popover card.
+`AgentChatPanel.css` sets the panel on `--bg` with eyebrow title, pill thread
+tabs and ghost controls. `SessionList.vue` is the sunk column with nav-row
+geometry, the active session on the card surface, a dashed ghost "New chat",
+eyebrow group heads and counts. `ChatPage.vue` drops the ember glow, sizes
+the greeting on the type scale, pills the quick actions, and narrows the
+stream to 760px. `SpecChatPopup.vue` is a 44px ink launcher and a card
+window. `multi-turn.css` is on tokens and its id-addressed mobile modal rules
+are replaced by sheet rules. `checks.mjs` `chat` asserts the list, the
+composer, the entry width and the popup inside the viewport; `make ui-test`
+passes thirteen scenes. `ChatMessageList.test.ts` covers the working pill,
+the user block and the error tint.
+
+**Decisions made during implementation.**
+- The streaming title keeps its "Working…" text (an existing test pins it);
+  the pill sits beside it rather than replacing it.
+- The send stays a split button (send + shortcut toggle) on ink rather than a
+  bare `.btn.sm`: the toggle is part of the same affordance.
+- The chat popup keeps its drag and resize chrome; only material changed.
+
+**Deviations from the spec.** The user turn's author eyebrow is a CSS
+pseudo-element ("You") rather than template markup, so the message list's
+render path is untouched.
+
+**Follow-ups.** None beyond the sibling specs.
