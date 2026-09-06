@@ -63,6 +63,16 @@ function removeTag(i: number) { tags.value.splice(i, 1); }
 // A trailing comma typed/pasted into the draft auto-commits.
 watch(tagDraft, (v) => { if (v.includes(',')) { tagDraft.value = v.replace(/,/g, ''); commitTag(); } });
 
+// Timeout presets for the select; 'custom' reveals a minutes field.
+const TIMEOUT_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: '15', label: '15 min' },
+  { value: '30', label: '30 min' },
+  { value: '60', label: '1 hour' },
+  { value: '120', label: '2 hours' },
+  { value: '300', label: '5 hours' },
+  { value: 'custom', label: 'Custom…' },
+];
 const timeoutPreset = ref<'' | '15' | '30' | '60' | '120' | '300' | 'custom'>('');
 const timeoutCustomMin = ref<number | null>(null);
 const timeoutMin = computed<number | null>(() => {
@@ -304,7 +314,7 @@ function onInput(e: Event) {
       <textarea
         ref="textareaRef"
         v-model="prompt"
-        class="composer__prompt"
+        class="field composer__prompt"
         :placeholder="promptPlaceholder"
         rows="4"
         @keydown="onKeydown"
@@ -357,15 +367,7 @@ function onInput(e: Event) {
       <label class="composer__opt">
         <span class="composer__opt-label">Timeout</span>
         <div class="composer__opt-controls">
-          <select v-model="timeoutPreset" class="field composer__select" aria-label="Timeout preset">
-            <option value="">—</option>
-            <option value="15">15 min</option>
-            <option value="30">30 min</option>
-            <option value="60">1 hour</option>
-            <option value="120">2 hours</option>
-            <option value="300">5 hours</option>
-            <option value="custom">Custom…</option>
-          </select>
+          <AppSelect v-model="timeoutPreset" :options="TIMEOUT_OPTIONS" aria-label="Timeout preset" class="composer__select" />
           <input
             v-if="timeoutPreset === 'custom'"
             v-model.number="timeoutCustomMin"
@@ -377,16 +379,18 @@ function onInput(e: Event) {
           />
         </div>
       </label>
-      <button
-        type="button"
-        class="composer__more"
-        title="Mention a file (@)"
-        aria-label="Insert @ mention"
-        @click="insertAtMention"
-      >@</button>
-      <button type="button" class="composer__more" @click="showMore = !showMore">
-        {{ showMore ? '− Less' : '+ More' }}
-      </button>
+      <div class="composer__utils">
+        <button
+          type="button"
+          class="btn sm ghost composer__more"
+          title="Mention a file (@)"
+          aria-label="Insert @ mention"
+          @click="insertAtMention"
+        >@</button>
+        <button type="button" class="btn sm ghost composer__more" @click="showMore = !showMore">
+          {{ showMore ? '− Less' : '+ More' }}
+        </button>
+      </div>
     </div>
     <div v-if="showMore" class="composer__opts">
       <label class="composer__opt composer__opt--grow">
@@ -503,18 +507,12 @@ function onInput(e: Event) {
   color: var(--accent);
 }
 .composer__prompt-wrap { position: relative; }
+/* The prompt is a bounded field like every other control in the card. */
 .composer__prompt {
-  width: 100%;
+  min-height: 84px;
   resize: vertical;
-  min-height: 72px;
-  padding: 2px 0;
-  background: transparent;
-  color: var(--ink);
-  border: none;
   font-size: var(--fs-md);
   line-height: 1.45;
-  font-family: inherit;
-  outline: none;
 }
 .composer__prompt::placeholder {
   color: var(--ink-4);
@@ -585,12 +583,12 @@ function onInput(e: Event) {
 .composer__coord--experimental {
   color: var(--warn);
 }
-.composer__select,
 .composer__input {
   min-height: 30px;
   padding: 4px 8px;
   font-size: 12px;
 }
+.composer__select { min-width: 110px; }
 .composer__input--num { width: 88px; }
 /* Custom pickers match the field height and fill their column. */
 .composer__opt :deep(.app-select),
@@ -629,21 +627,18 @@ function onInput(e: Event) {
 .composer__tag-x:hover { color: var(--ink); }
 .composer__tag-input { flex: 1; min-width: 60px; background: none; border: none; outline: none; color: var(--ink); font-size: 12px; }
 .composer__tag-input::placeholder { color: var(--ink-4); }
-.composer__more {
-  /* Labels add ~18px above each control; these label-less utility buttons get
-     the same offset so they align with the control row. */
+/* Labels add 18px above each control; the label-less utility buttons take the
+   same offset so they sit on the control row. */
+.composer__utils {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 18px;
   align-self: flex-start;
-  background: none;
-  border: none;
-  color: var(--ink-3);
-  font-size: var(--fs-10);
-  cursor: pointer;
-  padding: 4px 6px;
-  line-height: 20px;
-  border-radius: var(--r-sm);
 }
-.composer__more:hover { color: var(--ink); background: var(--bg-sunk); }
+.composer__more {
+  min-height: 30px;
+}
 .composer__actions {
   display: flex;
   justify-content: flex-end;

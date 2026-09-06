@@ -47,10 +47,14 @@ describe('TaskComposer layout', () => {
   it('keeps the custom timeout input beside the select on one row', async () => {
     ({ app, host } = await mount());
 
-    const select = host.querySelector<HTMLSelectElement>('select[aria-label="Timeout preset"]');
+    // The timeout is the shared select: open it and pick Custom.
+    const select = host.querySelector<HTMLButtonElement>('.app-select__trigger[aria-label="Timeout preset"]');
     expect(select).not.toBeNull();
-    select!.value = 'custom';
-    select!.dispatchEvent(new Event('change'));
+    select!.click();
+    await nextTick();
+    const custom = Array.from(host.querySelectorAll<HTMLElement>('.app-select__opt')).find((o) => o.textContent?.includes('Custom'));
+    expect(custom).not.toBeUndefined();
+    custom!.click();
     await nextTick();
 
     const num = host.querySelector<HTMLInputElement>('.composer__input--num[aria-label="Custom timeout in minutes"]');
