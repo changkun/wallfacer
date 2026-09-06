@@ -81,7 +81,7 @@ spec:
               memory: 128Mi
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /livez
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 30

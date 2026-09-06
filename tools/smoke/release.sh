@@ -68,7 +68,7 @@ asset="$(grep -Eo "assets/app-[^\"'<> ]+\\.js" "$tmp/index.html" | head -1 || tr
 [ -n "$asset" ] || fail "GET /: no Vite entry asset in HTML"
 pass "asset present: $asset"
 
-check_status "GET /healthz" "/healthz" "200" "$tmp/healthz"
+check_status "GET /livez" "/livez" "200" "$tmp/livez"
 check_status "GET /api/debug/health" "/api/debug/health" "200" "$tmp/api_health"
 
 if [ -n "$OUTPUT_MD" ]; then
@@ -82,7 +82,7 @@ if [ -n "$OUTPUT_MD" ]; then
     [ -n "$BUILD_URL" ]  && echo "- Build: ${BUILD_URL}"
     [ -n "$DEPLOY_URL" ] && echo "- Deploy: ${DEPLOY_URL}"
     echo "- Asset: \`${asset}\`"
-    echo "- Smoke: \`GET /\`, \`/healthz\`, \`/api/debug/health\` returned 200"
+    echo "- Smoke: \`GET /\`, \`/livez\`, \`/api/debug/health\` returned 200"
   } > "$OUTPUT_MD"
 fi
 

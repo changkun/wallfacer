@@ -159,7 +159,7 @@ once production is deployed and smoke-passing. Tags with a `-suffix`
 `-ldflags "-X latere.ai/x/wallfacer/internal/cli.Version=X.Y.Z"`,
 stamping the version for `wallfacer doctor` and usage output.
 
-**Release evidence.** `tools/smoke/release.sh` checks `/`, `/healthz`, and
+**Release evidence.** `tools/smoke/release.sh` checks `/`, `/livez`, and
 `/api/debug/health` against the live deployment and, when `OUTPUT_MD` is set,
 writes a markdown evidence block (tag, commit, build/deploy links, served
 asset, smoke result). The `deploy` job mirrors it to the run summary and

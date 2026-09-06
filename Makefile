@@ -195,4 +195,4 @@ release-prod:
 	@echo ">> [4/5] rolling out to $(RELEASE_NS)/$(RELEASE_DEPLOYMENT) (watch)"
 	kubectl set image deployment/$(RELEASE_DEPLOYMENT) $(RELEASE_DEPLOYMENT)=$(RELEASE_IMAGE):$(REL_VER) -n $(RELEASE_NS)
 	kubectl rollout status deployment/$(RELEASE_DEPLOYMENT) -n $(RELEASE_NS) --timeout=200s
-	@echo ">> [5/5] smoke" && curl -fsS $(RELEASE_URL)/healthz && echo " <- healthz ok ($(REL_VER) live)"
+	@echo ">> [5/5] smoke" && curl -fsS $(RELEASE_URL)/livez && echo " <- livez ok ($(REL_VER) live)"
