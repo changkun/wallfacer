@@ -7,8 +7,8 @@ import (
 	"slices"
 
 	"latere.ai/x/pkg/atomicfile"
-	"latere.ai/x/pkg/registry"
 	"latere.ai/x/pkg/sanitize"
+	"latere.ai/x/pkg/uniq"
 
 	"latere.ai/x/wallfacer/internal/pkg/yamldir"
 
@@ -118,9 +118,9 @@ func NewMergedRegistry(dir string) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	all, err := registry.MergeUnique("agent", BuiltinAgents, user, func(r Role) string { return r.Slug }, nil)
+	all, err := uniq.Merge(BuiltinAgents, user, func(r Role) string { return r.Slug })
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("user agent shadows a built-in slug; rename the file: %w", err)
 	}
 	return NewRegistry(all...), nil
 }
