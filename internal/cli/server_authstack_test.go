@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/authkit"
-	"latere.ai/x/pkg/jwtauth"
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/jwt"
+	"latere.ai/x/pkg/authkit/oidc"
 
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/handler"
@@ -33,7 +33,7 @@ import (
 // when WALLFACER_CLOUD is on: BearerAuth wraps next, OptionalAuth wraps
 // BearerAuth. apiKey="" disables the static-key check (local cloud
 // deployment without a key).
-func stackWithValidator(t *testing.T, v *jwtauth.Validator, apiKey string, captured **authkit.Identity) http.Handler {
+func stackWithValidator(t *testing.T, v *jwt.Validator, apiKey string, captured **authkit.Identity) http.Handler {
 	t.Helper()
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, _ := auth.PrincipalFromContext(r.Context())

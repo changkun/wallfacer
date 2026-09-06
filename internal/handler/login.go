@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/oidc"
 )
 
 // AuthProvider is the subset of *oidc.Client the HTTP handlers need. Kept

@@ -3,7 +3,7 @@ package auth_test
 import (
 	"testing"
 
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/oidc"
 )
 
 // TestNew_EmptyConfigReturnsNil confirms the graceful-degrade contract we

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"golang.org/x/oauth2"
-	"latere.ai/x/pkg/authkit"
+	"latere.ai/x/pkg/authkit/cli"
 )
 
 // TestRunAuthLogout_RemovesToken verifies the logout subcommand calls
@@ -20,11 +20,11 @@ func TestRunAuthLogout_RemovesToken(t *testing.T) {
 	// touch ~/.config/latere/token.json on a real machine.
 	t.Setenv("XDG_CONFIG_HOME", dir)
 
-	storePath, err := authkit.DefaultFileTokenStorePath()
+	storePath, err := cli.DefaultFileTokenStorePath()
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := authkit.NewFileTokenStore(storePath)
+	store, err := cli.NewFileTokenStore(storePath)
 	if err != nil {
 		t.Fatal(err)
 	}

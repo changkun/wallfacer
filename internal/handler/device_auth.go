@@ -12,8 +12,8 @@ import (
 
 	"latere.ai/x/pkg/httpjson"
 
-	"latere.ai/x/pkg/authkit"
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/cli"
+	"latere.ai/x/pkg/authkit/oidc"
 
 	"golang.org/x/oauth2"
 )
@@ -25,7 +25,7 @@ import (
 //	GET  /api/auth/device/poll   -> { status: pending | done | denied, ... }
 //	POST /api/auth/device/cancel -> {}
 //
-// Token persistence is done via authkit.FileTokenStore at
+// Token persistence is done via cli.FileTokenStore at
 // <UserConfigDir>/latere/token.json, the same path latere-cli and the
 // `wallfacer auth login` CLI use, so all three share a single login.
 //
@@ -33,7 +33,7 @@ import (
 // when /start is called again (the previous flow is cancelled).
 type DeviceAuth struct {
 	OIDC      *oidc.Client
-	Store     authkit.TokenStore
+	Store     cli.TokenStore
 	NewClient func() *oidc.Client // optional override for tests
 
 	mu   sync.Mutex

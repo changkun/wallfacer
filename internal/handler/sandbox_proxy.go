@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/pkg/jwtauth"
+	"latere.ai/x/pkg/authkit/jwt"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -68,7 +68,7 @@ type SandboxProxy struct {
 	// require one of scp=llm:proxy / scp=github:token per route. Nil
 	// means no validator is configured: an enabled proxy then rejects
 	// every request (fail closed).
-	Validator *jwtauth.Validator
+	Validator *jwt.Validator
 }
 
 // NewSandboxProxy constructs a trust-plane proxy from config and a
@@ -76,7 +76,7 @@ type SandboxProxy struct {
 // proxy without a validator rejects every request (fail closed).
 // Local runs without credentials keep cfg.Enabled false and 503
 // before any JWT check.
-func NewSandboxProxy(cfg SandboxProxyConfig, v *jwtauth.Validator) *SandboxProxy {
+func NewSandboxProxy(cfg SandboxProxyConfig, v *jwt.Validator) *SandboxProxy {
 	return &SandboxProxy{
 		Cfg:       cfg,
 		Client:    &http.Client{Timeout: 5 * time.Minute, Transport: otel.Transport(nil)},
@@ -254,7 +254,7 @@ func (p *SandboxProxy) forwardLLM(
 // A nil validator fails closed: the proxy cannot establish who is
 // calling, so it rejects instead of accepting the request as
 // anonymous-but-authorized.
-func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, scope string) (*jwtauth.Claims, bool) {
+func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, scope string) (*jwt.Claims, bool) {
 	if p.Validator == nil {
 		http.Error(w, "sandbox proxy JWT validator not configured", http.StatusServiceUnavailable)
 		return nil, false
@@ -284,7 +284,7 @@ func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, sco
 // 8693 delegator first, so a delegated agent's call attributed to its grantor;
 // the identity service removed agent delegation and no longer mints a token
 // carrying a delegator, so the principal IS the user.
-func callerSub(c *jwtauth.Claims) string {
+func callerSub(c *jwt.Claims) string {
 	if c == nil {
 		return ""
 	}

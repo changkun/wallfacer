@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/authkit/jwt"
+	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/jwtauth"
 	"latere.ai/x/pkg/metrics"
-	"latere.ai/x/pkg/oidc"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
@@ -278,7 +278,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
 	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
 	var (
-		jwtValidator *jwtauth.Validator
+		jwtValidator *jwt.Validator
 		authClient   *oidc.Client
 	)
 	// Sign-in is wired by default using the public (secret-less) "wallfacer"
@@ -1416,7 +1416,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// fail closed: an enabled proxy without a validator rejects every
 	// request, so a deployment that sets the SANDBOX_PROXY_*
 	// credentials must set the auth URL too.
-	var sandboxProxyValidator *jwtauth.Validator
+	var sandboxProxyValidator *jwt.Validator
 	if u := os.Getenv("SANDBOX_PROXY_AUTH_URL"); u != "" {
 		sandboxProxyValidator = auth.BuildValidator(
 			oidc.Config{AuthURL: u},

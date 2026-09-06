@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/oidc"
 )
 
 // fakeMeAuth is an AuthProvider that also implements meBuilder, so AuthMe takes

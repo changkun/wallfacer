@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/oidc"
 )
 
 // TestResolveAuthConfig_PublicDefault verifies that with no AUTH_* env a plain

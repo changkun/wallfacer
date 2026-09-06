@@ -12,8 +12,8 @@ import (
 	"strings"
 	"syscall"
 
-	"latere.ai/x/pkg/authkit"
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/cli"
+	"latere.ai/x/pkg/authkit/oidc"
 )
 
 // RunAuth dispatches the `wallfacer auth` subcommand:
@@ -83,11 +83,11 @@ func runAuthLogin(args []string) error {
 	noBrowser := fs.Bool("no-browser", false, "do not open the browser automatically")
 	_ = fs.Parse(args)
 
-	storePath, err := authkit.DefaultFileTokenStorePath()
+	storePath, err := cli.DefaultFileTokenStorePath()
 	if err != nil {
 		return fmt.Errorf("locate token store: %w", err)
 	}
-	store, err := authkit.NewFileTokenStore(storePath)
+	store, err := cli.NewFileTokenStore(storePath)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func runAuthLogin(args []string) error {
 		return errors.New("oidc: missing AuthURL or ClientID")
 	}
 
-	dcc := authkit.NewDeviceCodeClient(client, store)
+	dcc := cli.NewDeviceCodeClient(client, store)
 	dcc.Output = os.Stderr
 	if *noBrowser {
 		dcc.OpenBrowser = func(string) error { return nil }
@@ -121,11 +121,11 @@ func runAuthLogin(args []string) error {
 }
 
 func runAuthLogout() error {
-	storePath, err := authkit.DefaultFileTokenStorePath()
+	storePath, err := cli.DefaultFileTokenStorePath()
 	if err != nil {
 		return err
 	}
-	store, err := authkit.NewFileTokenStore(storePath)
+	store, err := cli.NewFileTokenStore(storePath)
 	if err != nil {
 		return err
 	}
@@ -137,11 +137,11 @@ func runAuthLogout() error {
 }
 
 func runAuthWhoami() error {
-	storePath, err := authkit.DefaultFileTokenStorePath()
+	storePath, err := cli.DefaultFileTokenStorePath()
 	if err != nil {
 		return err
 	}
-	store, err := authkit.NewFileTokenStore(storePath)
+	store, err := cli.NewFileTokenStore(storePath)
 	if err != nil {
 		return err
 	}

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"latere.ai/x/pkg/authkit"
+	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/metrics"
-	"latere.ai/x/pkg/oidc"
 
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/handler"

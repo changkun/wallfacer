@@ -19,7 +19,7 @@ require (
 	golang.org/x/text v0.39.0
 	google.golang.org/grpc v1.83.1
 	gopkg.in/yaml.v3 v3.0.1
-	latere.ai/x/pkg v0.50.1-0.20260905122732-8add66b8b7d1
+	latere.ai/x/pkg v0.53.0
 	latere.ai/x/topos v0.4.1-0.20260905141805-f958ba52ca5e
 )
 

@@ -12,13 +12,13 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/oidc"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
-// fakeTokenStore is an in-memory authkit.TokenStore for exercising the token
+// fakeTokenStore is an in-memory cli.TokenStore for exercising the token
 // callback without touching disk.
 type fakeTokenStore struct {
 	tok    *oauth2.Token

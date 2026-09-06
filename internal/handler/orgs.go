@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/pkg/httpjson"

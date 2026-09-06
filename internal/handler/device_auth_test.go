@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/pkg/authkit"
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/cli"
+	"latere.ai/x/pkg/authkit/oidc"
 
 	"golang.org/x/oauth2"
 )
@@ -52,7 +52,7 @@ func TestDeviceAuth_Lifecycle(t *testing.T) {
 	defer srv.Close()
 
 	tmpStore := filepath.Join(t.TempDir(), "token.json")
-	store, _ := authkit.NewFileTokenStore(tmpStore)
+	store, _ := cli.NewFileTokenStore(tmpStore)
 	d := &DeviceAuth{OIDC: c, Store: store}
 
 	mux := deviceMux(d)
@@ -246,7 +246,7 @@ func TestDeviceAuth_SignsInViaAuthMe(t *testing.T) {
 		CookieKey:       "0011223344556677889900aabbccddeeff",
 		InsecureCookies: true,
 	})
-	store, _ := authkit.NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
+	store, _ := cli.NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
 
 	h, _ := newTestHandlerWithWorkspaces(t)
 	// The same client backs both surfaces so the minted cookie is readable.
@@ -322,7 +322,7 @@ func TestHandler_SetDeviceAuth_Wires(t *testing.T) {
 		`{"device_code":"dc","user_code":"UC-9","verification_uri":"https://verify.example/","expires_in":300,"interval":1}`,
 		`{"error":"authorization_pending"}`, http.StatusBadRequest)
 	defer srv.Close()
-	store, _ := authkit.NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
+	store, _ := cli.NewFileTokenStore(filepath.Join(t.TempDir(), "token.json"))
 	h.SetDeviceAuth(&DeviceAuth{OIDC: c, Store: store})
 
 	rec = httptest.NewRecorder()
@@ -343,7 +343,7 @@ func TestDeviceAuth_Cancel(t *testing.T) {
 	defer srv.Close()
 
 	tmpStore := filepath.Join(t.TempDir(), "token.json")
-	store, _ := authkit.NewFileTokenStore(tmpStore)
+	store, _ := cli.NewFileTokenStore(tmpStore)
 	d := &DeviceAuth{OIDC: c, Store: store}
 
 	mux := deviceMux(d)

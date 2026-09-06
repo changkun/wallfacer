@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"latere.ai/x/pkg/authkit"
-	"latere.ai/x/pkg/jwtauth"
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/jwt"
+	"latere.ai/x/pkg/authkit/oidc"
 )
 
 // identityCtxKey scopes the context value used to carry the resolved principal
@@ -22,7 +22,7 @@ import (
 // from authkit.IdentityFromContext, which cannot tell "absent" from "zero".
 type identityCtxKey struct{}
 
-// BuildValidator constructs a jwtauth.Validator from the OIDC configuration.
+// BuildValidator constructs a jwt.Validator from the OIDC configuration.
 // JWKS endpoint is auto-derived from cfg.AuthURL when not passed
 // explicitly. Issuer validation is optional and only applied when an
 // explicit issuer is passed or AUTH_ISSUER is set — fosite-issued JWT
@@ -35,14 +35,14 @@ type identityCtxKey struct{}
 // to keep the default (empty issuer = skip iss check). The CLI boot
 // path reads AUTH_JWKS_URL and AUTH_ISSUER from the environment and
 // forwards them here.
-func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwtauth.Validator {
+func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwt.Validator {
 	if cfg.AuthURL == "" {
 		return nil
 	}
 	if jwksURL == "" {
 		jwksURL = strings.TrimRight(cfg.AuthURL, "/") + "/.well-known/jwks.json"
 	}
-	jc := jwtauth.Config{
+	jc := jwt.Config{
 		JWKSURL: jwksURL,
 		Issuer:  issuer, // empty = skip iss check; operator sets AUTH_ISSUER to opt in
 	}
@@ -62,7 +62,7 @@ func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwtauth.Validator 
 		}
 		jc.Audiences = auds
 	}
-	return jwtauth.New(jc)
+	return jwt.New(jc)
 }
 
 // OptionalAuth validates a Bearer JWT when present and injects the resolved
@@ -77,13 +77,13 @@ func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwtauth.Validator 
 //   - Bearer present, validation ok     -> inject *authkit.Identity into ctx
 //
 // A nil validator (local mode) returns next unchanged.
-func OptionalAuth(v *jwtauth.Validator, next http.Handler) http.Handler {
+func OptionalAuth(v *jwt.Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
-	jwt := authkit.NewJWT(v, nil)
+	bearerAuth := jwt.NewAuthenticator(v, nil)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if id, err := jwt.Authenticate(r); err == nil {
+		if id, err := bearerAuth.Authenticate(r); err == nil {
 			next.ServeHTTP(w, withIdentity(r, &id))
 			return
 		}
@@ -94,17 +94,17 @@ func OptionalAuth(v *jwtauth.Validator, next http.Handler) http.Handler {
 // Auth validates a Bearer JWT and rejects the request on failure with
 // 401. Use this on routes that strictly require an authenticated
 // principal. A nil validator returns next unchanged (local mode).
-func Auth(v *jwtauth.Validator, next http.Handler) http.Handler {
+func Auth(v *jwt.Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
-	jwt := authkit.NewJWT(v, nil)
+	bearerAuth := jwt.NewAuthenticator(v, nil)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := bearerToken(r); !ok {
 			writeUnauthorized(w, "missing bearer token")
 			return
 		}
-		id, err := jwt.Authenticate(r)
+		id, err := bearerAuth.Authenticate(r)
 		if err != nil {
 			writeUnauthorized(w, err.Error())
 			return
@@ -115,7 +115,7 @@ func Auth(v *jwtauth.Validator, next http.Handler) http.Handler {
 
 // CookieAuth resolves the principal from the encrypted session cookie when no
 // Bearer-sourced identity is already present, via the shared
-// authkit.SessionAuthenticator (which trusts the AES-GCM-authenticated cookie —
+// oidc.SessionAuthenticator (which trusts the AES-GCM-authenticated cookie —
 // the platform-canonical posture, replacing wallfacer's former bespoke
 // re-validation). A nil client (local mode) returns next unchanged.
 //
@@ -128,7 +128,7 @@ func CookieAuth(client *oidc.Client, next http.Handler) http.Handler {
 	if client == nil {
 		return next
 	}
-	sess := authkit.NewSessionAuthenticator(client)
+	sess := oidc.NewSessionAuthenticator(client)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, already := PrincipalFromContext(r.Context()); already {
 			next.ServeHTTP(w, r)

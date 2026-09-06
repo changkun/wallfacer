@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"latere.ai/x/pkg/authkit"
-	"latere.ai/x/pkg/oidc"
+	"latere.ai/x/pkg/authkit/cli"
+	"latere.ai/x/pkg/authkit/oidc"
 
 	"latere.ai/x/pkg/gitutil"
 
@@ -95,7 +95,7 @@ func loadOptIn(path string) bool {
 // a goroutine. It returns the gate so the settings layer can toggle opt-in. The
 // connector self-gates on sign-in (a stored token) and opt-in, so calling this
 // unconditionally is safe: nothing dials until both hold.
-func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, tokenStore authkit.TokenStore, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
+func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, tokenStore cli.TokenStore, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
 	gate := &coordinationGate{path: filepath.Join(configDir, "coordination-opt-in")}
 	gate.optedIn.Store(loadOptIn(gate.path))
 
@@ -163,12 +163,12 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 // newCoordinationTokenStore opens the persisted token store the connector reads
 // and the session bridge writes (the same path `wallfacer auth login` and the
 // latere CLI use). Returns nil on failure; the connector then stays disabled.
-func newCoordinationTokenStore() authkit.TokenStore {
-	p, err := authkit.DefaultFileTokenStorePath()
+func newCoordinationTokenStore() cli.TokenStore {
+	p, err := cli.DefaultFileTokenStorePath()
 	if err != nil {
 		return nil
 	}
-	store, err := authkit.NewFileTokenStore(p)
+	store, err := cli.NewFileTokenStore(p)
 	if err != nil {
 		return nil
 	}
@@ -184,11 +184,11 @@ func newCoordinationTokenStore() authkit.TokenStore {
 // so signing in via the UI enables the outbound connection automatically.
 type sessionTokenBridge struct {
 	client *oidc.Client
-	store  authkit.TokenStore
+	store  cli.TokenStore
 	last   atomic.Value // string: last access token written, to skip redundant saves
 }
 
-func newSessionTokenBridge(client *oidc.Client, store authkit.TokenStore) *sessionTokenBridge {
+func newSessionTokenBridge(client *oidc.Client, store cli.TokenStore) *sessionTokenBridge {
 	return &sessionTokenBridge{client: client, store: store}
 }
 
@@ -244,7 +244,7 @@ type authConfigForRefresh struct {
 // device-code token (the same token.json the local board's sign-in writes) and
 // refreshes it when expired. Returns ("", false) when signed out so the
 // connector stays idle.
-func coordinationTokenFunc(ctx context.Context, store authkit.TokenStore, oidcClient *oidc.Client) func() (string, bool) {
+func coordinationTokenFunc(ctx context.Context, store cli.TokenStore, oidcClient *oidc.Client) func() (string, bool) {
 	return func() (string, bool) {
 		tok, err := store.Load()
 		if err != nil || tok == nil || tok.AccessToken == "" {
