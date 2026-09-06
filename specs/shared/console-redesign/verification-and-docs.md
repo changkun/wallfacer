@@ -122,8 +122,8 @@ lists the surfaces, the scenes, the CI job and the one command.
 - The gate is a job in this repository's frontend workflow rather than a
   gate in the shared lateregate bar: it needs Chromium and a Go build, which
   the shared Go bar does not carry.
-- The stale `frontend/package-lock.json` stays for a separate housekeeping
-  commit; the memory note warns against running npm in `frontend/`.
+- The stale `frontend/package-lock.json` was an untracked local leftover;
+  it is deleted, and `bun install` is the only install path in `frontend/`.
 
 **Deviations from the spec.** The seed adds a routine and an artifact but
 not an agent document, a spec comment or a chat session with a tool call:
@@ -131,4 +131,4 @@ the agents page ships built-in fleets, and the chat surface renders its
 empty state; both read well without fixtures. `docs/guide/configuration.md`
 already carried the six-palette roster from the settings child.
 
-**Follow-ups.** Delete `frontend/package-lock.json`.
+**Follow-ups.** None.

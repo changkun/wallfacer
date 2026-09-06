@@ -312,7 +312,6 @@ per-component theme map. The routines editor became inline row controls
 because the API edits one field; the artifacts viewer kept its preview-first
 layout; the agent editor stayed a dialog rather than a drawer.
 
-**Follow-ups.** Delete `frontend/package-lock.json` (stale since the bun
-switch). The board card's routine footer still uses a native checkbox where
-the routines page uses the segmented switch.
+**Follow-ups.** The board card's routine footer still uses a native checkbox
+where the routines page uses the segmented switch.
 

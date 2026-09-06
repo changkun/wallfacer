@@ -149,9 +149,9 @@ Snapshots gain `picker`, `terminal` and `explorer`.
 with cards of rows, as specified, but the picker's list view keeps its rows
 in a card rather than bare `.rows` so it reads like the editor beside it.
 
-**Surprises.** `frontend/package-lock.json` is stale since the switch to bun
-and still pins latere-ui 1.9.12; running `npm` against it downgraded
-`node_modules/latere-ui` and broke the typecheck until `bun install` restored
-it. The lockfile is a leftover for a follow-up.
+**Surprises.** An untracked `frontend/package-lock.json` left on the machine
+from before the bun switch still pinned latere-ui 1.9.12; running `npm`
+against it downgraded `node_modules/latere-ui` and broke the typecheck until
+`bun install` restored it. The file is ignored by git and was deleted locally.
 
-**Follow-ups.** Delete `frontend/package-lock.json` in a housekeeping commit.
+**Follow-ups.** None.
