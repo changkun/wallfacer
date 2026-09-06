@@ -27,9 +27,9 @@ type identityCtxKey struct{}
 // explicitly. Issuer validation is optional and only applied when an
 // explicit issuer is passed or AUTH_ISSUER is set — fosite-issued JWT
 // access tokens don't always carry iss that matches the discovery
-// document. Audience validation uses cfg.ClientID when configured so
-// tokens minted for other relying parties are rejected. Returns nil
-// when cfg.AuthURL is empty.
+// document. Audience validation accepts exactly cfg.ClientID when
+// configured, never the issuer, so tokens minted for other relying
+// parties are rejected. Returns nil when cfg.AuthURL is empty.
 //
 // jwksURL and issuer override the derived defaults; pass "" for either
 // to keep the default (empty issuer = skip iss check). The CLI boot
@@ -47,20 +47,12 @@ func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwt.Validator {
 		Issuer:  issuer, // empty = skip iss check; operator sets AUTH_ISSUER to opt in
 	}
 	if cfg.ClientID != "" {
-		// Accept both the client id and the issuer (AuthURL) as audiences. The
-		// auth server stamps the issuer into every access token's aud
-		// unconditionally as the universal "valid at our own resource servers"
-		// marker, and a public client's allowed_audiences is just the issuer, so
-		// a token minted for this client carries aud=[issuer], not aud=[clientID].
-		// Without the issuer in this set the coordination connection (and any
-		// Bearer-JWT API call) is rejected with "invalid audience" even though the
-		// token is genuine. audMatch is OR, so accepting either keeps the
-		// other-relying-party rejection while admitting our own tokens.
-		auds := []string{cfg.ClientID}
-		if iss := strings.TrimRight(cfg.AuthURL, "/"); iss != "" && iss != cfg.ClientID {
-			auds = append(auds, iss)
-		}
-		jc.Audiences = auds
+		// Only this relying party's own audience is accepted. The auth server
+		// stamps the issuer (AuthURL) into every access token's aud, so
+		// admitting the issuer here would admit a token minted for any other
+		// latere service. The relying-party config requests aud=ClientID on
+		// /authorize (oidc.Config.Audience) so our own tokens carry it.
+		jc.Audiences = []string{cfg.ClientID}
 	}
 	return jwt.New(jc)
 }

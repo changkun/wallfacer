@@ -43,6 +43,11 @@ spec:
             # required and lives in its own minimal secret.
             - name: AUTH_CLIENT_ID
               value: wallfacer
+            # Requested on /authorize so the access token carries
+            # aud=wallfacer; the API validator accepts only this audience
+            # (never the issuer, which every latere token carries).
+            - name: AUTH_AUDIENCE
+              value: wallfacer
             - name: AUTH_COOKIE_KEY
               valueFrom:
                 secretKeyRef:

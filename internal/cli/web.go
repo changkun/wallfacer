@@ -49,9 +49,15 @@ func runWeb(args []string, frontendFS fs.FS) error {
 		ClientSecret: os.Getenv("AUTH_CLIENT_SECRET"),
 		RedirectURL:  os.Getenv("AUTH_REDIRECT_URL"),
 		CookieKey:    os.Getenv("AUTH_COOKIE_KEY"),
+		Audience:     os.Getenv("AUTH_AUDIENCE"),
 	}
 	if authCfg.AuthURL == "" {
 		authCfg.AuthURL = "https://auth.latere.ai"
+	}
+	// Request aud=ClientID so the validator below admits the token; the
+	// oidc default (aud=AuthURL) is rejected on purpose.
+	if authCfg.Audience == "" {
+		authCfg.Audience = authCfg.ClientID
 	}
 	authClient := oidc.New(authCfg)
 

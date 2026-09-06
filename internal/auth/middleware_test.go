@@ -211,15 +211,13 @@ func TestOptionalAuth_AudienceMismatchPassesThroughAnonymous(t *testing.T) {
 	}
 }
 
-// TestOptionalAuth_IssuerAudienceAccepted is the regression for the
-// coordination-plane "503 / invalid audience" bug: the auth server mints tokens
-// whose aud is the issuer (AuthURL), not the client id, because a public
-// client's allowed_audiences is just the issuer. The validator must admit such a
-// token, or every coordination dial (and Bearer-JWT API call) is rejected.
-func TestOptionalAuth_IssuerAudienceAccepted(t *testing.T) {
+// TestOptionalAuth_IssuerAudienceRejected pins the audience contract: the
+// auth server stamps the issuer (AuthURL) into every access token's aud, so
+// a validator that admitted the issuer would admit a token minted for any
+// other latere service. Only aud=ClientID is accepted.
+func TestOptionalAuth_IssuerAudienceRejected(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	// AuthURL is the issuer; the token's iss must match the validator's issuer.
 	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL)
 
 	payload := defaultPayload(time.Now().Add(time.Hour))
@@ -235,10 +233,35 @@ func TestOptionalAuth_IssuerAudienceAccepted(t *testing.T) {
 	h.ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
+		t.Fatalf("status = %d, want 200 (pass through)", w.Code)
 	}
+	if capt.ok {
+		t.Fatalf("issuer-audience token accepted; got claims %+v", capt.seen)
+	}
+}
+
+// TestOptionalAuth_ClientAndIssuerAudienceAccepted covers the shape auth mints
+// for a client registered for its own audience: aud=[issuer, client_id]. The
+// client id entry is what admits the token.
+func TestOptionalAuth_ClientAndIssuerAudienceAccepted(t *testing.T) {
+	key := genKey(t)
+	srv := serveJWKS(t, key)
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL)
+
+	payload := defaultPayload(time.Now().Add(time.Hour))
+	payload["iss"] = srv.URL
+	payload["aud"] = []string{srv.URL, "my-client"}
+	tok := signToken(t, key, defaultHeader(key), payload)
+
+	capt := &claimsCapture{}
+	h := auth.OptionalAuth(v, capt.handler())
+	r := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
 	if !capt.ok {
-		t.Fatal("issuer-audience token rejected; PrincipalFromContext returned !ok")
+		t.Fatal("aud=[issuer, client_id] token rejected; PrincipalFromContext returned !ok")
 	}
 	if capt.seen.Sub != "user-abc" {
 		t.Errorf("claims.Sub = %q, want user-abc", capt.seen.Sub)
