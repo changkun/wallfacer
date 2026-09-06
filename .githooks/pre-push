@@ -1,0 +1,7 @@
+#!/bin/sh
+# pre-push: golangci-lint over the packages this push changes, so a lint
+# finding is seen before CI rather than as a fix commit after it. The check
+# lives in lateregate; this file only calls it. Refs arrive on stdin, once:
+# a repository that adds its own check below reads $refs, not stdin.
+refs=$(cat)
+printf '%s\n' "$refs" | go tool lateregate prepush || exit 1
