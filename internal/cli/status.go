@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"latere.ai/x/pkg/otel"
 	"latere.ai/x/pkg/sanitize"
 )
 
@@ -105,7 +106,7 @@ func apiGet(addr, path, key string) (*http.Response, error) {
 	if key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
-	return http.DefaultClient.Do(req)
+	return otel.HTTPClient().Do(req)
 }
 
 // fetchTasks calls GET /api/tasks and returns the decoded slice.
