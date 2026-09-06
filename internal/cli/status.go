@@ -94,9 +94,23 @@ func truncate(s string, n int) string {
 	return sanitize.Truncate(s, n)
 }
 
+// apiGet issues GET addr+path with the server API key as Bearer when one is
+// known. A local instance always has a key (generated at startup when none is
+// configured), so an unauthenticated GET would 401.
+func apiGet(addr, path, key string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, addr+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	return http.DefaultClient.Do(req)
+}
+
 // fetchTasks calls GET /api/tasks and returns the decoded slice.
-func fetchTasks(addr string) ([]taskSummary, error) {
-	resp, err := http.Get(addr + "/api/tasks?include_archived=false")
+func fetchTasks(addr, key string) ([]taskSummary, error) {
+	resp, err := apiGet(addr, "/api/tasks?include_archived=false", key)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +176,7 @@ func printBoard(addr string, tasks []taskSummary) {
 }
 
 // RunStatus implements the `wallfacer status` subcommand.
-func RunStatus(_ string, args []string) {
+func RunStatus(configDir string, args []string) {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	defaultAddr := cmp.Or(os.Getenv("ADDR"), "http://localhost:8080")
 	addr := fs.String("addr", defaultAddr, "wallfacer server address (or ADDR env var)")
@@ -171,9 +185,10 @@ func RunStatus(_ string, args []string) {
 	_ = fs.Parse(args)
 
 	serverAddr := strings.TrimRight(*addr, "/")
+	apiKey := readServerAPIKey(configDir)
 
 	if *jsonOut {
-		resp, err := http.Get(serverAddr + "/api/tasks?include_archived=false")
+		resp, err := apiGet(serverAddr, "/api/tasks?include_archived=false", apiKey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "wallfacer: server not reachable at %s\n", serverAddr)
 			os.Exit(1)
@@ -190,7 +205,7 @@ func RunStatus(_ string, args []string) {
 	}
 
 	render := func() bool {
-		tasks, err := fetchTasks(serverAddr)
+		tasks, err := fetchTasks(serverAddr, apiKey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "wallfacer: server not reachable at %s\n", serverAddr)
 			return false

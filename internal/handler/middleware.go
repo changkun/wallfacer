@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"latere.ai/x/pkg/bearer"
 	"latere.ai/x/pkg/httpjson"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -113,16 +114,18 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
+			// Constant-time compares: a plain == returns on the first differing
+			// byte and leaks how much of the key a probe got right.
 			if isSSEPath(r.URL.Path) {
-				if r.URL.Query().Get("token") != key {
+				if !bearer.Equal(r.URL.Query().Get("token"), key) {
 					httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 					return
 				}
 				next.ServeHTTP(w, r)
 				return
 			}
-			got := strings.TrimSpace(r.Header.Get("Authorization"))
-			if got != "Bearer "+key {
+			got, ok := auth.BearerToken(r.Header.Get("Authorization"))
+			if !ok || !bearer.Equal(got, key) {
 				httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}

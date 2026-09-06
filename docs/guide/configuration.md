@@ -202,7 +202,7 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_SERVER_API_KEY` | | Require `Authorization: Bearer <key>` on API requests; bypassed when a signed-in identity is present. SSE endpoints accept `?token=` |
+| `WALLFACER_SERVER_API_KEY` | generated at `~/.wallfacer/server-api-key` | Require `Authorization: Bearer <key>` on API requests; bypassed when a signed-in identity is present. SSE endpoints accept `?token=`. A local run without a configured key generates one on first start and logs the file path; `wallfacer status` and the e2e scripts read it from there. The browser receives the key through the page only over a loopback connection, so a client on another host opens `http://<host>:<port>/?token=<key>` once |
 | `WALLFACER_DRIFT_TESTER` | off | Experimental spec drift pipeline: on task completion, an assessment agent classifies the linked spec as complete or stale instead of completing it directly |
 | `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days soft-deleted tasks remain restorable from the Trash |
 | `WALLFACER_MAX_TURN_OUTPUT_BYTES` | `8388608` | Per-turn output budget; longer output is truncated (0 = unlimited) |

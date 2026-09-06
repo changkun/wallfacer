@@ -527,9 +527,12 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	reg := metrics.NewRegistry()
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), stubVueFS(t), false)
 
-	// "/" serves the injected SPA index.
+	// "/" serves the injected SPA index. The key is released to a loopback
+	// peer (httptest's default RemoteAddr is not loopback).
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "127.0.0.1:4321"
+	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET /: status %d, want 200", rr.Code)
 	}
@@ -549,6 +552,31 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/some/client/route", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET /some/client/route: status %d, want 200 (SPA fallback)", rr.Code)
+	}
+
+	// A non-loopback anonymous peer gets the shell without the key: GET / is
+	// public, so this is the one place an unauthenticated caller could read it.
+	for _, path := range []string{"/", "/some/client/route"} {
+		rr = httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("GET %s (remote peer): status %d, want 200", path, rr.Code)
+		}
+		body = rr.Body.String()
+		if strings.Contains(body, "test-key") {
+			t.Fatalf("GET %s (remote peer): server API key leaked to an anonymous caller: %q", path, body)
+		}
+		if !strings.Contains(body, `serverApiKey:""`) {
+			t.Fatalf("GET %s (remote peer): expected empty serverApiKey, got %q", path, body)
+		}
+	}
+
+	// A remote peer that already holds the key (?token=, the form the SPA
+	// uses for streams) receives it, so a LAN client can bootstrap with one URL.
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?token=test-key", nil))
+	if !strings.Contains(rr.Body.String(), `"test-key"`) {
+		t.Fatalf("GET /?token=<key> (remote peer): expected injected key, got %q", rr.Body.String())
 	}
 }
 

@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"cmp"
 	"context"
-	cryptorand "crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -277,6 +275,26 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// wallfacer run` is a clean override without editing the file.
 	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
 	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
+	// A local instance is never open: without WALLFACER_SERVER_API_KEY the
+	// API would accept any request from any host the listener is reachable
+	// from, so generate a per-instance key and persist it for same-machine
+	// clients. The browser receives it through index.html on a loopback
+	// request (see indexKeyAllowed). Cloud mode gates on the session cookie
+	// and JWT instead and keeps the static key optional.
+	if !cloudMode && envCfg.ServerAPIKey == "" {
+		keyPath := filepath.Join(configDir, serverAPIKeyFile)
+		_, statErr := os.Stat(keyPath)
+		key, kerr := loadOrCreateServerAPIKey(configDir)
+		if kerr != nil {
+			logger.Fatal("server api key", "error", kerr)
+		}
+		envCfg.ServerAPIKey = key
+		if statErr != nil {
+			logger.Main.Info("server api key: none configured; generated one for this machine", "path", keyPath)
+		} else {
+			logger.Main.Info("server api key: none configured; using the generated one", "path", keyPath)
+		}
+	}
 	var (
 		jwtValidator *jwt.Validator
 		authClient   *oidc.Client
@@ -649,21 +667,7 @@ func defaultRedirectURL(addr string) string {
 // the session cookie of a public (secret-less) client, persisted at
 // <configDir>/cookie-key so sessions survive a restart. Generated on first use.
 func loadOrCreateCookieKey(configDir string) (string, error) {
-	path := filepath.Join(configDir, "cookie-key")
-	if b, err := os.ReadFile(path); err == nil {
-		if k := strings.TrimSpace(string(b)); len(k) >= 32 {
-			return k, nil
-		}
-	}
-	raw := make([]byte, 32)
-	if _, err := cryptorand.Read(raw); err != nil {
-		return "", err
-	}
-	key := hex.EncodeToString(raw)
-	if err := os.WriteFile(path, []byte(key), 0o600); err != nil {
-		return "", fmt.Errorf("persist cookie key: %w", err)
-	}
-	return key, nil
+	return loadOrCreateSecret(filepath.Join(configDir, "cookie-key"), "cookie key")
 }
 
 // requireClaudeOrExit fails fast when the claude CLI cannot be resolved, so
@@ -757,7 +761,6 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 	if cloudMode {
 		mode = "cloud"
 	}
-	apiKey := serverAPIKey
 	version := Version
 
 	rawHTML, err := fs.ReadFile(dist, "index.html")
@@ -765,27 +768,38 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 		logger.Main.Warn("vue-ui: failed to read index.html", "error", err)
 		return
 	}
-	inject := fmt.Sprintf(
-		`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
-		mode, apiKey, version,
-	)
-	indexHTML := strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1)
-	// The SSG-prerendered index.html bakes in the "/" route (ProductPage in
-	// cloud). Serving it verbatim for any other path flashes the landing page
-	// before Vue swaps in the real route, so we strip the stale markup there.
+	// render bakes the runtime config into the shell. The SSG-prerendered
+	// index.html bakes in the "/" route (ProductPage in cloud). Serving it
+	// verbatim for any other path flashes the landing page before Vue swaps
+	// in the real route, so the stripped variant drops the stale markup.
 	// Only cloud "/" keeps the prerender intact, where ProductPage hydration
 	// legitimately matches; everything else (local routes, cloud deep links
 	// like /dashboard) mounts from a blank #app.
-	strippedHTML := stripSSGContent(indexHTML)
+	render := func(apiKey string) (full, stripped string) {
+		inject := fmt.Sprintf(
+			`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
+			mode, apiKey, version,
+		)
+		full = strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1)
+		return full, stripSSGContent(full)
+	}
+	// Two variants: the key is released only to callers indexKeyAllowed
+	// admits; everyone else gets the shell with an empty serverApiKey.
+	keyedHTML, keyedStripped := render(serverAPIKey)
+	anonHTML, anonStripped := render("")
 
 	serveVueIndex := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
+		full, stripped := anonHTML, anonStripped
+		if indexKeyAllowed(r, serverAPIKey) {
+			full, stripped = keyedHTML, keyedStripped
+		}
 		if cloudMode && r.URL.Path == "/" {
-			_, _ = w.Write([]byte(indexHTML))
+			_, _ = w.Write([]byte(full))
 			return
 		}
-		_, _ = w.Write([]byte(strippedHTML))
+		_, _ = w.Write([]byte(stripped))
 	}
 
 	files := http.FS(dist)

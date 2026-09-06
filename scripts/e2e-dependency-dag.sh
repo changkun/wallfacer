@@ -35,6 +35,11 @@ export RTK_DISABLED=1
 WORKSPACE="${1:?usage: $0 <workspace-path>}"
 BASE_URL="${WALLFACER_URL:-http://localhost:8080}"
 API_KEY="${WALLFACER_SERVER_API_KEY:-}"
+# A local instance generates a key when none is configured and persists it
+# under the config dir for same-machine clients.
+if [ -z "$API_KEY" ] && [ -r "$HOME/.wallfacer/server-api-key" ]; then
+    API_KEY="$(cat "$HOME/.wallfacer/server-api-key")"
+fi
 TIMEOUT="${WALLFACER_TEST_TIMEOUT:-300}"
 FAILURES=0
 

@@ -119,7 +119,7 @@ func TestFetchTasks(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		tasks, err := fetchTasks(ts.URL)
+		tasks, err := fetchTasks(ts.URL, "")
 		if err != nil {
 			t.Fatalf("fetchTasks failed: %v", err)
 		}
@@ -138,7 +138,7 @@ func TestFetchTasks(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		if _, err := fetchTasks(ts.URL); err == nil {
+		if _, err := fetchTasks(ts.URL, ""); err == nil {
 			t.Fatal("expected error for invalid JSON")
 		}
 	})
@@ -196,6 +196,27 @@ func TestRunStatus(t *testing.T) {
 	}
 }
 
+// TestFetchTasks_SendsBearer confirms the status command presents the
+// server API key: a local instance always has one (generated at startup
+// when none is configured), so an anonymous GET would 401.
+func TestFetchTasks_SendsBearer(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer k-123" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+	if _, err := fetchTasks(ts.URL, "k-123"); err != nil {
+		t.Fatalf("fetchTasks with key: %v", err)
+	}
+	if _, err := fetchTasks(ts.URL, ""); err == nil {
+		t.Fatal("fetchTasks without key decoded a 401 body as success")
+	}
+}
+
 // TestFetchTasks_ReadBodyError verifies that fetchTasks returns an error when
 // the response body cannot be read.
 func TestFetchTasks_ReadBodyError(t *testing.T) {
@@ -215,7 +236,7 @@ func TestFetchTasks_ReadBodyError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := fetchTasks(ts.URL)
+	_, err := fetchTasks(ts.URL, "")
 	if err == nil {
 		t.Fatal("expected error when body read fails or JSON is truncated")
 	}
@@ -224,7 +245,7 @@ func TestFetchTasks_ReadBodyError(t *testing.T) {
 // TestFetchTasks_ServerDown verifies that fetchTasks returns an error when
 // the server is unreachable.
 func TestFetchTasks_ServerDown(t *testing.T) {
-	_, err := fetchTasks("http://127.0.0.1:1")
+	_, err := fetchTasks("http://127.0.0.1:1", "")
 	if err == nil {
 		t.Fatal("expected error for unreachable server")
 	}
