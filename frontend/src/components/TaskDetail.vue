@@ -1478,28 +1478,128 @@ async function submitReview() {
 
         <!-- Right aside -->
         <aside class="sheet-aside">
-          <!-- Actions: the forward transition is the ink button; the rest are
-               ghosts; the destructive one lives in the card's foot. -->
-          <div class="card compact">
-            <div class="card-head"><span class="eyebrow">Actions</span></div>
-            <div class="sheet-actions">
-              <button v-if="isBacklog" type="button" class="btn" :class="{ pending: busyAction === 'start' }" :disabled="busy" data-action="start" @click="runAction('start', startTask)">Start task</button>
-              <button v-if="isWaiting" type="button" class="btn" :class="{ pending: busyAction === 'done' }" :disabled="busy" data-action="done" @click="runAction('done', completeTask)">Mark as Done</button>
-              <button v-if="isFailed && task.session_id" type="button" class="btn" :class="{ pending: busyAction === 'resume' }" :disabled="busy" data-action="resume" @click="runAction('resume', resumeTask)">Resume</button>
+          <!-- Blocked by: the dependency list with its readiness summary. -->
+          <section v-if="blockedBy.length" class="mdl-section">
+            <div class="mdl-h">
+              Blocked by
+              <span v-if="blockedByUnmet > 0" class="pill pill-warn deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
+              <span v-else class="pill pill-ok deps-summary">all satisfied</span>
+            </div>
+            <button
+              v-for="d in blockedBy"
+              :key="d.id"
+              type="button"
+              class="dep-row"
+              :title="`Open ${d.label}`"
+              @click="openDep(d.id)"
+            >
+              <span class="pill" :class="pillClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
+              <span class="dep-row__label">{{ d.label }}</span>
+            </button>
+          </section>
 
-              <div class="sheet-actions__row">
-                <button v-if="isBacklog && !editingBacklog" type="button" class="btn ghost" data-action="edit" @click="openBacklogEdit">Edit task</button>
-                <button v-if="isWaiting || isDone || isFailed" type="button" class="btn ghost" :class="{ pending: busyAction === 'test' }" :disabled="busy" data-action="test" @click="runAction('test', testTask)">Test</button>
-                <button v-if="isWaiting && task.session_id" type="button" class="btn ghost" :class="{ pending: busyAction === 'review' }" :disabled="busy" data-action="review" title="Adversarial verification" @click="runAction('review', reviewTask)">Review</button>
-                <button v-if="budgetExceeded && (isWaiting || isFailed)" type="button" class="btn ghost" :class="{ pending: busyAction === 'budget' }" :disabled="busy" data-action="budget" title="Unblock and resume" @click="runAction('budget', raiseBudget)">Raise budget</button>
-                <button v-if="isWaiting || isFailed" type="button" class="btn ghost" :class="{ pending: busyAction === 'sync' }" :disabled="busy" data-action="sync" title="Rebase onto the default branch" @click="runAction('sync', syncTask)">Sync</button>
-                <button v-if="isFailed || isCancelled" type="button" class="btn ghost" :class="{ pending: busyAction === 'retry' }" :disabled="busy" data-action="retry" title="Move back to Backlog" @click="runAction('retry', retryTask)">Retry</button>
-                <button v-if="(isDone || isCancelled) && !isArchived" type="button" class="btn ghost" :class="{ pending: busyAction === 'archive' }" :disabled="busy" data-action="archive" title="Hide from board" @click="runAction('archive', archiveTask)">Archive</button>
-                <button v-if="isArchived" type="button" class="btn ghost" :class="{ pending: busyAction === 'unarchive' }" :disabled="busy" data-action="unarchive" title="Restore to board" @click="runAction('unarchive', unarchiveTask)">Unarchive</button>
-                <button v-if="isInProgress || isWaiting" type="button" class="btn ghost danger" :class="{ pending: cancelling }" :disabled="cancelling || busy" data-action="cancel" title="Stop the process and discard changes" @click="cancelTask">{{ cancelling ? 'Shutting down…' : 'Cancel' }}</button>
-              </div>
+          <section class="mdl-section mdl-section--pr">
+            <TaskPrPanel :task="props.task" />
+          </section>
 
-              <div v-if="editingBacklog" class="backlog-edit">
+          <!-- Actions: a stack of explicit rows, each with a glyph, a label and
+               a hint. The forward transition takes the accent, done the green,
+               cancel the warn tone and delete the red. -->
+          <section class="mdl-section sheet-actions">
+            <div class="mdl-h">Actions</div>
+            <button v-if="isBacklog" type="button" class="aside-action aside-action--primary" :class="{ 'is-busy': busyAction === 'start' }" :disabled="busy" data-action="start" @click="runAction('start', startTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Start task</span>
+                <span class="aside-action__hint">move to In Progress</span>
+              </span>
+            </button>
+            <button v-if="isBacklog && !editingBacklog" type="button" class="aside-action" data-action="edit" @click="openBacklogEdit">
+              <span class="aside-action__icon" aria-hidden="true">&#9998;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Edit task</span>
+                <span class="aside-action__hint">prompt, deps, schedule, budget</span>
+              </span>
+            </button>
+            <button v-if="isWaiting" type="button" class="aside-action aside-action--success" :class="{ 'is-busy': busyAction === 'done' }" :disabled="busy" data-action="done" @click="runAction('done', completeTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#10003;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Mark as Done</span>
+                <span class="aside-action__hint">commit and close</span>
+              </span>
+            </button>
+            <button v-if="isFailed && task.session_id" type="button" class="aside-action aside-action--primary" :class="{ 'is-busy': busyAction === 'resume' }" :disabled="busy" data-action="resume" @click="runAction('resume', resumeTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#8635;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Resume</span>
+                <span class="aside-action__hint">continue existing session</span>
+              </span>
+            </button>
+            <button v-if="isWaiting || isDone || isFailed" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'test' }" :disabled="busy" data-action="test" @click="runAction('test', testTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Test</span>
+                <span class="aside-action__hint">run test verification</span>
+              </span>
+            </button>
+            <button v-if="isWaiting && task.session_id" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" data-action="review" @click="runAction('review', reviewTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#9878;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Review</span>
+                <span class="aside-action__hint">adversarial verification</span>
+              </span>
+            </button>
+            <button v-if="budgetExceeded && (isWaiting || isFailed)" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'budget' }" :disabled="busy" data-action="budget" @click="runAction('budget', raiseBudget)">
+              <span class="aside-action__icon" aria-hidden="true">&#36;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Raise budget</span>
+                <span class="aside-action__hint">unblock and resume</span>
+              </span>
+            </button>
+            <button v-if="isWaiting || isFailed" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'sync' }" :disabled="busy" data-action="sync" @click="runAction('sync', syncTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#8645;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Sync</span>
+                <span class="aside-action__hint">rebase onto default branch</span>
+              </span>
+            </button>
+            <button v-if="isFailed || isCancelled" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'retry' }" :disabled="busy" data-action="retry" @click="runAction('retry', retryTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#8634;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Retry</span>
+                <span class="aside-action__hint">move back to Backlog</span>
+              </span>
+            </button>
+            <button v-if="(isDone || isCancelled) && !isArchived" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'archive' }" :disabled="busy" data-action="archive" @click="runAction('archive', archiveTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#128229;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Archive</span>
+                <span class="aside-action__hint">hide from board</span>
+              </span>
+            </button>
+            <button v-if="isArchived" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'unarchive' }" :disabled="busy" data-action="unarchive" @click="runAction('unarchive', unarchiveTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#128228;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Unarchive</span>
+                <span class="aside-action__hint">restore to board</span>
+              </span>
+            </button>
+            <button v-if="isInProgress || isWaiting" type="button" class="aside-action aside-action--warn" :class="{ 'is-busy': cancelling }" :disabled="cancelling || busy" data-action="cancel" @click="cancelTask">
+              <span class="aside-action__icon" aria-hidden="true">&#9209;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">{{ cancelling ? 'Shutting down…' : 'Cancel' }}</span>
+                <span class="aside-action__hint">{{ cancelling ? 'stopping process' : 'discard changes' }}</span>
+              </span>
+            </button>
+            <button v-if="true" type="button" class="aside-action aside-action--danger" :class="{ 'is-busy': busyAction === 'delete' }" :disabled="busy" data-action="delete" @click="runAction('delete', deleteTask)">
+              <span class="aside-action__icon" aria-hidden="true">&#128465;</span>
+              <span class="aside-action__body">
+                <span class="aside-action__label">Delete</span>
+                <span class="aside-action__hint">remove permanently</span>
+              </span>
+            </button>
+
+            <div v-if="editingBacklog" class="backlog-edit">
                 <div class="backlog-edit__field">
                   <div class="backlog-edit__prompt-tabs">
                     <span>Prompt</span>
@@ -1553,76 +1653,51 @@ async function submitReview() {
                   <button type="button" class="btn sm" :disabled="editSaving" @click="saveBacklogEdit">{{ editSaving ? 'Saving…' : 'Save' }}</button>
                 </div>
               </div>
-            </div>
-            <div class="card-foot">
-              <button type="button" class="btn ghost danger" :class="{ pending: busyAction === 'delete' }" :disabled="busy" data-action="delete" title="Remove permanently" @click="runAction('delete', deleteTask)">Delete</button>
-            </div>
-          </div>
+          </section>
 
-          <TaskPrPanel :task="props.task" />
+          <section class="mdl-section">
+            <div class="mdl-h">Agent</div>
+            <div class="row"><span class="k">harness</span><span class="v">{{ task.sandbox || '—' }}</span></div>
+            <div class="row"><span class="k">model</span><span class="v mono">{{ task.model || '—' }}</span></div>
+            <div class="row"><span class="k">status</span><span class="v">{{ status }}</span></div>
+            <div class="row"><span class="k">elapsed</span><span class="v">{{ elapsedDisplay }}</span></div>
+          </section>
 
-          <div class="card compact">
-            <div class="card-head"><span class="eyebrow">Agent</span></div>
-            <div class="rows">
-              <div class="row"><span class="k">Harness</span><span class="v">{{ task.sandbox || '—' }}</span></div>
-              <div class="row"><span class="k">Model</span><span class="v mono">{{ task.model || '—' }}</span></div>
-              <div class="row"><span class="k">Status</span><span class="v">{{ status }}</span></div>
-              <div class="row"><span class="k">Elapsed</span><span class="v mono">{{ elapsedDisplay }}</span></div>
-              <div class="row">
-                <span class="k">Spec</span>
-                <span class="v">
-                  <a v-if="specSourcePath" href="#" :title="specSourcePath" @click.prevent="openSpec">{{ specSourceLabel }}</a>
-                  <template v-else>—</template>
-                </span>
-              </div>
-              <div class="row"><span class="k">Depends on</span><span class="v">{{ dependsOnDisplay }}</span></div>
-            </div>
-          </div>
-
-          <div class="card compact">
-            <div class="card-head"><span class="eyebrow">Budget</span></div>
-            <div class="rows">
-              <div class="row"><span class="k">Tokens</span><span class="v mono">{{ tokenCount((task.usage?.input_tokens || 0) + (task.usage?.output_tokens || 0)) }}</span></div>
-              <div class="row"><span class="k">Cost</span><span class="v mono">{{ costDisplay }}</span></div>
-              <div class="row"><span class="k">Timeout</span><span class="v">{{ task.timeout ? task.timeout + ' min' : '—' }}</span></div>
-            </div>
+          <section class="mdl-section">
+            <div class="mdl-h">Budget</div>
+            <div class="row"><span class="k">tokens</span><span class="v mono">{{ tokenCount((task.usage?.input_tokens || 0) + (task.usage?.output_tokens || 0)) }}</span></div>
+            <div class="row"><span class="k">cost</span><span class="v mono">{{ costDisplay }}</span></div>
+            <div class="row"><span class="k">timeout</span><span class="v">{{ task.timeout ? task.timeout + ' min' : '—' }}</span></div>
             <div v-if="budgetPct > 0" class="bar" :title="budgetPct.toFixed(0) + '% of budget'">
               <i :style="{ width: budgetPct.toFixed(1) + '%' }"></i>
             </div>
-          </div>
+          </section>
 
-          <div class="card compact">
-            <div class="card-head">
-              <span class="eyebrow">Git</span>
-              <span v-if="blockedBy.length && blockedByUnmet > 0" class="pill pill-warn deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
-              <span v-else-if="blockedBy.length" class="pill pill-ok deps-summary">deps satisfied</span>
-            </div>
-            <div class="rows">
-              <div class="row"><span class="k">Branches</span><span class="v mono">{{ gitBranches }}</span></div>
-              <div class="row"><span class="k">Worktrees</span><span class="v mono">{{ gitWorktrees }}</span></div>
-              <button
-                v-for="d in blockedBy"
-                :key="d.id"
-                type="button"
-                class="row clickable dep-row"
-                :title="`Open ${d.label}`"
-                @click="openDep(d.id)"
-              >
-                <span class="pill" :class="pillClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
-                <span class="dep-row__label">{{ d.label }}</span>
-              </button>
-            </div>
-          </div>
+          <section class="mdl-section">
+            <div class="mdl-h">Git</div>
+            <div class="row"><span class="k">branches</span><span class="v mono">{{ gitBranches }}</span></div>
+            <div class="row"><span class="k">worktrees</span><span class="v mono">{{ gitWorktrees }}</span></div>
+          </section>
 
-          <div v-if="envRows.length" class="card compact">
-            <div class="card-head"><span class="eyebrow">Environment</span></div>
-            <div class="rows">
-              <div v-for="row in envRows" :key="row.label" class="row">
-                <span class="k">{{ row.label }}</span>
-                <span class="v" :class="{ mono: row.mono }">{{ row.value }}</span>
-              </div>
+          <section class="mdl-section">
+            <div class="mdl-h">Links</div>
+            <div class="row">
+              <span class="k">spec</span>
+              <span class="v">
+                <a v-if="specSourcePath" href="#" :title="specSourcePath" @click.prevent="openSpec">{{ specSourceLabel }}</a>
+                <template v-else>—</template>
+              </span>
             </div>
-          </div>
+            <div class="row"><span class="k">depends on</span><span class="v">{{ dependsOnDisplay }}</span></div>
+          </section>
+
+          <section v-if="envRows.length" class="mdl-section">
+            <div class="mdl-h">Environment</div>
+            <div v-for="row in envRows" :key="row.label" class="row">
+              <span class="k">{{ row.label }}</span>
+              <span class="v" :class="{ mono: row.mono }">{{ row.value }}</span>
+            </div>
+          </section>
         </aside>
       </div>
     </div>

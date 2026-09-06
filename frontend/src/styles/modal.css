@@ -178,10 +178,10 @@
   padding: 16px 20px 24px 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   font-size: var(--fs-base);
 }
-/* Cards keep their height; the aside scrolls rather than squeezing them. */
+/* Sections keep their height; the aside scrolls rather than squeezing them. */
 .sheet-aside > * {
   flex: none;
 }
@@ -247,25 +247,49 @@
   word-break: break-word;
 }
 
-/* --- Aside cards: label / value rows --- */
-.sheet-aside .card .rows .row {
-  padding: 8px 14px;
-  gap: var(--gap-row);
+/* --- Aside sections: an eyebrow, then key / value rows --- */
+.sheet-aside .mdl-section {
+  display: flex;
+  flex-direction: column;
+}
+.sheet-aside .mdl-section--pr:empty {
+  display: none;
+}
+.sheet-aside .mdl-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font: 600 var(--fs-9) / 1 var(--font-mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.sheet-aside .mdl-h .deps-summary {
+  margin-left: auto;
+}
+.sheet-aside .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
   font-size: 12.5px;
 }
 .sheet-aside .row .k {
-  color: var(--ink-3);
+  width: 78px;
   flex: none;
-  min-width: 78px;
+  font: 500 var(--fs-9) / 1.5 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 .sheet-aside .row .v {
-  color: var(--ink);
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .sheet-aside .row .v.mono {
@@ -281,7 +305,7 @@
 }
 .sheet-aside .bar {
   height: 3px;
-  margin: 0 14px 12px;
+  margin-top: 6px;
   background: var(--bg-sunk);
   border-radius: var(--r-pill);
   overflow: hidden;
@@ -293,28 +317,172 @@
   border-radius: var(--r-pill);
   transition: width 0.2s var(--ease-fluid);
 }
-/* Actions card: the forward transition is the ink button, the rest ghosts,
-   the destructive one last in the foot. */
+.sheet-aside .dep-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.sheet-aside .dep-row:hover .dep-row__label {
+  color: var(--accent);
+}
+.sheet-aside .dep-row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Actions: a stack of explicit rows, each a glyph, a label and a hint --- */
 .sheet-actions {
+  gap: 6px;
+}
+.sheet-actions .mdl-h {
+  margin-bottom: 2px;
+}
+.aside-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-hover),
+    border-color var(--dur-hover),
+    color var(--dur-hover);
+}
+.aside-action:hover {
+  background: var(--bg-card);
+  border-color: var(--rule-2);
+}
+.aside-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.aside-action[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.aside-action[disabled]:hover {
+  background: var(--bg-sunk);
+  border-color: var(--rule);
+}
+/* The in-flight row keeps full opacity and swaps its glyph for a spinner. */
+.aside-action.is-busy {
+  opacity: 1;
+}
+.aside-action.is-busy .aside-action__icon {
+  position: relative;
+  font-size: 0;
+}
+.aside-action.is-busy .aside-action__icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: wf-spin 0.6s linear infinite;
+}
+@keyframes wf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.aside-action__icon {
+  width: 18px;
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+  opacity: 0.85;
+}
+.aside-action__body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
 }
-.sheet-actions .btn {
-  width: 100%;
+.aside-action__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
 }
-.sheet-actions__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.aside-action__hint {
+  font: 500 var(--fs-9) / 1.3 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
-.sheet-actions__row .btn {
-  width: auto;
-  flex: 1 1 auto;
+.aside-action--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
 }
-.sheet-aside .card-foot .btn {
-  width: 100%;
+.aside-action--primary .aside-action__hint {
+  color: color-mix(in srgb, var(--accent-fg) 78%, transparent);
+}
+.aside-action--primary:hover {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.aside-action--primary[disabled]:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.aside-action--success {
+  background: var(--tint-green);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
+  color: var(--ok);
+}
+.aside-action--success .aside-action__hint {
+  color: color-mix(in srgb, var(--ok) 70%, transparent);
+}
+.aside-action--success:hover {
+  background: color-mix(in srgb, var(--ok) 22%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  color: var(--ok);
+}
+.aside-action--warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--rule));
+}
+.aside-action--warn:hover {
+  background: var(--tint-amber);
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--rule));
+  color: var(--warn);
+}
+.aside-action--danger {
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 35%, var(--rule));
+}
+.aside-action--danger:hover {
+  background: var(--tint-red);
+  border-color: color-mix(in srgb, var(--err) 55%, var(--rule));
+  color: var(--err);
+}
+.sheet-actions .backlog-edit {
+  margin-top: 4px;
 }
 
 /* --- Trash dialog banner and loading row (TrashModal) --- */

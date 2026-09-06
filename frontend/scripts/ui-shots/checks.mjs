@@ -246,8 +246,8 @@ SCENES['task-detail'] = async (page) => {
   expect('task-detail', aside && Math.abs(aside.width - 340) <= 1, `aside width ${aside && aside.width}, want 340`);
   const tabs = await firstBox(page, '.sheet-tabs');
   expect('task-detail', tabs && tabs.height >= 30, 'tabs row missing');
-  const inks = await page.$$eval('.sheet-actions .btn:not(.ghost)', (els) => els.length);
-  expect('task-detail', inks <= 1, `${inks} ink buttons in the Actions card`);
+  const inks = await page.$$eval('.sheet-actions .aside-action--primary, .sheet-actions .aside-action--success', (els) => els.length);
+  expect('task-detail', inks <= 1, `${inks} filled action rows in the Actions section`);
   const mainBox = await firstBox(page, '.sheet-main');
   const overflow = await page.$eval('.sheet-main', (el) => el.scrollWidth > el.clientWidth + 1);
   expect('task-detail', mainBox && !overflow, 'sheet main column overflows horizontally');

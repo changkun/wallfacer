@@ -42,8 +42,8 @@ async function mount(task: Task) {
   for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
   return { app, host };
 }
-const ink = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButtonElement>('.sheet-actions .btn:not(.ghost)')).map((b) => b.dataset.action);
-const ghosts = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButtonElement>('.sheet-actions .btn.ghost')).map((b) => b.dataset.action);
+const ink = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButtonElement>('.sheet-actions .aside-action--primary, .sheet-actions .aside-action--success')).map((b) => b.dataset.action);
+const ghosts = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButtonElement>('.sheet-actions .aside-action:not(.aside-action--primary):not(.aside-action--success):not(.aside-action--danger)')).map((b) => b.dataset.action);
 
 describe('TaskDetail sheet', () => {
   it.each([
@@ -55,7 +55,7 @@ describe('TaskDetail sheet', () => {
     const { app, host } = await mount(makeTask({ status: status as Task['status'], ...over }));
     expect(ink(host)).toEqual(wantInk);
     expect(ghosts(host)).toEqual(wantGhost);
-    expect(host.querySelector('.sheet-aside .card-foot [data-action="delete"]')!.classList.contains('danger')).toBe(true);
+    expect(host.querySelector('.sheet-actions [data-action="delete"]')!.classList.contains('aside-action--danger')).toBe(true);
     app.unmount(); host.remove();
   });
 
