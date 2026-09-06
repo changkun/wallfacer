@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/authkit/oidc"
+	"latere.ai/x/pkg/health"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -87,12 +88,7 @@ func runWeb(args []string, frontendFS fs.FS) error {
 	// SPA's GET / fallback.
 	mux.Handle("POST /v1/telemetry/", otel.TelemetryProxy("/v1/telemetry"))
 
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("ok"))
-	})
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("ok"))
-	})
+	mountWebProbes(mux)
 
 	if authClient != nil {
 		mux.HandleFunc("GET /login", authClient.HandleLogin)
@@ -132,4 +128,16 @@ func runWeb(args []string, frontendFS fs.FS) error {
 
 	slog.Info("wallfacer web started", "addr", *addr)
 	return otel.RunServer(ctx, srv, 10*time.Second, nil)
+}
+
+// mountWebProbes mounts the fleet's probe paths (pkg/health) on the web
+// mux, path by path because the SPA fallback owns the rest of it. The web
+// server has no dependency a probe should gate on, so readiness is always
+// ready. /healthz stays an alias of /livez for one release while the
+// manifest moves.
+func mountWebProbes(mux *http.ServeMux) {
+	probes := health.Handler(health.Options{Version: Version, LegacyHealthz: true})
+	for _, p := range []string{"GET /livez", "GET /readyz", "GET /version", "GET /healthz"} {
+		mux.Handle(p, probes)
+	}
 }

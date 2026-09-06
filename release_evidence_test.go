@@ -28,7 +28,7 @@ func TestSmokeReleaseEmitsEvidence(t *testing.T) {
 
 	const asset = "assets/app-deadbeef.js"
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.HandleFunc("/livez", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("/api/debug/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintf(w, `<!doctype html><html><head><script src="%s"></script></head><body></body></html>`, asset)
@@ -60,7 +60,7 @@ func TestSmokeReleaseEmitsEvidence(t *testing.T) {
 		"v9.9.9-test",
 		"abcdef0",
 		asset,
-		"/healthz",
+		"/livez",
 	} {
 		if !strings.Contains(evidence, want) {
 			t.Errorf("evidence missing %q:\n%s", want, evidence)
