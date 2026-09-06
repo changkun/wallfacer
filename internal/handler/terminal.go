@@ -7,11 +7,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -223,6 +226,56 @@ func (r *sessionRegistry) activeSession() (*terminalSession, bool) {
 	return sess, ok
 }
 
+// sameHostOrigin reports whether a browser Origin belongs to this server:
+// the origin's host:port equals the request Host, or both are loopback
+// aliases (localhost, 127.0.0.1, ::1) on the same port. An empty Origin
+// passes, matching CSRFMiddleware: browsers always send it on a WebSocket
+// upgrade, so an absent header is a non-browser client that could not have
+// been driven by a foreign page.
+func sameHostOrigin(origin, host string) bool {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	if strings.EqualFold(u.Host, host) {
+		return true
+	}
+	originHost, originPort := splitHostPortDefault(u.Host, u.Scheme)
+	reqHost, reqPort := splitHostPortDefault(host, "http")
+	return isLoopbackHost(originHost) && isLoopbackHost(reqHost) && originPort == reqPort
+}
+
+// splitHostPortDefault splits host[:port], filling the scheme's default port
+// (443 for https/wss, 80 otherwise) when none is given.
+func splitHostPortDefault(hostport, scheme string) (host, port string) {
+	host, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host = strings.Trim(hostport, "[]")
+		port = ""
+	}
+	if port == "" {
+		port = "80"
+		if scheme == "https" || scheme == "wss" {
+			port = "443"
+		}
+	}
+	return host, port
+}
+
+// isLoopbackHost reports whether host names the local machine: the literal
+// "localhost" or a loopback IP.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 // HandleTerminalWS upgrades to a WebSocket connection and relays I/O
 // between the client and a host shell via a PTY.
 func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
@@ -240,8 +293,18 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	cwd := r.URL.Query().Get("cwd")
 	cwd = h.resolveTerminalCwd(r.Context(), cwd)
 
+	// A WebSocket upgrade is not covered by CORS: any page the developer has
+	// open could dial ws://localhost:<port>/api/terminal/ws and get a shell.
+	// Only origins on this server's own host (or a loopback alias of it on
+	// the same port) are accepted. The check runs here rather than through
+	// AcceptOptions.OriginPatterns because that matcher is filepath.Match,
+	// which reads the brackets in "[::1]:8080" as a character class.
+	if !sameHostOrigin(r.Header.Get("Origin"), r.Host) {
+		httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "forbidden: invalid origin"})
+		return
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // Origin check not needed; same-host dev tool.
+		InsecureSkipVerify: true, // Origin verified by sameHostOrigin above.
 	})
 	if err != nil {
 		logger.Handler.Error("terminal: websocket accept failed", "error", err)

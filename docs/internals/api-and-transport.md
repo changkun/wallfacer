@@ -362,7 +362,7 @@ The handler (`internal/handler/terminal.go`) manages multiple concurrent shell s
 
 Every session is a host shell rooted at the workspace directory. (Earlier builds could exec into a sandbox container; the shipping host-process runtime has no container to exec into, so the `create_session` message carries no target and always spawns a host shell.)
 
-The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers.
+The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
 
 ### Message Protocol
 

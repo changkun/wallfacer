@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -104,6 +105,69 @@ func TestTerminalWS_AuthRequired(t *testing.T) {
 	if resp != nil && resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", resp.StatusCode)
 	}
+}
+
+// TestSameHostOrigin pins the origin policy: same host:port, or loopback
+// aliases on the same port, and nothing else.
+func TestSameHostOrigin(t *testing.T) {
+	cases := []struct {
+		origin, host string
+		want         bool
+	}{
+		{"", "localhost:8080", true},
+		{"http://localhost:8080", "localhost:8080", true},
+		{"http://LOCALHOST:8080", "localhost:8080", true},
+		{"http://127.0.0.1:8080", "localhost:8080", true},
+		{"http://[::1]:8080", "127.0.0.1:8080", true},
+		{"http://localhost:8080", "[::1]:8080", true},
+		{"https://wf.example.com", "wf.example.com", true},
+		{"http://localhost", "localhost:80", true},
+		{"http://localhost:9090", "localhost:8080", false},
+		{"http://evil.example", "localhost:8080", false},
+		{"http://evil.example:8080", "localhost:8080", false},
+		{"http://localhost:8080", "192.168.1.5:8080", false},
+		{"http://192.168.1.5:8080", "localhost:8080", false},
+		{"null", "localhost:8080", false},
+		{"://bad", "localhost:8080", false},
+	}
+	for _, tc := range cases {
+		if got := sameHostOrigin(tc.origin, tc.host); got != tc.want {
+			t.Errorf("sameHostOrigin(%q, %q) = %v, want %v", tc.origin, tc.host, got, tc.want)
+		}
+	}
+}
+
+// TestTerminalWS_OriginCheck confirms a foreign Origin cannot open a shell
+// while a same-host (loopback alias) Origin still can.
+func TestTerminalWS_OriginCheck(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws?cols=80&rows=24"
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Origin": []string{"http://evil.example"}},
+	})
+	if err == nil {
+		t.Fatal("dial with foreign Origin succeeded, want rejection")
+	}
+	if resp == nil || resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("foreign Origin: resp = %v, want 403", resp)
+	}
+
+	// The test server listens on 127.0.0.1; a localhost origin on the same
+	// port is a loopback alias and must be accepted.
+	conn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Origin": []string{"http://localhost:" + port}},
+	})
+	if err != nil {
+		t.Fatalf("dial with same-host Origin: %v", err)
+	}
+	_ = conn.Close(websocket.StatusNormalClosure, "")
 }
 
 func TestTerminalWS_Connect(t *testing.T) {
