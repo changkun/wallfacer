@@ -83,8 +83,10 @@ func proxyValidator(t *testing.T, jwksURL string) *jwt.Validator {
 // internal/cli/server.go does, so tests exercise the same routing.
 func proxyMux(p *SandboxProxy) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/internal/sandbox-proxy/llm/anthropic/", p.LLMAnthropic)
-	mux.HandleFunc("/internal/sandbox-proxy/llm/openai/", p.LLMOpenAI)
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/anthropic/", p.LLMAnthropic)
+		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/openai/", p.LLMOpenAI)
+	}
 	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", p.GitHubToken)
 	return mux
 }
@@ -245,7 +247,7 @@ func TestSandboxProxyLLMEndpointAllowlist(t *testing.T) {
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/files", http.StatusNotFound},
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/fine_tuning/jobs", http.StatusNotFound},
 		{http.MethodGet, "/internal/sandbox-proxy/llm/openai/v1/fine_tuning/jobs", http.StatusNotFound},
-		{http.MethodDelete, "/internal/sandbox-proxy/llm/openai/v1/models", http.StatusNotFound},
+		{http.MethodDelete, "/internal/sandbox-proxy/llm/openai/v1/models", http.StatusMethodNotAllowed},
 		{http.MethodGet, "/internal/sandbox-proxy/llm/openai/v1/chat/completions", http.StatusNotFound},
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/chat/completions/", http.StatusNotFound},
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/", http.StatusNotFound},

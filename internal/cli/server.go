@@ -1435,10 +1435,13 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	}
 	sandboxProxy := handler.NewSandboxProxy(
 		handler.LoadSandboxProxyConfig(), sandboxProxyValidator)
-	// Method-less patterns: the proxy pins method+path to its inference
-	// allowlist itself (GET /v1/models next to the POST endpoints).
-	mux.HandleFunc("/internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
-	mux.HandleFunc("/internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
+	// One pattern per method the allowlist admits (GET /v1/models sits next
+	// to the POST endpoints). A method-less pattern would conflict with the
+	// SPA's "GET /" in ServeMux; the proxy pins method+path itself.
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
+		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
+	}
 	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", sandboxProxy.GitHubToken)
 
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
