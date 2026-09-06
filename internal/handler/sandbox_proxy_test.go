@@ -83,8 +83,8 @@ func proxyValidator(t *testing.T, jwksURL string) *jwt.Validator {
 // internal/cli/server.go does, so tests exercise the same routing.
 func proxyMux(p *SandboxProxy) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /internal/sandbox-proxy/llm/anthropic/", p.LLMAnthropic)
-	mux.HandleFunc("POST /internal/sandbox-proxy/llm/openai/", p.LLMOpenAI)
+	mux.HandleFunc("/internal/sandbox-proxy/llm/anthropic/", p.LLMAnthropic)
+	mux.HandleFunc("/internal/sandbox-proxy/llm/openai/", p.LLMOpenAI)
 	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", p.GitHubToken)
 	return mux
 }
@@ -209,6 +209,57 @@ func TestSandboxProxyLLMValidJWTPassesAuthGate(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "provider key not configured") {
 		t.Errorf("body = %q, want provider-key message (JWT gate must have passed)", rec.Body.String())
+	}
+}
+
+// TestSandboxProxyLLMEndpointAllowlist pins the reachable provider
+// surface: only inference endpoints are forwarded with the org's key.
+// Files, fine-tuning and every other path 404 after the JWT gate and
+// before the provider-key check, so a valid sandbox token gains
+// nothing beyond inference.
+func TestSandboxProxyLLMEndpointAllowlist(t *testing.T) {
+	key, jwks := proxyKeyAndJWKS(t)
+	cfg := SandboxProxyConfig{
+		Enabled:                  true,
+		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
+		AuthServiceToken:         "svc-token",
+	}
+	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
+	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"llm:proxy"})
+
+	cases := []struct {
+		method, path string
+		wantCode     int
+	}{
+		// Allowed: the key is unset, so 503 proves the allowlist passed.
+		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages", http.StatusServiceUnavailable},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages/count_tokens", http.StatusServiceUnavailable},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/chat/completions", http.StatusServiceUnavailable},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/responses", http.StatusServiceUnavailable},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/embeddings", http.StatusServiceUnavailable},
+		{http.MethodGet, "/internal/sandbox-proxy/llm/openai/v1/models", http.StatusServiceUnavailable},
+		// Refused.
+		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/files", http.StatusNotFound},
+		{http.MethodGet, "/internal/sandbox-proxy/llm/anthropic/v1/files", http.StatusNotFound},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages/batches", http.StatusNotFound},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/files", http.StatusNotFound},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/fine_tuning/jobs", http.StatusNotFound},
+		{http.MethodGet, "/internal/sandbox-proxy/llm/openai/v1/fine_tuning/jobs", http.StatusNotFound},
+		{http.MethodDelete, "/internal/sandbox-proxy/llm/openai/v1/models", http.StatusNotFound},
+		{http.MethodGet, "/internal/sandbox-proxy/llm/openai/v1/chat/completions", http.StatusNotFound},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/chat/completions/", http.StatusNotFound},
+		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/", http.StatusNotFound},
+	}
+	for _, tc := range cases {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			rec := proxyRequest(t, mux, tc.method, tc.path, tok)
+			if rec.Code != tc.wantCode {
+				t.Fatalf("status = %d, want %d (body %q)", rec.Code, tc.wantCode, rec.Body.String())
+			}
+			if tc.wantCode == http.StatusNotFound && !strings.Contains(rec.Body.String(), "endpoint not proxied") {
+				t.Errorf("body = %q, want allowlist refusal", rec.Body.String())
+			}
+		})
 	}
 }
 

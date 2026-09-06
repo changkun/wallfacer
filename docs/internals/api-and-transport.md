@@ -194,8 +194,8 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 | `GET /api/artifacts` | List the self-contained web files under `<workspace>/artifacts/` |
 | `GET /artifact/{path...}` | Serve one artifact. Singular on purpose, so the raw route never collides with the SPA gallery page at `/artifacts` |
 | `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
-| `POST /internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic) |
-| `POST /internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI) |
+| `/internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic). Forwards only `POST /v1/messages` and `POST /v1/messages/count_tokens`; every other path 404s |
+| `/internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI). Forwards only `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/embeddings`, `GET /v1/models`; every other path 404s |
 | `GET /internal/sandbox-proxy/github-token` | Trust-plane GitHub token mint |
 | `GET /` | Serves the embedded SPA index for every non-API path, so client-side routes survive a hard load |
 | `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |

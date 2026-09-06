@@ -1435,8 +1435,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	}
 	sandboxProxy := handler.NewSandboxProxy(
 		handler.LoadSandboxProxyConfig(), sandboxProxyValidator)
-	mux.HandleFunc("POST /internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
-	mux.HandleFunc("POST /internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
+	// Method-less patterns: the proxy pins method+path to its inference
+	// allowlist itself (GET /v1/models next to the POST endpoints).
+	mux.HandleFunc("/internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
+	mux.HandleFunc("/internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
 	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", sandboxProxy.GitHubToken)
 
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).

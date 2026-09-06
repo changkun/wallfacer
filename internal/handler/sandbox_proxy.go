@@ -84,10 +84,44 @@ func NewSandboxProxy(cfg SandboxProxyConfig, v *jwt.Validator) *SandboxProxy {
 	}
 }
 
-// LLMAnthropic handles POST /internal/sandbox-proxy/llm/anthropic/...
+// llmEndpoint is one upstream inference endpoint the trust plane
+// forwards: the method and the exact path under the provider root.
+type llmEndpoint struct {
+	method string
+	path   string
+}
+
+// The proxy substitutes the org's provider key, so the reachable
+// surface is pinned to inference. Everything else on the provider API
+// (files, fine-tuning, batches, admin, billing) is refused: a sandbox
+// must not be able to upload data, spend on training, or read account
+// state with a key it never holds.
+var (
+	anthropicEndpoints = []llmEndpoint{
+		{http.MethodPost, "/v1/messages"},
+		{http.MethodPost, "/v1/messages/count_tokens"},
+	}
+	openaiEndpoints = []llmEndpoint{
+		{http.MethodPost, "/v1/chat/completions"},
+		{http.MethodPost, "/v1/responses"},
+		{http.MethodPost, "/v1/embeddings"},
+		{http.MethodGet, "/v1/models"},
+	}
+)
+
+// allowedLLMEndpoint reports whether method+tail names an allowlisted
+// endpoint. Exact match only: no prefixes, no trailing slash, so
+// /v1/messages/../files cannot be smuggled past the list (ServeMux has
+// already cleaned the path by the time it reaches the handler).
+func allowedLLMEndpoint(list []llmEndpoint, method, tail string) bool {
+	return slices.Contains(list, llmEndpoint{method: method, path: tail})
+}
+
+// LLMAnthropic handles /internal/sandbox-proxy/llm/anthropic/... for
+// the endpoints in anthropicEndpoints.
 func (p *SandboxProxy) LLMAnthropic(w http.ResponseWriter, r *http.Request) {
 	p.forwardLLM(w, r, "https://api.anthropic.com", p.Cfg.AnthropicKey,
-		"/internal/sandbox-proxy/llm/anthropic", "llm:proxy",
+		"/internal/sandbox-proxy/llm/anthropic", "llm:proxy", anthropicEndpoints,
 		func(req *http.Request) {
 			// Anthropic uses x-api-key, not Authorization.
 			req.Header.Set("x-api-key", p.Cfg.AnthropicKey)
@@ -96,10 +130,11 @@ func (p *SandboxProxy) LLMAnthropic(w http.ResponseWriter, r *http.Request) {
 		})
 }
 
-// LLMOpenAI handles POST /internal/sandbox-proxy/llm/openai/...
+// LLMOpenAI handles /internal/sandbox-proxy/llm/openai/... for the
+// endpoints in openaiEndpoints.
 func (p *SandboxProxy) LLMOpenAI(w http.ResponseWriter, r *http.Request) {
 	p.forwardLLM(w, r, "https://api.openai.com", p.Cfg.OpenAIKey,
-		"/internal/sandbox-proxy/llm/openai", "llm:proxy",
+		"/internal/sandbox-proxy/llm/openai", "llm:proxy", openaiEndpoints,
 		func(req *http.Request) {
 			req.Header.Set("Authorization", "Bearer "+p.Cfg.OpenAIKey)
 		})
@@ -177,6 +212,7 @@ func (p *SandboxProxy) forwardLLM(
 	key string,
 	trim string,
 	scope string,
+	allowed []llmEndpoint,
 	mutateReq func(*http.Request),
 ) {
 	if !p.Cfg.Enabled {
@@ -186,11 +222,15 @@ func (p *SandboxProxy) forwardLLM(
 	if _, ok := p.requireClaims(w, r, scope); !ok {
 		return
 	}
+	tail := strings.TrimPrefix(r.URL.Path, trim)
+	if !allowedLLMEndpoint(allowed, r.Method, tail) {
+		http.Error(w, "endpoint not proxied", http.StatusNotFound)
+		return
+	}
 	if key == "" {
 		http.Error(w, "provider key not configured", http.StatusServiceUnavailable)
 		return
 	}
-	tail := strings.TrimPrefix(r.URL.Path, trim)
 	target, err := url.Parse(upstream + tail)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

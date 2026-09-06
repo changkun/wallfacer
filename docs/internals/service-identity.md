@@ -28,8 +28,8 @@ A request that validates but is addressed to a different audience is rejected wi
 
 | Route | Required scope |
 |---|---|
-| `POST /internal/sandbox-proxy/llm/anthropic/...` | `llm:proxy` |
-| `POST /internal/sandbox-proxy/llm/openai/...` | `llm:proxy` |
+| `/internal/sandbox-proxy/llm/anthropic/...` (inference endpoints only) | `llm:proxy` |
+| `/internal/sandbox-proxy/llm/openai/...` (inference endpoints only) | `llm:proxy` |
 | `GET /internal/sandbox-proxy/github-token?repo=owner/name` | `github:token` |
 
 A token that clears the audience but lacks the route's scope is rejected with `403`. Missing or unparseable bearer tokens are `401`.
