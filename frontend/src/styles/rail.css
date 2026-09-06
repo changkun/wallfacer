@@ -105,6 +105,7 @@
 }
 .rail-search svg {
   flex: none;
+  transform: translateY(1px);
 }
 .rail-search-label {
   flex: 1;
@@ -187,6 +188,28 @@
 .nav-btn.active .nav-ico {
   background: var(--accent-soft);
   color: var(--accent);
+}
+/* A toggle (the terminal) that is open: the glyph takes the accent and a dot
+   marks the state, but the row stays quiet so only the current page reads as
+   the highlighted entry. */
+.nav-btn.on .nav-ico {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.nav-btn.on::after {
+  content: "";
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+.app-rail--fold .nav-btn.on::after {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  margin: 0;
 }
 .nav-label {
   flex: 1;
@@ -590,4 +613,12 @@
   .rail-fold-btn {
     display: none;
   }
+}
+
+/* The account menu fills the trigger width in the open rail; in the folded
+   rail the trigger is an icon, so the menu takes a reading width of its own
+   and hangs off the rail's left edge instead of squeezing to 48px. */
+.app-rail--fold .rail-foot .lu-am-up .lu-am-dd {
+  width: 260px;
+  right: auto;
 }

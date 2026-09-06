@@ -149,7 +149,8 @@ watch(
               v-else
               type="button"
               class="nav-btn"
-              :class="{ active: item.id === 'terminal' && ui.showTerminal }"
+              :class="{ on: item.id === 'terminal' && ui.showTerminal }"
+              :aria-pressed="item.id === 'terminal' ? ui.showTerminal : undefined"
               :title="collapsed ? item.label : undefined"
               :data-nav="item.id"
               @click="onAction(item)"
