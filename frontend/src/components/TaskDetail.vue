@@ -378,6 +378,23 @@ function fetchForTab(t: MainTab) {
   if (t === 'events' && !eventsFetched.value) fetchEvents();
 }
 watch(mainTab, fetchForTab);
+// Task SSE invalidates cached detail data; files can change between task
+// updates, so refresh the visible data tab while an agent is running too.
+function refreshVisibleData() {
+  spansFetched.value = false;
+  resultsFetched.value = false;
+  eventsFetched.value = false;
+  diffFetched.value = false;
+  fetchForTab(mainTab.value);
+}
+watch(() => [props.task.updated_at, props.task.status, props.task.turns], refreshVisibleData);
+let detailTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  detailTimer = setInterval(() => {
+    if (props.task.status === 'in_progress' || props.task.status === 'committing') refreshVisibleData();
+  }, 3000);
+});
+onUnmounted(() => clearInterval(detailTimer));
 // When opened directly on a data tab (command-palette jump / deep link), the
 // change watcher above never fires, so kick off that tab's fetch on mount.
 onMounted(() => { if (mainTab.value !== 'spec') fetchForTab(mainTab.value); });
@@ -417,8 +434,9 @@ const streamTaskId = computed(() => props.task.id || null);
 // Transcript view: rendered trajectory (default) ↔ raw harness-native JSON.
 const transcriptView = ref<'rendered' | 'raw'>('rendered');
 const taskHarness = computed(() => props.task.sandbox);
+const streamRevision = computed(() => `${props.task.status}:${props.task.turns}`);
 const { raw: rawOutput, activity, answer: transcriptAnswer, streaming, truncated: serverTruncated } =
-  useTaskActivity(streamTaskId, { harness: taskHarness, mode: transcriptView });
+  useTaskActivity(streamTaskId, { harness: taskHarness, mode: transcriptView, refreshKey: streamRevision });
 // The assistant's answer prose, rendered as sanitised markdown for the
 // rendered transcript view.
 const transcriptAnswerHtml = computed(() =>
@@ -473,6 +491,7 @@ function stopOversightPolling() {
 }
 
 async function fetchOversight() {
+  stopOversightPolling();
   // Reset state if the user switched to a different task while keeping the
   // Activity tab open.
   if (oversightTaskId !== props.task.id) {

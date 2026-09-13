@@ -29,6 +29,8 @@ export interface UseTaskActivityOptions {
   // Which view the user is looking at. Defaults to 'rendered'. Only affects
   // non-Claude harnesses (Claude renders and shows raw from the same fetch).
   mode?: Ref<TranscriptView>;
+  // Status and turn changes reopen a completed log stream after feedback.
+  refreshKey?: Ref<string>;
 }
 
 type Strategy = 'claude' | 'normalized' | 'raw';
@@ -42,8 +44,10 @@ export function useTaskActivity(taskId: Ref<string | null>, opts: UseTaskActivit
   // sentinel. Avoids rescanning the whole accumulated log on every chunk.
   const truncated = ref(false);
   let handle: StreamingFetchHandle | null = null;
+  let generation = 0;
 
   function stop() {
+    generation++;
     handle?.abort();
     handle = null;
     streaming.value = false;
@@ -60,6 +64,7 @@ export function useTaskActivity(taskId: Ref<string | null>, opts: UseTaskActivit
 
   function start(id: string) {
     stop();
+    const epoch = generation;
     raw.value = '';
     activity.value = [];
     answer.value = '';
@@ -78,6 +83,7 @@ export function useTaskActivity(taskId: Ref<string | null>, opts: UseTaskActivit
     handle = startStreamingFetch({
       url,
       onChunk: (chunk) => {
+        if (epoch !== generation) return;
         raw.value += chunk;
         if (!truncated.value) {
           if ((sentinelTail + chunk).includes(TRUNCATION_SENTINEL)) {
@@ -98,6 +104,7 @@ export function useTaskActivity(taskId: Ref<string | null>, opts: UseTaskActivit
         }
       },
       onDone: () => {
+        if (epoch !== generation) return;
         if (turn) {
           turn.finalize();
           activity.value = [...turn.rows()];
@@ -109,14 +116,14 @@ export function useTaskActivity(taskId: Ref<string | null>, opts: UseTaskActivit
         }
         streaming.value = false;
       },
-      onError: () => { streaming.value = false; },
+      onError: () => { if (epoch === generation) streaming.value = false; },
     });
   }
 
   // Re-fetch when the task, the harness, or the view changes (the latter two
   // can flip the endpoint between raw and normalized).
   watch(
-    [taskId, () => opts.harness?.value, () => opts.mode?.value],
+    [taskId, () => opts.harness?.value, () => opts.mode?.value, () => opts.refreshKey?.value],
     ([id]) => {
       if (id) start(id);
       else stop();

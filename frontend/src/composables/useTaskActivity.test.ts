@@ -32,6 +32,22 @@ afterEach(() => {
 });
 
 describe('useTaskActivity', () => {
+  it('reconnects on a new turn and ignores callbacks from the previous stream', async () => {
+    const refreshKey = ref('waiting:1');
+    const state = useTaskActivity(ref('t1'), { refreshKey });
+    const previous = captured!;
+    previous.onChunk(frameLine(0));
+    previous.onDone();
+    refreshKey.value = 'in_progress:1';
+    await nextTick();
+    expect(captured).not.toBe(previous);
+    captured!.onChunk(frameLine(1));
+    previous.onChunk(frameLine(2));
+    previous.onDone();
+    expect(state.streaming.value).toBe(true);
+    expect(state.activity.value).toEqual(parseActivity(frameLine(1)));
+  });
+
   it('parses each frame once (linear), not the whole buffer per chunk', () => {
     const taskId = ref<string | null>('t1');
     const { activity } = useTaskActivity(taskId);

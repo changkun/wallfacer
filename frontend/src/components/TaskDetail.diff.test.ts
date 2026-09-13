@@ -95,6 +95,10 @@ describe('TaskDetail Changes tab', () => {
     await settle();
     expect(diffCalls.filter((u) => u.includes('task-aaa'))).toHaveLength(1);
 
+    task.value = makeTask('task-aaa', { updated_at: '2026-09-13T12:00:00Z' });
+    await settle();
+    expect(diffCalls.filter((u) => u.includes('task-aaa'))).toHaveLength(2);
+
     // Switch to a different task while the Changes tab is open.
     task.value = makeTask('task-bbb');
     await settle();
