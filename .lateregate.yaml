@@ -85,3 +85,17 @@ waive:
       per repository; which holder every file should carry is undecided, and
       an identifier printed into 300 files is not a guess to make
     until: 2026-10-31
+
+# The identity shape of the family: specs/infrastructure/identity.md in latere-ai/specs
+identity:
+  role: bff
+  waive:
+    verifier:
+      until: 2026-11-30
+      reason: internal/runner/runner.go takes a token apart by hand; id-04 moves it onto authkit/jwt
+    delegation:
+      until: 2026-11-30
+      reason: live cloud and identity specs describe the removed exchange; id-02 archives them
+    documents:
+      until: 2026-11-30
+      reason: docs/internals and two identity specs describe the removed exchange; id-02 archives them
