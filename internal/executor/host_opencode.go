@@ -32,7 +32,10 @@ func (b *HostBackend) launchOpenCode(ctx context.Context, spec ContainerSpec) (H
 		return nil, err
 	}
 
-	env := b.buildChildEnv(spec)
+	env, err := b.buildChildEnv(spec)
+	if err != nil {
+		return nil, err
+	}
 	req := requestFromClaudeSpec(spec)
 	if req.Prompt == "" {
 		return nil, fmt.Errorf("host backend: opencode launch requires a -p <prompt> argument in spec.Cmd")

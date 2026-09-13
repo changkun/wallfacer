@@ -306,6 +306,7 @@ export interface ServerConfig {
 }
 
 export interface EnvConfig {
+  secret_store?: 'file' | 'keyring';
   oauth_token: string;
   api_key: string;
   base_url: string;
@@ -332,6 +333,7 @@ export interface EnvConfig {
 }
 
 export interface EnvUpdatePayload {
+  secret_store?: 'file' | 'keyring';
   oauth_token?: string;
   api_key?: string;
   base_url?: string;

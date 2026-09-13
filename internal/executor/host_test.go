@@ -452,11 +452,14 @@ func TestBuildChildEnv_ParsesEnvFile(t *testing.T) {
 	}
 
 	b := &HostBackend{}
-	env := b.buildChildEnv(ContainerSpec{
+	env, err := b.buildChildEnv(ContainerSpec{
 		EnvFile: path,
 		Env:     map[string]string{"A": "overlaid"}, // spec.Env wins on collision
 	})
 
+	if err != nil {
+		t.Fatal(err)
+	}
 	got := map[string]string{}
 	for _, kv := range env {
 		if k, v, ok := strings.Cut(kv, "="); ok {

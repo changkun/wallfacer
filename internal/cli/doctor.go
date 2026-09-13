@@ -53,29 +53,16 @@ func RunDoctor(configDir string, args []string) {
 	}
 
 	// --- .env file ---
-	raw, err := os.ReadFile(envFile)
-	if err != nil {
+	vals, err := envconfig.ReadRaw(envFile)
+	if os.IsNotExist(err) {
 		fmt.Printf("[!] Env file not found: %s\n", envFile)
 		fmt.Printf("    Run 'wallfacer run' once to auto-create it.\n")
 		issues++
+	} else if err != nil {
+		fmt.Printf("[!] Cannot read env configuration: %v\n", err)
+		issues++
 	} else {
-		fmt.Printf("[ok] Env file exists\n")
-	}
-
-	// --- Parse env values ---
-	vals := map[string]string{}
-	if raw != nil {
-		for line := range strings.SplitSeq(string(raw), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "#") || line == "" {
-				continue
-			}
-			k, v, ok := strings.Cut(line, "=")
-			if !ok {
-				continue
-			}
-			vals[strings.TrimSpace(k)] = strings.TrimSpace(v)
-		}
+		fmt.Printf("[ok] Env file and credential storage readable\n")
 	}
 
 	// --- Claude Code sandbox credentials ---

@@ -308,3 +308,24 @@ Press `?` anywhere to open this reference in the app. Shortcuts without modifier
 - [Agent Graph](agent-graph.md): custom agents, flows, and harness pinning
 - [Workspaces](workspaces.md): folder sets and per-workspace settings
 - [Architecture](../internals/architecture.md): internals for contributors
+
+### System keyring storage
+
+In **Settings → Harnesses → Credential storage**, choose **System keyring** and
+save. Wallfacer moves saved provider tokens into the operating system keyring
+and leaves only `WALLFACER_SECRET_STORE=keyring` and a
+`WALLFACER_SECRET_BUNDLE` reference in `.env`. Ordinary settings remain in the
+file. This covers Claude, Anthropic gateway, OpenAI, Cursor, and OpenCode
+credentials saved by Wallfacer. Native CLI sign-ins and server authentication
+have their own storage.
+
+Unlock the keyring before saving or starting agents. On Linux, a running Secret
+Service and session bus are required. If a credential cannot be read, Wallfacer
+reports an error and prevents agent launch. It does not fall back to plaintext.
+Settings connection tests use temporary credentials without changing saved ones.
+
+For headless deployments, configuration-file storage remains the default. To
+move credentials back into the private `.env` file, explicitly select
+**Configuration file** and save while the keyring is available. Moving a
+keyring-backed `.env` file to another machine also requires transferring or
+recreating its credential bundle; the reference alone is insufficient.

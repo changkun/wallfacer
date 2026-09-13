@@ -1,5 +1,5 @@
 // Package envconfig provides helpers for reading and updating the wallfacer
-// .env file that is passed to task containers via --env-file.
+// .env file and provider credentials used by task agents.
 package envconfig
 
 import (
@@ -9,14 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	"latere.ai/x/pkg/atomicfile"
-
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
 // Config holds the known configuration values from the .env file.
 type Config struct {
+	SecretStore            string // WALLFACER_SECRET_STORE (file or keyring)
 	OAuthToken             string // CLAUDE_CODE_OAUTH_TOKEN
 	APIKey                 string // ANTHROPIC_API_KEY
 	AuthToken              string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
@@ -76,9 +75,9 @@ type Config struct {
 
 // knownKeys is the ordered list of keys managed by this package.
 // This order determines where newly-appended keys appear in the file.
-// Note: ANTHROPIC_AUTH_TOKEN is intentionally omitted — it is read-only
-// (parsed but never written by Update) because it is managed externally.
+// ANTHROPIC_AUTH_TOKEN is only rewritten when migrating provider storage.
 var knownKeys = []string{
+	secretModeKey, secretBundleKey, "ANTHROPIC_AUTH_TOKEN",
 	"CLAUDE_CODE_OAUTH_TOKEN",
 	"ANTHROPIC_API_KEY",
 	"ANTHROPIC_BASE_URL",
@@ -123,7 +122,7 @@ var knownKeys = []string{
 // Parse reads the env file at path and returns the known configuration values.
 // Lines that are blank or start with "#" are ignored. Unknown keys are skipped.
 func Parse(path string) (Config, error) {
-	raw, err := os.ReadFile(path)
+	raw, values, err := readConfigFile(path)
 	if err != nil {
 		return Config{}, err
 	}
@@ -135,6 +134,7 @@ func Parse(path string) (Config, error) {
 	// picker opens on a sensible "last month" view when the user hasn't
 	// configured anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
+		SecretStore:            "file",
 		TerminalEnabled:        true,
 		AgentSessionWindowDays: 30,
 	}
@@ -144,6 +144,8 @@ func Parse(path string) (Config, error) {
 			continue
 		}
 		switch k {
+		case secretModeKey:
+			cfg.SecretStore = v
 		case "CLAUDE_CODE_OAUTH_TOKEN":
 			cfg.OAuthToken = v
 		case "ANTHROPIC_API_KEY":
@@ -251,6 +253,12 @@ func Parse(path string) (Config, error) {
 			cfg.Cloud = ParseBoolFlag(v)
 		}
 	}
+	cfg.OAuthToken = values["CLAUDE_CODE_OAUTH_TOKEN"]
+	cfg.APIKey = values["ANTHROPIC_API_KEY"]
+	cfg.AuthToken = values["ANTHROPIC_AUTH_TOKEN"]
+	cfg.OpenAIAPIKey = values["OPENAI_API_KEY"]
+	cfg.CursorAPIKey = values["CURSOR_API_KEY"]
+	cfg.OpenCodeServerPassword = values["OPENCODE_SERVER_PASSWORD"]
 	return cfg, nil
 }
 
@@ -261,17 +269,8 @@ func Parse(path string) (Config, error) {
 // without round-tripping through a separate parser. Lines that don't
 // match KEY=VALUE are skipped silently, matching Parse's semantics.
 func ReadRaw(path string) (map[string]string, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[string]string)
-	for line := range strings.SplitSeq(string(raw), "\n") {
-		if k, v, ok := parseEnvLine(line); ok {
-			out[k] = v
-		}
-	}
-	return out, nil
+	_, values, err := readConfigFile(path)
+	return values, err
 }
 
 // Lookup returns the value for key from shell env (os.Getenv) when set,
@@ -431,6 +430,7 @@ func stripEnvInlineComment(v string) string {
 //   - non-nil, non-empty → set to the provided value
 //   - non-nil, empty → remove the line (clear the value)
 type Updates struct {
+	SecretStore          *string
 	OAuthToken           *string
 	APIKey               *string
 	BaseURL              *string
@@ -462,6 +462,7 @@ type Updates struct {
 // Comments and unrecognized keys are preserved verbatim.
 func Update(path string, u Updates) error {
 	updates := map[string]*string{
+		secretModeKey:                       u.SecretStore,
 		"CLAUDE_CODE_OAUTH_TOKEN":           u.OAuthToken,
 		"ANTHROPIC_API_KEY":                 u.APIKey,
 		"ANTHROPIC_BASE_URL":                u.BaseURL,
@@ -535,13 +536,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		defaultSandboxValue = &s
 	}
 
-	// Read the file early so we can pass the raw bytes to updateRawWithUpdates.
-	// This avoids a double-read that would otherwise happen via updateFile.
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read env file: %w", err)
-	}
-
 	updates := map[string]*string{
 		"WALLFACER_DEFAULT_SANDBOX":        defaultSandboxValue,
 		"WALLFACER_SANDBOX_IMPLEMENTATION": impl,
@@ -550,17 +544,19 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		"WALLFACER_SANDBOX_OVERSIGHT":      oversight,
 		"WALLFACER_SANDBOX_COMMIT_MESSAGE": commit,
 	}
-	return updateRawWithUpdates(path, raw, updates)
+	return updateFile(path, updates)
 }
 
 // updateFile reads the env file at path and applies the given updates map.
 // It delegates to updateRawWithUpdates after reading the file contents.
 func updateFile(path string, updates map[string]*string) error {
+	envMu.Lock()
+	defer envMu.Unlock()
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
 	}
-	return updateRawWithUpdates(path, raw, updates)
+	return updateSecrets(path, raw, updates, false)
 }
 
 // updateRawWithUpdates applies a set of key updates to raw env file content.
@@ -568,7 +564,7 @@ func updateFile(path string, updates map[string]*string) error {
 //  1. Scan existing lines, updating or clearing matched keys in-place.
 //  2. Append any new keys (not already in the file) in knownKeys order.
 //  3. Strip blank lines introduced by clearing, then write atomically.
-func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) error {
+func renderUpdates(raw []byte, updates map[string]*string) []byte {
 	lines := strings.Split(string(raw), "\n")
 	seen := map[string]bool{}
 	// Indices blanked by the clear phase below; only these are dropped during
@@ -584,7 +580,7 @@ func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) e
 		if !ok {
 			continue
 		}
-		k = strings.TrimSpace(k)
+		k = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(k), "export "))
 		ptr, known := updates[k]
 		if !known {
 			continue
@@ -626,7 +622,7 @@ func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) e
 	}
 	content := strings.TrimRight(strings.Join(kept, "\n"), "\n") + "\n"
 
-	return atomicfile.Write(path, []byte(content), 0600)
+	return []byte(content)
 }
 
 // unquote strips matching double or single quotes surrounding a value.

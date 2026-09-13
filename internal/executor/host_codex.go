@@ -44,7 +44,10 @@ func (b *HostBackend) launchCodex(ctx context.Context, spec ContainerSpec) (Hand
 		return nil, err
 	}
 
-	env := b.buildChildEnv(spec)
+	env, err := b.buildChildEnv(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	req := requestFromClaudeSpec(spec)
 	if req.Prompt == "" {

@@ -14,7 +14,7 @@ import type {
 } from '../../api/types';
 
 const taskStore = useTaskStore();
-const { env, fetchEnv, updateEnv } = useEnvConfig();
+const { env, error: envError, loading: envLoading, fetchEnv, updateEnv } = useEnvConfig();
 
 // --- Sandbox list ---
 // Fall back to the full harness registry so the default-harness select is
@@ -22,6 +22,7 @@ const { env, fetchEnv, updateEnv } = useEnvConfig();
 const sandboxes = computed<string[]>(() => supportedHarnesses(taskStore.config?.sandboxes));
 
 // --- Form state (local refs bound to inputs) ---
+const secretStore = ref<'file' | 'keyring'>('file');
 const oauthToken = ref('');
 const apiKey = ref('');
 const claudeBaseUrl = ref('');
@@ -80,6 +81,7 @@ const showClaudeOauthBtn = computed(() => !claudeBaseUrl.value);
 const showCodexOauthBtn = computed(() => !openaiBaseUrl.value);
 
 function applyEnvToForm(cfg: EnvConfig | null): void {
+  secretStore.value = cfg?.secret_store || 'file';
   oauthToken.value = '';
   apiKey.value = '';
   openaiApiKey.value = '';
@@ -105,6 +107,7 @@ watch(env, (cfg) => applyEnvToForm(cfg), { immediate: false });
 // --- Save / revert ---
 function buildSavePayload(): EnvUpdatePayload {
   const body: EnvUpdatePayload = {};
+  if (secretStore.value !== (env.value?.secret_store || 'file')) body.secret_store = secretStore.value;
   const oauthRaw = oauthToken.value.trim();
   const apiKeyRaw = apiKey.value.trim();
   const openaiRaw = openaiApiKey.value.trim();
@@ -418,6 +421,17 @@ const defaultSandboxOptions = computed(() => [
 </script>
 
 <template>
+  <p v-if="envError" role="alert" class="set-hint">Cannot read saved configuration: {{ envError }}</p>
+  <div class="card compact credential-storage">
+    <h3>Credential storage</h3>
+    <label for="credential-storage">Save provider credentials in</label>
+    <select id="credential-storage" v-model="secretStore" class="input">
+      <option value="file">Configuration file</option>
+      <option value="keyring">System keyring</option>
+    </select>
+    <p class="set-hint">System keyring moves saved provider tokens out of the configuration file. Unlock the keyring before saving or running tasks. Linux requires a desktop Secret Service session. Native CLI sign-ins remain managed by each CLI.</p>
+  </div>
+
   <div v-if="noCredentials" class="set-notice" data-settings-tab="sandbox">
     <strong>No API credentials configured.</strong>
     Sign in below or enter a Claude OAuth token / Anthropic API key (or an OpenAI key for Codex) to start running tasks.
@@ -426,7 +440,7 @@ const defaultSandboxOptions = computed(() => [
   <div class="card compact">
     <div class="card-head">
       <span class="eyebrow">Harness configuration</span>
-      <span class="set-row__help sb-head-help">Written to <code>~/.wallfacer/.env</code>; takes effect on the next task run. Leave token fields blank to keep the existing value.</span>
+      <span class="set-row__help sb-head-help">Settings take effect on the next task run. Provider tokens use the selected credential storage. Leave token fields blank to keep the existing value.</span>
     </div>
   </div>
 
@@ -641,13 +655,17 @@ const defaultSandboxOptions = computed(() => [
   </div>
 
   <div class="set-foot">
-    <button type="button" class="btn" @click="saveConfig">Save harness configuration</button>
+    <button type="button" class="btn" :disabled="envLoading || !!envError || !env" @click="saveConfig">Save harness configuration</button>
     <button type="button" class="btn ghost" @click="revertConfig">Revert</button>
-    <span id="env-config-status" class="set-status">{{ saveStatus }}</span>
+    <span id="env-config-status" class="set-status" role="status">{{ saveStatus }}</span>
   </div>
 </template>
 
 <style scoped>
+.credential-storage { padding: 16px; display: grid; gap: 8px; }
+.credential-storage h3, .credential-storage p { margin: 0; }
+.credential-storage p { color: var(--text-muted); font-size: 12px; }
+.credential-storage select { max-width: 260px; }
 .sb-head-help {
   margin-left: auto;
   text-align: right;

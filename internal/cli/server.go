@@ -273,7 +273,10 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// second — users can drop everything in ~/.wallfacer/.env or export
 	// them on the command line. Shell wins so `AUTH_CLIENT_ID=other
 	// wallfacer run` is a clean override without editing the file.
-	envFileKV, _ := envconfig.ReadRaw(cfg.EnvFile)
+	envFileKV, envReadErr := envconfig.ReadRaw(cfg.EnvFile)
+	if errors.Is(envReadErr, envconfig.ErrSecretStore) {
+		logger.Fatal("read provider credentials", "error", envReadErr)
+	}
 	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
 	// A local instance is never open: without WALLFACER_SERVER_API_KEY the
 	// API would accept any request from any host the listener is reachable

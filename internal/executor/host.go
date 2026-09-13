@@ -15,7 +15,6 @@ import (
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // requestFromClaudeSpec translates a runner-built ContainerSpec (whose Cmd
@@ -318,7 +317,10 @@ func (b *HostBackend) launchPlainHostAgent(ctx context.Context, spec ContainerSp
 		return nil, err
 	}
 
-	env := b.buildChildEnv(spec)
+	env, err := b.buildChildEnv(spec)
+	if err != nil {
+		return nil, err
+	}
 	req := requestFromClaudeSpec(spec)
 	if p.requirePrompt && req.Prompt == "" {
 		return nil, fmt.Errorf("host backend: %s launch requires a -p <prompt> argument in spec.Cmd", p.id)
@@ -368,12 +370,12 @@ func (b *HostBackend) launchPlainHostAgent(ctx context.Context, spec ContainerSp
 
 // buildChildEnv returns os.Environ() with spec.EnvFile values merged in
 // and spec.Env overlaid on top. spec.Env wins on collision.
-func (b *HostBackend) buildChildEnv(spec ContainerSpec) []string {
+func (b *HostBackend) buildChildEnv(spec ContainerSpec) ([]string, error) {
 	env := os.Environ()
 	if spec.EnvFile != "" {
 		fromFile, err := envconfig.ReadRaw(spec.EnvFile)
 		if err != nil {
-			logger.Runner.Warn("host backend: parse env file", "path", spec.EnvFile, "error", err)
+			return nil, fmt.Errorf("host backend: read credentials: %w", err)
 		} else {
 			for k, v := range fromFile {
 				env = setEnv(env, k, v)
@@ -383,7 +385,7 @@ func (b *HostBackend) buildChildEnv(spec ContainerSpec) []string {
 	for k, v := range spec.Env {
 		env = setEnv(env, k, v)
 	}
-	return env
+	return env, nil
 }
 
 // List returns info about the host processes currently tracked by the

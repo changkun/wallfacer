@@ -631,7 +631,11 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 // cannot launch. The run is prompt-only (no worktree tools); sanitizeCommitMessage
 // normalizes the output as on the host path.
 func (r *Runner) generateCommitMessageInProcess(ctx context.Context, taskID uuid.UUID, sessionID, commitPrompt string) (string, error) {
-	res, err := agentgraph.RunAgent(ctx, sessionID, r.agenticModelConfig(), "commit-msg", "", commitPrompt, "", nil)
+	cfg, err := r.agenticModelConfig()
+	if err != nil {
+		return "", err
+	}
+	res, err := agentgraph.RunAgent(ctx, sessionID, cfg, "commit-msg", "", commitPrompt, "", nil)
 	if err != nil {
 		logger.Runner.Warn("commit message generation (in-process) failed", "task", taskID, "error", err)
 		return "", newCommitMessageGenerationError("%v", err)

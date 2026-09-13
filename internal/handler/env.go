@@ -98,6 +98,7 @@ func validateBaseURL(u string) error {
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
+	SecretStore          string                               `json:"secret_store"`
 	OAuthToken           string                               `json:"oauth_token"` // masked
 	APIKey               string                               `json:"api_key"`     // masked
 	BaseURL              string                               `json:"base_url"`
@@ -198,7 +199,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		agentNice = executor.DefaultAgentNice
 	}
 	httpjson.Write(w, http.StatusOK, envConfigResponse{
-		OAuthToken:           envconfig.MaskToken(cfg.OAuthToken),
+		SecretStore: cfg.SecretStore, OAuthToken: envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:               envconfig.MaskToken(cfg.APIKey),
 		BaseURL:              cfg.BaseURL,
 		OpenAIAPIKey:         envconfig.MaskToken(cfg.OpenAIAPIKey),
@@ -281,7 +282,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to prepare test env: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer func() { _ = os.Remove(tempEnvFile) }()
+	defer envconfig.RemoveTestFile(tempEnvFile)
 
 	timeout := 3
 	if req.Timeout != nil {
@@ -385,17 +386,16 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = tempFile.Close() }()
-
-	if h.envFile != "" {
-		raw, err := os.ReadFile(h.envFile)
-		if err != nil && !os.IsNotExist(err) {
-			return "", err
+	_ = tempFile.Close()
+	success := false
+	defer func() {
+		if !success {
+			envconfig.RemoveTestFile(tempFile.Name())
 		}
-		if err == nil {
-			if _, err := tempFile.Write(raw); err != nil {
-				return "", err
-			}
+	}()
+	if h.envFile != "" {
+		if err := envconfig.CloneForTest(h.envFile, tempFile.Name()); err != nil && !os.IsNotExist(err) {
+			return "", err
 		}
 	}
 
@@ -421,6 +421,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		return "", err
 	}
 
+	success = true
 	return tempFile.Name(), nil
 }
 
@@ -435,6 +436,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
+		SecretStore          *string                              `json:"secret_store"`
 		OAuthToken           *string                              `json:"oauth_token"`
 		APIKey               *string                              `json:"api_key"`
 		BaseURL              *string                              `json:"base_url"`
@@ -588,8 +590,13 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.SecretStore != nil && *req.SecretStore != "file" && *req.SecretStore != "keyring" {
+		http.Error(w, "secret_store must be file or keyring", http.StatusUnprocessableEntity)
+		return
+	}
+
 	if err := envconfig.Update(h.envFile, envconfig.Updates{
-		OAuthToken:           req.OAuthToken,
+		SecretStore: req.SecretStore, OAuthToken: req.OAuthToken,
 		APIKey:               req.APIKey,
 		BaseURL:              req.BaseURL,
 		OpenAIAPIKey:         req.OpenAIAPIKey,

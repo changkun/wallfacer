@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"time"
 
@@ -26,16 +27,19 @@ import (
 // talks to the provider directly. Only the static x-api-key credential is wired
 // for now; Bearer-style tokens (ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN)
 // are deferred (they need a per-call BearerSource).
-func (r *Runner) agenticModelConfig() agentgraph.ModelConfig {
+func (r *Runner) agenticModelConfig() (agentgraph.ModelConfig, error) {
 	if r.envFile == "" {
-		return agentgraph.ModelConfig{}
+		return agentgraph.ModelConfig{}, nil
 	}
 	cfg, err := envconfig.Parse(r.envFile)
+	if errors.Is(err, envconfig.ErrSecretStore) {
+		return agentgraph.ModelConfig{}, err
+	}
 	if err != nil {
-		return agentgraph.ModelConfig{}
+		return agentgraph.ModelConfig{}, nil
 	}
 	if cfg.APIKey == "" {
-		return agentgraph.ModelConfig{}
+		return agentgraph.ModelConfig{}, nil
 	}
 	mode := agentgraph.ModelModeDirect
 	baseURL := ""
@@ -49,7 +53,7 @@ func (r *Runner) agenticModelConfig() agentgraph.ModelConfig {
 		Model:    cfg.DefaultModel,
 		BaseURL:  baseURL,
 		APIKey:   cfg.APIKey,
-	}
+	}, nil
 }
 
 // gatewayOrigin reduces the .env's ANTHROPIC_BASE_URL, which is shaped for the
@@ -134,7 +138,11 @@ func agenticEvent(ev agentgraph.Event) (store.EventType, map[string]string, bool
 // driveToposRun. The caller sets statusSet=true before invoking this.
 func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt, worktree string) {
 	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error) {
-		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), r.agenticModelConfig(), f, r.agentsReg, prompt, worktree, onEvent)
+		cfg, err := r.agenticModelConfig()
+		if err != nil {
+			return agentgraph.Result{}, err
+		}
+		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), cfg, f, r.agentsReg, prompt, worktree, onEvent)
 	})
 }
 
@@ -151,7 +159,11 @@ func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task st
 	// worktree is the task's set-up worktree (the real repo) so the agent's tools
 	// edit actual files; an empty worktree falls back to the topos temp-dir sandbox.
 	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error) {
-		return agentgraph.RunAgent(ctx, task.ID.String(), r.agenticModelConfig(), "implement", "", prompt, worktree, onEvent)
+		cfg, err := r.agenticModelConfig()
+		if err != nil {
+			return agentgraph.Result{}, err
+		}
+		return agentgraph.RunAgent(ctx, task.ID.String(), cfg, "implement", "", prompt, worktree, onEvent)
 	})
 }
 

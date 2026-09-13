@@ -102,7 +102,7 @@ func main() {
 // envEcho returns a subset of env vars the tests care about, so they can
 // assert env-file merge / spec.Env overlay without dumping the full parent env.
 func envEcho() map[string]string {
-	keys := []string{"FAKEAGENT_A", "FAKEAGENT_B", "FAKEAGENT_C", "WALLFACER_AGENT"}
+	keys := []string{"FAKEAGENT_A", "FAKEAGENT_B", "FAKEAGENT_C", "WALLFACER_AGENT", "ANTHROPIC_API_KEY"}
 	out := make(map[string]string, len(keys))
 	for _, k := range keys {
 		if v := os.Getenv(k); v != "" {

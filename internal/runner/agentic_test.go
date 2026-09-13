@@ -3,12 +3,14 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/agents"
+	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
@@ -32,21 +34,21 @@ func writeEnvFile(t *testing.T, lines string) string {
 func TestAgenticModelConfig(t *testing.T) {
 	t.Run("no env file falls back to fake", func(t *testing.T) {
 		r := &Runner{}
-		if cfg := r.agenticModelConfig(); cfg != (agentgraph.ModelConfig{}) {
+		if cfg := mustAgenticModelConfig(t, r); cfg != (agentgraph.ModelConfig{}) {
 			t.Errorf("config = %+v, want zero (fake)", cfg)
 		}
 	})
 
 	t.Run("env without anthropic key falls back to fake", func(t *testing.T) {
 		r := &Runner{envFile: writeEnvFile(t, "WALLFACER_AUTO_PUSH=true\n")}
-		if cfg := r.agenticModelConfig(); cfg != (agentgraph.ModelConfig{}) {
+		if cfg := mustAgenticModelConfig(t, r); cfg != (agentgraph.ModelConfig{}) {
 			t.Errorf("config = %+v, want zero (fake)", cfg)
 		}
 	})
 
 	t.Run("bare key selects direct", func(t *testing.T) {
 		r := &Runner{envFile: writeEnvFile(t, "ANTHROPIC_API_KEY=sk-test\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
-		cfg := r.agenticModelConfig()
+		cfg := mustAgenticModelConfig(t, r)
 		want := agentgraph.ModelConfig{
 			Mode:     agentgraph.ModelModeDirect,
 			Provider: "anthropic",
@@ -64,7 +66,7 @@ func TestAgenticModelConfig(t *testing.T) {
 		// lux-native dialect lives under.
 		r := &Runner{envFile: writeEnvFile(t,
 			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai/anthropic\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
-		cfg := r.agenticModelConfig()
+		cfg := mustAgenticModelConfig(t, r)
 		want := agentgraph.ModelConfig{
 			Mode:     agentgraph.ModelModeLux,
 			Provider: "anthropic",
@@ -80,7 +82,7 @@ func TestAgenticModelConfig(t *testing.T) {
 	t.Run("origin-shaped base url passes through unchanged", func(t *testing.T) {
 		r := &Runner{envFile: writeEnvFile(t,
 			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai\n")}
-		if got := r.agenticModelConfig().BaseURL; got != "https://lux.latere.ai" {
+		if got := mustAgenticModelConfig(t, r).BaseURL; got != "https://lux.latere.ai" {
 			t.Errorf("BaseURL = %q, want origin unchanged", got)
 		}
 	})
@@ -305,5 +307,22 @@ func TestRun_AgenticFlowCommitsWorktreeEdits(t *testing.T) {
 	}
 	if len(updated.CommitHashes) == 0 {
 		t.Error("no commit hashes were recorded on the task")
+	}
+}
+
+func mustAgenticModelConfig(t *testing.T, r *Runner) agentgraph.ModelConfig {
+	t.Helper()
+	cfg, err := r.agenticModelConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
+}
+
+func TestAgenticModelConfigRejectsUnavailableSecret(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_SECRET_STORE=keyring\nWALLFACER_SECRET_BUNDLE=invalid\n")
+	r := &Runner{envFile: path}
+	if _, err := r.agenticModelConfig(); !errors.Is(err, envconfig.ErrSecretStore) {
+		t.Fatalf("must not fall back to fake model: %v", err)
 	}
 }
