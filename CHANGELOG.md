@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.1.0 - 2026-09-13
+
 - Signing in requests no audience any more: the session token belongs to
   the identity provider, and the coordination connector presents a
   five-minute actor token minted for wallfacer instead of the login token.
