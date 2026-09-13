@@ -86,7 +86,7 @@ func launchOpenCodeAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([
 
 func TestHostBackend_LaunchOpenCode_SynthesizesResult(t *testing.T) {
 	bin := buildFakeOpenCode(t)
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+	b, err := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, OpenCodeBinary: bin})
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestHostBackend_LaunchOpenCode_SynthesizesResult(t *testing.T) {
 // distinct from the unrecognised-output error path).
 func TestHostBackend_LaunchOpenCode_ToolsOnlySuccess(t *testing.T) {
 	bin := buildFakeOpenCode(t)
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, OpenCodeBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-opencode-toolsonly",
@@ -173,7 +173,7 @@ func TestHostBackend_LaunchOpenCode_ToolsOnlySuccess(t *testing.T) {
 
 func TestHostBackend_LaunchOpenCode_MissingPromptFails(t *testing.T) {
 	bin := buildFakeOpenCode(t)
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, OpenCodeBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-opencode-noprompt",
@@ -197,7 +197,7 @@ func TestHostBackend_LaunchOpenCode_MissingPromptFails(t *testing.T) {
 // change would trigger, and it must surface loudly.
 func TestHostBackend_LaunchOpenCode_UnrecognizedOutputIsError(t *testing.T) {
 	bin := buildFakeOpenCode(t)
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, OpenCodeBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-opencode-garbage",
@@ -222,7 +222,7 @@ func TestHostBackend_LaunchOpenCode_UnrecognizedOutputIsError(t *testing.T) {
 // drain tolerates the exit code; correctness comes from the events).
 func TestHostBackend_LaunchOpenCode_NonZeroExitWithResult(t *testing.T) {
 	bin := buildFakeOpenCode(t)
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, OpenCodeBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, OpenCodeBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-opencode-exit1",

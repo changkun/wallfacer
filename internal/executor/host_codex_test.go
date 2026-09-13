@@ -68,7 +68,7 @@ func launchCodexAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([]ma
 
 func TestHostBackend_LaunchCodex_WrapsResult(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, err := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestHostBackend_LaunchCodex_WrapsResult(t *testing.T) {
 
 func TestHostBackend_LaunchCodex_MissingPromptFails(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	// No -p flag in Cmd.
 	spec := ContainerSpec{

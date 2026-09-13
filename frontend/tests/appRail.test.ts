@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { createApp, nextTick } from 'vue';
+import { describe, expect, it, vi } from 'vitest';
+import { createApp, nextTick, ref } from 'vue';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import { createPinia } from 'pinia';
 import { LATERE_PRODUCTS } from 'latere-ui';
+
+// These tests cover rail rendering. WorkspaceChip's live subscription is
+// exercised separately; happy-dom has no EventSource implementation.
+vi.mock('../src/api/client', () => ({ api: vi.fn(async () => []) }));
+vi.mock('../src/composables/useSse', () => ({
+  useSse: () => ({ connected: ref(true), connState: ref('ok'), stop: vi.fn() }),
+}));
 
 import AppRail from '../src/components/AppRail.vue';
 import { NAV_GROUPS } from '../src/lib/nav';

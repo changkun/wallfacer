@@ -90,6 +90,7 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 	}
 
 	runner := NewRunner(s, RunnerConfig{
+		AgentNice:        -1,     // fake agents must not depend on OS background scheduling
 		Command:          "echo", // dummy — not used for host-side operations
 		EnvFile:          "",
 		Workspaces:       workspaces,

@@ -87,7 +87,7 @@ func launchPiAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([]map[s
 // prevent any edit; launchPi must override it to Full (no --tools).
 func TestHostBackend_LaunchPi_ForcesWritePermission(t *testing.T) {
 	bin := buildFakePi(t)
-	b, err := NewHostBackend(HostBackendConfig{PiBinary: bin})
+	b, err := NewHostBackend(HostBackendConfig{AgentNice: -1, PiBinary: bin})
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestHostBackend_LaunchPi_ForcesWritePermission(t *testing.T) {
 // whose Cmd has no -p <prompt> rather than execing pi with an empty prompt.
 func TestHostBackend_LaunchPi_RequiresPrompt(t *testing.T) {
 	bin := buildFakePi(t)
-	b, err := NewHostBackend(HostBackendConfig{PiBinary: bin})
+	b, err := NewHostBackend(HostBackendConfig{AgentNice: -1, PiBinary: bin})
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}

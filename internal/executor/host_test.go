@@ -115,7 +115,7 @@ func launchAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) map[string
 
 func TestHostBackend_Launch_Argv(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, err := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, err := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestHostBackend_Launch_Argv(t *testing.T) {
 // back through requestFromClaudeSpec / BuildArgv.
 func TestHostBackend_Launch_NoFastPrompt(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-test-nofast",
@@ -161,7 +161,7 @@ func TestHostBackend_Launch_NoFastPrompt(t *testing.T) {
 
 func TestHostBackend_Launch_ResumeFlag(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-test-resume",
@@ -177,7 +177,7 @@ func TestHostBackend_Launch_ResumeFlag(t *testing.T) {
 
 func TestHostBackend_Launch_EnvMerge(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	envFile := filepath.Join(t.TempDir(), ".env")
 	// A=1 from file; B=2 from file but overridden by spec.Env to 3; C=4 only in spec.Env.
@@ -212,7 +212,7 @@ func TestHostBackend_Launch_EnvMerge(t *testing.T) {
 
 func TestHostBackend_Launch_WorkDirIsUsed(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	wd := t.TempDir()
 	// t.TempDir returns an evaluated path on darwin/linux, but symlinks under
@@ -238,7 +238,7 @@ func TestHostBackend_Launch_WorkDirIsUsed(t *testing.T) {
 
 func TestHostBackend_Launch_RejectsContainerPath(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	spec := ContainerSpec{
 		Name:    "wallfacer-test-reject",
@@ -257,7 +257,7 @@ func TestHostBackend_Launch_RejectsContainerPath(t *testing.T) {
 
 func TestHostBackend_Launch_MissingAgentEnv(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	_, err := b.Launch(context.Background(), ContainerSpec{
 		Name:    "wallfacer-test-noagent",
@@ -271,7 +271,7 @@ func TestHostBackend_Launch_MissingAgentEnv(t *testing.T) {
 
 func TestHostBackend_Kill_Escalates(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	spec := ContainerSpec{
 		Name: "wallfacer-test-kill",
@@ -338,7 +338,7 @@ func TestHostBackend_Kill_EscalatesImmediatelyWhenSignalUnsupported(t *testing.T
 	t.Cleanup(func() { gracefulSig = orig })
 
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	spec := ContainerSpec{
 		Name: "wallfacer-test-kill-unsupported",
@@ -382,7 +382,7 @@ func TestHostBackend_Kill_EscalatesImmediatelyWhenSignalUnsupported(t *testing.T
 
 func TestHostBackend_List(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
-	b, _ := NewHostBackend(HostBackendConfig{ClaudeBinary: bin, CodexBinary: bin})
+	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
 	// Use a sleeping fakeagent so List catches it mid-flight.
 	spec := ContainerSpec{

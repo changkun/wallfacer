@@ -107,7 +107,7 @@ func newTestHandler(t *testing.T) *Handler {
 
 		t.Fatal(err)
 	}
-	r := runner.NewRunner(s, runner.RunnerConfig{})
+	r := runner.NewRunner(s, runner.RunnerConfig{AgentNice: -1})
 	// Cleanups run in LIFO order (last registered runs first).
 	// Order: remove store dir → wait compaction → wait background → shutdown.
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
@@ -135,6 +135,7 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
+		AgentNice:  -1,
 		EnvFile:    envPath,
 		Workspaces: workspaces,
 	})

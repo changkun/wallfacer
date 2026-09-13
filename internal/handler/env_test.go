@@ -41,7 +41,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	if err := os.WriteFile(envPath, []byte{}, 0644); err != nil {
 		t.Fatal(err)
 	}
-	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath})
+	r := runner.NewRunner(s, runner.RunnerConfig{AgentNice: -1, EnvFile: envPath})
 	// Cleanups run LIFO: remove store dir last, after compaction and background work finish.
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 	t.Cleanup(s.WaitCompaction)
@@ -66,7 +66,7 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"header.payload.sig","refresh_token":"rt"}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, CodexAuthPath: codexAuthDir})
+	r := runner.NewRunner(s, runner.RunnerConfig{AgentNice: -1, EnvFile: envPath, CodexAuthPath: codexAuthDir})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 	h := NewHandler(s, r, t.TempDir(), nil, nil)

@@ -87,7 +87,7 @@ func launchCursorAndDrain(t *testing.T, b *HostBackend, spec ContainerSpec) ([]m
 // ReadOnly zero value, so launchCursor must override it to Full.
 func TestHostBackend_LaunchCursor_ForcesWritePermission(t *testing.T) {
 	bin := buildFakeCursor(t)
-	b, err := NewHostBackend(HostBackendConfig{CursorBinary: bin})
+	b, err := NewHostBackend(HostBackendConfig{AgentNice: -1, CursorBinary: bin})
 	if err != nil {
 		t.Fatalf("new: %v", err)
 	}

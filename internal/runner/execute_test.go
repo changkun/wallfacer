@@ -48,6 +48,7 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 	}
 	resolved := resolveTestCmd(cmd)
 	r := NewRunner(s, RunnerConfig{
+		AgentNice:        -1, // deterministic fake-process deadlines
 		Command:          cmd,
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
