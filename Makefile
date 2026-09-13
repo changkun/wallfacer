@@ -107,7 +107,7 @@ endif
 #   make ui-test
 #   SKIP_BUILD=1 make ui-test
 ui-test:
-	sh frontend/scripts/ui-shots/ui-test.sh
+	bash frontend/scripts/ui-shots/ui-test.sh
 
 # The wf-spec-* skills in .claude/skills/ are a mirror of the `spec` plugin in
 # latere-ai/agent-skills. They stay committed because the Claude harness runs
