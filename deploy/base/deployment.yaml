@@ -43,9 +43,9 @@ spec:
             # required and lives in its own minimal secret.
             - name: AUTH_CLIENT_ID
               value: wallfacer
-            # Requested on /authorize so the access token carries
-            # aud=wallfacer; the API validator accepts only this audience
-            # (never the issuer, which every latere token carries).
+            # The audience this API verifies and nothing else: a login
+            # token is the issuer's and opens nothing here; a local
+            # instance presents an actor token auth mints for wallfacer.
             - name: AUTH_AUDIENCE
               value: wallfacer
             - name: AUTH_COOKIE_KEY

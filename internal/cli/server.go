@@ -311,7 +311,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		ClientSecret: envconfig.Lookup(envFileKV, "AUTH_CLIENT_SECRET"),
 		RedirectURL:  envconfig.Lookup(envFileKV, "AUTH_REDIRECT_URL"),
 		CookieKey:    envconfig.Lookup(envFileKV, "AUTH_COOKIE_KEY"),
-		Audience:     envconfig.Lookup(envFileKV, "AUTH_AUDIENCE"),
 	}
 	authCfg, err = resolveAuthConfig(authCfg, cfg.Addr, configDir)
 	if err != nil {
@@ -330,12 +329,16 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// JWT validator for API requests that carry Authorization: Bearer
 	// <jwt>. Issuer and JWKS URL fall back to AuthURL derivatives when
 	// the deployment doesn't override them; the only accepted audience
-	// is the OAuth client ID so tokens minted for other services are
-	// rejected.
+	// is this service's, AUTH_AUDIENCE (default: the OAuth client id), so
+	// a login token and a token minted for another service are rejected.
+	// A local instance reaches this API with an actor token minted for
+	// that audience from its own session.
+	apiAudience := cmp.Or(envconfig.Lookup(envFileKV, "AUTH_AUDIENCE"), authCfg.ClientID)
 	jwtValidator = auth.BuildValidator(
 		authCfg,
 		envconfig.Lookup(envFileKV, "AUTH_JWKS_URL"),
 		envconfig.Lookup(envFileKV, "AUTH_ISSUER"),
+		apiAudience,
 	)
 
 	// Coordination plane (dial side): hold one outbound WebSocket to the cloud
@@ -351,7 +354,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	coordTokenStore := newCoordinationTokenStore()
 	coordBridge := newSessionTokenBridge(authClient, coordTokenStore)
 	coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay, coordTokenStore,
-		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID},
+		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID, Audience: apiAudience},
 		logger.Main)
 	h.SetCoordinationToggle(coordGate)
 	// Signing out clears the coordination token: the connector's gate then drops
@@ -617,13 +620,9 @@ func resolveAuthConfig(cfg oidc.Config, addr, configDir string) (oidc.Config, er
 	if cfg.ClientID == "" {
 		cfg.ClientID = "wallfacer"
 	}
-	// The access token must carry aud=ClientID for BuildValidator to admit it;
-	// oidc.New would otherwise default the requested audience to AuthURL, which
-	// the validator rejects on purpose (an issuer-audience token is valid at
-	// every latere service).
-	if cfg.Audience == "" {
-		cfg.Audience = cfg.ClientID
-	}
+	// No audience is requested at login: the session token is the issuer's,
+	// and the API is reached with an actor token minted for this service.
+	cfg.Audience = ""
 	if cfg.RedirectURL == "" {
 		cfg.RedirectURL = defaultRedirectURL(addr)
 	}
@@ -1445,6 +1444,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			oidc.Config{AuthURL: u},
 			os.Getenv("SANDBOX_PROXY_AUTH_JWKS_URL"),
 			os.Getenv("SANDBOX_PROXY_AUTH_ISSUER"),
+			"",
 		)
 	}
 	sandboxProxy := handler.NewSandboxProxy(

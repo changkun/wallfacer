@@ -25,17 +25,18 @@ type identityCtxKey struct{}
 // BuildValidator constructs a jwt.Validator from the OIDC configuration.
 // JWKS endpoint is auto-derived from cfg.AuthURL when not passed
 // explicitly. Issuer validation is optional and only applied when an
-// explicit issuer is passed or AUTH_ISSUER is set — fosite-issued JWT
-// access tokens don't always carry iss that matches the discovery
-// document. Audience validation accepts exactly cfg.ClientID when
-// configured, never the issuer, so tokens minted for other relying
-// parties are rejected. Returns nil when cfg.AuthURL is empty.
+// explicit issuer is passed or AUTH_ISSUER is set. Audience validation
+// accepts exactly audience, which defaults to cfg.ClientID, and never the
+// issuer, so a login token (addressed to the issuer alone) and a token
+// minted for another service are both rejected; what this API takes is
+// the actor token auth mints for this audience. Returns nil when
+// cfg.AuthURL is empty.
 //
 // jwksURL and issuer override the derived defaults; pass "" for either
 // to keep the default (empty issuer = skip iss check). The CLI boot
-// path reads AUTH_JWKS_URL and AUTH_ISSUER from the environment and
-// forwards them here.
-func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwt.Validator {
+// path reads AUTH_JWKS_URL, AUTH_ISSUER and AUTH_AUDIENCE from the
+// environment and forwards them here.
+func BuildValidator(cfg oidc.Config, jwksURL, issuer, audience string) *jwt.Validator {
 	if cfg.AuthURL == "" {
 		return nil
 	}
@@ -46,13 +47,11 @@ func BuildValidator(cfg oidc.Config, jwksURL, issuer string) *jwt.Validator {
 		JWKSURL: jwksURL,
 		Issuer:  issuer, // empty = skip iss check; operator sets AUTH_ISSUER to opt in
 	}
-	if cfg.ClientID != "" {
-		// Only this relying party's own audience is accepted. The auth server
-		// stamps the issuer (AuthURL) into every access token's aud, so
-		// admitting the issuer here would admit a token minted for any other
-		// latere service. The relying-party config requests aud=ClientID on
-		// /authorize (oidc.Config.Audience) so our own tokens carry it.
-		jc.Audiences = []string{cfg.ClientID}
+	if audience == "" {
+		audience = cfg.ClientID
+	}
+	if audience != "" {
+		jc.Audiences = []string{audience}
 	}
 	return jwt.New(jc)
 }
@@ -73,7 +72,7 @@ func OptionalAuth(v *jwt.Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
-	bearerAuth := jwt.NewAuthenticator(v, nil)
+	bearerAuth := jwt.NewAuthenticator(v)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if id, err := bearerAuth.Authenticate(r); err == nil {
 			next.ServeHTTP(w, withIdentity(r, &id))
@@ -90,7 +89,7 @@ func Auth(v *jwt.Validator, next http.Handler) http.Handler {
 	if v == nil {
 		return next
 	}
-	bearerAuth := jwt.NewAuthenticator(v, nil)
+	bearerAuth := jwt.NewAuthenticator(v)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := bearerToken(r); !ok {
 			writeUnauthorized(w, "missing bearer token")

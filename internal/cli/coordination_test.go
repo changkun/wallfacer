@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -32,22 +33,38 @@ func (s *fakeTokenStore) Clear() error                 { s.tok = nil; return nil
 func TestCoordinationTokenFunc(t *testing.T) {
 	ctx := context.Background()
 
+	mint := func(_ context.Context, login string) (string, error) { return "actor-for-" + login, nil }
+
 	t.Run("signed out yields not-ok", func(t *testing.T) {
-		tf := coordinationTokenFunc(ctx, &fakeTokenStore{}, nil)
+		tf := coordinationTokenFunc(ctx, &fakeTokenStore{}, nil, mint)
 		if _, ok := tf(); ok {
 			t.Fatal("expected not signed in with no stored token")
 		}
 	})
 
-	t.Run("valid token returns access token", func(t *testing.T) {
+	t.Run("a valid login token yields the actor token minted from it", func(t *testing.T) {
 		store := &fakeTokenStore{tok: &oauth2.Token{
 			AccessToken: "live-jwt",
 			Expiry:      time.Now().Add(time.Hour),
 		}}
-		tf := coordinationTokenFunc(ctx, store, nil)
+		tf := coordinationTokenFunc(ctx, store, nil, mint)
 		got, ok := tf()
-		if !ok || got != "live-jwt" {
-			t.Fatalf("token = %q, ok = %v; want live-jwt, true", got, ok)
+		if !ok || got != "actor-for-live-jwt" {
+			t.Fatalf("token = %q, ok = %v; want the actor token minted from live-jwt", got, ok)
+		}
+	})
+
+	t.Run("the login token is never presented", func(t *testing.T) {
+		store := &fakeTokenStore{tok: &oauth2.Token{
+			AccessToken: "live-jwt",
+			Expiry:      time.Now().Add(time.Hour),
+		}}
+		refused := func(context.Context, string) (string, error) { return "", errors.New("invalid_target") }
+		if _, ok := coordinationTokenFunc(ctx, store, nil, refused)(); ok {
+			t.Fatal("a refused mint must leave the connector idle, not dial with the login token")
+		}
+		if _, ok := coordinationTokenFunc(ctx, store, nil, nil)(); ok {
+			t.Fatal("no minter must leave the connector idle")
 		}
 	})
 
@@ -57,7 +74,7 @@ func TestCoordinationTokenFunc(t *testing.T) {
 			Expiry:      time.Now().Add(-time.Hour),
 		}}
 		// nil oidc client => no refresh path; expired token must not be sent.
-		tf := coordinationTokenFunc(ctx, store, nil)
+		tf := coordinationTokenFunc(ctx, store, nil, mint)
 		if _, ok := tf(); ok {
 			t.Fatal("expired token without refresh must report signed out")
 		}

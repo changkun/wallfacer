@@ -123,13 +123,13 @@ func (c *claimsCapture) handler() http.Handler {
 // --- BuildValidator --------------------------------------------------------
 
 func TestBuildValidator_NilWhenAuthURLEmpty(t *testing.T) {
-	if v := auth.BuildValidator(oidc.Config{}, "", ""); v != nil {
+	if v := auth.BuildValidator(oidc.Config{}, "", "", ""); v != nil {
 		t.Fatalf("BuildValidator(empty) = %v, want nil", v)
 	}
 }
 
 func TestBuildValidator_UsesAuthURLDefaults(t *testing.T) {
-	v := auth.BuildValidator(oidc.Config{AuthURL: "https://auth.example.com"}, "", "")
+	v := auth.BuildValidator(oidc.Config{AuthURL: "https://auth.example.com"}, "", "", "")
 	if v == nil {
 		t.Fatal("BuildValidator returned nil with valid AuthURL")
 	}
@@ -140,7 +140,7 @@ func TestBuildValidator_UsesAuthURLDefaults(t *testing.T) {
 func TestOptionalAuth_ValidTokenInjectsClaims(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	tok := signToken(t, key, defaultHeader(key), defaultPayload(time.Now().Add(time.Hour)))
 
@@ -168,7 +168,7 @@ func TestOptionalAuth_ValidTokenInjectsClaims(t *testing.T) {
 func TestOptionalAuth_ExpiredTokenPassesThroughAnonymous(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	tok := signToken(t, key, defaultHeader(key), defaultPayload(time.Now().Add(-time.Hour)))
 
@@ -190,7 +190,7 @@ func TestOptionalAuth_ExpiredTokenPassesThroughAnonymous(t *testing.T) {
 func TestOptionalAuth_AudienceMismatchPassesThroughAnonymous(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	payload := defaultPayload(time.Now().Add(time.Hour))
 	payload["aud"] = "other-client"
@@ -218,7 +218,7 @@ func TestOptionalAuth_AudienceMismatchPassesThroughAnonymous(t *testing.T) {
 func TestOptionalAuth_IssuerAudienceRejected(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL)
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL, "")
 
 	payload := defaultPayload(time.Now().Add(time.Hour))
 	payload["iss"] = srv.URL
@@ -246,7 +246,7 @@ func TestOptionalAuth_IssuerAudienceRejected(t *testing.T) {
 func TestOptionalAuth_ClientAndIssuerAudienceAccepted(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL)
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, srv.URL, "")
 
 	payload := defaultPayload(time.Now().Add(time.Hour))
 	payload["iss"] = srv.URL
@@ -271,7 +271,7 @@ func TestOptionalAuth_ClientAndIssuerAudienceAccepted(t *testing.T) {
 func TestOptionalAuth_MalformedHeaderPassesThrough(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	capt := &claimsCapture{}
 	h := auth.OptionalAuth(v, capt.handler())
@@ -291,7 +291,7 @@ func TestOptionalAuth_MalformedHeaderPassesThrough(t *testing.T) {
 func TestOptionalAuth_NoHeaderPassesThrough(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	capt := &claimsCapture{}
 	h := auth.OptionalAuth(v, capt.handler())
@@ -324,7 +324,7 @@ func TestOptionalAuth_NilValidatorIsIdentity(t *testing.T) {
 func TestAuth_ValidToken200(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	tok := signToken(t, key, defaultHeader(key), defaultPayload(time.Now().Add(time.Hour)))
 
@@ -346,7 +346,7 @@ func TestAuth_ValidToken200(t *testing.T) {
 func TestAuth_MissingTokenReturns401(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	h := auth.Auth(v, (&claimsCapture{}).handler())
 	r := httptest.NewRequest(http.MethodGet, "/api/admin/rebuild-index", nil)
@@ -361,7 +361,7 @@ func TestAuth_MissingTokenReturns401(t *testing.T) {
 func TestAuth_ExpiredTokenReturns401(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	tok := signToken(t, key, defaultHeader(key), defaultPayload(time.Now().Add(-time.Hour)))
 
@@ -379,7 +379,7 @@ func TestAuth_ExpiredTokenReturns401(t *testing.T) {
 func TestAuth_AudienceMismatchReturns401(t *testing.T) {
 	key := genKey(t)
 	srv := serveJWKS(t, key)
-	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai")
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "")
 
 	payload := defaultPayload(time.Now().Add(time.Hour))
 	payload["aud"] = "other-client"
@@ -413,5 +413,37 @@ func TestPrincipalFromContext_EmptyContextReturnsFalse(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	if _, ok := auth.PrincipalFromContext(r.Context()); ok {
 		t.Fatal("PrincipalFromContext on empty ctx should return (nil, false)")
+	}
+}
+
+// The audience the validator accepts is configuration, AUTH_AUDIENCE, and
+// defaults to the client id. A token minted for that audience is admitted; a
+// token addressed to the issuer alone, which is what a login token is, and a
+// token for the client id when another audience is configured, are not.
+func TestBuildValidator_AcceptsOnlyTheConfiguredAudience(t *testing.T) {
+	key := genKey(t)
+	srv := serveJWKS(t, key)
+	v := auth.BuildValidator(oidc.Config{AuthURL: srv.URL, ClientID: "my-client"}, srv.URL, "https://auth.latere.ai", "wf-api")
+
+	for name, c := range map[string]struct {
+		aud  any
+		want bool
+	}{
+		"the configured audience":  {"wf-api", true},
+		"the client id":            {"my-client", false},
+		"the issuer alone (login)": {"https://auth.latere.ai", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			payload := defaultPayload(time.Now().Add(time.Hour))
+			payload["aud"] = c.aud
+			tok := signToken(t, key, defaultHeader(key), payload)
+			cap := &claimsCapture{}
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Authorization", "Bearer "+tok)
+			auth.OptionalAuth(v, cap.handler()).ServeHTTP(httptest.NewRecorder(), req)
+			if cap.ok != c.want {
+				t.Fatalf("identity present = %v, want %v", cap.ok, c.want)
+			}
+		})
 	}
 }

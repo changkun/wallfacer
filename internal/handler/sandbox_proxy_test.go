@@ -76,7 +76,7 @@ func signProxyJWT(t *testing.T, key *rsa.PrivateKey, sub, aud string, scopes []s
 
 func proxyValidator(t *testing.T, jwksURL string) *jwt.Validator {
 	t.Helper()
-	return auth.BuildValidator(oidc.Config{AuthURL: jwksURL}, jwksURL, "https://auth.latere.ai")
+	return auth.BuildValidator(oidc.Config{AuthURL: jwksURL}, jwksURL, "https://auth.latere.ai", "")
 }
 
 // proxyMux wires the three trust-plane routes exactly as

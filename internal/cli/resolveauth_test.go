@@ -28,10 +28,10 @@ func TestResolveAuthConfig_PublicDefault(t *testing.T) {
 	if cfg.RedirectURL != "http://localhost:8080/callback" {
 		t.Errorf("RedirectURL = %q, want http://localhost:8080/callback", cfg.RedirectURL)
 	}
-	// The requested audience must be the client id: BuildValidator accepts
-	// only that, and the oidc default (AuthURL) would be rejected.
-	if cfg.Audience != "wallfacer" {
-		t.Errorf("Audience = %q, want wallfacer (= ClientID)", cfg.Audience)
+	// No audience is requested at login: the session token is the issuer's,
+	// and the API takes an actor token minted for this service instead.
+	if cfg.Audience != "" {
+		t.Errorf("Audience = %q, want none requested", cfg.Audience)
 	}
 	if cfg.CookieKey == "" {
 		t.Error("expected a generated cookie key")
@@ -85,8 +85,8 @@ func TestResolveAuthConfig_EnvOverride(t *testing.T) {
 		cfg.RedirectURL != "https://app.example.com/callback" {
 		t.Errorf("env values not preserved: %+v", cfg)
 	}
-	if cfg.Audience != "custom-aud" {
-		t.Errorf("Audience = %q, want the explicit AUTH_AUDIENCE", cfg.Audience)
+	if cfg.Audience != "" {
+		t.Errorf("Audience = %q, want none requested whatever the input says", cfg.Audience)
 	}
 	if cfg.CookieKey != "deadbeefdeadbeefdeadbeefdeadbeef" {
 		t.Errorf("cookie key overwritten: %q", cfg.CookieKey)

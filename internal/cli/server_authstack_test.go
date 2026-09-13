@@ -105,6 +105,7 @@ func TestAPIRoutes_ClaimsContext_InCloudMode(t *testing.T) {
 		oidc.Config{AuthURL: jwks.URL, ClientID: "my-client"},
 		jwks.URL,
 		"https://auth.latere.ai",
+		"",
 	)
 
 	var captured *authkit.Identity
@@ -133,6 +134,7 @@ func TestAPIRoutes_JWTWithStaticKeySet_BypassesKeyCheck(t *testing.T) {
 		oidc.Config{AuthURL: jwks.URL, ClientID: "my-client"},
 		jwks.URL,
 		"https://auth.latere.ai",
+		"",
 	)
 
 	var captured *authkit.Identity

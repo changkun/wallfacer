@@ -127,7 +127,7 @@ func startCoordinationClient(ctx context.Context, configDir string, wsMgr *works
 		version = "dev"
 	}
 
-	tokenFunc := coordinationTokenFunc(ctx, tokenStore, oidcClient)
+	tokenFunc := coordinationTokenFunc(ctx, tokenStore, oidcClient, coordinationMinter(oidcClient, authCfg.Audience))
 	gate.signedIn = func() bool { _, ok := tokenFunc(); return ok }
 	cfg := client.Config{
 		URL:      url,
@@ -233,33 +233,66 @@ func (b *sessionTokenBridge) sync(accessToken, refreshToken string, expiry time.
 }
 
 // authConfigForRefresh is the subset of auth config the connector needs to
-// refresh tokens. Declared locally so coordination.go does not import the auth
-// package's full Config shape.
+// refresh the login token and to mint the token it presents. Declared
+// locally so coordination.go does not import the auth package's full Config
+// shape.
 type authConfigForRefresh struct {
 	AuthURL  string
 	ClientID string
+	// Audience is the coordinator's: the connector presents an actor token
+	// minted for it, never the login token.
+	Audience string
 }
 
+// actorMinter mints the token the connector presents from the login token:
+// an actor token the issuer addresses to the coordinator's audience for the
+// signed-in person. Returns an error when the issuer refuses or is away.
+type actorMinter func(ctx context.Context, loginToken string) (string, error)
+
 // coordinationTokenFunc returns a Token callback that loads the persisted
-// device-code token (the same token.json the local board's sign-in writes) and
-// refreshes it when expired. Returns ("", false) when signed out so the
-// connector stays idle.
-func coordinationTokenFunc(ctx context.Context, store cli.TokenStore, oidcClient *oidc.Client) func() (string, bool) {
+// login token (the same token.json the local board's sign-in writes),
+// refreshes it when expired, and hands back an actor token minted from it
+// for the coordinator. The login token itself is presented to the issuer
+// only. Returns ("", false) when signed out or when nothing can be minted,
+// so the connector stays idle rather than dial with the wrong credential.
+func coordinationTokenFunc(ctx context.Context, store cli.TokenStore, oidcClient *oidc.Client, mint actorMinter) func() (string, bool) {
 	return func() (string, bool) {
 		tok, err := store.Load()
 		if err != nil || tok == nil || tok.AccessToken == "" {
 			return "", false
 		}
-		if tok.Valid() {
-			return tok.AccessToken, true
-		}
-		if tok.RefreshToken != "" && oidcClient != nil {
-			if nt, err := oidcClient.RefreshTokenContext(ctx, tok.RefreshToken); err == nil && nt != nil && nt.AccessToken != "" {
-				_ = store.Save(nt)
-				return nt.AccessToken, true
+		var login string
+		switch {
+		case tok.Valid():
+			login = tok.AccessToken
+		case tok.RefreshToken != "" && oidcClient != nil:
+			nt, err := oidcClient.RefreshTokenContext(ctx, tok.RefreshToken)
+			if err != nil || nt == nil || nt.AccessToken == "" {
+				return "", false
 			}
+			_ = store.Save(nt)
+			login = nt.AccessToken
+		default:
+			return "", false
 		}
-		return "", false
+		if mint == nil {
+			return "", false
+		}
+		actor, err := mint(ctx, login)
+		if err != nil || actor == "" {
+			return "", false
+		}
+		return actor, true
+	}
+}
+
+// coordinationMinter mints for the coordinator's audience through the
+// library, which reuses a token per login token until shortly before it
+// expires, so a connector that asks on every dial pays one mint per lifetime.
+func coordinationMinter(oidcClient *oidc.Client, audience string) actorMinter {
+	return func(ctx context.Context, loginToken string) (string, error) {
+		tok, _, err := oidcClient.ActorToken(ctx, &oidc.Session{AccessToken: loginToken}, audience)
+		return tok, err
 	}
 }
 

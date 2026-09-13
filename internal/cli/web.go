@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"flag"
@@ -50,22 +51,21 @@ func runWeb(args []string, frontendFS fs.FS) error {
 		ClientSecret: os.Getenv("AUTH_CLIENT_SECRET"),
 		RedirectURL:  os.Getenv("AUTH_REDIRECT_URL"),
 		CookieKey:    os.Getenv("AUTH_COOKIE_KEY"),
-		Audience:     os.Getenv("AUTH_AUDIENCE"),
 	}
 	if authCfg.AuthURL == "" {
 		authCfg.AuthURL = "https://auth.latere.ai"
 	}
-	// Request aud=ClientID so the validator below admits the token; the
-	// oidc default (aud=AuthURL) is rejected on purpose.
-	if authCfg.Audience == "" {
-		authCfg.Audience = authCfg.ClientID
-	}
+	// The login requests no audience: the session token is the issuer's and
+	// opens nothing here. What the API below takes is the actor token auth
+	// mints for this service's audience, AUTH_AUDIENCE (default: the client
+	// id), which a local instance mints from its session for every call.
 	authClient := oidc.New(authCfg)
+	apiAudience := cmp.Or(os.Getenv("AUTH_AUDIENCE"), authCfg.ClientID)
 
 	// JWT validator for the coordination WebSocket: a local instance dials with
 	// Authorization: Bearer <jwt>, validated on the same internal/auth path as
 	// every API request. Issuer/JWKS fall back to AuthURL derivatives.
-	jwtValidator := auth.BuildValidator(authCfg, os.Getenv("AUTH_JWKS_URL"), os.Getenv("AUTH_ISSUER"))
+	jwtValidator := auth.BuildValidator(authCfg, os.Getenv("AUTH_JWKS_URL"), os.Getenv("AUTH_ISSUER"), apiAudience)
 
 	mux := http.NewServeMux()
 
