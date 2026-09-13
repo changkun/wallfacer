@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -20,12 +23,18 @@ func TestLoadOrCreateServerAPIKey_GeneratesAndReuses(t *testing.T) {
 	if len(a) != 64 {
 		t.Fatalf("key length = %d, want 64 hex chars", len(a))
 	}
+	if _, err := hex.DecodeString(a); err != nil {
+		t.Fatalf("key is not hexadecimal: %v", err)
+	}
 	info, err := os.Stat(filepath.Join(dir, serverAPIKeyFile))
 	if err != nil {
 		t.Fatalf("key not persisted: %v", err)
 	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
+	if perm := info.Mode().Perm(); runtime.GOOS != "windows" && perm != 0o600 {
 		t.Errorf("key file mode = %o, want 600", perm)
+	}
+	if body, err := os.ReadFile(filepath.Join(dir, serverAPIKeyFile)); err != nil || strings.TrimSpace(string(body)) != a {
+		t.Fatalf("persisted key does not match generated key: %v", err)
 	}
 	b, err := loadOrCreateServerAPIKey(dir)
 	if err != nil {

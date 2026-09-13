@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -158,8 +159,11 @@ func TestBuildExplorerCommitMessage(t *testing.T) {
 }
 
 func TestCommitExplorerEdit_LiteralPathspec(t *testing.T) {
-	for _, saved := range []string{"*.md", ":(glob)*.md", "[ab].md"} {
+	for _, saved := range []string{"*.md", ":(glob)*.md", "[ab].md", "nested/[ab].md", "-a.md"} {
 		t.Run(saved, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.ContainsAny(saved, ":*") {
+				t.Skip("Windows filenames cannot contain colons or asterisks; bracket pathspecs still run")
+			}
 			ws := initGitTestRepo(t)
 			writeExplorerFile(t, ws, "a.md", "staged\n")
 			runGit(t, ws, "add", "a.md")
