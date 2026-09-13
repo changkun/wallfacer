@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,13 +11,12 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/authkit/jwt"
-	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
 )
 
-// SandboxProxyConfig is everything the three trust-plane endpoints
+// SandboxProxyConfig is everything the two trust-plane endpoints
 // need from the environment. Populated by the CLI boot path from
 // SANDBOX_PROXY_* env vars; left zero in local mode (handlers return
 // 503 when disabled).
@@ -26,20 +24,6 @@ type SandboxProxyConfig struct {
 	// Enabled flips the routes on. When false, handlers 503 with a
 	// configuration-error message.
 	Enabled bool
-	// AuthInstallationTokenURL is auth's
-	// /internal/github/installation-token endpoint. Wallfacer calls
-	// this to mint a per-repo GitHub App installation token for the
-	// sidecar's git-credential request.
-	AuthInstallationTokenURL string
-	// AuthURL is the issuer wallfacer asks for its own service token, the
-	// credential it presents at the URL above. ClientID and ClientSecret
-	// are the confidential client registered for that: the token is minted
-	// with the client_credentials grant, scope github:mint-token, and
-	// re-minted before it expires (rule R5: a service acting as itself
-	// holds a service token, never a long-lived static one).
-	AuthURL      string
-	ClientID     string
-	ClientSecret string
 	// AnthropicKey / OpenAIKey are the upstream API keys the trust
 	// plane substitutes for the sandbox's inbound placeholder
 	// Authorization. v1 shares a single org-level key per provider;
@@ -48,21 +32,15 @@ type SandboxProxyConfig struct {
 	OpenAIKey    string
 }
 
-// LoadSandboxProxyConfig reads SANDBOX_PROXY_* env vars. Absent vars
-// leave the field zero; Enabled is true only when every required
-// field is set.
+// LoadSandboxProxyConfig reads the provider keys from the environment.
+// Absent vars leave the field zero; Enabled is true when at least one
+// provider key is set.
 func LoadSandboxProxyConfig() SandboxProxyConfig {
 	cfg := SandboxProxyConfig{
-		AuthInstallationTokenURL: os.Getenv("SANDBOX_PROXY_AUTH_INSTALLATION_URL"),
-		AuthURL:                  os.Getenv("SANDBOX_PROXY_AUTH_URL"),
-		ClientID:                 os.Getenv("SANDBOX_PROXY_CLIENT_ID"),
-		ClientSecret:             os.Getenv("SANDBOX_PROXY_CLIENT_SECRET"),
-		AnthropicKey:             os.Getenv("ANTHROPIC_API_KEY"),
-		OpenAIKey:                os.Getenv("OPENAI_API_KEY"),
+		AnthropicKey: os.Getenv("ANTHROPIC_API_KEY"),
+		OpenAIKey:    os.Getenv("OPENAI_API_KEY"),
 	}
-	cfg.Enabled = cfg.AuthInstallationTokenURL != "" &&
-		cfg.AuthURL != "" && cfg.ClientID != "" && cfg.ClientSecret != "" &&
-		(cfg.AnthropicKey != "" || cfg.OpenAIKey != "")
+	cfg.Enabled = cfg.AnthropicKey != "" || cfg.OpenAIKey != ""
 	return cfg
 }
 
@@ -72,10 +50,6 @@ func LoadSandboxProxyConfig() SandboxProxyConfig {
 type SandboxProxy struct {
 	Cfg    SandboxProxyConfig
 	Client *http.Client
-	// Tokens hands out wallfacer's own service token for the issuer's
-	// installation-token endpoint, minted through client_credentials and
-	// reused until it nears expiry. Tests substitute a fixed source.
-	Tokens TokenSource
 	// Validator validates the inbound sandbox JWT. The JWT is issued
 	// by auth with aud=wallfacer-sandbox-proxy; we additionally
 	// require one of scp=llm:proxy / scp=github:token per route. Nil
@@ -84,23 +58,13 @@ type SandboxProxy struct {
 	Validator *jwt.Validator
 }
 
-// TokenSource is what hands the proxy its own credential per call.
-type TokenSource interface {
-	Token(ctx context.Context) (string, error)
-}
-
 // NewSandboxProxy constructs a trust-plane proxy from config and a
 // JWT validator. A nil validator does not skip JWT checks: an enabled
 // proxy without a validator rejects every request (fail closed).
 // Local runs without credentials keep cfg.Enabled false and 503
 // before any JWT check.
 func NewSandboxProxy(cfg SandboxProxyConfig, v *jwt.Validator) *SandboxProxy {
-	var tokens TokenSource
-	if cfg.ClientID != "" && cfg.ClientSecret != "" && cfg.AuthURL != "" {
-		tokens = oidc.NewServiceTokenSource(cfg.AuthURL, cfg.ClientID, cfg.ClientSecret, "", []string{"github:mint-token"})
-	}
 	return &SandboxProxy{
-		Tokens:    tokens,
 		Cfg:       cfg,
 		Client:    &http.Client{Timeout: 5 * time.Minute, Transport: otel.Transport(nil)},
 		Validator: v,
@@ -161,78 +125,6 @@ func (p *SandboxProxy) LLMOpenAI(w http.ResponseWriter, r *http.Request) {
 		func(req *http.Request) {
 			req.Header.Set("Authorization", "Bearer "+p.Cfg.OpenAIKey)
 		})
-}
-
-// GitHubToken handles GET /internal/sandbox-proxy/github-token?repo=owner/name.
-// Returns a per-repo installation token minted by auth. The sidecar
-// wraps the response in git credential helper format locally.
-func (p *SandboxProxy) GitHubToken(w http.ResponseWriter, r *http.Request) {
-	if !p.Cfg.Enabled {
-		http.Error(w, "sandbox proxy disabled", http.StatusServiceUnavailable)
-		return
-	}
-	claims, ok := p.requireClaims(w, r, "github:token")
-	if !ok {
-		return
-	}
-	repo := r.URL.Query().Get("repo")
-	if repo == "" || !strings.Contains(repo, "/") {
-		http.Error(w, "repo=owner/name required", http.StatusBadRequest)
-		return
-	}
-
-	// Find the caller's installation that covers this repo. v1 always asks
-	// auth to resolve by principal+repo so we don't need to maintain our own
-	// installation table.
-	userSub := callerSub(claims)
-	if userSub == "" {
-		http.Error(w, "token lacks sub", http.StatusForbidden)
-		return
-	}
-
-	// Auth's endpoint takes installation_id; we don't have it here.
-	// Resolve by calling auth with principal+repo. Auth owns the
-	// github_app_installations table and picks the right row.
-	target, err := url.Parse(p.Cfg.AuthInstallationTokenURL)
-	if err != nil {
-		http.Error(w, "bad SANDBOX_PROXY_AUTH_INSTALLATION_URL", http.StatusInternalServerError)
-		return
-	}
-	q := target.Query()
-	q.Set("principal", userSub)
-	q.Set("repo", repo)
-	target.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, target.String(), nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if p.Tokens == nil {
-		http.Error(w, "sandbox proxy has no service credential", http.StatusServiceUnavailable)
-		return
-	}
-	serviceToken, err := p.Tokens.Token(r.Context())
-	if err != nil {
-		http.Error(w, "service token: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-	req.Header.Set("Authorization", "Bearer "+serviceToken)
-
-	resp, err := p.Client.Do(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode/100 != 2 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<14))
-		http.Error(w, string(b), resp.StatusCode)
-		return
-	}
-	// Pass through the JSON body verbatim (creds-proxy knows the shape).
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = io.Copy(w, resp.Body)
 }
 
 // ---- internals ----

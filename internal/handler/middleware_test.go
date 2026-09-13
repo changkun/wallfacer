@@ -209,7 +209,7 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 			})
 		}
 	}
-	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/artifact/private.html", "/internal/sandbox-proxy/github-token", "/assets/../api/config", "/static/../artifact/private.html"} {
+	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/artifact/private.html", "/internal/sandbox-proxy/llm/anthropic/v1/messages", "/assets/../api/config", "/static/../artifact/private.html"} {
 		t.Run("protected"+target, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			next.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))

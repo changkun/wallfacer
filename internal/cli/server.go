@@ -1460,7 +1460,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
 		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
 	}
-	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", sandboxProxy.GitHubToken)
 
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {

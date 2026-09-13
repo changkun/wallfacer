@@ -10,6 +10,15 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Removed
+
+- The sandbox proxy's `GET /internal/sandbox-proxy/github-token` route, the
+  service token it presented to auth, and `SANDBOX_PROXY_AUTH_INSTALLATION_URL`,
+  `SANDBOX_PROXY_AUTH_URL`, `SANDBOX_PROXY_CLIENT_ID` and
+  `SANDBOX_PROXY_CLIENT_SECRET`. auth v0.25.0 removed the installation-token
+  brokering the route called, so it had nothing left to call. The proxy is
+  enabled by a provider key alone and serves the two LLM routes.
+
 ## v0.2.0 - 2026-09-13
 
 ### Changed

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -88,7 +87,6 @@ func proxyMux(p *SandboxProxy) *http.ServeMux {
 		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/anthropic/", p.LLMAnthropic)
 		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/openai/", p.LLMOpenAI)
 	}
-	mux.HandleFunc("GET /internal/sandbox-proxy/github-token", p.GitHubToken)
 	return mux
 }
 
@@ -109,7 +107,6 @@ func TestSandboxProxyDisabled503(t *testing.T) {
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages"},
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/chat/completions"},
-		{http.MethodGet, "/internal/sandbox-proxy/github-token?repo=o/r"},
 	} {
 		rec := proxyRequest(t, mux, tc.method, tc.path, "")
 		if rec.Code != http.StatusServiceUnavailable {
@@ -126,19 +123,14 @@ func TestSandboxProxyDisabled503(t *testing.T) {
 // anonymous-but-authorized.
 func TestSandboxProxyEnabledNilValidatorRejects(t *testing.T) {
 	cfg := SandboxProxyConfig{
-		Enabled:                  true,
-		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthURL:                  "https://auth.example",
-		ClientID:                 "wallfacer-proxy",
-		ClientSecret:             "s3cret",
-		AnthropicKey:             "sk-ant",
-		OpenAIKey:                "sk-oai",
+		Enabled:      true,
+		AnthropicKey: "sk-ant",
+		OpenAIKey:    "sk-oai",
 	}
-	mux := proxyMux(withTokens(NewSandboxProxy(cfg, nil)))
+	mux := proxyMux(NewSandboxProxy(cfg, nil))
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages"},
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/chat/completions"},
-		{http.MethodGet, "/internal/sandbox-proxy/github-token?repo=o/r"},
 	} {
 		rec := proxyRequest(t, mux, tc.method, tc.path, "")
 		if rec.Code != http.StatusServiceUnavailable {
@@ -150,65 +142,15 @@ func TestSandboxProxyEnabledNilValidatorRejects(t *testing.T) {
 	}
 }
 
-// Happy path end to end: a valid JWT with aud=wallfacer-sandbox-proxy
-// and scp=github:token reaches auth's installation-token endpoint and
-// the JSON body is passed through.
-func TestSandboxProxyGitHubTokenValidJWT(t *testing.T) {
-	key, jwks := proxyKeyAndJWKS(t)
-
-	var gotAuth, gotPrincipal, gotRepo string
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotAuth = r.Header.Get("Authorization")
-		gotPrincipal = r.URL.Query().Get("principal")
-		gotRepo = r.URL.Query().Get("repo")
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"token":"ghs_test","expires_at":"2026-01-01T00:00:00Z"}`))
-	}))
-	t.Cleanup(upstream.Close)
-
-	cfg := SandboxProxyConfig{
-		Enabled:                  true,
-		AuthInstallationTokenURL: upstream.URL,
-		AuthURL:                  "https://auth.example",
-		ClientID:                 "wallfacer-proxy",
-		ClientSecret:             "s3cret",
-		AnthropicKey:             "sk-ant",
-	}
-	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
-
-	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"github:token"})
-	rec := proxyRequest(t, mux, http.MethodGet, "/internal/sandbox-proxy/github-token?repo=owner/name", tok)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), `"token":"ghs_test"`) {
-		t.Errorf("body = %q, want auth JSON passthrough", rec.Body.String())
-	}
-	if gotAuth != "Bearer svc-token" {
-		t.Errorf("auth call Authorization = %q, want service token bearer", gotAuth)
-	}
-	if gotPrincipal != "user-42" {
-		t.Errorf("auth call principal = %q, want user-42 (non-delegated sub)", gotPrincipal)
-	}
-	if gotRepo != "owner/name" {
-		t.Errorf("auth call repo = %q, want owner/name", gotRepo)
-	}
-}
-
 // A valid JWT clears the auth gate on the LLM route: with no provider
 // key configured the request fails AFTER requireClaims with the
 // distinct provider-key 503, proving the JWT was accepted.
 func TestSandboxProxyLLMValidJWTPassesAuthGate(t *testing.T) {
 	key, jwks := proxyKeyAndJWKS(t)
 	cfg := SandboxProxyConfig{
-		Enabled:                  true,
-		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthURL:                  "https://auth.example",
-		ClientID:                 "wallfacer-proxy",
-		ClientSecret:             "s3cret",
+		Enabled: true,
 	}
-	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
+	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
 
 	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"llm:proxy"})
 	rec := proxyRequest(t, mux, http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages", tok)
@@ -229,13 +171,9 @@ func TestSandboxProxyLLMValidJWTPassesAuthGate(t *testing.T) {
 func TestSandboxProxyLLMEndpointAllowlist(t *testing.T) {
 	key, jwks := proxyKeyAndJWKS(t)
 	cfg := SandboxProxyConfig{
-		Enabled:                  true,
-		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthURL:                  "https://auth.example",
-		ClientID:                 "wallfacer-proxy",
-		ClientSecret:             "s3cret",
+		Enabled: true,
 	}
-	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
+	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
 	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"llm:proxy"})
 
 	cases := []struct {
@@ -279,14 +217,10 @@ func TestSandboxProxyLLMEndpointAllowlist(t *testing.T) {
 func TestSandboxProxyRejections(t *testing.T) {
 	key, jwks := proxyKeyAndJWKS(t)
 	cfg := SandboxProxyConfig{
-		Enabled:                  true,
-		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthURL:                  "https://auth.example",
-		ClientID:                 "wallfacer-proxy",
-		ClientSecret:             "s3cret",
-		AnthropicKey:             "sk-ant",
+		Enabled:      true,
+		AnthropicKey: "sk-ant",
 	}
-	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
+	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
 
 	cases := []struct {
 		name     string
@@ -298,18 +232,18 @@ func TestSandboxProxyRejections(t *testing.T) {
 		{"garbage token", "not-a-jwt", http.StatusUnauthorized, ""},
 		{
 			"wrong audience",
-			signProxyJWT(t, key, "user-42", "some-other-service", []string{"github:token"}),
+			signProxyJWT(t, key, "user-42", "some-other-service", []string{"llm:proxy"}),
 			http.StatusForbidden, "aud mismatch",
 		},
 		{
 			"wrong scope",
-			signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"llm:proxy"}),
-			http.StatusForbidden, "missing scope github:token",
+			signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"read:files"}),
+			http.StatusForbidden, "missing scope llm:proxy",
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := proxyRequest(t, mux, http.MethodGet, "/internal/sandbox-proxy/github-token?repo=o/r", tc.bearer)
+			rec := proxyRequest(t, mux, http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages", tc.bearer)
 			if rec.Code != tc.wantCode {
 				t.Fatalf("status = %d, want %d (body %q)", rec.Code, tc.wantCode, rec.Body.String())
 			}
@@ -318,14 +252,4 @@ func TestSandboxProxyRejections(t *testing.T) {
 			}
 		})
 	}
-}
-
-// fixedTokens is the service token source the tests hand the proxy.
-type fixedTokens string
-
-func (f fixedTokens) Token(context.Context) (string, error) { return string(f), nil }
-
-func withTokens(p *SandboxProxy) *SandboxProxy {
-	p.Tokens = fixedTokens("svc-token")
-	return p
 }
