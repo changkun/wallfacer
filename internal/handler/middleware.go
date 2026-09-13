@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"latere.ai/x/pkg/bearer"
@@ -85,8 +86,8 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 // BearerAuthMiddleware enforces bearer-token authentication on non-SSE routes.
 // SSE and WebSocket paths use a ?token= query parameter instead of the
 // Authorization header because EventSource and WebSocket APIs do not support
-// custom request headers. The root path (GET /) is always public so the
-// browser can load the UI shell.
+// custom request headers. UI shell routes and embedded assets are public so
+// the browser can load before it reads the injected local API key.
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
@@ -105,7 +106,8 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			// The SPA shell loads for everyone, and the Prometheus scrape
 			// carries no credential: /metrics is operational telemetry
 			// with no user data, and a scraper cannot present the key.
-			if r.Method == http.MethodGet && (r.URL.Path == "/" || r.URL.Path == "/metrics") {
+			if ((r.Method == http.MethodGet || r.Method == http.MethodHead) && publicUIPath(r.URL.Path)) ||
+				(r.Method == http.MethodGet && r.URL.Path == "/metrics") {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -135,4 +137,17 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// publicUIPath admits only embedded assets and known client-side routes.
+// Workspace artifacts, API data, and internal endpoints still require a key.
+func publicUIPath(rawPath string) bool {
+	p := path.Clean(rawPath)
+	switch p {
+	case "/", "/favicon.ico", "/install", "/dashboard", "/agent-graph", "/agents", "/workflows", "/flows",
+		"/routines", "/analytics", "/chat", "/plan", "/whiteboard", "/artifacts", "/mission", "/map", "/settings", "/docs":
+		return true
+	}
+	return strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/fonts/") ||
+		strings.HasPrefix(p, "/static/") || strings.HasPrefix(p, "/docs/")
 }

@@ -185,6 +185,41 @@ func TestBearerAuthMiddleware(t *testing.T) {
 	}
 }
 
+func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
+	next := BearerAuthMiddleware("generated-local-key")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	public := []string{
+		"/", "/assets/app-123.js", "/assets/app-123.css", "/fonts/ui.woff2", "/static/overview.png", "/favicon.ico",
+		"/install", "/dashboard", "/agent-graph", "/agents", "/workflows", "/flows", "/routines", "/analytics",
+		"/chat", "/plan", "/whiteboard", "/artifacts", "/mission", "/map", "/settings", "/docs", "/docs/guide/start",
+	}
+	for _, target := range public {
+		for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost} {
+			t.Run(method+target, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				next.ServeHTTP(rec, httptest.NewRequest(method, target, nil))
+				want := http.StatusNoContent
+				if method == http.MethodPost {
+					want = http.StatusUnauthorized
+				}
+				if rec.Code != want {
+					t.Fatalf("status = %d, want %d", rec.Code, want)
+				}
+			})
+		}
+	}
+	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/artifact/private.html", "/internal/sandbox-proxy/github-token", "/assets/../api/config", "/static/../artifact/private.html"} {
+		t.Run("protected"+target, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			next.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want 401", rec.Code)
+			}
+		})
+	}
+}
+
 // TestBearerAuthMiddleware_ClaimsBypass confirms that a request whose
 // context already carries a validated principal (populated upstream by
 // auth.OptionalAuth in cloud mode) skips the static-key check. Keeps
