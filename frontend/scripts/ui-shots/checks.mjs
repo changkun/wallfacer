@@ -29,6 +29,15 @@ const base = arg('base', 'http://localhost:8099');
 const only = arg('only', '');
 const BOOT = { mode: 'local', serverApiKey: '', version: 'dev' };
 
+// APIRequestContext does not inherit the local server key from the page.
+async function fixtureRequest(page, method, path, data) {
+  const headers = await page.evaluate(() => {
+    const key = window.__WALLFACER__?.serverApiKey;
+    return key ? { Authorization: `Bearer ${key}` } : {};
+  });
+  return page.request.fetch(base + path, { method, headers, data });
+}
+
 // ---- geometry helpers (run client-side and return plain boxes) ------------
 async function boxes(page, sel) {
   return page.$$eval(sel, (els) =>
@@ -254,6 +263,137 @@ SCENES['task-detail'] = async (page) => {
   for (const tab of ['changes', 'verification', 'events']) {
     await page.click(`[data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(250);
+  }
+};
+
+// Acquisition feedback: waiting replies stay reachable on every tab, and
+// reopening a completed log stream follows the next SSE task update.
+SCENES['feedback-live'] = async (page) => {
+  const response = await (await fixtureRequest(page, 'GET', '/api/tasks')).json();
+  const tasks = Array.isArray(response) ? response : response.tasks;
+  const task = tasks.find((t) => t.id === '44444444-4444-4444-8444-444444444444');
+  task.result = 'Should the CSV include cache token columns?\n\n' + 'Detailed analysis.\n\n'.repeat(150);
+  task.prompt = '# Long specification\n\n' + 'Acceptance requirements.\n\n'.repeat(150);
+  let version = 1;
+  let logRequests = 0;
+  const commits = () => Array.from({ length: version }, (_, i) => ({
+    repository: '/fixture/repo', hash: `abcdef${i}0123456789`, subject: `Feedback commit ${i + 1}`,
+    author: 'Fixture', authored_at: '2026-09-13T10:00:00Z', attempt: 1, turn: i + 1, patch: `+change from turn ${i + 1}`,
+  }));
+  await page.route(/\/api\/tasks(?:\?.*)?$/, (route) => route.fulfill({ json: tasks }));
+  await page.route('**/api/tasks/stream*', (route) => {
+    return route.fulfill({ contentType: 'text/event-stream', body: `retry: 250\nevent: snapshot\ndata: ${JSON.stringify(tasks)}\n\n` });
+  });
+  await page.route(`**/api/tasks/${task.id}/logs*`, (route) => {
+    logRequests++;
+    return route.fulfill({ contentType: 'text/plain', body: JSON.stringify({ type: 'result', result: `Live transcript turn ${version}`, stop_reason: 'end_turn' }) + '\n' });
+  });
+  await page.route(`**/api/tasks/${task.id}/diff`, (route) => route.fulfill({ json: {
+    behind_counts: {}, diff: `diff --git a/example.txt b/example.txt\n--- a/example.txt\n+++ b/example.txt\n@@ -1 +1 @@\n-old\n+live change ${version}\n`,
+  } }));
+  await page.route(`**/api/tasks/${task.id}/commits`, (route) => route.fulfill({ json: commits() }));
+  await page.setViewportSize({ width: 1280, height: 760 });
+  await page.goto(`${base}/?task=${task.id}&tab=spec`, { waitUntil: 'load' });
+  await page.waitForSelector('.task-response textarea', { timeout: 8000 });
+  for (const tab of ['spec', 'activity', 'changes', 'verification', 'events', 'timeline']) {
+    await page.click(`.sheet [data-tab="${tab}"]`);
+    await page.waitForTimeout(120);
+    const visible = await page.$eval('.task-response textarea', (el) => {
+      const box = el.getBoundingClientRect();
+      return box.width > 0 && box.top >= 0 && box.bottom <= window.innerHeight;
+    });
+    expect('feedback-live', visible, `reply input buried or hidden on ${tab}`);
+  }
+  await page.click('.sheet [data-tab="changes"]');
+  await page.waitForSelector('.task-commit summary');
+  await page.click('.task-commit summary');
+  expect('feedback-live', await page.locator('.task-commit pre').isVisible(), 'commit patch does not expand');
+  const priorLogs = logRequests;
+  version = 2;
+  task.status = 'in_progress';
+  task.turns++;
+  task.updated_at = new Date().toISOString();
+  // Resuming a task intentionally selects Activity. Verify the resumed log,
+  // then return to Changes and keep it open through a subsequent live update.
+  await page.waitForFunction(() => document.querySelector('[data-main-tab-section="activity"]')?.textContent.includes('Live transcript turn 2'), undefined, { timeout: 8000 });
+  expect('feedback-live', logRequests > priorLogs, 'log stream did not reopen after the task resumed');
+  expect('feedback-live', (await page.locator('[data-main-tab-section="activity"]').textContent()).includes('Live transcript turn 2'), 'resumed transcript stayed stale');
+  await page.click('.sheet [data-tab="changes"]');
+  await page.waitForFunction(() => document.querySelector('.task-commits')?.textContent.includes('Feedback commit 2'));
+  version = 3;
+  task.turns++;
+  task.updated_at = new Date().toISOString();
+  await page.waitForFunction(() => document.querySelector('.task-commits')?.textContent.includes('Feedback commit 3'), undefined, { timeout: 8000 });
+  expect('feedback-live', (await page.locator('[data-main-tab-section="changes"]').textContent()).includes('live change 3'), 'aggregate diff stayed stale');
+};
+
+SCENES['title-progress'] = async (page) => {
+  const response = await (await fixtureRequest(page, 'GET', '/api/tasks')).json();
+  const tasks = Array.isArray(response) ? response : response.tasks;
+  const task = tasks.find((t) => t.status === 'backlog');
+  task.title = '';
+  task.title_generating = true;
+  task.prompt = 'Prompt stays visible during title generation';
+  await page.route(/\/api\/tasks(?:\?.*)?$/, (route) => route.fulfill({ json: tasks }));
+  await page.route('**/api/tasks/stream*', (route) => route.fulfill({ contentType: 'text/event-stream', body: `event: snapshot\ndata: ${JSON.stringify(tasks)}\n\n` }));
+  await page.reload({ waitUntil: 'load' });
+  await page.getByText('Generating title…').waitFor({ state: 'visible' });
+  expect('title-progress', await page.getByText(task.prompt, { exact: true }).isVisible(), 'title progress hid the prompt');
+};
+
+SCENES['onboarding-guidance'] = async (page) => {
+  await page.route('**/api/specs/tree*', (route) => route.fulfill({ json: { nodes: [], index: null, groups: [], progress: {} } }));
+  await page.goto(base + '/plan', { waitUntil: 'load' });
+  await page.waitForSelector('.plan-start');
+  const intro = await page.locator('.plan-start').textContent();
+  expect('onboarding-guidance', intro.includes('/create') && intro.includes('Validate') && intro.includes('Dispatch'), 'empty Plan omits the next steps');
+  await page.click('.sb-ws-switch');
+  await page.click('.sb-ws-popover__add');
+  await page.getByRole('button', { name: '+ New workspace' }).click();
+  expect('onboarding-guidance', (await page.locator('.dialog-sub').textContent()).includes('Agents read and edit these folders'), 'folder chooser omits workspace purpose');
+  const next = page.getByRole('button', { name: 'Next: Name' });
+  expect('onboarding-guidance', await next.isDisabled(), 'empty folder selection can be saved');
+};
+
+SCENES['credential-storage'] = async (page) => {
+  let selected = '';
+  await page.route('**/api/env', (route) => {
+    if (route.request().method() === 'PUT') {
+      selected = route.request().postDataJSON().secret_store;
+      return route.fulfill({ status: 500, body: 'Unlock the system keyring' });
+    }
+    return route.continue();
+  });
+  await page.goto(base + '/settings', { waitUntil: 'load' });
+  await page.click('[data-tab="sandbox"]');
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent === 'Save harness configuration' && !b.disabled));
+  await page.selectOption('#credential-storage', 'keyring');
+  await page.getByRole('button', { name: 'Save harness configuration' }).click();
+  await page.waitForFunction(() => document.querySelector('#env-config-status')?.textContent.includes('Unlock the system keyring'));
+  expect('credential-storage', selected === 'keyring', 'storage selection not sent to Settings API');
+  expect('credential-storage', await page.locator('#env-config-status').isVisible(), 'storage error is hidden');
+};
+
+// Native Topos has no host CLI launch path for chat. This exercises a real
+// asynchronous launch failure without invoking a provider or spending tokens.
+SCENES['chat-error'] = async (page) => {
+  const created = await fixtureRequest(page, 'POST', '/api/agent/sessions', { name: 'Failure surface regression' });
+  expect('chat-error', created.status() === 201, 'could not create test chat');
+  const thread = await created.json();
+  try {
+    await fixtureRequest(page, 'PATCH', '/api/agent/sessions/' + thread.id, { state: 'active' });
+    const sent = await fixtureRequest(page, 'POST', '/api/agent/messages', { thread: thread.id, message: 'Exercise a failed host launch', harness: 'topos' });
+    expect('chat-error', sent.status() === 202, 'test message was not accepted');
+    await page.goto(base + '/chat', { waitUntil: 'load' });
+    await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });
+    expect('chat-error', (await page.locator('.pcp-bubble-error').textContent()).includes('could not start'), 'launch failure is not visible in chat');
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });
+    expect('chat-error', (await page.locator('.pcp-bubble-error').textContent()).includes('Settings'), 'reload lost the actionable error');
+  } finally {
+    await fixtureRequest(page, 'PATCH', '/api/agent/sessions/' + thread.id, { state: 'archived' });
+    const removed = await fixtureRequest(page, 'DELETE', '/api/agent/sessions/' + thread.id);
+    expect('chat-error', removed.ok(), 'could not remove the test conversation');
   }
 };
 
