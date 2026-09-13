@@ -196,13 +196,12 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 | `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
 | `/internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic). Forwards only `POST /v1/messages` and `POST /v1/messages/count_tokens`; every other path 404s |
 | `/internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI). Forwards only `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/embeddings`, `GET /v1/models`; every other path 404s |
-| `GET /internal/sandbox-proxy/github-token` | Trust-plane GitHub token mint |
 | `GET /` | Serves the embedded SPA index for every non-API path, so client-side routes survive a hard load |
 | `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |
 | `GET /static/` | Embedded SPA assets served without the cache wrapper |
 | `GET /favicon.ico` | Embedded favicon, 404 when the build did not produce one |
 
-The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox credential sidecar makes, not part of the browser contract. They are wired unconditionally but respond 503 when `SandboxProxyConfig.Enabled` is false (local runs with no credentials). When `SANDBOX_PROXY_AUTH_URL` is set, requests are validated against the JWKS built from `SANDBOX_PROXY_AUTH_JWKS_URL` and `SANDBOX_PROXY_AUTH_ISSUER`. When it is unset no validator is built, and `requireClaims` fails closed: an enabled proxy rejects every trust-plane request with 503 rather than treating the caller as anonymous-but-authorized.
+The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox credential sidecar makes, not part of the browser contract. They are wired unconditionally but respond 503 when `SandboxProxyConfig.Enabled` is false (local runs with no provider key). When `SANDBOX_PROXY_AUTH_URL` is set, requests are validated against the JWKS built from `SANDBOX_PROXY_AUTH_JWKS_URL` and `SANDBOX_PROXY_AUTH_ISSUER`. When it is unset no validator is built, and `requireClaims` fails closed: an enabled proxy rejects every trust-plane request with 503 rather than treating the caller as anonymous-but-authorized.
 
 ## Request Middleware Chain
 

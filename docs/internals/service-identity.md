@@ -30,11 +30,10 @@ A request that validates but is addressed to a different audience is rejected wi
 |---|---|
 | `/internal/sandbox-proxy/llm/anthropic/...` (inference endpoints only) | `llm:proxy` |
 | `/internal/sandbox-proxy/llm/openai/...` (inference endpoints only) | `llm:proxy` |
-| `GET /internal/sandbox-proxy/github-token?repo=owner/name` | `github:token` |
 
 A token that clears the audience but lacks the route's scope is rejected with `403`. Missing or unparseable bearer tokens are `401`.
 
-Do not confuse this inbound `github:token` scope with `github:mint-token`. The latter is the scope on wallfacer's *outbound* service token, minted with `SANDBOX_PROXY_CLIENT_ID` and `SANDBOX_PROXY_CLIENT_SECRET` through the client_credentials grant, that it presents to auth when minting an installation token. They sit on opposite edges of the proxy.
+The proxy presents no credential of its own to any other service: it substitutes provider keys it holds and calls nothing at the issuer.
 
 ## Fail closed
 
@@ -42,7 +41,7 @@ The validator is fail closed. If the JWT validator is not configured, the trust 
 
 This is the floor beneath the whole edge: the proxy only forwards to a real upstream (an LLM provider, or auth's installation-token endpoint) once a caller has proven identity against the declared audience and carries the route's scope. Absent the configuration to check that, nothing is forwarded.
 
-The trust-plane routes are also gated on the proxy being enabled at all: without the upstream credentials wired (`SANDBOX_PROXY_AUTH_INSTALLATION_URL`, `SANDBOX_PROXY_AUTH_URL`, the proxy's client id and secret, and at least one provider key) the routes answer `503` before any JWT check, which is the permanent state of a local, single-user run.
+The trust-plane routes are also gated on the proxy being enabled at all: without a provider key the routes answer `503` before any JWT check, which is the permanent state of a local, single-user run.
 
 ## The family audience scheme
 
