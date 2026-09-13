@@ -1053,39 +1053,11 @@ async function submitReview() {
 
       <div id="sheet-body" class="sheet-body" role="tabpanel">
         <div class="sheet-main">
-                <!-- SPEC tab -->
-                <div data-main-tab-section="spec">
-                  <div class="md-section-head">
-                    <h3 class="section-title">Spec</h3>
-                    <span class="md-section-actions">
-                      <button type="button" class="btn sm ghost" @click="copyText(task.prompt)">Copy</button>
-                      <button type="button" class="btn sm ghost" @click="specShowRaw = !specShowRaw">{{ specShowRaw ? 'Rendered' : 'Raw' }}</button>
-                    </span>
-                  </div>
-                  <pre v-if="specShowRaw" class="code-block mb-4">{{ task.prompt }}</pre>
-                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                  <div v-else class="prose-content mb-4" v-html="specPromptHtml"></div>
-
-                  <template v-if="task.result">
-                    <div class="md-section-head">
-                      <h3 class="section-title">Result</h3>
-                      <span class="md-section-actions">
-                        <button type="button" class="btn sm ghost" @click="copyText(task.result || '')">Copy</button>
-                        <button type="button" class="btn sm ghost" @click="resultShowRaw = !resultShowRaw">{{ resultShowRaw ? 'Rendered' : 'Raw' }}</button>
-                      </span>
-                    </div>
-                    <pre v-if="resultShowRaw" class="code-block mb-4">{{ task.result }}</pre>
-                    <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
-                    <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
-                  </template>
-
-                  <AgentTrace
-                    v-if="task.trace || task.status === 'in_progress'"
-                    :task-id="task.id"
-                    :refresh-key="task.updated_at"
-                  />
-
-                  <div v-if="isWaiting" class="mb-4">
+          <section v-if="isWaiting" class="task-response" aria-label="Agent response and feedback">
+            <h3 class="section-title">Latest response</h3>
+            <div v-if="task.result" class="task-response__result prose-content" v-html="specResultHtml"></div>
+            <p v-else class="text-xs text-v-muted">The agent is waiting for a response.</p>
+                  <div>
                     <h3 class="section-title">Provide Feedback</h3>
                     <div class="fb-wrap">
                       <textarea
@@ -1120,6 +1092,40 @@ async function submitReview() {
                       </button>
                     </div>
                   </div>
+          </section>
+                <!-- SPEC tab -->
+                <div data-main-tab-section="spec">
+                  <div class="md-section-head">
+                    <h3 class="section-title">Spec</h3>
+                    <span class="md-section-actions">
+                      <button type="button" class="btn sm ghost" @click="copyText(task.prompt)">Copy</button>
+                      <button type="button" class="btn sm ghost" @click="specShowRaw = !specShowRaw">{{ specShowRaw ? 'Rendered' : 'Raw' }}</button>
+                    </span>
+                  </div>
+                  <pre v-if="specShowRaw" class="code-block mb-4">{{ task.prompt }}</pre>
+                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                  <div v-else class="prose-content mb-4" v-html="specPromptHtml"></div>
+
+                  <template v-if="task.result && !isWaiting">
+                    <div class="md-section-head">
+                      <h3 class="section-title">Result</h3>
+                      <span class="md-section-actions">
+                        <button type="button" class="btn sm ghost" @click="copyText(task.result || '')">Copy</button>
+                        <button type="button" class="btn sm ghost" @click="resultShowRaw = !resultShowRaw">{{ resultShowRaw ? 'Rendered' : 'Raw' }}</button>
+                      </span>
+                    </div>
+                    <pre v-if="resultShowRaw" class="code-block mb-4">{{ task.result }}</pre>
+                    <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                    <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
+                  </template>
+
+                  <AgentTrace
+                    v-if="task.trace || task.status === 'in_progress'"
+                    :task-id="task.id"
+                    :refresh-key="task.updated_at"
+                  />
+
+
                 </div>
 
                 <!-- ACTIVITY tab -->
@@ -1705,6 +1711,9 @@ async function submitReview() {
 </template>
 
 <style scoped>
+.task-response { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--rule); }
+.task-response__result { max-height: 12rem; overflow-y: auto; margin-bottom: 16px; }
+
 .modal-overlay {
   position: fixed;
   inset: 0;

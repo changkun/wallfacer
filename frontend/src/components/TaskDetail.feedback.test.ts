@@ -73,7 +73,7 @@ async function settle() {
 }
 
 describe('TaskDetail feedback submit', () => {
-  it('POSTs the textarea text under the message key', async () => {
+  it.each(['spec', 'activity', 'changes', 'verification', 'events', 'timeline'])('keeps the latest reply and feedback reachable from %s', async (initialTab) => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }],
@@ -85,7 +85,7 @@ describe('TaskDetail feedback submit', () => {
     document.body.appendChild(host);
     const app = createApp(defineComponent({
       setup() {
-        return () => h(TaskDetail, { task: makeTask('task-fb'), initialTab: 'overview' });
+        return () => h(TaskDetail, { task: makeTask('task-fb', { prompt: 'Long task instructions. '.repeat(1000), result: 'Please confirm the new layout.' }), initialTab });
       },
     }));
     app.use(activePinia);
@@ -95,6 +95,10 @@ describe('TaskDetail feedback submit', () => {
 
     const textarea = host.querySelector('textarea');
     expect(textarea).toBeTruthy();
+    expect(textarea!.closest('[data-main-tab-section]')).toBeNull();
+    const response = host.querySelector('.sheet-main')!.firstElementChild!;
+    expect(response.textContent).toContain('Please confirm the new layout.');
+    expect(response.contains(textarea)).toBe(true);
     (textarea as HTMLTextAreaElement).value = 'please fix the race';
     textarea!.dispatchEvent(new Event('input'));
     await settle();
