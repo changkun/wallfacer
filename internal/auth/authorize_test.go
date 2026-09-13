@@ -28,7 +28,7 @@ func TestRequireSuperadmin_SuperadminClaim_Passes(t *testing.T) {
 	h := auth.RequireSuperadmin(inner)
 
 	r := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{Sub: "root", IsSuperadmin: true}))
+	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{Sub: "root", Roles: []string{authkit.RolePlatformAdmin}}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -45,7 +45,7 @@ func TestRequireSuperadmin_RegularUser_Forbidden(t *testing.T) {
 	h := auth.RequireSuperadmin(inner)
 
 	r := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{Sub: "alice", IsSuperadmin: false}))
+	r = r.WithContext(auth.WithIdentity(r.Context(), &authkit.Identity{Sub: "alice"}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 

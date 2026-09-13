@@ -79,7 +79,7 @@ Local authenticated benefits from the identity plumbing (event timeline shows *"
 
 ## Identity Model
 
-Wallfacer consumes identity produced by the platform auth service. The principal surfaced to handlers is `auth.Identity` (a type alias for `authkit.Identity`, internal/auth/auth.go), carrying `Sub`, `OrgID`, `Email`, `PrincipalType` (`"user" | "service" | "agent" | "dev"`), `IsSuperadmin`, and `Scopes []string`. This spec is **purely a consumer** of those claims; it adds no user model, no org model, no password storage, no invite flow.
+Wallfacer consumes identity produced by the platform auth service. The principal surfaced to handlers is `auth.Identity` (a type alias for `authkit.Identity`, internal/auth/auth.go), carrying `Sub`, `OrgID`, `Email`, `PrincipalType` (`"user" | "service" | "agent" | "dev"`), `Roles []string` (carrying `platform_admin` for the installation administrator), and `Scopes []string`. This spec is **purely a consumer** of those claims; it adds no user model, no org model, no password storage, no invite flow.
 
 ### Identity types wallfacer persists
 
@@ -98,7 +98,7 @@ A `service:<name>` actor would be a reserved `ActorSub` namespace used when wall
 
 ### Roles
 
-The platform JWT exposes coarse privilege via `Identity.IsSuperadmin` and `Identity.Scopes []string`; there is **no** `roles[]` claim in `authkit.Identity` today. Wallfacer's admin/editor/viewer model in the RBAC section therefore maps onto **scopes** (the shipped `auth.RequireScope(scope)` and `auth.RequireSuperadmin` wrappers in internal/auth/authorize.go are the enforcement primitives), not onto a role claim that does not exist. Defining the canonical scope-to-permission mapping is part of the `rbac-matrix` child spec.
+The platform JWT exposes the installation administrator as the `platform_admin` role in `Identity.Roles` and coarse privilege via `Identity.Scopes []string`. Wallfacer's admin/editor/viewer model in the RBAC section therefore maps onto **scopes** (the shipped `auth.RequireScope(scope)` and `auth.RequireSuperadmin` wrappers in internal/auth/authorize.go are the enforcement primitives), not onto a role claim that does not exist. Defining the canonical scope-to-permission mapping is part of the `rbac-matrix` child spec.
 
 The minimum viable permission set wallfacer recognizes:
 
@@ -108,7 +108,7 @@ The minimum viable permission set wallfacer recognizes:
 | `editor` | Create/update/cancel/feedback/delete-own tasks; edit planning specs; edit instructions; send planning chat; dispatch specs |
 | `viewer` | Read-only: board, task events, diffs, oversight, usage, planning chat history, spec tree |
 
-Callers with no recognized scope default to `viewer`. `IsSuperadmin=true` overrides all per-scope checks (used for latere.ai operations, not for regular members).
+Callers with no recognized scope default to `viewer`. The `platform_admin` role overrides all per-scope checks (used for latere.ai operations, not for regular members).
 
 ### Fallback: local / anonymous modes
 
@@ -383,7 +383,7 @@ The current-user lookup (`GET /api/me`, handler `AuthMe`) and org switching (`GE
 
 ### Implementation
 
-A scope-aware HTTP middleware (building on `auth.RequireScope` / `auth.RequireSuperadmin`, internal/auth/authorize.go), applied per route when the router is built in `internal/handler/`. The identity is read from the validated principal in context once per request (`auth.PrincipalFromContext`). `self`-scoped routes run the role check first, then a `RequireSelf(ctx, resourceOwnerID)` that lets through when the caller is the owner (`Sub`) or `IsSuperadmin`/admin-scoped. Tests hit the matrix table-driven to catch regressions.
+A scope-aware HTTP middleware (building on `auth.RequireScope` / `auth.RequireSuperadmin`, internal/auth/authorize.go), applied per route when the router is built in `internal/handler/`. The identity is read from the validated principal in context once per request (`auth.PrincipalFromContext`). `self`-scoped routes run the role check first, then a `RequireSelf(ctx, resourceOwnerID)` that lets through when the caller is the owner (`Sub`) or holds `platform_admin`/admin-scoped. Tests hit the matrix table-driven to catch regressions.
 
 ---
 
@@ -591,7 +591,7 @@ Each child is `large` or smaller and dispatchable as a single agent task once it
 1. **Spec should be broken down into children before dispatch.** Steps 1-2 (identity plumbing + actor fields/migration) have shipped, so the breakdown should start from `rbac-matrix.md` (steps 3-4), which everything downstream gates on. See the Dispatch split for the full child list.
 2. **Archived dependencies.** Both `cloud/multi-tenant.md` and `specs/identity/authentication.md` are now `archived`. The hard `depends_on` edges have been dropped from the frontmatter; the prose retains them as historical context. Confirm there is no live successor spec for the authentication surface that this spec should depend on instead.
 3. **Service-actor naming vs the shipped `ActorType` enum.** The spec wants `service:<name>` sentinel **subs** to distinguish automation loops, but the shipped enum already uses `ActorService "service"` to mean "service-account JWT" and stamps all loops with `ActorSystem "system"`. Reconcile: probably `ActorType "system"` (or a new value) plus a `service:<name>` sub, decided in `service-actors.md`.
-4. **Roles vs scopes.** `authkit.Identity` exposes `Scopes []string` and `IsSuperadmin`, not a `roles[]` claim. The admin/editor/viewer model must be defined as a scope-to-permission mapping in `rbac-matrix.md`; confirm the platform issues scopes granular enough to express the three groups.
+4. **Roles vs scopes.** `authkit.Identity` exposes `Scopes []string` and `Roles []string` (carrying `platform_admin`). The admin/editor/viewer model must be defined as a scope-to-permission mapping in `rbac-matrix.md`; confirm the platform issues scopes granular enough to express the three groups.
 5. **`/api/org/members` vs the shipped `/api/auth/orgs`.** Org *listing* and switching already ship (`/api/auth/orgs`, `switchOrg`). This spec's `/api/org/members` (members of one org) is related but distinct; confirm the auth service exposes a members endpoint to proxy, and whether the cached member list can reuse the existing orgs-list plumbing in `stores/auth.ts`.
 6. **Guest / external-reviewer role.** Common ask: invite a non-member to view one task. Deferred; would need per-task ACL in addition to the role system. Noted for follow-up.
 7. **Workspace-group per-member override.** Today the workspace group is org-global. A member might want their own local workspace view without forcing the whole team. This is probably a UI-only preference (filter the set of displayed workspaces) rather than a store change. Noted.

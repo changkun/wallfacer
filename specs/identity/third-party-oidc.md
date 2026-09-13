@@ -71,7 +71,7 @@ ends up living:
 
 - A claim mapping from provider-native claims to wallfacer's internal
   principal (`sub`, `email`, `name`, `picture`, `org_id`, `scp`,
-  `is_superadmin`). Some providers don't surface `org_id`; deployments
+  `platform_admin` role). Some providers don't surface `org_id`; deployments
   that need org scoping will have to map a group / role claim instead.
 - Cookie naming. The session and flow cookie names
   (`__Host-latere-session`, `__Host-latere-flow`) and the `__Host-`

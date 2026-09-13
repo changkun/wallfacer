@@ -11,6 +11,7 @@ import { storeToRefs } from 'pinia';
 import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem, type Principal } from 'latere-ui';
 
 import { useAuthStore } from '../stores/auth';
+import { accountRole } from '../lib/accountRole';
 import { usePrefsStore, type Locale } from '../stores/prefs';
 import { useDeviceSignIn } from '../composables/useDeviceSignIn';
 import DeviceSignInModal from './DeviceSignInModal.vue';
@@ -29,12 +30,12 @@ const auth = useAuthStore();
 // Derive the account role so the shared AccountMenu renders the role badge +
 // dropdown descriptor (as in lux). null in anonymous local-run mode.
 // wallfacer's /api/me carries no org-admin signal, so org users are left
-// roleless (the dropdown shows the org name, not a fabricated tier);
-// superadmin and no-org individual are unambiguous.
+// roleless (the dropdown shows the org name, not a fabricated tier); the
+// platform_admin role and the no-org individual are unambiguous.
 const principal = computed<Principal | null>(() => {
   const m = auth.me;
   if (!m) return null;
-  const role = m.is_superadmin ? 'platform_admin' : m.org_id ? undefined : 'individual';
+  const role = accountRole(m);
   return { ...m, role };
 });
 const prefs = usePrefsStore();

@@ -10,6 +10,19 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Changed
+
+- Access is by role, not the retired flag (identity id-09, rule R9).
+  RequireSuperadmin admits the `platform_admin` role in the verified
+  principal where it read the installation flag before, and the
+  sandbox-proxy reads its required scope from the token's `scp` claim into a
+  local slice rather than off the family Identity, which no longer carries a
+  scope. `GET /api/me` marshals the family principal, which now carries the
+  `roles` claim instead of `is_superadmin`; the console derives the account
+  role (`platform_admin`) from it. Pins pkg v0.64.0. Requires an issuer
+  that mints `platform_admin` (identity auth release); a token minted
+  before it refreshes within 15 minutes.
+
 ## v0.3.0 - 2026-09-13
 
 ### Removed

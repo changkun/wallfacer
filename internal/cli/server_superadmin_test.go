@@ -61,7 +61,7 @@ func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 func TestAdminRebuildIndex_CloudSuperadmin200(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, true)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "root", IsSuperadmin: true}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "root", Roles: []string{authkit.RolePlatformAdmin}}))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -71,12 +71,12 @@ func TestAdminRebuildIndex_CloudSuperadmin200(t *testing.T) {
 }
 
 // TestAdminRebuildIndex_CloudRegular403 covers the denied-principal
-// case: valid claims, but IsSuperadmin is false. The RequireSuperadmin
+// case: valid claims, but no platform_admin role. The RequireSuperadmin
 // wrapper short-circuits before the handler runs.
 func TestAdminRebuildIndex_CloudRegular403(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, true)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "alice", IsSuperadmin: false}))
+	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "alice"}))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 

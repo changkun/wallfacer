@@ -23,7 +23,7 @@ The lead child of [multi-user-collaboration.md](../multi-user-collaboration.md).
 ## Current State (shipped)
 
 - `internal/auth/authorize.go`: `RequireSuperadmin(next)` returns 403 when the caller is not a superadmin; `RequireScope(scope)` returns a handler-wrapper factory that 403s when the caller lacks the scope. Both read the principal from the request context.
-- `authkit.Identity` exposes `IsSuperadmin bool` and `Scopes []string`. There is **no** `roles[]` claim. So the admin/editor/viewer model maps onto **scopes**, not onto a role claim that does not exist.
+- `authkit.Identity` exposes `Roles []string` (carrying `platform_admin`) and `Scopes []string`. So the admin/editor/viewer model maps onto **scopes**, not onto a role claim that does not exist.
 - `internal/store/principal.go`: tasks are already org/owner-scoped for *visibility* (`Principal.CanSee`, `OrgID` / `CreatedBy`). RBAC adds *mutation* gating on top of visibility.
 - Anonymous/local mode installs no auth middleware, so the wrappers are simply absent (everyone is effectively admin). This spec must preserve that: no regression for self-hosted anonymous use.
 
@@ -43,7 +43,7 @@ Three conceptual roles, each a set of scopes the platform issues in `Identity.Sc
 | editor | `wallfacer:read`, `wallfacer:write` | Create/dispatch/cancel/feedback tasks, edit specs and planning, run flows. |
 | admin | `wallfacer:read`, `wallfacer:write`, `wallfacer:admin` | Editor plus org-level settings, force-archive, manage routines/agents, and destructive actions. |
 
-Superadmin (`Identity.IsSuperadmin`) stays orthogonal and above the matrix (cross-org operational access), enforced by the existing `RequireSuperadmin`.
+Platform admin (the `platform_admin` role) stays orthogonal and above the matrix (cross-org operational access), enforced by the existing `RequireSuperadmin`.
 
 ### The matrix
 

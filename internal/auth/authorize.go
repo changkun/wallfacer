@@ -9,7 +9,11 @@
 
 package auth
 
-import "net/http"
+import (
+	"net/http"
+
+	"latere.ai/x/pkg/authkit"
+)
 
 // RequireSuperadmin returns 403 when the caller is not a superadmin,
 // 401 when there are no claims in context. The 401 branch is defensive:
@@ -23,7 +27,7 @@ func RequireSuperadmin(next http.Handler) http.Handler {
 			writeUnauthorized(w, "authentication required")
 			return
 		}
-		if !c.IsSuperadmin {
+		if !c.Has(authkit.RolePlatformAdmin) {
 			writeForbidden(w, "superadmin required")
 			return
 		}

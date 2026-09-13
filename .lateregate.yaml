@@ -90,3 +90,4 @@ waive:
 identity:
   role: service
   audience: wallfacer
+  roles_only: true
