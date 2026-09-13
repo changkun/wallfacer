@@ -138,7 +138,7 @@ Capabilities{
 ## Open Questions
 
 - Should wallfacer reuse a single long-lived "wallfacer agent" definition across tasks, or one per (system prompt + tools) hash? Lean toward hash-keyed reuse — agent definitions are cheap to create and reuse maximizes Anthropic-side caching.
-- How does this compose with [agent-token-exchange](../identity/agent-token-exchange.md)? If a task's sub-agent needs to call Latere services, the Managed Agents sandbox would need the same RFC 8693 token. Defer until both ship.
+- If a task's sub-agent needs to call Latere services, what does the Managed Agents sandbox present? The family answer is the dispatching user's own token, audienced to the service being called; auth mints no credential that stands for a user. Confirm the sandbox can receive one before this ships.
 - Does this replace the [oauth-token-setup](../.archive/local/oauth-token-setup.md) Claude path for users who pick Managed Agents? No — Managed Agents needs a billing-capable API key, not an OAuth subscription token. Document the distinction clearly.
 
 ## Why a separate spec from Topos

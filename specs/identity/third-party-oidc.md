@@ -22,7 +22,7 @@ dispatched_task_id: null
 ## Problem
 
 Wallfacer's login flow is composed from the platform package
-`latere.ai/x/pkg/oidc` (re-exported through `internal/auth`). That RP
+`latere.ai/x/pkg/authkit/oidc` (re-exported through `internal/auth`). That RP
 is wired for latere.ai: the session and flow cookie names
 (`__Host-latere-session`, `__Host-latere-flow`), the `/userinfo`
 shape, and the claim layout are all tied to `auth.latere.ai`.
@@ -36,7 +36,7 @@ nothing else works today.
 
 Make any RFC-6749 / OIDC-core provider able to terminate wallfacer's
 login flow, without wallfacer owning a parallel OIDC implementation.
-The platform `pkg/oidc` RP stays the only relying party; the work is
+The platform `authkit/oidc` RP stays the only relying party; the work is
 to configure it (and, where it falls short, extend it upstream) so it
 can point at a non-latere.ai issuer. Latere.ai mode
 (`WALLFACER_CLOUD=true`, `AUTH_URL=https://auth.latere.ai`) stays the
@@ -44,9 +44,8 @@ default.
 
 ## Design space
 
-Wallfacer no longer vendors an OIDC package; `pkg/oidc`,
-`pkg/authkit`, and `pkg/jwtauth` are platform-owned
-(`latere.ai/x/pkg`). So the design is not "fork a local package", it is
+Wallfacer no longer vendors an OIDC package; `authkit`, `authkit/oidc`
+and `authkit/jwt` are platform-owned (`latere.ai/x/pkg`). So the design is not "fork a local package", it is
 "how far does configuring the existing platform RP get us, and what has
 to move upstream". The shape to weigh during the drafted to validated
 transition:
@@ -61,7 +60,7 @@ transition:
    whatever the platform RP hard-codes.
 2. **Extend the platform RP upstream for the gaps.** Where the foreign
    provider diverges (claim mapping, cookie naming, optional `org_id`),
-   the change lands in `latere.ai/x/pkg/oidc` so every consumer
+   the change lands in `latere.ai/x/pkg/authkit/oidc` so every consumer
    benefits, and wallfacer only consumes the new configuration surface.
    Wallfacer-local code stays a thin handler layer
    (`internal/handler/login.go`, the `AuthProvider` interface) plus env
@@ -76,7 +75,7 @@ ends up living:
   that need org scoping will have to map a group / role claim instead.
 - Cookie naming. The session and flow cookie names
   (`__Host-latere-session`, `__Host-latere-flow`) and the `__Host-`
-  prefix handling are owned by the platform `pkg/oidc`, so any
+  prefix handling are owned by the platform `authkit/oidc`, so any
   per-deployment renaming (to keep multiple deployments behind a shared
   domain from colliding) is an upstream concern, not a wallfacer-local
   knob.
@@ -113,7 +112,7 @@ this ships, a third combination opens up:
 ## What this spec does NOT answer
 
 - How much of the gap is configuration on the existing platform RP vs.
-  an upstream change to `latere.ai/x/pkg/oidc`. Needs a prototype round
+  an upstream change to `latere.ai/x/pkg/authkit/oidc`. Needs a prototype round
   against at least one real provider (likely Authelia or Dex for local
   dev) before committing.
 - How to surface the claim-mapping config: env vars vs. a YAML file

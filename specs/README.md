@@ -13,7 +13,7 @@ Foundations - 7/7 complete (see Archive)
 Identity - the live edge (auth + platform convergence)
   ✅ Authentication                ◐ Auth by Default + Console
   ○ Multi-User Collaboration       ○ Third-Party OIDC
-  ◐ Remote Control (→ cloud plane) ◌ Agent Token Exchange
+  ◐ Remote Control (→ cloud plane)
   ✅ Local Device-Code Sign-In (UI re-home)
   ✅ Local Per-Account/Org Isolation (signed-in scopes projects/tasks)
 
@@ -104,12 +104,12 @@ Everything about principals, sessions, delegation, and what data crosses the mac
 |------|--------|----------|
 | [local-account-isolation.md](.archive/identity/local-account-isolation.md) | **Complete** | Signed-in local `wallfacer run` now scopes projects (workspaces) and tasks to the active personal account / org, reversing the cloud-only-isolation design for signed-in local sessions. Shipped smaller than specced: the Layer-1 (workspace, `config.go`/`workspace_crud.go`) gates were dropped from `cloudMode` onto principal-presence so both layers share one rule (`bccd81bc`), the project list filters strictly while the active workspace drops only on a genuine cross-org carry-over (`6ed87396`), and device sign-in is re-enabled (`85e6ce6e`). The legacy owner-adoption migration and personal-coercion proved unnecessary (personal view already includes legacy no-owner records; a bare local token carries no org claim) and are deferred; multi-account legacy separation and redirect-free org switching remain follow-ups. |
 | [local-device-signin.md](.archive/identity/local-device-signin.md) | **Complete** | Re-homed the built-but-unwired RFC 8628 device-code flow onto the Vue account menu for local `wallfacer run`: `DeviceAuth` wiring, session-cookie mint on the poll `done` branch, and a user-code modal (`useDeviceSignIn` + `DeviceSignInModal`) that falls back to `/login` on 503. The boot wiring was reverted (`794602ef`) while local sign-in lacked per-account isolation; it is re-enabled (`85e6ce6e`) now that [local-account-isolation](.archive/identity/local-account-isolation.md) has shipped that isolation. |
-| [authentication.md](.archive/identity/authentication.md) | **Complete** | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Follow-up auth-unification (authkit.Identity, HTTP device-code login) shipped and is archived under `identity/authentication/`. |
+| [authentication.md](.archive/identity/authentication.md) | **Complete** | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/authkit/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Follow-up auth-unification (authkit.Identity, HTTP device-code login) shipped and is archived under `identity/authentication/`. |
 | [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Stale | Umbrella: org-scoped collaboration on the shipped identity plumbing (actor fields, org scoping). Adds RBAC, presence/focus, optimistic concurrency, private planning threads. Steps 1-2 (actor fields, migration) already shipped; breakdown started. Gate for cloud team hosting. |
 | ↳ [rbac-matrix.md](identity/multi-user-collaboration/rbac-matrix.md) | Stale | Lead child: the canonical scope-to-permission matrix (admin/editor/viewer mapped onto `Identity.Scopes`, since there is no role claim), wiring `RequireScope`/`RequireSuperadmin` onto mutating routes. Anonymous mode unchanged. |
-| [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Self-hosted non-latere.ai deployments log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. by configuring/extending the platform `pkg/oidc` RP rather than forking a local package. |
+| [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Self-hosted non-latere.ai deployments log in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. by configuring/extending the platform `authkit/oidc` RP rather than forking a local package. |
 | [remote-control.md](identity/remote-control.md) | Stale | Re-homed onto the cloud coordination plane: now the command-router capability (control UI, instance picker, offline handling, per-action auth + audit, opt-out scope) riding the one coordination connection, not its own wire. Transport lives in [coordination-plane.md](cloud/latere-integration/coordination-plane.md). |
-| [agent-token-exchange.md](identity/agent-token-exchange.md) | Drafted | Per-task agent credentials for calling latere.ai services on behalf of the dispatching user. Reopened 2026-07-17 against the Latere identity fabric: the credential source is the registered-agent delegation chain (auth agent principal + delegation row + `/internal/agent-runner-tokens`), superseding the parked user-session-exchange premise. Trust plane already shipped as the `sandbox_proxy.go` server-side proxy; stays drafted until a cloud executor consumes it. |
+| [agent-token-exchange.md](.archive/identity/agent-token-exchange.md) | **Archived** | Per-task agent credentials for calling latere.ai services on behalf of the dispatching user. Archived 2026-09-13: auth removed agent delegation on 2026-07-26, so the agent principal, the delegation row, `/internal/agent-runner-tokens` and the exchange this spec mints from are all gone. The trust plane it needed had already shipped as the `sandbox_proxy.go` server-side proxy and is unaffected. A task that calls a Latere service presents the dispatching user's own token, audienced to that service. |
 
 ### Identity dependencies
 
@@ -118,7 +118,6 @@ graph LR
   AUTH[Authentication ✅] --> ABD[Auth by Default ✅]
   AUTH --> TPO[Third-Party OIDC]
   AUTH --> RC[Remote Control]
-  AUTH --> ATE[Agent Token Exchange ◌]
   AUTH --> MUC[Multi-User Collaboration]
   MUC --> CH[Cloud team hosting]
 
@@ -126,7 +125,7 @@ graph LR
   style ABD fill:#d4edda,stroke:#28a745
 ```
 
-Auth-by-default has shipped (archived). Agent token exchange (◌) is dormant: its trust plane shipped as the `sandbox_proxy.go` server-side proxy, and the remaining mint path is demand-gated on latere.ai backend services. Multi-user collaboration is the gate for cloud *team* hosting (org-scoped shared boards).
+Auth-by-default has shipped (archived). Agent token exchange is archived: its trust plane shipped as the `sandbox_proxy.go` server-side proxy, and the mint path it was waiting on was removed from auth rather than built. Multi-user collaboration is the gate for cloud *team* hosting (org-scoped shared boards).
 
 ---
 

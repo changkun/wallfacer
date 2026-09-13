@@ -4,7 +4,6 @@ status: stale
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/identity/authentication.md
-  - specs/identity/agent-token-exchange.md
   - specs/shared/harness-abstraction.md
 affects:
   - internal/executor/
@@ -19,8 +18,10 @@ dispatched_task_id: null
 
 # Runtime Integration: Cella Backend
 
-> Identity/auth contracts for this executor are now governed by the
-> Latere identity fabric; refresh this spec against it before dispatch.
+> Identity for this executor is governed by
+> [infrastructure/identity.md](https://github.com/latere-ai/specs) in the
+> family spec tree: one token, verified locally, audienced to the service
+> it addresses. Refresh this spec against it before dispatch.
 
 ## Problem
 
@@ -111,13 +112,14 @@ the remote sandbox. Options, in preference order:
 This spec defines the backend contract; the worktree-sync mechanism is resolved
 jointly with the FS integration and must not be reinvented here.
 
-### Identity / per-task delegation
+### Identity
 
 A Cella sandbox running on the user's behalf may need to call Latere services
-(FS, telemetry) back. Mint a short-lived per-task token via RFC 8693 token
-exchange (see [agent-token-exchange.md](../../identity/agent-token-exchange.md))
-and hand it to the sandbox through the credential vault, not via the prompt or
-plaintext env.
+(FS, telemetry) back. It carries the dispatching user's own token, audienced
+to the service it calls, handed to the sandbox through the credential vault
+and never through the prompt or plaintext env. There is no per-task
+credential that stands for the user: auth removed agent delegation on
+2026-07-26 and mints nothing of the kind.
 
 ### Configuration & selection
 

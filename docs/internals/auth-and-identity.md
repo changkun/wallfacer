@@ -10,7 +10,7 @@ All paths persist the token via `authkit.FileTokenStore` at `<UserConfigDir>/lat
 
 ### Browser OIDC (authorization code + PKCE)
 
-`/login`, `/callback`, `/logout`, and `/logout/notify` are mounted unconditionally through the apicontract route table and handled by `internal/handler/login.go`. The handlers delegate to `latere.ai/x/pkg/oidc` (re-exported as `internal/auth`) and self-gate: with no auth client wired, `/login` and `/callback` answer 503 so a broken deployment fails loudly, while `/logout` falls back to a bare cookie clear.
+`/login`, `/callback`, `/logout`, and `/logout/notify` are mounted unconditionally through the apicontract route table and handled by `internal/handler/login.go`. The handlers delegate to `latere.ai/x/pkg/authkit/oidc` (re-exported as `internal/auth`) and self-gate: with no auth client wired, `/login` and `/callback` answer 503 so a broken deployment fails loudly, while `/logout` falls back to a bare cookie clear.
 
 Configuration resolution (`resolveAuthConfig`):
 
@@ -18,7 +18,7 @@ Configuration resolution (`resolveAuthConfig`):
 - `AUTH_REDIRECT_URL` derives from the listen address: a loopback or wildcard host yields `http://localhost:<port>/callback` (matching the redirect registered for the public client); any other host is assumed to terminate TLS and uses `https`.
 - Every `AUTH_*` value resolves shell environment first, then `~/.wallfacer/.env`, then the default, so `AUTH_CLIENT_ID=other wallfacer run` is a clean one-shot override.
 
-**Session cookie and the cookie-key file.** A confidential client derives the AES-GCM session-cookie key from `AUTH_CLIENT_SECRET`. The default public client has no secret, so `loadOrCreateCookieKey` generates a 32-byte hex key once and persists it at `<configDir>/cookie-key` (mode 0600); sessions survive restarts, and an explicit `AUTH_COOKIE_KEY` takes precedence. On a loopback `http://` redirect URL the client sets `InsecureCookies`: browsers reject `Secure` cookies over plain HTTP, so `pkg/oidc` drops the `__Host-` cookie-name prefix and the Secure attribute for local serving.
+**Session cookie and the cookie-key file.** A confidential client derives the AES-GCM session-cookie key from `AUTH_CLIENT_SECRET`. The default public client has no secret, so `loadOrCreateCookieKey` generates a 32-byte hex key once and persists it at `<configDir>/cookie-key` (mode 0600); sessions survive restarts, and an explicit `AUTH_COOKIE_KEY` takes precedence. On a loopback `http://` redirect URL the client sets `InsecureCookies`: browsers reject `Secure` cookies over plain HTTP, so `authkit/oidc` drops the `__Host-` cookie-name prefix and the Secure attribute for local serving.
 
 **Principal endpoint.** `GET /api/me` (`Handler.AuthMe`) returns 204 for no session, or the latere-ui Principal shape (identity, avatar, active org, org list) assembled by `oidc.BuildMe` off a single up-front token refresh, plus `principal_id` and `auth_url` so the shared AccountMenu renders the avatar and org switcher.
 
@@ -92,7 +92,7 @@ What the flag changes:
 
 ### OIDC specifics
 
-The integration is specific to the latere.ai auth service via `latere.ai/x/pkg/oidc`: the encrypted cookie format (`__Host-latere-flow`, `__Host-latere-session`), the userinfo shape, token refresh, and the front-channel logout protocol. Generic third-party OIDC (Keycloak, Entra ID) is deferred; self-hosted deployments without latere.ai auth use the `WALLFACER_SERVER_API_KEY` static bearer.
+The integration is specific to the latere.ai auth service via `latere.ai/x/pkg/authkit/oidc`: the encrypted cookie format (`__Host-latere-flow`, `__Host-latere-session`), the userinfo shape, token refresh, and the front-channel logout protocol. Generic third-party OIDC (Keycloak, Entra ID) is deferred; self-hosted deployments without latere.ai auth use the `WALLFACER_SERVER_API_KEY` static bearer.
 
 ### Environment variables
 

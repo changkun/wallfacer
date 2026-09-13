@@ -22,8 +22,10 @@ dispatched_task_id: null
 
 # Topos as a Remote Agent Executor
 
-> Identity/auth contracts for this executor are now governed by the
-> Latere identity fabric; refresh this spec against it before dispatch.
+> Identity for this executor is governed by
+> [infrastructure/identity.md](https://github.com/latere-ai/specs) in the
+> family spec tree: one token, verified locally, audienced to the service
+> it addresses. Refresh this spec against it before dispatch.
 
 ## Problem
 

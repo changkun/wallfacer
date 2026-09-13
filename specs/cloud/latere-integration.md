@@ -29,15 +29,17 @@ grown standalone services that own concerns wallfacer's older cloud specs
 proposed to build from scratch:
 
 - **Identity** (auth.latere.ai) - OIDC, JWTs, orgs, teams, service accounts,
-  Stripe billing, RFC 8693 token exchange.
+  Stripe billing. A plain OIDC provider: it says who is calling and in
+  which org, and nothing else.
 - **Cella** (cella.latere.ai) - K8s sandbox execution, warm pools, durable
   workspaces, credential vault, per-sandbox identity JWTs.
 - **FS** (fs.latere.ai) - two-tier file data plane (Spaces cold + PVC hot);
   `/files/*` is live, `/workspaces/*` is planned.
 - **Lux** - model key custody and routing.
 - **MCP Registry** - approved tool catalog.
-- **`latere.ai/x/pkg`** - shared Go libraries (`jwtauth`, `oidc`, `authkit`,
-  `scopes`, `otel`, `audit`); already a wallfacer dependency.
+- **`latere.ai/x/pkg`** - shared Go libraries (`authkit` with its `jwt`
+  and `oidc` subpackages, `scopes`, `otel`, `audit`); already a wallfacer
+  dependency.
 
 This umbrella defines **how wallfacer integrates with those services** so that
 the local-first product keeps working unchanged while cloud mode gains
@@ -82,11 +84,10 @@ seam is inert and local behavior is byte-identical to today.
 
 | Seam | Latere service | Wallfacer interface | Status | Spec |
 |------|----------------|---------------------|--------|------|
-| **Identity** | auth.latere.ai | `internal/auth` middleware + `pkg/jwtauth`/`oidc`; `authkit.Identity{Sub,OrgID}` principal | ✅ shipped (Phase 1+2) | [identity/authentication.md](../.archive/identity/authentication.md) |
+| **Identity** | auth.latere.ai | `internal/auth` middleware + `authkit/jwt` and `authkit/oidc`; `authkit.Identity{Sub,OrgID}` principal | ✅ shipped (Phase 1+2) | [identity/authentication.md](../.archive/identity/authentication.md) |
 | **Runtime** | Cella | `executor.Backend` (today: Host only; the cloud impl slots in as a third executor) | drafted | [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md) |
 | **Cella wire client** | Cella | a shared Go client published by Cella, consumed by Wallfacer's `CellaBackend` and Topos's `cella.Provider` | drafted | [latere-integration/shared-cella-client.md](latere-integration/shared-cella-client.md) |
 | **File data plane** | FS | `internal/workspace` + `internal/runner` (worktree staging) | drafted; **blocked on FS Workspace API** | [tenant-filesystem.md](tenant-filesystem.md) |
-| **Per-task delegation** | auth (RFC 8693) | mint short-lived agent tokens so sandboxes call back | drafted | [identity/agent-token-exchange.md](../identity/agent-token-exchange.md) |
 | **Deploy** | Latere platform infrastructure (DOKS) | thin deploy module + `pkg/otel` OTLP emit | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |
 | **Model keys** | Lux | credential injection into task env | future | - (specced when scheduled) |
 | **MCP catalog** | MCP Registry | approved-tool resolution | future | - |
@@ -122,8 +123,9 @@ seam is inert and local behavior is byte-identical to today.
   truth. This is the lead because it delivers cross-instance value (presence,
   team visibility, spec comments) without crossing the source/diff boundary.
 - **Phase 3+ - Axis B, remote execution (gated by demand & FS Workspace API).**
-  Cella execution, FS workspace staging, agent token exchange, model-key routing
-  via Lux. The runtime seam ([cella-runtime.md](latere-integration/cella-runtime.md))
+  Cella execution, FS workspace staging, model-key routing via Lux. A
+  sandbox that calls back carries the dispatching user's own token,
+  audienced to the service it calls. The runtime seam ([cella-runtime.md](latere-integration/cella-runtime.md))
   is its lead, behind the existing `executor.Backend` interface.
 
 ## Boundaries

@@ -94,9 +94,3 @@ identity:
     verifier:
       until: 2026-11-30
       reason: internal/runner/runner.go takes a token apart by hand; id-04 moves it onto authkit/jwt
-    delegation:
-      until: 2026-11-30
-      reason: live cloud and identity specs describe the removed exchange; id-02 archives them
-    documents:
-      until: 2026-11-30
-      reason: docs/internals and two identity specs describe the removed exchange; id-02 archives them

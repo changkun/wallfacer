@@ -1,6 +1,6 @@
 ---
 title: Agent Token Exchange
-status: drafted
+status: archived
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -10,21 +10,31 @@ affects:
   - internal/store/
 effort: medium
 created: 2026-04-19
-updated: 2026-07-17
+updated: 2026-09-13
 author: changkun
 dispatched_task_id: null
 ---
 
 # Agent Token Exchange
 
-> **Reopened 2026-07-17 (drafted).** The reopening condition is met: the
-> Latere identity service now provides the backend delegation chain. Per-task
-> agent credentials come from the registered-agent delegation chain (auth
-> agent principal + delegation row + `POST /internal/agent-runner-tokens`),
-> not from exchanging the dispatching user's session token as the parked
-> design assumed. Sections marked **historical** below record that parked
-> design and are superseded on the credential-source question. This spec
-> stays drafted until a cloud executor consumes it.
+> **Archived 2026-09-13. Retired as: the mechanism this spec is built on
+> no longer exists.** Auth removed agent delegation on 2026-07-26: there
+> is no agent principal, no delegation row, no
+> `POST /internal/agent-runner-tokens`, and no RFC 8693 exchange. Every
+> credential source this spec names, in both its reopened and its parked
+> form, is gone, so there is nothing left to schedule.
+>
+> What shipped stays shipped: `internal/handler/sandbox_proxy.go` holds
+> the upstream credential server-side and a sandbox never sees it. That
+> half needed no exchange and is unaffected.
+>
+> A task that needs to call a Latere service on a user's behalf presents
+> that user's own token, audienced to the service it is calling. If a
+> credential that is not the user's is ever needed again, it gets a spec
+> written against whatever auth issues then, not this one.
+>
+> Everything below is the 2026-04-19 design and its 2026-07-17 reopening,
+> kept as the record of what was considered.
 
 ## Problem
 
