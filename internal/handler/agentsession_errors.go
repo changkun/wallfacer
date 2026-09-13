@@ -12,7 +12,7 @@ import (
 // writeAgentFailure emits the same terminal error shape the chat parser uses
 // for provider errors. The leading newline separates any partial agent frame.
 func writeAgentFailure(log io.Writer, code, message, detail string) []byte {
-	frame, _ := json.Marshal(struct {
+	frame, err := json.Marshal(struct {
 		Type    string `json:"type"`
 		Subtype string `json:"subtype"`
 		IsError bool   `json:"is_error"`
@@ -24,6 +24,10 @@ func writeAgentFailure(log io.Writer, code, message, detail string) []byte {
 		Type: "result", Subtype: "error", IsError: true,
 		Code: code, Message: message, Detail: detail, Result: message,
 	})
+	if err != nil {
+		slog.Error("encode agent failure", "error", err)
+		return nil
+	}
 	frame = append(append([]byte{'\n'}, frame...), '\n')
 	_, _ = log.Write(frame)
 	return frame
