@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -50,7 +51,9 @@ func TestKeyringUpdatesAndExplicitFileMigration(t *testing.T) {
 	if !strings.Contains(string(raw), "ANTHROPIC_API_KEY="+token) || strings.Contains(string(raw), secretBundleKey) {
 		t.Fatal("explicit file migration failed")
 	}
-	if st, _ := os.Stat(path); st.Mode().Perm() != 0600 {
+	// Windows permissions are ACL-based; FileMode only exposes the read-only
+	// attribute there. The migration assertions above still run on Windows.
+	if st, _ := os.Stat(path); runtime.GOOS != "windows" && st.Mode().Perm() != 0600 {
 		t.Fatal("credential file must be private")
 	}
 }
