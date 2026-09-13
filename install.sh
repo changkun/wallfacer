@@ -69,13 +69,16 @@ if [ "$VERSION" = "latest" ]; then
   # Use GitHub API to get the most recent release including prereleases/betas.
   API_URL="https://api.github.com/repos/${REPO}/releases"
   if command -v curl >/dev/null 2>&1; then
-    VERSION="$(curl -fsSL "$API_URL" | grep -m1 '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+    RELEASES="$(curl -fsSL "$API_URL")"
   elif command -v wget >/dev/null 2>&1; then
-    VERSION="$(wget -qO- "$API_URL" | grep -m1 '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+    RELEASES="$(wget -qO- "$API_URL")"
   else
     echo "Error: curl or wget is required." >&2
     exit 1
   fi
+  # Consume the whole response before selecting a tag. An early-exiting grep
+  # closes curl's pipe and hides download failures behind the parser's status.
+  VERSION="$(printf '%s\n' "$RELEASES" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | sed -n '1p')"
   if [ -z "$VERSION" ]; then
     echo "Error: could not determine latest release version." >&2
     exit 1
@@ -125,3 +128,5 @@ esac
 echo ""
 echo "Get started:"
 echo "  wallfacer run"
+echo "  Open Settings to add a provider credential and select an installed harness."
+echo "  Check prerequisites with: wallfacer doctor"
