@@ -32,7 +32,10 @@ func otlpSink(t *testing.T) {
 	t.Setenv("OTEL_TRACES_SAMPLER_ARG", "1.0")
 }
 
-func newRunServer(t *testing.T) *ServerComponents {
+// newRunServer boots the run tree and returns it with the server key
+// initServer generated, which every API request below must present: the
+// bearer middleware admits only the SPA shell and /metrics without it.
+func newRunServer(t *testing.T) (*ServerComponents, string) {
 	t.Helper()
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -46,7 +49,14 @@ func newRunServer(t *testing.T) *ServerComponents {
 		EnvFile:   envFile,
 	}, testFS(t), testFS(t))
 	t.Cleanup(sc.Shutdown)
-	return sc
+	return sc, readServerAPIKey(configDir)
+}
+
+// healthRequest is GET /api/debug/health carrying the server key.
+func healthRequest(key string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/health", nil)
+	req.Header.Set("Authorization", "Bearer "+key)
+	return req
 }
 
 // TestRunBootstrapsTelemetry is the discriminator for the `run` subcommand:
@@ -62,7 +72,7 @@ func TestRunBootstrapsTelemetry(t *testing.T) {
 	// which would make a bare type assertion pass without run registering
 	// anything. Pre-fix the provider is untouched, so before and after match.
 	before := otelapi.GetTracerProvider()
-	newRunServer(t)
+	_, _ = newRunServer(t)
 	after := otelapi.GetTracerProvider()
 
 	if after == before {
@@ -83,9 +93,9 @@ func TestRunBootstrapsTelemetry(t *testing.T) {
 // middleware stack could not tell the two apart.
 func TestRunServerRecordsServerSpan(t *testing.T) {
 	rec := oteltest.Install(t)
-	sc := newRunServer(t)
+	sc, key := newRunServer(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/debug/health", nil)
+	req := healthRequest(key)
 	rr := httptest.NewRecorder()
 	sc.Srv.Handler.ServeHTTP(rr, req)
 
@@ -111,7 +121,7 @@ func TestRunServerRecordsServerSpan(t *testing.T) {
 // that records nothing at all.
 func TestRunServerSkipsMetricsScrapeSpan(t *testing.T) {
 	rec := oteltest.Install(t)
-	sc := newRunServer(t)
+	sc, key := newRunServer(t)
 
 	serverSpans := func() int { return len(oteltest.SpanNames(rec, trace.SpanKindServer)) }
 
@@ -124,7 +134,7 @@ func TestRunServerSkipsMetricsScrapeSpan(t *testing.T) {
 		t.Fatalf("metrics scrape recorded %d server span(s); it must be skipped", n)
 	}
 
-	sc.Srv.Handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/debug/health", nil))
+	sc.Srv.Handler.ServeHTTP(httptest.NewRecorder(), healthRequest(key))
 	if n := serverSpans(); n == 0 {
 		t.Fatal("no server span for an ordinary request; the provider is inert, so the skip assertion above proved nothing")
 	}
@@ -137,9 +147,9 @@ func TestRunServerSkipsMetricsScrapeSpan(t *testing.T) {
 // the exact status code.
 func TestRunServerPreservesPrometheusSeries(t *testing.T) {
 	oteltest.Install(t)
-	sc := newRunServer(t)
+	sc, key := newRunServer(t)
 
-	sc.Srv.Handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/debug/health", nil))
+	sc.Srv.Handler.ServeHTTP(httptest.NewRecorder(), healthRequest(key))
 
 	rr := httptest.NewRecorder()
 	sc.Srv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/metrics", nil))

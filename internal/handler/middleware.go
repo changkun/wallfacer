@@ -102,7 +102,10 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodGet && r.URL.Path == "/" {
+			// The SPA shell loads for everyone, and the Prometheus scrape
+			// carries no credential: /metrics is operational telemetry
+			// with no user data, and a scraper cannot present the key.
+			if r.Method == http.MethodGet && (r.URL.Path == "/" || r.URL.Path == "/metrics") {
 				next.ServeHTTP(w, r)
 				return
 			}
