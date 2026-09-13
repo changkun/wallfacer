@@ -237,7 +237,12 @@ jobs:
           cat evidence/release-evidence.md >> notes.md
           # dist/ now also holds SHA256SUMS, the SPDX SBOM, and the two cosign
           # bundles, so the glob attaches the attestation with the binaries.
-          gh release create "$TAG" $prerelease \
-            --title "Wallfacer $TAG" \
-            --notes-file notes.md \
-            dist/*
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md --draft=false
+          else
+            gh release create "$TAG" $prerelease \
+              --title "Wallfacer $TAG" \
+              --notes-file notes.md --verify-tag \
+              dist/*
+          fi
