@@ -63,9 +63,15 @@ func TestUITestSeedsAgentBinariesWithoutAnInstalledAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, seed, found := strings.Cut(string(body), "echo \"==> Seeding deterministic demo data\"")
+	_, seed, found := strings.Cut(string(body), "# The UI fixture exercises the server")
 	if !found {
-		t.Fatal("UI harness has no seed step")
+		t.Fatal("UI harness has no agent fixture setup")
+	}
+	// The browser suite covers the Node-based demo data. This Go regression
+	// exercises the agent setup after it, including on the Node-free hermetic runner.
+	_, seed, found = strings.Cut(seed, "\n")
+	if !found {
+		t.Fatal("UI harness has no agent fixture commands")
 	}
 	seed, _, found = strings.Cut(seed, "echo \"==> Ensuring playwright sandbox")
 	if !found {
@@ -73,6 +79,9 @@ func TestUITestSeedsAgentBinariesWithoutAnInstalledAgent(t *testing.T) {
 	}
 	dir := t.TempDir()
 	home := filepath.Join(dir, "home")
+	if err := os.MkdirAll(filepath.Join(home, ".wallfacer"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command("bash", "-e", "-c", seed)
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "HOME_DIR="+home, "DATA="+filepath.Join(dir, "data"), "WS="+filepath.Join(dir, "ws"))
