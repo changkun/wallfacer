@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -127,11 +128,13 @@ func TestSandboxProxyEnabledNilValidatorRejects(t *testing.T) {
 	cfg := SandboxProxyConfig{
 		Enabled:                  true,
 		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthServiceToken:         "svc-token",
+		AuthURL:                  "https://auth.example",
+		ClientID:                 "wallfacer-proxy",
+		ClientSecret:             "s3cret",
 		AnthropicKey:             "sk-ant",
 		OpenAIKey:                "sk-oai",
 	}
-	mux := proxyMux(NewSandboxProxy(cfg, nil))
+	mux := proxyMux(withTokens(NewSandboxProxy(cfg, nil)))
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages"},
 		{http.MethodPost, "/internal/sandbox-proxy/llm/openai/v1/chat/completions"},
@@ -166,10 +169,12 @@ func TestSandboxProxyGitHubTokenValidJWT(t *testing.T) {
 	cfg := SandboxProxyConfig{
 		Enabled:                  true,
 		AuthInstallationTokenURL: upstream.URL,
-		AuthServiceToken:         "svc-token",
+		AuthURL:                  "https://auth.example",
+		ClientID:                 "wallfacer-proxy",
+		ClientSecret:             "s3cret",
 		AnthropicKey:             "sk-ant",
 	}
-	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
+	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
 
 	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"github:token"})
 	rec := proxyRequest(t, mux, http.MethodGet, "/internal/sandbox-proxy/github-token?repo=owner/name", tok)
@@ -199,9 +204,11 @@ func TestSandboxProxyLLMValidJWTPassesAuthGate(t *testing.T) {
 	cfg := SandboxProxyConfig{
 		Enabled:                  true,
 		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthServiceToken:         "svc-token",
+		AuthURL:                  "https://auth.example",
+		ClientID:                 "wallfacer-proxy",
+		ClientSecret:             "s3cret",
 	}
-	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
+	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
 
 	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"llm:proxy"})
 	rec := proxyRequest(t, mux, http.MethodPost, "/internal/sandbox-proxy/llm/anthropic/v1/messages", tok)
@@ -224,9 +231,11 @@ func TestSandboxProxyLLMEndpointAllowlist(t *testing.T) {
 	cfg := SandboxProxyConfig{
 		Enabled:                  true,
 		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthServiceToken:         "svc-token",
+		AuthURL:                  "https://auth.example",
+		ClientID:                 "wallfacer-proxy",
+		ClientSecret:             "s3cret",
 	}
-	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
+	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
 	tok := signProxyJWT(t, key, "user-42", "wallfacer-sandbox-proxy", []string{"llm:proxy"})
 
 	cases := []struct {
@@ -272,10 +281,12 @@ func TestSandboxProxyRejections(t *testing.T) {
 	cfg := SandboxProxyConfig{
 		Enabled:                  true,
 		AuthInstallationTokenURL: "https://auth.example/internal/github/installation-token",
-		AuthServiceToken:         "svc-token",
+		AuthURL:                  "https://auth.example",
+		ClientID:                 "wallfacer-proxy",
+		ClientSecret:             "s3cret",
 		AnthropicKey:             "sk-ant",
 	}
-	mux := proxyMux(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL)))
+	mux := proxyMux(withTokens(NewSandboxProxy(cfg, proxyValidator(t, jwks.URL))))
 
 	cases := []struct {
 		name     string
@@ -307,4 +318,14 @@ func TestSandboxProxyRejections(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fixedTokens is the service token source the tests hand the proxy.
+type fixedTokens string
+
+func (f fixedTokens) Token(context.Context) (string, error) { return string(f), nil }
+
+func withTokens(p *SandboxProxy) *SandboxProxy {
+	p.Tokens = fixedTokens("svc-token")
+	return p
 }

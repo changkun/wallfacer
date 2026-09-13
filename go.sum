@@ -157,9 +157,9 @@ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EV
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-latere.ai/x/ci-gate v0.32.2 h1:6tVTDU9gCzjesvGIytHUHnHcY6spKECvGl3SB9hSCEc=
-latere.ai/x/ci-gate v0.32.2/go.mod h1:kg1CjxG++fy21VRkwTQSzW4JgGwjOFSeisERzZfarWo=
-latere.ai/x/pkg v0.61.0 h1:kbnEq0JCE//+rKIcZjp+AeLDZ3pL9tmbkj9tqHcrZ3g=
-latere.ai/x/pkg v0.61.0/go.mod h1:VpXn6tJuThl46QtIURBLHQ1AEek7ITy3lPvyfLJeExs=
+latere.ai/x/ci-gate v0.34.0 h1:TkEKfejlRlsPFtCdLPpJIFQgnGv16H9sksaJ55zmACw=
+latere.ai/x/ci-gate v0.34.0/go.mod h1:kg1CjxG++fy21VRkwTQSzW4JgGwjOFSeisERzZfarWo=
+latere.ai/x/pkg v0.63.0 h1:l/tH5lQU7x62VDWqr4vroFv3KXvfMR7nqldFNdc0oCE=
+latere.ai/x/pkg v0.63.0/go.mod h1:VpXn6tJuThl46QtIURBLHQ1AEek7ITy3lPvyfLJeExs=
 latere.ai/x/topos v0.4.1-0.20260905141805-f958ba52ca5e h1:cTPAA+p1wxyOGSVXNeDrBs3Klv9s9uEukGJm9TlDlf0=
 latere.ai/x/topos v0.4.1-0.20260905141805-f958ba52ca5e/go.mod h1:5W3c7EjMCzzX8JGt0QeX/v0BgERaw2qVRLZkoAeiWKQ=

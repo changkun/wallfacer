@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/authkit/jwt"
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/envutil"
 	"latere.ai/x/pkg/metrics"
@@ -753,19 +753,11 @@ func (r *Runner) hostCodexAuthPath() string {
 
 // isJWTExpired checks whether a JWT's "exp" claim is at or past now.
 // Returns false for malformed tokens (non-3-segment, invalid base64, missing exp).
-func isJWTExpired(jwt string, now time.Time) bool {
-	parts := strings.Split(jwt, ".")
-	if len(parts) < 2 {
-		return false
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return false
-	}
+func isJWTExpired(raw string, now time.Time) bool {
 	var claims struct {
 		Exp int64 `json:"exp"`
 	}
-	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp <= 0 {
+	if err := jwt.DecodePayload(raw, &claims); err != nil || claims.Exp <= 0 {
 		return false
 	}
 	return now.Unix() >= claims.Exp

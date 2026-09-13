@@ -90,7 +90,3 @@ waive:
 identity:
   role: service
   audience: wallfacer
-  waive:
-    verifier:
-      until: 2026-11-30
-      reason: internal/runner/runner.go takes a token apart by hand; id-04 moves it onto authkit/jwt

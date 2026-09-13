@@ -10,6 +10,17 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Changed
+
+- The sandbox proxy presents wallfacer's own service token at the issuer's
+  installation-token endpoint, minted with the client_credentials grant
+  from `SANDBOX_PROXY_CLIENT_ID` and `SANDBOX_PROXY_CLIENT_SECRET` against
+  `SANDBOX_PROXY_AUTH_URL` and re-minted before expiry.
+  `SANDBOX_PROXY_AUTH_SERVICE_TOKEN`, a long-lived static JWT, is gone.
+- The runner reads a token's expiry through the shared `jwt.DecodePayload`
+  instead of splitting and decoding it by hand, and the verifier runs the
+  family's `authkit/conformance` suite in the tests of internal/auth.
+
 ## v0.1.0 - 2026-09-13
 
 - Signing in requests no audience any more: the session token belongs to

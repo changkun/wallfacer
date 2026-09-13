@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/authkit/jwt"
+	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -29,10 +31,15 @@ type SandboxProxyConfig struct {
 	// this to mint a per-repo GitHub App installation token for the
 	// sidecar's git-credential request.
 	AuthInstallationTokenURL string
-	// AuthServiceToken is wallfacer's long-lived JWT (scope
-	// github:mint-token) used as the Bearer when calling the URL
-	// above.
-	AuthServiceToken string
+	// AuthURL is the issuer wallfacer asks for its own service token, the
+	// credential it presents at the URL above. ClientID and ClientSecret
+	// are the confidential client registered for that: the token is minted
+	// with the client_credentials grant, scope github:mint-token, and
+	// re-minted before it expires (rule R5: a service acting as itself
+	// holds a service token, never a long-lived static one).
+	AuthURL      string
+	ClientID     string
+	ClientSecret string
 	// AnthropicKey / OpenAIKey are the upstream API keys the trust
 	// plane substitutes for the sandbox's inbound placeholder
 	// Authorization. v1 shares a single org-level key per provider;
@@ -47,12 +54,14 @@ type SandboxProxyConfig struct {
 func LoadSandboxProxyConfig() SandboxProxyConfig {
 	cfg := SandboxProxyConfig{
 		AuthInstallationTokenURL: os.Getenv("SANDBOX_PROXY_AUTH_INSTALLATION_URL"),
-		AuthServiceToken:         os.Getenv("SANDBOX_PROXY_AUTH_SERVICE_TOKEN"),
+		AuthURL:                  os.Getenv("SANDBOX_PROXY_AUTH_URL"),
+		ClientID:                 os.Getenv("SANDBOX_PROXY_CLIENT_ID"),
+		ClientSecret:             os.Getenv("SANDBOX_PROXY_CLIENT_SECRET"),
 		AnthropicKey:             os.Getenv("ANTHROPIC_API_KEY"),
 		OpenAIKey:                os.Getenv("OPENAI_API_KEY"),
 	}
 	cfg.Enabled = cfg.AuthInstallationTokenURL != "" &&
-		cfg.AuthServiceToken != "" &&
+		cfg.AuthURL != "" && cfg.ClientID != "" && cfg.ClientSecret != "" &&
 		(cfg.AnthropicKey != "" || cfg.OpenAIKey != "")
 	return cfg
 }
@@ -63,6 +72,10 @@ func LoadSandboxProxyConfig() SandboxProxyConfig {
 type SandboxProxy struct {
 	Cfg    SandboxProxyConfig
 	Client *http.Client
+	// Tokens hands out wallfacer's own service token for the issuer's
+	// installation-token endpoint, minted through client_credentials and
+	// reused until it nears expiry. Tests substitute a fixed source.
+	Tokens TokenSource
 	// Validator validates the inbound sandbox JWT. The JWT is issued
 	// by auth with aud=wallfacer-sandbox-proxy; we additionally
 	// require one of scp=llm:proxy / scp=github:token per route. Nil
@@ -71,13 +84,23 @@ type SandboxProxy struct {
 	Validator *jwt.Validator
 }
 
+// TokenSource is what hands the proxy its own credential per call.
+type TokenSource interface {
+	Token(ctx context.Context) (string, error)
+}
+
 // NewSandboxProxy constructs a trust-plane proxy from config and a
 // JWT validator. A nil validator does not skip JWT checks: an enabled
 // proxy without a validator rejects every request (fail closed).
 // Local runs without credentials keep cfg.Enabled false and 503
 // before any JWT check.
 func NewSandboxProxy(cfg SandboxProxyConfig, v *jwt.Validator) *SandboxProxy {
+	var tokens TokenSource
+	if cfg.ClientID != "" && cfg.ClientSecret != "" && cfg.AuthURL != "" {
+		tokens = oidc.NewServiceTokenSource(cfg.AuthURL, cfg.ClientID, cfg.ClientSecret, "", []string{"github:mint-token"})
+	}
 	return &SandboxProxy{
+		Tokens:    tokens,
 		Cfg:       cfg,
 		Client:    &http.Client{Timeout: 5 * time.Minute, Transport: otel.Transport(nil)},
 		Validator: v,
@@ -185,7 +208,16 @@ func (p *SandboxProxy) GitHubToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	req.Header.Set("Authorization", "Bearer "+p.Cfg.AuthServiceToken)
+	if p.Tokens == nil {
+		http.Error(w, "sandbox proxy has no service credential", http.StatusServiceUnavailable)
+		return
+	}
+	serviceToken, err := p.Tokens.Token(r.Context())
+	if err != nil {
+		http.Error(w, "service token: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+serviceToken)
 
 	resp, err := p.Client.Do(req)
 	if err != nil {
