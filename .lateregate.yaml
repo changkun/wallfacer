@@ -88,7 +88,8 @@ waive:
 
 # The identity shape of the family: specs/infrastructure/identity.md in latere-ai/specs
 identity:
-  role: bff
+  role: service
+  audience: wallfacer
   waive:
     verifier:
       until: 2026-11-30
