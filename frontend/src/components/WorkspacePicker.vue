@@ -257,7 +257,7 @@ function onKey(e: KeyboardEvent) {
           </h3>
           <p class="dialog-sub">
             <template v-if="view === 'list'">Click a workspace to switch the board to it. Editing folders never loses history.</template>
-            <template v-else-if="step === 1">Pick the project folders this workspace spans. Each one appears in the list below.</template>
+            <template v-else-if="step === 1">A workspace groups project folders on one task board. Agents read and edit these folders when tasks run. Choose a folder, then name and activate the workspace to open its board.</template>
             <template v-else>Name this workspace and review its folders. The name is stable across folder edits.</template>
           </p>
         </div>

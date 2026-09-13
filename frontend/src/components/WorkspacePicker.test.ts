@@ -97,6 +97,14 @@ describe('WorkspacePicker wizard', () => {
     host = null;
   });
 
+  it('explains what a workspace contains and what activating it does', async () => {
+    ({ app, host } = await mountOpen());
+    const explanation = host!.querySelector('.dialog-sub')!.textContent;
+    expect(explanation).toContain('A workspace groups project folders');
+    expect(explanation).toContain('task board');
+    expect(explanation).toMatch(/agents/i);
+  });
+
   it('opens the browser at the home directory (empty path), not filesystem root', async () => {
     ({ app, host } = await mountOpen());
     const browse = apiCalls.find((c) => c.path.startsWith('/api/workspaces/browse'));
