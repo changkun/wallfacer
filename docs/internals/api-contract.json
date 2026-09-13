@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 133,
+  "route_count": 134,
   "routes": [
     {
       "method": "GET",
@@ -887,6 +887,15 @@
       "pattern": "/api/tasks/{id}/trace",
       "name": "TaskTrace",
       "description": "Read the agent-graph trace (nodes + edges) of an agentic-flow run.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/commits",
+      "name": "TaskCommits",
+      "description": "Read preserved task commits and patches across feedback turns and retries.",
       "tags": [
         "tasks"
       ]

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TaskCommitHistory from './TaskCommitHistory.vue';
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { api } from '../api/client';
 import { useTaskActivity } from '../composables/useTaskActivity';
@@ -110,6 +111,7 @@ const diffFiles = ref<DiffFile[]>([]);
 const diffHighlights = computed<(HighlightedDiffLine[] | null)[]>(
   () => diffFiles.value.map((f) => highlightDiffFile(f)),
 );
+const commitRefreshKey = ref(0);
 const diffLoading = ref(false);
 const diffError = ref('');
 const diffFetched = ref(false);
@@ -130,6 +132,7 @@ async function fetchDiff() {
     diffFiles.value = parseDiffFiles(data?.diff || '');
     behindCounts.value = data?.behind_counts || {};
     diffFetched.value = true;
+    commitRefreshKey.value++;
   } catch (e) {
     diffError.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -1276,6 +1279,7 @@ async function submitReview() {
 
                 <!-- CHANGES (diff) tab -->
                 <div ref="changesEl" data-main-tab-section="changes">
+                  <TaskCommitHistory :task-id="task.id" :active="mainTab === 'changes'" :refresh-key="commitRefreshKey" />
                   <div v-if="diffLoading" class="text-xs text-v-muted">Loading diff…</div>
                   <div v-else-if="diffError" class="text-xs text-v-muted">Could not load diff: {{ diffError }}</div>
                   <template v-else>

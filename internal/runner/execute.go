@@ -451,6 +451,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if saveErr := r.taskStore(taskID).SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
 			logger.Runner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
+		if captureErr := r.captureTaskCommits(bgCtx, taskID, turns, worktreePaths); captureErr != nil {
+			r.failCommitHistory(bgCtx, taskID, captureErr)
+			statusSet = true
+			return
+		}
+
 		if len(rawStderr) > 0 {
 			stderrFile := fmt.Sprintf("turn-%04d.stderr.txt", turns)
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{

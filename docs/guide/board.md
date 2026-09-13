@@ -134,10 +134,24 @@ Click any card to open the detail view. A left rail carries the header (status, 
 |---|---|
 | **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy), the agent trace graph, and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
-| **Changes** | Per-file git diff of the worktree against the default branch, with a commits-behind warning. |
+| **Changes** | Task commits with expandable patches, followed by the aggregate diff and a commits-behind warning. |
 | **Verification** | The Review panel and the test agent's per-turn results. |
 | **Events** | The event audit trail grouped by type, usage statistics, per-agent usage, retry history, and prompt history. |
 | **Timeline** | Execution spans rendered as a flamegraph with a time axis, an optional cumulative-cost overlay, and a span table sorted by duration. |
+
+### Commit history
+
+The **Task commits** list records commits across feedback turns and retries.
+Each entry shows its repository, hash, subject, author, date, execution attempt,
+and first observed turn. Expand an entry to read its patch. The list refreshes
+while the Changes tab is open and remains available after worktree cleanup or
+an agent amends a previously recorded commit.
+
+Uncommitted edits remain in the aggregate diff below the list. Existing tasks
+whose worktrees were removed before commit-history capture was introduced can
+have no recorded entries. Patch previews are limited to 2 MiB per commit, with
+an explicit notice when truncated. A history-storage failure keeps the worktree
+and marks the task failed so it can be retried after storage is repaired.
 
 ### Inline diff comments
 

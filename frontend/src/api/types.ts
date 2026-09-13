@@ -374,3 +374,15 @@ export interface SandboxTestResponse {
   stop_reason?: string;
   reauth_available?: boolean;
 }
+
+export interface TaskCommit {
+ repository: string;
+ hash: string;
+ subject: string;
+ author: string;
+ authored_at: string;
+ attempt: number;
+ turn: number;
+ patch: string;
+ patch_truncated?: boolean;
+}

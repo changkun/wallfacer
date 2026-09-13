@@ -66,7 +66,7 @@ func (r *Runner) commit(
 	ctx context.Context,
 	taskID uuid.UUID,
 	sessionID string,
-	_ int,
+	turn int,
 	worktreePaths map[string]string,
 	branchName string,
 ) error {
@@ -102,6 +102,11 @@ func (r *Runner) commit(
 			"error": eventMessage,
 		})
 		return fmt.Errorf("stage and commit: %w", stageErr)
+	}
+
+	if err := r.captureTaskCommits(ctx, taskID, turn, worktreePaths); err != nil {
+		r.failCommitHistory(bgCtx, taskID, err)
+		return err
 	}
 
 	// Phase 2: host-side rebase and merge for each git worktree.

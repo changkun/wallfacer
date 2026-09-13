@@ -260,6 +260,11 @@ func TestRun_NativeToposHarnessCommitsWorktreeEdits(t *testing.T) {
 	if len(updated.CommitHashes) == 0 {
 		t.Error("no commit hashes were recorded on the task")
 	}
+	commits, err := s.GetTaskCommits(task.ID)
+	if err != nil || len(commits) == 0 {
+		t.Fatalf("native execution lost commit history: %v", err)
+	}
+
 }
 
 func TestRun_AgenticFlowCommitsWorktreeEdits(t *testing.T) {

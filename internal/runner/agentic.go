@@ -224,6 +224,10 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 	res, err := runFn(ctx, onEvent)
 	close(traceCh)
 	<-traceDone
+	if captureErr := r.captureTaskCommits(bgCtx, taskID, task.Turns+1, nil); captureErr != nil {
+		r.failCommitHistory(bgCtx, taskID, captureErr)
+		return
+	}
 	if err != nil {
 		if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 			return

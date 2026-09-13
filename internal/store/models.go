@@ -256,9 +256,11 @@ type Task struct {
 	// verification agent (and review critics). When non-empty it renders into the
 	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
 	// a hard gate. omitempty keeps existing task.json files deserializing clean.
-	Criteria          string              `json:"criteria,omitempty"`
-	PromptHistory     []string            `json:"prompt_history,omitempty"`
-	RetryHistory      []RetryRecord       `json:"retry_history,omitempty"`
+	Criteria      string        `json:"criteria,omitempty"`
+	PromptHistory []string      `json:"prompt_history,omitempty"`
+	RetryHistory  []RetryRecord `json:"retry_history,omitempty"`
+	// ExecutionAttempt survives pruning of older retry records. Zero uses the legacy history length.
+	ExecutionAttempt  int                 `json:"execution_attempt,omitempty"`
 	RefineSessions    []RefinementSession `json:"refine_sessions,omitempty"`
 	CurrentRefinement *RefinementJob      `json:"current_refinement,omitempty"`
 	Status            TaskStatus          `json:"status"`

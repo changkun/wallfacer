@@ -572,6 +572,11 @@ var Routes = []Route{
 	},
 
 	{
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/commits", Name: "TaskCommits",
+		Description: "Read preserved task commits and patches across feedback turns and retries.",
+		Tags:        []string{"tasks"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/diff", Name: "TaskDiff",
 		Description: "Git diff of task worktrees versus the default branch.",
 		Tags:        []string{"tasks"},

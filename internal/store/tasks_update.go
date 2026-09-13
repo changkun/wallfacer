@@ -489,6 +489,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	// Snapshot FailureCategory before clearing it so the RetryRecord captures
 	// the cause of the lifecycle being retired.
 	retiredCategory := t.FailureCategory
+	t.ExecutionAttempt = t.CurrentAttempt() + 1
 	t.RetryHistory = append(t.RetryHistory, RetryRecord{
 		RetiredAt:       time.Now(),
 		Prompt:          t.Prompt,
