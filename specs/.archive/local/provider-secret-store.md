@@ -1,6 +1,6 @@
 ---
 title: Provider credentials in the system keyring
-status: drafted
+status: complete
 depends_on: []
 affects:
   - internal/envconfig/
@@ -24,7 +24,7 @@ into the operating system keyring. Existing file-based and headless deployments
 remain supported. Enabling keyring storage is explicit and never falls back to
 plaintext when the keyring is unavailable.
 
-## Current state
+## Before implementation
 
 `envconfig.Update` writes credentials directly into `.env`. `Parse`, `ReadRaw`,
 host execution, and native Topos consume those values. Settings smoke tests copy
@@ -64,3 +64,19 @@ the file and apply temporary overrides. OAuth completion also calls `Update`.
 
 Related acquisition and GitHub-token specs retain their existing ownership;
 neither is a prerequisite for this local provider-storage feature.
+
+## Outcome
+
+Implemented in `aef09a19` with character-preserving file migration hardened in
+`a488c37e`. Settings exposes file and keyring storage, the shared readers resolve
+provider bundles for native and subprocess execution, and unavailable storage
+prevents launch. Staged bundles and temporary test copies preserve the active
+configuration on failure.
+
+Regression tests cover plaintext removal, duplicate/exported entries, failures,
+concurrent updates, independent smoke-test credentials, masking, startup cloud
+authentication, launch-time refresh, and special-character round trips. The
+`envconfig` package passes the race detector with 91.7% statement coverage.
+The browser test selects keyring storage and verifies a visible save failure.
+Native operating-system prompts use the platform adapter and were not exercised
+in automated tests.

@@ -153,8 +153,6 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [provider-secret-store.md](local/provider-secret-store.md) | Drafted | Move provider credentials into the operating system keyring with explicit migration and no plaintext fallback. |
-| [task-commit-history.md](local/task-commit-history.md) | Drafted | Preserve and inspect commits across feedback turns and worktree cleanup. |
 | [chat-model-transparency.md](local/chat-model-transparency.md) | Drafted | Surface the observed harness model in the chat window — a session-level header badge ("Claude · Opus 4.8") from the system-init line plus a per-turn chip on assistant messages whose `message.model` differs from the session primary (sub-agents, fallbacks) — and fix task provenance to record the observed model from the init event instead of the often-empty requested one (`(unknown)` → real model). Adds `harness.Event.Model` (Claude only). |
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Stale | Drag-and-drop file and image attachments for task prompts; worktree `.attachments/` staging + Read tool. Supersedes the archived file-attachments. Marked stale in the June review; needs a refresh pass against the Vue + host-executor surface before dispatch. |
 | [inline-file-panel.md](.archive/local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
@@ -408,6 +406,8 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 
 | Spec | Delivers |
 |------|----------|
+| [provider-secret-store.md](.archive/local/provider-secret-store.md) | Provider credentials in the system keyring, explicit migration, safe temporary tests, and launch-time resolution without plaintext fallback. |
+| [task-commit-history.md](.archive/local/task-commit-history.md) | Durable commit metadata and patches across feedback turns, retries, native execution, and worktree cleanup, with a live Changes list. |
 | [desktop-app.md](.archive/local/desktop-app.md) | Wails native wrapper, archived, code removed 2026-06-14 |
 | [terminal-sessions.md](.archive/local/terminal-sessions.md) | Multiple concurrent terminal sessions with tab bar |
 | [terminal-container-exec.md](.archive/local/terminal-container-exec.md) | Attach to running task containers from the terminal panel |
