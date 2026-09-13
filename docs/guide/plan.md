@@ -10,6 +10,11 @@ With specs present, Plan shows three surfaces: the **spec explorer** (file tree)
 
 A workspace with no specs and no roadmap opens in a **chat-first** layout instead: a single centered chat panel invites free-form planning, with `/create <title>` as the path to the first spec. The layout flips to three-pane automatically as soon as a spec appears (the tree updates over a live stream). The chat engine is identical to the dedicated [Chat](chat.md) surface, including the twelve slash commands; Plan adds the spec tree and the focused-spec context that gives those commands a target.
 
+Chat launch failures, interrupted agent processes, and provider errors appear
+in the conversation and remain available after reload. A launch or credential
+failure points to the selected harness and credential settings instead of
+leaving an empty reply.
+
 ## Spec document model
 
 A spec is a markdown file under `specs/` with YAML frontmatter. The tree in the explorer is derived from the filesystem: top-level directories under `specs/` are *tracks*, and a file with a same-named sibling directory is a non-leaf spec whose children live inside that directory. When `specs/README.md` exists, the explorer pins a **Roadmap** entry at the top that renders it as a plain document with no lifecycle.

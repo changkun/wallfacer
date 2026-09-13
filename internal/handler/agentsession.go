@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -480,6 +481,8 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		handle, err := h.agentSession.Exec(context.Background(), cmd, sb)
 		if err != nil {
 			slog.Error("agent exec failed", "error", err)
+			raw := writeAgentFailure(ll, "agent_launch_failed", "The agent could not start. Check the selected harness and credentials in Settings.", err.Error())
+			persistAgentFailure(cs, raw, req.FocusedSpec, focusedTaskID)
 			return
 		}
 
@@ -487,14 +490,13 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		tee := io.TeeReader(handle.Stdout(), ll)
 		rawStdout, _ := io.ReadAll(tee)
 		stderr, _ := io.ReadAll(handle.Stderr())
-		// A non-zero exit (crash, OOM, expired credentials) otherwise looks
-		// exactly like a clean run: the code carries on and parses whatever
-		// partial stdout arrived. Logging the status with a bounded stderr
-		// excerpt makes the difference visible. Control flow is unchanged - the
-		// parse below still handles a truncated stream on its own.
+		// Non-zero exits must not become blank or apparently successful replies.
 		if code, err := handle.Wait(); err != nil || code != 0 {
 			slog.Error("agent exited non-zero", "code", code, "error", err,
 				"stderr", sanitize.Truncate(string(stderr), agentStderrLogRunes))
+			if !agentsession.IsErrorResult(rawStdout) {
+				rawStdout = append(rawStdout, writeAgentFailure(ll, "agent_exit_failed", "The agent stopped before completing its reply. Check harness credentials in Settings and try again.", fmt.Sprintf("exit code %d: %v", code, err))...)
+			}
 		}
 
 		// Extract session ID and save for future --resume calls.
@@ -536,6 +538,8 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			retryHandle, retryErr := h.agentSession.Exec(context.Background(), retryCmd, sb)
 			if retryErr != nil {
 				slog.Error("agent retry exec failed", "error", retryErr)
+				raw := writeAgentFailure(ll2, "agent_launch_failed", "The agent could not start. Check the selected harness and credentials in Settings.", retryErr.Error())
+				persistAgentFailure(cs, raw, req.FocusedSpec, focusedTaskID)
 				return
 			}
 			retryTee := io.TeeReader(retryHandle.Stdout(), ll2)
@@ -544,6 +548,9 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			if code, err := retryHandle.Wait(); err != nil || code != 0 {
 				slog.Error("agent retry exited non-zero", "code", code, "error", err,
 					"stderr", sanitize.Truncate(string(retryStderr), agentStderrLogRunes))
+				if !agentsession.IsErrorResult(rawStdout) {
+					rawStdout = append(rawStdout, writeAgentFailure(ll2, "agent_exit_failed", "The agent stopped before completing its reply. Check harness credentials in Settings and try again.", fmt.Sprintf("exit code %d: %v", code, err))...)
+				}
 			}
 			h.agentSession.CloseLiveLog()
 
@@ -561,6 +568,11 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 					FocusedTask: pinned2.FocusedTask,
 				})
 			}
+		}
+
+		if agentsession.IsErrorResult(rawStdout) {
+			persistAgentFailure(cs, rawStdout, req.FocusedSpec, focusedTaskID)
+			return
 		}
 
 		// Persist round usage before building the assistant message so the
