@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.2.0 - 2026-09-13
+
 ### Changed
 
 - The sandbox proxy presents wallfacer's own service token at the issuer's
