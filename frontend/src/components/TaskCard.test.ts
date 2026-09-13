@@ -32,6 +32,12 @@ async function mountCard(t: Task, rank?: number) {
 }
 
 describe('TaskCard', () => {
+  it('shows title generation without hiding the task prompt', async () => {
+    const { host, app } = await mountCard(task({ title: '', title_generating: true } as Partial<Task>));
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Generating title');
+    expect(host.textContent).toContain('Show a badge');
+    app.unmount(); host.remove();
+  });
   it('renders one state pill and at most one qualifier', async () => {
     const { host, app } = await mountCard(task({ status: 'failed', last_test_result: 'fail', failure_category: 'agent_error', session_id: 's' }));
     expect(host.querySelector('[data-role="state"]')!.classList.contains('pill-err')).toBe(true);

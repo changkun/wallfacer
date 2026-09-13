@@ -161,6 +161,14 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	return nil
 }
 
+// UpdateTaskTitleGenerating publishes whether a title agent is running.
+func (s *Store) UpdateTaskTitleGenerating(_ context.Context, id uuid.UUID, generating bool) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.TitleGenerating = generating
+		return nil
+	})
+}
+
 // UpdateTaskTitle sets a task's display title.
 func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) error {
 	// Compute the lowercased title before acquiring the lock so that the

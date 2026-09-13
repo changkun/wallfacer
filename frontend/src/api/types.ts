@@ -117,6 +117,7 @@ export interface TaskUsage {
 export interface Task {
   id: string;
   title: string;
+  title_generating?: boolean;
   prompt: string;
   criteria?: string;
   status: TaskStatus;

@@ -466,6 +466,9 @@ function onCardKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Row 2: title -->
+    <div v-if="props.task.title_generating" class="task-card__title" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span> Generating title…
+    </div>
     <div v-if="props.task.title" class="task-card__title" :title="props.task.title" v-html="titleHtml"></div>
 
     <!-- Row 3: the meta line. priority · impact · labels · provenance · the

@@ -8,6 +8,29 @@ import (
 	"latere.ai/x/pkg/pubsub"
 )
 
+func TestTitleGenerationDoesNotSurviveRestart(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTaskWithOptions(t.Context(), TaskCreateOptions{Prompt: "Name this task"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskTitleGenerating(t.Context(), task.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := NewFileStore(s.DataDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	got, err := reopened.GetTask(t.Context(), task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TitleGenerating {
+		t.Fatal("restarted task still claims a title agent is running")
+	}
+}
+
 func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
 	s := newTestStore(t)
 	id, ch := s.Subscribe()

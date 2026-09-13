@@ -217,6 +217,8 @@ func (s *Store) loadAll() error {
 	}
 
 	for _, task := range allTasks {
+		// Title agents do not survive a server restart.
+		task.TitleGenerating = false
 		id := task.ID
 
 		// Check for a tombstone marker; if present this task is soft-deleted.

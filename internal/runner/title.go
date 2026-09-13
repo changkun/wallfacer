@@ -37,6 +37,15 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	if task.Title != "" {
 		return
 	}
+	if err := r.taskStore(taskID).UpdateTaskTitleGenerating(r.shutdownCtx, taskID, true); err != nil {
+		logger.Runner.Warn("title generation: publish start failed", "task", taskID, "error", err)
+		return
+	}
+	defer func() {
+		if err := r.taskStore(taskID).UpdateTaskTitleGenerating(r.shutdownCtx, taskID, false); err != nil {
+			logger.Runner.Warn("title generation: publish finish failed", "task", taskID, "error", err)
+		}
+	}()
 
 	titlePrompt := r.promptsMgr.Title(prompt)
 	res, err := r.runAgent(r.shutdownCtx, agents.Title, task, titlePrompt, runAgentOpts{

@@ -581,6 +581,39 @@ func TestRunContainerRegistersHandleForKill(t *testing.T) {
 
 const titleOutput = `{"result":"Fix Login Bug","session_id":"sess1","stop_reason":"end_turn","is_error":false}`
 
+func TestGenerateTitlePublishesLoadingState(t *testing.T) {
+	for _, output := range []string{titleOutput, ""} {
+		t.Run(output, func(t *testing.T) {
+			s, r := setupRunnerWithCmd(t, nil, fakeCmdScript(t, output, 0))
+			task, err := s.CreateTaskWithOptions(t.Context(), store.TaskCreateOptions{Prompt: "Fix login", Timeout: 5})
+			if err != nil {
+				t.Fatal(err)
+			}
+			id, changes := s.Subscribe()
+			defer s.Unsubscribe(id)
+			r.GenerateTitle(task.ID, task.Prompt)
+			started := false
+			for {
+				select {
+				case change := <-changes:
+					raw, _ := json.Marshal(change)
+					started = started || strings.Contains(string(raw), `"title_generating":true`)
+				default:
+					if !started {
+						t.Fatal("title generation never published its loading state")
+					}
+					final, _ := s.GetTask(t.Context(), task.ID)
+					raw, _ := json.Marshal(final)
+					if strings.Contains(string(raw), `"title_generating":true`) {
+						t.Fatal("title generation stayed busy after completion")
+					}
+					return
+				}
+			}
+		})
+	}
+}
+
 // TestGenerateTitleSuccess verifies that a valid container output sets the
 // task title.
 func TestGenerateTitleSuccess(t *testing.T) {
