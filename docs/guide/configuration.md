@@ -34,6 +34,27 @@ The **Global Harness Routing** section selects the default harness (`WALLFACER_D
 
 Tasks run as host processes with the account's full permissions; the tab shows this warning while active. Run Wallfacer only on trusted machines.
 
+#### Organization connectors in Claude
+
+Wallfacer runs the installed Claude CLI with its normal home and configuration.
+For claude.ai organization connectors, open `claude` in a terminal, use `/login`
+to sign in with the subscription account, and confirm the connections in `/mcp`.
+Remove `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_AUTH_TOKEN`
+from the Wallfacer environment when choosing that login method. API keys and
+tokens from `claude setup-token` do not grant connector discovery. Organization
+tool restrictions still apply. See [Claude's connector authentication guide](https://code.claude.com/docs/en/mcp#use-mcp-servers-from-claudeai).
+
+#### Ollama and OpenRouter
+
+Select **OpenCode** as the task harness to use providers configured in the local
+OpenCode CLI. For local models, configure the Ollama provider in OpenCode and
+verify it there first; [Ollama's OpenCode setup](https://docs.ollama.com/integrations/opencode)
+describes the connection. For OpenRouter, run `opencode auth login`, choose
+OpenRouter, and select a provider model using
+[OpenRouter's OpenCode setup](https://openrouter.ai/docs/cookbook/coding-agents/opencode-integration).
+Use the configured default or enter its provider/model identifier on the task.
+Wallfacer passes the model through to OpenCode.
+
 ### GitHub tab
 
 Shows the GitHub connection state. Wallfacer does not run its own GitHub OAuth flow; the connection is borrowed from the signed-in latere.ai account:

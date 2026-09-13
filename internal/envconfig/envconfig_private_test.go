@@ -2,6 +2,7 @@ package envconfig
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -9,6 +10,27 @@ import (
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
 )
+
+func TestLegacyPlaceholderDoesNotOverrideNativeClaudeLogin(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte("export CLAUDE_CODE_OAUTH_TOKEN='your-oauth-token-here' # old template\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Parse(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OAuthToken != "" {
+		t.Fatal("legacy placeholder was treated as a credential")
+	}
+	raw, err := ReadRaw(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := raw["CLAUDE_CODE_OAUTH_TOKEN"]; exists {
+		t.Fatal("legacy placeholder would be passed to the host harness")
+	}
+}
 
 // TestKnownKeysIncludesHostPiBinary verifies WALLFACER_HOST_PI_BINARY is in the
 // managed-keys allowlist so Update round-trips it.

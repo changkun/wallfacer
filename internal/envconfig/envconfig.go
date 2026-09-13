@@ -378,7 +378,11 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 
 	k = strings.TrimSpace(k)
 	v = strings.TrimSpace(stripEnvInlineComment(v))
-	return k, unquote(v), true
+	v = unquote(v)
+	if k == "CLAUDE_CODE_OAUTH_TOKEN" && v == "your-oauth-token-here" {
+		return "", "", false
+	}
+	return k, v, true
 }
 
 // stripEnvInlineComment removes a trailing # comment from a value string,

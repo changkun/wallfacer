@@ -54,8 +54,9 @@ func initConfigDir(configDir, envFile string) {
 		content := "# =============================================================================\n" +
 			"# Claude Code sandbox (default)\n" +
 			"# =============================================================================\n\n" +
-			"# Authentication: set ONE of the two variables below.\n" +
-			"CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here\n" +
+			"# Authentication: use native Claude login, or set ONE variable below.\n" +
+			"# Native subscription login is required for claude.ai connectors.\n" +
+			"# CLAUDE_CODE_OAUTH_TOKEN=\n" +
 			"# ANTHROPIC_API_KEY=sk-ant-...\n\n" +
 			"# Optional: custom Anthropic-compatible API base URL.\n" +
 			"# ANTHROPIC_BASE_URL=https://api.anthropic.com\n\n" +
