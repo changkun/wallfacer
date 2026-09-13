@@ -102,6 +102,14 @@ function stpWidth(host: HTMLElement): string {
 }
 
 describe('PlanPage sidebar resize', () => {
+  it('explains the purpose and first action when no specs exist', async () => {
+    const { host, app } = await mountPage();
+    useAgentStore().applyTree({ nodes: [], index: null, progress: {} });
+    await nextTick();
+    expect(host.textContent).toContain('Turn an idea into executable tasks');
+    expect(host.textContent).toContain('/create');
+    app.unmount();
+  });
   beforeEach(() => {
     localStorage.removeItem('wallfacer-spec-sidebar-width');
     localStorage.removeItem('wallfacer-spec-tree-collapsed');

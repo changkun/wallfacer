@@ -20,6 +20,7 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import SpecFocusedView from './SpecFocusedView.vue';
 import { useAgentStore } from '../../stores/agentSession';
+import { useTaskStore } from '../../stores/tasks';
 
 // vi.hoisted so the spy exists when the hoisted vi.mock factory runs.
 const { enhanceMermaid } = vi.hoisted(() => ({ enhanceMermaid: vi.fn() }));
@@ -27,6 +28,7 @@ vi.mock('../../lib/mermaidRender', () => ({
   enhanceMermaid,
   watchThemeReinit: vi.fn(),
 }));
+vi.mock('./SpecCommentsLayer.vue', () => ({ default: { template: '<div />' } }));
 
 const PROMPT = 'Intro paragraph.\n\n```mermaid\ngraph TD; A-->B;\n```\n';
 
@@ -59,6 +61,7 @@ describe('SpecFocusedView mermaid rendering', () => {
     app?.unmount();
     app = null;
     el.remove();
+    vi.unstubAllGlobals();
   });
 
   it('enhances mermaid placeholders already rendered at mount', async () => {
@@ -82,5 +85,28 @@ describe('SpecFocusedView mermaid rendering', () => {
     const container = enhanceMermaid.mock.calls[0][0] as HTMLElement;
     expect(container).toBeTruthy();
     expect(container.querySelector('.mermaid-block')).toBeTruthy();
+  });
+
+  it.each([
+    ['vague', true, 'Describe the intended behavior'],
+    ['drafted', true, 'choose Validate'],
+    ['validated', true, 'choose Dispatch'],
+    ['drafted', false, 'Break Down'],
+    ['testing', true, 'verification'],
+    ['stale', true, 'Reopen as Draft'],
+    ['complete', true, 'Archive'],
+    ['archived', true, 'read-only'],
+  ])('explains the next action for %s specs', async (status, isLeaf, expected) => {
+    useTaskStore().config = { workspaces: ['/tmp/ws'] } as never;
+    const agentStore = useAgentStore();
+    agentStore.applyTree({ nodes: [{ path: 'specs/example.md', is_leaf: isLeaf, spec: { title: 'Example', status } } as never], index: null, progress: {} });
+    agentStore.focusedSpecPath = 'specs/example.md';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`---\ntitle: Example\nstatus: ${status}\n---\nExample scope.\n`)));
+    await router.push('/');
+    await router.isReady();
+    app = createApp(SpecFocusedView, { chatVisible: true });
+    app.use(router); app.use(pinia); app.mount(el);
+    await flushUntil(() => el.textContent?.includes('Example scope.') === true);
+    expect(el.querySelector('.spec-next-step')?.textContent).toContain(expected);
   });
 });

@@ -325,15 +325,23 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
     <!-- Chat-first: no specs yet, the full-width panel covers the workspace.
          Gated on the layout directly (not v-else) so deactivating the
          three-pane popup above doesn't pull this panel into the spec view. -->
-    <AgentChatPanel
-      v-if="layout === 'chat-first'"
-      :visible="true"
-      class="chat-first"
-    />
+    <section v-if="layout === 'chat-first'" class="plan-start">
+      <div class="plan-intro">
+        <h1>Turn an idea into executable tasks</h1>
+        <p>Plan captures the intended behavior and acceptance criteria in specs before agents change code.</p>
+        <p>Describe an idea in the chat below, then use <code>/create</code> to draft a spec. Review it, choose Validate, and Dispatch it to the task board when it is ready.</p>
+      </div>
+      <AgentChatPanel :visible="true" class="chat-first" />
+    </section>
   </div>
 </template>
 
 <style scoped>
+.plan-start { display: flex; flex-direction: column; min-height: 0; width: 100%; max-width: 720px; }
+.plan-intro { padding: 24px; border-bottom: 1px solid var(--rule); }
+.plan-intro h1 { font-size: 20px; margin: 0 0 12px; }
+.plan-intro p { font-size: 13px; color: var(--ink-2); margin: 8px 0 0; }
+.plan-start :deep(.agent-chat-panel) { flex: 1; min-height: 0; }
 .plan-page {
   display: flex;
   height: 100%;

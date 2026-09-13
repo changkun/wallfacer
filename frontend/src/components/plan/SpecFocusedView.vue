@@ -172,6 +172,18 @@ const dispatchedTaskId = computed(() => {
   const raw = parsed.value.frontmatter.dispatched_task_id;
   return raw && raw !== 'null' ? raw : '';
 });
+const nextStep = computed(() => {
+  if (status.value === 'archived') return 'This spec is read-only. Choose Unarchive to resume planning.';
+  if (status.value === 'complete') return 'Review the completed work, then choose Archive when this spec is no longer needed.';
+  if (status.value === 'stale') return 'Choose Reopen as Draft, update the design, then validate it again.';
+  if (status.value === 'testing') return 'Check verification on the linked task before completing this spec.';
+  if (dispatchedTaskId.value) return 'Open the linked task to start work or review agent progress.';
+  if (status.value === 'vague') return 'Describe the intended behavior and acceptance criteria in Chat to draft this spec.';
+  if (!isLeaf.value) return 'Review the child specs. Use Break Down in Chat to split any remaining broad work into smaller specs.';
+  if (status.value === 'drafted') return 'Review the scope and acceptance criteria, then choose Validate.';
+  if (status.value === 'validated') return 'When dependencies are complete, choose Dispatch to create a task on the board.';
+  return 'Describe the change in Chat, review its spec, then validate and dispatch it to the board.';
+});
 function openDispatchedTask() {
   if (!dispatchedTaskId.value) return;
   void router.push({ path: '/', query: { task: dispatchedTaskId.value } });
@@ -602,6 +614,9 @@ defineExpose({ dispatchFocused, breakdownFocused });
     </header>
 
     <div v-if="metaParts" class="sf-meta">{{ metaParts }}</div>
+    <p v-if="focusedSpecPath && !focusedIsIndex && !focusedTaskId" class="spec-next-step" role="status">
+      <strong>Next:</strong> {{ nextStep }}
+    </p>
 
     <div v-if="dependsOn.length || affects.length" class="sf-relations">
       <div v-if="dependsOn.length" class="sf-rel-group">
@@ -729,6 +744,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
 </template>
 
 <style scoped>
+.spec-next-step { margin: 0; padding: 10px 24px; font-size: 12px; color: var(--ink-2); background: var(--bg-sunk); border-bottom: 1px solid var(--rule); }
 /* Focused-view crossfade (mirrors spec-mode.js _scheduleFocusedCrossfade). */
 .sf-crossfade-leave-active { transition: opacity 140ms ease-in; }
 .sf-crossfade-enter-active { transition: opacity 180ms var(--ease-fluid); }
