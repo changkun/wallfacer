@@ -218,3 +218,29 @@ func TestKeyringPreservesPasswordCharacters(t *testing.T) {
 		t.Fatal("host resolution changed password characters")
 	}
 }
+
+func TestCredentialStorageRoundTripPreservesSpecialCharacters(t *testing.T) {
+	for _, initialMode := range []string{"file", "keyring"} {
+		t.Run(initialMode, func(t *testing.T) {
+			path := secretFixture(t)
+			mode := initialMode
+			token := "  password # 'single' \"double\" \\path\nsecond line\t "
+			if err := Update(path, Updates{SecretStore: &mode, APIKey: &token}); err != nil {
+				t.Fatal(err)
+			}
+			for _, mode = range []string{"keyring", "file"} {
+				if err := Update(path, Updates{SecretStore: &mode}); err != nil {
+					t.Fatal(err)
+				}
+				cfg, err := Parse(path)
+				if err != nil || cfg.APIKey != token {
+					t.Fatalf("%s migration changed credential characters: %v", mode, err)
+				}
+				raw, err := ReadRaw(path)
+				if err != nil || raw["ANTHROPIC_API_KEY"] != token {
+					t.Fatalf("%s host reader changed credential characters: %v", mode, err)
+				}
+			}
+		})
+	}
+}

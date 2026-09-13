@@ -595,7 +595,7 @@ func renderUpdates(raw []byte, updates map[string]*string) []byte {
 			lines[i] = ""
 			blanked[i] = true
 		} else {
-			lines[i] = k + "=" + *ptr
+			lines[i] = k + "=" + quoteEnvValue(*ptr)
 		}
 	}
 
@@ -608,7 +608,7 @@ func renderUpdates(raw []byte, updates map[string]*string) []byte {
 		if seen[k] || ptr == nil || *ptr == "" {
 			continue
 		}
-		lines = append(lines, k+"="+*ptr)
+		lines = append(lines, k+"="+quoteEnvValue(*ptr))
 	}
 
 	// Drop only the lines blanked by the clear phase, then ensure a single
@@ -625,9 +625,24 @@ func renderUpdates(raw []byte, updates map[string]*string) []byte {
 	return []byte(content)
 }
 
-// unquote strips matching double or single quotes surrounding a value.
+// quoteEnvValue keeps simple tokens readable and encodes values that could be
+// parsed as comments, multiple lines, or quoted strings without changing them.
+func quoteEnvValue(v string) string {
+	if strings.ContainsAny(v, " \t\r\n#'\"\\") {
+		return strconv.Quote(v)
+	}
+	return v
+}
+
+// unquote decodes double-quoted values and strips literal single quotes.
+// Invalid escape sequences retain the historical literal parsing behavior.
 func unquote(v string) string {
 	if len(v) >= 2 {
+		if v[0] == '"' && v[len(v)-1] == '"' {
+			if decoded, err := strconv.Unquote(v); err == nil {
+				return decoded
+			}
+		}
 		if (v[0] == '"' && v[len(v)-1] == '"') || (v[0] == '\'' && v[len(v)-1] == '\'') {
 			return v[1 : len(v)-1]
 		}
