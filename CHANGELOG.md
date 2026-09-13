@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.3.0 - 2026-09-13
+
 ### Removed
 
 - The sandbox proxy's `GET /internal/sandbox-proxy/github-token` route, the
