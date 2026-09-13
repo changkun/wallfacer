@@ -30,6 +30,13 @@ fi
 echo "==> Seeding deterministic demo data"
 rm -rf "$HOME_DIR"   # fresh config home so migration + first-run are exercised
 node frontend/scripts/ui-shots/seed.mjs --data "$DATA" --home "$HOME_DIR" --ws "$WS" >/dev/null
+# The UI fixture exercises the server without depending on installed agent
+# CLIs or making model calls. Use the host backend's existing test double.
+go build -o "$HOME_DIR/fakeagent" ./internal/executor/testdata/fakeagent/main.go
+{
+  printf 'WALLFACER_HOST_CLAUDE_BINARY=%s\n' "$HOME_DIR/fakeagent"
+  printf 'WALLFACER_HOST_CODEX_BINARY=%s\n' "$HOME_DIR/fakeagent"
+} >> "$HOME_DIR/.wallfacer/.env"
 
 echo "==> Ensuring playwright sandbox at $PW"
 mkdir -p "$PW"
