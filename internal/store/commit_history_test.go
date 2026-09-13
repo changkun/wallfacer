@@ -109,11 +109,10 @@ func TestCommitHistoryAttemptSurvivesRetryPruning(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	reopened, err := NewFileStore(s.DataDir())
+	reopened, err := newTestFileStore(t, s.DataDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
 	updated, err := reopened.GetTask(bg(), task.ID)
 	if err != nil || updated.CurrentAttempt() != 5 || len(updated.RetryHistory) != 1 {
 		t.Fatal("attempt count followed pruned retry records")

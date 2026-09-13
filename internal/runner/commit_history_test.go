@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 func TestCommitPipelinePersistsCommitHistoryBeforeCleanup(t *testing.T) {
@@ -60,11 +61,10 @@ func TestCommitPipelinePersistsCommitHistoryBeforeCleanup(t *testing.T) {
 	if history[0].Turn != 1 || history[1].Turn != 2 {
 		t.Fatal("feedback turn attribution lost")
 	}
-	reopened, err := store.NewFileStore(s.DataDir())
+	reopened, err := storetest.NewFileStore(t, s.DataDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
 	persisted, err := TaskCommits(ctx, reopened, task.ID)
 	if err != nil || len(persisted) != 2 {
 		t.Fatalf("history unreadable after restart: %v", err)

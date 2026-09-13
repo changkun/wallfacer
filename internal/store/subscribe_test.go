@@ -17,11 +17,10 @@ func TestTitleGenerationDoesNotSurviveRestart(t *testing.T) {
 	if err := s.UpdateTaskTitleGenerating(t.Context(), task.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := NewFileStore(s.DataDir())
+	reopened, err := newTestFileStore(t, s.DataDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
 	got, err := reopened.GetTask(t.Context(), task.ID)
 	if err != nil {
 		t.Fatal(err)

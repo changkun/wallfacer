@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/gitutil"
+
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -3618,11 +3619,18 @@ func TestCreateTask_ReturnsSandboxBudgetAndScheduleInBody(t *testing.T) {
 	}
 }
 
+// Creation delta tests isolate the synchronous write from the title worker's
+// intentional start/finish notifications, covered by runner title tests.
+type creationOnlyRunner struct{ runner.Interface }
+
+func (creationOnlyRunner) GenerateTitleBackground(uuid.UUID, string) {}
+
 // TestCreateTask_EmitsOnlyOneDelta verifies that creating a fully configured
 // task (sandbox + budget + schedule) emits exactly one SSE delta, not one per
 // post-create update call.
 func TestCreateTask_EmitsOnlyOneDelta(t *testing.T) {
 	h := newTestHandler(t)
+	h.runner = creationOnlyRunner{h.runner}
 
 	subID, deltaCh := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)
@@ -3733,6 +3741,7 @@ func TestBatchCreateTasks_RejectsSandboxField(t *testing.T) {
 // emits exactly one SSE delta.
 func TestBatchCreateTasks_EmitsOneDeltaPerTask(t *testing.T) {
 	h := newTestHandler(t)
+	h.runner = creationOnlyRunner{h.runner}
 
 	subID, deltaCh := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)
