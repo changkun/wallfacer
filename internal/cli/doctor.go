@@ -54,14 +54,15 @@ func RunDoctor(configDir string, args []string) {
 
 	// --- .env file ---
 	vals, err := envconfig.ReadRaw(envFile)
-	if os.IsNotExist(err) {
+	switch {
+	case os.IsNotExist(err):
 		fmt.Printf("[!] Env file not found: %s\n", envFile)
 		fmt.Printf("    Run 'wallfacer run' once to auto-create it.\n")
 		issues++
-	} else if err != nil {
+	case err != nil:
 		fmt.Printf("[!] Cannot read env configuration: %v\n", err)
 		issues++
-	} else {
+	default:
 		fmt.Printf("[ok] Env file and credential storage readable\n")
 	}
 

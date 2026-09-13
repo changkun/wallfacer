@@ -376,10 +376,9 @@ func (b *HostBackend) buildChildEnv(spec ContainerSpec) ([]string, error) {
 		fromFile, err := envconfig.ReadRaw(spec.EnvFile)
 		if err != nil {
 			return nil, fmt.Errorf("host backend: read credentials: %w", err)
-		} else {
-			for k, v := range fromFile {
-				env = setEnv(env, k, v)
-			}
+		}
+		for k, v := range fromFile {
+			env = setEnv(env, k, v)
 		}
 	}
 	for k, v := range spec.Env {

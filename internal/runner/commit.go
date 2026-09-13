@@ -105,7 +105,8 @@ func (r *Runner) commit(
 	}
 
 	if err := r.captureTaskCommits(ctx, taskID, turn, worktreePaths); err != nil {
-		r.failCommitHistory(bgCtx, taskID, err)
+		// Keep request trace values while recording a failure after its deadline.
+		r.failCommitHistory(context.WithoutCancel(ctx), taskID, err)
 		return err
 	}
 

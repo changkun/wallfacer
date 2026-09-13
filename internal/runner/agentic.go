@@ -35,9 +35,8 @@ func (r *Runner) agenticModelConfig() (agentgraph.ModelConfig, error) {
 	if errors.Is(err, envconfig.ErrSecretStore) {
 		return agentgraph.ModelConfig{}, err
 	}
-	if err != nil {
-		return agentgraph.ModelConfig{}, nil
-	}
+	// Parse returns an empty Config on ordinary file errors. Those retain the
+	// existing no-credential development behavior; secret-store errors do not.
 	if cfg.APIKey == "" {
 		return agentgraph.ModelConfig{}, nil
 	}
