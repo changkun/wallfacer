@@ -244,19 +244,13 @@ func (p *SandboxProxy) requireClaims(w http.ResponseWriter, r *http.Request, sco
 	return claims, true
 }
 
-// proxyScopes decodes the scp claim from an already verified sandbox-proxy
-// token. The token carries wallfacer's own scope vocabulary, so it is read from
-// the verified payload into a local slice rather than off the family Identity,
-// which no longer carries a scope (identity rule R9). Validate checked the
-// signature above.
+// proxyScopes reads the scp claim from an already verified sandbox-proxy token.
+// The token carries wallfacer's own scope vocabulary, decoded from the verified
+// payload rather than off the family Identity, which carries no scope (identity
+// rule R9). Validate checked the signature above. The decode goes through the
+// one shared helper so the scp claim is read in a single place.
 func proxyScopes(raw string) []string {
-	var payload struct {
-		Scopes []string `json:"scp"`
-	}
-	if err := jwt.DecodePayload(raw, &payload); err != nil {
-		return nil
-	}
-	return payload.Scopes
+	return jwt.Scopes(raw)
 }
 
 // callerSub is the user a proxied call acts for. It used to resolve an RFC
