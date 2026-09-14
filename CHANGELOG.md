@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.4.0 - 2026-09-14
+
 ### Changed
 
 - Access is by role, not the retired flag (identity id-09, rule R9).
