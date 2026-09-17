@@ -90,4 +90,10 @@ waive:
 identity:
   role: service
   audience: wallfacer
+  # The module is wallfacer and the deployment runs
+  # ghcr.io/changkun/wallfacerd, built from the package main at the
+  # module root. The name the image was built under is neither a
+  # directory under cmd/ nor the module's last segment, so the audience
+  # and bearers rules are told it.
+  image: wallfacerd
   roles_only: true
