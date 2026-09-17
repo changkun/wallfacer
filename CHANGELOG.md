@@ -10,6 +10,17 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Changed
+
+- A release is cut only from a green build. The release command reads CI
+  before it runs the quality bar and refuses while the repository is red,
+  so a version whose build failed, or whose tag published no notes, does
+  not reach you as a release. The same bump puts this deployment's
+  audience back under check: the gate reads `AUTH_AUDIENCE` off the
+  deployment again, which it had stopped doing when the command moved to
+  the module root, so the audience wallfacer verifies is proved to be the
+  one it runs with.
+
 ## v0.4.0 - 2026-09-14
 
 ### Changed
