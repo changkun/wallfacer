@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -141,8 +142,8 @@ func TestExtractSnapshotToWorkspace(t *testing.T) {
 }
 
 // TestExtractSnapshotDoesNotLeakGitDir verifies that the .git directory from
-// the snapshot is not extracted to the target workspace. rsync excludes it;
-// the cp fallback removes it afterward.
+// the snapshot is not extracted to the target workspace. Both the rsync path
+// and the Go fallback exclude it from the copy.
 func TestExtractSnapshotDoesNotLeakGitDir(t *testing.T) {
 	snapshot := t.TempDir()
 	target := t.TempDir()
@@ -165,6 +166,136 @@ func TestExtractSnapshotDoesNotLeakGitDir(t *testing.T) {
 	// The main file must be present.
 	if _, err := os.Stat(filepath.Join(target, "app.txt")); err != nil {
 		t.Fatal("app.txt should be in target:", err)
+	}
+	// The snapshot .git must not have been copied.
+	if _, err := os.Stat(filepath.Join(target, ".git")); !os.IsNotExist(err) {
+		t.Fatalf("snapshot .git leaked into target: %v", err)
+	}
+}
+
+// TestExtractSnapshotKeepsWorkspaceGit pins the contract both branches of
+// extractSnapshotToWorkspace share: the workspace keeps its own .git, the
+// snapshot .git never lands, and .git entries nested in submodules or
+// vendored repositories are excluded too. The rsync case runs wherever rsync
+// exists, the fallback case runs everywhere by emptying PATH, so CI covers
+// both branches on every runner.
+func TestExtractSnapshotKeepsWorkspaceGit(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		noRsync bool
+	}{
+		{name: "rsync"},
+		{name: "go-fallback", noRsync: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.noRsync {
+				t.Setenv("PATH", t.TempDir()) // no rsync on PATH forces the Go fallback
+			} else if _, err := exec.LookPath("rsync"); err != nil {
+				t.Skip("rsync not installed")
+			}
+			snapshot := t.TempDir()
+			target := t.TempDir()
+
+			writeFile := func(path, content string) {
+				t.Helper()
+				if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// The workspace is a git repository of its own; this metadata is
+			// the user's, not the snapshot's, and must survive untouched.
+			writeFile(filepath.Join(target, ".git", "HEAD"), "ref: refs/heads/workspace")
+			writeFile(filepath.Join(target, ".git", "config"), "[core]\n\tbare = false\n")
+
+			// The snapshot carries the synthetic tracking repository, a
+			// vendored repository with a nested .git directory, and a
+			// submodule whose .git is a file rather than a directory.
+			writeFile(filepath.Join(snapshot, "app.txt"), "app\n")
+			writeFile(filepath.Join(snapshot, ".git", "HEAD"), "ref: refs/heads/snapshot")
+			writeFile(filepath.Join(snapshot, "vendor", "dep", "main.go"), "package dep\n")
+			writeFile(filepath.Join(snapshot, "vendor", "dep", ".git", "HEAD"), "ref: refs/heads/dep")
+			writeFile(filepath.Join(snapshot, "sub", "file.txt"), "sub\n")
+			writeFile(filepath.Join(snapshot, "sub", ".git"), "gitdir: ../.git/modules/sub\n")
+
+			if err := extractSnapshotToWorkspace(snapshot, target); err != nil {
+				t.Fatal("extractSnapshotToWorkspace:", err)
+			}
+
+			// The workspace .git is byte-identical and complete.
+			head, err := os.ReadFile(filepath.Join(target, ".git", "HEAD"))
+			if err != nil {
+				t.Fatal("workspace .git/HEAD removed:", err)
+			}
+			if string(head) != "ref: refs/heads/workspace" {
+				t.Fatalf("workspace .git/HEAD = %q, want the workspace ref", head)
+			}
+			if _, err := os.Stat(filepath.Join(target, ".git", "config")); err != nil {
+				t.Fatal("workspace .git/config removed:", err)
+			}
+
+			// Nothing named .git travelled from the snapshot, at any depth.
+			for _, rel := range []string{
+				filepath.Join("vendor", "dep", ".git"),
+				filepath.Join("sub", ".git"),
+			} {
+				if _, err := os.Stat(filepath.Join(target, rel)); !os.IsNotExist(err) {
+					t.Fatalf("snapshot %s leaked into target: %v", rel, err)
+				}
+			}
+
+			// Everything else copied.
+			for rel, want := range map[string]string{
+				"app.txt": "app\n",
+				filepath.Join("vendor", "dep", "main.go"): "package dep\n",
+				filepath.Join("sub", "file.txt"):          "sub\n",
+			} {
+				got, err := os.ReadFile(filepath.Join(target, rel))
+				if err != nil || string(got) != want {
+					t.Fatalf("%s = %q, %v; want %q", rel, got, err, want)
+				}
+			}
+		})
+	}
+}
+
+// TestCopySnapshotWithoutGitReplacesExistingSymlink covers a workspace that
+// already holds the symlink the snapshot carries: os.Symlink refuses an
+// existing name, so the fallback replaces the link instead of failing.
+func TestCopySnapshotWithoutGitReplacesExistingSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs elevated privileges on Windows")
+	}
+	snapshot := t.TempDir()
+	target := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(snapshot, "new.txt"), []byte("new\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("new.txt", filepath.Join(snapshot, "current")); err != nil {
+		t.Fatal(err)
+	}
+	// The workspace link points at a different file before the extraction.
+	if err := os.WriteFile(filepath.Join(target, "old.txt"), []byte("old\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("old.txt", filepath.Join(target, "current")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copySnapshotWithoutGit(snapshot, target); err != nil {
+		t.Fatal("copySnapshotWithoutGit:", err)
+	}
+
+	dest, err := os.Readlink(filepath.Join(target, "current"))
+	if err != nil {
+		t.Fatal("symlink missing after copy:", err)
+	}
+	if dest != "new.txt" {
+		t.Fatalf("symlink target = %q, want %q", dest, "new.txt")
 	}
 }
 
