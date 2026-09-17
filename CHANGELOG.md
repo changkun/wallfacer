@@ -31,6 +31,13 @@ committed: the commit log already holds that.
   the module root, so the audience wallfacer verifies is proved to be the
   one it runs with.
 
+- The identity gate now also reads the frontend for the retired admin flag.
+  It read the Go, the documents and the deploy manifests, so a page that
+  still branched on the flag passed while the Go beside it was clean; the
+  flag is now looked for in the repository's `.ts`, `.tsx`, `.jsx`, `.vue`,
+  `.svelte`, `.js`, `.mjs` and `.cjs` too. Nothing changes for a user of
+  wallfacer.
+
 ## v0.4.0 - 2026-09-14
 
 ### Changed
