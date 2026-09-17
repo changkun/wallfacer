@@ -10,6 +10,16 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Fixed
+
+- A workspace that is a git repository keeps its history when wallfacer writes
+  a task's work back to it on a machine without `rsync`, such as Windows.
+  Without rsync the write-back deleted the workspace's `.git` directory right
+  after copying the files in, so the repository lost its commits, branches and
+  remotes. The write-back now leaves everything named `.git` in the workspace
+  untouched and copies none out of the snapshot, at any depth, matching what
+  the rsync path always did.
+
 ### Changed
 
 - A release is cut only from a green build. The release command reads CI
