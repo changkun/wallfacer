@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.5.0 - 2026-09-18
+
 ### Fixed
 
 - A workspace that is a git repository keeps its history when wallfacer writes
