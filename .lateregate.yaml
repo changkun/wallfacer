@@ -97,3 +97,8 @@ identity:
   # and bearers rules are told it.
   image: wallfacerd
   roles_only: true
+
+# The database shape of the family: specs/infrastructure/database-pooling.md in latere-ai/specs
+postgres:
+  # Direct until this repository's cutover release reads WALLFACER_DATABASE_POOL_URL.
+  role: direct
