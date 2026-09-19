@@ -98,7 +98,7 @@ identity:
   image: wallfacerd
   roles_only: true
 
-# The database shape of the family: specs/infrastructure/database-pooling.md in latere-ai/specs
+# The database shape: which endpoint the serving path connects on.
 postgres:
   # Direct until this repository's cutover release reads WALLFACER_DATABASE_POOL_URL.
   role: direct
