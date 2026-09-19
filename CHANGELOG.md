@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.6.0 - 2026-09-19
+
 ### Changed
 
 - The coordination plane serves through the family's database pooler.
