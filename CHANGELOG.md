@@ -10,6 +10,16 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Changed
+
+- The coordination plane serves through the family's database pooler.
+  Serving traffic opens `WALLFACER_DATABASE_POOL_URL` when the deployment
+  carries it and falls back to `WALLFACER_DATABASE_URL`, so a deployment
+  whose secret predates the pool starts unchanged. Migrations keep the direct
+  endpoint, because they hold a lock across statements that a transaction
+  pooler cannot keep on one connection. The pool's own size, and no longer
+  the replica count, is the plane's claim on the shared database.
+
 ## v0.5.0 - 2026-09-18
 
 ### Fixed
