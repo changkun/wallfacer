@@ -2060,6 +2060,14 @@ func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
 // TestTryAutoTest_TriggersForEligibleTask verifies that a qualifying waiting task
 // (untested, up-to-date worktree) is transitioned to in_progress to run the test agent.
 func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
+	// The worktree parent is claimed before the handler exists, because
+	// cleanups run last-registered-first: registering it here puts its
+	// removal after the handler's Shutdown and WaitBackground, so the test
+	// agent this case starts has finished writing into the worktree by the
+	// time the directory goes. Claimed after the handler, the removal runs
+	// first and races the agent, which surfaces as "directory not empty".
+	wtParent := t.TempDir()
+
 	h := newTestHandler(t)
 	h.SetAutotest(true)
 	ctx := context.Background()
@@ -2085,7 +2093,6 @@ func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
 	// t.TempDir rather than os.MkdirTemp: the framework removes it and fails
 	// the test if it cannot, where a cleanup that swallows the error leaves
 	// the directory under TMPDIR for the life of the machine.
-	wtParent := t.TempDir()
 	wt := filepath.Join(wtParent, "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
