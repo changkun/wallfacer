@@ -34,3 +34,27 @@ func TestCommentStoreFallbackReason(t *testing.T) {
 		}
 	})
 }
+
+// TestServingDatabaseURLPrefersThePool pins which endpoint the coordinator's
+// pool opens. The pooled DSN is the claim on the cluster that does not move
+// with the replica count, so it wins whenever it is set.
+func TestServingDatabaseURLPrefersThePool(t *testing.T) {
+	t.Setenv("WALLFACER_DATABASE_URL", "postgres://u:p@directhost.invalid:5432/wallfacer")
+	t.Setenv("WALLFACER_DATABASE_POOL_URL", "postgres://u:p@pooled.invalid:25061/wallfacer-pool")
+	want := "postgres://u:p@pooled.invalid:25061/wallfacer-pool"
+	if got := servingDatabaseURL(); got != want {
+		t.Fatalf("servingDatabaseURL() = %q, want the pooled endpoint %q", got, want)
+	}
+}
+
+// TestServingDatabaseURLFallsBackToDirect pins the behaviour of a deployment
+// whose Secret does not carry the pooled key: it serves on the direct endpoint
+// exactly as it did before the pooler existed.
+func TestServingDatabaseURLFallsBackToDirect(t *testing.T) {
+	t.Setenv("WALLFACER_DATABASE_URL", "postgres://u:p@directhost.invalid:5432/wallfacer")
+	t.Setenv("WALLFACER_DATABASE_POOL_URL", "")
+	want := "postgres://u:p@directhost.invalid:5432/wallfacer"
+	if got := servingDatabaseURL(); got != want {
+		t.Fatalf("servingDatabaseURL() = %q, want the direct endpoint %q", got, want)
+	}
+}

@@ -94,7 +94,7 @@ func TestNew_AppliesMigrations(t *testing.T) {
 	dsn := testDSN(t)
 	dropAll(ctx, t, dsn)
 
-	st, err := New(ctx, dsn)
+	st, err := New(ctx, dsn, dsn)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestNew_ExistingTablesUpgrade(t *testing.T) {
 	}
 	pool.Close()
 
-	st, err := New(ctx, dsn)
+	st, err := New(ctx, dsn, dsn)
 	if err != nil {
 		t.Fatalf("New against existing tables: %v", err)
 	}
@@ -143,13 +143,13 @@ func TestNew_Idempotent(t *testing.T) {
 	dsn := testDSN(t)
 	dropAll(ctx, t, dsn)
 
-	st1, err := New(ctx, dsn)
+	st1, err := New(ctx, dsn, dsn)
 	if err != nil {
 		t.Fatalf("New 1: %v", err)
 	}
 	st1.Close()
 
-	st2, err := New(ctx, dsn)
+	st2, err := New(ctx, dsn, dsn)
 	if err != nil {
 		t.Fatalf("New 2 (should be a no-op): %v", err)
 	}

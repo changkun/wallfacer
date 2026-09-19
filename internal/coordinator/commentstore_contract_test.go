@@ -30,7 +30,7 @@ func commentStores(_ *testing.T) []storeFactory {
 			make: func(t *testing.T) CommentStore {
 				// The shared store owns the pool and runs the migrations; the
 				// comment store borrows the pool.
-				st, err := postgres.New(context.Background(), dsn)
+				st, err := postgres.New(context.Background(), dsn, dsn)
 				if err != nil {
 					t.Fatalf("open pg store: %v", err)
 				}

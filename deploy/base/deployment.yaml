@@ -70,6 +70,17 @@ spec:
                 secretKeyRef:
                   name: wallfacer-db
                   key: WALLFACER_DATABASE_URL
+            # The pooler's endpoint, which the serving pool opens. Migrations
+            # keep WALLFACER_DATABASE_URL: they hold a session-scoped advisory
+            # lock across statements and a transaction-mode pooler reassigns
+            # the backend between transactions. Optional, so a cluster whose
+            # Secret predates the pool still starts.
+            - name: WALLFACER_DATABASE_POOL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wallfacer-db
+                  key: WALLFACER_DATABASE_POOL_URL
+                  optional: true
           ports:
             - containerPort: 8080
           resources:

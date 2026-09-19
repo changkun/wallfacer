@@ -329,6 +329,23 @@ func coordinationManifestFunc(instanceID, hostLabel, version string, wsMgr *work
 	}
 }
 
+// servingDatabaseURL is the DSN the coordinator's pool opens: the pooler's
+// endpoint in WALLFACER_DATABASE_POOL_URL when one is configured, the direct
+// endpoint in WALLFACER_DATABASE_URL otherwise. Behind the pooler the pool
+// size and not the replica count is this service's claim on the shared
+// cluster. The fallback keeps a deployment whose Secret carries only
+// WALLFACER_DATABASE_URL serving exactly as it did before the pooler existed.
+//
+// Migrations do not take this string. They hold a session-scoped advisory lock
+// across statements, and a transaction-mode pooler reassigns the backend
+// between transactions, so the migrator keeps the direct endpoint.
+func servingDatabaseURL() string {
+	if pooled := os.Getenv("WALLFACER_DATABASE_POOL_URL"); pooled != "" {
+		return pooled
+	}
+	return os.Getenv("WALLFACER_DATABASE_URL")
+}
+
 // newCommentStore selects the coordinator's authoritative comment store. With
 // WALLFACER_DATABASE_URL set it uses the durable Postgres store (the system of
 // record for the cloud-authoritative comments); otherwise an in-memory store
@@ -346,8 +363,9 @@ func newCommentStore(ctx context.Context) coordinator.CommentStore {
 	if dsn != "" {
 		// The shared store owns the pool and runs migrations; the comment store
 		// borrows the pool. The pool lives for the process, the same lifetime the
-		// inline-schema store had.
-		st, err := postgres.New(ctx, dsn)
+		// inline-schema store had. The pool opens the pooler's endpoint and the
+		// migrator keeps the direct one it is given here.
+		st, err := postgres.New(ctx, servingDatabaseURL(), dsn)
 		if err == nil {
 			logger.Main.Info("coordination: using Postgres comment store")
 			return coordinator.NewPostgresCommentStore(st.Pool())

@@ -100,5 +100,9 @@ identity:
 
 # The database shape: which endpoint the serving path connects on.
 postgres:
-  # Direct until this repository's cutover release reads WALLFACER_DATABASE_POOL_URL.
-  role: direct
+  # Serving traffic opens the pooled endpoint and falls back to the direct one;
+  # the golang-migrate runner keeps the direct endpoint.
+  role: pooled
+  # The Secret carries WALLFACER_DATABASE_URL and WALLFACER_DATABASE_POOL_URL,
+  # so the names the checks look for carry the prefix.
+  prefix: WALLFACER
