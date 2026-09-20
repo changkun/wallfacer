@@ -10,6 +10,16 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+### Fixed
+
+- A spec comment's anchor is written as text, which is correct on any database
+  connection. A json value handed to Postgres as bytes is sent as a binary
+  string and arrives as a hex literal, which a json column refuses whenever
+  parameters travel in the text format. Connections that ask the server to
+  describe a statement first, which is how the coordination plane connects
+  today, accept it, so nothing was failing in production. The build refuses a
+  json value bound as bytes, so this cannot return unnoticed.
+
 ## v0.6.0 - 2026-09-19
 
 ### Changed
