@@ -89,6 +89,10 @@ func (s *pgStore) PutThread(ctx context.Context, t speccomment.Thread) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// anchor is jsonb and NOT NULL, and the encoding is bound as text. A byte
+	// slice is sent as bytea, which reaches the server as a hex literal that
+	// json refuses with SQLSTATE 22P02 whenever a parameter is encoded without
+	// the server describing the statement first.
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO spec_comment_threads
 			(id, org_id, workspace_id, spec_path, anchor, author_sub, created_at, resolved, resolved_by, resolved_at, status)
@@ -99,7 +103,7 @@ func (s *pgStore) PutThread(ctx context.Context, t speccomment.Thread) error {
 			resolved_by = EXCLUDED.resolved_by,
 			resolved_at = EXCLUDED.resolved_at,
 			status = EXCLUDED.status`,
-		t.ID, t.OrgID, t.WorkspaceID, t.SpecPath, anchorJSON, t.AuthorSub, t.CreatedAt,
+		t.ID, t.OrgID, t.WorkspaceID, t.SpecPath, string(anchorJSON), t.AuthorSub, t.CreatedAt,
 		t.Resolved, t.ResolvedBy, nullableTime(t.ResolvedAt), t.Status); err != nil {
 		return err
 	}
