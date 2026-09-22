@@ -1,0 +1,79 @@
+# The identity the release pipeline deploys with. It is bounded twice: to
+# the `latere` namespace, and to the kinds `deploy/prod` contains. It can
+# apply those objects, roll the Deployment, and read the result. It holds
+# no grant on Secrets or Namespaces, no delete, and nothing outside this
+# namespace.
+#
+# The bound is per namespace, not per service: anything that can change a
+# pod template can mount any Secret in that namespace. What a per-service
+# identity adds is attribution in the audit log and revocation that does
+# not touch another service's pipeline.
+#
+# The pipeline reads a kubeconfig built from this account's token out of
+# the `DEPLOY_KUBECONFIG` repository secret. `deploy/bootstrap` is never
+# applied by a pipeline, so the identity cannot widen its own grant; a
+# kind added to `deploy/prod` is added here and applied by an operator.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wallfacerd-rollout
+  namespace: latere
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wallfacerd-rollout
+  namespace: latere
+rules:
+  # `kubectl apply` reads each object before it writes it, and
+  # `set image` patches the Deployment.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  # `rollout status` watches the Deployment and the ReplicaSets under it.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  # Reading a failed rollout's pods is what makes a red release legible.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wallfacerd-rollout
+  namespace: latere
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wallfacerd-rollout
+subjects:
+  - kind: ServiceAccount
+    name: wallfacerd-rollout
+    namespace: latere
+---
+# A ServiceAccount no longer mints a long-lived token on its own, and a
+# pipeline cannot refresh a short one, so the token is a Secret bound to
+# the account. It is the only credential this identity has; deleting the
+# Secret revokes it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wallfacerd-rollout-token
+  namespace: latere
+  annotations:
+    kubernetes.io/service-account.name: wallfacerd-rollout
+type: kubernetes.io/service-account-token
