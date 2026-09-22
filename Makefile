@@ -45,7 +45,6 @@ fmt:
 
 hooks:                                                                   ## Install git hooks (the pre-commit delegates to lateregate)
 	git config core.hooksPath .githooks
-	@[ -e CLAUDE.md ] || [ -L CLAUDE.md ] || ln -s AGENTS.md CLAUDE.md
 	@echo "installed git hooks (core.hooksPath=.githooks)"
 
 # ---- The shared bar -------------------------------------------------------

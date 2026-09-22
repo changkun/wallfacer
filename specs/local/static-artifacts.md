@@ -73,7 +73,7 @@ The new tab is the presentation surface; the iframe is a preview. A full-screen 
 
 1. Backend: `internal/handler/artifacts.go` (`ListArtifacts`, `ServeArtifact`), route registration in `internal/cli/server.go`, handler tests. Prove end-to-end by serving the committed deck.
 2. Frontend: `ArtifactsView.vue`, router entry, sidebar entry, iframe preview + open-in-tab.
-3. Docs: `docs/guide/artifacts.md`, README/usage link, CLAUDE.md route note.
+3. Docs: `docs/guide/artifacts.md`, README/usage link, route rows in `docs/internals/api-and-transport.md`.
 
 ## Out of Scope / Future
 

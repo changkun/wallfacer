@@ -252,7 +252,7 @@ async function submit() {
         const patch: Record<string, unknown> = {};
         if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
         // POST /api/tasks rejects sandbox; the server-side path for per-task
-        // sandbox overrides is a follow-up PATCH (see CLAUDE.md task lifecycle).
+        // sandbox overrides is a follow-up PATCH (see docs/internals/api-and-transport.md).
         if (sandbox.value) patch.sandbox = sandbox.value;
         if (Object.keys(patch).length) {
           await store.patchTask(created.id, patch);
