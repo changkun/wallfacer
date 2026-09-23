@@ -32,7 +32,7 @@ brick mark. The Liquid Glass material goes: every surface is matte.
 
 The current console reads as a different generation from replichai because of
 four things: a hard border seam between rail and content plus a 24px status
-strip, 4 to 6px radii with 10 to 12px type, six saturated tint colours on one
+strip, 4 to 6px radii with 10 to 12px type, six saturated tint colors on one
 card, and a cream canvas with the terracotta accent. Retinting through tokens
 fixes none of the geometry, because 7k of the 14.5k lines of CSS are scoped
 inside components with hardcoded radii, sizes and 150+ hex literals. So the
@@ -80,7 +80,7 @@ Decisions made with the user (2026-09-05):
 
 ## Architecture
 
-The system has three layers. Tokens carry colour, type and geometry.
+The system has three layers. Tokens carry color, type and geometry.
 Primitives are the shared classes every surface is composed from. Surfaces are
 the screens, each rebuilt only from primitives plus the minimum scoped CSS for
 its own layout.
@@ -186,7 +186,7 @@ $$
 $$
 
 so `--tint-green` becomes `color-mix(in srgb, var(--ok) 14%, transparent)` and
-a badge is always its own state colour on a wash of itself.
+a badge is always its own state color on a wash of itself.
 
 ### Geometry
 
@@ -275,7 +275,7 @@ Three tiers, each child adds to all three:
   `<style>` block, no hex literal in scoped CSS outside `styles/`, the palette
   contrast formulas, the token names the child promises to consume.
 - **Component tests** (vitest + happy-dom, pattern of
-  `tests/sidebarWorkspacePopover.test.ts`): behaviour that moved, e.g. the
+  `tests/sidebarWorkspacePopover.test.ts`): behavior that moved, e.g. the
   branch actions now in the rail, the terminal toggle in the topbar.
 - **Browser checks** (`scripts/ui-shots/checks.mjs`, Playwright, `make
   ui-test`): one scene per surface asserting geometry (rail 236/64, main inset
@@ -306,7 +306,7 @@ seed in both themes.
 
 **Design evolution.** Two shapes joined the primitives after the umbrella
 was written: `.pop` and `.dialog` (panels child) and the tree row shared by
-the plan tree, the explorer and the docs nav. Colour for canvas and SVG code
+the plan tree, the explorer and the docs nav. Color for canvas and SVG code
 moved behind `lib/chartPalette.ts` and token expressions rather than a
 per-component theme map. The routines editor became inline row controls
 because the API edits one field; the artifacts viewer kept its preview-first

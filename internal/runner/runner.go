@@ -382,7 +382,7 @@ func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
 }
 
 // NewRunner constructs a Runner from the given store and config. The returned
-// Runner is ready for use: it has an initialised circuit breaker, sandbox
+// Runner is ready for use: it has an initialized circuit breaker, sandbox
 // backend, and a background goroutine watching for store mutations to
 // invalidate the board context cache. Call Shutdown() to drain background work.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
@@ -448,7 +448,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		logger.Runner.Warn("flows watcher: setup failed", "dir", flowsDir, "error", err)
 	}
 
-	// Initialise container circuit breaker.
+	// Initialize container circuit breaker.
 	// Defaults: 5 consecutive failures trip the breaker; it stays open for
 	// 30 s before allowing a single probe (half-open).
 	// Both values can be overridden via environment variables.
@@ -770,7 +770,7 @@ func (r *Runner) repoLock(repoPath string) *sync.Mutex {
 	return mu
 }
 
-// oversightLock returns the per-task mutex for serialising oversight generation.
+// oversightLock returns the per-task mutex for serializing oversight generation.
 // The mutex is created on first access and stored in oversightMu.
 func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
 	mu, _ := r.oversightMu.LoadOrStore(taskID.String(), &sync.Mutex{})

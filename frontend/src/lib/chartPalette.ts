@@ -1,4 +1,4 @@
-// The ramp and surfaces as concrete colour strings for code that paints
+// The ramp and surfaces as concrete color strings for code that paints
 // outside CSS: the canvas charts. Read from the computed style of the root so
 // a palette or theme change is one call away; watchPalette re-invokes a
 // callback when either root attribute changes.

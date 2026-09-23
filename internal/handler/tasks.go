@@ -808,7 +808,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		// worktrees, cascade to routine children) that bypasses the state
 		// machine. Intercept it before the routine guard and agent-session-lock
 		// check below so cancelling a routine card still runs its cascade,
-		// matching the old POST /api/tasks/{id}/cancel behaviour.
+		// matching the old POST /api/tasks/{id}/cancel behavior.
 		if newStatus == store.TaskStatusCancelled {
 			if !cancellableStatuses[oldStatus] {
 				http.Error(w, "task cannot be cancelled in its current status", http.StatusBadRequest)

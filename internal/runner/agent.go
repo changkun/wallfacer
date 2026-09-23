@@ -92,7 +92,7 @@ type runAgentOpts struct {
 	WorktreeOverrides map[string]string
 	// BoardDir is the host directory containing board.json, mounted
 	// read-only at /workspace/.tasks/ alongside any siblings. Only
-	// honoured for mountReadWrite roles with MountBoard=true.
+	// honored for mountReadWrite roles with MountBoard=true.
 	BoardDir string
 	// SiblingMounts maps shortID → (repoPath → worktreePath) for
 	// read-only mounts of other in-progress task worktrees, so the
@@ -160,7 +160,7 @@ func (r *Runner) runAgent(
 	}
 
 	// role.PromptTmpl carries a user-authored preamble that shapes
-	// the agent's behaviour. When non-empty, prepend it to the
+	// the agent's behavior. When non-empty, prepend it to the
 	// caller's prompt so the agent sees the preamble first and
 	// the runtime input second, separated by a blank line. No
 	// template substitution — the preamble is whatever the user
@@ -172,7 +172,7 @@ func (r *Runner) runAgent(
 	// GenerateCommitMessage, GenerateOversight, RunRefinement,
 	// RunIdeation) construct their own rendered prompts and
 	// bypass this preamble; they're scoped to built-in roles with
-	// empty PromptTmpl, so their behaviour is unchanged.
+	// empty PromptTmpl, so their behavior is unchanged.
 	if role.PromptTmpl != "" {
 		prompt = role.PromptTmpl + "\n\n" + prompt
 	}
@@ -412,7 +412,7 @@ func (r *Runner) launchOne(
 	}
 
 	// Context cancellation → report as terminated (matches the legacy
-	// title/oversight/commit behaviour).
+	// title/oversight/commit behavior).
 	if ctx.Err() != nil {
 		_ = handle.Kill()
 		return nil, fmt.Errorf("%s container terminated: %w", role.Slug, ctx.Err())
@@ -432,7 +432,7 @@ func (r *Runner) launchOne(
 		if exitCode != 0 {
 			// No wait error: distinguish this from a crash so the
 			// auto-retry classifier treats it as Unknown (no retry).
-			// Matches pre-migration behaviour in the heavyweight
+			// Matches pre-migration behavior in the heavyweight
 			// runContainer path.
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
 				role.Slug, exitCode, truncate(string(rawStderr), 200))
@@ -442,7 +442,7 @@ func (r *Runner) launchOne(
 
 	// Parse first so a non-zero exit with a valid final NDJSON payload
 	// still counts as success — several existing tests cover this
-	// tolerant behaviour for title + oversight, and the legacy code
+	// tolerant behavior for title + oversight, and the legacy code
 	// paths all implemented it. Parsing is harness-owned: each harness
 	// maps its own event stream to canonical events, and
 	// parseHarnessOutput collapses them into the result fields below.

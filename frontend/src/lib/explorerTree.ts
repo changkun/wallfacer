@@ -3,7 +3,7 @@
 // `{ name, type, size, modified }` entries — it does NOT send an absolute
 // `path` or an `is_dir` flag. The client reconstructs both: `path` from the
 // parent request path + entry name (matching the legacy ui/js/explorer.js
-// behaviour), and `is_dir` from `type === 'dir'`. Directories sort before
+// behavior), and `is_dir` from `type === 'dir'`. Directories sort before
 // files, then case-insensitive alphabetical.
 
 export interface RawExplorerEntry {

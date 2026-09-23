@@ -18,7 +18,7 @@ import (
 // single-turn text roles this is the assistant's final text.
 func (r *Runner) RunAgent(ctx context.Context, slug string, task *store.Task, prompt string) (any, error) {
 	if r.agentsReg == nil {
-		return nil, fmt.Errorf("runner: agents registry not initialised")
+		return nil, fmt.Errorf("runner: agents registry not initialized")
 	}
 	role, ok := r.agentsReg.Get(slug)
 	if !ok {

@@ -309,7 +309,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	}
 	// Populate the per-group concurrency override cache from disk.
 	h.reloadGroupLimits()
-	// Initialise handler state from the current workspace snapshot.
+	// Initialize handler state from the current workspace snapshot.
 	h.applySnapshot(wsMgr.Snapshot())
 	if wsMgr != nil {
 		// Subscribe to workspace changes so that when the user switches workspace

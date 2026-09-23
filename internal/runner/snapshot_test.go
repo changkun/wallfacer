@@ -37,7 +37,7 @@ func TestExtractSnapshotCreatesMissingWorkspaceWithoutExternalTools(t *testing.T
 
 // TestSetupNonGitSnapshotCopiesFiles verifies that setupNonGitSnapshot copies
 // workspace files (including nested directories) into the snapshot path and
-// initialises a git repo there.
+// initializes a git repo there.
 func TestSetupNonGitSnapshotCopiesFiles(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "file.txt"), []byte("hello"), 0644); err != nil {
@@ -63,7 +63,7 @@ func TestSetupNonGitSnapshotCopiesFiles(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(snapshotPath, "subdir", "nested.txt")); err != nil {
 		t.Fatal("subdir/nested.txt should be in snapshot:", err)
 	}
-	// Git repo must be initialised.
+	// Git repo must be initialized.
 	if _, err := os.Stat(filepath.Join(snapshotPath, ".git")); err != nil {
 		t.Fatal(".git should exist in snapshot:", err)
 	}
@@ -237,7 +237,7 @@ func TestExtractSnapshotKeepsWorkspaceGit(t *testing.T) {
 				t.Fatal("workspace .git/config removed:", err)
 			}
 
-			// Nothing named .git travelled from the snapshot, at any depth.
+			// Nothing named .git traveled from the snapshot, at any depth.
 			for _, rel := range []string{
 				filepath.Join("vendor", "dep", ".git"),
 				filepath.Join("sub", ".git"),

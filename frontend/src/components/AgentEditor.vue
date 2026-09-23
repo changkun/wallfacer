@@ -107,7 +107,7 @@ async function seedFromProps() {
   const token = ++seedToken;
   if (props.isNew) {
     // New / clone draft mode: clearing saveError matches the original
-    // openNewEditor/startClone behaviour.
+    // openNewEditor/startClone behavior.
     saveError.value = '';
     editingDraft.value = null;
     const seed = props.agent;
@@ -320,7 +320,7 @@ async function deleteAgent(slug: string) {
           Optional preamble prepended to every invocation of this agent
           through the flow engine. The agent sees this text first, then
           a blank line, then the caller's prompt. Leave empty to use the
-          agent's default behaviour. Note: built-in sub-agents invoked by
+          agent's default behavior. Note: built-in sub-agents invoked by
           the implement turn loop (title, oversight, commit-msg) use
           their embedded templates regardless; put custom prompts on a
           clone referenced from a custom flow.
@@ -430,7 +430,7 @@ async function deleteAgent(slug: string) {
           Optional preamble prepended to every invocation of this agent
           through the flow engine. The agent sees this text first, then
           a blank line, then the caller's prompt. Leave empty to use the
-          agent's default behaviour. Note: built-in sub-agents invoked by
+          agent's default behavior. Note: built-in sub-agents invoked by
           the implement turn loop (title, oversight, commit-msg) use
           their embedded templates regardless; put custom prompts on a
           clone referenced from a custom flow.

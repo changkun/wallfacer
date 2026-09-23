@@ -8,7 +8,7 @@ export default defineConfig({
   // latere-ui ships source SFCs; compile them for the SSG build and keep one Vue copy.
   resolve: { dedupe: ['vue'] },
   // Pre-bundle the Vue ecosystem together so esbuild's lazy __esm init keeps
-  // @vue/shared's helpers (isFunction, etc.) initialised before vue-router's
+  // @vue/shared's helpers (isFunction, etc.) initialized before vue-router's
   // top-level defineComponent() calls run. Without this the optimized dev
   // chunks crash with "isFunction is not a function" and the app never mounts.
   optimizeDeps: { include: ['vue', 'pinia'], exclude: ['vue-router'] },

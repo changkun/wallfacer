@@ -90,7 +90,7 @@ func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) 
 // Size-limiting design:
 //   - The self-task entry receives its full Prompt and Result.
 //   - Sibling task entries have Prompt truncated to 500 chars and Result to 1000.
-//   - After marshalling, if the manifest exceeds 64 KB a warning is logged.
+//   - After marshaling, if the manifest exceeds 64 KB a warning is logged.
 func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, map[string]map[string]string, error) {
 	// Cache check: if no store mutation has occurred since we last generated
 	// the board context for this task, return the cached result.
@@ -276,7 +276,7 @@ func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID
 // logBoardManifestSizeWarning logs a warning that board.json has grown large,
 // and lists the top-5 tasks by estimated serialized size to help operators
 // pinpoint the source of the bloat. sizes contains pre-computed per-task byte
-// counts collected by the caller during serialisation.
+// counts collected by the caller during serialization.
 func logBoardManifestSizeWarning(sizes []struct {
 	id    string
 	bytes int

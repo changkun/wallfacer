@@ -236,7 +236,7 @@ srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 
 ### What each middleware does
 
-| Layer | Location | Behaviour |
+| Layer | Location | Behavior |
 |---|---|---|
 | **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels; unmatched requests (404, empty `r.Pattern`) collapse to a single `route="<unmatched>"` series to bound label cardinality. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | Unconditional. For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |

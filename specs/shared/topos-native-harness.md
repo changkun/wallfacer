@@ -242,7 +242,7 @@ end in-process):
 - **Decoupling audit DONE** (`9059cb99`). The harness resolver's final fallback
   (`sandboxForTaskActivity`, `runAgent` tier-6, the plan-commit-message helper)
   routes through `harness.Default()` instead of a literal `harness.Claude`;
-  behaviour-identical today. The Claude→Codex token-limit fallback is correctly
+  behavior-identical today. The Claude→Codex token-limit fallback is correctly
   left keyed on the *resolved* primary (Claude-specific, not default-specific).
 - **Harness registration DONE** (`26a8d02f`). `harness.Topos` + a `toposHarness`
   registry citizen; in-process (`BuildArgv` returns `ErrInProcess`); an

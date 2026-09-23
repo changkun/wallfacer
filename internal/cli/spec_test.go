@@ -42,7 +42,7 @@ func validSpec(title string) string {
 func TestPathFilter_AbsoluteAndRelative(t *testing.T) {
 	dir := t.TempDir()
 	abs := filepath.Join(dir, "specs", "local", "foo.md")
-	// The filter keys are canonicalised paths relative to specsDir's parent.
+	// The filter keys are canonicalized paths relative to specsDir's parent.
 	filter := pathFilter([]string{abs, "specs/local/bar.md"}, filepath.Join(dir, "specs"))
 	if filter == nil {
 		t.Fatal("expected non-nil filter for non-empty inputs")

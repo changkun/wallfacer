@@ -20,7 +20,7 @@ import {
 
 // AgentGraphPage is the unified agent-graph surface (spec:
 // unified-agent-graph-ui.md). A flow is presented as an agent FLEET: the palette
-// (left) is the agent registry; the canvas (centre) renders the selected fleet
+// (left) is the agent registry; the canvas (center) renders the selected fleet
 // (lead + members, delegation edges). Editing clones a built-in or edits a user
 // fleet into a draft -- drag agents from the palette to add members, set the
 // lead, pick the coordination, remove -- and saves through the flow CRUD. When
@@ -63,7 +63,7 @@ const canvasFlow = computed<Flow | null>(() =>
 );
 
 // Run overlay (M6.3): the agentic runs of the selected fleet, and the trace
-// status of the chosen run keyed by agent slug for the canvas to colour.
+// status of the chosen run keyed by agent slug for the canvas to color.
 const runs = ref<Task[]>([]);
 const selectedRunId = ref<string | null>(null);
 const runStatus = ref<Record<string, string>>({});

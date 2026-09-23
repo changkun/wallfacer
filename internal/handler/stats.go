@@ -61,7 +61,7 @@ type UsageStat struct {
 }
 
 // addUsage accumulates every field of u into s, including the two cache
-// token columns. Centralised so per-bucket aggregations can't silently
+// token columns. Centralized so per-bucket aggregations can't silently
 // drop fields the way the inline += loops used to.
 func (s *UsageStat) addUsage(u store.TaskUsage) {
 	s.CostUSD += u.CostUSD

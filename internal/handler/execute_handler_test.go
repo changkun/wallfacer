@@ -144,7 +144,7 @@ func TestSubmitFeedback_Success(t *testing.T) {
 
 // --- CompleteTask ---
 
-// TestCompleteTask_AcquiresPromoteMu verifies CompleteTask serialises its
+// TestCompleteTask_AcquiresPromoteMu verifies CompleteTask serializes its
 // waiting→ transition under promoteMu, so it cannot race tryAutoSubmit into a
 // double commit. While promoteMu is held elsewhere, CompleteTask must block
 // before touching the task rather than completing the transition.
@@ -169,7 +169,7 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 	select {
 	case <-done:
 		promoteMu.Unlock()
-		t.Fatal("CompleteTask completed while promoteMu was held; it does not serialise the waiting transition")
+		t.Fatal("CompleteTask completed while promoteMu was held; it does not serialize the waiting transition")
 	case <-time.After(250 * time.Millisecond):
 		// Expected: blocked on promoteMu.Lock().
 	}
@@ -190,7 +190,7 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 	}
 }
 
-// TestTestTask_AcquiresPromoteMu verifies TestTask serialises its waiting→
+// TestTestTask_AcquiresPromoteMu verifies TestTask serializes its waiting→
 // in_progress transition under promoteMu, so a concurrent tryAutoSubmit cannot
 // move the task to committing between TestTask's status check and its
 // UpdateTaskTestRun/UpdateTaskStatus writes.
@@ -212,7 +212,7 @@ func TestTestTask_AcquiresPromoteMu(t *testing.T) {
 	select {
 	case <-done:
 		promoteMu.Unlock()
-		t.Fatal("TestTask completed while promoteMu was held; it does not serialise the waiting transition")
+		t.Fatal("TestTask completed while promoteMu was held; it does not serialize the waiting transition")
 	case <-time.After(250 * time.Millisecond):
 		// Expected: blocked on promoteMu.Lock() before any write.
 	}
@@ -490,7 +490,7 @@ func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	}
 
 	// Wait for the commit pipeline to run and the recovery to return the task
-	// to waiting, signalled by the "returned to waiting" system event.
+	// to waiting, signaled by the "returned to waiting" system event.
 	returned := false
 	for range 100 {
 		events, _ := h.store.GetEvents(ctx, task.ID)

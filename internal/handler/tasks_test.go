@@ -2835,7 +2835,7 @@ func TestUpdateTask_RejectsUnknownFields(t *testing.T) {
 // calling tryAutoPromote concurrently can both complete Phase 1 (the unlocked
 // store scan) without blocking each other. A rendezvous barrier installed via
 // testPhase1Done ensures both goroutines reach the Phase 1/Phase 2 boundary
-// simultaneously; if Phase 1 were still serialised by promoteMu the second
+// simultaneously; if Phase 1 were still serialized by promoteMu the second
 // goroutine would never arrive and the test would time out.
 func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
@@ -2871,7 +2871,7 @@ func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 		// Signal that this goroutine completed Phase 1.
 		phase1Done <- struct{}{}
 		// Wait until both goroutines have completed Phase 1 before proceeding to
-		// Phase 2. If Phase 1 were serialised (old design), the goroutine holding
+		// Phase 2. If Phase 1 were serialized (old design), the goroutine holding
 		// promoteMu would block here forever because the second goroutine could
 		// not enter Phase 1 until the lock was released.
 		<-gate
@@ -2891,9 +2891,9 @@ func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 			// Goroutine i+1 completed Phase 1 concurrently — good.
 		case <-timeout.C:
 			// Only one goroutine reached Phase 1 within the timeout, which means
-			// Phase 1 is being serialised: the second goroutine was blocked by
+			// Phase 1 is being serialized: the second goroutine was blocked by
 			// the first (the old single-phase design).
-			t.Errorf("goroutine %d of 2 did not complete Phase 1 within timeout — Phase 1 appears serialised", i+1)
+			t.Errorf("goroutine %d of 2 did not complete Phase 1 within timeout — Phase 1 appears serialized", i+1)
 			close(gate) // unblock whatever is waiting so wg.Wait() can finish
 			wg.Wait()
 			return
@@ -3379,11 +3379,11 @@ func TestUpdateTask_PatchModelOverrideClear(t *testing.T) {
 }
 
 // TestListTasks_ModelOverrideSerialised verifies that a task with ModelOverride set
-// serialises model_override in the GET /api/tasks response.
+// serializes model_override in the GET /api/tasks response.
 func TestListTasks_ModelOverrideSerialised(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test serialise model", Timeout: 15})
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test serialize model", Timeout: 15})
 	if err := h.store.UpdateTaskModelOverride(ctx, task.ID, "claude-haiku-4-5"); err != nil {
 		t.Fatalf("set model override: %v", err)
 	}

@@ -251,7 +251,7 @@ func statusStrings() []string {
 	return out
 }
 
-// effortStrings is the Effort analogue of statusStrings.
+// effortStrings is the Effort analog of statusStrings.
 func effortStrings() []string {
 	all := ValidEfforts()
 	out := make([]string, len(all))

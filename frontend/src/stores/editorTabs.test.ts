@@ -91,7 +91,7 @@ describe('editorTabs store', () => {
     expect(s.activeId).toBe(BOARD_TAB_ID);
   });
 
-  it('closes a tab and falls back to a neighbour, then the board', async () => {
+  it('closes a tab and falls back to a neighbor, then the board', async () => {
     mockRead('x');
     const s = useEditorTabsStore();
     await s.openFile('/ws', 'a.ts', { preview: false });

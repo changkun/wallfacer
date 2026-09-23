@@ -19,7 +19,7 @@ describe('lastRoute', () => {
     expect(routeToRestore('/', '/plan?spec=specs/foo.md')).toBe('/plan?spec=specs/foo.md');
   });
 
-  it('honours an explicit URL (does not override a non-/ landing)', () => {
+  it('honors an explicit URL (does not override a non-/ landing)', () => {
     expect(routeToRestore('/plan', '/agents')).toBeNull();
     expect(routeToRestore('/?task=t1', '/plan?spec=specs/foo.md')).toBeNull();
   });

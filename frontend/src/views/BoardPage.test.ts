@@ -3,7 +3,7 @@
 // The file explorer used to be a standalone /explorer route, so opening it
 // navigated away and hid the board entirely (see
 // specs/foundations/file-explorer.md — it was always meant to be a left side
-// panel with the board still visible). This test pins the corrected behaviour:
+// panel with the board still visible). This test pins the corrected behavior:
 // the folder button toggles an in-board ExplorerPanel without a route change,
 // and the board grid stays mounted alongside it.
 

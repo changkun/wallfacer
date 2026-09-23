@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { tags } from '@lezer/highlight';
 import { consoleHighlight, consoleTheme } from './editorTheme';
 
-// The editor reads the ramp, never a bundled palette: every colour in the
+// The editor reads the ramp, never a bundled palette: every color in the
 // highlight style is a token, and the keyword tone matches styles/syntax.css.
 describe('editorTheme', () => {
-  it('maps tokens to the ramp with no literal colours', () => {
+  it('maps tokens to the ramp with no literal colors', () => {
     const specs = consoleHighlight.specs;
     for (const s of specs) {
       expect(String(s.color)).toMatch(/^(var\(--|color-mix\()/);

@@ -2040,7 +2040,7 @@ func TestParseTestVerdictCustomPatterns(t *testing.T) {
 			expected:   "pass", // built-in goTestOKPattern fires
 		},
 		{
-			name:     "empty custom slices reproduce existing behaviour",
+			name:     "empty custom slices reproduce existing behavior",
 			input:    "5 passing (23ms)",
 			expected: "pass",
 		},

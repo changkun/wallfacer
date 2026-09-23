@@ -13,7 +13,7 @@ import (
 // The two-phase design avoids holding a global lock during slow I/O operations
 // (git subprocess calls, disk reads) that happen in Phase 1. Only the fast
 // in-memory state verification and status transition happen under the lock in
-// Phase 2. This prevents autoimplement watchers from serialising against each other
+// Phase 2. This prevents autoimplement watchers from serializing against each other
 // when multiple tasks are eligible simultaneously.
 type TwoPhaseWatcherConfig struct {
 	// Name is used in log messages.
@@ -39,7 +39,7 @@ type TwoPhaseWatcherConfig struct {
 // runTwoPhase executes the two-phase protocol described above.
 // It acquires mu only during Phase2 and emits a debug log when Phase2
 // skips the candidate (signals a benign race window). When mu is nil,
-// Phase2 runs without locking; this preserves existing behaviour for
+// Phase2 runs without locking; this preserves existing behavior for
 // watchers that do not compete for the promoteMu capacity slot.
 func runTwoPhase(ctx context.Context, mu *sync.Mutex, cfg TwoPhaseWatcherConfig) {
 	candidate, err := cfg.Phase1(ctx)

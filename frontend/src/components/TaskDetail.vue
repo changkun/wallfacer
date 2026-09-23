@@ -73,7 +73,7 @@ function openDep(id: string) {
 }
 
 // Source spec link (Links → spec). The basename is shown as the label; the
-// click deep-links to /plan focusing the spec (PlanPage honours ?spec=<path>).
+// click deep-links to /plan focusing the spec (PlanPage honors ?spec=<path>).
 const specSourcePath = computed(() => props.task.spec_source_path ?? '');
 const specSourceLabel = computed(() => {
   const p = specSourcePath.value;
@@ -99,7 +99,7 @@ const toast = useToastStore();
 
 type MainTab = 'spec' | 'activity' | 'changes' | 'verification' | 'events' | 'timeline';
 const MAIN_TABS: readonly MainTab[] = ['spec', 'activity', 'changes', 'verification', 'events', 'timeline'];
-// Honour an initial tab (command-palette tab-switch jumps / deep links).
+// Honor an initial tab (command-palette tab-switch jumps / deep links).
 const mainTab = ref<MainTab>(
   MAIN_TABS.includes(props.initialTab as MainTab) ? (props.initialTab as MainTab) : 'spec',
 );
@@ -440,7 +440,7 @@ const taskHarness = computed(() => props.task.sandbox);
 const streamRevision = computed(() => `${props.task.status}:${props.task.turns}`);
 const { raw: rawOutput, activity, answer: transcriptAnswer, streaming, truncated: serverTruncated } =
   useTaskActivity(streamTaskId, { harness: taskHarness, mode: transcriptView, refreshKey: streamRevision });
-// The assistant's answer prose, rendered as sanitised markdown for the
+// The assistant's answer prose, rendered as sanitized markdown for the
 // rendered transcript view.
 const transcriptAnswerHtml = computed(() =>
   transcriptAnswer.value ? renderResultMarkdown(transcriptAnswer.value) : '');
@@ -1125,7 +1125,7 @@ async function submitReview() {
                     </span>
                   </div>
                   <pre v-if="specShowRaw" class="code-block mb-4">{{ task.prompt }}</pre>
-                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
                   <div v-else class="prose-content mb-4" v-html="specPromptHtml"></div>
 
                   <template v-if="task.result && !isWaiting">
@@ -1137,7 +1137,7 @@ async function submitReview() {
                       </span>
                     </div>
                     <pre v-if="resultShowRaw" class="code-block mb-4">{{ task.result }}</pre>
-                    <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                    <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
                     <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
                   </template>
 
@@ -1204,7 +1204,7 @@ async function submitReview() {
                       </div>
 
                       <!-- RAW view: the harness-native stream. Carriage returns
-                           are collapsed and ANSI escapes are coloured via
+                           are collapsed and ANSI escapes are colored via
                            lib/ansi so spinners + warning lines read like a
                            terminal. -->
                       <div v-if="transcriptView === 'raw'" class="activity-oversight-box" id="modal-logs-section">
@@ -1260,7 +1260,7 @@ async function submitReview() {
                           <!-- The assistant's answer prose, rendered as markdown
                                (the prose-only greeting case used to fall through
                                to the raw JSON dump). -->
-                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
                           <div v-if="transcriptAnswerHtml" class="ta-transcript-answer prose-content" v-html="transcriptAnswerHtml"></div>
                         </div>
 
@@ -1489,7 +1489,7 @@ async function submitReview() {
                           <button type="button" class="btn sm ghost" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
                         </div>
                         <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
                         <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
                       </details>
                     </template>
@@ -1638,7 +1638,7 @@ async function submitReview() {
                     </div>
                   </div>
                   <textarea v-if="!editPromptPreview" v-model="editPrompt" class="field backlog-edit__prompt" rows="6" placeholder="Task prompt (Markdown)"></textarea>
-                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+                  <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
                   <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
                 </div>
                 <label class="backlog-edit__field">

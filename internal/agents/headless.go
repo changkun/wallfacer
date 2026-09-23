@@ -14,7 +14,7 @@ var Title = Role{
 var Oversight = Role{
 	Slug:               "oversight",
 	Title:              "Oversight",
-	Description:        "Summarises an agent run's activity into a structured phase list.",
+	Description:        "Summarizes an agent run's activity into a structured phase list.",
 	PromptTemplateName: "oversight",
 }
 

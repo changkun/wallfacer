@@ -3,7 +3,7 @@ import { createApp, nextTick } from 'vue';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import { createPinia } from 'pinia';
 
-// The card's colour budget (specs/shared/console-redesign/board.md): one
+// The card's color budget (specs/shared/console-redesign/board.md): one
 // state pill and at most one qualifier pill on the first row, tags as a mono
 // meta line, and one ink action per column.
 vi.mock('../api/client', () => ({ api: vi.fn(async () => ({})), ApiError: class extends Error {} }));
@@ -48,7 +48,7 @@ describe('TaskCard', () => {
     app.unmount(); host.remove();
   });
 
-  it('puts tags on one meta line with priority first and only high coloured', async () => {
+  it('puts tags on one meta line with priority first and only high colored', async () => {
     const { host, app } = await mountCard(task({ tags: ['frontend', 'impact:3', 'priority:high'] }));
     const tags = Array.from(host.querySelectorAll('.task-card__tag')).map((e) => e.textContent!.trim());
     expect(tags).toEqual(['high', 'impact 3', 'frontend']);

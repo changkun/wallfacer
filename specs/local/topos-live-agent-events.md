@@ -164,12 +164,12 @@ and observer-panic recovery; full topos suite + golangci-lint green.
 trace hub + JSONL + dedicated SSE endpoint + new UI, the run's events are
 forwarded onto the **existing task timeline** via `InsertEvent`, which already
 renders live through `/api/tasks/stream`. This delivers the live multi-agent
-transcript (per-turn assistant text, delegations, tool use, labelled by trace
+transcript (per-turn assistant text, delegations, tool use, labeled by trace
 node id) with no new endpoint and no frontend change — far less surface for the
 same user-visible outcome. agentgraph gained a topos-free `TraceEvent` + an
 `onEvent` observer on `RunFlowWithModel` (wired to `topos.Options.Observer` inside
 the seam); `runAgenticFlow` drains events through a buffered channel (non-blocking,
-honouring the synchronous-observer contract) and maps the meaningful ones to
+honoring the synchronous-observer contract) and maps the meaningful ones to
 timeline lines. Tests: the observer receives the ordered stream with Node→trace
 join; `agenticTraceEvent` maps/filters correctly. Import guard intact; lint green.
 

@@ -161,7 +161,7 @@ whole felt improvement while the proven `implement` loop keeps running untouched
 - One authoring primitive: the **agent graph**. It carries its **coordination** —
   *delegating* (lead/mesh) or *deterministic* (ordered DAG with parallel groups,
   the simple case). Both are "agent graphs"; edges differ in meaning and are
-  labelled.
+  labeled.
 - A task runs on a chosen agent graph; the board picks a graph (not a "flow"),
   shows its coordination, and links back to the run on the graph.
 - One consistent free-form editing model (below) that fixes every review gap.

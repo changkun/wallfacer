@@ -23,12 +23,12 @@ dispatched_task_id: null
 The agents surface: a list of agent documents, a graph canvas, and an editor.
 It has 448 lines of scoped CSS in the page and 12 hex literals in the canvas.
 The list and editor get the primitives; the canvas keeps its own drawing but
-reads every colour from the ramp.
+reads every color from the ramp.
 
 ## Current State
 
 - `AgentGraphPage.vue` (979 lines, 448 scoped, one `backdrop-filter`): left
-  list of agents with kind badges and running state, centre canvas, right
+  list of agents with kind badges and running state, center canvas, right
   editor drawer.
 - `AgentGraphCanvas.vue` (177 scoped, 12 hex): nodes, edges, selection,
   running pulse.
@@ -104,7 +104,7 @@ without errors. `make ui-test` passes thirteen scenes.
   and selected states match the settings and workspace rows.
 
 **Deviations from the spec.** The editor is a dialog, not a drawer, as
-above. `SystemPromptsManager` was tokenised in place, not rebuilt on the
+above. `SystemPromptsManager` was tokenized in place, not rebuilt on the
 sheet layout: it is a single list with one editor and gains nothing from
 the aside.
 

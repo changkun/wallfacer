@@ -119,7 +119,7 @@ function statusLabel(task: Task): string {
   return task.status;
 }
 
-// The state pill: one ramp colour per column, a dot on the live states.
+// The state pill: one ramp color per column, a dot on the live states.
 const statePill = computed<{ cls: string; dot: boolean; pulse: boolean }>(() => {
   const t = props.task;
   if (t.archived) return { cls: 'pill-neutral', dot: false, pulse: false };
@@ -297,9 +297,9 @@ const depBadgeTitle = computed(() => {
 // Friendly failure-category label (Timeout/Budget/…) for failed cards.
 const failureBadge = computed(() => failureLabel(props.task.failure_category));
 
-// The card's colour budget: one state pill and one qualifier pill on the first
+// The card's color budget: one state pill and one qualifier pill on the first
 // row. The qualifier is the most decisive signal available; the rest become
-// plain text on the meta line so nothing is lost, only de-emphasised.
+// plain text on the meta line so nothing is lost, only de-emphasized.
 interface Signal { label: string; cls: string; title: string }
 const signals = computed<Signal[]>(() => {
   const out: Signal[] = [];
@@ -378,7 +378,7 @@ function focusSibling(direction: 'next' | 'prev' | 'left' | 'right') {
   else if (direction === 'prev') nextIdx = Math.max(0, idx - 1);
   else {
     // Left/Right: find the nearest card whose column differs and whose
-    // vertical centre is closest to ours.
+    // vertical center is closest to ours.
     const me = root.getBoundingClientRect();
     const myCol = me.left + me.width / 2;
     let bestIdx = idx;

@@ -46,7 +46,7 @@ export function useDeviceSignIn() {
 
   // start begins the device flow. Returns true when the local flow started (the
   // caller shows the modal) and false when device sign-in is unavailable (503),
-  // signalling the caller to fall back to the browser redirect. Other failures
+  // signaling the caller to fall back to the browser redirect. Other failures
   // reject.
   async function start(): Promise<boolean> {
     reset();

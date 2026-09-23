@@ -1,4 +1,4 @@
-// v-scrollfade — an opt-in overlay-scrollbar behaviour for a single scroll
+// v-scrollfade — an opt-in overlay-scrollbar behavior for a single scroll
 // container: the bar stays hidden and only fades in while the element is being
 // scrolled (or hovered so the thumb is grabbable), then fades back out after a
 // short idle.

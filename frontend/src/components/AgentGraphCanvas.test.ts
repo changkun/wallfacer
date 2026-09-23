@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp, nextTick } from 'vue';
 import AgentGraphCanvas from './AgentGraphCanvas.vue';
 
-// The canvas draws nodes to the card geometry and reads its colours from the
+// The canvas draws nodes to the card geometry and reads its colors from the
 // ramp (specs/shared/console-redesign/agent-graph.md): a 14px corner radius,
 // the lead marked by class, and run states as classes the stylesheet maps to
 // ok / err / run.

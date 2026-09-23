@@ -1,6 +1,6 @@
 // Helpers for the span-timeline flamegraph view. Pure + tested so the
 // layout logic is not buried inside the SVG component. Mirrors the
-// label / lane / humanise behaviour of the legacy ui/js/modal-flamegraph.js,
+// label / lane / humanise behavior of the legacy ui/js/modal-flamegraph.js,
 // including idle-gap compression via the shared time map (so a long
 // "waiting" gap doesn't squish all the real activity into a sliver).
 
@@ -67,7 +67,7 @@ export function humanSpanLabel(phase: string, label: string): string {
   return label ? `${phase}: ${label}` : phase;
 }
 
-/** Deterministic per-label colour (HSL hue from a djb2 hash). */
+/** Deterministic per-label color (HSL hue from a djb2 hash). */
 export function labelHue(s: string): number {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);

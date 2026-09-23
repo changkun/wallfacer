@@ -181,7 +181,7 @@ func firstWorktreePath(worktreePaths map[string]string) string {
 // the task. It forwards the run's live trace events onto the task timeline (so
 // the per-turn assistant text, delegations, and tool use are visible as the run
 // proceeds, not just as a trace graph at the end), persists the final text and
-// the JSON-marshalled trace graph, then walks the task through the same
+// the JSON-marshaled trace graph, then walks the task through the same
 // in_progress -> waiting -> committing -> done state machine the flow-engine and
 // ideation branches use (the state machine forbids a direct in_progress -> done
 // transition). In the committing phase it runs the real commit pipeline

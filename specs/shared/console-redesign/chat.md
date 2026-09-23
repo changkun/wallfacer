@@ -73,7 +73,7 @@ composer inside, close as `.icon-btn`.
 
 ## Testing Strategy
 
-- Existing `useChatSession.*.test.ts` cover behaviour; add
+- Existing `useChatSession.*.test.ts` cover behavior; add
   `components/ChatMessageList.test.ts`: turn kinds render their classes, tool
   call rows collapse, streaming pill present while `streaming`.
 - `tests/designSystem.test.ts`: `ChatPage.vue`, `SessionList.vue`,

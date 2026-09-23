@@ -14,7 +14,7 @@ import (
 )
 
 // noSummary is a loadSummary stub that always returns (nil, nil), simulating
-// the backward-compatible behaviour when no summary.json exists.
+// the backward-compatible behavior when no summary.json exists.
 func noSummary(_ uuid.UUID) (*store.TaskSummary, error) { return nil, nil }
 
 func TestAggregateStats(t *testing.T) {

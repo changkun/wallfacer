@@ -8,7 +8,7 @@ Each agent turn runs as a host `os/exec` of the selected CLI (`claude`, `codex`,
 
 The runner unconditionally selects `executor.HostBackend` (the only `executor.Backend` implementation) and sets `hostMode = true` (`internal/runner/runner.go:491-498`). The backend execs the CLI directly (`internal/executor/host.go`). Cancellation is `SIGTERM` then `SIGKILL` on the host process (`internal/executor/host.go`), not a runtime kill command.
 
-Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `ContainerSpec`, `ContainerInfo`, `ContainerLister`, `buildContainerSpecForSandbox`, and the launch circuit breaker's `WALLFACER_CONTAINER_CB_*` env vars. These name code, not behaviour. The behaviour is a host process.
+Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `ContainerSpec`, `ContainerInfo`, `ContainerLister`, `buildContainerSpecForSandbox`, and the launch circuit breaker's `WALLFACER_CONTAINER_CB_*` env vars. These name code, not behavior. The behavior is a host process.
 
 ## System Overview
 
@@ -327,7 +327,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
 | Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
-| Change pub/sub behaviour | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
+| Change pub/sub behavior | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
 | Change cloud auth wiring | `internal/cli/server.go` (middleware chain) + `internal/auth/` |
 
 ## Package Map
@@ -349,7 +349,7 @@ Every `internal/` package and its role in the system:
 | `github` | GitHub integration: principal-scoped token store for the brokered "Latere AI" GitHub App credential, API client, PR/comment read-write surfaces | `Store`, `HTTPBroker`, `Client` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
-| `handler` | HTTP API handlers organised by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
+| `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus in-process `topos`; replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Topos`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
@@ -401,7 +401,7 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Validate()`, `CanTransition()`, `Allowed()` |
 | `pkg/tree` | Generic tree data structure with `iter.Seq` walk | `Node[T]`, `Walk()` |
 
-## Handler Organisation
+## Handler Organization
 
 Each handler file in `internal/handler/` owns a specific concern area. The table below lists representative non-test `.go` files.
 

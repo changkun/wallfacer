@@ -14,7 +14,7 @@ import { coordinationOf, type Coordination } from '../lib/flowDraft';
 // draft. Free-form node positioning is a follow-up; this lays the fleet out.
 // runStatus overlays a run's trace: agent_slug -> 'running' | 'done' |
 // 'failed'. When present (a run is selected) the matching agent nodes are
-// coloured by status, so a finished or in-flight run is visible on the same
+// colored by status, so a finished or in-flight run is visible on the same
 // graph that authored it.
 const props = withDefaults(
   defineProps<{ flow: Flow | null; editable?: boolean; runStatus?: Record<string, string> }>(),
@@ -499,7 +499,7 @@ const draggable = computed(() => props.editable && mode.value !== 'sequence');
   stroke: var(--accent-line);
   stroke-width: 1.5;
 }
-/* Run overlay: the ramp colour of the agent that ran. */
+/* Run overlay: the ramp color of the agent that ran. */
 .agc-node--run-running .agc-node-box {
   stroke: var(--run);
   stroke-width: 1.5;

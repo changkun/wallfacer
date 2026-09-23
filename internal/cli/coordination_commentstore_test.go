@@ -47,7 +47,7 @@ func TestServingDatabaseURLPrefersThePool(t *testing.T) {
 	}
 }
 
-// TestServingDatabaseURLFallsBackToDirect pins the behaviour of a deployment
+// TestServingDatabaseURLFallsBackToDirect pins the behavior of a deployment
 // whose Secret does not carry the pooled key: it serves on the direct endpoint
 // exactly as it did before the pooler existed.
 func TestServingDatabaseURLFallsBackToDirect(t *testing.T) {

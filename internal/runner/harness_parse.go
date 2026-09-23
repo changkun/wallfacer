@@ -33,7 +33,7 @@ func (r *Runner) parseAgentStream(sb harness.ID, raw string) (*agentOutput, erro
 //     assistant/result event, not a top-level result string);
 //   - session id is taken from any event that carries one (init events
 //     expose it even when a run is killed before producing a result);
-//   - if no line parses into a recognised event, it is an error, matching
+//   - if no line parses into a recognized event, it is an error, matching
 //     parseOutput's "no valid JSON object found".
 func parseHarnessOutput(h harness.Harness, raw string) (*agentOutput, error) {
 	var (
@@ -81,7 +81,7 @@ func parseHarnessOutput(h harness.Harness, raw string) (*agentOutput, error) {
 		if !sawAnyEvent {
 			return nil, fmt.Errorf("no valid JSON object found in output")
 		}
-		// Recognised non-terminal events only (e.g. an init line with a
+		// Recognized non-terminal events only (e.g. an init line with a
 		// session id but no result yet). Surface what we have so callers
 		// that tolerate a missing result still see the session id.
 		return &agentOutput{SessionID: sessionID, ObservedModel: observedModel}, nil

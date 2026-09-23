@@ -33,7 +33,7 @@ function walk(dir: string, ext: string, out: string[] = []): string[] {
 }
 const rel = (abs: string) => abs.slice(root.length + 1);
 
-// ---- colour maths -----------------------------------------------------------
+// ---- color maths -----------------------------------------------------------
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
@@ -177,7 +177,7 @@ describe('primitives.css defines the shared classes', () => {
   });
 
   // Surface stylesheets rebuilt on the system carry no hex literal and no
-  // radius literal: colour and geometry come from tokens. Each surface spec
+  // radius literal: color and geometry come from tokens. Each surface spec
   // adds its files here as it lands.
   const tokenOnly = [
     'src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css',

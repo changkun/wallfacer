@@ -374,7 +374,7 @@ A panel/modal (styled with `frontend/src/styles/tokens.css`, consistent with `Se
    - **Commands**: Pre-command, build command, run command (monospace inputs), working directory, auto-rebuild toggle.
    - **Network**: Port (number input) used for the "open in browser" link.
    - **Environment**: Key-value editor for per-session `config.Env` overrides. An "Edit serve.env" action opens a text editor for the shared `<configDir>/serve.env` file (same pattern as the instructions/AGENTS.md editor, `InstructionsEditor.vue`). Discovery-detected variable names are shown as hints with empty values.
-   - **Services** (reserved, greyed out): Placeholder showing detected `docker-compose.yml` services. Informational only in v1.
+   - **Services** (reserved, grayed out): Placeholder showing detected `docker-compose.yml` services. Informational only in v1.
 
 3. **Action buttons**: "Detect Commands" (runs discovery), "Start", "Stop", "Open in Browser" (when a port is set and the session is running).
 

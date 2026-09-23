@@ -78,7 +78,7 @@ func toNormalized(evt harness.Event) normalizedEvent {
 //
 // It is installed at the top of StreamLogs so every downstream serve path
 // (live relay, stored turns, phase filters) inherits normalization without
-// change. Lines the harness does not recognise (KindUnknown) and non-JSON
+// change. Lines the harness does not recognize (KindUnknown) and non-JSON
 // noise (stderr, keepalive newlines) are dropped — the raw view still carries
 // them; the normalized view is events only.
 type normalizingWriter struct {

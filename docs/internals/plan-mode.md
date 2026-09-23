@@ -68,7 +68,7 @@ type Spec struct {
 }
 ```
 
-`Status` enumerates the seven lifecycle states; `Effort` enumerates the four size buckets. Both sets are exposed via `ValidStatuses()` and `ValidEfforts()`. The `Date` type marshals from `YYYY-MM-DD` YAML scalars and serialises to the same shape in JSON. `Path` and `Track` are filled by the tree builder (they are not user-authored frontmatter). `Body` is kept in the Go struct but omitted from JSON responses because specs can be kilobytes long and the frontend renders bodies lazily through the file explorer endpoints.
+`Status` enumerates the seven lifecycle states; `Effort` enumerates the four size buckets. Both sets are exposed via `ValidStatuses()` and `ValidEfforts()`. The `Date` type marshals from `YYYY-MM-DD` YAML scalars and serializes to the same shape in JSON. `Path` and `Track` are filled by the tree builder (they are not user-authored frontmatter). `Body` is kept in the Go struct but omitted from JSON responses because specs can be kilobytes long and the frontend renders bodies lazily through the file explorer endpoints.
 
 ### Lifecycle State Machine
 
@@ -296,7 +296,7 @@ Every task carries `SpecSourcePath` so the completion hook can find its way back
 [spec_system][archivedSpecGuard][base]
 ```
 
-- `selectSpecSystemPrompt(workspaces)` picks the "empty" prompt when every workspace's `BuildTree` yields no non-archived parseable specs and the "nonempty" prompt otherwise. Evaluated per-turn so archiving the last spec takes effect on the very next message. I/O errors (permission denied, EIO) default to the **nonempty** variant on the principle that falsely signalling "no specs" would invite the agent to scaffold against an unknown tree.
+- `selectSpecSystemPrompt(workspaces)` picks the "empty" prompt when every workspace's `BuildTree` yields no non-archived parseable specs and the "nonempty" prompt otherwise. Evaluated per-turn so archiving the last spec takes effect on the very next message. I/O errors (permission denied, EIO) default to the **nonempty** variant on the principle that falsely signaling "no specs" would invite the agent to scaffold against an unknown tree.
 - `archivedSpecGuard(workspaces, focusedSpec)` returns a guard prefix only when the focused spec's status is `archived`, instructing the agent to refuse writes. Empty string otherwise.
 
 The assembled prompt is passed to `runtime.Exec` with `--verbose --output-format stream-json`; an `--resume <session-id>` flag is appended when `LoadSession()` yields a non-empty session. If the round fails with `IsStaleSessionError`, the handler clears the session (keeping history) and retries with `BuildHistoryContext()` prepended.
@@ -331,7 +331,7 @@ On success it counts existing `EventTypePromptRound` events to derive the next r
 Each directive captures:
 
 - `Path`, required; validated against `spec.ValidateSpecPath`.
-- `Title`, `Status`, `Effort`, optional `key=value` attributes; quoted values (`title="two words"`) survive tokenisation.
+- `Title`, `Status`, `Effort`, optional `key=value` attributes; quoted values (`title="two words"`) survive tokenization.
 - `Body`, every non-directive line emitted between this directive and the next (or the end of the turn) is appended as the spec's body.
 
 `processDirectives` runs each captured directive through `scaffoldDirective`, which calls `spec.Scaffold` with `Force=false`: racing scaffolds are rejected atomically by `O_CREATE|O_EXCL`, and a collision surfaces as a `system`-role chat message rather than silently overwriting. On success, `scaffoldDirective` also calls `spec.EnsureReadme` so the workspace roadmap gains a row for the new spec. A successful scaffold emits no chat message, the agent's original text flows through untouched.

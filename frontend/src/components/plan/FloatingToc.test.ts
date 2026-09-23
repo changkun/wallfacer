@@ -1,7 +1,7 @@
 // FloatingToc surfaces the spec's headings as a floating nav and can be
 // hidden. These pin the toggle contract: a collapse button swaps the panel for
 // a small reveal tab, the choice persists to localStorage, and a persisted
-// collapsed state is honoured on mount.
+// collapsed state is honored on mount.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, nextTick, h, type App } from 'vue';
 import FloatingToc from './FloatingToc.vue';
@@ -90,7 +90,7 @@ describe('FloatingToc collapse toggle', () => {
     expect(memStore.get(KEY)).toBe('0');
   });
 
-  it('honours a persisted collapsed state on mount', async () => {
+  it('honors a persisted collapsed state on mount', async () => {
     memStore.set(KEY, '1');
     await mount(bodyWithHeadings());
     expect(host.querySelector('.floating-toc')).toBeNull();

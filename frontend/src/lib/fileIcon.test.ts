@@ -6,7 +6,7 @@ describe('fileIcon', () => {
     expect(fileIcon('src', true, false).paths).toBe(PATHS.folder);
     expect(fileIcon('src', true, true).paths).toBe(PATHS.folderOpen);
   });
-  it('colours by extension', () => {
+  it('colors by extension', () => {
     expect(fileIcon('main.go', false).color).toBe('#00ADD8');
     expect(fileIcon('App.tsx', false).color).toBe('#3178C6');
   });

@@ -243,7 +243,7 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 }
 
 // TestSummary_WrittenOnForceDoneTransition verifies that ForceUpdateTaskStatus
-// also writes summary.json when transitioning to done, matching the behaviour
+// also writes summary.json when transitioning to done, matching the behavior
 // of UpdateTaskStatus. This covers the auto-submit and manual "Mark as Done"
 // no-session paths that bypass the normal state machine via ForceUpdateTaskStatus.
 func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {

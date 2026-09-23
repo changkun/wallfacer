@@ -35,7 +35,7 @@ type Index struct {
 }
 
 // indexFallbackTitle is the display title used when the README has no
-// top-level heading — keeps the pinned explorer entry labelled even for
+// top-level heading — keeps the pinned explorer entry labeled even for
 // stub files.
 const indexFallbackTitle = "Roadmap"
 

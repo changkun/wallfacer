@@ -1,6 +1,6 @@
 ---
 name: wf-spec-review-impl
-description: Read-only verdict on whether an implementation meets its spec: each acceptance criterion classified, unintended changes flagged, test coverage checked. Writes nothing; returns COMPLETE, INCOMPLETE, or NEEDS FIXES. Use to judge finished work; use drift to record that judgement on the spec, wrapup to close the spec out.
+description: Read-only verdict on whether an implementation meets its spec: each acceptance criterion classified, unintended changes flagged, test coverage checked. Writes nothing; returns COMPLETE, INCOMPLETE, or NEEDS FIXES. Use to judge finished work; use drift to record that judgment on the spec, wrapup to close the spec out.
 argument-hint: <spec-file.md or task-file.md> [commit-range]
 ---
 

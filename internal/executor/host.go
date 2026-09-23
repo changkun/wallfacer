@@ -448,7 +448,7 @@ type hostHandle struct {
 	release  func()        // frees the global budget slot; set by Launch, nil ⇒ no-op
 }
 
-// newHostHandle constructs a hostHandle with state initialised to Creating.
+// newHostHandle constructs a hostHandle with state initialized to Creating.
 // All construction goes through this so the initial state is never ambiguous.
 func newHostHandle(name string, cmd *exec.Cmd, stdout, stderr io.ReadCloser, taskID string, backend *HostBackend) *hostHandle {
 	h := &hostHandle{
@@ -531,7 +531,7 @@ func (h *hostHandle) signalAndEscalate() {
 	}
 	// Signal the whole process group, not just the leader: under Setpgid the
 	// agent's tool subprocesses (builds, test runners) are group members, and
-	// signalling only the leader would orphan them.
+	// signaling only the leader would orphan them.
 	if err := terminateGroupSignal(h.cmd, gracefulSig); err != nil {
 		_ = terminateGroupKill(h.cmd)
 		return

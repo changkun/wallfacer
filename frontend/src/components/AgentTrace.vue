@@ -5,7 +5,7 @@ import { renderMarkdown } from '../lib/markdown';
 import type { TaskTrace, TraceNode } from '../api/types';
 
 // AgentTrace renders an agentic-flow run's agent graph plus a live, per-agent
-// transcript. The graph nodes (with status colour) and handoff edges come from
+// transcript. The graph nodes (with status color) and handoff edges come from
 // the persisted trace; the transcript is built from the run's events
 // (forwarded onto the task timeline as the run proceeds), so it appears live
 // while the run is in flight, not just after it completes. refreshKey (the task's
@@ -169,7 +169,7 @@ function renderTurn(text: string): string {
         :class="`trace__turn--${row.kind}`"
       >
         <span class="trace__turn-agent">{{ row.agent }}</span>
-        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
         <div
           v-if="row.kind === 'assistant' && row.text"
           class="trace__turn-body prose-content"

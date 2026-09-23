@@ -1,4 +1,4 @@
-// The ramp colour a spec's lifecycle status carries in the tree and the
+// The ramp color a spec's lifecycle status carries in the tree and the
 // focused view. Statuses rank themselves by tone: drafted and vague are ink,
 // validated is live work (run), testing is attention (warn), complete is ok,
 // stale is err, archived and frontmatter-less docs are muted.

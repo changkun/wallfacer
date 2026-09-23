@@ -296,7 +296,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Launch periodic oversight generation while the turn-loop executes.
 	// The goroutine exits when Run returns (oversightCancel is deferred).
 	// Skip for test runs — those are short verification passes where the
-	// implementation oversight is already finalised — and for native topos
+	// implementation oversight is already finalized — and for native topos
 	// runs, which produce their own live trace and never enter the turn loop.
 	if !isTestRun && !toposRun {
 		oversightCtx, oversightCancel := context.WithCancel(ctx)
@@ -334,7 +334,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		// that existing branches are reattached (preserving committed changes)
 		// rather than creating fresh worktrees from HEAD. When the task has
 		// no stored paths (first run), this falls back to setupWorktrees
-		// behaviour which uses r.Workspaces().
+		// behavior which uses r.Workspaces().
 		if len(task.WorktreePaths) > 0 {
 			worktreePaths, branchName, err = r.ensureTaskWorktrees(taskID, task.WorktreePaths, task.BranchName)
 		} else {

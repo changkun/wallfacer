@@ -195,7 +195,7 @@ func buildAgentCmd(prompt, model string) []string {
 //
 // The fallback only *redirects* to a known-good default; it never silently
 // suppresses a configured path, so an unrelated missing env file still reaches
-// the backend unchanged (preserving prior pass-through behaviour and letting
+// the backend unchanged (preserving prior pass-through behavior and letting
 // the backend surface its own diagnostic). Returns "" only when envFile itself
 // is empty.
 func (r *Runner) resolveEnvFile() string {

@@ -62,7 +62,7 @@ var addedDispatchLine = regexp.MustCompile(
 //
 // The `?thread=<id>` query parameter selects the caller's thread; when
 // omitted, the active thread is used. Dispatched board tasks referenced
-// by the reverted commit are cancelled (same behaviour as the pre-revert
+// by the reverted commit are cancelled (same behavior as the pre-revert
 // design). Dirty user edits are stashed across the revert.
 //
 // Responds 409 if the thread has no planning commits to undo, or if the

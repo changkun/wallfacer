@@ -9,7 +9,7 @@ import (
 )
 
 // TestAgenticEvent maps topos trace events to task-timeline events: assistant
-// text and tool use become readable system lines labelled by agent; lifecycle
+// text and tool use become readable system lines labeled by agent; lifecycle
 // bookkeeping and empty payloads are filtered out.
 func TestAgenticEvent(t *testing.T) {
 	cases := []struct {

@@ -231,7 +231,7 @@ Served by:
 
 The UI renders phases in the Oversight tab and as an interactive flamegraph Timeline.
 
-The generator reads the task's trace events, passes them to the Claude API with a summarisation prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob`: the implementation summary lands in `oversight.json` and the test-agent summary in `oversight-test.json`, both directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
+The generator reads the task's trace events, passes them to the Claude API with a summarization prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob`: the implementation summary lands in `oversight.json` and the test-agent summary in `oversight-test.json`, both directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
 
 `POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
 

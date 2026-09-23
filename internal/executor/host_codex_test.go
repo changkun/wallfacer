@@ -99,7 +99,7 @@ func TestHostBackend_LaunchCodex_WrapsResult(t *testing.T) {
 		t.Errorf("is_error = %v; want false", final["is_error"])
 	}
 	if res, _ := final["result"].(string); !strings.Contains(res, "hello codex") {
-		t.Errorf("result should echo prompt (fake behaviour); got %q", res)
+		t.Errorf("result should echo prompt (fake behavior); got %q", res)
 	}
 
 	usage, _ := final["usage"].(map[string]any)

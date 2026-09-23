@@ -206,7 +206,7 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	})
 }
 
-// UpdateTaskTrace stores the JSON-marshalled topos trace graph produced by
+// UpdateTaskTrace stores the JSON-marshaled topos trace graph produced by
 // an agentic-flow run (see internal/agentgraph). The store keeps it as an opaque
 // string so it never imports the topos package; the graph endpoint unmarshals it.
 func (s *Store) UpdateTaskTrace(_ context.Context, id uuid.UUID, traceJSON string) error {
@@ -295,7 +295,7 @@ func (s *Store) UpdateTaskScheduledAt(_ context.Context, id uuid.UUID, scheduled
 func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn []string) error {
 	return s.mutateTask(id, func(t *Task) error {
 		if len(dependsOn) == 0 {
-			t.DependsOn = nil // normalise so omitempty keeps JSON clean
+			t.DependsOn = nil // normalize so omitempty keeps JSON clean
 		} else {
 			t.DependsOn = dependsOn
 		}

@@ -589,7 +589,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// ServeMux pattern. loggingMiddleware stays inside it and keeps feeding the
 	// wallfacer_* Prometheus series unchanged. It is not folded into
 	// WithMetricsHook because the hook reports a status class ("2xx") while
-	// wallfacer_http_requests_total is labelled with the exact status code, and
+	// wallfacer_http_requests_total is labeled with the exact status code, and
 	// because probes skipped for tracing must still be counted.
 	srv := &http.Server{
 		Handler:     otel.Handler(loggingMiddleware(srvHandler, reg), "wallfacer", otel.WithSkip(skipTracing)),

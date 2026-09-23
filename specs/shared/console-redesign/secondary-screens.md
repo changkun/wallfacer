@@ -39,7 +39,7 @@ land as one child so the console has no old screen left after it.
 ## Current State
 
 - `AnalyticsPage.vue` with three tabs; `AnalyticsTabCost.vue` observes
-  `data-theme` for chart colours; tiles and tables inline.
+  `data-theme` for chart colors; tiles and tables inline.
 - `RoutinesPage.vue` (210 lines) + `routines.css` (175): routine rows,
   schedule, enable toggle, run now.
 - `MapPage.vue` (529 lines, 187 scoped, 21 hex), `map/GraphCanvas.vue` (16
@@ -56,9 +56,9 @@ land as one child so the console has no old screen left after it.
 The page keeps its tabs as `.tabs`. Stat tiles become two `.card`s in the
 replichai boundary-card shape (eyebrow, big `.tabular` number, one-line
 qualifier, a bar) rather than a row of counters; tables are `.rows` with mono
-`.tabular` values. Chart colours come from a `chartPalette()` helper that
+`.tabular` values. Chart colors come from a `chartPalette()` helper that
 reads the ramp from computed style at mount and on `data-theme` change, so
-`AnalyticsTabCost` stops carrying its own colour map.
+`AnalyticsTabCost` stops carrying its own color map.
 
 ### Routines
 
@@ -68,9 +68,9 @@ next run `.muted`, enabled as the two-state `.seg`, Run now as
 
 ### Mission Control
 
-The map canvas reads every colour from the ramp through the same
+The map canvas reads every color from the ramp through the same
 `chartPalette()` helper (node fill `--bg-card`, stroke `--rule-2`, state
-colour on the dot and edge, selected `--accent`). The node popup is a `.pop`
+color on the dot and edge, selected `--accent`). The node popup is a `.pop`
 with the task's state pill, title and a `.btn.sm` Open. The legend is `.rows`
 of dot plus label. The 48 hex literals go to zero.
 
@@ -140,8 +140,8 @@ replace the analytics smoke; `make ui-test` passes twenty scenes.
   which the scene asserts cell by cell.
 - The routine schedule edits inline in the row. The schedule endpoint accepts
   the interval and the enabled flag only, so a dialog would hold one field.
-- The map's colour map keeps a distinct expression per state (mixes toward a
-  neighbour where two states share a ramp hue) so the legend never shows two
+- The map's color map keeps a distinct expression per state (mixes toward a
+  neighbor where two states share a ramp hue) so the legend never shows two
   identical dots.
 - The mission chrome moved from `docs.css` into `mission.css`; `docs.css`
   keeps the screenshot pair rules only.

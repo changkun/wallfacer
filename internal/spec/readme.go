@@ -22,7 +22,7 @@ type Meta struct {
 	Path string
 
 	// Title defaults to a title-cased filename via [TitleFromFilename]
-	// when empty, mirroring the Scaffold behaviour.
+	// when empty, mirroring the Scaffold behavior.
 	Title string
 
 	// Status is the spec's lifecycle state. Empty values render as

@@ -208,7 +208,7 @@ describe('AgentGraphPage (fleet)', () => {
     host.remove();
   });
 
-  it('overlays a run: selecting a run colours the agent nodes by status', async () => {
+  it('overlays a run: selecting a run colors the agent nodes by status', async () => {
     agents = [{ slug: 'impl', title: 'Implementation', builtin: true }, { slug: 'test', title: 'Testing', builtin: true }];
     flows = [
       {

@@ -23,7 +23,7 @@ func parseTitleResult(o *agentOutput) (any, error) {
 }
 
 // GenerateTitle runs a lightweight container to produce a 2-5 word
-// title summarising the task prompt, then persists it via the store.
+// title summarizing the task prompt, then persists it via the store.
 func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {

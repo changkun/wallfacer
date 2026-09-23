@@ -80,7 +80,7 @@ meanings a reader already has:
 | `diff` | `drift` | The skill does not show a diff; it classifies how far an implementation diverged from its spec |
 | `status` | `report` | `status` is the frontmatter field, and read as "this spec's status" when the skill surveys the whole tree |
 
-Descriptions lead with what separates a skill from its neighbours rather than
+Descriptions lead with what separates a skill from its neighbors rather than
 with mechanics, since the description is all a model sees when routing. The
 after-implementation trio needed it most: `review-impl` is read-only and returns
 a verdict, `drift` writes that verdict onto the spec, `wrapup` closes the spec
@@ -198,7 +198,7 @@ Code would silently ignore.
   plugin, so `spec-workflow:create` said the same word twice.
 - **Two skills were renamed on the way out**, which the spec did not anticipate:
   `diff → drift` and `status → report`. Every description was also rewritten to
-  lead with what separates a skill from its neighbours, since that is all a
+  lead with what separates a skill from its neighbors, since that is all a
   model sees when routing.
 - **One-way `make skills-sync` became bidirectional `skills-pull` /
   `skills-push`.** A one-way sync answers "upstream changed" but not "I edited

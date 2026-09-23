@@ -1,5 +1,5 @@
 // The CodeMirror theme for the file editor, read from the console tokens so
-// the pane follows the palette and the theme without a rebuild. Colours are
+// the pane follows the palette and the theme without a rebuild. Colors are
 // CSS variables: the ramp swaps per theme, so one highlight style serves both.
 // The token mapping mirrors styles/syntax.css so a keyword reads the same in
 // prose, diffs and the editor.

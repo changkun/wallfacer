@@ -2,7 +2,7 @@
 //
 // ChatPage mounts SessionList plus the shared chat core; we stub the children
 // and side-effecting imports, then drive the drag handle with synthetic mouse
-// events. Two behaviours are asserted: the width clamps to [200, 480] like the
+// events. Two behaviors are asserted: the width clamps to [200, 480] like the
 // Plan spec-tree splitter, and dragging narrower than the fold threshold snaps
 // the list to the collapsed rail instead of sticking at the min width.
 //

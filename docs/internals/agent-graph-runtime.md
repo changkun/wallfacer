@@ -68,14 +68,14 @@ Both paths converge on `driveToposRun` (`internal/runner/agentic.go`), which:
 - applies the task timeout (`task.Timeout` minutes, falling back to `constants.DefaultTaskTimeout`);
 - forwards live trace events onto the task timeline. The topos observer is called synchronously on the run's goroutines, so it must not block: events are pushed into a 256-slot buffered channel and drained into the store by a separate goroutine, dropping on overflow rather than backpressuring the run;
 - on error, respects an already-cancelled task, classifies the failure (`classifyFailure`), attempts `tryAutoRetry`, and otherwise fails the task with an error event;
-- on success, persists the final text (`UpdateTaskResult` with stop reason `end_turn`) and the JSON-marshalled trace (`UpdateTaskTrace`) **before** transitioning, so the durable record is complete the moment the task reaches done;
+- on success, persists the final text (`UpdateTaskResult` with stop reason `end_turn`) and the JSON-marshaled trace (`UpdateTaskTrace`) **before** transitioning, so the durable record is complete the moment the task reaches done;
 - walks `in_progress -> waiting -> committing`, runs `Runner.Commit` to stage, commit, rebase, merge, and clean up the task worktrees, then transitions to `done`. A commit failure transitions from `committing` to `failed`; the state machine forbids a direct `in_progress -> done` transition.
 
 ## Task.Trace and the Graph Endpoint
 
-`store.Task.Trace` (`internal/store/models.go`) holds the JSON-marshalled trace as an opaque `*string`, so the store never depends on topos types. Nil for every non-agentic task.
+`store.Task.Trace` (`internal/store/models.go`) holds the JSON-marshaled trace as an opaque `*string`, so the store never depends on topos types. Nil for every non-agentic task.
 
-`GET /api/tasks/{id}/trace` (`internal/handler/tasks_trace.go`, `TaskTrace`) reparses the stored string into the thin frontend shape: `nodes` (id, name, role, status `running|done|failed`, grants, sandbox) and `edges` (from, to, kind `delegate|deliver|next`). The stored JSON uses capitalised keys with no tags; `json.Unmarshal` matches case-insensitively, so it binds directly to the lowercase wire fields. A task with no trace returns 200 with empty arrays, never null, so the client renders nothing without special casing. `AgentTrace.vue` draws the graph in the task detail modal.
+`GET /api/tasks/{id}/trace` (`internal/handler/tasks_trace.go`, `TaskTrace`) reparses the stored string into the thin frontend shape: `nodes` (id, name, role, status `running|done|failed`, grants, sandbox) and `edges` (from, to, kind `delegate|deliver|next`). The stored JSON uses capitalized keys with no tags; `json.Unmarshal` matches case-insensitively, so it binds directly to the lowercase wire fields. A task with no trace returns 200 with empty arrays, never null, so the client renders nothing without special casing. `AgentTrace.vue` draws the graph in the task detail modal.
 
 ## Live Traces on the Task Timeline
 

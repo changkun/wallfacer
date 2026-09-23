@@ -1380,7 +1380,7 @@ func TestOpenFolder_AllowedWorkspace(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/open-folder", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.OpenFolder(w, req)
-	// 400 would mean the workspace wasn't recognised — that is the bug we guard against.
+	// 400 would mean the workspace wasn't recognized — that is the bug we guard against.
 	if w.Code == http.StatusBadRequest {
 		t.Errorf("should not 400 for a configured workspace, got %d: %s", w.Code, w.Body.String())
 	}

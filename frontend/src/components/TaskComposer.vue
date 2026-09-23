@@ -562,7 +562,7 @@ function onInput(e: Event) {
   min-width: 0;
 }
 /* Growable text fields share one flex basis and a max width so no single field
-   balloons far wider than its neighbours when a row wraps. */
+   balloons far wider than its neighbors when a row wraps. */
 .composer__opt--grow { flex: 1 1 200px; min-width: 150px; max-width: 380px; }
 /* The timeout preset select and its "Custom…" minutes input stay on one row. */
 .composer__opt-controls { display: flex; align-items: center; gap: 4px; }

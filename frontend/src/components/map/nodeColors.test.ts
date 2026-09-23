@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { stateColor, STATE_COLORS } from './nodeColors';
 
 describe('stateColor', () => {
-  it('gives every state its own colour expression on the ramp', () => {
+  it('gives every state its own color expression on the ramp', () => {
     const values = Object.values(STATE_COLORS);
     expect(new Set(values).size).toBe(values.length);
     for (const v of values) expect(v).toMatch(/^(var\(--|color-mix\()/);

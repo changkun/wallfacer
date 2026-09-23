@@ -58,7 +58,7 @@ type codexUsageLine struct {
 // native JSON event stream. Unknown fields are ignored.
 //
 // It also carries the top-level claude-shaped result fields (Result,
-// IsError, Subtype) so the parser can recognise the normalized result
+// IsError, Subtype) so the parser can recognize the normalized result
 // envelope the host launcher emits (codex's final assistant message lives
 // in --output-last-message, not in the event stream) without a separate
 // claude-shaped decode pass.
@@ -93,7 +93,7 @@ type codexItem struct {
 
 // ParseEvent maps one NDJSON line of codex output to a canonical Event.
 // Codex emits dot-namespaced event types (thread.*, turn.*, item.*); this
-// adapter recognises the high-leverage ones, plus the normalized result
+// adapter recognizes the high-leverage ones, plus the normalized result
 // envelope the host launcher appends (a typeless line carrying the final
 // message text from --output-last-message). Unrecognised lines fall
 // through to KindUnknown.
@@ -163,7 +163,7 @@ func (codexHarness) ParseEvent(raw []byte) (Event, error) {
 		(line.Result != "" || line.StopReason != "" || line.SessionID != "" || line.IsError)):
 		// Normalized result envelope (claude-shaped, typeless or
 		// type:"result") appended by the host launcher with the final
-		// message recovered from --output-last-message. Recognised so the
+		// message recovered from --output-last-message. Recognized so the
 		// codex harness owns parsing of its own normalized output.
 		evt.Kind = KindResult
 		evt.StopReason = line.StopReason

@@ -74,7 +74,7 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 	return true
 }
 
-// promoteMu serialises auto-promotion so two simultaneous state changes
+// promoteMu serializes auto-promotion so two simultaneous state changes
 // cannot both promote a task, exceeding the concurrency limit. It is shared
 // across tryAutoPromote, tryAutoTest, tryAutoSubmit, SubmitFeedback,
 // ResumeTask, SyncTask, and checkAndSyncWaitingTasks — any code path that
@@ -487,7 +487,7 @@ func (h *Handler) tryAutoRetry(ctx context.Context, s *store.Store, task store.T
 		h.incAutoimplementAction("auto_retrier", "suppressed_max_count")
 		return
 	}
-	// For container-crash failures, honour the circuit breaker.
+	// For container-crash failures, honor the circuit breaker.
 	if task.FailureCategory == store.FailureCategoryContainerCrash && !h.runner.ContainerCircuitAllow() {
 		logger.Handler.Warn("auto-retry suppressed: container circuit breaker open",
 			"task", task.ID)

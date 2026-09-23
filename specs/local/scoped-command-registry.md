@@ -127,7 +127,7 @@ A small file (`internal/commands/scopes.go`) enumerates the valid scopes and the
 
 ### Migration
 
-The 12 existing planning commands move to `internal/commands/` with `scopes: ["planning"]`. The planning handler continues to call `registry.Commands("planning")` and `registry.Expand("planning", ...)`; behaviour for existing callers is preserved.
+The 12 existing planning commands move to `internal/commands/` with `scopes: ["planning"]`. The planning handler continues to call `registry.Commands("planning")` and `registry.Expand("planning", ...)`; behavior for existing callers is preserved.
 
 `GET /api/planning/commands` remains as an alias (or redirects to `/api/commands?scope=planning`) for a deprecation window, then is removed. `usePlanningAutocomplete.ts` is updated alongside.
 

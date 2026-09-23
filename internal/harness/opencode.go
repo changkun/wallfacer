@@ -15,7 +15,7 @@ func init() {
 // no terminal result event: the run loop simply breaks when the session goes
 // idle. The host launcher therefore aggregates the final text + token usage
 // and appends a synthesized {"type":"result", ...} line, which ParseEvent
-// recognises as KindResult. This mirrors the codex output-last-message path.
+// recognizes as KindResult. This mirrors the codex output-last-message path.
 type openCodeHarness struct{}
 
 // ID returns harness.OpenCode.
@@ -116,11 +116,11 @@ type openCodeLine struct {
 }
 
 // ParseEvent maps one NDJSON line of opencode output to a canonical Event.
-// Recognised top-level types: text → KindAssistantText, reasoning →
+// Recognized top-level types: text → KindAssistantText, reasoning →
 // KindThinking, tool_use → KindToolCall{Start,End}, step_start → KindSystemInit, error →
 // KindError, and the synthesized result → KindResult. Everything else
 // (step_finish, future event types) yields KindUnknown with Raw preserved,
-// matching the spec's tolerance for opencode's less-standardised schema.
+// matching the spec's tolerance for opencode's less-standardized schema.
 func (openCodeHarness) ParseEvent(raw []byte) (Event, error) {
 	evt := Event{Raw: append([]byte(nil), raw...)}
 

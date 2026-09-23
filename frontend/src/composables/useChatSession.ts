@@ -1,6 +1,6 @@
 // useChatSession — the agent-session chat lifecycle, extracted from
 // AgentChatPanel so multiple surfaces (the dedicated Chat view, the spec-mode
-// floating popup, the legacy docked panel) drive identical behaviour from one
+// floating popup, the legacy docked panel) drive identical behavior from one
 // implementation. Owns the rendered message list, streaming, the per-thread send
 // queue, thread switching/rename/archive, and per-round undo. Reads and writes
 // the agent store; introduces no new persistent state.

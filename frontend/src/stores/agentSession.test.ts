@@ -111,7 +111,7 @@ describe('truncateTitle / isDefaultThreadName', () => {
     expect(out.length).toBe(48);
   });
 
-  it('recognises only seeded "Chat N" names as default', () => {
+  it('recognizes only seeded "Chat N" names as default', () => {
     expect(isDefaultThreadName('Chat 1')).toBe(true);
     expect(isDefaultThreadName('Chat 42')).toBe(true);
     expect(isDefaultThreadName('Chat')).toBe(false);

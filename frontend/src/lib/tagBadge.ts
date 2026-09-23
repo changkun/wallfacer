@@ -2,11 +2,11 @@
 // tags that lead the card's meta line; spawned-by:* names the routine that
 // created the task; everything else is a label the reader can filter by.
 // Tags are one mono meta line under the title, never a row of tinted chips:
-// the card's colour budget is spent on state (specs/shared/console-redesign/board.md).
+// the card's color budget is spent on state (specs/shared/console-redesign/board.md).
 
 export type TagKind = 'priority' | 'impact' | 'spawned' | 'label';
 
-// The priority levels that earn a colour. Everything else is ink.
+// The priority levels that earn a color. Everything else is ink.
 export type TagTone = 'warn' | 'err' | '';
 
 export interface RenderedTag {

@@ -12,7 +12,7 @@ For the cloud control plane (identity, tenancy, deployment topology), see [Auth 
 
 [Architecture](architecture.md)
 
-System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop, the engine, and the agentic topos path). Package map covering all `internal/` and `internal/pkg/` packages. Handler organisation table. Start here to build a mental model of how all the pieces fit together.
+System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop, the engine, and the agentic topos path). Package map covering all `internal/` and `internal/pkg/` packages. Handler organization table. Start here to build a mental model of how all the pieces fit together.
 
 For a user-facing treatment of the same primitives (how to clone an agent, what the Harness pin does, recipes), see the [Agent Graph](../guide/agent-graph.md) guide.
 

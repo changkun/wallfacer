@@ -35,7 +35,7 @@ func TestNewOpensServingOnTheFirstURL(t *testing.T) {
 // lock across statements, which a transaction-mode pooler cannot keep on one
 // backend, so a migrator pointed at the pool loses the lock it believes it
 // holds and two of them can write the schema version at once. The serving DSN
-// here is parseable and would be dialled: if it reached the migrator, the
+// here is parseable and would be dialed: if it reached the migrator, the
 // error would name the pooled host. This runs for the ten seconds pgxmigrate
 // retries the database open before it gives up.
 func TestNewMigratesOnTheSecondURL(t *testing.T) {

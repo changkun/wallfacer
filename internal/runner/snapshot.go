@@ -14,7 +14,7 @@ import (
 	"latere.ai/x/wallfacer/internal/logger"
 )
 
-// setupNonGitSnapshot copies ws into snapshotPath and initialises a local git
+// setupNonGitSnapshot copies ws into snapshotPath and initializes a local git
 // repo there for change tracking. This lets the standard commit pipeline work
 // on non-git workspaces: Phase 1 commits changes in the snapshot, Phase 2
 // copies the snapshot back to ws (instead of rebasing into a remote branch).

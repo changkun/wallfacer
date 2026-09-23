@@ -1,8 +1,8 @@
-// State to colour, shared by the canvas (node disc fill) and the inspector
-// legend so the two never drift. Every value is a CSS colour expression on
+// State to color, shared by the canvas (node disc fill) and the inspector
+// legend so the two never drift. Every value is a CSS color expression on
 // the ramp, so the map follows the palette and the theme. Spec lifecycle and
 // task status share one map; their value sets do not collide, and states
-// that share a ramp hue are mixed toward a neighbour so no two legend rows
+// that share a ramp hue are mixed toward a neighbor so no two legend rows
 // look alike.
 export const STATE_COLORS: Record<string, string> = {
   // task status

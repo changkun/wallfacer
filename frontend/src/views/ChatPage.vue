@@ -3,7 +3,7 @@
 // sub-sidebar plus a conversation that starts from a centered entry screen
 // (greeting + hero composer + quick actions) and morphs into the message
 // stream on the first send. Supersedes chat-first mode as the single empty
-// state. All conversation behaviour comes from the shared chat core.
+// state. All conversation behavior comes from the shared chat core.
 import { ref, computed } from 'vue';
 import { useChatSession } from '../composables/useChatSession';
 import { aggregateUsage, formatTokens, formatCost, formatPercent } from '../lib/agentUsage';

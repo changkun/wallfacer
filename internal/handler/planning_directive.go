@@ -81,7 +81,7 @@ func (s *DirectiveScanner) ScanLine(line string) {
 }
 
 // Directives returns the captured directives, with each directive's
-// Body finalised from the accumulated lines. Safe to call multiple
+// Body finalized from the accumulated lines. Safe to call multiple
 // times; subsequent calls return the same result until [ScanLine] is
 // invoked again.
 func (s *DirectiveScanner) Directives() []Directive {

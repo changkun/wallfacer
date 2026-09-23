@@ -160,7 +160,7 @@ func TestHostBackend_LaunchOpenCode_ToolsOnlySuccess(t *testing.T) {
 	}
 	_, final := launchOpenCodeAndDrain(t, b, spec)
 	if final["is_error"] != false {
-		t.Errorf("is_error = %v; want false (recognised events, just no final text)", final["is_error"])
+		t.Errorf("is_error = %v; want false (recognized events, just no final text)", final["is_error"])
 	}
 	if res, _ := final["result"].(string); res != "" {
 		t.Errorf("result = %q; want empty (no text part emitted)", res)
@@ -210,7 +210,7 @@ func TestHostBackend_LaunchOpenCode_UnrecognizedOutputIsError(t *testing.T) {
 		t.Fatalf("final type = %v; want result", final["type"])
 	}
 	if final["is_error"] != true {
-		t.Errorf("is_error = %v; want true (no recognised events)", final["is_error"])
+		t.Errorf("is_error = %v; want true (no recognized events)", final["is_error"])
 	}
 	if final["stop_reason"] != "error_during_execution" {
 		t.Errorf("stop_reason = %v; want error_during_execution", final["stop_reason"])

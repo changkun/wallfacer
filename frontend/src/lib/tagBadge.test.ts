@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { classifyTag, orderTags } from './tagBadge';
 
 describe('classifyTag', () => {
-  it('strips the priority prefix and colours only high and critical', () => {
+  it('strips the priority prefix and colors only high and critical', () => {
     expect(classifyTag('priority:high')).toMatchObject({ kind: 'priority', label: 'high', tone: 'warn' });
     expect(classifyTag('priority:critical')).toMatchObject({ kind: 'priority', label: 'critical', tone: 'err' });
     expect(classifyTag('priority:low')).toMatchObject({ kind: 'priority', label: 'low', tone: '' });
@@ -13,7 +13,7 @@ describe('classifyTag', () => {
   it('keeps the spawned-by provenance whole', () => {
     expect(classifyTag('spawned-by:abc')).toMatchObject({ kind: 'spawned', label: 'spawned-by:abc' });
   });
-  it('treats everything else as a label with no colour', () => {
+  it('treats everything else as a label with no color', () => {
     expect(classifyTag('frontend')).toEqual({ rawTag: 'frontend', kind: 'label', label: 'frontend', tone: '' });
   });
 });

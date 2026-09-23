@@ -880,7 +880,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   accent-color: var(--accent);
 }
-/* The status dot: one ramp colour per lifecycle status. */
+/* The status dot: one ramp color per lifecycle status. */
 .stp-dot {
   flex: none;
   width: 6px;

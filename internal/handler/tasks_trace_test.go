@@ -11,7 +11,7 @@ import (
 )
 
 // storedTraceJSON mirrors the opaque string the runner persists from a topos
-// run (capitalised keys, no json tags; see internal/agentgraph.Trace).
+// run (capitalized keys, no json tags; see internal/agentgraph.Trace).
 const storedTraceJSON = `{"Nodes":[` +
 	`{"ID":"run-x/planner","Name":"planner","Role":"Planner","Status":"done","Grants":["read"],"Sandbox":"local"},` +
 	`{"ID":"run-x/builder","Name":"builder","Role":"Builder","Status":"running","Grants":[],"Sandbox":""}],` +

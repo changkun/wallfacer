@@ -51,7 +51,7 @@ type MockRunner struct {
 
 	// Optional override for ContainerName return value.
 	// When nil the method returns "" (no container active), matching the default
-	// behaviour expected by most tests.
+	// behavior expected by most tests.
 	ContainerNameFn func(taskID uuid.UUID) string
 
 	// GenerateCommitMessageFn lets tests stub the task-free commit-message
@@ -221,7 +221,7 @@ func (m *MockRunner) Prompts() *prompts.Manager { return prompts.NewManager("") 
 
 // GenerateCommitMessage delegates to GenerateCommitMessageFn when set; the
 // default returns ("", nil) so callers hit their deterministic fallback
-// path without signalling an error.
+// path without signaling an error.
 func (m *MockRunner) GenerateCommitMessage(ctx context.Context, data prompts.CommitData) (string, error) {
 	if m.GenerateCommitMessageFn != nil {
 		return m.GenerateCommitMessageFn(ctx, data)

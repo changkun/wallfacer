@@ -175,7 +175,7 @@ func TestCmdexecGitInvalidDir(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestSetupWorktreesIdempotent verifies that calling setupWorktrees twice for
-// the same taskID returns the same paths without error (idempotent behaviour).
+// the same taskID returns the same paths without error (idempotent behavior).
 func TestSetupWorktreesIdempotent(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
@@ -873,8 +873,8 @@ func TestParseTestVerdict(t *testing.T) {
 		// Bold PASS/FAIL with details on subsequent lines.
 		{"bold PASS then details", "**PASS**\nDetails: all 5 tests passed.", "pass"},
 		{"bold FAIL then details", "**FAIL**\nDetails: test_foo failed.", "fail"},
-		{"labelled PASS", "Summary: PASS", "pass"},
-		{"labelled FAIL", "Status: failed", "fail"},
+		{"labeled PASS", "Summary: PASS", "pass"},
+		{"labeled FAIL", "Status: failed", "fail"},
 		{"status PASSED", "Verification status: PASSED", "pass"},
 		{"outcome FAILURE", "Outcome: FAILURE", "fail"},
 		{"PASS with emoji", "All checks complete. PASS ✅", "pass"},

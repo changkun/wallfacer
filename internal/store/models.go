@@ -25,7 +25,7 @@ type TaskUsage struct {
 	CostUSD              float64 `json:"cost_usd"`
 }
 
-// Add accumulates every field of other into u. Centralised so callers
+// Add accumulates every field of other into u. Centralized so callers
 // can't accidentally drop one of the cache-token fields when summing
 // usage across tasks (a bug the per-bucket aggregations in
 // /api/stats used to have).
@@ -268,7 +268,7 @@ type Task struct {
 	SessionID         *string             `json:"session_id"`
 	FreshStart        bool                `json:"fresh_start,omitempty"`
 	Result            *string             `json:"result"`
-	// Trace holds the JSON-marshalled agentgraph.Trace (nodes + edges),
+	// Trace holds the JSON-marshaled agentgraph.Trace (nodes + edges),
 	// produced by an agentic-flow run through internal/agentgraph. Nil
 	// for every non-agentic task. Persisted as an opaque string so the
 	// store does not depend on the topos package; the graph endpoint
@@ -344,7 +344,7 @@ type Task struct {
 	// (*Task).ResolvedFlowID.
 	FlowID string `json:"flow_id,omitempty"`
 
-	// Tags are labels attached to a task for categorisation (e.g.
+	// Tags are labels attached to a task for categorization (e.g.
 	// "spawned-by:<routine-id>" for tasks created by a routine).
 	Tags []string `json:"tags,omitempty"`
 
@@ -360,7 +360,7 @@ type Task struct {
 
 	// ScheduledAt is an optional future time before which the task will not
 	// be auto-promoted from backlog. Nil means "run as soon as there is
-	// capacity" (the existing default behaviour).
+	// capacity" (the existing default behavior).
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 
 	// FailureCategory records the machine-readable root cause of the last

@@ -43,7 +43,7 @@ let reconnectDelay = 1000;
 let reconnectTimer: number | null = null;
 
 // VSCode-style ANSI palettes (dark matches legacy ui/js/terminal.js; light is
-// the VSCode light+ palette so colours stay legible on a light surface).
+// the VSCode light+ palette so colors stay legible on a light surface).
 const darkAnsi = {
   black: '#3c3c3c', red: '#f14c4c', green: '#23d18b', yellow: '#f5f543',
   blue: '#3b8eea', magenta: '#d670d6', cyan: '#29b8db', white: '#cccccc',

@@ -28,7 +28,7 @@ dispatched_task_id: null
 The kanban is the first screen and the densest one. It gets the card
 geometry, a badge budget, eyebrow column headers, and a composer that reads as
 one control. The four-column layout, drag and drop, sort modes, archive
-controls and the explorer rail keep their behaviour.
+controls and the explorer rail keep their behavior.
 
 ## Current State
 
@@ -41,7 +41,7 @@ controls and the explorer rail keep their behaviour.
   timeout, age; title; tag badges (priority, impact, labels) from the
   `--tag-bg-N` slots; description; last output or error block; turns and
   cost; action buttons per state (Plan, Start, Resume, Test, Done, Retry) in
-  `.card-action-*` colour variants.
+  `.card-action-*` color variants.
 - `TaskComposer.vue` (636 lines, 162 scoped): the "+ New Task" dashed button
   expanding into a textarea with mentions, harness select, deps picker.
 - `board.css` 607 lines, `search.css` 78 lines.
@@ -51,7 +51,7 @@ controls and the explorer rail keep their behaviour.
 ### Column header
 
 `.col-hd` becomes `.eyebrow` with the state dot (5px circle in the column's
-ramp colour, `--col-*` now aliases of the ramp), the count as `.count`
+ramp color, `--col-*` now aliases of the ramp), the count as `.count`
 (mono, `--ink-3`), and the column controls as `.icon-btn`s that appear on
 hover of the header, matching replichai's borderless icon buttons. The
 "max N" parallel tag on In Progress is a `.pill-neutral`.
@@ -71,7 +71,7 @@ Migrate frontend store to Pinia setup
 medium · impact 4 · frontend
 ```
 
-- Rank and status are `.pill-neutral` and the state pill in ramp colour
+- Rank and status are `.pill-neutral` and the state pill in ramp color
   (`backlog` neutral, `in_progress` run with `.pill-dot.pulse`, `waiting`
   warn, `done` ok, `failed` err, `cancelled`/`archived` neutral).
 - Verification (`verified`, `unverified`, `verify failed`) is the qualifier
@@ -80,14 +80,14 @@ medium · impact 4 · frontend
   the harness logo at 12px.
 - Priority, impact and labels stop being tinted badges. They are one mono
   meta line under the title, `--ink-3`, separated by `·`, with priority first
-  and coloured only when it is `high` (`--warn`) or `critical` (`--err`). The
+  and colored only when it is `high` (`--warn`) or `critical` (`--err`). The
   `--tag-bg-N` slots and the palette tag block in `palettes.css` are deleted.
 - The last output or error block is a `.card-out` well: `--bg-sunk`, radius
   `--r-sm`, mono 11px, an `err` variant with `--err` text on its tint.
 - Turns and cost are `.tabular` on the meta line of the last row.
 - Actions: one `.btn.sm` for the primary transition of the column (Start,
   Resume, Done) and `.btn.sm.ghost` for the rest (Plan, Test, Retry). The
-  `card-action-*` colour variants are deleted.
+  `card-action-*` color variants are deleted.
 
 ### Composer
 
@@ -124,10 +124,10 @@ the toggle being the `.seg` two-state form.
 action helper) and `1068e86a` (card, columns, composer, search, checks).
 
 **What shipped.** `TaskCard.vue` renders the badge budget: rank, one state pill
-(ramp colour, pulsing dot while running) and one qualifier chosen from
+(ramp color, pulsing dot while running) and one qualifier chosen from
 verification, failure category, dependency state, schedule and PR state, with
 the rest as plain text on the meta line. Tags are one mono meta line ordered
-priority, impact, labels, provenance; only `high` and `critical` carry colour
+priority, impact, labels, provenance; only `high` and `critical` carry color
 (`lib/tagBadge.ts`, `orderTags`). Actions are `.btn.sm` with the forward
 transition as the ink button (`primaryCardAction`). Column headers are
 eyebrows with quiet pill controls; the tray is 18px with 14px cards.

@@ -43,7 +43,7 @@ func readSkills(t *testing.T) map[string]string {
 // enumSeparator matches the connector between two status literals that
 // belong to the same enumeration — "a/b", "a|b", "a, b", "a, or b",
 // "a or b". Padded pipes (" | ") are deliberately excluded: those are
-// markdown table cells, where the neighbouring statuses are a row's
+// markdown table cells, where the neighboring statuses are a row's
 // source and its allowed targets, not one list.
 var enumSeparator = regexp.MustCompile(`^(/|\||, ?(or )?| or )$`)
 
@@ -127,7 +127,7 @@ func TestSkillsDoNotClaimIllegalEdges(t *testing.T) {
 		plain := strings.NewReplacer("`", "", "**", "").Replace(body)
 		lines := strings.Split(plain, "\n")
 		for i, line := range lines {
-			// The forbidding word often lands on the neighbouring line
+			// The forbidding word often lands on the neighboring line
 			// because these files are hard-wrapped, so judge a window.
 			window := strings.Join(lines[max(0, i-1):min(len(lines), i+2)], " ")
 			for _, m := range arrow.FindAllStringSubmatch(line, -1) {

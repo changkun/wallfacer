@@ -2,7 +2,7 @@
 // SVG-based span timeline (a Gantt-style flamegraph) for the task detail
 // view. Pure layout helpers live in lib/flamegraph; this component is just
 // presentation + hover tooltip. Lanes are laid out top-down; horizontal
-// axis is the task's wall-clock time normalised into 100% of the SVG width.
+// axis is the task's wall-clock time normalized into 100% of the SVG width.
 import { computed, ref } from 'vue';
 import { formatMs, layoutSpans, labelHue, cumulativeCostPoints, type SpanResult, type TurnUsageRecord } from '../lib/flamegraph';
 

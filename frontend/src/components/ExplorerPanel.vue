@@ -53,7 +53,7 @@ function openTaskPrompt(entry: TaskPromptEntry) {
 const children = ref<Map<string, TreeEntry[]>>(new Map());
 const expanded = ref<Set<string>>(new Set());
 
-// Semantic file-type icon (colour + SVG paths) for a tree entry. See lib/fileIcon.
+// Semantic file-type icon (color + SVG paths) for a tree entry. See lib/fileIcon.
 function iconFor(entry: TreeEntry): FileIcon {
   return fileIcon(entry.name, entry.is_dir, expanded.value.has(entry.path));
 }

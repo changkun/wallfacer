@@ -119,7 +119,7 @@ const maxParallel = computed<string | number>(() => {
 });
 
 // Empty-state composer: when the whole board is empty (no tasks across
-// every column, archived or not), show a centred prompt + auto-expanded
+// every column, archived or not), show a centered prompt + auto-expanded
 // composer instead of the four columns. Mirrors ui/js/board-composer.js's
 // #board-empty-composer slot.
 const hasWorkspace = computed(() => (store.config?.workspaces?.length ?? 0) > 0);

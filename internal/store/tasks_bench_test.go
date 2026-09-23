@@ -1,5 +1,5 @@
 // Benchmarks for tasks.go: measure lock hold time reduction for
-// buildIndexEntry-before-lock optimisations.
+// buildIndexEntry-before-lock optimizations.
 package store
 
 import (
@@ -65,7 +65,7 @@ func BenchmarkUpdateTaskTitle(b *testing.B) {
 }
 
 // BenchmarkCreateTask_LargeOversight measures the RestoreTask path with a
-// large (~55 KB) oversight string.  Before the optimisation, LoadOversightText
+// large (~55 KB) oversight string.  Before the optimization, LoadOversightText
 // and buildIndexEntry ran inside the write lock; after, they run before it.
 // The benchmark calls RestoreTask once per iteration, re-deleting the task
 // between iterations so the task stays available in the deleted map.

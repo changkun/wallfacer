@@ -345,7 +345,7 @@ watch(showArchived, () => void loadGraph());
 <style scoped>
 /* Inspector cards: the selection, the ready and critical lists, the legend.
    Rows are the primitive at a tighter padding; the state dot carries the
-   colour so the list and the canvas never disagree. */
+   color so the list and the canvas never disagree. */
 .mc-dot {
   width: 9px;
   height: 9px;

@@ -229,7 +229,7 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 	b.WriteString("  ")
 
-	// Component: fixed 8-char column, dim cyan (de-emphasised label).
+	// Component: fixed 8-char column, dim cyan (de-emphasized label).
 	b.WriteString(col(ansiCyan+ansiDim, fmt.Sprintf("%-8s", component)))
 	b.WriteString("  ")
 

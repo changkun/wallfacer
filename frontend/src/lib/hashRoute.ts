@@ -1,7 +1,7 @@
 // Migrate legacy hash-mode deep links to history-mode routes (spec AD-2).
 // Old UI used `#<uuid>` for a task modal and `#plan/<path>` / `#plan` for the
 // agent-session/plan view. Returns the equivalent history route, or null when the hash
-// isn't a recognised legacy deep link.
+// isn't a recognized legacy deep link.
 
 export interface HashTarget {
   path: string;

@@ -41,7 +41,7 @@ type Store struct {
 // direct endpoint and serving traffic goes through the pooler, where the pool
 // size and not the replica count is this service's claim on the shared
 // cluster. The pool is opened first because pgxpool.New parses the DSN and
-// hands back a handle without dialling: with MinConns at the pgx default of 0
+// hands back a handle without dialing: with MinConns at the pgx default of 0
 // no backend is taken until the first query, which is after the migrations.
 func New(ctx context.Context, servingURL, migrationURL string) (*Store, error) {
 	pool, err := pgxpool.New(ctx, servingURL)

@@ -138,7 +138,7 @@ func (h *Handler) GetSpecTree(w http.ResponseWriter, r *http.Request) {
 // The server polls the spec directories every 3 seconds and sends the
 // full tree data only when it differs from the previous snapshot.
 // Changes to the roadmap (specs/README.md) also fire a snapshot via
-// this path since the poller serialises the full TreeResponse and
+// this path since the poller serializes the full TreeResponse and
 // compares the JSON — any field-level change drives a new event.
 func (h *Handler) SpecTreeStream(w http.ResponseWriter, r *http.Request) {
 	stream := sse.NewWriter(w)

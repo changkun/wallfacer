@@ -35,7 +35,7 @@ type Harness interface {
 	BuildArgv(req Request) (argv []string, stdin io.Reader, err error)
 
 	// ParseEvent parses one NDJSON line of harness output into a
-	// canonical Event. Lines the harness does not recognise should be
+	// canonical Event. Lines the harness does not recognize should be
 	// returned as Event{Kind: KindUnknown, Raw: raw} rather than an
 	// error, so callers can record but not crash on schema drift.
 	ParseEvent(raw []byte) (Event, error)

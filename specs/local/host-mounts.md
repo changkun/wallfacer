@@ -73,7 +73,7 @@ type HostMount struct {
 HostMounts []HostMount `json:"host_mounts,omitempty"`
 ```
 
-`omitempty` means existing `task.json` files without the field deserialise cleanly with a nil slice. No schema migration needed.
+`omitempty` means existing `task.json` files without the field deserialize cleanly with a nil slice. No schema migration needed.
 
 **What is NOT stored:** No derived container-side path. The agent uses the literal `HostPath`, so there is nothing else to persist.
 
@@ -221,7 +221,7 @@ When viewing a task with host path references:
 
 ## Edge Cases
 
-| Scenario | Behaviour |
+| Scenario | Behavior |
 |----------|-----------|
 | **Path disappears between creation and launch** | Reference omitted from the turn-1 prompt stanza; system event logged. Task runs normally with the remaining references. |
 | **Path is a symlink** | Validate the resolved target (absolute, not sensitive, regular file/dir), not the symlink itself. The agent reads through the symlink at the original path. |

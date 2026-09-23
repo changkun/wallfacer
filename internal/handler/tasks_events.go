@@ -48,7 +48,7 @@ var validEventTypes = map[string]store.EventType{
 // GetEvents returns the event timeline for a task.
 //
 // Without query params, the full event list is returned as a JSON array
-// (backward-compatible behaviour).
+// (backward-compatible behavior).
 //
 // With any of after, limit, or types present, a paginated envelope is returned:
 //

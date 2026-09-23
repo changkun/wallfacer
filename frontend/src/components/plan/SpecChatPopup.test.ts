@@ -1,4 +1,4 @@
-// Geometry behaviour for the floating spec-mode chat popup: default bottom-right
+// Geometry behavior for the floating spec-mode chat popup: default bottom-right
 // anchor, drag + persist, viewport clamping, and open-state persistence. The
 // chat children and network are stubbed — this pins the popup chrome only.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

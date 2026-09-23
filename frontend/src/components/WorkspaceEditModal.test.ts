@@ -1,5 +1,5 @@
 // WorkspaceEditModal is the single per-workspace settings popup (name, folders,
-// parallel caps, delete). These pin the behaviour that must hold:
+// parallel caps, delete). These pin the behavior that must hold:
 //  - one Name field (no duplicated label/input box),
 //  - folder add/remove and caps persist via wsStore.update (never the wizard's
 //    activate-on-confirm path),

@@ -1,5 +1,5 @@
 // Render contract for the assistant turn: the agent trajectory leads the
-// answer. While streaming the activity disclosure is open and labelled
+// answer. While streaming the activity disclosure is open and labeled
 // "Working…"; once the answer lands it collapses into an informative one-liner
 // (step + tool counts) that sits ABOVE the prose, not a generic "Agent
 // activity" toggle below it. A plain createApp mount exercises the real
@@ -85,7 +85,7 @@ describe('ChatMessageList — trajectory placement', () => {
     mount([assistant({ isStreaming: true, contentHtml: '' })]);
     const details = host.querySelector('details.pcp-activity')!;
     expect(details.hasAttribute('open')).toBe(true);
-    // The freeform (boxless) live mode is signalled by the --live modifier.
+    // The freeform (boxless) live mode is signaled by the --live modifier.
     expect(details.classList.contains('pcp-activity--live')).toBe(true);
     expect(host.querySelector('.pcp-activity-title')!.textContent).toBe('Working…');
   });

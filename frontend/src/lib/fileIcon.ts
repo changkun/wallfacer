@@ -1,5 +1,5 @@
 // Semantic file-type icons for the explorer tree, ported 1:1 from the legacy
-// ui/js/explorer.js icon map. Returns a stroke colour + the inner SVG path
+// ui/js/explorer.js icon map. Returns a stroke color + the inner SVG path
 // fragments; the component wraps them in a <svg viewBox="0 0 24 24">.
 
 const MUTED = 'var(--text-muted)';

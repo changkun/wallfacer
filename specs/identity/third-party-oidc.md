@@ -89,7 +89,7 @@ ends up living:
 - SAML. OIDC-only here; SAML is a separate spec if ever needed.
 - Social login (raw OAuth2 against GitHub / Google without OIDC).
   Providers that speak OIDC are covered; bare OAuth2 is not.
-- Reshaping the latere.ai-hosted flavour. `auth.latere.ai` keeps the
+- Reshaping the latere.ai-hosted flavor. `auth.latere.ai` keeps the
   same platform RP, its cookie semantics, and its front-channel logout
   iframe.
 - Third-party provider *registration* (client ID / secret rotation,

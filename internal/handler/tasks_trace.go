@@ -41,11 +41,11 @@ type taskTraceResp struct {
 
 // TaskTrace returns the trace sub-graph of an agentic-flow run for a task.
 // The stored trace is an opaque JSON string written by the runner from the
-// topos result (capitalised keys, no json tags); this handler reparses it into
+// topos result (capitalized keys, no json tags); this handler reparses it into
 // the thin lowercase-keyed shape the UI consumes. A task with no trace (every
 // non-agentic task, or one whose run has not produced a graph yet) returns
 // empty nodes and edges with 200, so the client renders nothing without special
-// casing. json.Unmarshal matches keys case-insensitively, so the capitalised
+// casing. json.Unmarshal matches keys case-insensitively, so the capitalized
 // stored keys bind to the lowercase-tagged fields directly.
 func (h *Handler) TaskTrace(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	s, ok := h.requireStore(w)

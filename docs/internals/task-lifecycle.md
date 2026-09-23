@@ -282,7 +282,7 @@ Tasks can declare dependencies on other tasks via `DependsOn []string` (a list o
 
 2. **Prompt validation**: Every task must have a non-empty prompt.
 
-3. **Flow validation**: Each task's `flow` field is optional on input but normalises to `implement` when omitted; unknown flow slugs are rejected at dispatch time by the runner. The deprecated `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400; see the [Agent Graph](../guide/agent-graph.md) guide for the migration path.
+3. **Flow validation**: Each task's `flow` field is optional on input but normalizes to `implement` when omitted; unknown flow slugs are rejected at dispatch time by the runner. The deprecated `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400; see the [Agent Graph](../guide/agent-graph.md) guide for the migration path.
 
 4. **Dependency reference resolution**: Each `depends_on_refs` entry must be either a known batch ref or a syntactically valid UUID.
 

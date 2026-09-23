@@ -90,7 +90,7 @@ func (b *HostBackend) launchOpenCode(ctx context.Context, spec ContainerSpec) (H
 
 // openCodeResultRecord is the synthesized terminal line appended after
 // opencode's stdout closes. Its shape matches what harness.OpenCode.ParseEvent
-// recognises as a KindResult (type "result", top-level result/usage/cost).
+// recognizes as a KindResult (type "result", top-level result/usage/cost).
 type openCodeResultRecord struct {
 	Type       string             `json:"type"`
 	SessionID  string             `json:"sessionID"`
@@ -193,14 +193,14 @@ func teeOpenCodeAndAppendResult(ocStdout io.Reader, out *io.PipeWriter) {
 
 	// Treat a run that produced no final text as a failure when the stream was
 	// empty, carried a session error, or carried only events we did not
-	// recognise. The last case is the schema-drift signature: opencode emitted
+	// recognize. The last case is the schema-drift signature: opencode emitted
 	// output but none of it matched the events we parse, so synthesizing a
 	// success with empty text + zero usage would hide a broken read path.
 	if record.Result == "" && (sawError || !hadStdout || !sawRecognized) {
 		record.IsError = true
 		record.StopReason = "error_during_execution"
 		if hadStdout && !sawRecognized {
-			logger.Runner.Warn("host backend: opencode produced output but no recognised events; result/usage may be missing (schema drift?)")
+			logger.Runner.Warn("host backend: opencode produced output but no recognized events; result/usage may be missing (schema drift?)")
 		}
 	}
 

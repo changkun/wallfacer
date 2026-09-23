@@ -79,7 +79,7 @@ function toggleFork(i: number) {
         <template v-else-if="status.kind === 'issues'">{{ unresolved }} unresolved attack{{ unresolved === 1 ? '' : 's' }} remain.</template>
         <template v-else>Verification complete.</template>
       </div>
-      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
       <div
         v-if="task.review_headline && (unresolved ?? 0) > 0"
         class="review__headline prose-content review-md"
@@ -113,7 +113,7 @@ function toggleFork(i: number) {
               <span class="review-msg__role">{{ r.role === 'critic' ? 'Critic' : 'Proposer' }}</span>
               <span class="review-msg__round">Round {{ r.round }}</span>
             </header>
-            <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitises -->
+            <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
             <div class="review-msg__body prose-content review-md" v-html="renderMarkdown(r.body)" />
           </article>
         </div>

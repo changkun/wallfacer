@@ -63,7 +63,7 @@ func initGitTestRepo(t *testing.T) string {
 	runGit(t, dir, "config", "user.email", "test@example.com")
 	runGit(t, dir, "config", "user.name", "Test User")
 	runGit(t, dir, "config", "commit.gpgsign", "false")
-	// Pin line-ending behaviour so stash/pop round-trips preserve the bytes
+	// Pin line-ending behavior so stash/pop round-trips preserve the bytes
 	// we wrote on Windows runners (git's default core.autocrlf=true there
 	// would rewrite LF → CRLF on checkout).
 	runGit(t, dir, "config", "core.autocrlf", "false")
@@ -566,7 +566,7 @@ func TestWrapLine(t *testing.T) {
 // TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit verifies that the
 // planning commit pipeline calls MaybeAutoPushWorkspace on the runner after
 // commitPlanningRound returns a positive round number (i.e. a commit was made).
-// This mirrors the behaviour of the "mark as done" flow for task cards, which
+// This mirrors the behavior of the "mark as done" flow for task cards, which
 // calls runner.Commit (and inside it maybeAutoPush) after moving a Waiting
 // task to Done.
 func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {

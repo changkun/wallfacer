@@ -141,7 +141,7 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     Validated same-origin end-to-end: clone -> agentic + dynamic + mesh + depth
     -> save -> the flow round-trips as `agentic:true, topology:mesh, depth:4`.
   - **M6.2e DONE.** Mark parallel via node drag: step nodes are pointer-draggable
-    (SVG does not fire HTML5 dragstart reliably, and a pointer model generalises
+    (SVG does not fire HTML5 dragstart reliably, and a pointer model generalizes
     to reordering), and dropping one node on another groups them into a parallel
     stage (`setParallel` merges the transitive groups into a fully-mutual,
     contiguous column). A per-node ungroup control pulls a step back out
@@ -164,9 +164,9 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
     and agents CRUD.
 - **M6.3: run overlay. DONE** (fleet model). A read-only run picker lists the
   selected fleet's agentic runs (tasks with `flow_id` == the fleet + a trace);
-  choosing one fetches `GET /api/tasks/{id}/trace` and colours the agent nodes
+  choosing one fetches `GET /api/tasks/{id}/trace` and colors the agent nodes
   by status (running / done / failed), matched by trace node name == agent
-  slug. Component-tested (filter by fleet, name-keyed status colouring).
+  slug. Component-tested (filter by fleet, name-keyed status coloring).
 - **M6.4: retire the old pages. PARITY DONE; cutover deferred.** The unified
   fleet surface now has full CRUD parity with `FlowsPage`: clone/edit/save (M6.2),
   delete a user fleet (inline two-step confirm), the run overlay (M6.3), and a

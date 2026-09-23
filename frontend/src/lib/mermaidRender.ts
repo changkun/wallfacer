@@ -1,5 +1,5 @@
 // Mermaid post-processor for markdown content. Mirrors the legacy
-// ui/js/lib/markdown-render.js behaviour:
+// ui/js/lib/markdown-render.js behavior:
 //   - Lazy-load mermaid v11 (already a dependency).
 //   - Read CSS custom properties so diagrams adopt the active theme.
 //   - Render `.mermaid-block[data-mermaid]` placeholders emitted by our
@@ -30,7 +30,7 @@ function cssVar(name: string): string {
 }
 
 function themeConfig() {
-  // Every diagram colour is a console token: nodes on the sunk surface with a
+  // Every diagram color is a console token: nodes on the sunk surface with a
   // rule stroke, text in ink, lines in the quiet ink, clusters on the card.
   const ink = cssVar('--ink');
   const ink3 = cssVar('--ink-3');
@@ -101,9 +101,9 @@ function fixNodeContrast(container: Element) {
     const node = shape.closest('.node');
     if (!node) continue;
     const labels = node.querySelectorAll<HTMLElement>('.nodeLabel, foreignObject span');
-    // A diagram may colour its own nodes; the label takes whichever of ink
+    // A diagram may color its own nodes; the label takes whichever of ink
     // and the page surface contrasts with that fill, so it reads in both
-    // themes without a literal colour.
+    // themes without a literal color.
     const ink = cssVar('--ink');
     const bg = cssVar('--bg');
     const inkLum = hexLuminance(ink);
@@ -163,7 +163,7 @@ export async function enhanceMermaid(container: HTMLElement | null): Promise<voi
   }
 }
 
-// Re-initialise mermaid against the current CSS variables and re-render
+// Re-initialize mermaid against the current CSS variables and re-render
 // every diagram in the document. Called when `<html data-theme>` changes.
 export async function reinitMermaidTheme(): Promise<void> {
   if (!mermaidPromise) return;

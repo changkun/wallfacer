@@ -27,7 +27,7 @@ Supersedes the archived [[file-attachments]] (specs/local/file-attachments.md), 
 
 ## Problem
 
-The task composer (`frontend/src/components/TaskComposer.vue`) accepts plain Markdown text only. There is no way to attach screenshots, diagrams, reference PDFs, or small data files for the agent to use as context. Users describe visual artefacts in prose (lossy) or paste text inline. The feedback composer on waiting tasks (`internal/handler/execute.go` `SubmitFeedback`) has the same gap.
+The task composer (`frontend/src/components/TaskComposer.vue`) accepts plain Markdown text only. There is no way to attach screenshots, diagrams, reference PDFs, or small data files for the agent to use as context. Users describe visual artifacts in prose (lossy) or paste text inline. The feedback composer on waiting tasks (`internal/handler/execute.go` `SubmitFeedback`) has the same gap.
 
 ## Goal
 

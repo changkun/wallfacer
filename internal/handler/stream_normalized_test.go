@@ -130,7 +130,7 @@ func TestNormalizingWriter_ChunkBoundaries(t *testing.T) {
 }
 
 func TestNormalizingWriter_DropsNoiseAndUnknown(t *testing.T) {
-	// stderr text, a blank line, and a JSON line the harness does not recognise
+	// stderr text, a blank line, and a JSON line the harness does not recognize
 	// must all be dropped from the normalized stream.
 	raw := []byte("a plain stderr line\n\n{\"type\":\"totally_unknown_event\"}\n")
 	evts := runNormalized(t, harness.OpenCode, raw, false)

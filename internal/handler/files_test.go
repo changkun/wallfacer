@@ -243,7 +243,7 @@ func TestFileIndex_OnlyOneRefreshInFlight(t *testing.T) {
 // --------------------------------------------------------------------------
 
 // newTestHandlerWithTwoWorkspaces creates a Handler with two separate temp-dir
-// workspaces so that multi-workspace behaviour can be exercised.
+// workspaces so that multi-workspace behavior can be exercised.
 func newTestHandlerWithTwoWorkspaces(t *testing.T) (*Handler, string, string) {
 	t.Helper()
 	ws1 := t.TempDir()

@@ -33,7 +33,7 @@ token values, the cream palette demoted to a preset, a type and radius ladder,
 matte shadows, the removal of Liquid Glass, and the shared primitive classes
 (`.btn`, `.icon-btn`, `.pill`, `.card`, `.rows`, `.row`, `.seg`, `.field`,
 `.eyebrow`). Nothing in this child changes a screen's layout. It changes how
-every screen is coloured and what classes the surface specs may compose from.
+every screen is colored and what classes the surface specs may compose from.
 
 ## Current State
 

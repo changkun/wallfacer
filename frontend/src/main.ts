@@ -54,7 +54,7 @@ export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) =>
   }
   // Browser RUM: only enable in cloud mode — that's the only deployment
   // where the backend exposes /v1/telemetry/* (TelemetryProxy). Local-mode
-  // binaries (and dev) have no proxy, so initialising here would spam the
+  // binaries (and dev) have no proxy, so initializing here would spam the
   // console with 405s from every OTLP batch.
   if (
     isClient &&

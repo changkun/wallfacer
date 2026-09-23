@@ -90,7 +90,7 @@ func TestDirectiveScanner_MultipleDirectives(t *testing.T) {
 func TestDirectiveScanner_ImbalancedFence(t *testing.T) {
 	// A fence that never closes — every subsequent line is inside-fence,
 	// including any /spec-new that appears. No directives should be
-	// recognised.
+	// recognized.
 	dirs := scanAll([]string{
 		"opening normal prose",
 		"```",

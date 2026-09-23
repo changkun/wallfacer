@@ -606,7 +606,7 @@ func TestStreamTasks_NoLastEventID_AlwaysSnapshot(t *testing.T) {
 
 // TestStreamTasks_ReplayViaLastEventIDHeader verifies that the Last-Event-ID
 // HTTP header (sent automatically by the browser's native EventSource on
-// reconnect) is also honoured.
+// reconnect) is also honored.
 func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()

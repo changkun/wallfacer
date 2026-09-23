@@ -129,7 +129,7 @@ func pathFilter(userPaths []string, specsDir string) map[string]bool {
 			}
 		}
 		for _, c := range candidates {
-			// Normalise: any form reduces to a forward-slash path rooted
+			// Normalize: any form reduces to a forward-slash path rooted
 			// at specsDir (matching what spec.Path records).
 			if rel, err := filepath.Rel(filepath.Dir(specsDir), c); err == nil && !strings.HasPrefix(rel, "..") {
 				wanted[filepath.ToSlash(rel)] = true

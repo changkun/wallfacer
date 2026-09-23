@@ -22,9 +22,9 @@ export function storedRoute(): string | null {
 
 // Decide where a cold launch should land. We only override the default board
 // landing (`/`): any explicit URL — a deep link, or a refresh on /plan — is
-// honoured as-is. Returns the stored path to restore, or null to stay put.
+// honored as-is. Returns the stored path to restore, or null to stay put.
 export function routeToRestore(landedAt: string, stored = getStored(KEY)): string | null {
-  if (landedAt !== '/') return null;          // explicit URL — honour it
+  if (landedAt !== '/') return null;          // explicit URL — honor it
   if (!stored || stored === '/') return null; // nothing better to restore
   return stored;
 }

@@ -198,7 +198,7 @@ func (s *Store) DismissRefinement(_ context.Context, id uuid.UUID) error {
 }
 
 // SearchTasks performs a case-insensitive substring search across title, prompt,
-// tags (joined), and oversight summary text. Search order favours the cheapest
+// tags (joined), and oversight summary text. Search order favors the cheapest
 // fields first. Each task produces at most one result (first matching field).
 // Results are capped at constants.MaxSearchResults. Archived tasks are included.
 //
@@ -265,7 +265,7 @@ func matchTask(t *Task, entry indexedTaskText, q string) (field, snippet string,
 	return "", "", false
 }
 
-// buildSnippet returns an HTML-escaped substring of src centred on the match at
+// buildSnippet returns an HTML-escaped substring of src centered on the match at
 // [idx, idx+matchLen) with up to constants.SnippetPadding bytes of context on each side.
 // Truncation points are adjusted to UTF-8 rune boundaries, and ellipsis markers
 // are prepended/appended when the window is shorter than src.

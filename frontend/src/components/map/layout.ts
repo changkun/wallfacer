@@ -8,7 +8,7 @@
 // 8000px-tall wall — exactly the "still a mess" the rebuild is meant to kill. A
 // layer wider than `maxRows` is packed into multiple sub-columns, bounding
 // column height to `maxRows * rowHeight`, and each layer's horizontal span is
-// accumulated so neighbouring layers never overlap.
+// accumulated so neighboring layers never overlap.
 //
 // Pure and deterministic: same graph in → same coordinates out.
 

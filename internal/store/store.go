@@ -56,7 +56,7 @@ type Store struct {
 	// It enables O(1) CountByStatus and O(k) ListTasksByStatus (where k is the
 	// count for that status) instead of O(n) full-map scans.
 	// Always accessed under s.mu (read or write lock). Inner maps are never nil
-	// after initialisation — use addToStatusIndex / removeFromStatusIndex.
+	// after initialization — use addToStatusIndex / removeFromStatusIndex.
 	tasksByStatus map[TaskStatus]map[uuid.UUID]struct{}
 
 	// searchIndex holds pre-lowercased text for fast in-memory search.

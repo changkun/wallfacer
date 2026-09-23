@@ -4,7 +4,7 @@
 // route definitions in internal/apicontract/routes.go.
 //
 // Generated files:
-//   - docs/internals/api-contract.json — machine-readable route catalogue
+//   - docs/internals/api-contract.json — machine-readable route catalog
 //
 // The Vue frontend uses literal /api/... paths, so no JS path-builder
 // helpers are generated.

@@ -331,7 +331,7 @@ func TestHostBackend_Kill_Escalates(t *testing.T) {
 // on Windows CI.
 func TestHostBackend_Kill_EscalatesImmediatelyWhenSignalUnsupported(t *testing.T) {
 	// Inject a signal the OS rejects so Process.Signal returns an error,
-	// reproducing Windows behaviour on any platform. Not parallel: gracefulSig
+	// reproducing Windows behavior on any platform. Not parallel: gracefulSig
 	// is process-global mutable state.
 	orig := gracefulSig
 	gracefulSig = syscall.Signal(0x7f) // out-of-range signal number → EINVAL

@@ -17,7 +17,7 @@ import (
 
 // registerTestBinding installs a binding under a test-only slug and
 // clears it at the end of the test. Tests register their own bindings
-// so they can drive custom parse / mount-mode behaviour without
+// so they can drive custom parse / mount-mode behavior without
 // mutating package-level state across tests.
 func registerTestBinding(t *testing.T, slug string, b agentBinding) {
 	t.Helper()
@@ -222,7 +222,7 @@ func TestRunAgent_PromptTmplPrepend(t *testing.T) {
 
 // TestRunAgent_PromptTmplEmptyUnchanged confirms that without a
 // PromptTmpl the prompt reaches the CLI verbatim, matching
-// pre-change behaviour.
+// pre-change behavior.
 func TestRunAgent_PromptTmplEmptyUnchanged(t *testing.T) {
 	r, backend, _ := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
@@ -253,7 +253,7 @@ func TestRunAgent_PromptTmplEmptyUnchanged(t *testing.T) {
 
 // TestRunAgent_HarnessPinEmptyInherits confirms the default path
 // is unchanged: an empty Harness pin lets the 4-tier resolver
-// pick the task's sandbox, matching pre-pin behaviour.
+// pick the task's sandbox, matching pre-pin behavior.
 func TestRunAgent_HarnessPinEmptyInherits(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}

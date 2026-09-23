@@ -30,7 +30,7 @@ The heaviest surface: a 2,392-line component with 611 lines of scoped CSS,
 a 708-line `modal.css` written for it, and 607 lines of diff styling. It
 becomes a sheet built from primitives: a header row, a tab strip, a scrolling
 main column, and a right column of `.card`s with `.rows`, replacing the three
-stacked action tiles, the 4px-radius chrome and the nine hardcoded colours.
+stacked action tiles, the 4px-radius chrome and the nine hardcoded colors.
 
 ## Current State
 
@@ -79,7 +79,7 @@ first consumer).
   `.btn.sm.ghost` right-aligned; the mermaid theme reads the ramp.
 - Activity and Events: `AgentTrace` rows become `.rows` inside a `.card`,
   each `.row` with a tool glyph, mono summary, duration `.tabular`; the
-  flamegraph colours read `--run`, `--warn`, `--err`, `--purple`.
+  flamegraph colors read `--run`, `--warn`, `--err`, `--purple`.
 - Changes: `diffs.css` restyled on tokens: file headers as `.card-head`,
   added lines on `color-mix(var(--ok) 10%)`, removed on `color-mix(var(--err)
   10%)`, hunk headers `--bg-sunk`, comments (`DiffLineRow`) as inset `.card`

@@ -44,7 +44,7 @@ function pretty(v: unknown): string {
 }
 
 // toolSummary pulls a one-line hint from a harness-shaped tool input without a
-// per-harness summariser (v1 generic): it walks the object shallowly for the
+// per-harness summarizer (v1 generic): it walks the object shallowly for the
 // common "what is this call doing" keys. Returns '' when nothing obvious is
 // present, leaving the row to rely on its expandable detail.
 function toolSummary(input: unknown): string {

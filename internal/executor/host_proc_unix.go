@@ -20,7 +20,7 @@ func configureProcessGroup(cmd *exec.Cmd) {
 
 // terminateGroupSignal sends sig to the agent's process group (negative pid
 // targets the group, whose leader pid equals the agent pid under Setpgid).
-// Falls back to signalling the leader alone if the group send fails.
+// Falls back to signaling the leader alone if the group send fails.
 func terminateGroupSignal(cmd *exec.Cmd, sig os.Signal) error {
 	if cmd.Process == nil {
 		return nil

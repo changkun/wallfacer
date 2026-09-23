@@ -111,7 +111,7 @@ with a dirty dot in `--warn` and a close `.icon-btn` on hover.
 
 **What shipped** (`6d45e5ac`, `a47db930`, `fdc3daad`, `53ebaac8`). `modal.css`
 defines the two floating shapes beside the sheet: `.pop` (a lifted card with
-`--sh-pop`, radius `--r-xl`) and `.dialog` (centred, 440 wide, `.dialog--wide`
+`--sh-pop`, radius `--r-xl`) and `.dialog` (centered, 440 wide, `.dialog--wide`
 720, with `.dialog-head`, `.dialog-body` and `.dialog-foot`). The command
 palette is a 640px `.pop` at the top of the viewport: a borderless field with
 an `esc` key in the head, sections under `.eyebrow` titles, rows at the row

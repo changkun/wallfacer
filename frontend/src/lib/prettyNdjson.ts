@@ -166,7 +166,7 @@ export function frameActivityRows(frame: Frame): ActivityRow[] {
     }
   } else if (frame.type === 'user') {
     for (const block of blocks) {
-      // Successful tool output is noise the agent's prose already summarises;
+      // Successful tool output is noise the agent's prose already summarizes;
       // surface only failures.
       if (block.type === 'tool_result' && block.is_error) {
         const text = toolResultText(block);

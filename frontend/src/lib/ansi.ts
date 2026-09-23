@@ -1,10 +1,10 @@
 // ANSI escape-code → HTML renderer for log text. Ported from
 // ui/js/modal-ansi.js so the Activity tab and any future raw-stderr view
-// can colour CLI output without a heavyweight terminal emulator. Handles:
+// can color CLI output without a heavyweight terminal emulator. Handles:
 //
-//   - Standard / bright 16-colour foregrounds (codes 30–37, 90–97)
+//   - Standard / bright 16-color foregrounds (codes 30–37, 90–97)
 //   - Bold / dim / italic / underline (1 / 2 / 3 / 4)
-//   - 24-bit colour escapes (38;2;r;g;b)
+//   - 24-bit color escapes (38;2;r;g;b)
 //   - Carriage returns collapsed per line so spinner animations render
 //     as their last overwrite, matching a real terminal.
 //
@@ -30,7 +30,7 @@ export function collapseCarriageReturns(raw: string): string {
   }).join('\n');
 }
 
-/** Convert ANSI-escaped text to HTML with span colouring. Output is safe
+/** Convert ANSI-escaped text to HTML with span coloring. Output is safe
  *  to drop into v-html (input HTML metacharacters are escaped first). */
 export function ansiToHtml(rawText: string): string {
   const text = collapseCarriageReturns(rawText);
@@ -59,7 +59,7 @@ export function ansiToHtml(rawText: string): string {
         else if (c >= 30 && c <= 37) style += `color:${ANSI_FG[c - 30]};`;
         else if (c >= 90 && c <= 97) style += `color:${ANSI_FG_BRIGHT[c - 90]};`;
         else if (c === 38 || c === 48) {
-          // Extended-colour operands: 38/48;5;n (256-colour) or 38/48;2;r;g;b
+          // Extended-color operands: 38/48;5;n (256-color) or 38/48;2;r;g;b
           // (24-bit). Consume the operand run so it is not reparsed as
           // standalone SGR codes. Only 24-bit foreground is rendered; the
           // rest are consumed and dropped.

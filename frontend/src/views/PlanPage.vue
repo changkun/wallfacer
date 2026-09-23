@@ -181,7 +181,7 @@ onMounted(async () => {
     void router.replace({ path: '/plan', query: { spec: hashPath } });
   }
 
-  // Honour ?task=<id>: open task-mode agent session pinned to that task.
+  // Honor ?task=<id>: open task-mode agent session pinned to that task.
   const focusTask = typeof route.query.task === 'string' ? route.query.task : '';
   if (focusTask) {
     if (tasks.tasks.length === 0) await tasks.fetchTasks().catch(() => {});
@@ -189,7 +189,7 @@ onMounted(async () => {
     void agentStore.openPlanForTask(focusTask, t?.title ?? '', t?.prompt ?? '');
   }
 
-  // Honour ?spec=<path> when the tree finishes loading.
+  // Honor ?spec=<path> when the tree finishes loading.
   const focus = typeof route.query.spec === 'string' ? route.query.spec : '';
   if (focus) {
     const stop = watch(tree, (v) => {

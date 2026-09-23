@@ -1,7 +1,7 @@
 // HeroSim is the marketing hero's self-playing product scene. These pin the
 // property the design relies on: the scene is complete static markup (so
 // vite-ssg prerenders it and prefers-reduced-motion users see a meaningful
-// still) and is exposed to assistive tech as a single labelled image.
+// still) and is exposed to assistive tech as a single labeled image.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { createApp, h, type App } from 'vue';
@@ -33,7 +33,7 @@ describe('HeroSim', () => {
     expect(host.querySelector('.hs-edges')).not.toBeNull();
   });
 
-  it('exposes the scene as a labelled image for assistive tech', () => {
+  it('exposes the scene as a labeled image for assistive tech', () => {
     const host = render();
     const root = host.querySelector('.hero-sim') as HTMLElement;
     expect(root.getAttribute('role')).toBe('img');

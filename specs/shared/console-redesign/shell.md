@@ -89,10 +89,10 @@ palette trigger (`.field`-styled button "Search or command ⌘K"), nav groups
 with `.eyebrow` labels, presence list, `AccountControl` pinned bottom.
 Nav row is the parent's `.nav-btn` geometry: 34px, radius 12, icon in a tinted
 22px square, active row on `--bg-card` with `--sh-card`. Folded: labels and
-eyebrows `display: none`, icons centred, tooltips via `title`. Collapse
+eyebrows `display: none`, icons centered, tooltips via `title`. Collapse
 persists at the existing `wallfacer-sidebar-collapsed` key. Below 860px the
 rail becomes a drawer with a scrim, the pattern replichai's `.rail-scrim`
-uses; the existing product switcher behaviour moves into the brand row.
+uses; the existing product switcher behavior moves into the brand row.
 
 ### WorkspaceChip.vue (new)
 

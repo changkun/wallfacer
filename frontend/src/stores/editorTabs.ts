@@ -199,7 +199,7 @@ export const useEditorTabsStore = defineStore('editorTabs', () => {
 
   // Close a file tab. The board tab is pinned and never closes. A dirty tab runs
   // the shared discard guard first; declining keeps the tab open. When the
-  // active tab closes, focus falls to its right neighbour, else left, else the
+  // active tab closes, focus falls to its right neighbor, else left, else the
   // board.
   async function close(id: string): Promise<void> {
     if (id === BOARD_TAB_ID) return;
