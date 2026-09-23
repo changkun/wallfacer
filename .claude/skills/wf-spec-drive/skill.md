@@ -15,8 +15,9 @@ the right `/wf-spec-*` sub-skill (or transition API call), and stops at gates.
 It is built to be **re-invoked**: under a `/goal` the Stop-hook evaluator re-runs
 you each turn with the remaining work, so each turn must (a) make concrete progress
 and (b) end by stating the spec's current `status` in your message, so the
-evaluator can judge whether the goal is met. Do not try to finish everything in one
-turn — finish what's legal now, report status, and let the loop continue.
+evaluator can judge whether the goal is met. Within a turn, carry the spec through
+every legal, non-gated transition you can; end the turn at a gate, at the target,
+or when the next step waits on work outside this session.
 
 ## The canonical lifecycle
 
@@ -56,8 +57,8 @@ validates the edge, runs drift / stale
 fan-out, and commits: `POST /api/specs/transition` with
 `{ "action": "<action>", "path": "<workspace-relative spec path>" }`. Actions:
 `dispatch`, `undispatch`, `archive`, `unarchive`, `validate`, `stale`,
-`unstale`, `dismiss-stale`, `force-complete`, `migrate` (the switch in
-the server's action switch). `wf-spec-dispatch` already uses this.
+`unstale`, `dismiss-stale`, `force-complete`, `migrate`. `/wf-spec-dispatch`
+uses the same endpoint.
 
 Whether you edit frontmatter or call the API, only ever move along a **legal
 edge** above. Never write an illegal jump (e.g. `validated → complete`).
@@ -72,7 +73,7 @@ directly; the server enters `testing` on task-done, and `force-complete` only do
 1. Read the spec's frontmatter: `status`, `dispatched_task_id`, `depends_on`,
    `affects`, and whether it has a child-spec directory (non-leaf).
 2. If `dispatched_task_id` is set, check the linked task's status (done /
-   in_progress / failed) — `GET /api/tasks/{id}` or the board, where one exists.
+   in_progress / failed) on the board, where one exists.
 3. Establish the **target** (arg 2, default `complete`) and confirm the spec is
    not already there or past it.
 
@@ -110,11 +111,12 @@ target requires it, drive the dependency first or report the block.
 For all other steps (refine, validate, breakdown, implement-direct, wrap-up of a
 spec you implemented this run), proceed without pausing.
 
-## Step 4: Execute one stage, then report
+## Step 4: Execute, then report
 
-Run the chosen sub-skill / API call. Do as much **non-gated, legal** progress as
-fits this turn (e.g. validate → implement → wrap-up can be one turn for a small
-leaf), but stop at the first gate, the target, or a genuinely long step.
+Run the chosen sub-skill / API call. Make all the **non-gated, legal** progress
+you can in this turn (e.g. validate → implement → wrap-up is one turn for a small
+leaf); stop at the first gate, the target, or a step that waits on work outside
+this session, such as a dispatched board task.
 
 End every turn with a status line the goal evaluator can read, e.g.:
 
@@ -126,9 +128,9 @@ Spec <path>: status <old> → <new>. Target: <target>. Next: <next step | GATE: 
 
 A user sets, e.g., `/goal spec <path> reaches status complete`. Each turn the
 Stop-hook evaluator reads your transcript; if the spec is not yet at the target it
-re-invokes you with what remains. You don't manage the loop — you make and report
-progress each turn; the harness caps consecutive auto-continues (≈8) and the goal
-auto-clears when met.
+re-invokes you with what remains. You don't manage the loop: you make and report
+progress each turn. The harness pauses the goal when the evaluator keeps finding
+it unmet, and clears it when met.
 
 Be honest about the reach of an **unattended** loop (no human watching):
 
@@ -138,13 +140,13 @@ Be honest about the reach of an **unattended** loop (no human watching):
   the way to `complete` unattended.
 - **Stalls and needs a human** — every gate in Step 3 (dispatch to the board,
   archive, `force-complete`, stale fan-out). The evaluator can't approve them and
-  can't run commands, so an unattended loop cannot pass them; it will burn blocks
-  and the harness force-stops (~8). When you reach a gate, **state it plainly and
-  stop asking-into-the-void**: report "GATE: <what> — needs you", so when the user
-  returns they can unblock with one message.
+  can't run commands, so an unattended loop cannot pass them, and repeated unmet
+  checks pause the goal. When you reach a gate, **state it plainly and end the
+  turn**: report "GATE: <what> (needs you)", so when the user returns they can
+  unblock with one message.
 - **Completes outside the loop** — a *dispatched* spec finishes asynchronously on
   the task board; the drift pipeline (server) renders its verdict on task-done.
-  The goal loop can't wait that out (≈8 blocks) and the evaluator can't observe the
+  The goal loop can't wait that out, and the evaluator can't observe the
   task finishing. So a goal targeting a spec you dispatch will pause at the dispatch
   gate; after the board task is done, re-run `/wf-spec-drive` (or `/wf-spec-wrapup`)
   to pick up `testing → complete`.

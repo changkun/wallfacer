@@ -197,8 +197,8 @@ packages. Identify:>
    ```
    | [<name>.md](<track>/<name>.md) | Not started | <one-line deliverable> |
    ```
-3. Add the spec to the Status Quo section if appropriate (use `○` for not
-   started).
+3. If the index keeps a status overview (e.g., a tree of `○`/`◐`/`✅` markers),
+   add the spec there as not started (`○`).
 4. If the spec has dependencies, note them in the dependency graph section
    if one exists.
 

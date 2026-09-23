@@ -23,7 +23,7 @@ Otherwise, report on the full project.
    otherwise the `track:` frontmatter field. An `NNN-` filename prefix is an
    independent, per-directory ordering convention — report in that order where
    it is present, but never read it as the dependency order. Take the track set
-   from what is on disk, never from a list memorized here or in an earlier run.
+   from what is on disk, not from a list remembered from an earlier run.
 2. For each spec, **parse YAML frontmatter** to extract `title`, `status`,
    `depends_on`, `affects`, `effort`, `dispatched_task_id`, and `track` (where
    the path does not already supply it).

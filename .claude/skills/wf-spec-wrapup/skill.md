@@ -51,11 +51,11 @@ diff. This is the single place that classification logic lives; wrap-up composes
 the Outcome from it, so the two skills never write the section twice.
 
 1. Determine the commit range:
-   - **Dispatched path** — the commits associated with the task UUID (per diff
-     Step 2).
+   - **Dispatched path**: the commits associated with the task UUID (per
+     `/wf-spec-drift` Step 2).
    - **Direct-implement path** — the commits on the `affects` files since
      `created:`: `git log --oneline -- <affects files>`.
-2. Run diff Steps 3–5: classify each spec item (Satisfied / Diverged / Not
+2. Run `/wf-spec-drift` Steps 3–5: classify each spec item (Satisfied / Diverged / Not
    implemented / Superseded), identify unspecified work (scaffolding /
    improvement / scope creep), and compute the **drift level** (Minimal /
    Moderate / Significant) and satisfaction rate.
@@ -66,10 +66,8 @@ Outcome itself; here, wrap-up owns the write (2b).
 ### 2b. Write the single Outcome section
 
 Insert one `## Outcome` section before any "Future Work" or "Phase N (Future)"
-sections. This is the canonical completion record — both `/wf-spec-implement`
-(which delegates here) and `/wf-spec-drift` (whose analysis 2a just consumed) feed
-this one section, replacing the older split between "Outcome", per-task
-"Implementation notes", and diff's separate drift report. It contains:
+sections. This is the canonical completion record: `/wf-spec-implement` delegates
+here, and `/wf-spec-drift` supplies the analysis consumed in 2a. It contains:
 
 1. **Summary** — 2-3 sentences: what shipped, dispatched vs implemented directly,
    commit SHAs (or PR link), and the **drift / satisfaction line** from 2a
@@ -133,8 +131,8 @@ If the spec has a File Inventory section, verify it matches the actual files tha
 ## Step 3: Update `specs/README.md`
 
 1. Read `specs/README.md`.
-2. Change the status in the ASCII art tree (e.g., `◐  M4: File Explorer (N/M)` → `✅ M4: File Explorer`).
-3. Change the status in the Milestones table (e.g., `**In progress** (N/M tasks done)` → `**Complete**`).
+2. Change the spec's status in its index table row, in the wording the table already uses.
+3. If the index keeps a status overview (e.g., a tree of `○`/`◐`/`✅` markers), mark the spec `✅` there too.
 4. Update the delivers column if the implementation differs from what was originally described.
 
 ## Step 4: Check downstream specs (reverse dependency analysis)
@@ -172,5 +170,5 @@ Tell the user:
 - **Read before writing** — read the spec and all task files before making changes.
 - **Preserve UX design** — the spec may contain detailed UX descriptions, wireframes, and user interaction flows. These are valuable documentation even after implementation. Do not remove or summarize them.
 - **Preserve future work** — Phase 3, Phase 4, and "Future Work" sections describe planned extensions. Keep them intact.
-- **Match the style** of other completed specs in the repo (e.g., `01-sandbox-backends.md`).
+- **Match the style** of other completed specs in the repo (specs with `status: complete` and an `## Outcome` section).
 - **Be factual** — the Outcome and Design Evolution sections should document what actually happened, not what was planned. Read task implementation notes for accuracy.

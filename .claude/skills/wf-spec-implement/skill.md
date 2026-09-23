@@ -59,9 +59,9 @@ Break the spec into an ordered list of implementation tasks. For each task:
 - Note any test files needed
 - Note any doc files that need updating
 
-Present this plan to the user using `EnterPlanMode`. Group tasks into logical
-commits (small, focused). Order tasks so each commit leaves the project in a
-working state.
+Present this plan to the user for approval (in Claude Code, through plan mode).
+Group tasks into logical commits (small, focused). Order tasks so each commit
+leaves the project in a working state.
 
 Wait for user approval before proceeding. The user may adjust scope, reorder
 items, or skip sections.
@@ -69,7 +69,7 @@ items, or skip sections.
 **Autonomous mode (goal-driven / driven by `/wf-spec-drive`):** plan-mode approval
 is an interactive gate — it *hangs* an unattended `/goal` loop. So when this skill
 is invoked by `/wf-spec-drive` under a goal, or with an explicit `auto` token in
-the arguments, the goal itself is the standing approval: **skip `EnterPlanMode`
+the arguments, the goal itself is the standing approval: **skip plan mode
 and the approval wait**, and go straight to Step 3. Stay conservative — keep
 commits small, and if the plan turns out ambiguous, risky, or larger than a
 single focused leaf, stop and report (surfacing it to the goal loop / user)

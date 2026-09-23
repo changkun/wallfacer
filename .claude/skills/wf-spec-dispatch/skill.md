@@ -111,12 +111,13 @@ POST /api/specs/transition
 The server cancels the linked task if still active, clears
 `dispatched_task_id`, resets `status` to `validated`, and commits.
 
-If the API exists but is unreachable, fall back to `POST /api/tasks` (or
-`/api/tasks/batch`) with `prompt` = the spec body, `goal` = the title,
-`depends_on` = the resolved task UUIDs (Step 3); then edit the spec frontmatter
-(`dispatched_task_id`, `updated`) by hand and commit. Flag clearly that this
-path loses the server's atomicity — a failed task create can leave a dangling
-link.
+If the transition endpoint fails but the task endpoints answer, fall back to
+`POST /api/tasks/batch` with one `tasks` entry per spec: `prompt` = the spec
+body, `spec_source_path` = the spec path (the server's task-done hook finds the
+spec through it), `depends_on_refs` = the resolved task UUIDs (Step 3); then
+edit the spec frontmatter (`dispatched_task_id`, `updated`) by hand and commit.
+Flag clearly that this path loses the server's atomicity: a failed task create
+can leave a dangling link.
 
 ## Step 5: Update spec file
 

@@ -121,8 +121,8 @@ append a second one. Check whether the spec already has an `## Outcome`:
 - **None yet** — write the divergence-flavored Outcome below.
 - **Already present** (e.g. wrap-up finalized a direct-implement spec, or a prior
   diff ran) — do not duplicate it. Merge your divergence findings into the
-  existing section (add/refresh the Divergences / Not Implemented / Unspecified
-  subsections) and leave its Summary/What-Shipped intact. The divergence analysis
+  existing section (add/refresh the Design Evolution / Not Implemented /
+  Unspecified Work subsections) and leave its Summary/What-Shipped intact. The divergence analysis
   augments the finalizer's Outcome; it does not replace it.
 
 When writing a fresh Outcome standalone, append it before any "Future Work" or
@@ -137,7 +137,7 @@ When writing a fresh Outcome standalone, append it before any "Future Work" or
 ### What Shipped
 - <bullet list of key deliverables with file paths>
 
-### Divergences
+### Design Evolution
 - **<spec item>**: spec said X, implementation does Y. Reason: <why>
 
 ### Not Implemented

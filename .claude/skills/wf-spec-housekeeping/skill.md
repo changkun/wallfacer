@@ -80,7 +80,8 @@ Status vocab varies by repo; map onto two buckets:
 - **Terminal** (archive it): `complete`, `shipped`, `implemented`, `superseded`,
   `abandoned`, `archived`, `stale`, `deferred`. Also treat a `draft`/`drafted`
   spec that carries an **Outcome** section (shipped-but-status-stale) as
-  terminal, and flip its status to `implemented` when you move it.
+  terminal, and flip its status to `complete`, the lifecycle status for shipped
+  work, when you move it.
 - **Live** (keep at the root, just give it a number if it lacks one): `vague`,
   `drafted`/`draft` with no Outcome, `validated`, `testing`, `in-progress`.
 
@@ -131,7 +132,7 @@ Then, in the same working set, fix every same-repo reference found in Step 4:
   pointed at the old location (use the repo's path convention — usually
   repo-root-relative `specs/.archive/NNN-name.md`).
 - README table rows and internal `docs/**` markdown links.
-- Flip any shipped-but-`draft` status to `implemented`.
+- Flip any shipped-but-`draft` status to `complete`.
 
 Leave live-but-newly-numbered specs at the root: `git mv name.md NNN-name.md`.
 
@@ -146,8 +147,8 @@ for f in specs/[0-9]*.md specs/.archive/[0-9]*.md; do
   | while read p; do case "$p" in specs/*) [ -f "$p" ] || echo "BROKEN $f -> $p";; esac; done
 done
 ```
-Any `BROKEN` line must be fixed before you commit. Optionally run the
-`wf-spec-validate` skill for the full document-model check.
+Any `BROKEN` line must be fixed before you commit. Optionally run
+`/wf-spec-validate` for the full document-model check.
 
 ## Step 7: Commit the numbering pass (atomic)
 
@@ -201,9 +202,9 @@ hand:
 - **Foot** — the **institutional-memory** sections a flat table cannot encode.
   Preserve, do not delete: in-progress state, deferral triggers ("un-defer
   when…"), pending external/tunable decisions, locked decisions, and
-  closed-scope ("do not re-litigate") lists. Fold any old *Shipped tracks* /
-  *Native backend* / per-tier tables into the one index — they are now
-  redundant. Remove any pointer to a deleted `ARCHIVED.md`.
+  closed-scope ("do not re-litigate") lists. Fold any older per-track or
+  per-tier status tables into the one index, which now carries their rows, and
+  remove links to index files that no longer exist.
 
 Non-numbered archive files (`*-README.md`, spikes, reconciled drafts) stay
 unlisted in the table; mention them once in the folder-layout paragraph.
@@ -231,7 +232,7 @@ Tell the user: how many name-only specs were numbered and their new
 same-repo reference fixed; any **sibling-repo** listings left stale on purpose
 (with paths, so they can fix those repos); and whether the README was rebuilt.
 
-## Gotchas (learned the hard way)
+## Gotchas
 
 - **The `.archive` grep undercounts the max number.** Active specs at the root
   usually hold the highest numbers. Compute `max` over root **and** `.archive/`.
