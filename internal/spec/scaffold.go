@@ -192,7 +192,7 @@ func RenderSkeleton(title string, status Status, effort Effort, author string, d
 	b.WriteString("## Design\n\n")
 	b.WriteString("<!-- High-level approach. Key decisions and trade-offs. -->\n\n")
 	b.WriteString("## Acceptance\n\n")
-	b.WriteString("<!-- How will we know this is done? Tests, behaviour changes, files touched. -->\n")
+	b.WriteString("<!-- How will we know this is done? Tests, behavior changes, files touched. -->\n")
 	return b.String()
 }
 

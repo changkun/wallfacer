@@ -174,7 +174,7 @@
 
 /* --- Cards ---
    One state pill and one qualifier on the first row, the title, then a mono
-   meta line for tags. Colour on a card means state; everything else is ink. */
+   meta line for tags. Color on a card means state; everything else is ink. */
 .task-card--just-created {
   animation: card-just-created 1.2s ease-out;
 }

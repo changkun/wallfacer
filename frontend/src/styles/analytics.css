@@ -1,7 +1,7 @@
 /* --- Analytics ---
    A reading column of cards: stat tiles in the boundary-card shape (eyebrow,
    big tabular number, one-line qualifier, a bar), then sections that hold a
-   table of rows with mono tabular numbers. Charts take their colours from the
+   table of rows with mono tabular numbers. Charts take their colors from the
    ramp through lib/chartPalette. See
    specs/shared/console-redesign/secondary-screens.md. */
 .analytics-page {

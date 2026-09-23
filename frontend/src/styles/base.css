@@ -10,7 +10,7 @@
   outline: none;
 }
 
-/* One focus ring for every control, accent-coloured, so keyboard travel is
+/* One focus ring for every control, accent-colored, so keyboard travel is
  * traceable across the app instead of each widget inventing its own. */
 :where(input, button, select, textarea, a, [tabindex]):focus-visible {
   outline: 2px solid var(--accent-ring);
@@ -35,7 +35,7 @@ body {
   font: var(--fs-base) / 1.5 var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
-/* Colour and decoration are inherited by default: a link looks like a link
+/* Color and decoration are inherited by default: a link looks like a link
  * because it opted in (.link), never because an author forgot a class. */
 a {
   color: inherit;

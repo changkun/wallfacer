@@ -3378,9 +3378,9 @@ func TestUpdateTask_PatchModelOverrideClear(t *testing.T) {
 	}
 }
 
-// TestListTasks_ModelOverrideSerialised verifies that a task with ModelOverride set
+// TestListTasks_ModelOverrideSerialized verifies that a task with ModelOverride set
 // serializes model_override in the GET /api/tasks response.
-func TestListTasks_ModelOverrideSerialised(t *testing.T) {
+func TestListTasks_ModelOverrideSerialized(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test serialize model", Timeout: 15})

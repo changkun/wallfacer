@@ -1,7 +1,7 @@
 /* =======================================================================
    Wallfacer — Selectable Color Palettes
    The default palette (clay on a neutral canvas) lives in tokens.css. Each
-   block below overrides the colour tokens when <html data-palette="..."> is
+   block below overrides the color tokens when <html data-palette="..."> is
    set (stores/prefs.ts + the index.html no-flash script). Selector shape:
    `:root[data-palette=X]` for light (outranks `:root`), and
    `[data-palette=X][data-theme="dark"]` for dark (outranks

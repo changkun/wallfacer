@@ -1,7 +1,7 @@
 /* --- Overlays: the scrim, the popover, the dialog, and the task sheet ---
    The scrim is a tint, never a blur. Three shapes float over a page: a
    popover (.pop) anchored near its trigger or at the top of the viewport, a
-   centred dialog (.dialog) at 440 or 720 wide, and the task sheet, the wide
+   centered dialog (.dialog) at 440 or 720 wide, and the task sheet, the wide
    dialog variant with a header row, an underline tab strip, a scrolling main
    column and a 340px aside of cards. See
    specs/shared/console-redesign/panels-and-overlays.md and task-detail.md. */
@@ -34,7 +34,7 @@
   animation: om-fade-up 0.18s var(--ease-fluid) both;
 }
 
-/* --- The dialog: a centred card with a head, a scrolling body and a foot --- */
+/* --- The dialog: a centered card with a head, a scrolling body and a foot --- */
 .dialog {
   display: flex;
   flex-direction: column;

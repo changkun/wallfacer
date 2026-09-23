@@ -181,7 +181,7 @@ func EnsureReadme(workspace string, newSpec Meta) error {
 func renderInitialReadme(track string, meta Meta) string {
 	var b strings.Builder
 	b.WriteString("# Specs\n\n")
-	b.WriteString("<!-- Auto-generated on first scaffold. Customise the prose freely — future appends only modify the track tables below. -->\n\n")
+	b.WriteString("<!-- Auto-generated on first scaffold. Customize the prose freely — future appends only modify the track tables below. -->\n\n")
 	b.WriteString("## " + TrackDisplayName(track) + "\n\n")
 	b.WriteString("| Spec | Status | Delivers |\n")
 	b.WriteString("|------|--------|----------|\n")

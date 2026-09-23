@@ -2,7 +2,7 @@
    opts in gets a thin, initially-invisible scrollbar that fades in while it is
    scrolled (.is-scrolling, toggled by the directive) or hovered, then fades out
    again. Styling the scrollbar opts the element out of native overlay bars, so
-   this behaviour is applied only where explicitly requested, never globally. */
+   this behavior is applied only where explicitly requested, never globally. */
 
 .scrollfade {
   /* Firefox: a thin bar that is transparent until the class/hover flips it. No

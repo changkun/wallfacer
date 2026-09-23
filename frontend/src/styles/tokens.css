@@ -3,17 +3,17 @@
 /* =======================================================================
    Wallfacer — Design Tokens
 
-   Ink carries the text; colour carries the meaning. One accent hue (clay)
+   Ink carries the text; color carries the meaning. One accent hue (clay)
    marks what the operator can act on: the primary control, the current page,
    a focus ring. A five-tone semantic ramp marks what the system reports:
    running, passed, needs attention, failed, published. Everything else is ink
-   on a neutral canvas, so the colour that is there always means something.
+   on a neutral canvas, so the color that is there always means something.
 
    The default palette is `clay` on a neutral canvas and carries no
    data-palette attribute. Alternative palettes live in palettes.css and are
    selected via <html data-palette>; a palette sets surfaces, ink, rules, the
    accent family and the semantic ramp only. Tint pairs, shadows and every
-   non-colour token derive from those, so a palette cannot drift from the
+   non-color token derive from those, so a palette cannot drift from the
    system. Existing CSS reads legacy aliases (--text, --border, --accent-hover,
    --sh-1..3) which are defined alongside the canonical tokens.
    See specs/shared/console-redesign.md.
@@ -138,7 +138,7 @@
   /* Overlay scrim behind dialogs and the command palette. Tint only, no blur. */
   --glass-dim: rgba(20, 19, 17, 0.28);
 
-  /* Tint pairs derive from the ramp: a badge is its own state colour on a
+  /* Tint pairs derive from the ramp: a badge is its own state color on a
      wash of itself. Palettes never set these. */
   --tint-blue: color-mix(in srgb, var(--run) 14%, transparent);
   --tint-blue-ink: var(--run);

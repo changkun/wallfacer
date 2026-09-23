@@ -203,7 +203,7 @@ button {
   border-radius: var(--r-sm);
 }
 
-/* ---- pills: state as a small mono capsule on a wash of its own colour ---- */
+/* ---- pills: state as a small mono capsule on a wash of its own color ---- */
 .pill {
   display: inline-flex;
   align-items: center;
