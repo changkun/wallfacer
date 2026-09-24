@@ -36,20 +36,11 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
     verbs: ["get", "list", "create", "update", "patch"]
-  # `rollout status` watches the Deployment and the ReplicaSets under it.
+  # `rollout status` gets the Deployment, then lists and watches it by
+  # name, and reads the rollout's state from its status alone.
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["watch"]
-  - apiGroups: ["apps"]
-    resources: ["replicasets"]
-    verbs: ["get", "list", "watch"]
-  # Reading a failed rollout's pods is what makes a red release legible.
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
