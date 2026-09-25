@@ -60,18 +60,18 @@ func TestAgenticModelConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("key plus base url routes through lux at the gateway origin", func(t *testing.T) {
+	t.Run("key plus base url routes through lux at the gateway root", func(t *testing.T) {
 		// The .env carries the anthropic-wire URL the container harness
-		// dials; the model leg must reduce it to the gateway origin the
+		// dials; the model leg must reduce it to the gateway root the
 		// lux-native dialect lives under.
 		r := &Runner{envFile: writeEnvFile(t,
-			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai/anthropic\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
+			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.example.com/anthropic\nCLAUDE_DEFAULT_MODEL=claude-sonnet-4-6\n")}
 		cfg := mustAgenticModelConfig(t, r)
 		want := agentgraph.ModelConfig{
 			Mode:     agentgraph.ModelModeLux,
 			Provider: "anthropic",
 			Model:    "claude-sonnet-4-6",
-			BaseURL:  "https://lux.latere.ai",
+			BaseURL:  "https://lux.example.com",
 			APIKey:   "lux_test",
 		}
 		if cfg != want {
@@ -81,9 +81,27 @@ func TestAgenticModelConfig(t *testing.T) {
 
 	t.Run("origin-shaped base url passes through unchanged", func(t *testing.T) {
 		r := &Runner{envFile: writeEnvFile(t,
-			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.latere.ai\n")}
-		if got := mustAgenticModelConfig(t, r).BaseURL; got != "https://lux.latere.ai" {
+			"ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL=https://lux.example.com\n")}
+		if got := mustAgenticModelConfig(t, r).BaseURL; got != "https://lux.example.com" {
 			t.Errorf("BaseURL = %q, want origin unchanged", got)
+		}
+	})
+
+	// A gateway served under a base path, as Latere's Lux core is under
+	// /v1/models, keeps that path: only the /anthropic door is dropped, so the
+	// lux-native dialect is dialed at <root>/lux/v1/generate and not at the
+	// host's root, where nothing answers it.
+	t.Run("base path survives and only the anthropic door is dropped", func(t *testing.T) {
+		for in, want := range map[string]string{
+			"https://api.example.com/v1/models/anthropic":  "https://api.example.com/v1/models",
+			"https://api.example.com/v1/models/anthropic/": "https://api.example.com/v1/models",
+			"https://api.example.com/v1/models":            "https://api.example.com/v1/models",
+			"https://api.example.com/v1/models/":           "https://api.example.com/v1/models",
+		} {
+			r := &Runner{envFile: writeEnvFile(t, "ANTHROPIC_API_KEY=lux_test\nANTHROPIC_BASE_URL="+in+"\n")}
+			if got := mustAgenticModelConfig(t, r).BaseURL; got != want {
+				t.Errorf("ANTHROPIC_BASE_URL=%s: BaseURL = %q, want %q", in, got, want)
+			}
 		}
 	})
 }

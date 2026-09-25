@@ -12,6 +12,13 @@ committed: the commit log already holds that.
 
 ### Fixed
 
+- An agent-graph run through Lux reaches a gateway served under a base path.
+  The model leg reduced `ANTHROPIC_BASE_URL` to its origin, so
+  `https://api.latere.ai/v1/models/anthropic`, the Lux core's Anthropic door,
+  sent the lux-native call to `https://api.latere.ai/lux/v1/generate`, where
+  nothing answers. It now drops only the trailing `/anthropic` segment and
+  keeps the base path. A gateway at the root of its host is unaffected.
+
 - A spec comment's anchor is written as text, which is correct on any database
   connection. A json value handed to Postgres as bytes is sent as a binary
   string and arrives as a hex literal, which a json column refuses whenever

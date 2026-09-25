@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,7 +45,7 @@ func (r *Runner) agenticModelConfig() (agentgraph.ModelConfig, error) {
 	baseURL := ""
 	if cfg.BaseURL != "" {
 		mode = agentgraph.ModelModeLux
-		baseURL = gatewayOrigin(cfg.BaseURL)
+		baseURL = gatewayRoot(cfg.BaseURL)
 	}
 	return agentgraph.ModelConfig{
 		Mode:     mode,
@@ -55,18 +56,23 @@ func (r *Runner) agenticModelConfig() (agentgraph.ModelConfig, error) {
 	}, nil
 }
 
-// gatewayOrigin reduces the .env's ANTHROPIC_BASE_URL, which is shaped for the
-// container harness (Claude Code dials the gateway's anthropic-wire surface,
-// e.g. https://lux.latere.ai/anthropic), to the origin the lux-native dialect
-// (POST /lux/v1/generate) lives under. The .env stays harness-shaped; the model
-// leg derives the base it needs. An unparseable value passes through untouched
-// so the resulting request error names the configured URL.
-func gatewayOrigin(harnessBase string) string {
+// gatewayRoot reduces the .env's ANTHROPIC_BASE_URL, which is shaped for the
+// container harness (Claude Code dials the gateway's anthropic-wire door, e.g.
+// https://api.latere.ai/v1/models/anthropic), to the gateway root the
+// lux-native dialect (POST /lux/v1/generate) lives under, e.g.
+// https://api.latere.ai/v1/models. Only the trailing /anthropic door segment
+// is dropped: a gateway served under a base path keeps that path, and one at
+// the root of its host reduces to the origin. Query and fragment are dropped.
+// The .env stays harness-shaped; the model leg derives the base it needs. An
+// unparseable value passes through untouched so the resulting request error
+// names the configured URL.
+func gatewayRoot(harnessBase string) string {
 	u, err := url.Parse(harnessBase)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return harnessBase
 	}
-	return u.Scheme + "://" + u.Host
+	path := strings.TrimSuffix(strings.TrimRight(u.Path, "/"), "/anthropic")
+	return u.Scheme + "://" + u.Host + path
 }
 
 // flowBySlug looks up a flow by slug, guarding against a nil flow registry

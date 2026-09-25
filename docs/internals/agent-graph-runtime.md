@@ -31,7 +31,7 @@ Consumers on the wallfacer side read the seam's exported entrypoints: `RunFlowWi
 The runner derives the config in `Runner.agenticModelConfig` (`internal/runner/agentic.go`) from the same `.env` file the subprocess harnesses read:
 
 1. No env file, unparseable env file, or no `ANTHROPIC_API_KEY`: zero `ModelConfig`, which maps to the fake model. Tests and no-credential development keep working.
-2. `ANTHROPIC_API_KEY` set and `ANTHROPIC_BASE_URL` set: `ModelModeLux` through the gateway.
+2. `ANTHROPIC_API_KEY` set and `ANTHROPIC_BASE_URL` set: `ModelModeLux` through the gateway. The base URL is the Anthropic door the container harness dials; the runner drops only its trailing `/anthropic` segment and keeps any base path, so `https://api.latere.ai/v1/models/anthropic` becomes the gateway root `https://api.latere.ai/v1/models`.
 3. `ANTHROPIC_API_KEY` set, no base URL: `ModelModeDirect` against the provider.
 
 `CLAUDE_DEFAULT_MODEL` supplies the model id; the provider is always `anthropic` today. The fake fallback is centralized in `modelOptions`: a real-mode config missing a credential also degrades to fake rather than building a guaranteed-401 adapter, so callers never pre-check.
