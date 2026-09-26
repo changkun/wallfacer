@@ -10,6 +10,8 @@ committed: the commit log already holds that.
 
 ## Unreleased
 
+## v0.6.1 - 2026-09-26
+
 ### Fixed
 
 - An agent-graph run through Lux reaches a gateway served under a base path.
