@@ -26,8 +26,10 @@ describe('accountRole', () => {
   });
 
   // Regression (id-09): the retired is_superadmin flag confers nothing; only the
-  // roles claim does. A token carrying the dead flag is not an admin.
+  // roles claim does. Principal no longer declares the flag, but a payload from
+  // an older identity service can still carry it, and that caller is not an admin.
   it('the retired is_superadmin flag is ignored', () => {
-    expect(accountRole({ ...base, org_id: 'org_1', is_superadmin: true })).toBeUndefined();
+    const payload: Principal & { is_superadmin: boolean } = { ...base, org_id: 'org_1', is_superadmin: true };
+    expect(accountRole(payload)).toBeUndefined();
   });
 });

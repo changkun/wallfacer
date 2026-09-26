@@ -27,7 +27,7 @@
         "@xterm/xterm": "^6.0.0",
         "codemirror": "^6.0.1",
         "highlight.js": "^11.11.1",
-        "latere-ui": "github:latere-ai/latere-ui#v1.26.2",
+        "latere-ui": "github:latere-ai/latere-ui#v1.30.0",
         "markdown-it": "^14.1.0",
         "markdown-it-anchor": "^9.2.0",
         "mermaid": "^11.14.0",
@@ -839,7 +839,7 @@
 
     "langium": ["langium@4.2.3", "", { "dependencies": { "@chevrotain/regexp-to-ast": "~12.0.0", "chevrotain": "~12.0.0", "chevrotain-allstar": "~0.4.3", "vscode-languageserver": "~9.0.1", "vscode-languageserver-textdocument": "~1.0.11", "vscode-uri": "~3.1.0" } }, ""],
 
-    "latere-ui": ["latere-ui@github:latere-ai/latere-ui#af3dc48", { "peerDependencies": { "pinia": "^2.2.0 || ^3.0.0", "vue": "^3.5.0" } }, "latere-ai-latere-ui-af3dc48", "sha512-XjIKmzEIEYzmGOGvMfAkZKPNsWXZrLr5tggr/l5JKp2U0pMyGkbyKpNaLInBJnfy40J9rUKxmJQspIWdrZUhfw=="],
+    "latere-ui": ["latere-ui@github:latere-ai/latere-ui#f034959", { "dependencies": { "@opentelemetry/api": "1.9.1", "@opentelemetry/exporter-trace-otlp-http": "0.218.0", "@opentelemetry/instrumentation": "0.218.0", "@opentelemetry/instrumentation-document-load": "0.63.0", "@opentelemetry/instrumentation-fetch": "0.218.0", "@opentelemetry/instrumentation-xml-http-request": "0.218.0", "@opentelemetry/resources": "2.7.1", "@opentelemetry/sdk-trace-web": "2.7.1", "@opentelemetry/semantic-conventions": "1.43.0", "web-vitals": "6.2.2" }, "peerDependencies": { "pinia": "^2.2.0 || ^3.0.0", "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0", "vue": "^3.5.0" }, "optionalPeers": ["react", "react-dom"] }, "latere-ai-latere-ui-f034959", "sha512-wsjPHxQO412aUMkxENKOgiGy1ax+S26MYI0C5FUdhqHaKV90KmeCbSuNc2BlXqsnV9Ctzckt17zjXnq6JvyvKQ=="],
 
     "layout-base": ["layout-base@1.0.2", "", {}, ""],
 
@@ -1087,6 +1087,8 @@
 
     "w3c-xmlserializer": ["w3c-xmlserializer@5.0.0", "", { "dependencies": { "xml-name-validator": "^5.0.0" } }, ""],
 
+    "web-vitals": ["web-vitals@6.2.2", "", {}, "sha512-oto5x6dLEgrRqfcWed+pZEUb2q6ikbFmqF54CRDhI/QGbn+qxC49b4C4OkbH+kb9C3a8shpFD3SgR9kRcs80ZQ=="],
+
     "webidl-conversions": ["webidl-conversions@8.0.1", "", {}, ""],
 
     "webworkify": ["webworkify@1.5.0", "", {}, "sha512-AMcUeyXAhbACL8S2hqqdqOLqvJ8ylmIbNwUIqQujRSouf4+eUFaXbG6F1Rbu+srlJMmxQWsiU7mOJi0nMBfM1g=="],
@@ -1174,6 +1176,8 @@
     "jsdom/whatwg-mimetype": ["whatwg-mimetype@5.0.0", "", {}, ""],
 
     "katex/commander": ["commander@8.3.0", "", {}, ""],
+
+    "latere-ui/@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.43.0", "", {}, "sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg=="],
 
     "markdown-it/entities": ["entities@4.5.0", "", {}, ""],
 

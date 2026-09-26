@@ -72,14 +72,6 @@
     .docs-grid { grid-template-columns: 1fr; }
     .pricing-grid { grid-template-columns: 1fr; max-width: 360px; }
     .download-grid { grid-template-columns: 1fr; max-width: 280px; }
-    .footer-container {
-        grid-template-columns: 1fr;
-        gap: 24px;
-        padding: 0 20px;
-    }
-    .footer-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-    .footer-extra { align-items: flex-start; }
-    .footer-bottom { padding: 16px 20px; }
 }
 
 @media (max-width: 480px) {

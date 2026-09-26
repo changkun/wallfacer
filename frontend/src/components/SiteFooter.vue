@@ -20,8 +20,8 @@ function onLocale(code: string) {
 <template>
   <!-- Shared Latere platform footer. Internal links resolve to https://latere.ai
        (Wallfacer's landing is on wf.latere.ai); theme/locale wired to the prefs
-       store. Package styles fill the gaps wallfacer's app.css footer CSS lacks
-       (4-col layout, subgroups, inline logo mark, full brand set, dropdown). -->
+       store. The package's styles lay it out whole: wallfacer carries no footer
+       rules of its own, which would override the package's layout. -->
   <PlatformFooter
     v-model:theme="theme"
     :locale="locale"
