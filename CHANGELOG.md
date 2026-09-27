@@ -12,13 +12,14 @@ committed: the commit log already holds that.
 
 ### Changed
 
-- The shared footer and product switcher follow latere-ui v1.30.0. The
+- The shared footer and product switcher follow latere-ui v1.30.1. The
   product switcher sends Lux to the platform console's Models section and no
   longer offers Drive. The footer puts the lockup, the social profiles and
   icon menus for theme and language beside four link columns (Applications
-  with Research, Platform, Company, Legal), and links the platform console in
-  place of the separate Topos, Cella, Lux and Drive entries. Wallfacer's own
-  footer rules, which overrode the shared layout, are removed.
+  with Research, Platform, Company, Legal) under semibold headings in the
+  full text tone, and links the platform console in place of the separate
+  Topos, Cella, Lux and Drive entries. Wallfacer's own footer rules, which
+  overrode the shared layout, are removed.
 
 ## v0.6.1 - 2026-09-26
 
