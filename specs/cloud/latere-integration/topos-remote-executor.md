@@ -29,7 +29,7 @@ dispatched_task_id: null
 
 ## Problem
 
-Wallfacer today executes every task locally — even in cloud mode, the harness runs on the user's machine. [Latere Topos](https://topos.latere.ai) is Latere's managed agent-workspace product, exposing a `/v1/agents` control plane that runs coding agents remotely. Wallfacer should be able to dispatch a task to Topos instead of running it locally, so users can offload long-running agents to managed infrastructure without leaving the wallfacer board.
+Wallfacer today executes every task locally — even in cloud mode, the harness runs on the user's machine. Topos is Latere's agent core; the platform hosts it as Agents, whose `/v1/agents` API at `https://api.latere.ai/v1/agents` runs coding agents remotely. Wallfacer should be able to dispatch a task to Topos instead of running it locally, so users can offload long-running agents to managed infrastructure without leaving the wallfacer board.
 
 ## Layering
 
@@ -60,7 +60,7 @@ wallfacer run --executor topos
 Plus env config:
 
 ```
-TOPOS_BASE_URL=https://topos.latere.ai
+TOPOS_BASE_URL=https://api.latere.ai
 # Auth: reuses the same Latere session cookie / bearer token established by `wallfacer auth login`.
 # No separate TOPOS_API_KEY in v1.
 ```
