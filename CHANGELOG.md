@@ -12,6 +12,15 @@ committed: the commit log already holds that.
 
 ### Changed
 
+- OpenTelemetry Go v1.46.0, with the log modules at v0.22.0, the slog bridge at
+  v0.20.1 and otelhttp at v0.71.0, past GO-2026-6615 and GO-2026-6505, and
+  `latere.ai/x/pkg` v0.90.2. pkg v0.90.2 names the service resource with
+  semantic conventions v1.43.0, the schema of this SDK; with an older schema
+  the two conflict when merged and the server disables telemetry export at start.
+  `latere.ai/x/topos` is at v0.7.0, the last release with the adversarial
+  review and graph packages Wallfacer uses; the earlier pin does not build
+  against pkg v0.90.2.
+
 - The shared footer and product switcher follow latere-ui v1.30.1. The
   product switcher sends Lux to the platform console's Models section and no
   longer offers Drive. The footer puts the lockup, the social profiles and
