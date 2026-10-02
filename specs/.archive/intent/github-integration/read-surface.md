@@ -1,6 +1,6 @@
 ---
 title: "GitHub Read Surface: PRs, Issues, and Comments"
-status: stale
+status: archived
 depends_on:
   - specs/intent/github-integration/oauth-token-store.md
 affects:
@@ -14,14 +14,57 @@ affects:
   - frontend/src/stores/github.ts
 effort: large
 created: 2026-06-26
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # GitHub Read Surface: PRs, Issues, and Comments
 
-Child of [github-integration](../github-integration.md).
+> **Archived 2026-10-02. Retired as: GitHub is metadata on a task, not a
+> destination to browse.** This spec was built and then removed. The
+> backend landed in `fc3b9a91`: `ListPulls`, `ListIssues`, `GetPull` and
+> `GetIssue` in `internal/github/read.go`, and
+> `GET /api/github/pulls`, `/pulls/{number}`, `/issues` and
+> `/issues/{number}` in `internal/handler/github_read.go`. It was REST
+> only, with conversation comments attached to the detail; line-anchored
+> review comments, a cache and a GraphQL client were never written. The
+> `/github` page, its route and its Sidebar entry landed in `1a8ebf9e`,
+> on the store from `2501105b`.
+>
+> The task-centric redesign of 2026-06-30, recorded in the
+> [umbrella](../../../intent/github-integration.md), removed all of it one
+> day later: the page, route, Sidebar entry and browse state in
+> `22407df2`; the four read functions and `github_read.go` in `bd5740cc`;
+> the routes in `df9df847`. The last two commits carry unrelated
+> subjects; the teardown rode along with them.
+>
+> What replaced each part:
+>
+> - **Pull request list and detail.** One lookup per task:
+>   `GET /api/tasks/{id}/pr` (`internal/handler/tasks_pr.go`, `ca8104b3`)
+>   returns the open pull request whose head is the task's branch, through
+>   `PullForBranch` in `internal/github/write.go`. It is shown in the task
+>   detail panel, as a badge on the board card and as a pill on a spec
+>   whose dispatched task has one (`b58ae5e4`). The design lives in
+>   [pull-request](../../../intent/github-integration/pull-request.md).
+> - **Issues.** Dropped. No list, detail or read endpoint remains.
+> - **Comment threads.** Not read anywhere. A comment can be posted to a
+>   task's pull request; the thread itself is read on GitHub.
+> - **The shared transport.** Kept. `internal/github/client.go` (`d41e1b51`)
+>   is what the write surface calls. It still parses rate-limit headers and
+>   the `Link` next-page cursor, and no caller reads either: a rate-limit
+>   rejection reaches the browser only as a 429 from `mapGitHubAPIError`.
+> - **`internal/github/read.go`.** Kept as a file, holding only the
+>   `PullRequest` and `Comment` models the write surface returns.
+> - **Rate-limit readout, cache, pagination.** Dropped with the list views
+>   that needed them.
+>
+> The text below is kept as written for the record. The umbrella's "UI
+> Architecture" section it refers to was removed from the umbrella on
+> 2026-10-02; its last version is in the umbrella at commit `acc2872a`.
+
+Child of [github-integration](../../../intent/github-integration.md).
 
 ## Design Problem
 
@@ -83,7 +126,7 @@ decide per view.
 ## UI
 
 Owns the **`/github` page shell** (the umbrella's
-[UI Architecture](../github-integration.md#ui-architecture)): the new
+[UI Architecture](../../../intent/github-integration.md)): the new
 `views/GithubPage.vue`, its route in `router.ts` (`localRoutes`, with
 `meta: { needsWorkspace: true }`), and a Sidebar entry under the **Workspace**
 group in `Sidebar.vue` (`{ id: 'github', label: 'GitHub', to: '/github',
