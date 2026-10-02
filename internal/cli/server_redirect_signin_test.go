@@ -18,7 +18,9 @@ import (
 )
 
 // redirectSignInUnavailable is the wire code /login and the org switch answer
-// with when the redirect sign-in cannot complete on the instance.
+// with when the redirect sign-in cannot complete on the instance. It is
+// spelled out here because clients match on the string: renaming the code in
+// the handler has to fail a test.
 const redirectSignInUnavailable = "redirect_sign_in_unavailable"
 
 // occupyPort binds an OS-assigned port for the life of the test and returns
