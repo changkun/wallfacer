@@ -278,13 +278,13 @@ co-dev `go.work`; **standalone/CI is gated on the topos release** (push+tag
 
 **Remaining (the `Default()` flip is gated on these — NOT yet done):**
 
-0. **Release the topos seam** (user action): push + tag `latere.ai/x/topos`
-   `0e8c971` (e.g. v0.0.6), bump wallfacer `go.mod`, so standalone/CI builds.
-1. **Commit + verification parity.** After the native run edits the worktree,
-   `runNativeTopos`/`driveToposRun` must make a durable git commit of the changes
-   and run the verification/test step (wallfacer owns the worktree + git, so this
-   is wallfacer-side, no topos change). Today the run edits the worktree but walks
-   the state machine through `committing` without committing.
+0. **Release the topos seam.** Done: the seam is tagged and `go.mod` pins a
+   released `latere.ai/x/topos`, so standalone and CI builds work.
+1. **Commit + verification parity.** The commit half is done: `driveToposRun`
+   runs the real commit pipeline in the `committing` phase when the run has a
+   worktree, so a native run's edits land as a durable git commit. The
+   verification half is open: a native run does not yet run the test step the
+   subprocess harnesses do.
 2. **Local and hosted targets.** Draw the execution-target selector for signed-in
    users (Component 3 above). The hosted run itself is
    [topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md).
