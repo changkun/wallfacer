@@ -1458,8 +1458,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	sandboxProxy := handler.NewSandboxProxy(
 		handler.LoadSandboxProxyConfig(), sandboxProxyValidator)
 	// One pattern per method the allowlist admits (GET /v1/models sits next
-	// to the POST endpoints). A method-less pattern would conflict with the
-	// SPA's "GET /" in ServeMux; the proxy pins method+path itself.
+	// to the POST endpoints), so the mux keeps every other method off the
+	// proxy: such a request falls through to the SPA catch-all, which answers
+	// 405 with an Allow header naming GET, HEAD and POST. The proxy pins
+	// method+path itself as well.
 	for _, method := range []string{http.MethodGet, http.MethodPost} {
 		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/anthropic/", sandboxProxy.LLMAnthropic)
 		mux.HandleFunc(method+" /internal/sandbox-proxy/llm/openai/", sandboxProxy.LLMOpenAI)
