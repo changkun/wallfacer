@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"latere.ai/x/pkg/authkit/oidc"
+	"latere.ai/x/pkg/httpjson"
 )
 
 // fakeMeAuth is an AuthProvider that also implements meBuilder, so AuthMe takes
@@ -194,6 +195,61 @@ func TestLogin_WithClient_Delegates(t *testing.T) {
 	}
 }
 
+// TestLogin_RedirectSignInOff_AnswersErrorEnvelope covers an instance whose
+// redirect URL does not lead back to it: /login must not hand the browser to
+// the provider, and answers one code, the fixed user sentence, and the
+// developer detail in its own field.
+func TestLogin_RedirectSignInOff_AnswersErrorEnvelope(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	f := &fakeAuth{}
+	h.SetAuth(f)
+	h.SetRedirectSignInOff(map[string]any{
+		"redirect_url": "http://localhost:8080/callback",
+		"bound_port":   53211,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	w := httptest.NewRecorder()
+	h.Login(w, req)
+
+	if f.loginCalls != 0 {
+		t.Errorf("loginCalls = %d; want 0, the provider must not start the flow", f.loginCalls)
+	}
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("code = %d; want 503", w.Code)
+	}
+	var env httpjson.ErrorEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if env.Error.Code != "redirect_sign_in_unavailable" {
+		t.Errorf("code = %q; want redirect_sign_in_unavailable", env.Error.Code)
+	}
+	if env.Error.Message != messageRedirectSignInUnavailable {
+		t.Errorf("message = %q; want the fixed sentence %q", env.Error.Message, messageRedirectSignInUnavailable)
+	}
+	if got := env.Error.Details["redirect_url"]; got != "http://localhost:8080/callback" {
+		t.Errorf("details.redirect_url = %v; want http://localhost:8080/callback", got)
+	}
+	if got := env.Error.Details["bound_port"]; got != float64(53211) {
+		t.Errorf("details.bound_port = %v; want 53211", got)
+	}
+}
+
+// TestRedirectSignInUnavailable_UserSentence holds the sentence to the user
+// register: present, and free of the addresses and ports that belong in the
+// details.
+func TestRedirectSignInUnavailable_UserSentence(t *testing.T) {
+	if messageRedirectSignInUnavailable == "" {
+		t.Fatal("redirect_sign_in_unavailable has no user sentence")
+	}
+	for _, tell := range []string{"localhost", "://", "/login", "/callback", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"} {
+		if strings.Contains(messageRedirectSignInUnavailable, tell) {
+			t.Errorf("user sentence %q carries %q, which belongs in the details", messageRedirectSignInUnavailable, tell)
+		}
+	}
+}
+
 // TestLogin_PublicClient_RedirectsToAuthorize is the end-to-end guard for the
 // default sign-in path: a real public (secret-less) client redirects /login to
 // the auth service's /authorize with client_id=wallfacer and the loopback
@@ -308,5 +364,38 @@ func TestGetConfig_CloudFlagTrue(t *testing.T) {
 	}
 	if got, _ := resp["auth_url"].(string); got != "https://auth.latere.ai" {
 		t.Errorf("auth_url = %q; want https://auth.latere.ai", got)
+	}
+}
+
+// TestGetConfig_AuthRedirectEnabled covers the flag the SPA reads before it
+// sends the browser to /login: true with a provider, false once the redirect
+// sign-in is switched off, and false with no provider at all.
+func TestGetConfig_AuthRedirectEnabled(t *testing.T) {
+	flag := func(t *testing.T, h *Handler) bool {
+		t.Helper()
+		w := httptest.NewRecorder()
+		h.GetConfig(w, httptest.NewRequest(http.MethodGet, "/api/config", nil))
+		var resp map[string]any
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		got, ok := resp["auth_redirect_enabled"].(bool)
+		if !ok {
+			t.Fatalf("auth_redirect_enabled = %v; want a boolean", resp["auth_redirect_enabled"])
+		}
+		return got
+	}
+
+	h, _ := newTestHandlerWithWorkspaces(t)
+	if flag(t, h) {
+		t.Error("auth_redirect_enabled = true with no provider; want false")
+	}
+	h.SetAuth(&fakeAuth{})
+	if !flag(t, h) {
+		t.Error("auth_redirect_enabled = false with a provider; want true")
+	}
+	h.SetRedirectSignInOff(map[string]any{"bound_port": 53211})
+	if flag(t, h) {
+		t.Error("auth_redirect_enabled = true after SetRedirectSignInOff; want false")
 	}
 }

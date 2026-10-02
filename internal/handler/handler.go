@@ -184,6 +184,12 @@ type Handler struct {
 	// SetDeviceAuth in local-mode wiring; nil for cloud-mode deployments
 	// (cloud mode uses /login + the OAuth code flow instead).
 	deviceAuth *DeviceAuth
+	// redirectSignInOff is true when the authorization-code sign-in behind
+	// /login cannot complete on this instance; redirectSignInDetails is the
+	// developer detail its error envelope carries. Wired via
+	// SetRedirectSignInOff from the CLI once the listener is bound.
+	redirectSignInOff     bool
+	redirectSignInDetails map[string]any
 
 	// github backs the /api/github/* surface with a principal-scoped GitHub
 	// App token provider. Nil until SetGitHub; endpoints then report the

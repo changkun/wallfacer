@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -315,6 +316,9 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		RedirectURL:  envconfig.Lookup(envFileKV, "AUTH_REDIRECT_URL"),
 		CookieKey:    envconfig.Lookup(envFileKV, "AUTH_COOKIE_KEY"),
 	}
+	// An operator-set redirect URL names the address the deployment is reached
+	// on; only a default derived from the listen address is tied to the port.
+	redirectFromAddr := authCfg.RedirectURL == ""
 	authCfg, err = resolveAuthConfig(authCfg, cfg.Addr, configDir)
 	if err != nil {
 		logger.Fatal("auth: resolve configuration", "error", err)
@@ -560,6 +564,23 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
+	// The default redirect URL names the requested port. On any other port the
+	// issuer would return the browser, with the authorization code, to whatever
+	// holds the requested one (typically another wallfacer instance), so the
+	// redirect sign-in is switched off for this instance. The device-code flow
+	// needs no redirect and stays as wired above.
+	if redirectFromAddr {
+		if reason := redirectPortMismatch(authCfg.RedirectURL, actualPort); reason != "" {
+			logger.Main.Warn("auth: redirect sign-in is off for this instance: the default redirect URL does not lead to the bound port",
+				"reason", reason, "redirect_url", authCfg.RedirectURL, "requested_addr", cfg.Addr, "bound_addr", ln.Addr().String())
+			h.SetRedirectSignInOff(map[string]any{
+				"reason":       reason,
+				"redirect_url": authCfg.RedirectURL,
+				"bound_port":   actualPort,
+			})
+		}
+	}
+
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist, cloudMode)
 
 	// Middleware stack (outermost first): logging → CSRF → CookieAuth
@@ -663,6 +684,21 @@ func defaultRedirectURL(addr string) string {
 	default:
 		return fmt.Sprintf("https://%s:%s/callback", host, port)
 	}
+}
+
+// redirectPortMismatch reports why redirectURL cannot receive the OAuth
+// callback on a listener bound to boundPort, or "" when it names that port.
+// The ports differ when the requested port was taken and the listener fell
+// back to a free one, and when port 0 was requested.
+func redirectPortMismatch(redirectURL string, boundPort int) string {
+	u, err := url.Parse(redirectURL)
+	if err != nil {
+		return fmt.Sprintf("redirect URL does not parse: %v", err)
+	}
+	if u.Port() != strconv.Itoa(boundPort) {
+		return fmt.Sprintf("redirect URL names port %q, the listener is bound to port %d", u.Port(), boundPort)
+	}
+	return ""
 }
 
 // loadOrCreateCookieKey returns a stable hex-encoded 32-byte key for encrypting

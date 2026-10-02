@@ -11,6 +11,7 @@ import (
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/authkit/oidc"
+	"latere.ai/x/pkg/httpjson"
 
 	"latere.ai/x/wallfacer/internal/auth"
 )
@@ -255,5 +256,41 @@ func TestPatchAuthMe_EmptyOrgIDSwitchesToPersonal(t *testing.T) {
 	}
 	if !cleared {
 		t.Error("session cookie not cleared on switch-to-personal")
+	}
+}
+
+// TestOrgSwitch_RedirectSignInOff_KeepsSession covers both switch endpoints on
+// an instance whose redirect URL does not lead back to it: the switch would
+// end in a /login that cannot complete, so it is refused with the same error
+// as /login and the session cookie is left in place.
+func TestOrgSwitch_RedirectSignInOff_KeepsSession(t *testing.T) {
+	endpoints := map[string]func(*Handler, http.ResponseWriter, *http.Request){
+		"SwitchOrg":   (*Handler).SwitchOrg,
+		"PatchAuthMe": (*Handler).PatchAuthMe,
+	}
+	for name, endpoint := range endpoints {
+		t.Run(name, func(t *testing.T) {
+			h := newTestHandler(t)
+			h.SetAuth(&fakeAuthClientWithSession{sess: &oidc.Session{AccessToken: "tok"}})
+			h.SetRedirectSignInOff(map[string]any{"bound_port": 53211})
+
+			req := httptest.NewRequest(http.MethodPost, "/api/me/switch-org", bytes.NewBufferString(`{"org_id":""}`))
+			w := httptest.NewRecorder()
+			endpoint(h, w, req)
+
+			if w.Code != http.StatusServiceUnavailable {
+				t.Fatalf("status = %d, want 503: %s", w.Code, w.Body.String())
+			}
+			var env httpjson.ErrorEnvelope
+			if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if env.Error.Code != codeRedirectSignInUnavailable {
+				t.Errorf("code = %q, want %q", env.Error.Code, codeRedirectSignInUnavailable)
+			}
+			if cookies := w.Result().Cookies(); len(cookies) != 0 {
+				t.Errorf("Set-Cookie = %v, want the session left alone", cookies)
+			}
+		})
 	}
 }

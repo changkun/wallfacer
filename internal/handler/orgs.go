@@ -168,6 +168,12 @@ func (h *Handler) doOrgSwitch(w http.ResponseWriter, r *http.Request) (string, b
 		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "auth not configured"})
 		return "", false
 	}
+	// The switch completes through /login. Where that sign-in cannot return to
+	// this instance, refuse before the session is cleared, so the browser keeps
+	// the session it has.
+	if h.redirectSignInUnavailable(w) {
+		return "", false
+	}
 	req, ok := httpjson.DecodeBody[patchAuthMeRequest](w, r)
 	if !ok {
 		return "", false

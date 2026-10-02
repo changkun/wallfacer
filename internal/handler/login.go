@@ -5,6 +5,15 @@ import (
 	"net/http"
 
 	"latere.ai/x/pkg/authkit/oidc"
+	"latere.ai/x/pkg/httpjson"
+)
+
+// The error /login and the org switch answer with when the authorization-code
+// sign-in cannot complete on this instance: one code and the one user sentence
+// for it. The developer detail travels separately, in the envelope's details.
+const (
+	codeRedirectSignInUnavailable    = "redirect_sign_in_unavailable"
+	messageRedirectSignInUnavailable = "Sign-in by browser redirect is off because Wallfacer is not running on its configured port. Sign in with a device code from the account menu, or restart Wallfacer when that port is free."
 )
 
 // AuthProvider is the subset of *oidc.Client the HTTP handlers need. Kept
@@ -42,6 +51,34 @@ func (h *Handler) SetDeviceAuth(d *DeviceAuth) {
 	h.deviceAuth = d
 }
 
+// SetRedirectSignInOff marks the authorization-code sign-in behind /login as
+// unable to complete on this instance. The issuer returns the browser, with
+// the authorization code, to the configured redirect URL; when that URL names
+// a port this process is not bound to, the code reaches whatever listens there
+// instead. details is the developer account of the mismatch. Called from the
+// CLI boot path after the listener is bound. The device-code flow needs no
+// redirect and is unaffected.
+func (h *Handler) SetRedirectSignInOff(details map[string]any) {
+	h.redirectSignInOff = true
+	h.redirectSignInDetails = details
+}
+
+// redirectSignInUnavailable answers a request that would start the
+// authorization-code sign-in while SetRedirectSignInOff has it switched off,
+// and reports whether it answered. A caller that gets true returns without
+// touching the session.
+func (h *Handler) redirectSignInUnavailable(w http.ResponseWriter) bool {
+	if !h.redirectSignInOff {
+		return false
+	}
+	httpjson.WriteError(w, http.StatusServiceUnavailable, httpjson.Error{
+		Code:    codeRedirectSignInUnavailable,
+		Message: messageRedirectSignInUnavailable,
+		Details: h.redirectSignInDetails,
+	})
+	return true
+}
+
 // SetCloudMode marks the handler as serving a multi-tenant cloud deployment
 // (WALLFACER_CLOUD). It gates org/personal workspace isolation: only cloud
 // deployments hide workspaces a principal can't see. A local single-user run
@@ -57,10 +94,15 @@ func (h *Handler) HasAuth() bool { return h.auth != nil }
 
 // Login redirects the browser to the auth service's authorize endpoint.
 // Returns 503 when auth is not configured so broken deployments fail
-// loudly instead of silently 404'ing.
+// loudly instead of silently 404'ing, and 503 with the
+// redirect_sign_in_unavailable envelope when the callback would not return to
+// this instance (see SetRedirectSignInOff).
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if h.auth == nil {
 		http.Error(w, "auth not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if h.redirectSignInUnavailable(w) {
 		return
 	}
 	h.auth.HandleLogin(w, r)

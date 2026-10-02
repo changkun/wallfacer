@@ -113,3 +113,30 @@ func TestDefaultRedirectURL(t *testing.T) {
 		}
 	}
 }
+
+// TestRedirectPortMismatch pins the decision behind the redirect sign-in gate:
+// a redirect URL can receive the callback only when it names the port the
+// listener is bound to.
+func TestRedirectPortMismatch(t *testing.T) {
+	cases := []struct {
+		name        string
+		redirectURL string
+		boundPort   int
+		mismatch    bool
+	}{
+		{"requested port bound", "http://localhost:8080/callback", 8080, false},
+		{"tls host on its port", "https://wf.latere.ai:443/callback", 443, false},
+		{"fallback port", "http://localhost:8080/callback", 53211, true},
+		{"port zero requested", "http://localhost:0/callback", 53211, true},
+		{"no port in the URL", "http://localhost/callback", 8080, true},
+		{"unparsable URL", "http://local host:8080/callback", 8080, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reason := redirectPortMismatch(tc.redirectURL, tc.boundPort)
+			if got := reason != ""; got != tc.mismatch {
+				t.Errorf("redirectPortMismatch(%q, %d) = %q, want a mismatch: %v", tc.redirectURL, tc.boundPort, reason, tc.mismatch)
+			}
+		})
+	}
+}
