@@ -164,7 +164,12 @@ seam is inert and local behavior is byte-identical to a build without it.
 
 1. **Local-first is invariant.** No seam changes local-anonymous behavior.
    The default build with no sign-in runs a host agent process over a
-   filesystem store with no network dependency on Latere.
+   filesystem store with no network dependency on Latere. (True of the CLI
+   harnesses that exist today. Under
+   [platform-native](../shared/platform-native.md), models come from the
+   platform, a signed-out instance keeps everything local that needs no
+   model, and running an agent needs a sign-in. This rule is restated when
+   that migration lands.)
 2. **Config-gated, nil-safe selection.** A seam activates only when its
    configuration is present. Otherwise its client is nil and call sites
    short-circuit, the way `AuthProvider` and `jwtValidator` already do.

@@ -121,9 +121,10 @@ Four decisions followed the review the same day, recorded in
 4. **Remove GitHub.** No GitHub connection until the platform has a connector
    ([remove-github-integration](shared/platform-native/remove-github-integration.md)).
 
-Still open: what a signed-out instance can do once models come from the
-platform, and whether the two third-party remote executor specs are archived.
-Both are in the umbrella's open questions.
+Also decided: a signed-out instance has no platform feature, and since models
+are one, it cannot run an agent. Still open: whether the two third-party
+remote executor specs are archived, and what users on a CLI subscription are
+told about cost.
 
 Spec Coordination and Foundations are complete. Cloud Platform is drafted and
 demand-gated, with the coordination connection and spec comments shipped.
@@ -136,7 +137,7 @@ The active program: four decisions of 2026-10-02 that make wallfacer an applicat
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and the open questions (what a signed-out instance can do; the third-party executors; CLI-subscription users; the sub-agent roles). |
+| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and what a signed-out instance can do (everything local that needs no model; no agent), and the open questions (the third-party executors; CLI-subscription users; the sub-agent roles). |
 | ↳ [retire-agent-fleets.md](shared/platform-native/retire-agent-fleets.md) | Drafted | Removal: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; the native single-agent path, the run trace and Mission Control stay. User files are left on disk unread; record fields are kept and ignored. |
 | ↳ [remove-github-integration.md](shared/platform-native/remove-github-integration.md) | Drafted | Removal: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes, `internal/github`. Plain git push is untouched. Cached tokens are deleted on first start. |
 | ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |

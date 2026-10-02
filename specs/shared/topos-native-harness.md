@@ -43,8 +43,9 @@ dispatched_task_id: null
 >   per-CLI credential flows.
 > - The sub-agent roles (title, commit message, oversight, test) need a home
 >   on the one harness.
-> - What a signed-out instance can do needs an answer, since models come from
->   the platform.
+> - A signed-out instance runs no agent, since models come from the platform
+>   (decided; see "Signed out" in the umbrella). The harness refuses to start
+>   and the interface offers sign-in.
 >
 > The body below is the accurate record of what is shipped on the current
 > pin. It is rewritten once the rebuilt module's embedding surface has been

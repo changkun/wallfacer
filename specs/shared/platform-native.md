@@ -113,27 +113,43 @@ Recorded so nobody reads the old statements as current.
   are local git and stay.
 - **The platform integration's first design rule.** It says the default build
   with no sign-in runs a host agent process with no network dependency on
-  Latere. With models coming from the platform, that cannot stay true as
-  written. See open question 1.
+  Latere. With models coming from the platform, running an agent needs a
+  sign-in. See "Signed out".
+
+## Signed out
+
+Decided by the maintainer on 2026-10-02: signed out means not logged in, and
+an instance that is not logged in has no platform feature. There is no second
+path.
+
+Models are a platform capability, so the consequence is direct:
+
+| | Signed out | Signed in |
+|---|---|---|
+| Open a workspace, browse files, read and edit specs, view the board and task history, review diffs, use plain git | yes | yes |
+| Run an agent: a task, a chat turn, planning, title, commit message, oversight, test verification | no | yes |
+| Coordination plane, hosted execution | no | yes |
+
+Wallfacer does not offer a provider key field or a "bring your own gateway"
+setting as a way around sign-in. The gateway is open source, and pointing the
+harness at a self-hosted one is a property of the harness's configuration,
+not a wallfacer feature to design or document.
+
+What this asks of the interface: a signed-out instance says plainly, where an
+agent would start, that running one needs a sign-in, and offers it. It does
+not show a board that silently fails tasks.
 
 ## Open questions
 
-1. **What a signed-out instance can do.** If the only model source is the
-   platform's Models capability, an instance with no Latere account can plan,
-   browse and review, and cannot run an agent. The alternatives are a model
-   gateway the user points at themselves (the gateway is open source and
-   self-hostable) or a direct provider key. Which of these wallfacer supports
-   decides whether "local-first" still means "works with no account". The
-   harness spec must answer this before the CLI adapters are removed.
-2. **Third-party remote executors.** [claude-managed-agents](../cloud/claude-managed-agents.md)
+1. **Third-party remote executors.** [claude-managed-agents](../cloud/claude-managed-agents.md)
    and [antigravity](../cloud/antigravity.md) dispatch tasks to other vendors'
    hosted agents. They contradict "clean use of the Latere platform" and were
    not named in the decision. Recommended: archive both. Not done yet.
-3. **Existing users of a CLI subscription.** A user who runs wallfacer on a
+2. **Existing users of a CLI subscription.** A user who runs wallfacer on a
    Claude or Codex subscription pays nothing per token today. After decision 2
    they pay the platform's model prices. The migration needs a stated position
    and a release note, not a silent switch.
-4. **Sub-agent roles.** Title, commit message, oversight and test verification
+3. **Sub-agent roles.** Title, commit message, oversight and test verification
    run as separate one-shot agents today, each pinned to a harness by an
    environment variable. On one harness they become model calls or spawned
    threads. Which, and on which model, is the harness spec's to decide.
