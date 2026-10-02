@@ -27,7 +27,7 @@ dispatched_task_id: null
 > **Archived 2026-10-02. Retired as: wallfacer no longer connects to
 > GitHub.** The maintainer decided to remove the GitHub integration from
 > wallfacer and to reach GitHub later through a platform connector
-> ([remove-github-integration](../../shared/platform-native/remove-github-integration.md),
+> ([remove-github-integration](../shared/platform-native/remove-github-integration.md),
 > under [platform-native](../../shared/platform-native.md)). The token layer that shipped, the pull-request surface on tasks, and the Settings tab are deleted by that spec.
 >
 > The text below is kept as written for the record. It was refreshed against

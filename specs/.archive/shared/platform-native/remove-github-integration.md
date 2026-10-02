@@ -1,6 +1,6 @@
 ---
 title: Remove the GitHub Integration
-status: drafted
+status: archived
 depends_on:
   - specs/shared/platform-native.md
 affects:
@@ -19,7 +19,7 @@ dispatched_task_id: null
 
 # Remove the GitHub Integration
 
-Decision 4 of [platform-native](../platform-native.md). A removal, not a
+Decision 4 of [platform-native](../../../shared/platform-native.md). A removal, not a
 rewrite.
 
 ## Goal
@@ -158,22 +158,22 @@ connector exists.
 
 ## Bookkeeping
 
-- [github-integration](../../.archive/intent/github-integration.md),
-  [pull-request](../../.archive/intent/github-integration/pull-request.md) and
-  [cloud-remote-fix](../../.archive/intent/github-integration/cloud-remote-fix.md):
+- [github-integration](../../intent/github-integration.md),
+  [pull-request](../../intent/github-integration/pull-request.md) and
+  [cloud-remote-fix](../../intent/github-integration/cloud-remote-fix.md):
   retired and archived with this spec. The already archived token-store,
   repository-selection and read-surface specs each get one line pointing
   here.
-- [repo-identity](../../cloud/latere-integration/coordination-plane/repo-identity.md):
+- [repo-identity](../../../cloud/latere-integration/coordination-plane/repo-identity.md):
   its upgrade tier (a server-authoritative check through the account's GitHub
   connection) loses its input and is struck. The default tier (proof with the
   user's own git credentials) never depended on it.
-- [platform integration](../../cloud/latere-integration.md) and the
-  [hosted executor](../../cloud/latere-integration/topos-remote-executor.md):
+- [platform integration](../../../cloud/latere-integration.md) and the
+  [hosted executor](../../../cloud/latere-integration/topos-remote-executor.md):
   where they point at cloud-remote-fix for repositories outside the
   platform's git host, they say instead that such repositories are out of
   scope until a platform connector exists.
-- The Git Workflow track keeps [task-revert](../../intent/task-revert.md) and
+- The Git Workflow track keeps [task-revert](../../../intent/task-revert.md) and
   the archived intent-commits. It no longer has a GitHub half.
 
 ## Out of scope
@@ -181,3 +181,37 @@ connector exists.
 - Any change to plain git operations.
 - The Latere account's GitHub connection, which is the identity service's.
 - A connector design.
+
+## Outcome
+
+Archived 2026-10-02 as complete. Shipped in four commits:
+
+- `ea6bcbd8` frontend: no Settings tab, and no pull-request state on a task
+  card, the task sheet, or a spec's focused view.
+- `ec6323ee` handler: the eight routes, their handlers and tests, the contract
+  entries and the `github` key in `/api/config` are gone, and so is the store
+  and broker construction in `internal/cli/server.go`.
+- `631273da` cli: `internal/github` is deleted, and the first start after
+  upgrade removes `<config dir>/github/` with one log line.
+- `08d57a9a` docs: guide, internals, README and changelog.
+
+Where it differed from the text above:
+
+- **Order.** Steps 2 and 3 could not compile separately: the handler setters
+  lived in a file step 2 deletes, so step 2 also removed their construction
+  in `internal/cli/server.go`, and step 3 deleted the package.
+- **Surface the spec missed:** the pull-request pill in
+  `plan/SpecFocusedView.vue`, an orphaned rule in `styles/modal.css`, two
+  paths in `tests/designSystem.test.ts`, the Settings tab loop in the
+  screenshot checks, and the generated docs index.
+- **Surface that did not exist:** no GitHub types in `api/types.ts` (they
+  lived in the two stores) and no strings in the language files.
+- **Acceptance criterion 2** holds on the API mux. On the full server, an
+  unknown `GET /api/...` path is answered by the single-page app's catch-all
+  with its index page, and other methods with 405. That is true of every
+  unknown API path, not only these, and is recorded as a separate defect.
+- **Criterion 6** gained a test it did not have: the session bridge writes the
+  shared identity token file and a fresh connector store reads it back.
+- `make ui-test` was not run: it builds the frontend, and its fixed paths and
+  port collide with parallel runs. The edited scene was checked by reading,
+  and no committed screenshot shows a removed surface.

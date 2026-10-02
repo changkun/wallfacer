@@ -19,7 +19,7 @@ dispatched_task_id: null
 
 > **Archived 2026-10-02. Retired as: wallfacer no longer connects to
 > GitHub.** See
-> [remove-github-integration](../../../shared/platform-native/remove-github-integration.md).
+> [remove-github-integration](../../shared/platform-native/remove-github-integration.md).
 > Running an agent on a repository that is not on the platform's git host is
 > out of scope until the platform offers a connector for that host. The
 > constraint this spec recorded still holds and is worth keeping in mind

@@ -265,4 +265,4 @@ and tests. It is listed here so the removal is a decision, not an oversight.
    repository on the platform's git host). A repository on another host is
    out of scope until the platform offers a connector for it: wallfacer
    removed its own GitHub integration on 2026-10-02
-   ([remove-github-integration](../shared/platform-native/remove-github-integration.md)).
+   ([remove-github-integration](../.archive/shared/platform-native/remove-github-integration.md)).

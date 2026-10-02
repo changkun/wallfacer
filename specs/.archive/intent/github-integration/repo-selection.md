@@ -199,4 +199,4 @@ Consumes
 `NormalizeRemoteURL` to key selections; touches `workspace.Group` only if the
 selection is stored on the group.
 
-Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../../shared/platform-native/remove-github-integration.md).
+Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../shared/platform-native/remove-github-integration.md).

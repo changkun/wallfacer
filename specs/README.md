@@ -96,7 +96,7 @@ Git Workflow - local git; the GitHub half is retired
 
 Platform-native - four decisions of 2026-10-02 (the active program)
   ○ Platform-Native Wallfacer (umbrella)
-  ○ Retire Agent Fleets (removal)       ○ Remove GitHub Integration (removal)
+  ○ Retire Agent Fleets (removal)       ✅ Remove GitHub Integration (done)
   ◐ Topos as the Only Harness (opt-in shipped; migration specified in 4 phases)
   ○ Sessions That Spawn and Fork (vague; decides what a hosted board hosts)
 ```
@@ -119,7 +119,7 @@ Four decisions followed the review the same day, recorded in
    time instead of isolated tasks
    ([sessions-that-spawn-and-fork](shared/platform-native/sessions-that-spawn-and-fork.md), vague).
 4. **Remove GitHub.** No GitHub connection until the platform has a connector
-   ([remove-github-integration](shared/platform-native/remove-github-integration.md)).
+   ([remove-github-integration](.archive/shared/platform-native/remove-github-integration.md)).
 
 Also decided the same day: a signed-out instance has no platform feature;
 sign-in with a model provider stays as a second source of model credentials
@@ -140,7 +140,7 @@ The active program: four decisions of 2026-10-02 that make wallfacer an applicat
 |------|--------|----------|
 | [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
 | ↳ [retire-agent-fleets.md](shared/platform-native/retire-agent-fleets.md) | Drafted | Removal: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; the native single-agent path, the run trace and Mission Control stay. User files are left on disk unread; record fields are kept and ignored. |
-| ↳ [remove-github-integration.md](shared/platform-native/remove-github-integration.md) | Drafted | Removal: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes, `internal/github`. Plain git push is untouched. Cached tokens are deleted on first start. |
+| ↳ [remove-github-integration.md](.archive/shared/platform-native/remove-github-integration.md) | **Complete** | Removed 2026-10-02: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes and `internal/github`. Plain git push is untouched; the first start after upgrade deletes the cached tokens. |
 | ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
 
 The migration itself is [topos-native-harness.md](shared/topos-native-harness.md) in Shared Design.
@@ -381,7 +381,7 @@ Why no wallfacer-owned sandbox or control plane? The platform composes sandbox l
 
 ## Git Workflow
 
-Git workflow on tasks. It is local git: every surface (tasks, planning rounds, spec transitions, explorer edits) commits with trailers and undoes via `git revert`, and pushing a branch uses the user's own git credentials. The GitHub half of this track (a token borrowed from the signed-in account, a pull request per task) was retired on 2026-10-02; its specs are archived and its code is removed by [remove-github-integration](shared/platform-native/remove-github-integration.md). GitHub returns through a platform connector, not through wallfacer.
+Git workflow on tasks. It is local git: every surface (tasks, planning rounds, spec transitions, explorer edits) commits with trailers and undoes via `git revert`, and pushing a branch uses the user's own git credentials. The GitHub half of this track (a token borrowed from the signed-in account, a pull request per task) was retired on 2026-10-02; its specs are archived and its code is removed by [remove-github-integration](.archive/shared/platform-native/remove-github-integration.md). GitHub returns through a platform connector, not through wallfacer.
 
 | Spec | Status | Delivers |
 |------|--------|----------|

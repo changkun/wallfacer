@@ -187,4 +187,4 @@ the `GET /api/github/pulls`, `/pulls/{number}`, `/issues`, `/issues/{number}`
 routes, and the `/github` page + list/detail UI (see UI above), including the
 route and Sidebar entry that make the page reachable.
 
-Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../../shared/platform-native/remove-github-integration.md).
+Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../shared/platform-native/remove-github-integration.md).

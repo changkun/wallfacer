@@ -126,7 +126,7 @@ dependency.
 ### Upgrade: per-user GitHub OAuth (server-authoritative)
 
 > Struck 2026-10-02. Wallfacer removed its GitHub integration
-> ([remove-github-integration](../../../shared/platform-native/remove-github-integration.md)),
+> ([remove-github-integration](../../../.archive/shared/platform-native/remove-github-integration.md)),
 > so this tier has no token to check with. A server-authoritative check
 > returns when the platform offers a connector for the git host, and is
 > specified then. The two tiers above are the model.

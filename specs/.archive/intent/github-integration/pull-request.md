@@ -33,7 +33,7 @@ dispatched_task_id: null
 > **Archived 2026-10-02. Retired as: wallfacer no longer connects to
 > GitHub.** The maintainer decided to remove the GitHub integration from
 > wallfacer and to reach GitHub later through a platform connector
-> ([remove-github-integration](../../../shared/platform-native/remove-github-integration.md),
+> ([remove-github-integration](../../shared/platform-native/remove-github-integration.md),
 > under [platform-native](../../../shared/platform-native.md)). The shipped create, state and comment surface is deleted, and the remaining work this spec lists (pushing the task branch, a generated title and body, merged and closed states) is not built.
 >
 > The text below is kept as written for the record. It was refreshed against
