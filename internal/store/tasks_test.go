@@ -1774,7 +1774,8 @@ func TestTaskSpecSourcePath_OmittedFromJSONWhenEmpty(t *testing.T) {
 }
 
 // TestCreateTaskWithFlow_PersistsFlowID asserts FlowID round-trips
-// through CreateTaskWithOptions and the JSON persistence layer.
+// through CreateTaskWithOptions and the JSON persistence layer, so a
+// stored task keeps the fleet name it carries.
 func TestCreateTaskWithFlow_PersistsFlowID(t *testing.T) {
 	s, err := newTestFileStore(t, t.TempDir())
 	if err != nil {
@@ -1804,7 +1805,7 @@ func TestCreateTaskWithFlow_PersistsFlowID(t *testing.T) {
 }
 
 // TestTaskFlowID_OmittedFromJSONWhenEmpty guards the omitempty tag so
-// pre-migration task records don't grow a spurious "flow_id":"" key.
+// task records that name no fleet don't grow a spurious "flow_id":"" key.
 func TestTaskFlowID_OmittedFromJSONWhenEmpty(t *testing.T) {
 	task := Task{Prompt: "test"}
 	data, err := json.Marshal(task)

@@ -35,20 +35,20 @@ func TestBuiltinAgents_SlugsAreUnique(t *testing.T) {
 	}
 }
 
-func TestNewBuiltinRegistry_LookupAndList(t *testing.T) {
-	reg := NewBuiltinRegistry()
-	for _, want := range BuiltinAgents {
-		got, ok := reg.Get(want.Slug)
-		if !ok {
-			t.Errorf("Get(%q) missing from registry", want.Slug)
-			continue
-		}
-		if got.Title != want.Title {
-			t.Errorf("Get(%q).Title = %q, want %q", want.Slug, got.Title, want.Title)
-		}
+// TestBuiltinAgents_AreTheFiveRoles pins the table to the five roles the
+// built-in pipeline runs, and checks none carries a harness pin: a pin is set
+// per call on a copy, never on the shared descriptor.
+func TestBuiltinAgents_AreTheFiveRoles(t *testing.T) {
+	want := []string{"title", "oversight", "commit-msg", "impl", "test"}
+	if len(BuiltinAgents) != len(want) {
+		t.Fatalf("BuiltinAgents has %d roles, want %d", len(BuiltinAgents), len(want))
 	}
-	listed := reg.List()
-	if len(listed) != len(BuiltinAgents) {
-		t.Fatalf("List returned %d roles, want %d", len(listed), len(BuiltinAgents))
+	for i, slug := range want {
+		if BuiltinAgents[i].Slug != slug {
+			t.Errorf("BuiltinAgents[%d].Slug = %q, want %q", i, BuiltinAgents[i].Slug, slug)
+		}
+		if BuiltinAgents[i].Harness != "" {
+			t.Errorf("%s: Harness = %q, want empty on the built-in descriptor", slug, BuiltinAgents[i].Harness)
+		}
 	}
 }

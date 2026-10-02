@@ -36,8 +36,9 @@ type TaskCreateOptions struct {
 	Timeout        int
 	MountWorktrees bool
 	Kind           TaskKind
-	// FlowID is the slug of the flow this task runs against. Empty means
-	// the runner's legacy Kind→Flow resolver picks the default ("implement").
+	// FlowID sets Task.FlowID, a record field the runner does not read for
+	// dispatch (see Task.FlowID). No handler sets it; it lets a caller build
+	// a record that carries the field, as a stored task may.
 	FlowID             string
 	Tags               []string
 	Sandbox            harness.ID
@@ -55,8 +56,11 @@ type TaskCreateOptions struct {
 	// for any other Kind.
 	RoutineIntervalSeconds int
 	RoutineEnabled         bool
-	RoutineSpawnKind       TaskKind // legacy; prefer RoutineSpawnFlow
-	RoutineSpawnFlow       string   // flow slug; wins over SpawnKind
+	// RoutineSpawnKind and RoutineSpawnFlow set the record fields of the
+	// same names, which the routine engine does not read. No handler sets
+	// them; they let a caller build a routine record that carries them.
+	RoutineSpawnKind TaskKind
+	RoutineSpawnFlow string
 
 	// Principal / org attribution. Empty on anonymous / local calls;
 	// populated at the handler boundary from auth.PrincipalFromContext.

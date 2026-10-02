@@ -161,29 +161,10 @@ func (r *Runner) runAgent(
 		return nil, fmt.Errorf("runAgent: binding for %s has no ParseResult", role.Slug)
 	}
 
-	// role.PromptTmpl carries a user-authored preamble that shapes
-	// the agent's behavior. When non-empty, prepend it to the
-	// caller's prompt so the agent sees the preamble first and
-	// the runtime input second, separated by a blank line. No
-	// template substitution — the preamble is whatever the user
-	// typed into the Agents-tab editor, verbatim. Built-in roles
-	// leave PromptTmpl empty, so the default path is a no-op.
-	//
-	// Effective for agents invoked via Runner.RunAgent (the flow
-	// engine's launcher). The turn-loop callers (GenerateTitle,
-	// GenerateCommitMessage, GenerateOversight, RunRefinement,
-	// RunIdeation) construct their own rendered prompts and
-	// bypass this preamble; they're scoped to built-in roles with
-	// empty PromptTmpl, so their behavior is unchanged.
-	if role.PromptTmpl != "" {
-		prompt = role.PromptTmpl + "\n\n" + prompt
-	}
-
 	// Resolve the sandbox, newest tier first:
-	//   1. role.Harness — the agent descriptor's explicit harness
-	//      pin (set by user-authored clones). Wins over every
-	//      per-task / env tier so a role marked "codex" always
-	//      reaches Codex.
+	//   1. role.Harness — a per-call pin a caller sets on a copy of a
+	//      built-in role. Wins over every per-task / env tier so a
+	//      role pinned to "codex" always reaches Codex.
 	//   2. Per-task per-activity override (SandboxByActivity).
 	//   3. Per-task sandbox.
 	//   4. Env-file per-activity setting.

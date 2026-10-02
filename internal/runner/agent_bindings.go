@@ -38,10 +38,10 @@ type agentBinding struct {
 }
 
 // agentBindings keys the private per-slug dispatch info off the
-// Role.Slug values declared in internal/agents. New agent slugs added
-// to BuiltinAgents without a matching entry here will fail at lookup
-// time — runAgent surfaces a clear error rather than running with
-// zero-value fields.
+// Role.Slug values declared in internal/agents. A slug added to
+// BuiltinAgents without a matching entry here fails the binding
+// coverage test, and at run time runAgent surfaces a clear error
+// rather than running with zero-value fields.
 var agentBindings = map[string]agentBinding{
 	agents.Title.Slug: {
 		Activity:    store.SandboxActivityTitle,

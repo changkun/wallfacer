@@ -274,10 +274,12 @@ type Task struct {
 	FreshStart        bool                `json:"fresh_start,omitempty"`
 	Result            *string             `json:"result"`
 	// Trace holds the JSON-marshaled agentgraph.Trace (nodes + edges),
-	// produced by an agentic-flow run through internal/agentgraph. Nil
-	// for every non-agentic task. Persisted as an opaque string so the
-	// store does not depend on the topos package; the graph endpoint
-	// (M5) unmarshals it. See specs/local/topos-runtime-integration.md.
+	// produced by a run on the in-process topos harness through
+	// internal/agentgraph. Nil for every task a subprocess harness ran.
+	// Traces stored by earlier multi-agent runs carry handoff edges and
+	// are served as they are. Persisted as an opaque string so the store
+	// does not depend on the topos package; the trace endpoint unmarshals
+	// it.
 	Trace *string `json:"trace,omitempty"`
 	// Lineage is the pre-schema-3 name of Trace, kept only so a task.json
 	// written before the rename still loads. migrateTaskJSON folds it into
@@ -342,11 +344,12 @@ type Task struct {
 	// Empty string and "task" are equivalent: a standard implementation task.
 	Kind TaskKind `json:"kind,omitempty"`
 
-	// FlowID is the slug of the flow this task runs against (see
-	// internal/flow). Empty means the runner falls back to the legacy
-	// Kind→Flow resolver so pre-flow-migration task records keep
-	// working without data migration. Resolved at read-time via
-	// (*Task).ResolvedFlowID.
+	// FlowID is the slug of the user-authored fleet a stored task names. It
+	// is kept as a record field so stored tasks load unchanged; no writer
+	// sets it and dispatch does not read it. Every task runs
+	// the built-in pipeline; a run of a task whose FlowID is set and is not
+	// "implement" writes one system event on the task's timeline saying the
+	// fleet no longer exists (see runner.noteRemovedFleet).
 	FlowID string `json:"flow_id,omitempty"`
 
 	// Tags are labels attached to a task for categorization (e.g.
@@ -398,9 +401,9 @@ type Task struct {
 	LastFetchErrorAt *time.Time `json:"last_fetch_error_at,omitempty"`
 
 	// Routine fields — only set when Kind == TaskKindRoutine. A routine card is
-	// a schedule template, not an executable task; the scheduler engine in
-	// internal/routine fires it at RoutineNextRun and spawns a fresh instance
-	// task of RoutineSpawnKind with the routine's prompt.
+	// a schedule template, not an executable task; the routine engine fires it
+	// at RoutineNextRun and spawns a fresh ordinary task with the routine's
+	// prompt.
 
 	// RoutineIntervalSeconds is the fixed interval between scheduled fires.
 	// Zero means the routine is paused. Must be >= 60 when set via the API.
@@ -415,20 +418,13 @@ type Task struct {
 	// RoutineLastFiredAt records when the routine most recently spawned an
 	// instance task (successful or not). Used by the UI to show "fired Xm ago".
 	RoutineLastFiredAt *time.Time `json:"routine_last_fired_at,omitempty"`
-	// RoutineSpawnKind is the legacy Kind assigned to tasks spawned by this
-	// routine. Kept for back-compat with records written before the Flow
-	// migration; new writers populate RoutineSpawnFlow instead and the
-	// runner resolves via ResolvedRoutineFlow. Whitelisted at the API
-	// boundary. Deprecated: use RoutineSpawnFlow.
+	// RoutineSpawnKind and RoutineSpawnFlow are the task kind and the
+	// user-authored fleet a stored routine names for its instances. They are
+	// kept as record fields so stored routines load unchanged; no writer sets
+	// them and the routine engine does not read them, so every routine spawns
+	// an ordinary task.
 	RoutineSpawnKind TaskKind `json:"routine_spawn_kind,omitempty"`
-
-	// RoutineSpawnFlow is the flow slug assigned to tasks spawned by this
-	// routine. When non-empty it takes precedence over RoutineSpawnKind;
-	// empty records continue to resolve via the legacy Kind mapper. The
-	// resolution helper is ResolvedRoutineFlow, which lives on
-	// *flow.Registry (the store package cannot import flow without a
-	// cycle).
-	RoutineSpawnFlow string `json:"routine_spawn_flow,omitempty"`
+	RoutineSpawnFlow string   `json:"routine_spawn_flow,omitempty"`
 
 	// Review adversarial-verification fields. Set by tryAutoAdon / the
 	// manual /api/tasks/{id}/review trigger after a run completes.

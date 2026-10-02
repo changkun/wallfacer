@@ -157,11 +157,11 @@ func TestRunAgent_MountReadOnly_SetsWorkspaceCWD(t *testing.T) {
 	}
 }
 
-// TestRunAgent_HarnessPinOverridesTaskSandbox verifies that an
-// agent descriptor with an explicit Harness pin reaches that
-// harness even when the task itself picks the other one. This is
-// the contract user-authored clones rely on: pinning the role to
-// "codex" should route there regardless of task / env settings.
+// TestRunAgent_HarnessPinOverridesTaskSandbox verifies that a role
+// carrying an explicit Harness pin reaches that harness even when
+// the task itself picks the other one. This is the contract a
+// per-call pin on a copy of a built-in role relies on: pinning the
+// role to "codex" routes there regardless of task / env settings.
 func TestRunAgent_HarnessPinOverridesTaskSandbox(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
@@ -186,49 +186,13 @@ func TestRunAgent_HarnessPinOverridesTaskSandbox(t *testing.T) {
 	}
 }
 
-// TestRunAgent_PromptTmplPrepend verifies a user-authored agent
-// with a non-empty PromptTmpl prepends that body to the caller's
-// prompt before handing it to the container CLI. Built-in roles
-// leave PromptTmpl empty, so the default path is unaffected.
-func TestRunAgent_PromptTmplPrepend(t *testing.T) {
+// TestRunAgent_PromptReachesCLIVerbatim confirms the caller's prompt
+// reaches the CLI as given, with no preamble prepended.
+func TestRunAgent_PromptReachesCLIVerbatim(t *testing.T) {
 	r, backend, _ := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
 
-	role := makeTestRole(t, "t-tmpl", mountNone)
-	role.PromptTmpl = "You are a terse reviewer.\nReply in bullet points."
-
-	_, err := r.runAgent(
-		context.Background(),
-		role,
-		nil,
-		"review this diff",
-		runAgentOpts{},
-	)
-	if err != nil {
-		t.Fatalf("runAgent: %v", err)
-	}
-	calls := backend.RunArgsCalls()
-	if len(calls) != 1 {
-		t.Fatalf("expected 1 Launch call, got %d", len(calls))
-	}
-	joined := strings.Join(calls[0].Args, " ")
-	// The preamble must reach the container verbatim, separated
-	// from the user prompt by a blank line.
-	want := "You are a terse reviewer.\nReply in bullet points.\n\nreview this diff"
-	if !strings.Contains(joined, want) {
-		t.Errorf("expected prepended preamble + prompt in launch args;\nwant substring: %q\ngot: %q", want, joined)
-	}
-}
-
-// TestRunAgent_PromptTmplEmptyUnchanged confirms that without a
-// PromptTmpl the prompt reaches the CLI verbatim, matching
-// pre-change behavior.
-func TestRunAgent_PromptTmplEmptyUnchanged(t *testing.T) {
-	r, backend, _ := newAgentTestRunner(t)
-	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
-
-	role := makeTestRole(t, "t-tmpl-empty", mountNone)
-	// role.PromptTmpl left empty.
+	role := makeTestRole(t, "t-prompt-verbatim", mountNone)
 	_, err := r.runAgent(
 		context.Background(),
 		role,
@@ -251,9 +215,9 @@ func TestRunAgent_PromptTmplEmptyUnchanged(t *testing.T) {
 	}
 }
 
-// TestRunAgent_HarnessPinEmptyInherits confirms the default path
-// is unchanged: an empty Harness pin lets the 4-tier resolver
-// pick the task's sandbox, matching pre-pin behavior.
+// TestRunAgent_HarnessPinEmptyInherits confirms the default path:
+// an empty Harness pin lets the tiered resolver pick the task's
+// sandbox.
 func TestRunAgent_HarnessPinEmptyInherits(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
@@ -330,5 +294,21 @@ func TestRunAgent_RequiresBindingRegistered(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no binding") {
 		t.Errorf("error = %q, want one mentioning 'no binding'", err)
+	}
+}
+
+// TestAgentBindings_CoverBuiltinRoles checks that every built-in role has a
+// runner binding with a result parser, so no built-in role can reach runAgent
+// and fail the "no binding" lookup.
+func TestAgentBindings_CoverBuiltinRoles(t *testing.T) {
+	for _, role := range agents.BuiltinAgents {
+		b, ok := bindingFor(role.Slug)
+		if !ok {
+			t.Errorf("built-in role %q has no runner binding", role.Slug)
+			continue
+		}
+		if b.ParseResult == nil {
+			t.Errorf("built-in role %q binding has no ParseResult", role.Slug)
+		}
 	}
 }
