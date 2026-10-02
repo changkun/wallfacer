@@ -1,5 +1,6 @@
-// The one way the SPA starts a latere.ai sign-in, shared by every "Sign in"
-// control (the account menu, the GitHub settings tab) so they cannot diverge.
+// The one way the SPA starts a latere.ai sign-in. Its caller is the account
+// menu's "Sign in" control (AccountControl); any other sign-in control starts
+// the flow here too, so the flows cannot diverge.
 // It composes the device-code flow (useDeviceSignIn) with the session store
 // and the server's redirect flag:
 //
