@@ -66,10 +66,10 @@ type Config struct {
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 
-	// Cloud gates every cloud-only UI surface and HTTP route (latere.ai
-	// sign-in badge today; tenant-filesystem, billing, remote-control
-	// later). Sourced from WALLFACER_CLOUD; parsed here so the CLI entry
-	// point reads a single config surface.
+	// Cloud marks a hosted deployment: sign-in is forced on every route
+	// and the SPA boots in cloud mode, which turns on its cloud-only
+	// surfaces. Sourced from WALLFACER_CLOUD; parsed here so the CLI
+	// entry point reads a single config surface.
 	Cloud bool // WALLFACER_CLOUD ("true"/"1"/"yes", case-insensitive)
 }
 
