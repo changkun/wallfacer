@@ -9,9 +9,7 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/agentgraph"
-	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/envconfig"
-	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -130,11 +128,6 @@ func TestAgenticModelConfig(t *testing.T) {
 	})
 }
 
-// TestRun_AgenticFlowReachesDoneWithTrace dispatches a task whose resolved
-// flow is marked Agentic. The runner must route it through the topos
-// agent-graph runtime (with the deterministic test model), reach done via the
-// normal state machine, record the final text, and persist a trace graph with
-// the expected two-node / one-next-edge shape. No container backend is invoked.
 // TestRun_NativeToposHarnessReachesDoneInProcess covers the native-harness
 // dispatch: a plain implement-path task pinned to the topos harness runs
 // in-process as a single topos agent (zero container launches), reaches done, and
@@ -190,68 +183,6 @@ func TestRun_NativeToposHarnessReachesDoneInProcess(t *testing.T) {
 	}
 	if len(lin.Edges) != 0 {
 		t.Errorf("trace edges = %+v, want none (no delegation)", lin.Edges)
-	}
-}
-
-func TestRun_AgenticFlowReachesDoneWithTrace(t *testing.T) {
-	r, backend, s := newAgentTestRunner(t)
-	r.allowTestModel = true
-	r.agentsReg = agents.NewRegistry(
-		agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
-		agents.Role{Slug: "ag-builder", Title: "Builder", PromptTmpl: "you build"},
-	)
-	r.flows = flow.NewRegistry(flow.Flow{
-		Slug:    "agentic-pair",
-		Name:    "Agentic Pair",
-		Agentic: true,
-		Steps:   []flow.Step{{AgentSlug: "ag-planner"}, {AgentSlug: "ag-builder"}},
-	})
-
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt:  "agentic dispatch",
-		Timeout: 5,
-		FlowID:  "agentic-pair",
-	})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus: %v", err)
-	}
-
-	r.Run(task.ID, "agentic dispatch", "", false)
-	r.WaitBackground()
-	s.WaitCompaction()
-
-	updated, _ := s.GetTask(ctx, task.ID)
-	if updated.Status != store.TaskStatusDone {
-		t.Fatalf("status = %q, want done", updated.Status)
-	}
-	if updated.Result == nil || *updated.Result == "" {
-		t.Error("result was not recorded")
-	}
-	// The agentic path runs in-process via topos; it must not touch the
-	// container backend at all.
-	if n := len(filterTaskCalls(backend.RunArgsCalls())); n != 0 {
-		t.Errorf("expected 0 container launches for an agentic flow, got %d", n)
-	}
-
-	if updated.Trace == nil {
-		t.Fatal("trace was not persisted")
-	}
-	var lin agentgraph.Trace
-	if err := json.Unmarshal([]byte(*updated.Trace), &lin); err != nil {
-		t.Fatalf("unmarshal trace: %v", err)
-	}
-	if len(lin.Nodes) != 2 {
-		t.Fatalf("trace nodes = %+v, want 2", lin.Nodes)
-	}
-	if lin.Nodes[0].Name != "ag-planner" || lin.Nodes[1].Name != "ag-builder" {
-		t.Errorf("node names = %q, %q; want ag-planner, ag-builder", lin.Nodes[0].Name, lin.Nodes[1].Name)
-	}
-	if len(lin.Edges) != 1 || lin.Edges[0].Kind != "next" {
-		t.Fatalf("trace edges = %+v, want one next edge", lin.Edges)
 	}
 }
 
@@ -312,61 +243,13 @@ func TestRun_NativeToposHarnessCommitsWorktreeEdits(t *testing.T) {
 
 }
 
-func TestRun_AgenticFlowCommitsWorktreeEdits(t *testing.T) {
-	repo := setupTestRepo(t)
-	s, r := setupTestRunner(t, []string{repo})
-	r.allowTestModel = true
-	enableCommitMessageGeneration(t, r)
-	r.agentsReg = agents.NewRegistry(
-		agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
-		agents.Role{Slug: "ag-builder", Title: "Builder", PromptTmpl: "you build"},
-	)
-	r.flows = flow.NewRegistry(flow.Flow{
-		Slug:    "agentic-pair",
-		Name:    "Agentic Pair",
-		Agentic: true,
-		Steps:   []flow.Step{{AgentSlug: "ag-planner"}, {AgentSlug: "ag-builder"}},
-	})
-	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
-
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
-		Prompt:  "agentic change > agentic-marker.txt",
-		Timeout: 5,
-		FlowID:  "agentic-pair",
-	})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus: %v", err)
-	}
-
-	r.Run(task.ID, task.Prompt, "", false)
-	r.WaitBackground()
-	s.WaitCompaction()
-
-	updated, _ := s.GetTask(ctx, task.ID)
-	if updated.Status != store.TaskStatusDone {
-		t.Fatalf("status = %q, want done", updated.Status)
-	}
-	if finalHash := gitRun(t, repo, "rev-parse", "HEAD"); finalHash == initialHash {
-		t.Fatal("expected a new commit on the default branch, but HEAD is unchanged")
-	}
-	if _, statErr := os.Stat(filepath.Join(repo, "agentic-marker.txt")); statErr != nil {
-		t.Fatalf("agentic flow file was not committed onto the default branch: %v", statErr)
-	}
-	if len(updated.CommitHashes) == 0 {
-		t.Error("no commit hashes were recorded on the task")
-	}
-}
-
-// TestRun_ToposWithoutModelCredentialIsRefused covers both in-process paths (a
-// task pinned to the topos harness and a delegating fleet) on a runner with no
-// model credential configured. The run must be refused before anything is set
-// up: the task fails with the model-credential category and the fixed
-// sentence, the error event keeps the developer detail in its own field, no
-// worktree is created, and the workspace repository is untouched.
+// TestRun_ToposWithoutModelCredentialIsRefused covers a task pinned to the
+// in-process topos harness on a runner with no model credential configured,
+// both as a fresh task and as a record that still names a removed fleet. The
+// run must be refused before anything is set up: the task fails with the
+// model-credential category and the fixed sentence, the error event keeps the
+// developer detail in its own field, no worktree is created, and the
+// workspace repository is untouched.
 func TestRun_ToposWithoutModelCredentialIsRefused(t *testing.T) {
 	const wantSentence = harness.ToposCredentialRequired
 
@@ -375,24 +258,13 @@ func TestRun_ToposWithoutModelCredentialIsRefused(t *testing.T) {
 		opts store.TaskCreateOptions
 	}{
 		{"native run", store.TaskCreateOptions{Prompt: "native change > refused-marker.txt", Timeout: 5, Sandbox: harness.Topos}},
-		{"delegating fleet", store.TaskCreateOptions{Prompt: "fleet change > refused-marker.txt", Timeout: 5, FlowID: "agentic-pair"}},
+		{"native run naming a removed fleet", store.TaskCreateOptions{Prompt: "fleet change > refused-marker.txt", Timeout: 5, Sandbox: harness.Topos, FlowID: "agentic-pair"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := setupTestRepo(t)
 			s, r := setupTestRunner(t, []string{repo})
 			enableCommitMessageGeneration(t, r)
-			r.agentsReg = agents.NewRegistry(
-				agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
-				agents.Role{Slug: "ag-builder", Title: "Builder", PromptTmpl: "you build"},
-			)
-			r.flows = flow.NewRegistry(flow.Flow{
-				Slug:    "agentic-pair",
-				Name:    "Agentic Pair",
-				Agentic: true,
-				Dynamic: true,
-				Steps:   []flow.Step{{AgentSlug: "ag-planner"}, {AgentSlug: "ag-builder"}},
-			})
 			initialHash := gitRun(t, repo, "rev-parse", "HEAD")
 
 			ctx := context.Background()

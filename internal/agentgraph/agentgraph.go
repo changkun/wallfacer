@@ -1,12 +1,10 @@
 // Package agentgraph embeds the topos runtime SDK (latere.ai/x/topos) as
-// wallfacer's in-process agent-graph execution path. It is the single seam
-// through which wallfacer uses topos: no other wallfacer package imports the
-// runtime, and nothing imports its engine subpackages, so the dependency stays
-// the curated embeddable surface. A boundary test enforces that.
-//
-// This is the M1 wiring slice (see specs/local/topos-runtime-integration.md). The
-// flow/agents -> region adapter, model and sandbox wiring, and trace mapping
-// land in later milestones; here the seam only constructs and runs a region.
+// wallfacer's in-process execution path: the native Topos harness runs a task
+// as one agent through RunAgent, on the model a ModelConfig selects, in the
+// task's worktree. The package maps the runtime's options, events and result
+// onto topos-free types (ModelConfig, Event, Result), so the runner consumes a
+// run without naming a topos type. No wallfacer package imports a topos engine
+// subpackage outside a designated seam; a boundary test enforces that.
 package agentgraph
 
 import (

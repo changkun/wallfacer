@@ -112,25 +112,21 @@ func TestModelOptions_Mapping(t *testing.T) {
 	})
 }
 
-// TestRunWithoutModelCredentialIsRefused asserts that neither entry point starts
-// a run for a config that carries no credential: the zero value and a real mode
-// missing its key both return ErrNoModelCredential, and nothing is written to
-// the worktree.
+// TestRunWithoutModelCredentialIsRefused asserts that RunAgent starts no run for
+// a config that carries no credential: the zero value and a real mode missing
+// its key both return ErrNoModelCredential, and nothing is written to the
+// worktree.
 func TestRunWithoutModelCredentialIsRefused(t *testing.T) {
 	configs := map[string]agentgraph.ModelConfig{
 		"unconfigured":       {},
 		"lux without key":    {Mode: agentgraph.ModelModeLux, BaseURL: "https://models.example.com/v1/models"},
 		"direct without key": {Mode: agentgraph.ModelModeDirect},
 	}
-	reg, f := twoAgentFixture()
 	for name, cfg := range configs {
 		t.Run(name, func(t *testing.T) {
 			worktree := t.TempDir()
 			if _, err := agentgraph.RunAgent(t.Context(), "run-refused", cfg, "implement", "", "hi > marker.txt", worktree, nil); !errors.Is(err, agentgraph.ErrNoModelCredential) {
 				t.Errorf("RunAgent: err = %v, want ErrNoModelCredential", err)
-			}
-			if _, err := agentgraph.RunFlowWithModel(t.Context(), "run-refused", cfg, f, reg, "hi > marker.txt", worktree, nil); !errors.Is(err, agentgraph.ErrNoModelCredential) {
-				t.Errorf("RunFlowWithModel: err = %v, want ErrNoModelCredential", err)
 			}
 			if _, err := os.Stat(filepath.Join(worktree, "marker.txt")); err == nil {
 				t.Error("marker.txt exists in the worktree; a refused run must not run anything")

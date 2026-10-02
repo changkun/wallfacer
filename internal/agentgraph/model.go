@@ -1,22 +1,18 @@
 package agentgraph
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"latere.ai/x/topos"
-
-	"latere.ai/x/wallfacer/internal/agents"
-	"latere.ai/x/wallfacer/internal/flow"
 )
 
 // ErrNoModelCredential reports that a ModelConfig carries no model credential.
-// Every entry point of the seam returns it before a runner is built, so a run
-// without a credential never starts and never touches its working directory.
+// RunAgent returns it before a runner is built, so a run without a credential
+// never starts and never touches its working directory.
 var ErrNoModelCredential = errors.New("agentgraph: model config carries no credential")
 
-// ModelMode selects how an agent-graph run reaches a model. It is the
+// ModelMode selects how an in-process run reaches a model. It is the
 // wallfacer-side, topos-free mirror of topos.ModelKind: the host configures a
 // ModelConfig in these terms and the seam maps it onto topos.ModelOptions, so no
 // wallfacer package outside this seam names a topos model type. The zero value
@@ -37,8 +33,8 @@ const (
 	ModelModeFake ModelMode = "fake"
 )
 
-// ModelConfig is wallfacer's topos-free description of the model an agentic run
-// should use. The runner derives it from wallfacer's existing credential
+// ModelConfig is wallfacer's topos-free description of the model an in-process
+// run should use. The runner derives it from wallfacer's existing credential
 // settings (the .env file: ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL /
 // CLAUDE_DEFAULT_MODEL) and hands it to the seam; only the seam turns it into a
 // topos.ModelOptions. The zero value is not runnable: it yields
@@ -90,51 +86,19 @@ func modelOptions(c ModelConfig) (topos.ModelOptions, error) {
 	}
 }
 
-// runOptions builds the topos.Options for an agentic run from the session id,
-// the model config, and the flow. It is the single place that names
-// topos.Options: the model selection comes from the config and the recursion
-// bound (MaxHandoffDepth) rides on the flow, so a zero flow depth passes 0 and
-// the topos runner applies its own default (3). It returns modelOptions' error
-// for a config that selects no model.
-func runOptions(sessionID string, c ModelConfig, f flow.Flow) (topos.Options, error) {
+// runOptions builds the topos.Options for an in-process run from the session
+// id and the model config. It is the single place that names topos.Options.
+// sessionID seeds the run id so trace node ids (<session>/<agent>) are stable.
+// It returns modelOptions' error for a config that selects no model.
+func runOptions(sessionID string, c ModelConfig) (topos.Options, error) {
 	model, err := modelOptions(c)
 	if err != nil {
 		return topos.Options{}, err
 	}
 	return topos.Options{
-		SessionID:       sessionID,
-		Model:           model,
-		MaxHandoffDepth: f.MaxHandoffDepth,
+		SessionID: sessionID,
+		Model:     model,
 	}, nil
-}
-
-// RunFlowWithModel runs a flow through the agent-graph runtime using the model
-// the config selects, returning a topos-free Result. A config without a
-// credential returns ErrNoModelCredential before anything runs. sessionID seeds
-// the run id so trace node ids (<session>/<agent>) are stable.
-//
-// When worktree is non-empty, the local sandbox runs tools in that directory.
-// Options.Sandbox remains nil; sharing wallfacer's executor.Backend through a
-// topos.Sandbox adapter is future work.
-func RunFlowWithModel(ctx context.Context, sessionID string, c ModelConfig, f flow.Flow, reg *agents.Registry, prompt, worktree string, onEvent func(Event)) (Result, error) {
-	opts, err := runOptions(sessionID, c, f)
-	if err != nil {
-		return Result{}, err
-	}
-	if worktree != "" {
-		opts.Workdir = worktree
-	}
-	if onEvent != nil {
-		// Bridge topos's observer to a topos-free Event so only this seam
-		// names a topos type. The callback runs synchronously on the run's
-		// goroutine(s); the host's onEvent must be non-blocking.
-		opts.Observer = func(e topos.Event) { onEvent(toEvent(e)) }
-	}
-	res, err := RunFlow(ctx, opts, f, reg, prompt)
-	if err != nil {
-		return Result{}, err
-	}
-	return toResult(res), nil
 }
 
 // toEvent converts a topos.Event into the topos-free Event. Node is the

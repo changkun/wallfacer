@@ -27,9 +27,7 @@ func newTestHandlerWithPrompts(t *testing.T) (*Handler, *prompts.Manager) {
 	}
 	mgr := prompts.NewManager(promptsDir)
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Prompts:   mgr,
-		AgentsDir: filepath.Join(dir, "agents"),
-		FlowsDir:  filepath.Join(dir, "flows"),
+		Prompts: mgr,
 	})
 	t.Cleanup(r.WaitBackground)
 	h := NewHandler(s, r, dir, []string{}, nil)

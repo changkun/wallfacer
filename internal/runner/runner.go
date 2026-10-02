@@ -19,14 +19,11 @@ import (
 	"latere.ai/x/pkg/syncmap"
 	"latere.ai/x/pkg/trackedwg"
 
-	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
-	"latere.ai/x/wallfacer/internal/pkg/yamlwatch"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -98,43 +95,6 @@ type RunnerConfig struct {
 	Prompts            *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager   *workspace.Manager
 	Reg                *metrics.Registry // optional metrics registry; nil disables metric collection
-	// AgentsDir is the filesystem directory scanned for user-authored
-	// agent descriptors (*.yaml). Empty falls back to the default
-	// (~/.wallfacer/agents/). Missing dir is not an error — the
-	// runner uses the built-in catalog alone.
-	AgentsDir string
-	// FlowsDir is the filesystem directory scanned for user-authored
-	// flow descriptors (*.yaml). Defaults to ~/.wallfacer/flows/
-	// (overridable via WALLFACER_FLOWS_DIR). Same failure semantics
-	// as AgentsDir.
-	FlowsDir string
-}
-
-func defaultFlowsDir() string {
-	if v := strings.TrimSpace(os.Getenv("WALLFACER_FLOWS_DIR")); v != "" {
-		return v
-	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return ""
-	}
-	return filepath.Join(home, ".wallfacer", "flows")
-}
-
-// defaultAgentsDir returns the default location for user-authored
-// agent YAML files. Respects WALLFACER_AGENTS_DIR when set; otherwise
-// ~/.wallfacer/agents/. Returns an empty string if neither the env
-// var nor the home directory are available (tests can supply an
-// explicit RunnerConfig.AgentsDir to avoid this branch).
-func defaultAgentsDir() string {
-	if v := strings.TrimSpace(os.Getenv("WALLFACER_AGENTS_DIR")); v != "" {
-		return v
-	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return ""
-	}
-	return filepath.Join(home, ".wallfacer", "agents")
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -184,17 +144,6 @@ type Runner struct {
 	shutdownCtx         context.Context
 	shutdownCancel      context.CancelFunc
 	reg                 *metrics.Registry // optional; nil disables metric collection
-
-	// agentsReg is the read-only catalog used by RunAgent to resolve
-	// slug → AgentRole. Built from agents.BuiltinAgents once at
-	// NewRunner. flows is the flow registry the dispatch path consults
-	// to pick the execution mode (implement/engine). Both are nil-safe:
-	// callers that bypass dispatch (direct runAgent) never read them.
-	agentsReg  *agents.Registry
-	agentsDir  string // ~/.wallfacer/agents by default; user-authored YAML lives here
-	flows      *flow.Registry
-	flowsDir   string // ~/.wallfacer/flows by default
-	flowEngine *flow.Engine
 
 	// allowTestModel lets an in-process run with no model credential use the
 	// runtime's deterministic test model instead of being refused. It keeps the
@@ -411,49 +360,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		taskContainers:   &containerRegistry{},
 		shutdownCh:       make(chan struct{}),
 	}
-	agentsDir := cfg.AgentsDir
-	if agentsDir == "" {
-		agentsDir = defaultAgentsDir()
-	}
-	if reg, err := agents.NewMergedRegistry(agentsDir); err == nil {
-		r.agentsReg = reg
-	} else {
-		logger.Runner.Warn("agents: user dir load failed, using built-in registry", "dir", agentsDir, "error", err)
-		r.agentsReg = agents.NewBuiltinRegistry()
-	}
-	r.agentsDir = agentsDir
-	flowsDir := cfg.FlowsDir
-	if flowsDir == "" {
-		flowsDir = defaultFlowsDir()
-	}
-	if reg, err := flow.NewMergedRegistry(flowsDir); err == nil {
-		r.flows = reg
-	} else {
-		logger.Runner.Warn("flows: user dir load failed, using built-in registry", "dir", flowsDir, "error", err)
-		r.flows = flow.NewBuiltinRegistry()
-	}
-	r.flowsDir = flowsDir
-	r.flowEngine = flow.NewEngine(r)
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
-
-	// Watch user-authored directories so edits made directly on
-	// disk (outside the HTTP API) take effect without a restart.
-	// Reload failures are logged but don't fault startup; the
-	// registry simply keeps its previous state.
-	if _, err := yamlwatch.Watch(r.shutdownCtx, "agents", agentsDir, func() {
-		if err := r.ReloadAgents(); err != nil {
-			logger.Runner.Warn("agents watcher: reload failed", "error", err)
-		}
-	}); err != nil {
-		logger.Runner.Warn("agents watcher: setup failed", "dir", agentsDir, "error", err)
-	}
-	if _, err := yamlwatch.Watch(r.shutdownCtx, "flow", flowsDir, func() {
-		if err := r.ReloadFlows(); err != nil {
-			logger.Runner.Warn("flows watcher: reload failed", "error", err)
-		}
-	}); err != nil {
-		logger.Runner.Warn("flows watcher: setup failed", "dir", flowsDir, "error", err)
-	}
 
 	// Initialize container circuit breaker.
 	// Defaults: 5 consecutive failures trip the breaker; it stays open for
@@ -493,59 +400,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	r.startBoardSubscriptionLoop(s)
 
 	return r
-}
-
-// AgentsRegistry returns the merged built-in + user-authored agent
-// registry the runner uses for flow dispatch. Exposed so the HTTP
-// handler's /api/agents endpoints read the same catalog the runner
-// executes against.
-func (r *Runner) AgentsRegistry() *agents.Registry {
-	return r.agentsReg
-}
-
-// AgentsDir returns the filesystem directory where user-authored
-// agent YAML files live. Exposed so /api/agents write handlers can
-// target the same directory the runner scans on startup.
-func (r *Runner) AgentsDir() string {
-	return r.agentsDir
-}
-
-// ReloadAgents re-reads the user-authored agents directory and
-// replaces the in-memory registry. Called by the /api/agents
-// POST/DELETE handlers after they write to disk so subsequent task
-// launches see the new role without a server restart.
-func (r *Runner) ReloadAgents() error {
-	reg, err := agents.NewMergedRegistry(r.agentsDir)
-	if err != nil {
-		return err
-	}
-	r.agentsReg = reg
-	return nil
-}
-
-// FlowsRegistry returns the merged built-in + user-authored flow
-// registry the dispatcher reads at Run time.
-func (r *Runner) FlowsRegistry() *flow.Registry {
-	return r.flows
-}
-
-// FlowsDir returns the filesystem directory where user-authored
-// flow YAML files live.
-func (r *Runner) FlowsDir() string {
-	return r.flowsDir
-}
-
-// ReloadFlows re-reads the user-authored flows directory and
-// replaces the in-memory registry. Also reinitialises the flow
-// engine so it holds no stale reference to the prior registry.
-func (r *Runner) ReloadFlows() error {
-	reg, err := flow.NewMergedRegistry(r.flowsDir)
-	if err != nil {
-		return err
-	}
-	r.flows = reg
-	r.flowEngine = flow.NewEngine(r)
-	return nil
 }
 
 // WorkspaceManager returns the runner's workspace manager.

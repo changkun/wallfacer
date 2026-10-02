@@ -6,16 +6,6 @@ import (
 	"testing"
 )
 
-// supportedToposPackages is the set of topos import paths ANY wallfacer package
-// may name directly. The root latere.ai/x/topos is the runtime surface;
-// latere.ai/x/topos/graph is the canonical authored-graph model (the shared
-// definition type both wallfacer and the control plane serialize), so it is
-// supported surface, not an engine internal. Every other subpackage (sandbox,
-// hooks, the engine) stays behind a seam.
-var supportedToposPackages = map[string]bool{
-	"latere.ai/x/topos/graph": true,
-}
-
 // seamPackages maps a wallfacer package to the topos engine subpackages it is
 // the designated seam for. A seam confines an engine import to one package so
 // the rest of wallfacer depends on the seam rather than the engine directly.
@@ -31,10 +21,11 @@ var seamPackages = map[string]map[string]bool{
 }
 
 // TestWallfacerImportsOnlyRootTopos enforces the embeddable boundary: no
-// wallfacer package may directly import a topos ENGINE subpackage
-// (latere.ai/x/topos/...) except the root package, the supported authoring
-// surface (supportedToposPackages), or a designated seam (seamPackages). This
-// keeps the runtime an implementation detail behind a seam. The whole module is
+// wallfacer package may directly import a topos subpackage
+// (latere.ai/x/topos/...) unless it is the designated seam for that subpackage
+// (seamPackages). The root latere.ai/x/topos is the runtime surface and may be
+// named anywhere; every subpackage (sandbox, hooks, the engine) stays behind a
+// seam. This keeps the runtime an implementation detail. The whole module is
 // scanned by import path so the check does not depend on the test's CWD.
 //
 // Test files are scanned too (TestImports and XTestImports alongside Imports):
@@ -56,9 +47,6 @@ func TestWallfacerImportsOnlyRootTopos(t *testing.T) {
 		pkg := fields[0]
 		for _, imp := range fields[1:] {
 			if !strings.HasPrefix(imp, "latere.ai/x/topos/") { // root topos is fine
-				continue
-			}
-			if supportedToposPackages[imp] {
 				continue
 			}
 			if seam := seamPackages[pkg]; seam != nil && seam[imp] {

@@ -194,106 +194,27 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		// non-fatal: continue execution
 	}
 
-	// Resolve the task's flow: task.FlowID when it names a registered flow,
-	// otherwise "implement". The implement path stays on the turn loop
-	// below (multi-turn semantics the linear engine does not express
-	// yet); any other flow runs through the flow engine.
-	flowSlug := "implement"
-	if r.flows != nil {
-		flowSlug = r.flows.ResolveForTask(task)
-	}
+	// Every task runs the built-in pipeline. A record written while fleets
+	// existed may still name one in FlowID; the field is not read for
+	// dispatch, and the task's timeline says once that the fleet is gone.
+	r.noteRemovedFleet(bgCtx, task)
 
-	// A flow marked Agentic (a delegating fleet, or a pinned chain saved with
-	// the flag) runs through the in-process topos agent-graph runtime
-	// (internal/agentgraph) rather than the flow engine. The flow is compiled
-	// into a topos.Region and run on the model the env file configures; a run
-	// without a model credential is refused before worktree setup. The run
-	// executes in the task worktree, which is set up below, and driveToposRun
-	// persists the trace, then commits and merges the worktree. It has no test
-	// step and no oversight, and the task passes through waiting to done
-	// without stopping there.
-	agenticFlow, foundAgenticFlow := r.flowBySlug(flowSlug)
-	agentic := foundAgenticFlow && agenticFlow.Agentic
-
-	// Non-implement flows: run through the flow engine.
-	// The engine walks the flow's steps linearly (with parallel-sibling
-	// fan-out) and launches each agent via Runner.RunAgent. The
-	// implement flow stays on the turn loop below because it needs
-	// multi-turn semantics the engine does not express yet.
-	//
-	// This branch returns before worktree setup, so the steps run in the
-	// workspace folders themselves and nothing is committed: the task walks
-	// waiting -> committing -> done without calling the commit pipeline. That
-	// is a known gap of the fixed-sequence path, not a guarantee.
-	if !agentic && flowSlug != "implement" && r.flowEngine != nil {
-		statusSet = true
-		f, ok := r.flows.Get(flowSlug)
-		if !ok {
-			err := fmt.Errorf("unknown flow %q", flowSlug)
-			logger.Runner.Error("flow resolve", "task", taskID, "error", err)
-			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, classifyFailure(err, false, ""))
-			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, err.Error(), "", "", 0)
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
-			return
-		}
-		flowTimeout := time.Duration(task.Timeout) * time.Minute
-		if flowTimeout <= 0 {
-			flowTimeout = constants.DefaultTaskTimeout
-		}
-		flowCtx, flowCancel := context.WithTimeout(bgCtx, flowTimeout)
-		defer flowCancel()
-		if runErr := r.flowEngine.Execute(flowCtx, f, task); runErr != nil {
-			if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
-				return
-			}
-			category := classifyFailure(runErr, false, "")
-			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
-			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
-			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
-			return
-		}
-		// Follow the in_progress → waiting → committing → done path
-		// (the state machine does not allow a direct in_progress → done
-		// transition).
-		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
-		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-			store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
-		return
-	}
-
-	// Native Topos harness: an implement-path task whose resolved harness runs
-	// in-process executes as a single in-process topos agent (a one-node region)
-	// instead of launching a subprocess harness. Agentic flows share its worktree
-	// setup below but dispatch through their compiled region. Dispatch happens
-	// after worktree setup, so the agent's tools run in the task's worktree;
-	// the oversight worker and turn loop are skipped for it, and driveToposRun
-	// commits and merges without stopping in waiting. While harness.Default() is
-	// Claude this only triggers for a task explicitly pinned to the topos
-	// harness. A test run of such a task stays on the turn loop, where the
-	// testing activity resolves to the default subprocess harness.
+	// Native Topos harness: a task whose resolved harness runs in-process
+	// executes as a single in-process topos agent (a one-node region) instead
+	// of launching a subprocess harness. Dispatch happens after worktree setup,
+	// so the agent's tools run in the task's worktree; the oversight worker and
+	// turn loop are skipped for it, and driveToposRun commits and merges
+	// without stopping in waiting. While harness.Default() is Claude this only
+	// triggers for a task explicitly pinned to the topos harness. A test run of
+	// such a task stays on the turn loop, where the testing activity resolves
+	// to the default subprocess harness.
 	nativeTopos := !task.IsTestRun && harness.InProcess(r.sandboxForTask(task))
-	toposRun := agentic || nativeTopos
 
 	// An in-process run needs a model config. Resolve it here, before the
 	// worktree is set up, so a run that has none (no model credential, or a
 	// secret store that cannot be read) is refused with nothing created and
 	// nothing run on its behalf.
-	if toposRun {
+	if nativeTopos {
 		if _, cfgErr := r.agenticModelConfig(); cfgErr != nil {
 			statusSet = true
 			r.failToposRun(bgCtx, taskID, cfgErr)
@@ -319,7 +240,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Skip for test runs — those are short verification passes where the
 	// implementation oversight is already finalized — and for native topos
 	// runs, which produce their own live trace and never enter the turn loop.
-	if !isTestRun && !toposRun {
+	if !isTestRun && !nativeTopos {
 		oversightCtx, oversightCancel := context.WithCancel(ctx)
 		defer oversightCancel()
 		go r.periodicOversightWorker(oversightCtx, taskID)
@@ -382,14 +303,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if err := r.taskStore(taskID).UpdateTaskWorktrees(bgCtx, taskID, worktreePaths, branchName); err != nil {
 			logger.Runner.Error("save worktree paths", "task", taskID, "error", err)
 		}
-	}
-
-	// Agentic flow dispatch: now that the worktree exists, run the compiled
-	// multi-agent region rooted there so its edits enter the shared commit path.
-	if agentic {
-		statusSet = true
-		r.runAgenticFlow(bgCtx, taskID, *task, agenticFlow, prompt, firstWorktreePath(worktreePaths))
-		return
 	}
 
 	// Native Topos harness dispatch: now that the worktree exists, run the task

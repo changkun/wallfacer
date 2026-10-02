@@ -13,7 +13,6 @@ import (
 	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
-	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
@@ -117,21 +116,10 @@ func gatewayRoot(harnessBase string) string {
 	return u.Scheme + "://" + u.Host + path
 }
 
-// flowBySlug looks up a flow by slug, guarding against a nil flow registry
-// (hand-constructed Runners in tests may leave it unset). Returning ok=false for
-// nil keeps the dispatch falling through to the legacy paths exactly as it did
-// before the agentic branch existed.
-func (r *Runner) flowBySlug(slug string) (flow.Flow, bool) {
-	if r.flows == nil {
-		return flow.Flow{}, false
-	}
-	return r.flows.Get(slug)
-}
-
 // agenticEvent maps a topos trace event to a task-timeline event, returning
 // ok=false for events that should not surface (lifecycle bookkeeping, empty
-// payloads). It renders the agent-graph run as a readable live trace: each agent
-// turn's assistant text, delegations, and tool use. The agent label is the
+// payloads). It renders an in-process run as a readable live trace: each agent
+// turn's assistant text, any delegation, and tool use. The agent label is the
 // trace node id (ev.Node) so the timeline lines join to graph nodes.
 func agenticEvent(ev agentgraph.Event) (store.EventType, map[string]string, bool) {
 	label := ev.AgentID
@@ -179,29 +167,15 @@ func agenticEvent(ev agentgraph.Event) (store.EventType, map[string]string, bool
 	}
 }
 
-// runAgenticFlow executes an agentic flow through the in-process topos
-// agent-graph runtime (internal/agentgraph): it compiles the flow into a
-// multi-agent topos.Region and drives the resulting run onto the task via
-// driveToposRun. The caller sets statusSet=true before invoking this.
-func (r *Runner) runAgenticFlow(bgCtx context.Context, taskID uuid.UUID, task store.Task, f flow.Flow, prompt, worktree string) {
-	r.driveToposRun(bgCtx, taskID, task, func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error) {
-		cfg, err := r.agenticModelConfig()
-		if err != nil {
-			return agentgraph.Result{}, err
-		}
-		return agentgraph.RunFlowWithModel(ctx, task.ID.String(), cfg, f, r.agentsReg, prompt, worktree, onEvent)
-	})
-}
-
-// runNativeTopos executes a plain task through the native Topos harness: a single
-// in-process agent (a one-node topos region) rather than a multi-agent flow. It
-// is the path a task resolves to when its harness is Topos (the native default,
-// once harness.Default() is flipped; until then only an explicit topos pin
-// reaches here). Like the agentic-flow path it produces a final text + trace
-// and walks the state machine; driveToposRun then runs the real commit pipeline
-// so the worktree edits land as a durable git commit. Verification (the test
-// step) parity with the subprocess harnesses is tracked in the
-// topos-native-harness spec.
+// runNativeTopos executes a task through the native Topos harness: a single
+// in-process agent (a one-node topos region). It is the path a task resolves
+// to when its harness is Topos (the native default, once harness.Default() is
+// flipped; until then only an explicit topos pin reaches here). It produces a
+// final text + trace and walks the state machine; driveToposRun then runs the
+// real commit pipeline so the worktree edits land as a durable git commit.
+// Verification (the test step) parity with the subprocess harnesses is
+// tracked in the topos-native-harness spec. The caller sets statusSet=true
+// before invoking this.
 func (r *Runner) runNativeTopos(bgCtx context.Context, taskID uuid.UUID, task store.Task, prompt, worktree string) {
 	// worktree is the task's set-up worktree (the real repo) so the agent's tools
 	// edit actual files; an empty worktree falls back to the topos temp-dir sandbox.
@@ -224,19 +198,17 @@ func firstWorktreePath(worktreePaths map[string]string) string {
 	return ""
 }
 
-// driveToposRun executes an in-process topos run (a multi-agent agentic flow or a
-// single-agent native-harness run) supplied as runFn, and maps the outcome onto
-// the task. It forwards the run's live trace events onto the task timeline (so
-// the per-turn assistant text, delegations, and tool use are visible as the run
+// driveToposRun executes an in-process topos run supplied as runFn and maps the
+// outcome onto the task. It forwards the run's live trace events onto the task
+// timeline (so the per-turn assistant text and tool use are visible as the run
 // proceeds, not just as a trace graph at the end), persists the final text and
-// the JSON-marshaled trace graph, then walks the task through the same
-// in_progress -> waiting -> committing -> done state machine the flow-engine and
-// ideation branches use (the state machine forbids a direct in_progress -> done
-// transition). In the committing phase it runs the real commit pipeline
-// (r.Commit) when the run has a worktree, so a native run's edits land as a
-// durable git commit rather than reaching done uncommitted. runFn performs the
-// actual topos run, wired with the supplied non-blocking observer. The caller
-// sets statusSet=true before invoking this.
+// the JSON-marshaled trace graph, then walks the task through
+// in_progress -> waiting -> committing -> done (the state machine forbids a
+// direct in_progress -> done transition). In the committing phase it runs the
+// real commit pipeline (r.Commit) when the run has a worktree, so the run's
+// edits land as a durable git commit rather than reaching done uncommitted.
+// runFn performs the actual topos run, wired with the supplied non-blocking
+// observer. The caller sets statusSet=true before invoking this.
 func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task store.Task, runFn func(ctx context.Context, onEvent func(agentgraph.Event)) (agentgraph.Result, error)) {
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
@@ -288,10 +260,10 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 	_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, res.Final, "", "end_turn", 0)
 	if data, mErr := json.Marshal(res.Trace); mErr == nil {
 		if lErr := r.taskStore(taskID).UpdateTaskTrace(bgCtx, taskID, string(data)); lErr != nil {
-			logger.Runner.Warn("agentic flow trace persist", "task", taskID, "error", lErr)
+			logger.Runner.Warn("topos run trace persist", "task", taskID, "error", lErr)
 		}
 	} else {
-		logger.Runner.Warn("agentic flow trace marshal", "task", taskID, "error", mErr)
+		logger.Runner.Warn("topos run trace marshal", "task", taskID, "error", mErr)
 	}
 	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
 		"result": res.Final,
@@ -311,9 +283,9 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 	// the work uncommitted. r.Commit re-fetches the task, so it sees the worktree
 	// paths execute.go persisted after this snapshot was taken.
 	//
-	// The commit is gated on a worktree being present. Both the native
-	// single-agent and multi-agent flow paths run in the task worktree and commit
-	// here; tests without a configured workspace keep using a temporary sandbox.
+	// The commit is gated on a worktree being present. A native run executes in
+	// the task worktree and commits here; tests without a configured workspace
+	// keep using a temporary sandbox.
 	if cur, gErr := r.taskStore(taskID).GetTask(bgCtx, taskID); gErr == nil && cur != nil && len(cur.WorktreePaths) > 0 {
 		if err := r.Commit(taskID, ""); err != nil {
 			logger.Runner.Error("topos run commit", "task", taskID, "error", err)

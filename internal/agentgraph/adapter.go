@@ -6,63 +6,13 @@ import (
 	"time"
 
 	"latere.ai/x/topos"
-
-	"latere.ai/x/wallfacer/internal/agents"
-	"latere.ai/x/wallfacer/internal/flow"
 )
 
-// FromFlow compiles a wallfacer flow + agents registry into a topos.Region via the
-// canonical authored graph model: FromFlowGraph builds the ref-form graph.Graph,
-// registryResolver swaps each ref for the inline spec reg holds, and ToRuntime
-// lowers it. A wallfacer flow is a single region, so the lowered graph's one region
-// is returned.
-//
-// The flow's first step becomes the region entry; the remaining steps become the
-// ordered peer chain. The resolver maps each agents.Role onto the spec: the slug is
-// the stable identity (so trace node ids are <session>/<slug>), Title/Description
-// carry the role labels, PromptTmpl becomes the system prompt, and Capabilities
-// become the permission scopes. A non-dynamic flow lowers to a deterministic pinned
-// chain (Optional / RunInParallelWith hints are not expressed by the graph model); a
-// dynamic flow lowers to Autonomy: Dynamic with the topology its coordination
-// selects. Built-in roles leave PromptTmpl empty (they render through the prompts
-// package); an empty system prompt is legal for every model and the headless path.
-func FromFlow(f flow.Flow, reg *agents.Registry) (topos.Region, error) {
-	authored, err := FromFlowGraph(f)
-	if err != nil {
-		return topos.Region{}, err
-	}
-	resolved, err := authored.Resolve(registryResolver(reg))
-	if err != nil {
-		return topos.Region{}, err
-	}
-	rt, err := resolved.ToRuntime()
-	if err != nil {
-		return topos.Region{}, err
-	}
-	return rt.Regions[0].Region, nil
-}
-
-// RunFlow builds a topos runner from opts and runs the region compiled from the
-// flow against prompt, returning the run result (final text + trace graph).
-func RunFlow(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.Registry, prompt string) (topos.RunResult, error) {
-	region, err := FromFlow(f, reg)
-	if err != nil {
-		return topos.RunResult{}, err
-	}
-	runner, err := NewRunner(opts)
-	if err != nil {
-		return topos.RunResult{}, err
-	}
-	return runner.Run(ctx, region, prompt)
-}
-
-// RunAgent runs a single agent in-process as a one-node topos region — the
-// degenerate, non-delegating case that backs the native Topos harness. A plain
-// task with no multi-agent flow executes as one agent, sharing the same engine,
-// trace, observer, and model selection the multi-agent path uses. name is the
-// agent's trace identity (node ids are <session>/<name>); systemPrompt is its
-// system prompt; onEvent may be nil. Like RunFlowWithModel, a config without a
-// credential returns ErrNoModelCredential before anything runs.
+// RunAgent runs a single agent in-process as a one-node topos region with no
+// delegation: the run that backs the native Topos harness. name is the agent's
+// trace identity (node ids are <session>/<name>); systemPrompt is its system
+// prompt; onEvent may be nil. A config without a credential returns
+// ErrNoModelCredential before anything runs.
 func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt, worktree string, onEvent func(Event)) (Result, error) {
 	if name == "" {
 		name = "agent"
@@ -71,7 +21,7 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 		Entry:    topos.AgentSpec{Name: name, SystemPrompt: systemPrompt},
 		Autonomy: topos.Pinned,
 	}
-	opts, err := runOptions(sessionID, c, flow.Flow{})
+	opts, err := runOptions(sessionID, c)
 	if err != nil {
 		return Result{}, err
 	}
@@ -84,8 +34,9 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 		opts.Workdir = worktree
 	}
 	if onEvent != nil {
-		// Same topos-free observer bridge as RunFlowWithModel; this seam is the
-		// only place that names a topos type.
+		// Bridge topos's observer to a topos-free Event so only this seam names
+		// a topos type. The callback runs synchronously on the run's
+		// goroutine(s); the host's onEvent must be non-blocking.
 		opts.Observer = func(e topos.Event) { onEvent(toEvent(e)) }
 	}
 	runner, err := NewRunner(opts)
@@ -99,7 +50,7 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 	return toResult(res), nil
 }
 
-// Result is the host-facing outcome of an agent-graph run. It mirrors
+// Result is the host-facing outcome of an in-process run. It mirrors
 // topos.RunResult with topos-free types so a wallfacer package (e.g. the runner)
 // can consume a run without importing topos and crossing the seam.
 type Result struct {

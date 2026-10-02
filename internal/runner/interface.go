@@ -6,9 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
@@ -94,16 +92,6 @@ type Interface interface {
 	EnvFile() string
 	Prompts() *prompts.Manager
 	WorkspaceManager() *workspace.Manager
-
-	// Agents catalog accessors (merged built-in + user-authored).
-	AgentsRegistry() *agents.Registry
-	AgentsDir() string
-	ReloadAgents() error
-
-	// Flows catalog accessors (merged built-in + user-authored).
-	FlowsRegistry() *flow.Registry
-	FlowsDir() string
-	ReloadFlows() error
 }
 
 // compile-time assertion: *Runner satisfies Interface.

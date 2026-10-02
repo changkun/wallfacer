@@ -261,6 +261,10 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// wallfacer holds no GitHub credential, so the files are unread secrets.
 	removeGitHubTokenCache(configDir, logger.Main)
 
+	// Say once per start that agent and fleet definitions left under the
+	// config dir are not read; the files themselves stay where they are.
+	warnRetiredFleetDirs(configDir, logger.Main)
+
 	// Cloud mode: wire latere.ai sign-in. Both the WALLFACER_CLOUD flag
 	// and the AUTH_* vars resolve from shell env first, .env file
 	// second — users can drop everything in ~/.wallfacer/.env or export

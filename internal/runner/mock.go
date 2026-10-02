@@ -8,9 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/flow"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
@@ -273,24 +271,3 @@ func (m *MockRunner) AutoPushWorkspaceCalls() []string {
 // WorkspaceManager returns the injected manager (or nil, the default, which
 // makes NewHandler fall back to a static manager).
 func (m *MockRunner) WorkspaceManager() *workspace.Manager { return m.WorkspaceMgr }
-
-// AgentsRegistry returns the built-in catalog. Sufficient for handler
-// tests that need slug lookups without hitting the disk.
-func (m *MockRunner) AgentsRegistry() *agents.Registry { return agents.NewBuiltinRegistry() }
-
-// AgentsDir returns an empty string. Handler tests that exercise the
-// write path set this via a concrete Runner instead of the mock.
-func (m *MockRunner) AgentsDir() string { return "" }
-
-// ReloadAgents is a no-op on the mock.
-func (m *MockRunner) ReloadAgents() error { return nil }
-
-// FlowsRegistry returns the built-in flow catalog. Mirrors
-// AgentsRegistry for symmetry with the concrete Runner.
-func (m *MockRunner) FlowsRegistry() *flow.Registry { return flow.NewBuiltinRegistry() }
-
-// FlowsDir returns an empty string on the mock.
-func (m *MockRunner) FlowsDir() string { return "" }
-
-// ReloadFlows is a no-op on the mock.
-func (m *MockRunner) ReloadFlows() error { return nil }

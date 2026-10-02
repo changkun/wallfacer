@@ -182,9 +182,9 @@ func TestFireRoutine_CreatesAndRunsInstanceTask(t *testing.T) {
 }
 
 // TestFireRoutine_StoredSpawnTargetSpawnsOrdinaryTask covers a routine
-// record written before fleets were removed: it still names a spawn flow and
-// a spawn kind. Firing it spawns an ordinary task that names no fleet, and
-// hands that task to the runner like any other instance.
+// record that names a spawn flow and a spawn kind, record fields no writer
+// sets and the engine does not read. Firing it spawns an ordinary task that
+// names no fleet, and hands that task to the runner like any other instance.
 func TestFireRoutine_StoredSpawnTargetSpawnsOrdinaryTask(t *testing.T) {
 	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)
