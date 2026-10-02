@@ -293,7 +293,7 @@ overlay. `FlowsPage.vue`, `AgentsPage.vue`, and `flows.css` are deleted;
   across the API, the store, and the UI (`9bed1f6b`, `dbc0896e`).
 - **Delegating modes are labeled experimental** (`66a9a757`), following the
   execution findings in
-  [agent-graph-e2e-design](../../local/agent-graph-e2e-design.md). That spec
+  [agent-graph-e2e-design](agent-graph-e2e-design.md). That spec
   tracks what the label says against what the runner does.
 
 **Dropped.**
@@ -313,6 +313,8 @@ the run overlay, delete, and the blank draft.
 
 **Follow-ups.** The remaining authoring work (editable edges, undo, positions
 saved with the fleet, the link from a task to its fleet) is carried by
-[agent-graph-e2e-design](../../local/agent-graph-e2e-design.md). First-run
+[agent-graph-e2e-design](agent-graph-e2e-design.md). First-run
 guidance for this surface is
 [first-run-onboarding](../../local/first-run-onboarding.md).
+
+Later, 2026-10-02: user-authored agents and fleets were retired, and with them the page and engines this spec delivered. See [retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md).

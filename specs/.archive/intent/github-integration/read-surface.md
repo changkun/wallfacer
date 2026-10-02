@@ -33,7 +33,7 @@ dispatched_task_id: null
 > on the store from `2501105b`.
 >
 > The task-centric redesign of 2026-06-30, recorded in the
-> [umbrella](../../../intent/github-integration.md), removed all of it one
+> [umbrella](../github-integration.md), removed all of it one
 > day later: the page, route, Sidebar entry and browse state in
 > `22407df2`; the four read functions and `github_read.go` in `bd5740cc`;
 > the routes in `df9df847`. The last two commits carry unrelated
@@ -47,7 +47,7 @@ dispatched_task_id: null
 >   `PullForBranch` in `internal/github/write.go`. It is shown in the task
 >   detail panel, as a badge on the board card and as a pill on a spec
 >   whose dispatched task has one (`b58ae5e4`). The design lives in
->   [pull-request](../../../intent/github-integration/pull-request.md).
+>   [pull-request](pull-request.md).
 > - **Issues.** Dropped. No list, detail or read endpoint remains.
 > - **Comment threads.** Not read anywhere. A comment can be posted to a
 >   task's pull request; the thread itself is read on GitHub.
@@ -64,7 +64,7 @@ dispatched_task_id: null
 > Architecture" section it refers to was removed from the umbrella on
 > 2026-10-02; its last version is in the umbrella at commit `acc2872a`.
 
-Child of [github-integration](../../../intent/github-integration.md).
+Child of [github-integration](../github-integration.md).
 
 ## Design Problem
 
@@ -126,7 +126,7 @@ decide per view.
 ## UI
 
 Owns the **`/github` page shell** (the umbrella's
-[UI Architecture](../../../intent/github-integration.md)): the new
+[UI Architecture](../github-integration.md)): the new
 `views/GithubPage.vue`, its route in `router.ts` (`localRoutes`, with
 `meta: { needsWorkspace: true }`), and a Sidebar entry under the **Workspace**
 group in `Sidebar.vue` (`{ id: 'github', label: 'GitHub', to: '/github',
@@ -186,3 +186,5 @@ Establishes `internal/github/client.go` (shared transport) and `read.go`, adds
 the `GET /api/github/pulls`, `/pulls/{number}`, `/issues`, `/issues/{number}`
 routes, and the `/github` page + list/detail UI (see UI above), including the
 route and Sidebar entry that make the page reachable.
+
+Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../../shared/platform-native/remove-github-integration.md).

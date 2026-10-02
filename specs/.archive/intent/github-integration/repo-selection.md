@@ -33,7 +33,7 @@ dispatched_task_id: null
 > (`RepoPicker.vue`) and the `/github` page landed in `1a8ebf9e`.
 >
 > The task-centric redesign of 2026-06-30, recorded in the
-> [umbrella](../../../intent/github-integration.md), removed all of it one
+> [umbrella](../github-integration.md), removed all of it one
 > day later: the page, the picker and the repository state in
 > `stores/github.ts` in `22407df2`; `repos.go` in `bd5740cc`; the two
 > routes and their handlers in `df9df847`. The last two commits carry
@@ -57,13 +57,13 @@ dispatched_task_id: null
 > - **The "no local clone" state.** Gone with the picker. A task always
 >   has a local worktree; a repository with no local checkout is the
 >   subject of
->   [cloud-remote-fix](../../../intent/github-integration/cloud-remote-fix.md).
+>   [cloud-remote-fix](cloud-remote-fix.md).
 >
 > The text below is kept as written for the record. The umbrella's "UI
 > Architecture" section it refers to was removed from the umbrella on
 > 2026-10-02; its last version is in the umbrella at commit `acc2872a`.
 
-Child of [github-integration](../../../intent/github-integration.md).
+Child of [github-integration](../github-integration.md).
 
 ## Design Problem
 
@@ -86,7 +86,7 @@ associates with local workspace state, and how the org boundary is enforced.
   (`internal/workspace/groups.go`); there is no clone path. A picked repo in
   local mode associates with an existing group member by matching its `origin`.
 - Actual clone-into-a-new-folder belongs to the gated
-  [cloud-remote-fix](../../../intent/github-integration/cloud-remote-fix.md) phase, not here.
+  [cloud-remote-fix](cloud-remote-fix.md) phase, not here.
 
 ## Options
 
@@ -147,7 +147,7 @@ picker shows the install affordance rather than an empty list.
 ## UI
 
 Contributes the **repo selector** to the `/github` page (the umbrella's
-[UI Architecture](../../../intent/github-integration.md)): a `RepoPicker.vue`
+[UI Architecture](../github-integration.md)): a `RepoPicker.vue`
 under `components/github/`, surfaced both as the page header's repo dropdown and,
 when no repo is chosen, as the page's centered first-run picker. Selection state
 lives in `stores/github.ts` and keys the read/write surfaces.
@@ -181,7 +181,7 @@ Selected (collapses into the page header dropdown)
   the full surface.
 - **No local clone** (`○ no`): selectable for read (PR/issue browse works
   without a checkout), but a banner notes "no local checkout" and points at the
-  gated [cloud-remote-fix](../../../intent/github-integration/cloud-remote-fix.md) phase for clone-and-fix; write
+  gated [cloud-remote-fix](cloud-remote-fix.md) phase for clone-and-fix; write
   actions that need a working tree are disabled with that hint. Not an error.
 - **Install affordance** (`+ Install on another org or grant more repos`) deep
   links to the GitHub App installation page; on return, the list refetches.
@@ -198,3 +198,5 @@ Adds repo-list + repo-select endpoints under `/api/github/repos`, a
 Consumes
 `NormalizeRemoteURL` to key selections; touches `workspace.Group` only if the
 selection is stored on the group.
+
+Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../../shared/platform-native/remove-github-integration.md).

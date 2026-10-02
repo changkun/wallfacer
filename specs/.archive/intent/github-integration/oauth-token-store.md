@@ -26,7 +26,7 @@ dispatched_task_id: null
 > [Outcome](#outcome) at the end records what was built, what differs and
 > what was left out. The design text is kept as written.
 
-Lead child of [github-integration](../../../intent/github-integration.md). Nothing else
+Lead child of [github-integration](../github-integration.md). Nothing else
 dispatches until GitHub tokens exist.
 
 ## Design Problem
@@ -176,7 +176,7 @@ above.
 ## UI
 
 Owns the **Settings tab** half of the surface (the umbrella's
-[UI Architecture](../../../intent/github-integration.md)); the `/github` page
+[UI Architecture](../github-integration.md)); the `/github` page
 chrome belongs to components 2-3. A new `SettingsTabGithub.vue` is registered in
 `SettingsPage.vue` alongside the existing Execution / Sandbox / Workspace tabs,
 following the `AccountControl.vue` connect pattern. All status reads come from
@@ -318,3 +318,5 @@ refresh mechanism and the storage choice landed smaller than designed.
 - Open question 6. No code hands the GitHub token to the coordination plane;
   `internal/github` is imported only by `internal/cli/server.go` and
   `internal/handler`.
+
+Later, 2026-10-02: the whole GitHub integration was retired from wallfacer, this part included. See [remove-github-integration](../../../shared/platform-native/remove-github-integration.md).

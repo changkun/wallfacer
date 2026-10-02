@@ -161,7 +161,7 @@ What left this spec:
   [unified-agent-graph-ui](unified-agent-graph-ui.md): one page at
   `/agent-graph`, with the Agents and Flows pages deleted. What that surface
   and the execution paths behind it should become is the open decision in
-  [agent-graph-e2e-design](../../local/agent-graph-e2e-design.md).
+  [agent-graph-e2e-design](agent-graph-e2e-design.md).
 - **Hosted execution**, listed out of scope here, is specified in
   [topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md).
 
@@ -174,3 +174,5 @@ One constraint for any later work: `go.mod` pins the runtime at a release
 that predates the project's rebuild into a different module shape, with no
 root package. The embed keeps working on the pin. Moving the pin is a
 migration of the seam, not a version bump.
+
+Later, 2026-10-02: the fleet half of this integration (flows flagged `Agentic`, the dynamic and mesh topologies) was retired, and the single-agent half became the base of the harness migration. See [platform-native](../../shared/platform-native.md).

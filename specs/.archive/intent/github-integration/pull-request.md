@@ -1,6 +1,6 @@
 ---
 title: "Pull Request Creation and Commenting (Write Surface)"
-status: drafted
+status: archived
 depends_on: []
 affects:
   - internal/handler/tasks_pr.go
@@ -30,10 +30,20 @@ dispatched_task_id: null
 
 # Pull Request Creation and Commenting (Write Surface)
 
+> **Archived 2026-10-02. Retired as: wallfacer no longer connects to
+> GitHub.** The maintainer decided to remove the GitHub integration from
+> wallfacer and to reach GitHub later through a platform connector
+> ([remove-github-integration](../../../shared/platform-native/remove-github-integration.md),
+> under [platform-native](../../../shared/platform-native.md)). The shipped create, state and comment surface is deleted, and the remaining work this spec lists (pushing the task branch, a generated title and body, merged and closed states) is not built.
+>
+> The text below is kept as written for the record. It was refreshed against
+> the code on the day it was retired, so it is an accurate description of
+> what existed.
+
 Child of [github-integration](../github-integration.md). The pull request
 surface is attached to a task: a task is a branch in a repository, and its pull
 request is metadata on the task. The token it uses comes from the shipped
-[token layer](../../.archive/intent/github-integration/oauth-token-store.md).
+[token layer](oauth-token-store.md).
 
 This spec started on 2026-04-01 as a host-side `gh pr create` flow for the
 branch a workspace has checked out. The create call moved to the GitHub API on
