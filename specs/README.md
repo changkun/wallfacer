@@ -34,7 +34,7 @@ Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Planning UX                   ✅ Chat-First Mode
   ✅ Planning Chat Threads         ✅ Spec State Control Plane
 
-Local Product - 30 shipped, 6 designed and unbuilt, 2 waiting on decisions
+Local Product - 30 shipped, 6 designed and unbuilt, 1 vague
   ⊘ Desktop App (code removed)     ✅ Terminal Sessions
   ✅ Container Exec                ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ✅ Routine Tasks
@@ -50,12 +50,12 @@ Local Product - 30 shipped, 6 designed and unbuilt, 2 waiting on decisions
   ✅ Test Criteria                 ✅ Visual Verification (in CI)
   ✅ Adversarial Review            ✅ Workspace Model
 
-  Agent graph (one page shipped; what it should become is undecided)
+  Agent graph (shipped; being retired, see Platform-native)
     ✅ Topos Runtime Integration M1-M5  ✅ Topos Live Agent Events
     ✅ Unified Agent Graph UI (one page; Agents and Flows pages deleted)
     ⊘ Workflows Graph UX (its page was deleted)
-    ○ Agent Graph E2E Design (decision anchor: accept or withdraw)
-    ○ First-Run Onboarding (vague; blocked on two decisions)
+    ⊘ Agent Graph E2E Design (withdrawn)
+    ○ First-Run Onboarding (vague; one decision left)
 
   Designed, unbuilt, not scheduled
     ○ Task Prompt Attachments      ○ Scoped Command Registry
@@ -89,12 +89,16 @@ Cloud Platform - two axes over one Latere platform (api.latere.ai)
   archived: Multi-Tenant, Billing Idempotency, Cella Runtime, Shared Cella
     Client, Tenant Filesystem, Tenant API (the platform owns the concern)
 
-Git Workflow - GitHub as metadata on a task
-  ◐ GitHub Integration (umbrella)       ✅ Brokered GitHub Token
-  ◐ Pull Requests on Tasks (create/state/comment shipped)
-  ⊘ Repo Selection, Read Surface (built, then removed)
-  ○ Task Revert (unbuilt)               ✅ Intent-Driven Commits
-  ○ Cloud Remote Fix (vague; gated on the hosted executor)
+Git Workflow - local git; the GitHub half is retired
+  ✅ Intent-Driven Commits              ○ Task Revert (unbuilt)
+  ⊘ GitHub Integration, Brokered Token, Pull Requests on Tasks,
+    Repo Selection, Read Surface, Cloud Remote Fix (retired 2026-10-02)
+
+Platform-native - four decisions of 2026-10-02 (the active program)
+  ○ Platform-Native Wallfacer (umbrella)
+  ○ Retire Agent Fleets (removal)       ○ Remove GitHub Integration (removal)
+  ◐ Topos as the Only Harness (opt-in shipped; migration and rewrite pending)
+  ○ Sessions That Spawn and Fork (vague; decides what a hosted board hosts)
 ```
 
 Where things stand after the 2026-10-02 review. Every spec in the active tree
@@ -102,21 +106,42 @@ was checked against the code; what shipped moved to the archive with an
 Outcome, what lost its premise moved there with a banner, and what remains is
 either designed and unbuilt (`drafted`) or waiting on a decision.
 
-The open decisions, in the order they unblock work:
+Four decisions followed the review the same day, recorded in
+[platform-native](shared/platform-native.md), and they are the active program:
 
-1. **The agent graph.** One page shipped and four execution paths run behind
-   it with different guarantees. [agent-graph-e2e-design](local/agent-graph-e2e-design.md)
-   is the anchor: accept its remainder as the plan, or withdraw it.
-2. **The native harness as default.** The opt-in harness works; five items and
-   a pin on a pre-rebuild runtime module stand before the default changes
-   ([topos-native-harness](shared/topos-native-harness.md)).
-3. **A hosted board.** Whether one ships decides the hosted deployment spec
-   and unblocks multi-user collaboration.
-4. **What "done" means for a task with an open pull request**, in
-   [pull-request](intent/github-integration/pull-request.md).
+1. **Retire fleets.** No user-authored agents or fleets; the page, the two
+   engines only fleets reach, and the two CRUD APIs are removed
+   ([retire-agent-fleets](shared/platform-native/retire-agent-fleets.md)).
+2. **One harness.** Migrate to the rebuilt Topos module and make it the only
+   harness, with platform models and a model switch; no CLI harnesses
+   ([topos-native-harness](shared/topos-native-harness.md), rewrite pending).
+3. **Rethink the board before hosting it.** Agents that spawn and fork at run
+   time instead of isolated tasks
+   ([sessions-that-spawn-and-fork](shared/platform-native/sessions-that-spawn-and-fork.md), vague).
+4. **Remove GitHub.** No GitHub connection until the platform has a connector
+   ([remove-github-integration](shared/platform-native/remove-github-integration.md)).
+
+Still open: what a signed-out instance can do once models come from the
+platform, and whether the two third-party remote executor specs are archived.
+Both are in the umbrella's open questions.
 
 Spec Coordination and Foundations are complete. Cloud Platform is drafted and
 demand-gated, with the coordination connection and spec comments shipped.
+
+---
+
+## Platform-Native
+
+The active program: four decisions of 2026-10-02 that make wallfacer an application on the Latere platform with one harness. Two are removals, one is a migration, one is a design question.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and the open questions (what a signed-out instance can do; the third-party executors; CLI-subscription users; the sub-agent roles). |
+| ↳ [retire-agent-fleets.md](shared/platform-native/retire-agent-fleets.md) | Drafted | Removal: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; the native single-agent path, the run trace and Mission Control stay. User files are left on disk unread; record fields are kept and ignored. |
+| ↳ [remove-github-integration.md](shared/platform-native/remove-github-integration.md) | Drafted | Removal: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes, `internal/github`. Plain git push is untouched. Cached tokens are deleted on first start. |
+| ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
+
+The migration itself is [topos-native-harness.md](shared/topos-native-harness.md) in Shared Design, whose rewrite is pending.
 
 ---
 
@@ -207,10 +232,10 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [topos-runtime-integration.md](.archive/local/topos-runtime-integration.md) | **Complete** | The public `latere.ai/x/topos` runtime embedded as an in-process execution path (`agentic` flow kind) behind the `internal/agentgraph` seam and its import guard, with a real model through the gateway and the run's trace served and rendered. M1-M5 shipped; M6 (the unified surface) left for unified-agent-graph-ui. The pin predates the runtime's upstream rebuild; moving it is a migration of the seam. |
 | [topos-live-agent-events.md](.archive/local/topos-live-agent-events.md) | **Complete** | Live agent events for topos runs. topos gained a root `Options.Observer` seam + `EventAssistantMessage` (per-turn text) + the entry session-id↔node-id join fix (topos `d8e51f8`); wallfacer's agentgraph seam forwards the run's events (assistant text, delegations, tool use) onto the task timeline via the existing `/api/tasks/stream` live path — the multi-agent transcript now appears as the run proceeds, no new endpoint or UI. Bespoke SSE + trace-node animation deferred as optional polish. Shipped: topos v0.0.5 tagged + pushed, go.mod bumped, verified building GOWORK=off. |
 | [unified-agent-graph-ui.md](.archive/local/unified-agent-graph-ui.md) | **Complete** | One agent-graph page at `/agent-graph` (agent registry, fleet editor, run overlay) in place of the Agents and Flows pages, which were deleted. The pipeline gestures built along the way were dropped in the fleet rebuild. |
-| [agent-graph-e2e-design.md](local/agent-graph-e2e-design.md) | Drafted | **Decision anchor, not accepted.** Describes the four execution paths as they run (the turn loop, the flow engine, delegating fleets, the native harness), records what shipped of A1 to A5 ahead of acceptance, and plans the remainder: true labels, a repository contract for fixed-sequence user fleets (today they run in the workspace folder and do not commit), a task-to-graph link, undo, saved positions, sequence editing, one vocabulary, `RoutineSpawnKind` removal. Accepting it makes that remainder the plan; withdrawing it archives it. |
+| [agent-graph-e2e-design.md](.archive/local/agent-graph-e2e-design.md) | **Archived** | Withdrawn 2026-10-02 with the decision to retire fleets. Its body is the accurate record of the four execution paths as they ran and of the two findings that motivated the removal (a fixed-sequence user fleet never commits; delegating fleets merge with no test step, no oversight and no stop in `waiting`). |
 | [workflows-graph-ux.md](.archive/local/workflows-graph-ux.md) | **Archived** | Renamed Flows to Workflows and drew a read-only pipeline (2026-06-15). Retired when the agent-graph page replaced `FlowsPage` two weeks later, before its on-canvas editing was built. |
 | [remove-idea-agent-subsystem.md](.archive/local/remove-idea-agent-subsystem.md) | **Complete** | Full teardown of the idea-agent (brainstorm) auto-ideation engine and the test-only flow: removed across runner/handler/flow/agents/store/envconfig/constants/apicontract/frontend/docs. Accepted feature loss; clears vestigial flow paths ahead of the agent-graph convergence. |
-| [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | Stub for a guided first run and for teaching the agent-graph page. Blocked on two decisions: which first action is the path, and whether agents and fleets belong in it. The stub names which of its own statements are false today. |
+| [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | Stub for a guided first run. Agents and fleets are out of it (decided 2026-10-02). One decision remains, which first action is the path, best taken after the harness migration, when a first run also means signing in and choosing a model. |
 | [agents-and-flows/refinements.md](.archive/local/agents-and-flows/refinements.md) | **Archived** | Post-ship follow-ups: split-pane UI redesign, token-based CSS restyle, `Role.PromptTmpl` runtime wiring, a dedicated [`docs/guide/agent-graph.md`](../docs/guide/agent-graph.md) guide, and a cross-reference repair across 12 docs. |
 
 Archived local specs (superseded or dropped) are listed in the [Archive](#local-archived-superseded-or-dropped) section below.
@@ -269,7 +294,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [extensible-prompts.md](.archive/shared/extensible-prompts.md) | **Archived** | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. Archived: superseded by the Topos agent-document model (the discoverable/composable unit is now the `topos.latere.ai/v1` agent document, with the `harness/skills` layer for capabilities); what remains in `internal/prompts/` is internal harness plumbing that benefits from staying typed and compiled. Was its prompt-provider for the archived `agent-abstraction`. |
 | [agent-session-vocabulary.md](.archive/shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](.archive/shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
-| [topos-native-harness.md](shared/topos-native-harness.md) | Drafted | Both | The opt-in native harness is shipped: a task pinned to `topos` runs in-process in its worktree and commits. Remaining before `Default()` changes: verification parity, refusing a run with no credential, sub-agent roles, usage and limits, the local/hosted selector (the hosted run itself is the cloud track's executor), and a decision on flipping while pinned to the pre-rebuild runtime module. |
+| [topos-native-harness.md](shared/topos-native-harness.md) | Drafted | Both | The opt-in native harness is shipped on the current runtime pin: a task pinned to `topos` runs in-process in its worktree and commits. **Scope changed 2026-10-02, rewrite pending:** it becomes the only harness, on the rebuilt runtime module, with platform models and a model switch; the CLI adapters, the subprocess executor and the per-CLI credential flows are removed. See [platform-native](shared/platform-native.md). |
 | [visual-identity.md](.archive/shared/visual-identity.md) | **Complete** | Both | Umbrella: replace the Anthropic/Claude-like identity (cream `#f4f1ea`, terracotta `#c45a33`/`#d97757`, Instrument Serif) with an indigo-on-zinc system, rebuild the marketing site with animation/interactive graphics, and tear down + rewrite the drifted docs. Token names stay stable; three children below. |
 | ↳ [visual-identity/design-tokens.md](.archive/shared/visual-identity/design-tokens.md) | **Complete** | Both | New palette + all-sans/mono type system in `tokens.css` (values only, names stable), base.css token-block reconciliation, Space Grotesk + bundled JetBrains Mono, in-repo `.wallfacer-brand` override, retheme of the four `data-theme`-observing components, full ui-shots light+dark sweep. |
 | ↳ [visual-identity/marketing-site.md](.archive/shared/visual-identity/marketing-site.md) | **Complete** | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
@@ -307,7 +332,7 @@ The earlier shape of this track, one thin client per Latere service (a sandbox r
 |------|--------|----------|
 | [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the one platform and its capabilities, the rule that cloud mode is one client of Agents, the two axes, credentials (one sign-in, an actor token per audience), and the table of retired seams. Read it first. |
 | ↳ [latere-integration/coordination-plane.md](cloud/latere-integration/coordination-plane.md) | Drafted | **Axis A anchor (Cloud v1).** One outbound connection per signed-in instance to a coordinator role on wallfacerd; relay + projection never mirror; git-remote workspace identity; spec comments cloud-now / git-export-later. |
-| ↳↳ [coordination-plane/repo-identity.md](cloud/latere-integration/coordination-plane/repo-identity.md) | Drafted | Foundation (canonical remote form and manifest remote built; verification tiers and the registry not): collaboration unit is the repo (host/owner/repo), not the folder-group. Server stores repo identities (never paths); ephemeral instance->repos in Valkey, durable org->repos + comments in Postgres. Verification layered (local credential proof default, org-registry fallback, GitHub OAuth upgrade); org boundary is the perimeter. |
+| ↳↳ [coordination-plane/repo-identity.md](cloud/latere-integration/coordination-plane/repo-identity.md) | Drafted | Foundation (canonical remote form and manifest remote built; verification tiers and the registry not): collaboration unit is the repo (host/owner/repo), not the folder-group. Server stores repo identities (never paths); ephemeral instance->repos in Valkey, durable org->repos + comments in Postgres. Verification layered (local credential proof default, org-registry fallback; the GitHub upgrade tier is struck); org boundary is the perimeter. |
 | ↳↳ [coordination-plane/connection-and-presence.md](cloud/latere-integration/coordination-plane/connection-and-presence.md) | Drafted | Phase 1 lead: the outbound WSS, ephemeral registry, heartbeat, and org-wide presence re-homed from process-local to coordinator-aggregated. Multi-replica via Valkey (Directory seam); single-replica in-memory fallback. The connection is built for one replica; presence is not. |
 | ↳↳↳ [connection-and-presence/connection.md](cloud/latere-integration/coordination-plane/connection-and-presence/connection.md) | Drafted | Leaf 1: the outbound connector and its opt-in gate, JWT-derived principal, manifest, persisted instance id, heartbeat, the registry. Built for one replica (criteria 1-6); the Valkey-backed directory and cross-replica fan-out (criteria 7-8) are not. |
 | ↳↳↳ [connection-and-presence/presence.md](cloud/latere-integration/coordination-plane/connection-and-presence/presence.md) | Drafted | Leaf 2: org-wide presence aggregated by the coordinator across instances, with the avatar stack and focus hints. Unbuilt. |
@@ -330,7 +355,6 @@ graph LR
   TRI[Topos Runtime Integration ✅] --> HE
   AG[Platform Agents API ext] --> HE
   HE --> HB[Hosted Board Deployment]
-  HE -.gated.-> CRF[GitHub: Cloud Remote Fix]
   CP --> DB[Data Boundary]
   HE --> DB
 
@@ -355,34 +379,21 @@ Why no wallfacer-owned sandbox or control plane? The platform composes sandbox l
 
 ## Git Workflow
 
-Git and GitHub workflow on tasks. GitHub is metadata on a task, not a surface of its own: wallfacer runs no GitHub OAuth flow, it borrows a per-user token from the signed-in latere.ai account, shows the connection in Settings, and attaches one pull request to a task. A repository picker and PR/issue browsing were built and removed within days; a pull request's repository is derived from the task's git origin. Revert and commit attribution are local git: every surface (tasks, planning rounds, spec transitions, explorer edits) commits with trailers and undoes via `git revert`. Running an agent on a GitHub repository with no local checkout is gated on the cloud track's hosted executor.
+Git workflow on tasks. It is local git: every surface (tasks, planning rounds, spec transitions, explorer edits) commits with trailers and undoes via `git revert`, and pushing a branch uses the user's own git credentials. The GitHub half of this track (a token borrowed from the signed-in account, a pull request per task) was retired on 2026-10-02; its specs are archived and its code is removed by [remove-github-integration](shared/platform-native/remove-github-integration.md). GitHub returns through a platform connector, not through wallfacer.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [github-integration.md](intent/github-integration.md) | Drafted | **Umbrella.** GitHub as metadata on a task: a token borrowed from the signed-in latere.ai account (wallfacer runs no OAuth flow of its own), connection state in Settings, and a pull request per task. The token layer shipped; the repository picker and PR/issue browsing were built and removed; pull-request work remains; cloud remote fix is gated on the hosted executor. |
-| ↳ [oauth-token-store.md](.archive/intent/github-integration/oauth-token-store.md) | **Complete** | The brokered GitHub App user token: fetched from the Latere identity service with the user's identity token, cached per principal in a 0600 file store, surfaced by `/api/github/auth/status`, `/api/config` and a read-only Settings tab. No in-app connect; shipped differently from the spec's title, as its Outcome records. |
+| [github-integration.md](.archive/intent/github-integration.md) | **Archived** | Retired 2026-10-02: wallfacer no longer connects to GitHub. Umbrella for GitHub as metadata on a task (a token borrowed from the signed-in account, a pull request per task). |
+| ↳ [oauth-token-store.md](.archive/intent/github-integration/oauth-token-store.md) | **Archived** | Shipped, then retired with the whole integration on 2026-10-02. The brokered GitHub token: fetched through the identity service, cached per principal, shown in a Settings tab. |
 | ↳ [repo-selection.md](.archive/intent/github-integration/repo-selection.md) | **Archived** | Retired: the repository list and picker were built and removed one day later. A pull request's repository is derived from the task's git origin. |
 | ↳ [read-surface.md](.archive/intent/github-integration/read-surface.md) | **Archived** | Retired: PR and issue lists and detail were built and removed. What remains is one open-PR lookup per task and the shared API transport; issues have no replacement. |
-| ↳ [pull-request.md](intent/github-integration/pull-request.md) | Drafted | Pull requests on tasks. Create, state and comment over the GitHub API are shipped. Remaining: commit and push the task branch before creating, a generated title and body, merged and closed states, errors that name their cause, draft from the panel. |
-| ↳ [cloud-remote-fix.md](intent/github-integration/cloud-remote-fix.md) | Vague | Gated. Run an agent on a GitHub repo with no local checkout; blocked on the hosted executor, and on a route for a GitHub repo into a hosted session (its push credential covers the platform's git host only). |
+| ↳ [pull-request.md](.archive/intent/github-integration/pull-request.md) | **Archived** | Retired 2026-10-02. Create, state and comment on a task's pull request had shipped; pushing the task branch, a generated title and body, and merged and closed states had not. |
+| ↳ [cloud-remote-fix.md](.archive/intent/github-integration/cloud-remote-fix.md) | **Archived** | Retired 2026-10-02. Running an agent on a repository outside the platform's git host waits for a platform connector. |
 | [task-revert.md](intent/task-revert.md) | Drafted | Not built. One-action revert of a done task's whole merged range (`BaseCommitHashes..CommitHashes`) per repository, in a temporary worktree fast-forwarded into the default branch, with an agent for conflicts, plus retry, cancel, events and usage. |
 | [intent-commits.md](.archive/intent/intent-commits.md) | Complete | Task, planning, and explorer paths all auto-commit with attribution trailers and undo via `git revert`. |
 
-```mermaid
-graph LR
-  TOK[Brokered GitHub Token ✅] --> GHI[GitHub Integration<br/>umbrella]
-  GHI --> PR[Pull Requests on Tasks ◐]
-  HE[Hosted Agents Executor] -.gated.-> CRF[Cloud Remote Fix]
-  GHI --> CRF
-  TR[Task Revert]
-  IC[Intent-Driven Commits ✅]
-  style TOK fill:#d4edda,stroke:#28a745
-  style IC fill:#d4edda,stroke:#28a745
-  style PR fill:#fff3cd,stroke:#ffc107
-  style HE stroke-dasharray: 5 5
-```
 
-The token layer is shipped and archived. Pull requests are part shipped: create, state and comment work over the API, and the remaining work (commit and push the task branch before creating, a generated title and body, merged and closed states) is in the pull-request spec. Task revert is unbuilt and independent. Intent-commits is fully realized.
+Task revert is unbuilt and independent. Intent-commits is fully realized.
 
 ---
 
@@ -397,7 +408,7 @@ The token layer is shipped and archived. Pull requests are part shipped: create,
 - Spec coordination is complete (document model, planning UX, archival, chat-first mode, planning threads, and the state control plane / drift detection all shipped; the drift pipeline's agent-backed tester is wired but gated behind `WALLFACER_DRIFT_TESTER`, off by default).
 - Editor tabs (inline-file-panel), inline-diff-feedback, test-criteria, chat-model-transparency, static-artifacts and the dockable terminal shipped.
 - Five feature specs (task-prompt-attachments, scoped-command-registry, host-mounts, live-serve, terminal-ui) and one refactor spec (internal-consolidation) are designed, checked against the code on 2026-10-02, and unbuilt. None is scheduled; each is dispatchable after validation.
-- The agent graph: the unified page shipped and the workflows redraw was retired with its page. [agent-graph-e2e-design.md](local/agent-graph-e2e-design.md) is refreshed against the code and waits on accept or withdraw. Two facts from that refresh weigh on the decision: a fixed-sequence user fleet runs in the workspace folder and does not commit, and delegating fleets and native runs merge with no test step, no oversight and no stop in `waiting`. The proven path is still the built-in `implement` turn loop.
+- The agent graph is being retired. The unified page shipped, the audit found that only the built-in turn loop carries the full guarantees, and the maintainer chose removal over completion.
 
 **Within cloud platform:**
 - [latere-integration.md](cloud/latere-integration.md) is the umbrella; read it first.
