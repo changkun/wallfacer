@@ -1,6 +1,6 @@
 // Drives the local-mode RFC 8628 device-code sign-in: start the flow, poll
 // until the user approves on auth.latere.ai, and expose reactive state for the
-// modal. On a 503 (device sign-in not wired — e.g. a cloud deployment) `start`
+// modal. On a 503 (device sign-in not wired, e.g. a cloud deployment) `start`
 // reports "not started" so the caller falls back to the browser /login
 // redirect. Sign-in controls reach it through useSignIn, which adds that
 // fallback and the session refresh. Mirrors the start/poll/cancel shape of the
