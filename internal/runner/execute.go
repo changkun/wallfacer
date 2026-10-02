@@ -203,13 +203,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		flowSlug = r.flows.ResolveForTask(task)
 	}
 
-	// Agentic flows run through the in-process topos agent-graph runtime
-	// (internal/agentgraph) rather than the legacy flow engine. The flow is
-	// compiled into a topos.Region (entry + ordered peer chain), executed with
-	// the deterministic fake model for now (real Lux wiring is M4), and the
-	// resulting trace graph is persisted on the task. Dispatch happens after
-	// worktree setup so its tools edit the real checkout and the commit pipeline
-	// can durably merge those edits.
+	// A flow marked Agentic (a delegating fleet, or a pinned chain saved with
+	// the flag) runs through the in-process topos agent-graph runtime
+	// (internal/agentgraph) rather than the flow engine. The flow is compiled
+	// into a topos.Region and run on the model the env file configures; a run
+	// without a model credential is refused before worktree setup. The run
+	// executes in the task worktree, which is set up below, and driveToposRun
+	// persists the trace, then commits and merges the worktree. It has no test
+	// step and no oversight, and the task passes through waiting to done
+	// without stopping there.
 	agenticFlow, foundAgenticFlow := r.flowBySlug(flowSlug)
 	agentic := foundAgenticFlow && agenticFlow.Agentic
 
@@ -218,6 +220,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// fan-out) and launches each agent via Runner.RunAgent. The
 	// implement flow stays on the turn loop below because it needs
 	// multi-turn semantics the engine does not express yet.
+	//
+	// This branch returns before worktree setup, so the steps run in the
+	// workspace folders themselves and nothing is committed: the task walks
+	// waiting -> committing -> done without calling the commit pipeline. That
+	// is a known gap of the fixed-sequence path, not a guarantee.
 	if !agentic && flowSlug != "implement" && r.flowEngine != nil {
 		statusSet = true
 		f, ok := r.flows.Get(flowSlug)
@@ -274,9 +281,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// instead of launching a subprocess harness. Agentic flows share its worktree
 	// setup below but dispatch through their compiled region. Dispatch happens
 	// after worktree setup, so the agent's tools run in the task's worktree;
-	// the oversight worker and turn loop are skipped for it. Until harness.Default()
-	// flips to Topos this only triggers for a task explicitly pinned to the topos
-	// harness (opt-in). Test runs keep the subprocess verification path for now.
+	// the oversight worker and turn loop are skipped for it, and driveToposRun
+	// commits and merges without stopping in waiting. While harness.Default() is
+	// Claude this only triggers for a task explicitly pinned to the topos
+	// harness. A test run of such a task stays on the turn loop, where the
+	// testing activity resolves to the default subprocess harness.
 	nativeTopos := !task.IsTestRun && harness.InProcess(r.sandboxForTask(task))
 	toposRun := agentic || nativeTopos
 
