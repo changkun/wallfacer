@@ -251,7 +251,9 @@ Diff (may be truncated):
 The first non-empty line of the output is the title and the rest is the body.
 When generation fails or times out, the request continues with the shipped
 defaults, with one change: the body falls back to `CommitBodies` instead of
-`task.CommitMessage`, which is empty at this point. A failed generation is
+`task.CommitMessage`. That field is empty unless step 1 made a commit, and
+then it describes only that commit, not the ones the agent made. A failed
+generation is
 recorded as a `system` event on the task and does not fail the request.
 
 The role's binding names a new activity,
