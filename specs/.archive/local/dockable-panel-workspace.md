@@ -1,6 +1,6 @@
 ---
 title: Dockable Panel Workspace
-status: drafted
+status: archived
 depends_on: []
 affects:
   - frontend/src/layouts/AppLayout.vue
@@ -11,7 +11,7 @@ affects:
   - frontend/src/lib/panelHeight.ts
 effort: xlarge
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -284,3 +284,24 @@ work — DOM-render and drag behavior do not survive jsdom).
   type, dock left, confirm the same session/scrollback and a working prompt).
   jsdom cannot exercise xterm or HTML5 drag, so this is verified in a real
   browser (reuse the `frontend/scripts/ui-shots` harness pattern).
+
+## Outcome
+
+Archived 2026-10-02. Phases 1 and 2 shipped and are the feature: the terminal
+docks to any edge, maximizes, and is dragged by its header onto a drop zone,
+with the layout persisted (`870a7ab1`, `c5aaf69d`, `869ba972`, `57b6f419`,
+`492e9bee`). The "Implementation Status" section above is accurate for them.
+
+Phases 3 and 4 were not built and are closed with this spec:
+
+- **Splits and tab groups.** The reducers this section calls "in place"
+  (`dropPanel`, `moveTab`, `groups`, `groupIdOf`) were removed on 2026-06-16
+  (`9b73b721`) because nothing called them. No split or tab-group rendering
+  exists.
+- **Explorer as a dock panel.** `ExplorerPanel` still lives in the board. The
+  question this spec left open (what a docked explorer does on the Plan route)
+  was never settled.
+
+A second dockable panel is the precondition for both, and none is planned. If
+one appears, it gets a new spec that starts from the dock store and
+`DockWorkspace.vue` as they are, not from the removed reducers.

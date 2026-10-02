@@ -1,6 +1,6 @@
 ---
 title: "Static Artifacts - Serve Self-Contained HTML from Wallfacer"
-status: drafted
+status: archived
 depends_on: []
 affects:
   - internal/handler/artifacts.go
@@ -11,7 +11,7 @@ affects:
   - docs/guide/artifacts.md
 effort: medium
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -22,7 +22,7 @@ dispatched_task_id: null
 
 Agents and users produce self-contained HTML deliverables - slide decks, reports, dashboards, one-off visualizations. Today there is no way to open one inside Wallfacer: the file lands in the repo and must be opened by hand from a file browser. The desired flow is direct: ask in chat for a deck, the agent writes it into the repo, and it opens in the app with one click.
 
-This is the lightweight end of [live-serve.md](live-serve.md). That spec (stale, unbuilt) covers running and building developed software - dev servers, build pipelines, long-lived processes. Static artifacts need none of that: no build step, no process, no port. Just static files served over the app's existing HTTP server. Applications that need a backend remain future work under live-serve.
+This is the lightweight end of [live-serve.md](../../local/live-serve.md). That spec (stale, unbuilt) covers running and building developed software - dev servers, build pipelines, long-lived processes. Static artifacts need none of that: no build step, no process, no port. Just static files served over the app's existing HTTP server. Applications that need a backend remain future work under live-serve.
 
 ## Scope
 
@@ -81,3 +81,26 @@ The new tab is the presentation surface; the iframe is a preview. A full-screen 
 - Cross-origin isolation for cloud/principal mode.
 - Editing or authoring artifacts in the app (they are produced by agents or by hand).
 - Per-task-worktree artifact serving before merge.
+
+## Outcome
+
+Archived 2026-10-02 as complete. All three phases shipped as specced.
+
+- **Backend** (`2be285ca`): `ListArtifacts` and `ServeArtifact` in
+  `internal/handler/artifacts.go`, confined to `<workspace>/artifacts/` with
+  `os.OpenRoot` and a web content-type allow-list; routes `GET /api/artifacts`
+  and `GET /artifact/{path...}` registered in `internal/cli/server.go`. Handler
+  tests cover the served type, nested paths, traversal out of the root,
+  non-web extensions, the missing-file and no-workspace cases, and the listing.
+- **Frontend** (`275eaaa5`): `ArtifactsView.vue` at `/artifacts`, a gallery
+  with a full-bleed iframe preview and open-in-tab.
+- **Docs**: `docs/guide/artifacts.md`, and the two route rows in
+  `docs/internals/api-and-transport.md`.
+
+One addition beyond the spec: the listing is ordered newest first.
+
+Still open, as the spec said it would be: artifacts are served from the app's
+own origin, which is acceptable for a local single-user instance and is not
+for a hosted or principal-scoped one. A hosted board must move them to a
+separate origin before it serves any. Build steps and processes remain
+[live-serve](../../local/live-serve.md)'s.

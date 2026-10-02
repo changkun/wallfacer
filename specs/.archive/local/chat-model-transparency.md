@@ -1,6 +1,6 @@
 ---
 title: Chat + Task Model Transparency
-status: drafted
+status: archived
 depends_on: []
 affects:
   - internal/harness/harness.go
@@ -19,7 +19,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-06-29
-updated: 2026-06-29
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -262,3 +262,21 @@ passes after.
   test asserting the header badge appears once a model is observed.
 - **Finishing gate**: `make build` / `make lint` (golangci-lint + vue-tsc +
   vitest + vite-ssg), not just unit tests.
+
+## Outcome
+
+Archived 2026-10-02 as complete. Every component shipped.
+
+- **`harness.Event.Model`** (`57032d65`): the Claude adapter lifts the model
+  from the init line and from each assistant line.
+- **Label helper** (`dea08fe4`): `modelLabel` in `frontend/src/lib/harness.ts`;
+  a later change strips the dated release suffix from labels (`d844af70`).
+- **Session badge and per-turn chip** (`c98d461a`, `b0be2eb7`):
+  `ChatModelBadge.vue` in the header of all three chat surfaces, and a chip in
+  `ChatMessageList.vue` on a turn whose model differs from the session's.
+- **Task provenance** (`628464d7`, `eb6b38e5`): the runner captures the
+  observed model in `harness_parse.go`, and `execute.go` rewrites the recorded
+  model name when it differs; a per-task model pin is honored in the record.
+
+As specced, only the Claude adapter reports a model. The other harnesses leave
+`Event.Model` empty, so their sessions show the harness without a model.
