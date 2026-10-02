@@ -48,7 +48,7 @@ const ghosts = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButto
 describe('TaskDetail sheet', () => {
   it.each([
     ['backlog', {}, ['start'], ['edit']],
-    ['waiting', { session_id: 's' }, ['done'], ['test', 'review', 'sync', 'cancel']],
+    ['waiting', { session_id: 's', worktree_paths: { '/repo': '/wt/repo' } }, ['done'], ['test', 'review', 'sync', 'cancel']],
     ['failed', { session_id: 's' }, ['resume'], ['test', 'sync', 'retry']],
     ['done', {}, [], ['test', 'archive']],
   ] as const)('%s: one ink action, the rest ghosts', async (status, over, wantInk, wantGhost) => {
