@@ -1,6 +1,6 @@
 ---
 title: "GitHub OAuth App and Token Store"
-status: stale
+status: archived
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -14,14 +14,19 @@ affects:
   - frontend/src/stores/github.ts
 effort: large
 created: 2026-06-26
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # GitHub OAuth App and Token Store
 
-Lead child of [github-integration](../github-integration.md). Nothing else
+> **Archived 2026-10-02 as shipped.** The brokered token and its store are
+> in the code; the in-app connect flow designed below is not, by decision.
+> [Outcome](#outcome) at the end records what was built, what differs and
+> what was left out. The design text is kept as written.
+
+Lead child of [github-integration](../../../intent/github-integration.md). Nothing else
 dispatches until GitHub tokens exist.
 
 ## Design Problem
@@ -41,7 +46,7 @@ revoked.
   `~/.config/latere/token.json`. The GitHub token is a **distinct** credential
   and must not be conflated with the latere.ai identity token.
 - Principal context (user sub, org) comes from
-  [authentication.md](../../.archive/identity/authentication.md); the GitHub token is
+  [authentication.md](../../identity/authentication.md); the GitHub token is
   scoped to it so a signed-in user's token is not reused across principals.
 - `/api/config` (`internal/handler/config.go`, `buildConfigResponse`) is the
   existing place the UI reads capability/auth status; extend it.
@@ -171,7 +176,7 @@ above.
 ## UI
 
 Owns the **Settings tab** half of the surface (the umbrella's
-[UI Architecture](../github-integration.md#ui-architecture)); the `/github` page
+[UI Architecture](../../../intent/github-integration.md)); the `/github` page
 chrome belongs to components 2-3. A new `SettingsTabGithub.vue` is registered in
 `SettingsPage.vue` alongside the existing Execution / Sandbox / Workspace tabs,
 following the `AccountControl.vue` connect pattern. All status reads come from
@@ -229,3 +234,87 @@ extends `/api/config` with GitHub auth status, and adds the connect/disconnect
 UI as a new `SettingsTabGithub.vue` (see UI above). The token-store decision
 ripples into whether
 `internal/store/models.go` gains a GitHub-token entity.
+
+## Outcome
+
+**Summary.** Implemented directly (not dispatched) between 2026-06-29 and
+2026-07-01. Wallfacer holds a GitHub App user-to-server token for the
+signed-in principal, fetched from the Latere identity service and cached on
+disk, and every GitHub call uses it. The brokering decision held. The connect
+flow did not: wallfacer has no connect or disconnect control of its own, and
+the connection is made once on the latere.ai account and borrowed. Drift:
+moderate. The credential and its seams match the design; the Settings UI, the
+refresh mechanism and the storage choice landed smaller than designed.
+
+**What shipped.**
+- `internal/github/token.go`, `internal/github/store.go` (`1cb2b67d`):
+  `Token`, `Principal{OrgID, Sub}`, the `Store` interface, and `FileStore`,
+  which keeps one `github-<sha256 of org and sub>.json` per principal, mode
+  0600 in a 0700 directory, written by temp file and rename.
+- `internal/github/provider.go` (`dc68515b`): the `Broker` interface and
+  `Provider.Get`, which serves the stored token while it is valid and
+  otherwise asks the broker and saves the result.
+- `internal/github/broker.go` (`91f03949`): `HTTPBroker`, which calls
+  `GET <auth URL>/me/integrations/github/token` with the signed-in user's
+  identity token as the bearer, and maps 404, 401 and 503 to
+  `ErrNotConnected`.
+- `internal/handler/github_auth.go`, `internal/handler/config.go`,
+  `internal/apicontract/routes.go` (`eae8c8e4`):
+  `GET /api/github/auth/status`, `POST /api/github/auth/connect`,
+  `POST /api/github/auth/disconnect`, and a `github` block on `/api/config`.
+- `internal/cli/server.go` (`eae8c8e4`, `a80ff04c`): the file store is
+  created under `<config dir>/github/`. The broker is attached when an auth
+  URL is configured; its bearer comes from the shared identity token file
+  that the device-code sign-in and the browser session bridge both write.
+- `frontend/src/components/settings/SettingsTabGithub.vue` and
+  `frontend/src/stores/github.ts` (`1a8ebf9e`, `2501105b`, reshaped by
+  `ff4958e7`, restyled by `7ca61208`): the GitHub tab in Settings.
+
+**Design evolution (diverged).**
+- **No in-app connect.** `a80ff04c` built it: the connect endpoint returns
+  the install URL on the identity service, and `474eb2ae` passed `return_to`
+  so the install came back to wallfacer. `ff4958e7` removed the caller one
+  day later. Its stated reason is the connectors-hub model: GitHub is
+  connected once on the latere.ai account and shared across products, and
+  wallfacer borrows that connection instead of making one. The tab now has
+  three read-only states: signed out (a sign-in
+  button), signed in and not connected (a link to the account page), and
+  connected (the login and a manage link). The designed Connecting state,
+  the Disconnect button with its confirm dialog, the Manage installation
+  link, the installed-on line and the permissions line are not rendered.
+  The `connect` and `disconnect` endpoints remain, and no frontend code
+  calls them.
+- **Status source.** The design has the tab read `/api/config`. The tab reads
+  `GET /api/github/auth/status`, which asks the broker first and so reflects
+  a connection made on the account page. `/api/config` carries the same block
+  from the cache alone, without a broker call.
+- **Refresh (open question 5).** No refresh token reaches wallfacer: the
+  broker response carries an access token, an expiry and a login. Renewal is
+  `Provider.Get` asking the broker again once the cached token is within 30
+  seconds of expiry. A 401 from the GitHub API is not retried; it is returned
+  as 401 by `mapGitHubAPIError`. A valid cached token is served without
+  asking the broker, so a connection removed on the account page stays
+  usable locally until that token expires.
+- **Token metadata (open question 3).** `Token` declares `RefreshToken`,
+  `InstallationID`, `Account` and `Permissions`. `HTTPBroker` sets none of
+  them, so the `account` and `permissions` fields of the status response are
+  always empty with the live broker. Wallfacer neither requests nor checks
+  permissions; they are a property of the app registration.
+- **Storage (open question 4).** File store only.
+  `internal/store/models.go` gained no GitHub entity.
+- **Local principal.** A request with no identity stores its token under a
+  fixed `local` key (`githubPrincipal`).
+- **Files.** There is no `internal/github/auth.go`. The auth layer is
+  `broker.go`, `provider.go`, `token.go` and `store.go`.
+
+**Not built.**
+- The "Direct" localhost OAuth callback kept in the design as a development
+  stopgap. Tests use a fake broker instead.
+- A durable store for many principals. `internal/github/doc.go` still names
+  it as later work. `HTTPBroker` is documented as the local single-user path:
+  its bearer is the one identity token the instance holds. A hosted board
+  serving several principals needs a bearer per request and a durable store,
+  and no live spec owns that work.
+- Open question 6. No code hands the GitHub token to the coordination plane;
+  `internal/github` is imported only by `internal/cli/server.go` and
+  `internal/handler`.
