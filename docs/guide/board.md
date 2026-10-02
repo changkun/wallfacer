@@ -154,7 +154,7 @@ and marks the task failed so it can be retried after storage is repaired.
 
 ### Inline diff comments
 
-While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box (Cmd+Enter saves). Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. When sign-in is enabled, reviewing requires a signed-in principal.
+While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box (Cmd+Enter saves). Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
 
 ### Verification and Review
 

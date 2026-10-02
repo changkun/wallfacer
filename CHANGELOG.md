@@ -136,6 +136,14 @@ committed: the commit log already holds that.
   `wallfacer run` does, where it answered a `GET` with the web app's page and
   200.
 
+- A browser on a local instance that is not signed in submits feedback to a
+  waiting task and reviews its changes inline, where the feedback request
+  answered `401 {"error":"sign in required"}` and the inline review was hidden
+  since sign-in became available on every run; a cloud-mode deployment still
+  requires a signed-in account for both, and spec comments still need a
+  signed-in browser on either, now answering 401 with the `sign_in_required`
+  error envelope.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

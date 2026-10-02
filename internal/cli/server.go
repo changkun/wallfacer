@@ -1424,7 +1424,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		if requiresStore(route.Name) {
 			registered = h.RequireStoreMiddleware(registered)
 		}
-		if requiresPrincipal(route.Name) {
+		if requiresPrincipal(route.Name, cloudMode) {
 			registered = h.RequirePrincipalMiddleware(registered)
 		}
 		mux.Handle(route.FullPattern(), registered)
@@ -1597,20 +1597,28 @@ func requiresStore(name string) bool {
 	}
 }
 
-// requiresPrincipal lists the routes that require an authenticated browser
-// principal when auth is configured. The spec-comment surface reads and writes
-// the coordination relay, which serves the connector's cached threads regardless
-// of the browser session, so a logged-out browser must be rejected at the data
-// layer (not just hidden in the SPA). SubmitFeedback joins it: the inline
-// diff-review surface (gutter comments batched into one feedback message) is
-// restricted to signed-in users, gated server-side the same way — and since
-// feedback is a single message string whether composed inline or in the Overview
-// textarea, gating the one route covers both paths. Local mode (HasAuth false) is
-// a no-op, preserving permissive single-user runs. See RequirePrincipalMiddleware.
-func requiresPrincipal(name string) bool {
+// requiresPrincipal reports whether the route needs an authenticated browser
+// principal (RequirePrincipalMiddleware) in the given mode.
+//
+// The spec-comment surface needs one in every mode. It reads and writes the
+// coordination relay, which serves the connector's cached threads from the
+// token store regardless of the browser session; that store is the local
+// file the CLI and a board sign-in share, so a logged-out browser on a local
+// instance must be rejected at the data layer, not just hidden in the SPA.
+// The spec-comment layer reads that 401 as its signal to show nothing.
+//
+// SubmitFeedback needs one in cloud mode only. On a hosted deployment the
+// inline diff-review surface (gutter comments batched into one feedback
+// message) is restricted to signed-in users, and since feedback is one message
+// string whether composed inline or in the Overview textarea, gating the one
+// route covers both paths. A local instance's credential is the server key, so
+// a local user who never signs in still submits feedback.
+func requiresPrincipal(name string, cloudMode bool) bool {
 	switch name {
-	case "ListSpecComments", "SubmitSpecComment", "StreamSpecComments", "SubmitFeedback":
+	case "ListSpecComments", "SubmitSpecComment", "StreamSpecComments":
 		return true
+	case "SubmitFeedback":
+		return cloudMode
 	default:
 		return false
 	}

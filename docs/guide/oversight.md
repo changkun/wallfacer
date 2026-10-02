@@ -86,7 +86,7 @@ The **Changes** tab shows the task's diff against the default branch. While a ta
 3. The **Review comments** panel collects all comments grouped by file, each editable and deletable, alongside an optional general feedback field. Click a line reference to scroll back to the anchored diff line.
 4. Click **Submit** to send everything as one batched feedback message. Comments are serialized with their file and line anchors so the agent can locate each one, and the task resumes with the feedback.
 
-When sign-in is enabled, submitting feedback requires a signed-in principal.
+On a hosted deployment (`WALLFACER_CLOUD`), submitting feedback requires a signed-in account; a local instance accepts it signed in or not.
 
 ## Analytics
 

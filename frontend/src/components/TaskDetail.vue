@@ -906,14 +906,16 @@ const isCancelled = computed(() => status.value === 'cancelled');
 const isArchived = computed(() => !!props.task.archived);
 
 // ── Inline diff review comments ─────────────────────────────────────
-// The gutter/editor/panel surface is login-gated like spec comments: the backend
-// 401s the feedback route without a browser principal (RequirePrincipalMiddleware),
-// and the SPA mirrors that with `canReview`. In local mode (auth disabled) it is
-// always on, so single-user runs keep the feature.
+// The gutter/editor/panel surface is login-gated on a cloud deployment: there
+// the backend 401s the feedback route without a browser principal
+// (RequirePrincipalMiddleware), and the SPA mirrors that with `canReview`. A
+// local instance accepts feedback signed in or not, so the surface is always on
+// there; sign-in being available (`auth_enabled`, true on every run) does not
+// gate it.
 const auth = useAuthStore();
 const diffComments = useDiffCommentsStore();
-const authEnabled = computed(() => taskStore.config?.auth_enabled === true);
-const canReview = computed(() => !authEnabled.value || !!auth.me);
+const isCloud = typeof window !== 'undefined' && window.__WALLFACER__?.mode === 'cloud';
+const canReview = computed(() => !isCloud || !!auth.me);
 const reviewing = computed(() => isWaiting.value && canReview.value);
 
 function isCommentable(kind: string): boolean {

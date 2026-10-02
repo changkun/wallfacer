@@ -226,7 +226,7 @@ srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 | **ForceLogin** | `handler/force_login.go` `ForceLogin()` | Cloud-mode only: redirects unauthenticated browser requests for the app shell to `/login`. API routes return 401 instead. Not inserted in local mode. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `PickFolder`, `MkdirWorkspace`, `RenameWorkspace`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`, and the workspace CRUD routes (`ListWorkspaces`, `CreateWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`, `ActivateWorkspace`), which must work before any workspace is open. |
-| **Principal guard** | `handler/handler.go` `RequirePrincipalMiddleware()` | Applied per-route via `requiresPrincipal()`. When auth is configured, `ListSpecComments`, `SubmitSpecComment`, `StreamSpecComments`, and `SubmitFeedback` require a signed-in principal; local mode without auth is a no-op. |
+| **Principal guard** | `handler/handler.go` `RequirePrincipalMiddleware()` | Applied per-route via `requiresPrincipal()`, which decides per mode. `ListSpecComments`, `SubmitSpecComment`, and `StreamSpecComments` require a signed-in principal in every mode; `SubmitFeedback` requires one in cloud mode only. Without one the route answers 401 `sign_in_required`. |
 
 ## SSE Live Updates
 

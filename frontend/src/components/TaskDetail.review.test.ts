@@ -130,8 +130,9 @@ describe('TaskDetail inline review', () => {
     app.unmount();
   });
 
-  it('hides the review surface when auth is enabled and the browser is signed out', async () => {
-    // Cloud mode (auth_enabled true) + signed-out (/api/me 204) → canReview false.
+  // signedOutWithSignIn serves a config with sign-in available (every run
+  // reports auth_enabled true) and a /api/me that answers "no session".
+  function signedOutWithSignIn() {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/diff')) {
@@ -143,18 +144,48 @@ describe('TaskDetail inline review', () => {
       if (url.includes('/api/me')) return new Response('', { status: 204 });
       return new Response('[]', { status: 200 });
     }) as unknown as typeof globalThis.fetch;
+  }
 
-    const { host, app } = mount();
-    // Pull config into the task store so authEnabled flips true.
-    const { useTaskStore } = await import('../stores/tasks');
-    await useTaskStore().fetchConfig();
-    await settle();
+  it('hides the review surface on a cloud deployment when the browser is signed out', async () => {
+    // Cloud mode + signed-out (/api/me 204) → canReview false.
+    signedOutWithSignIn();
+    const previousBoot = window.__WALLFACER__;
+    window.__WALLFACER__ = { mode: 'cloud', serverApiKey: '', version: '' };
+    try {
+      const { host, app } = mount();
+      const { useTaskStore } = await import('../stores/tasks');
+      await useTaskStore().fetchConfig();
+      await settle();
 
-    expect(host.querySelector('.dc-gutter')).toBeNull();
-    expect(host.querySelector('.dc-panel')).toBeNull();
-    // The diff itself still renders.
-    expect(Array.from(host.querySelectorAll('.diff-line')).some((el) => (el.textContent || '').includes('added line'))).toBe(true);
+      expect(host.querySelector('.dc-gutter')).toBeNull();
+      expect(host.querySelector('.dc-panel')).toBeNull();
+      // The diff itself still renders.
+      expect(Array.from(host.querySelectorAll('.diff-line')).some((el) => (el.textContent || '').includes('added line'))).toBe(true);
 
-    app.unmount();
+      app.unmount();
+    } finally {
+      window.__WALLFACER__ = previousBoot;
+    }
+  });
+
+  it('shows the review surface on a local instance when the browser is signed out', async () => {
+    // Local mode keeps inline review for a browser that never signed in, as
+    // the feedback route accepts it there; sign-in being available
+    // (auth_enabled true) does not gate it.
+    signedOutWithSignIn();
+    const previousBoot = window.__WALLFACER__;
+    window.__WALLFACER__ = { mode: 'local', serverApiKey: '', version: '' };
+    try {
+      const { host, app } = mount();
+      const { useTaskStore } = await import('../stores/tasks');
+      await useTaskStore().fetchConfig();
+      await settle();
+
+      expect(host.querySelector('.dc-gutter')).not.toBeNull();
+
+      app.unmount();
+    } finally {
+      window.__WALLFACER__ = previousBoot;
+    }
   });
 });

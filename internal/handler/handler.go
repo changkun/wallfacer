@@ -627,19 +627,33 @@ func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// RequirePrincipalMiddleware rejects requests with 401 when auth is configured
-// but the request carries no authenticated browser principal. It is the
-// data-layer gate for the spec-comment surface: a logged-out browser (no session
-// cookie) must neither read nor write comments, even though the instance still
-// holds a coordination token and could otherwise serve the connector's cached
-// threads. The gate must live here, not in the SPA, because the comment
-// endpoints serve the relay cache independent of the browser session. In local
-// mode (no auth configured) it is a no-op, preserving permissive single-user
-// behavior (there is no session concept to gate on, and coordination is off).
+// The error RequirePrincipalMiddleware answers with: one code and the one user
+// sentence for it.
+const (
+	codeSignInRequired    = "sign_in_required"
+	messageSignInRequired = "This action needs a signed-in account. Sign in and try again."
+)
+
+// RequirePrincipalMiddleware rejects a request that carries no authenticated
+// browser principal with 401 sign_in_required. It is the data-layer gate for
+// the routes requiresPrincipal (internal/cli/server.go) selects, which decides
+// per route and per mode where it applies: the spec-comment surface in every
+// mode, because the comment endpoints serve the coordination relay from the
+// connector's token independent of the browser session, and feedback in cloud
+// mode only. The gate lives here, not in the SPA, because the SPA only hides
+// the surface. The middleware itself applies in local and cloud mode alike.
+//
+// It passes every request through when no sign-in provider is wired (HasAuth
+// false): there is no session to require. Every run wires one, so that branch
+// is reached only by a Handler built without SetAuth.
 func (h *Handler) RequirePrincipalMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h.HasAuth() && principalFromRequest(r) == nil {
-			httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "sign in required"})
+			httpjson.WriteError(w, http.StatusUnauthorized, httpjson.Error{
+				Code:    codeSignInRequired,
+				Message: messageSignInRequired,
+				Details: map[string]any{"path": r.URL.Path},
+			})
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -693,25 +693,24 @@ func TestRequiresStore(t *testing.T) {
 }
 
 // TestRequiresPrincipal verifies which routes are gated behind an authenticated
-// browser principal. The spec-comment surface and SubmitFeedback (the inline
-// diff-review batch lands on the feedback route) require a principal; ordinary
-// task routes do not.
+// browser principal in each mode. The spec-comment surface requires one in
+// every mode; SubmitFeedback (the inline diff-review batch lands on the
+// feedback route) requires one in cloud mode only; ordinary task routes never
+// do.
 func TestRequiresPrincipal(t *testing.T) {
-	gated := []string{
-		"ListSpecComments", "SubmitSpecComment", "StreamSpecComments", "SubmitFeedback",
-	}
-	for _, name := range gated {
-		if !requiresPrincipal(name) {
-			t.Errorf("requiresPrincipal(%q) = false, want true", name)
+	for _, cloud := range []bool{false, true} {
+		for _, name := range []string{"ListSpecComments", "SubmitSpecComment", "StreamSpecComments"} {
+			if !requiresPrincipal(name, cloud) {
+				t.Errorf("requiresPrincipal(%q, cloud=%v) = false, want true", name, cloud)
+			}
 		}
-	}
-
-	open := []string{
-		"ListTasks", "CreateTask", "GetEvents", "CompleteTask", "ResumeTask", "GetConfig",
-	}
-	for _, name := range open {
-		if requiresPrincipal(name) {
-			t.Errorf("requiresPrincipal(%q) = true, want false", name)
+		if got := requiresPrincipal("SubmitFeedback", cloud); got != cloud {
+			t.Errorf("requiresPrincipal(%q, cloud=%v) = %v, want %v", "SubmitFeedback", cloud, got, cloud)
+		}
+		for _, name := range []string{"ListTasks", "CreateTask", "GetEvents", "CompleteTask", "ResumeTask", "GetConfig"} {
+			if requiresPrincipal(name, cloud) {
+				t.Errorf("requiresPrincipal(%q, cloud=%v) = true, want false", name, cloud)
+			}
 		}
 	}
 }
