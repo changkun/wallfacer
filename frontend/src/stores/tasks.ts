@@ -118,7 +118,6 @@ export const useTaskStore = defineStore('tasks', () => {
   async function createTask(
     prompt: string,
     opts?: {
-      flow?: string;
       criteria?: string;
       timeout?: number;
       tags?: string[];
@@ -130,7 +129,6 @@ export const useTaskStore = defineStore('tasks', () => {
     const body: Record<string, unknown> = { prompt };
     if (opts?.criteria?.trim()) body.criteria = opts.criteria.trim();
     if (opts?.timeout !== undefined) body.timeout = opts.timeout;
-    if (opts?.flow) body.flow = opts.flow;
     if (opts?.tags?.length) body.tags = opts.tags;
     if (opts?.model) body.model = opts.model;
     if (opts?.maxCostUsd && opts.maxCostUsd > 0) body.max_cost_usd = opts.maxCostUsd;
@@ -139,13 +137,12 @@ export const useTaskStore = defineStore('tasks', () => {
   }
 
   /** Create up to 50 tasks in a single round-trip via POST /api/tasks/batch.
-   *  All entries share the same flow / tags / timeout / model / budget; the
-   *  server rejects per-task sandbox overrides, follow up with PATCH if needed.
+   *  All entries share the same tags / timeout / model / budget; the server
+   *  rejects per-task sandbox overrides, follow up with PATCH if needed.
    */
   async function batchCreateTasks(
     prompts: string[],
     opts?: {
-      flow?: string;
       criteria?: string;
       timeout?: number;
       tags?: string[];
@@ -158,7 +155,6 @@ export const useTaskStore = defineStore('tasks', () => {
       const t: Record<string, unknown> = { prompt };
       if (opts?.criteria?.trim()) t.criteria = opts.criteria.trim();
       if (opts?.timeout !== undefined) t.timeout = opts.timeout;
-      if (opts?.flow) t.flow = opts.flow;
       if (opts?.tags?.length) t.tags = opts.tags;
       if (opts?.model) t.model = opts.model;
       if (opts?.maxCostUsd && opts.maxCostUsd > 0) t.max_cost_usd = opts.maxCostUsd;

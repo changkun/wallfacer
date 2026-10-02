@@ -8,19 +8,6 @@ import DependencyPicker from './DependencyPicker.vue';
 import HarnessSelect from './HarnessSelect.vue';
 import AppSelect from './AppSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
-import { coordinationOf, type Coordination } from '../lib/flowDraft';
-import type { FlowTopology } from '../api/types';
-
-// FlowOption mirrors the agent-graph (flow) list from GET /api/flows. The
-// coordination fields let the composer show how the chosen graph runs, and warn
-// when it is a delegating (experimental) one.
-interface FlowOption {
-  slug: string;
-  name: string;
-  agentic?: boolean;
-  dynamic?: boolean;
-  topology?: FlowTopology;
-}
 
 const props = defineProps<{ autoExpand?: boolean }>();
 const store = useTaskStore();
@@ -41,8 +28,6 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
 // Advanced fields.
-const flows = ref<FlowOption[]>([]);
-const flow = ref('implement');
 // Tag chips: committed tags + a pending draft. comma/Enter commit the draft;
 // Backspace on an empty draft removes the last chip. Mirrors legacy tasks.js.
 const tags = ref<string[]>([]);
@@ -81,26 +66,7 @@ const timeoutMin = computed<number | null>(() => {
   return Number(timeoutPreset.value);
 });
 
-// Flow-aware placeholder hint, mirroring the legacy data-task-flow behavior.
-const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
-
-// Coordination of the selected agent graph: how it runs a task. Delegating modes
-// (lead / mesh) are experimental (no durable commits yet), so the composer warns.
-const selectedFlowOption = computed(() => flows.value.find((f) => f.slug === flow.value));
-const selectedCoordination = computed<Coordination>(() =>
-  coordinationOf(selectedFlowOption.value ?? {}),
-);
-const coordinationLabel = computed(
-  () =>
-    ({ sequence: 'Fixed sequence', lead: 'Lead delegates', mesh: 'Open mesh' })[
-      selectedCoordination.value
-    ],
-);
-const coordinationExperimental = computed(() => selectedCoordination.value !== 'sequence');
-const promptPlaceholder = computed(() => {
-  const f = flow.value || 'implement';
-  return `Describe the task… (graph: ${f} · Markdown, @ to mention files, ${modKey}↵ to save)`;
-});
+const promptPlaceholder = `Describe the task… (Markdown, @ to mention files, ${modKey}↵ to save)`;
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
 const model = ref('');
@@ -133,16 +99,6 @@ const depCandidates = computed(() =>
 
 const batchCount = computed(() => (batchMode.value ? splitBatch(prompt.value).length : 0));
 
-async function loadFlows() {
-  if (flows.value.length) return;
-  try {
-    const res = await api<FlowOption[] | { flows: FlowOption[] }>('GET', '/api/flows');
-    flows.value = Array.isArray(res) ? res : (res?.flows ?? []);
-  } catch (e) {
-    console.error('load flows:', e);
-  }
-}
-
 // Inserts an "@" at the cursor (with a leading space if needed) and opens the
 // mention autocomplete, matching the legacy board-composer "@" action button.
 function insertAtMention() {
@@ -171,7 +127,6 @@ onMounted(() => {
 
 async function expand() {
   expanded.value = true;
-  loadFlows();
   await nextTick();
   textareaRef.value?.focus();
 }
@@ -200,7 +155,6 @@ async function submitRoutine(text: string): Promise<void> {
   await api('POST', '/api/routines', {
     prompt: text,
     interval_minutes: minutes,
-    spawn_flow: flow.value || 'implement',
     timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
     tags: tags.value.slice(),
   });
@@ -223,7 +177,6 @@ async function submit() {
       return;
     }
     const sharedOpts = {
-      flow: flow.value || undefined,
       criteria: criteria.value.trim() || undefined,
       tags: tags.value.slice(),
       timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
@@ -334,18 +287,6 @@ function onInput(e: Event) {
       </ul>
     </div>
     <div class="composer__opts">
-      <label class="composer__opt">
-        <span class="composer__opt-label">Agent graph</span>
-        <AppSelect v-model="flow" :options="flowOptions" aria-label="Agent graph" block />
-        <span
-          v-if="flow"
-          class="composer__coord"
-          :class="{ 'composer__coord--experimental': coordinationExperimental }"
-          :title="coordinationExperimental
-            ? 'Delegating graphs are experimental: no durable commits yet. Use a Fixed sequence graph for real runs.'
-            : 'Runs the graph\'s agents in a fixed order.'"
-        >{{ coordinationLabel }}<template v-if="coordinationExperimental"> · experimental</template></span>
-      </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Tags</span>
         <div class="composer__tags">
@@ -551,7 +492,7 @@ function onInput(e: Event) {
   padding-top: 8px;
   border-top: 1px solid var(--rule);
   /* Align every option at the top so labels line up and each control sits at
-     the same y, whatever a sublabel below it does. */
+     the same y, whatever the height of the option beside it. */
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -572,16 +513,6 @@ function onInput(e: Event) {
   text-transform: uppercase;
   color: var(--ink-3);
   padding-top: 2px;
-}
-.composer__coord {
-  margin-top: 3px;
-  font-size: var(--fs-9);
-  line-height: 14px;
-  color: var(--ink-3);
-  cursor: help;
-}
-.composer__coord--experimental {
-  color: var(--warn);
 }
 .composer__input {
   min-height: 30px;

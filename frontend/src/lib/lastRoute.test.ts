@@ -20,8 +20,14 @@ describe('lastRoute', () => {
   });
 
   it('honors an explicit URL (does not override a non-/ landing)', () => {
-    expect(routeToRestore('/plan', '/agents')).toBeNull();
+    expect(routeToRestore('/plan', '/routines')).toBeNull();
     expect(routeToRestore('/?task=t1', '/plan?spec=specs/foo.md')).toBeNull();
+  });
+
+  it('stays on the board when the stored page no longer exists', () => {
+    const routable = (path: string) => path !== '/agent-graph';
+    expect(routeToRestore('/', '/agent-graph', routable)).toBeNull();
+    expect(routeToRestore('/', '/routines', routable)).toBe('/routines');
   });
 
   it('stays on the board when nothing better is stored', () => {

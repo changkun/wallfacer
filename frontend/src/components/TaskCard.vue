@@ -30,10 +30,6 @@ const routineMinutes = computed(() => {
 
 const routineEnabled = computed(() => !!props.task.routine_enabled);
 
-const routineSpawnLabel = computed(() => {
-  return props.task.routine_spawn_flow || props.task.routine_spawn_kind || 'task';
-});
-
 const routineIntervalChoices = computed(() => {
   const set = new Set<number>(ROUTINE_INTERVAL_OPTIONS);
   if (routineMinutes.value > 0) set.add(routineMinutes.value);
@@ -515,7 +511,6 @@ function onCardKeydown(e: KeyboardEvent) {
     <div v-if="isRoutine" class="routine-footer" @click.stop>
       <div class="routine-footer-row">
         <span class="pill pill-brand" title="Routine schedule">routine</span>
-        <span class="pill pill-neutral" :title="'Spawns ' + routineSpawnLabel + ' tasks'">{{ routineSpawnLabel }}</span>
         <span class="routine-next-run" title="Next scheduled fire">{{ routineCountdown }}</span>
       </div>
       <div class="routine-footer-row">

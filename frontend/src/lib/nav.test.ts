@@ -12,8 +12,14 @@ describe('nav model', () => {
 
   it('names every routed destination and nothing else', () => {
     expect(navLabel('/')).toBe('Board');
-    expect(navLabel('/agent-graph')).toBe('Agents');
+    expect(navLabel('/routines')).toBe('Routines');
     expect(navLabel('/nowhere')).toBe('');
+  });
+
+  it('has no row for the removed agents page', () => {
+    const items = NAV_GROUPS.flatMap((g) => g.items);
+    expect(items.some((i) => i.label === 'Agents' || i.to === '/agent-graph')).toBe(false);
+    expect(navLabel('/agent-graph')).toBe('');
   });
 
   it('pins exactly one group to the bottom and gives every other group an eyebrow', () => {

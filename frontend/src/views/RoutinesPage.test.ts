@@ -12,7 +12,6 @@ vi.mock('../api/client', () => ({
   api: vi.fn(async (method: string, path: string, body?: unknown) => {
     calls.push({ method, path, body });
     if (method === 'GET' && path === '/api/routines') return { routines };
-    if (method === 'GET' && path === '/api/flows') return [{ slug: 'implement', name: 'Implement' }];
     return {};
   }),
 }));
@@ -37,7 +36,7 @@ beforeEach(() => {
   setActivePinia(pinia);
   calls.length = 0;
   routines = [
-    { id: 'r1', kind: 'routine', status: 'backlog', title: 'Weekly cleanup', prompt: 'p', routine_interval_seconds: 3600, routine_enabled: true, routine_spawn_flow: 'implement', routine_next_run: new Date(Date.now() + 90_000).toISOString() },
+    { id: 'r1', kind: 'routine', status: 'backlog', title: 'Weekly cleanup', prompt: 'p', routine_interval_seconds: 3600, routine_enabled: true, routine_next_run: new Date(Date.now() + 90_000).toISOString() },
     { id: 'r2', kind: 'routine', status: 'backlog', title: 'Paused one', prompt: 'p2', routine_interval_seconds: 300, routine_enabled: false },
   ];
 });
@@ -49,7 +48,6 @@ describe('RoutinesPage', () => {
     const rows = host.querySelectorAll('.routine-row');
     expect(rows.length).toBe(2);
     expect(rows[0].querySelector('.routine-row__every')?.textContent).toBe('every 60 min');
-    expect(rows[0].querySelector('.routine-row__flow')?.textContent).toBe('Implement');
     expect(rows[0].querySelector('.routine-row__next')?.textContent).toMatch(/^in 1m/);
     expect(rows[1].querySelector('.routine-row__next')?.textContent).toBe('paused');
     expect(rows[0].querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
@@ -84,5 +82,8 @@ describe('RoutinesPage', () => {
     const post = calls.find((c) => c.method === 'POST' && c.path === '/api/routines');
     expect(post).toBeDefined();
     expect((post!.body as { prompt: string }).prompt).toBe('Do the thing');
+    // A routine spawns an ordinary task: the create request names no fleet.
+    expect(post!.body).not.toHaveProperty('spawn_flow');
+    expect(calls.some((c) => c.path.startsWith('/api/flows'))).toBe(false);
   });
 });

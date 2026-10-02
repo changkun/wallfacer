@@ -1,7 +1,7 @@
 import { ViteSSG } from 'vite-ssg';
 import { createPinia } from 'pinia';
 import App from './App.vue';
-import { routes } from './router';
+import { NOT_FOUND_ROUTE, routes } from './router';
 import { rememberRoute, routeToRestore, storedRoute } from './lib/lastRoute';
 import './styles/tokens.css';
 import './styles/palettes.css';
@@ -26,7 +26,6 @@ import './styles/explorer.css';
 import './styles/spec-mode.css';
 import './styles/docs.css';
 import './styles/mission.css';
-import './styles/agents.css';
 import './styles/syntax.css';
 import './styles/utilities.css';
 import './styles/scroll-fade.css';
@@ -48,7 +47,11 @@ export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) =>
     const previous = storedRoute();
     router.afterEach((to) => rememberRoute(to.fullPath));
     void router.isReady().then(() => {
-      const target = routeToRestore(router.currentRoute.value.fullPath, previous);
+      const target = routeToRestore(
+        router.currentRoute.value.fullPath,
+        previous,
+        (path) => router.resolve(path).name !== NOT_FOUND_ROUTE,
+      );
       if (target) void router.replace(target).catch(() => {});
     });
   }

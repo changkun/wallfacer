@@ -192,7 +192,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/styles/settings-page.css', 'src/views/SettingsPage.vue', 'src/components/settings/SettingsTabExecution.vue', 'src/components/settings/SettingsTabAppearance.vue',
     'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabAbout.vue',
     'src/components/settings/SettingToggle.vue', 'src/components/AppSelect.vue', 'src/components/HarnessSelect.vue',
-    'src/views/AgentGraphPage.vue', 'src/components/AgentGraphCanvas.vue', 'src/components/AgentEditor.vue', 'src/styles/agents.css', 'src/components/SystemPromptsManager.vue',
+    'src/components/SystemPromptsManager.vue', 'src/views/LocalNotFoundPage.vue',
     'src/styles/command-palette.css', 'src/styles/workspace-picker.css', 'src/styles/explorer.css', 'src/styles/dock.css',
     'src/components/CommandPalette.vue', 'src/components/WorkspacePicker.vue', 'src/components/WorkspaceEditModal.vue', 'src/components/FolderBrowser.vue',
     'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue', 'src/components/KeyboardShortcutsModal.vue',

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Shown in place of any workspace-scoped view (board, plan, agents, flows,
-// routines, analytics, map) when no workspace is visible to the current
+// Shown in place of any workspace-scoped view (board, plan, routines,
+// analytics, map) when no workspace is visible to the current
 // session. Keeps every surface consistent with /api/config's "no workspace"
 // state instead of rendering an empty or stale workspace-scoped UI.
 import { useUiStore } from '../stores/ui';

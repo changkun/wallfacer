@@ -36,12 +36,12 @@ describe('tasks store create payloads', () => {
   it('omits timeout for batch tasks when unset', async () => {
     const store = useTaskStore();
 
-    await store.batchCreateTasks(['one', 'two'], { flow: 'implement' });
+    await store.batchCreateTasks(['one', 'two'], { tags: ['x'] });
 
     expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks/batch', {
       tasks: [
-        { prompt: 'one', flow: 'implement' },
-        { prompt: 'two', flow: 'implement' },
+        { prompt: 'one', tags: ['x'] },
+        { prompt: 'two', tags: ['x'] },
       ],
     });
   });

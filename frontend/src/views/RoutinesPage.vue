@@ -3,8 +3,9 @@
 // is one reading column: a create card, then a card of rows, one per routine,
 // with the schedule as a pill, the countdown, the enabled switch, the
 // interval, Run now and Delete. The schedule endpoint accepts the interval
-// and the enabled flag; the prompt and the agent graph are fixed at creation.
-import { ref, computed, onMounted } from 'vue';
+// and the enabled flag; the prompt is fixed at creation. Every fire spawns an
+// ordinary task.
+import { ref, onMounted } from 'vue';
 import { api } from '../api/client';
 import AppSelect from '../components/AppSelect.vue';
 import SettingToggle from '../components/settings/SettingToggle.vue';
@@ -15,19 +16,15 @@ import { routineCountdown, routineLastFired, routineMinutes } from '../lib/routi
 import type { Task } from '../api/types';
 import '../styles/routines.css';
 
-interface FlowOption { slug: string; name: string }
-
 const dialog = useDialogStore();
 const toast = useToastStore();
 const now = useNow();
 const routines = ref<Task[]>([]);
-const flows = ref<FlowOption[]>([]);
 const loading = ref(true);
 const busy = ref<Record<string, boolean>>({});
 
 const prompt = ref('');
 const intervalMin = ref(60);
-const spawnFlow = ref('implement');
 const creating = ref(false);
 
 const BRAINSTORM_EXAMPLE =
@@ -39,7 +36,6 @@ function fillExample() {
 
 const INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
 const intervalOptions = INTERVAL_OPTIONS.map((m) => ({ value: m, label: `${m} min` }));
-const flowOptions = computed(() => flows.value.map((f) => ({ value: f.slug, label: f.name })));
 
 // A routine whose interval is not in the fixed list still shows its own value.
 function intervalOptionsFor(r: Task) {
@@ -47,11 +43,6 @@ function intervalOptionsFor(r: Task) {
   const m = routineMinutes(r);
   if (m > 0) set.add(m);
   return [...set].sort((a, b) => a - b).map((v) => ({ value: v, label: `${v} min` }));
-}
-
-function spawnLabel(r: Task): string {
-  const slug = r.routine_spawn_flow || r.routine_spawn_kind || 'task';
-  return flows.value.find((f) => f.slug === slug)?.name || slug;
 }
 
 const promptEl = ref<HTMLTextAreaElement | null>(null);
@@ -75,15 +66,6 @@ async function loadRoutines() {
   }
 }
 
-async function loadFlows() {
-  try {
-    const res = await api<FlowOption[] | { flows: FlowOption[] }>('GET', '/api/flows');
-    flows.value = Array.isArray(res) ? res : (res?.flows ?? []);
-  } catch (e) {
-    console.error('load flows:', e);
-  }
-}
-
 async function createRoutine() {
   const text = prompt.value.trim();
   if (!text || creating.value) return;
@@ -92,7 +74,6 @@ async function createRoutine() {
     await api('POST', '/api/routines', {
       prompt: text,
       interval_minutes: intervalMin.value,
-      spawn_flow: spawnFlow.value || undefined,
       enabled: true,
     });
     prompt.value = '';
@@ -160,7 +141,7 @@ async function deleteRoutine(r: Task) {
   }
 }
 
-onMounted(() => { loadRoutines(); loadFlows(); });
+onMounted(() => { loadRoutines(); });
 </script>
 
 <template>
@@ -185,10 +166,6 @@ onMounted(() => { loadRoutines(); loadFlows(); });
             <label class="routine-create__opt">
               <span class="eyebrow">Every</span>
               <AppSelect v-model="intervalMin" :options="intervalOptions" class="routine-create__select" aria-label="Interval" />
-            </label>
-            <label class="routine-create__opt">
-              <span class="eyebrow">Agent graph</span>
-              <AppSelect v-model="spawnFlow" :options="flowOptions" class="routine-create__select" aria-label="Agent graph" />
             </label>
             <button
               type="button"
@@ -218,7 +195,6 @@ onMounted(() => { loadRoutines(); loadFlows(); });
               <div class="row-title routine-row__title" :title="r.prompt">{{ r.title || r.prompt }}</div>
               <div class="row-meta routine-row__meta">
                 <span class="pill pill-neutral routine-row__every">every {{ routineMinutes(r) }} min</span>
-                <span class="routine-row__flow">{{ spawnLabel(r) }}</span>
                 <span class="muted routine-row__next">{{ routineCountdown(r, now) }}</span>
                 <span v-if="routineLastFired(r, now)" class="muted">{{ routineLastFired(r, now) }}</span>
               </div>

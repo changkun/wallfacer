@@ -1,50 +1,3 @@
-// --- Agent registry (GET /api/agents) ---
-// The merged built-in + user-authored agent catalog. Mirrors the handler's
-// agent response shape; the agent-graph palette renders these as nodes.
-export interface Agent {
-  slug: string;
-  title: string;
-  description?: string;
-  capabilities?: string[];
-  multiturn?: boolean;
-  harness?: string;
-  builtin: boolean;
-}
-
-// --- Flow registry (GET /api/flows) ---
-// A flow is an ordered composition of agent steps. FlowStep mirrors the
-// handler's StepResponse; agent_name is resolved server-side so the UI needs
-// no second round-trip per step.
-export interface FlowStep {
-  agent_slug: string;
-  agent_name?: string;
-  optional?: boolean;
-  input_from?: string;
-  run_in_parallel_with?: string[];
-}
-
-// FlowTopology mirrors flow.Topology: whom an agent in a dynamic agentic flow
-// may delegate to. orchestrator-worker pins delegation to the entry agent;
-// mesh lets any agent delegate recursively.
-export type FlowTopology = 'orchestrator-worker' | 'mesh';
-
-export interface Flow {
-  slug: string;
-  name: string;
-  description?: string;
-  builtin: boolean;
-  steps?: FlowStep[];
-  // M3 agentic fields, serialized by GET /api/flows (see
-  // internal/handler/flows.go FlowResponse / describeFlow) and accepted on
-  // POST/PUT. They are omitted for ordinary flows, so they arrive undefined for
-  // a non-agentic flow; the agent-graph topology indicator reads them
-  // defensively.
-  agentic?: boolean;
-  dynamic?: boolean;
-  topology?: FlowTopology;
-  max_handoff_depth?: number;
-}
-
 export interface Me {
   sub: string;
   email: string;
@@ -149,11 +102,6 @@ export interface Task {
   routine_enabled?: boolean;
   routine_next_run?: string | null;
   routine_last_fired_at?: string | null;
-  routine_spawn_kind?: string;
-  routine_spawn_flow?: string;
-  // flow_id is the fleet (flow slug) this task ran against; used by the
-  // agent-graph run overlay to find a fleet's runs.
-  flow_id?: string;
   // Budget guardrails — 0 / missing means unlimited.
   max_cost_usd?: number;
   max_input_tokens?: number;
@@ -167,14 +115,16 @@ export interface Task {
   // Review adversarial-verification results. Absent = not yet run.
   review_unresolved?: number;
   review_headline?: string;
-  // Present (non-empty string) only for tasks run via the agentic flow kind;
-  // the opaque JSON of the run's agent-graph trace. The thin parsed shape is
-  // served by GET /api/tasks/{id}/trace (see AgentTrace).
+  // Present (non-empty string) only for tasks that ran on the in-process
+  // topos harness: the opaque JSON of the run's trace. The thin parsed shape
+  // is served by GET /api/tasks/{id}/trace (see AgentTrace).
   trace?: string | null;
 }
 
-// Agent-graph trace of an agentic-flow run (GET /api/tasks/{id}/trace).
-// status is the node lifecycle; kind is the handoff type between agents.
+// Trace of an in-process run (GET /api/tasks/{id}/trace). status is the node
+// lifecycle; kind is the handoff type between agents. A native run records
+// one node and no edge; traces stored by earlier multi-agent runs also carry
+// handoff edges, and they still render.
 export type TraceNodeStatus = 'running' | 'done' | 'failed' | string;
 export type TraceEdgeKind = 'delegate' | 'deliver' | 'next' | string;
 export interface TraceNode {

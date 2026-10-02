@@ -2,7 +2,7 @@
 // topbar's crumb, so a destination is named the same way in both places.
 
 export type NavIcon =
-  | 'chat' | 'plan' | 'whiteboard' | 'artifacts' | 'board' | 'agent-graph'
+  | 'chat' | 'plan' | 'whiteboard' | 'artifacts' | 'board'
   | 'routines' | 'map' | 'terminal' | 'analytics' | 'docs' | 'settings';
 
 export interface NavItem {
@@ -29,7 +29,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'whiteboard', label: 'Whiteboard', to: '/whiteboard', icon: 'whiteboard' },
       { id: 'artifacts', label: 'Artifacts', to: '/artifacts', icon: 'artifacts' },
       { id: 'board', label: 'Board', to: '/', icon: 'board' },
-      { id: 'agent-graph', label: 'Agents', to: '/agent-graph', icon: 'agent-graph' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
       { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },
     ],
@@ -51,8 +50,8 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 // activeNavId maps a route path to the nav row it belongs to. `/` is the
-// board; `/docs/...` stays on Docs; `/agents`, `/flows` redirect to the agent
-// graph in the router, so they never reach here.
+// board; `/docs/...` stays on Docs; `/map` is the Mission Control alias. A
+// path no row owns yields an id that matches no row.
 export function activeNavId(path: string): string {
   path = path.split('?')[0].split('#')[0];
   if (path === '/') return 'board';

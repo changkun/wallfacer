@@ -7,20 +7,17 @@ const cloudRoutes: RouteRecordRaw[] = [
   { path: '/:pathMatch(.*)*', component: () => import('./views/NotFoundPage.vue') },
 ];
 
+// NOT_FOUND_ROUTE names the local catch-all, so a caller can tell whether a
+// path resolves to a real console page (see the last-route restore in main.ts).
+export const NOT_FOUND_ROUTE = 'not-found';
+
 // needsWorkspace marks routes that render workspace-scoped data; App.vue
 // shows the WorkspaceRequired prompt for these when no workspace is visible,
-// so the board, plan/chat, agents, etc. stay consistent with /api/config's
-// "no workspace" state. Settings and docs are workspace-independent.
+// so the board, plan/chat, routines, etc. stay consistent with /api/config's
+// "no workspace" state. Settings, docs and the not-found page are
+// workspace-independent.
 export const localRoutes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/BoardPage.vue'), meta: { needsWorkspace: true } },
-  // The agent-graph surface is the single place to define agents AND compose
-  // them into graphs (it embeds the agent editor). It supersedes both the old
-  // Flows composer and the Agents page, so /agents, /workflows and /flows all
-  // redirect here (e2e design: teardown of the legacy flow + agents surfaces).
-  { path: '/agent-graph', component: () => import('./views/AgentGraphPage.vue'), meta: { needsWorkspace: true } },
-  { path: '/agents', redirect: '/agent-graph', meta: { needsWorkspace: true } },
-  { path: '/workflows', redirect: '/agent-graph', meta: { needsWorkspace: true } },
-  { path: '/flows', redirect: '/agent-graph', meta: { needsWorkspace: true } },
   { path: '/routines', component: () => import('./views/RoutinesPage.vue'), meta: { needsWorkspace: true } },
   { path: '/analytics', component: () => import('./views/AnalyticsPage.vue'), meta: { needsWorkspace: true } },
   // /chat is the dedicated chat surface; /plan is the spec-mode page (kept as
@@ -38,6 +35,9 @@ export const localRoutes: RouteRecordRaw[] = [
   { path: '/settings', component: () => import('./views/SettingsPage.vue') },
   { path: '/docs', component: () => import('./views/LocalDocsPage.vue') },
   { path: '/docs/:slug(.*)', component: () => import('./views/LocalDocsPage.vue') },
+  // Any other path, including addresses of pages the console no longer has,
+  // renders the not-found page inside the console shell.
+  { path: '/:pathMatch(.*)*', name: NOT_FOUND_ROUTE, component: () => import('./views/LocalNotFoundPage.vue') },
 ];
 
 function readMode(): 'local' | 'cloud' {

@@ -4,9 +4,11 @@ import { api } from '../api/client';
 import { renderMarkdown } from '../lib/markdown';
 import type { TaskTrace, TraceNode } from '../api/types';
 
-// AgentTrace renders an agentic-flow run's agent graph plus a live, per-agent
-// transcript. The graph nodes (with status color) and handoff edges come from
-// the persisted trace; the transcript is built from the run's events
+// AgentTrace renders the trace of a run on the in-process topos harness plus a
+// live, per-agent transcript. The graph nodes (with status color) and any
+// handoff edges come from the persisted trace: a native run has one node and
+// no edge, while traces stored by earlier multi-agent runs keep their edges
+// and still render. The transcript is built from the run's events
 // (forwarded onto the task timeline as the run proceeds), so it appears live
 // while the run is in flight, not just after it completes. refreshKey (the task's
 // updated_at) re-pulls both whenever the task changes, riding the existing live

@@ -22,9 +22,17 @@ export function storedRoute(): string | null {
 
 // Decide where a cold launch should land. We only override the default board
 // landing (`/`): any explicit URL — a deep link, or a refresh on /plan — is
-// honored as-is. Returns the stored path to restore, or null to stay put.
-export function routeToRestore(landedAt: string, stored = getStored(KEY)): string | null {
+// honored as-is. routable reports whether a path still names a console page;
+// a stored path that does not (a page removed since it was visited) is not
+// restored, so the launch stays on the board instead of the not-found page.
+// Returns the stored path to restore, or null to stay put.
+export function routeToRestore(
+  landedAt: string,
+  stored = getStored(KEY),
+  routable: (path: string) => boolean = () => true,
+): string | null {
   if (landedAt !== '/') return null;          // explicit URL — honor it
   if (!stored || stored === '/') return null; // nothing better to restore
+  if (!routable(stored)) return null;         // the page no longer exists
   return stored;
 }

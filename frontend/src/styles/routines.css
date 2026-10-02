@@ -74,9 +74,6 @@
   gap: 8px;
   margin-top: 4px;
 }
-.routine-row__flow {
-  color: var(--ink-2);
-}
 .routine-row__end {
   display: flex;
   align-items: center;
