@@ -106,9 +106,12 @@ the `(principal, repo)` pair verified, with a re-check TTL.
 
 - No external GitHub App, no extra OAuth, works with github.com **and** GHES /
   self-hosted git. This is the enterprise-friendly path and the reason it is the
-  default: the platform's centrally-brokered GitHub App was retired (auth dropped
+  default: installation-token brokering for sandboxes was retired (auth dropped
   `github_app_installations`; the sandbox creds-proxy that minted installation
-  tokens is archived), so wallfacer does not reintroduce central brokering.
+  tokens is archived), so verification does not depend on a central GitHub
+  App. What remains brokered is a per-user GitHub token for the signed-in
+  Latere account, which the pull-request feature uses; this tier does not need
+  it.
 - It is genuinely *verified*, not *asserted*: you cannot `ls-remote` a repo you
   cannot reach. It is **client-attested** (the coordinator trusts the JWT-bound
   instance's report of its local check), which is acceptable because the org
@@ -161,7 +164,9 @@ field never carries a local path, a token, or repo contents (data boundary).
 ## Non-goals
 
 - Storing local folder paths server-side. Never; only repo identities cross.
-- Reintroducing a centrally-brokered GitHub App. The platform retired it.
+- Reintroducing installation-token brokering to verify repositories. The
+  platform retired it. The per-user token the signed-in account brokers is the
+  upgrade tier's input, not a default.
 - Cross-org collaboration. The org boundary is absolute; an external collaborator
   is an Identity/org-membership concern, not this spec.
 - Mirroring repo *contents* to the coordinator. Comments anchor to specs by path

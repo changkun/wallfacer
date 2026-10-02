@@ -2,7 +2,6 @@
 title: "Cloud Clone and Remote Fix (Gated)"
 status: vague
 depends_on:
-  - specs/intent/github-integration/oauth-token-store.md
   - specs/cloud/latere-integration/topos-remote-executor.md
 affects:
   - internal/github/clone.go

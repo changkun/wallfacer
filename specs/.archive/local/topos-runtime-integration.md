@@ -157,9 +157,10 @@ What came after on the same seam:
 
 What left this spec:
 
-- **M6, the unified Agents and Flows graph surface**, is carried by
-  [unified-agent-graph-ui](../../local/unified-agent-graph-ui.md) and the
-  design decision in
+- **M6, the unified Agents and Flows graph surface**, shipped under
+  [unified-agent-graph-ui](unified-agent-graph-ui.md): one page at
+  `/agent-graph`, with the Agents and Flows pages deleted. What that surface
+  and the execution paths behind it should become is the open decision in
   [agent-graph-e2e-design](../../local/agent-graph-e2e-design.md).
 - **Hosted execution**, listed out of scope here, is specified in
   [topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md).
