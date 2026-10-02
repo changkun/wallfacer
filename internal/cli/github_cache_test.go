@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -125,32 +126,23 @@ func TestRemoveGitHubTokenCache_EmptyConfigDirTouchesNothing(t *testing.T) {
 	}
 }
 
-// TestRemoveGitHubTokenCache_FailureIsLoggedNotFatal makes the directory
-// unremovable (its parent is read-only, so the entry cannot be unlinked) and
-// checks that the failure is reported as a warning and the call returns, so
-// startup continues.
+// TestRemoveGitHubTokenCache_FailureIsLoggedNotFatal makes the removal fail
+// and checks that the failure is reported as a warning and the call returns,
+// so startup continues.
 func TestRemoveGitHubTokenCache_FailureIsLoggedNotFatal(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root ignores directory permissions, so the removal cannot be made to fail")
-	}
 	configDir := t.TempDir()
 	dir := filepath.Join(configDir, githubTokenCacheDir)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if err := os.Chmod(configDir, 0o500); err != nil {
-		t.Fatalf("chmod: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chmod(configDir, 0o700); err != nil {
-			t.Errorf("restore permissions: %v", err)
-		}
-	})
+	orig := removeAll
+	removeAll = func(string) error { return errors.New("remove refused") }
+	t.Cleanup(func() { removeAll = orig })
 
 	var buf bytes.Buffer
 	removeGitHubTokenCache(configDir, slog.New(slog.NewTextHandler(&buf, nil)))
 	lines := logLines(&buf)
-	if len(lines) != 1 || !strings.Contains(lines[0], "level=WARN") || !strings.Contains(lines[0], "error=") {
+	if len(lines) != 1 || !strings.Contains(lines[0], "level=WARN") || !strings.Contains(lines[0], "remove refused") {
 		t.Fatalf("log = %q, want one WARN line carrying the error", lines)
 	}
 	if _, err := os.Lstat(dir); err != nil {

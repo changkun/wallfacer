@@ -14,6 +14,10 @@ import (
 // holds no GitHub credential and no code reads these files.
 const githubTokenCacheDir = "github"
 
+// removeAll is os.RemoveAll. It is a variable so a test can make the removal
+// fail on every platform: directory permissions do not stop it on Windows.
+var removeAll = os.RemoveAll
+
 // removeGitHubTokenCache deletes <configDir>/github/ when it exists, because a
 // credential that nothing reads should not stay on disk. It logs one line when
 // it removes the directory and nothing when there is no directory, so only the
@@ -33,7 +37,7 @@ func removeGitHubTokenCache(configDir string, log *slog.Logger) {
 		}
 		return
 	}
-	if err := os.RemoveAll(dir); err != nil {
+	if err := removeAll(dir); err != nil {
 		log.Warn("github token cache: remove failed", "path", dir, "error", err)
 		return
 	}
