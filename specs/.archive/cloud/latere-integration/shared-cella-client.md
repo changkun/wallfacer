@@ -1,18 +1,30 @@
 ---
 title: "Shared Cella Go Client"
-status: drafted
+status: archived
 depends_on:
   - specs/cloud/latere-integration.md
 affects:
   - internal/sandbox/
 effort: medium
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Shared Cella Go Client
+
+> **Archived 2026-10-02. Retired as: wallfacer has no caller for it.**
+> This spec asked for a Cella wire client shared by Topos's sandbox
+> provider and a wallfacer `CellaBackend`. The backend is retired (see
+> [cella-runtime.md](cella-runtime.md)): in cloud mode wallfacer calls
+> the platform's Agents capability at `https://api.latere.ai/v1/agents`
+> and never a sandbox API. The other half happened without wallfacer:
+> Cella publishes its own Go client from its repository, which is what
+> the spec's "Module location" section proposed.
+>
+> The text below is kept as written for the record. Its layered picture
+> names `LocalBackend`, which host execution removed.
 
 ## Problem
 

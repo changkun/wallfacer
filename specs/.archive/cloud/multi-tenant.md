@@ -24,7 +24,7 @@ dispatched_task_id: null
 > - **Per-instance runtime, provisioning, warm pools, hibernation, egress
 >   policy** → owned by **Cella** (cella.latere.ai).
 >   Wallfacer consumes it through the runtime integration seam — see
->   [latere-integration/cella-runtime.md](../../cloud/latere-integration/cella-runtime.md).
+>   [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md).
 > - **Cluster, routing, DNS/TLS, node pools** → owned by **terraform** (DOKS).
 >   Wallfacer needs only a thin deploy module — see
 >   [cloud-infrastructure.md](../../cloud/cloud-infrastructure.md).

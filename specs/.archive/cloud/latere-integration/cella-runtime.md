@@ -1,6 +1,6 @@
 ---
 title: "Runtime Integration: Cella Backend"
-status: stale
+status: archived
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/identity/authentication.md
@@ -11,12 +11,38 @@ affects:
   - internal/envconfig/
 effort: large
 created: 2026-05-30
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Runtime Integration: Cella Backend
+
+> **Archived 2026-10-02. Retired as: the seam this spec adds is one
+> wallfacer no longer has.** Latere consolidated its services into one
+> platform with one API origin, `https://api.latere.ai/v1/<capability>`.
+> In cloud mode wallfacer is a client of the platform's Agents capability
+> and nothing below it: it does not create sandboxes, hold their
+> credentials, or move a worktree into one. The hosted session opens its
+> own workload in Environments, clones its repositories, and pushes its
+> branch.
+>
+> What this spec designed and where each part went:
+>
+> - **`CellaBackend` and `--executor cella`**: not built, not planned.
+>   Remote execution is one executor over `/v1/agents`, in
+>   [topos-remote-executor.md](../../../cloud/latere-integration/topos-remote-executor.md).
+> - **Worktree transport** (FS workspace, git push, durable workspace):
+>   settled as git. A session clones from a git host and pushes a branch
+>   of its own; there is no mount and no staging service.
+> - **Secrets through a credential vault**: the platform's concern. A
+>   session's workload holds no credential; its egress gateway
+>   substitutes them.
+> - **`cella.latere.ai` and `/v1/sandboxes`**: the standalone host is
+>   gone. The capability answers at `/v1/environments`, and wallfacer
+>   does not call it.
+>
+> The text below is kept as written for the record.
 
 > Identity for this executor is governed by
 > [infrastructure/identity.md](https://github.com/latere-ai/specs) in the
@@ -130,7 +156,7 @@ credential that stands for the user: auth removed agent delegation on
   is no `--backend`/`--executor` flag and no `case "host"`/`case "cella"`
   branch in the codebase. Selecting Cella therefore depends on the
   `Executor`/`--executor` interface defined in
-  [shared/harness-abstraction.md](../../.archive/shared/harness-abstraction.md) (Layer 2,
+  [shared/harness-abstraction.md](../../shared/harness-abstraction.md) (Layer 2,
   Executor), which introduces the executor-selection seam. Land that seam first;
   then this spec adds `cella` as a selectable executor (`--executor cella`),
   with `NewRunner` constructing `executor.NewCellaBackend(...)` instead of the
@@ -153,7 +179,7 @@ executor selector and in `docs/`.
   through the same `r.backend.Launch()` path as the host backend, unmodified.
 - `--executor cella` selects it; default (host) behavior is byte-identical to
   today. (Depends on the executor-selection seam from
-  [harness-abstraction.md](../../.archive/shared/harness-abstraction.md) landing first.)
+  [harness-abstraction.md](../../shared/harness-abstraction.md) landing first.)
 - A task runs end-to-end in a Cella sandbox (with the chosen worktree-sync
   mechanism), streams output live, commits results, and cleans up the sandbox on
   completion, cancel, and kill.

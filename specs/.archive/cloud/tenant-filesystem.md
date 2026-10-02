@@ -1,18 +1,44 @@
 ---
 title: Tenant Filesystem
-status: drafted
+status: archived
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/foundations/storage-backends.md
 affects: [internal/workspace/, latere.ai/x/pkg/gitutil/]
 effort: large
 created: 2026-03-28
-updated: 2026-06-14
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Tenant Filesystem
+
+> **Archived 2026-10-02. Retired as: the service this spec integrates
+> with no longer exists, and its replacement is not reached this way.**
+> `fs.latere.ai` and its Workspace API (the hot tier a sandbox would
+> mount) were withdrawn. Files on the Latere platform are the Storage
+> capability at `https://api.latere.ai/v1/storage`, reached by API, and
+> no sandbox mounts it.
+>
+> What this spec designed and where each part went:
+>
+> - **Worktrees reachable by a cloud sandbox**: settled as git. A hosted
+>   agent session clones its repositories and pushes a branch of its
+>   own, so wallfacer stages nothing. See
+>   [topos-remote-executor.md](../../cloud/latere-integration/topos-remote-executor.md).
+> - **`FSClient`, `RepoResolver`, hot-tier workspace allocation**: not
+>   built, not planned.
+> - **Per-tenant config and state surviving hibernate and wake**: a
+>   concern of a hosted board only, and that deployment keeps its state
+>   on its own volume. See
+>   [cloud-infrastructure.md](../../cloud/cloud-infrastructure.md).
+> - **Workspace identity independent of local paths**: shipped locally
+>   as the workspace model (stable id, mutable folder set), and the
+>   cross-machine identity is the repo, in
+>   [repo-identity.md](../../cloud/latere-integration/coordination-plane/repo-identity.md).
+>
+> The text below is kept as written for the record.
 
 ## Problem
 
@@ -178,7 +204,7 @@ A new component manages the lifecycle of git repos on the runtime workspace. Its
 
 **Credential management:**
 
-Repos may be private. Git credentials (SSH keys or HTTPS tokens) are tenant-scoped via the `authkit.Identity` principal. In the single shared-instance cloud deployment (one task-board server Deployment in the `latere` cluster, see [cloud-infrastructure.md](cloud-infrastructure.md)), credentials reach the server through the deployment Secret and are applied per principal at clone/fetch time:
+Repos may be private. Git credentials (SSH keys or HTTPS tokens) are tenant-scoped via the `authkit.Identity` principal. In the single shared-instance cloud deployment (one task-board server Deployment in the `latere` cluster, see [cloud-infrastructure.md](../../cloud/cloud-infrastructure.md)), credentials reach the server through the deployment Secret and are applied per principal at clone/fetch time:
 
 1. The deployment Secret carries the credential material the server needs (or a reference the server resolves at runtime against the platform's secret store, keyed by principal).
 2. The server configures a git credential helper / `GIT_SSH_COMMAND` scoped to the operation, using the resolved credential for the requesting principal.
@@ -241,7 +267,7 @@ Worktree creation logic is unchanged: `internal/runner/worktree.go` orchestrates
 
 **Worktree reachability for the sandbox:**
 
-In host execution (`internal/executor/host.go`, the only executor backend today) the agent runs as a host process and reads the worktree directly. There is no wallfacer-managed container and no volume assembly: `internal/runner/buildContainerSpecForSandbox` describes a host process launch, not a pod, and wallfacer no longer schedules sandbox pods or owns mount manifests (that moved to Cella, see [cloud-infrastructure.md](cloud-infrastructure.md) and [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md)).
+In host execution (`internal/executor/host.go`, the only executor backend today) the agent runs as a host process and reads the worktree directly. There is no wallfacer-managed container and no volume assembly: `internal/runner/buildContainerSpecForSandbox` describes a host process launch, not a pod, and wallfacer no longer schedules sandbox pods or owns mount manifests (that moved to Cella, see [cloud-infrastructure.md](../../cloud/cloud-infrastructure.md) and [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md)).
 
 When execution moves to a Cella sandbox, the sandbox has no access to the host or hot-tier filesystem, so the task's worktree must reach it by transport, not by mount. That transport is the cella-runtime seam's concern, with two candidate mechanisms:
 

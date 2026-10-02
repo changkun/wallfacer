@@ -1,17 +1,40 @@
 ---
 title: Tenant API
-status: stale
+status: archived
 depends_on:
   - specs/cloud/latere-integration.md
 affects: [internal/handler/tenantapi/]
 effort: large
 created: 2026-03-28
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Tenant API
+
+> **Archived 2026-10-02. Retired as: its credential model contradicts
+> the platform's, and no demand arrived to rescope it.** This spec gives
+> each tenant an API key that the wallfacer instance issues, stores and
+> validates itself. On the Latere platform a developer holds one key for
+> every capability, issued by Latere Auth and exchanged for a short-lived
+> token; a product does not keep a key store of its own.
+>
+> Two of the three needs this spec served are met without it. Starting
+> work from a script or a CI job and following it is the Agents API at
+> `https://api.latere.ai/v1/agents`, and starting it on a schedule or on
+> a push is a trigger there. The third, reading and driving wallfacer's
+> own tasks and specs from outside the browser, has no replacement and
+> no requester.
+>
+> If a hosted board ever needs an external API, it is specced again from
+> the need: routes over tasks and specs only, authenticated by the
+> platform's tokens on the same validator the board already uses, with
+> no key table in wallfacer. This spec moved from stale to archived
+> rather than through another refresh because its open question (keep or
+> archive, gated on demand) stayed open from June to October.
+>
+> The text below is kept as written for the record.
 
 ## Problem
 
