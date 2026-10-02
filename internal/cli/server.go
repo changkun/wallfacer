@@ -757,10 +757,13 @@ func stripSSGContent(html string) string {
 	return html
 }
 
-// mountVueSPA overlays Vue SPA routes onto an existing mux, claiming the
-// root path and static assets. The API routes registered by BuildMux are
-// preserved because the SPA handler only claims GET / and the /assets/
-// prefix, not /api/*.
+// mountVueSPA overlays Vue SPA routes onto an existing mux, claiming every
+// path no other route matches, the static asset prefixes, and the unmatched
+// paths under /api. Every route BuildMux registers is more specific than the
+// catch-alls, so it keeps its requests. A hard load of a client route gets the
+// shell; an unmatched /api path gets a JSON 404 (or 405 when a route serves the
+// path under other methods), never the shell. See spa_api.go for why the
+// catch-alls are method-agnostic.
 func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMode bool) {
 	dist, err := fs.Sub(vueDist, "frontend/dist")
 	if err != nil {
@@ -820,7 +823,9 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 	files := http.FS(dist)
 	fileServer := http.FileServer(files)
 	cachedFileServer := withAssetCache(fileServer)
-	mux.HandleFunc("GET /", serveVueIndex)
+	mux.HandleFunc(spaCatchAll, spaFallback(mux, serveVueIndex))
+	mux.HandleFunc(apiCatchAll, apiFallback(mux))
+	mux.HandleFunc(apiRoot, apiFallback(mux))
 	mux.Handle("GET /assets/", cachedFileServer)
 	mux.Handle("GET /fonts/", cachedFileServer)
 	mux.Handle("GET /static/", fileServer)

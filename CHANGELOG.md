@@ -95,6 +95,12 @@ committed: the commit log already holds that.
   the title runs in-process, as a `topos` task's title does, where it failed
   before with "unsupported agent".
 
+- A request to a path under `/api` that no endpoint serves answers 404 with
+  the JSON error envelope, `not_found`, for every method, where a `GET` got
+  the web app's page with 200 and other methods 405; a path an endpoint serves
+  under other methods answers 405 `method_not_allowed`, and a page of the web
+  app still loads when its address is opened directly.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed
