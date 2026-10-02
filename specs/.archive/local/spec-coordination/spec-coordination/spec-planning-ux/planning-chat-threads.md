@@ -2,9 +2,9 @@
 title: Planning Chat Threads
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/undo-snapshots.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/undo-snapshots.md
 affects:
   - internal/planner/threads.go
   - internal/planner/conversation.go

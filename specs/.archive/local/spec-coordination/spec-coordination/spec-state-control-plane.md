@@ -2,8 +2,8 @@
 title: Spec State Control Plane
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination.md
-  - specs/spec-coordination/spec-coordination/spec-archival.md
+  - specs/local/spec-coordination/spec-coordination.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival.md
 affects:
   - internal/spec/
   - internal/handler/specs.go

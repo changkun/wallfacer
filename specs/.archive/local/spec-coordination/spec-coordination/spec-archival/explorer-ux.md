@@ -2,7 +2,7 @@
 title: "Archival: Explorer tree — Show archived toggle and muted rendering"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/core-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/core-model.md
 affects:
   - ui/js/spec-explorer.js
   - ui/css/spec-mode.css

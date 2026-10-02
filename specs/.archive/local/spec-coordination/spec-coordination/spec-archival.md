@@ -2,10 +2,10 @@
 title: Spec Archival
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-document-model.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-explorer.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-explorer.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
 affects:
   - internal/spec/
   - internal/handler/specs.go

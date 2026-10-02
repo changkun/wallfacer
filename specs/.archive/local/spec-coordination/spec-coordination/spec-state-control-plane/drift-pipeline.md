@@ -2,8 +2,8 @@
 title: "Task-done drift pipeline"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-state-control-plane/propagation-algorithm.md
-  - specs/spec-coordination/spec-coordination/spec-state-control-plane/lifecycle-testing-state.md
+  - specs/local/spec-coordination/spec-coordination/spec-state-control-plane/propagation-algorithm.md
+  - specs/local/spec-coordination/spec-coordination/spec-state-control-plane/lifecycle-testing-state.md
 affects:
   - internal/handler/specs_dispatch.go
   - internal/runner/oversight.go

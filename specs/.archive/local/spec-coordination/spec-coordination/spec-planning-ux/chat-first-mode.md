@@ -2,9 +2,9 @@
 title: Chat-First Mode (rename "Spec" to "Plan", collapse layout when no specs)
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md
 affects:
   - internal/spec/
   - internal/cli/spec.go

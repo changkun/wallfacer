@@ -2,8 +2,8 @@
 title: "Archival: Focused view read-only banner and archive/unarchive actions"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/archive-api.md
-  - specs/spec-coordination/spec-coordination/spec-archival/explorer-ux.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/archive-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/explorer-ux.md
 affects:
   - ui/js/spec-mode.js
   - ui/css/spec-mode.css

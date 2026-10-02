@@ -2,7 +2,7 @@
 title: Spec Badge on Task Cards
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
 affects:
   - ui/js/render.js
   - ui/css/

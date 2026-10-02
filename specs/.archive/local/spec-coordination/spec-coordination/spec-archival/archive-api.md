@@ -2,7 +2,7 @@
 title: "Archival: Archive/unarchive HTTP endpoints"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/core-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/core-model.md
 affects:
   - internal/handler/specs.go
   - internal/handler/specs_test.go

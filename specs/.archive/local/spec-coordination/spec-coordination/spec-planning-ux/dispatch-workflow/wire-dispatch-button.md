@@ -2,7 +2,7 @@
 title: Wire Dispatch Button in Spec Mode
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/dispatch-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/dispatch-api.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/generated/routes.js

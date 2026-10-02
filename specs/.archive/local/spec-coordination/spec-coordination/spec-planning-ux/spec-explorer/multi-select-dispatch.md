@@ -2,7 +2,7 @@
 title: Multi-select for batch dispatch
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-renderer.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-renderer.md
 affects:
   - ui/js/spec-explorer.js
 effort: small

@@ -2,7 +2,7 @@
 title: Focused markdown view
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/spec-mode-layout.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/spec-mode-layout.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/markdown.js

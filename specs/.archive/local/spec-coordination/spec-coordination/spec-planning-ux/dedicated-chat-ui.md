@@ -2,10 +2,10 @@
 title: Dedicated Chat UI (Claude-style chat, sidebar chat/spec/board, floating spec-mode chat)
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
 affects:
   - frontend/src/components/Sidebar.vue
   - frontend/src/views/PlanPage.vue

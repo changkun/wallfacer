@@ -2,7 +2,7 @@
 title: Create planner package with container lifecycle
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox/planning-activity.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox/planning-activity.md
 affects:
   - internal/planner/
   - internal/sandbox/

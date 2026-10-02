@@ -2,9 +2,9 @@
 title: First-spec bootstrap UX choreography — toast, auto-focus, timing
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/layout-state-machine.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/readme-autocreate.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/layout-state-machine.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/readme-autocreate.md
 affects:
   - ui/js/bootstrap-choreography.js
   - ui/js/spec-explorer.js

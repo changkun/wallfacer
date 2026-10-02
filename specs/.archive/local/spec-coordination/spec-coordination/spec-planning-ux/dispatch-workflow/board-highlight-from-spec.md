@@ -2,7 +2,7 @@
 title: Board Highlight from Spec Context
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/spec-badge-on-cards.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/spec-badge-on-cards.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/render.js

@@ -2,7 +2,7 @@
 title: View Source Spec Link in Task Modal
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
 affects:
   - ui/js/modal-core.js
   - ui/partials/task-detail-modal.html

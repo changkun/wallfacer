@@ -2,8 +2,8 @@
 title: Dispatch API Endpoint
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/spec-frontmatter-writer.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/spec-frontmatter-writer.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
 affects:
   - internal/apicontract/routes.go
   - internal/handler/

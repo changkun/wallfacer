@@ -2,7 +2,7 @@
 title: Undo API Endpoint
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/undo-snapshots/post-exec-commit.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/undo-snapshots/post-exec-commit.md
 affects:
   - internal/handler/planning_undo.go
   - internal/apicontract/routes.go

@@ -2,7 +2,7 @@
 title: Planning Chat Agent — Codex Compatibility
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent.md
 affects:
   - internal/planner/planner.go
   - internal/planner/spec.go

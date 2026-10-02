@@ -2,8 +2,8 @@
 title: Planning Block in modal-stats.js
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/stats-planning-section.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-window-config.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/stats-planning-section.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-window-config.md
 affects:
   - ui/partials/stats-modal.html
   - ui/js/modal-stats.js

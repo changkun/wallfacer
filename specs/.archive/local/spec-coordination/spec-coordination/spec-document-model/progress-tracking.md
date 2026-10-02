@@ -2,7 +2,7 @@
 title: Progress Tracking
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-document-model/spec-tree-builder.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/spec-tree-builder.md
 affects:
   - internal/spec/
 effort: small

@@ -2,7 +2,7 @@
 title: Wire Multi-Select Dispatch in Spec Explorer
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/dispatch-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/dispatch-api.md
 affects:
   - ui/js/spec-explorer.js
 effort: small

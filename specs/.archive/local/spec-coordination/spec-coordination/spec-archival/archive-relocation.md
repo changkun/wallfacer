@@ -2,7 +2,7 @@
 title: "Archival: relocate archived specs to specs/.archive/"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/archive-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/archive-api.md
 affects:
   - internal/spec/tree.go
   - internal/spec/archive.go

@@ -2,8 +2,8 @@
 title: Task Completion Hook for Spec Status
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/spec-frontmatter-writer.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/spec-frontmatter-writer.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/dispatch-workflow/task-spec-source-field.md
 affects:
   - internal/store/tasks_update.go
   - internal/spec/lifecycle.go

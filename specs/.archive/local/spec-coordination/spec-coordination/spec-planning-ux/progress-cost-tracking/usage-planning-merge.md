@@ -2,7 +2,7 @@
 title: Merge Planning Into /api/usage BySubAgent
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
 affects:
   - internal/handler/usage.go
   - internal/handler/usage_test.go

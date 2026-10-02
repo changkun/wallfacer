@@ -2,7 +2,7 @@
 title: Layout state machine — chat-first vs three-pane
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-tree-index-endpoint.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-tree-index-endpoint.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/spec-explorer.js

@@ -2,7 +2,7 @@
 title: Undo & Snapshot System
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
   - internal/handler/planning.go
   - internal/handler/planning_git.go

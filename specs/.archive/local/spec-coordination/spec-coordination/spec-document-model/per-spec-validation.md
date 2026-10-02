@@ -2,8 +2,8 @@
 title: Per-Spec Validation
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-document-model/spec-model-types.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/spec-lifecycle.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/spec-model-types.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/spec-lifecycle.md
 affects:
   - internal/spec/
 effort: medium

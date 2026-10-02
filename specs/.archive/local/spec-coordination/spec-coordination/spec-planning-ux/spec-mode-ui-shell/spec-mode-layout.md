@@ -2,7 +2,7 @@
 title: Spec mode three-pane layout
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/mode-state-and-switching.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/mode-state-and-switching.md
 affects:
   - ui/index.html
   - ui/js/spec-mode.js

@@ -2,7 +2,7 @@
 title: Spec Explorer & Dependency Minimap
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
 affects:
   - ui/js/
   - internal/handler/explorer.go

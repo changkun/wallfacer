@@ -2,7 +2,7 @@
 title: Expand /create slash command to a /spec-new directive
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
 affects:
   - internal/planner/commands.go
   - internal/planner/commands_templates/create.tmpl

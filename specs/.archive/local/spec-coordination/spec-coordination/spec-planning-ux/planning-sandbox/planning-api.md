@@ -2,7 +2,7 @@
 title: Planning sandbox API endpoints
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox/planner-core.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox/planner-core.md
 affects:
   - internal/apicontract/routes.go
   - internal/handler/

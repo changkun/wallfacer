@@ -2,7 +2,7 @@
 title: Spec Planning UX
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination.md
+  - specs/local/spec-coordination/spec-coordination.md
   - specs/foundations/file-explorer.md
   - specs/foundations/host-terminal.md
 affects:

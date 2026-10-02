@@ -2,7 +2,7 @@
 title: Empty-Board task-creation composer
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/plan-to-board-bridges.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/plan-to-board-bridges.md
 affects:
   - ui/js/board-composer.js
   - ui/js/render.js

@@ -2,7 +2,7 @@
 title: Auto-create specs/README.md on first scaffold and append rows thereafter
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-new-directive-parser.md
 affects:
   - internal/spec/readme.go
   - internal/handler/planning_directive.go

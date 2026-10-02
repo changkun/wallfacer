@@ -2,7 +2,7 @@
 title: Spec Document Model
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination.md
+  - specs/local/spec-coordination/spec-coordination.md
 affects:
   - internal/spec/
   - internal/pkg/dag/

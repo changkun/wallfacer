@@ -2,7 +2,7 @@
 title: UI Per-Message Undo
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/undo-snapshots/undo-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/undo-snapshots/undo-api.md
 affects:
   - ui/js/planning-chat.js
   - ui/css/spec-mode.css

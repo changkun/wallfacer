@@ -3,7 +3,7 @@ title: UI Message Queue and Interrupt
 status: archived
 track: local
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/ui-chat-send-stream.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/ui-chat-send-stream.md
 affects:
   - ui/js/planning-chat.js
   - ui/js/tests/planning-chat.test.js

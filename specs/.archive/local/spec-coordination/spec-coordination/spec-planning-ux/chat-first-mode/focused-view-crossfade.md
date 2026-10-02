@@ -2,8 +2,8 @@
 title: Crossfade focused view on index ↔ spec switch
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/layout-state-machine.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/explorer-roadmap-entry.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/layout-state-machine.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/explorer-roadmap-entry.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/planning-chat.js

@@ -2,8 +2,8 @@
 title: Planning Chat Agent
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox.md
 affects:
   - ui/js/
   - internal/handler/

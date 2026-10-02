@@ -3,8 +3,8 @@ title: Message API Endpoints
 status: archived
 track: local
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/conversation-store.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/planning-prompt.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/conversation-store.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/planning-prompt.md
 affects:
   - internal/handler/planning.go
   - internal/handler/planning_test.go

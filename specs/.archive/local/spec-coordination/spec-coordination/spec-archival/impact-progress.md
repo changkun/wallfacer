@@ -2,7 +2,7 @@
 title: "Archival: Impact analysis and progress tracking exclusions"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/core-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/core-model.md
 affects:
   - internal/spec/impact.go
   - internal/spec/impact_test.go

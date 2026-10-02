@@ -2,7 +2,7 @@
 title: Wire planner into server lifecycle
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox/planning-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-sandbox/planning-api.md
 affects:
   - internal/cli/server.go
   - internal/handler/handler.go

@@ -2,8 +2,8 @@
 title: Cross-Spec Validation
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-document-model/spec-tree-builder.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/per-spec-validation.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/spec-tree-builder.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/per-spec-validation.md
 affects:
   - internal/spec/
 effort: medium

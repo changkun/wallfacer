@@ -2,7 +2,7 @@
 title: Planning Section in /api/stats
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
 affects:
   - internal/handler/stats.go
   - internal/handler/stats_test.go

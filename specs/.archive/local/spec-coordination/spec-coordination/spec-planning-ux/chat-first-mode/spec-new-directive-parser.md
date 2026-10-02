@@ -2,8 +2,8 @@
 title: Server-side /spec-new directive parser and scaffold interception
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-scaffold-library.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/agent-system-prompts.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/spec-scaffold-library.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/chat-first-mode/agent-system-prompts.md
 affects:
   - internal/handler/planning.go
   - internal/handler/planning_directive.go

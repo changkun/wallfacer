@@ -2,7 +2,7 @@
 title: "Archival: Validation skips for archived specs"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/core-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/core-model.md
 affects:
   - internal/spec/validate.go
   - internal/spec/validate_test.go

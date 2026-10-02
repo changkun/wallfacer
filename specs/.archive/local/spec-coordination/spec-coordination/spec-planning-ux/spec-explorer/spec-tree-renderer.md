@@ -2,8 +2,8 @@
 title: Spec tree renderer with status badges
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-api.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/mode-state-and-switching.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/mode-state-and-switching.md
 affects:
   - ui/js/
 effort: medium

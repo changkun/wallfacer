@@ -2,7 +2,7 @@
 title: "Archival: Dispatch handler guards"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-archival/core-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-archival/core-model.md
 affects:
   - internal/handler/specs_dispatch.go
   - internal/handler/specs_dispatch_test.go

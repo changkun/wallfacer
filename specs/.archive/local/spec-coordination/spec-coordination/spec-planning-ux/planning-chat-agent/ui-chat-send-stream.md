@@ -3,7 +3,7 @@ title: UI Chat Send and Stream
 status: archived
 track: local
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/message-stream.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/message-stream.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/planning-chat.js

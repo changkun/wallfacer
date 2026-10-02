@@ -2,7 +2,7 @@
 title: Spec mode deep-linking and keyboard shortcuts
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/focused-markdown-view.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/spec-mode-ui-shell/focused-markdown-view.md
 affects:
   - ui/js/spec-mode.js
   - ui/js/api.js

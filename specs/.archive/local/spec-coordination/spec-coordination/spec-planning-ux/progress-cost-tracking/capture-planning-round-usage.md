@@ -2,7 +2,7 @@
 title: Capture Planning Round Usage
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-usage-store.md
 affects:
   - internal/planner/usage.go
   - internal/planner/usage_test.go

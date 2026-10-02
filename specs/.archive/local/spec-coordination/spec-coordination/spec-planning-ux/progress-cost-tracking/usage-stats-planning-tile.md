@@ -2,8 +2,8 @@
 title: Planning Tile in usage-stats.js
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/usage-planning-merge.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-window-config.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/usage-planning-merge.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/progress-cost-tracking/planning-window-config.md
 affects:
   - ui/js/usage-stats.js
   - ui/js/tests/usage-stats.test.js

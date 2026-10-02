@@ -3,7 +3,7 @@ title: Slash Command Registry
 status: archived
 track: local
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/message-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/message-api.md
 affects:
   - internal/planner/commands.go
   - internal/planner/commands_test.go

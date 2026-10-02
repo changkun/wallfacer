@@ -2,8 +2,8 @@
 title: Unify Refinement Into Plan Mode
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux.md
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-threads.md
 affects:
   - internal/handler/refine.go
   - internal/handler/planning.go

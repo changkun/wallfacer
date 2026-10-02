@@ -3,7 +3,7 @@ title: Message Stream SSE Endpoint
 status: archived
 track: local
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/message-api.md
+  - specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-chat-agent/message-api.md
 affects:
   - internal/handler/planning.go
   - internal/handler/planning_test.go

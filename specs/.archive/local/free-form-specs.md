@@ -2,7 +2,7 @@
 title: Free-Form Specs
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-document-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model.md
 affects:
   - internal/spec/parse.go
   - internal/spec/tree.go

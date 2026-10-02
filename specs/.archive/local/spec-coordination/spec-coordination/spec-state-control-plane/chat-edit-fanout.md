@@ -2,7 +2,7 @@
 title: "Chat-edit fan-out"
 status: archived
 depends_on:
-  - specs/spec-coordination/spec-coordination/spec-state-control-plane/propagation-algorithm.md
+  - specs/local/spec-coordination/spec-coordination/spec-state-control-plane/propagation-algorithm.md
 affects:
   - internal/handler/planning_git.go
 created: 2026-04-12
