@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { ApiError as SessionApiError } from 'latere-ui';
 import { api, ApiError, authHeaders, withAuthToken, getServerApiKey } from './client';
 
 function setKey(key: string | undefined) {
@@ -117,5 +118,14 @@ describe('api error messages', () => {
     vi.stubGlobal('fetch', mockFetch(404, 'Not Found',
       JSON.stringify({ error: 'missing' }), 'application/json'));
     await expect(api('GET', '/api/x')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('throws an error the shared session code recognizes, keeping the code', async () => {
+    vi.stubGlobal('fetch', mockFetch(401, 'Unauthorized', JSON.stringify({
+      error: { code: 'unauthorized', message: 'Sign in to continue.' },
+    }), 'application/json'));
+    const err = await api('GET', '/api/me').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SessionApiError);
+    expect(err).toMatchObject({ status: 401, message: 'Sign in to continue.', code: 'unauthorized' });
   });
 });

@@ -28,9 +28,13 @@ vi.mock('../stores/auth', () => ({
   }),
 }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('latere-ui', async () => {
+// The API client's ApiError extends latere-ui's, so the stub module keeps the
+// real class.
+vi.mock('latere-ui', async (orig) => {
+  const { ApiError } = await orig<typeof import('latere-ui')>();
   const { defineComponent, h: render } = await import('vue');
   return {
+    ApiError,
     AccountMenu: defineComponent({
       emits: ['login', 'switch-org'],
       setup(_, { emit }) {
