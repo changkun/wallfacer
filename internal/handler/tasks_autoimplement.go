@@ -1248,7 +1248,11 @@ func reviewStateDir(worktreePath string) string {
 // A failed round leaves the verdict unset and opens the auto-review breaker,
 // so the retry waits out the breaker's backoff.
 func (h *Handler) runReview(ctx context.Context, s *store.Store, t store.Task) error {
-	if !reviewable(&t) {
+	// A worktree that is gone or is not a git repository contributes nothing
+	// to the diff, and an approval of the remaining (possibly empty) diff
+	// would open the auto-submit gate unreviewed. Skip the round, as the
+	// auto-tester skips such a task.
+	if !reviewable(&t) || len(missingTaskWorktrees(&t)) > 0 {
 		return nil
 	}
 	cwd := primaryWorktree(t.WorktreePaths)

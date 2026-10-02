@@ -225,10 +225,14 @@ func waitingTaskForReview(t *testing.T, s *store.Store, sessionID string) store.
 	if err := s.UpdateTaskResult(ctx, task.ID, "done", sessionID, "end_turn", 1); err != nil {
 		t.Fatalf("UpdateTaskResult: %v", err)
 	}
-	// The worktree sits in a directory of its own, as <worktreesDir>/<taskID>/
-	// does in production, so each task's review state directory (the
-	// worktree's sibling) is its own.
+	// The worktree is a git repository in a directory of its own, as
+	// <worktreesDir>/<taskID>/<repo> is in production, so each task's review
+	// state directory (the worktree's sibling) is its own.
 	worktree := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(worktree, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, worktree, "init", "-b", "main")
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{t.TempDir(): worktree}, "branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
@@ -517,6 +521,36 @@ func TestTryAutoReview_DedupesConcurrentTicks(t *testing.T) {
 	v.mu.Unlock()
 	if got != 1 {
 		t.Errorf("verifier called %d times, want 1", got)
+	}
+}
+
+// TestRunReview_SkipsMissingWorktree proves a task whose worktree is gone is
+// not reviewed: its diff would leave the missing repository out, and an
+// approval of what remains would open the auto-submit gate unreviewed.
+func TestRunReview_SkipsMissingWorktree(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	v := &mockVerifier{result: finished(0, "")}
+	h.verifier = v
+
+	ctx := context.Background()
+	s, ok := h.currentStore()
+	if !ok {
+		t.Fatal("no current store")
+	}
+	task := waitingTaskForReview(t, s, "")
+	if err := os.RemoveAll(primaryWorktree(task.WorktreePaths)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.runReview(ctx, s, task); err != nil {
+		t.Fatalf("runReview: %v", err)
+	}
+	if v.calls() != 0 {
+		t.Errorf("verifier called %d times for a missing worktree, want 0", v.calls())
+	}
+	got, _ := s.GetTask(ctx, task.ID)
+	if got.ReviewUnresolved != nil {
+		t.Errorf("ReviewUnresolved = %v, want nil", *got.ReviewUnresolved)
 	}
 }
 

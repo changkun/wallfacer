@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -319,6 +320,28 @@ func TestReviewTask_RejectsTaskWithoutWorktree(t *testing.T) {
 	}
 }
 
+// TestReviewTask_RejectsMissingWorktree: a worktree that is gone leaves no
+// change to review, so the manual trigger refuses it like a task without one.
+func TestReviewTask_RejectsMissingWorktree(t *testing.T) {
+	h := newTestHandler(t)
+	h.verifier = &mockVerifier{result: finished(0, "")}
+
+	id := createWaitingTask(t, h, "gone")
+	gone := filepath.Join(t.TempDir(), "removed")
+	if err := h.store.UpdateTaskWorktrees(context.Background(), id, map[string]string{t.TempDir(): gone}, "branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/review", nil)
+	req.SetPathValue("id", id.String())
+	w := httptest.NewRecorder()
+	h.ReviewTask(w, req, id)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for a missing worktree, got %d", w.Code)
+	}
+}
+
 // TestReviewTask_Accepts202ForWaitingTaskWithWorktree: a review needs a
 // worktree, not an agent session, so a task without a session is accepted.
 func TestReviewTask_Accepts202ForWaitingTaskWithWorktree(t *testing.T) {
@@ -326,7 +349,9 @@ func TestReviewTask_Accepts202ForWaitingTaskWithWorktree(t *testing.T) {
 	h.verifier = &mockVerifier{result: finished(0, "")}
 
 	id := createWaitingTask(t, h, "verify-me")
-	if err := h.store.UpdateTaskWorktrees(context.Background(), id, map[string]string{t.TempDir(): t.TempDir()}, "branch"); err != nil {
+	worktree := t.TempDir()
+	gitRun(t, worktree, "init", "-b", "main")
+	if err := h.store.UpdateTaskWorktrees(context.Background(), id, map[string]string{t.TempDir(): worktree}, "branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
 

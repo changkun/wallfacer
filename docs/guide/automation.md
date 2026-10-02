@@ -77,7 +77,7 @@ Open findings at the end of a session are a hard barrier: the task stays parked 
 Scope and behavior:
 
 - A review needs a second model. When `WALLFACER_REVIEW_MODEL` is unset, or names the model the task runs on, the review does not run: the task timeline says why, once, and the task carries no verdict, so with Review on it is not auto-submitted.
-- Review supersedes the test agent for every waiting task that has a worktree, on any harness. A task without a worktree has no diff to review and falls back to the regular test agent.
+- Review supersedes the test agent for every waiting task that has a worktree, on any harness. A task without a worktree has no diff to review and falls back to the regular test agent; a task whose worktree has gone missing is not reviewed until it is restored.
 - Eligible waiting tasks are reviewed automatically when the `review` toggle is on. One round runs at a time per task, and at most 2 rounds run at once across tasks, outside the regular task caps.
 - A reviewer run that fails, or answers in a form that cannot be read, does not use up a round: the task timeline says so, and the round is retried once the auto-review breaker's backoff has passed.
 - The reviewer reads the diff from its prompt, capped at 16,000 bytes, and runs without access to the workspace, so it cannot change the task's worktree.

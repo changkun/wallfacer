@@ -763,14 +763,15 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
-// The error a manual review trigger returns for a task with nothing to review.
+// The error a manual review trigger returns for a task with nothing to review:
+// no worktree, or one that is gone or is not a git repository.
 const (
 	codeReviewNoWorktree    = "review_no_worktree"
-	messageReviewNoWorktree = "This task has no worktree, so there is no change to review."
+	messageReviewNoWorktree = "This task has no usable worktree, so there is no change to review."
 )
 
 // ReviewTask runs one review round for a waiting task, whatever the review
-// toggle says. The task must be waiting and have a worktree. The round runs
+// toggle says. The task must be waiting and have its worktrees present. The round runs
 // asynchronously; 202 Accepted is returned immediately with the task's review
 // state directory, and the transcript route shows the round as it lands.
 func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
@@ -788,7 +789,7 @@ func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, "only waiting tasks can be verified by review", http.StatusConflict)
 		return
 	}
-	if !reviewable(task) {
+	if !reviewable(task) || len(missingTaskWorktrees(task)) > 0 {
 		httpjson.WriteError(w, http.StatusBadRequest, httpjson.Error{
 			Code:    codeReviewNoWorktree,
 			Message: messageReviewNoWorktree,
