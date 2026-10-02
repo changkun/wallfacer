@@ -85,9 +85,9 @@ Cloud Platform - two axes over one Latere platform (api.latere.ai)
   Axis B: Remote execution (Cloud v2+, demand-gated)
     ○ Hosted Agents Executor (a task runs as a platform agent session)
     ○ Hosted Board Deployment (blocked on a product decision)
-    ○ Claude Managed Agents        ○ Antigravity (third-party executors)
   archived: Multi-Tenant, Billing Idempotency, Cella Runtime, Shared Cella
-    Client, Tenant Filesystem, Tenant API (the platform owns the concern)
+    Client, Tenant Filesystem, Tenant API (the platform owns the concern);
+    Claude Managed Agents, Antigravity (third-party executors, outdated)
 
 Git Workflow - local git; the GitHub half is retired
   ✅ Intent-Driven Commits              ○ Task Revert (unbuilt)
@@ -121,10 +121,11 @@ Four decisions followed the review the same day, recorded in
 4. **Remove GitHub.** No GitHub connection until the platform has a connector
    ([remove-github-integration](shared/platform-native/remove-github-integration.md)).
 
-Also decided: a signed-out instance has no platform feature, and since models
-are one, it cannot run an agent. Still open: whether the two third-party
-remote executor specs are archived, and what users on a CLI subscription are
-told about cost.
+Also decided the same day: a signed-out instance has no platform feature;
+sign-in with a model provider stays as a second source of model credentials
+(with the constraint that a Claude subscription token cannot feed a
+third-party harness, so the Claude path is an API key); and the two
+third-party remote executor specs are archived.
 
 Spec Coordination and Foundations are complete. Cloud Platform is drafted and
 demand-gated, with the coordination connection and spec comments shipped.
@@ -137,7 +138,7 @@ The active program: four decisions of 2026-10-02 that make wallfacer an applicat
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and what a signed-out instance can do (everything local that needs no model; no agent), and the open questions (the third-party executors; CLI-subscription users; the sub-agent roles). |
+| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
 | ↳ [retire-agent-fleets.md](shared/platform-native/retire-agent-fleets.md) | Drafted | Removal: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; the native single-agent path, the run trace and Mission Control stay. User files are left on disk unread; record fields are kept and ignored. |
 | ↳ [remove-github-integration.md](shared/platform-native/remove-github-integration.md) | Drafted | Removal: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes, `internal/github`. Plain git push is untouched. Cached tokens are deleted on first start. |
 | ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
@@ -341,8 +342,8 @@ The earlier shape of this track, one thin client per Latere service (a sandbox r
 | ↳↳ [coordination-plane/spec-comments.md](.archive/cloud/latere-integration/coordination-plane/spec-comments.md) | Complete | Phase 4: cloud-resident inline spec comments relayed in real time, ActorSub attribution, content-hash anchoring, export-friendly schema. Shipped v1; anchored text highlighted inline (`<mark>`). RBAC gate, outdated/re-place triage, comment edit deferred. |
 | ↳↳ [coordination-plane/postgres-store.md](.archive/cloud/latere-integration/coordination-plane/postgres-store.md) | **Complete** | Shared Postgres store owning the pool and embedded versioned migrations; replaced the inline `IF NOT EXISTS` schema string so the next durable consumer adds a numbered migration. One shared pool, one linear sequence. |
 | ↳ [latere-integration/topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md) | Drafted | **Axis B lead.** A task with the native harness and execution target `hosted` runs as an agent session at `https://api.latere.ai/v1/agents`: apply a manifest, start a session, follow its event stream onto the task timeline through the existing `driveToposRun` seam, fetch the session's branch. Per-task opt-in; re-attaches after a restart; personal contexts only until the platform runs an organization's agents. |
-| [claude-managed-agents.md](cloud/claude-managed-agents.md) | Drafted | Third-party remote executor: dispatch to Anthropic's Managed Agents API (`POST /v1/sessions`) with a self-hosted sandbox mounting the worktree locally. Independent of the Latere platform. |
-| [antigravity.md](cloud/antigravity.md) | Drafted | Third-party remote executor: dispatch to Google's Antigravity Interactions API. Harness + model both fixed (Gemini). Independent of the Latere platform. |
+| [claude-managed-agents.md](.archive/cloud/claude-managed-agents.md) | **Archived** | Retired 2026-10-02 as outdated: dispatching a task to Anthropic's Managed Agents API. Wallfacer runs one harness, hosted on the Latere platform for a remote run. |
+| [antigravity.md](.archive/cloud/antigravity.md) | **Archived** | Retired 2026-10-02 as outdated: dispatching a task to Google's Antigravity Interactions API. |
 | [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Drafted | Hosted board deployment: a second workload beside the site and coordinator, running `wallfacer run` in cloud mode with hosted execution only and a volume for the store. **Blocked** on whether a hosted board ships and on how it reaches repositories with no user machine (server-side clones vs the Repos API). |
 | [data-boundary-enforcement.md](cloud/data-boundary-enforcement.md) | Drafted | What may leave the machine: the SPA telemetry scrubber, the coordination-channel egress gate (opt-in, allow-listed), and the rule for hosted runs (per-task choice, named before it leaves). Owns the boundary rule and the gates; per-field allow-lists live in the projection/comments leaves. |
 
@@ -415,7 +416,7 @@ Task revert is unbuilt and independent. Intent-commits is fully realized.
 - [latere-integration.md](cloud/latere-integration.md) is the umbrella; read it first.
 - Axis A continues on the shipped connection: presence, then the metadata projection, then remote control.
 - The hosted executor is the only Latere remote executor. It builds on the shipped `driveToposRun` seam, and its first end-to-end run waits on the issuer letting wallfacer's sign-in client mint a token for `api.latere.ai`.
-- The hosted board waits on a product decision and on the repository question in its spec. The third-party executors (managed-agents, antigravity) are independent and need a self-contained dispatch seam; the hosted executor's session-shaped run is the candidate.
+- The hosted board waits on a product decision and on the repository question in its spec.
 
 **Cross-track:**
 - Agent and harness abstraction reduce duplication before either track adds new agent roles.

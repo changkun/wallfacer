@@ -103,10 +103,10 @@ does not change it. Axis B is where the consolidation applies: it was two
 parallel executors (a sandbox backend and an agent backend) plus a file
 plane, and is now one executor over `/v1/agents`.
 
-Two third-party remote executors,
-[claude-managed-agents.md](claude-managed-agents.md) and
-[antigravity.md](antigravity.md), sit beside Axis B. They dispatch to another
-vendor's hosted agents and are independent of the Latere platform.
+Two specs for dispatching to another vendor's hosted agents
+([claude-managed-agents.md](../.archive/cloud/claude-managed-agents.md),
+[antigravity.md](../.archive/cloud/antigravity.md)) once sat beside Axis B. They are archived
+as outdated; the hosted executor is the only remote executor.
 
 ## What wallfacer owns
 
@@ -166,10 +166,10 @@ seam is inert and local behavior is byte-identical to a build without it.
    The default build with no sign-in runs a host agent process over a
    filesystem store with no network dependency on Latere. (True of the CLI
    harnesses that exist today. Under
-   [platform-native](../shared/platform-native.md), models come from the
-   platform, a signed-out instance keeps everything local that needs no
-   model, and running an agent needs a sign-in. This rule is restated when
-   that migration lands.)
+   [platform-native](../shared/platform-native.md), an agent run needs a
+   model credential, from a Latere sign-in or a provider sign-in; an
+   instance with neither keeps everything local that needs no model. This
+   rule is restated when that migration lands.)
 2. **Config-gated, nil-safe selection.** A seam activates only when its
    configuration is present. Otherwise its client is nil and call sites
    short-circuit, the way `AuthProvider` and `jwtValidator` already do.

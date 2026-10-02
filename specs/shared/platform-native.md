@@ -42,8 +42,8 @@ lets agents organize themselves at run time.
 | | Today | After |
 |---|---|---|
 | Harness | Five CLI harnesses (Claude Code, Codex, Cursor, OpenCode, Pi) as subprocesses, plus an opt-in in-process one on a pre-rebuild runtime pin | The Topos harness, in-process for a local run and hosted for a remote one |
-| Models | Whatever each CLI is signed in to, or a provider key | The platform's Models capability; the user picks and switches the model |
-| Credentials | Per-CLI sign-in, provider keys in the keyring | One Latere sign-in |
+| Models | Whatever each CLI is signed in to, or a provider key | The platform's Models capability with a model switch, or a provider account the user signed in with |
+| Credentials | Per-CLI sign-in, provider keys in the keyring | A Latere sign-in, or a provider sign-in whose credential goes to the one harness |
 | Orchestration | Built-in `implement` pipeline, user-authored fleets on two other engines | One agent per task that spawns what it needs at run time |
 | Authoring surface | An agent and fleet editor | None. Instructions come from the repository's instruction files and the task |
 | GitHub | A brokered token, a pull request per task | Nothing. A push to a remote is plain git |
@@ -100,11 +100,16 @@ Recorded so nobody reads the old statements as current.
   implementation, and the abstraction is removed with the adapters.
 - **"Model agnosticism through harnesses."** Agnosticism moves to the model
   catalog: any model the platform offers, one harness.
-- **CLI credential flows.** The archived
-  [oauth-token-setup](../.archive/local/oauth-token-setup.md) (browser sign-in
-  for Claude and Codex credentials) and the provider half of
-  [provider-secret-store](../.archive/local/provider-secret-store.md) lose
-  their subject.
+- **CLI credential plumbing.** The browser sign-in for provider credentials
+  ([oauth-token-setup](../.archive/local/oauth-token-setup.md)) and the
+  keyring that holds them
+  ([provider-secret-store](../.archive/local/provider-secret-store.md)) are
+  kept. What goes is handing those credentials to a provider's CLI through
+  its environment; they feed the harness's model connection instead.
+- **Third-party remote executors.** The specs for dispatching to another
+  vendor's hosted agents
+  ([claude-managed-agents](../.archive/cloud/claude-managed-agents.md),
+  [antigravity](../.archive/cloud/antigravity.md)) are archived as outdated.
 - **The agent-graph design.** [agent-graph-e2e-design](../.archive/local/agent-graph-e2e-design.md)
   is withdrawn by decision 1.
 - **The Git workflow track's GitHub half.** The
@@ -114,42 +119,69 @@ Recorded so nobody reads the old statements as current.
 - **The platform integration's first design rule.** It says the default build
   with no sign-in runs a host agent process with no network dependency on
   Latere. With models coming from the platform, running an agent needs a
-  sign-in. See "Signed out".
+  model credential. See "Model credentials, and what signed out means".
 
-## Signed out
+## Model credentials, and what signed out means
 
-Decided by the maintainer on 2026-10-02: signed out means not logged in, and
-an instance that is not logged in has no platform feature. There is no second
-path.
+Two decisions by the maintainer on 2026-10-02.
 
-Models are a platform capability, so the consequence is direct:
+**Signed out means not logged in, and an instance that is not logged in to
+Latere has no platform feature.** There is nothing more to it: no models from
+the platform, no coordination plane, no hosted execution.
 
-| | Signed out | Signed in |
+**Sign-in with a model provider stays, as a second source of model
+credentials.** Wallfacer already has a module that signs in with Claude and
+with OpenAI in the browser and stores the credential (`internal/oauth`, with
+its handlers in `internal/handler/auth.go`). Today that credential is handed
+to the provider's own CLI. The module is kept, separated from the CLI
+plumbing that is being removed, and its credential goes to the one harness's
+model connection instead. A user with a provider account runs wallfacer on
+that account and is not billed by the platform for those calls.
+
+So an agent run needs a model credential from one of two places:
+
+| State | Models | Platform features |
 |---|---|---|
-| Open a workspace, browse files, read and edit specs, view the board and task history, review diffs, use plain git | yes | yes |
-| Run an agent: a task, a chat turn, planning, title, commit message, oversight, test verification | no | yes |
-| Coordination plane, hosted execution | no | yes |
+| No sign-in of either kind | none: the instance opens workspaces, shows the board and history, edits specs, reviews diffs, runs plain git, and starts no agent | none |
+| Signed in with a provider | that provider's models, on the user's provider account | none |
+| Signed in to Latere | the platform's catalog, with the model switch, billed by the platform | all |
+| Both | the user picks per task | all |
 
-Wallfacer does not offer a provider key field or a "bring your own gateway"
-setting as a way around sign-in. The gateway is open source, and pointing the
-harness at a self-hosted one is a property of the harness's configuration,
-not a wallfacer feature to design or document.
+What this asks of the interface: where an agent would start and no credential
+exists, it says so and offers both sign-ins. It does not show a board that
+silently fails tasks.
 
-What this asks of the interface: a signed-out instance says plainly, where an
-agent would start, that running one needs a sign-in, and offers it. It does
-not show a board that silently fails tasks.
+### A constraint on the provider path
+
+The two providers do not allow the same thing, and the design has to follow
+what each allows on the day it is built.
+
+- **OpenAI.** Signing in with a ChatGPT account and using the plan's included
+  usage is supported in third-party tools; several ship it.
+- **Anthropic.** Since 2026-02-19 its terms forbid using a Claude
+  subscription's OAuth token in any harness other than its own clients, and
+  since 2026-04-04 it blocks such tokens technically. A Claude subscription
+  credential therefore cannot feed wallfacer's harness. What can: an
+  Anthropic API key, billed per token on the user's own account. The sign-in
+  module already requests the scope that creates one.
+- **Client identity.** The module signs in under OAuth client ids that
+  belong to other tools (the comments in `internal/oauth/provider.go` say
+  which). That worked while the credential went to those tools' own CLIs.
+  Whether it is acceptable once the credential feeds a different harness is
+  a question to settle with each provider's terms before shipping, and the
+  answer may be that wallfacer needs client registrations of its own.
+
+A user who wants Claude models without an API key signs in to Latere and uses
+the platform's catalog.
 
 ## Open questions
 
-1. **Third-party remote executors.** [claude-managed-agents](../cloud/claude-managed-agents.md)
-   and [antigravity](../cloud/antigravity.md) dispatch tasks to other vendors'
-   hosted agents. They contradict "clean use of the Latere platform" and were
-   not named in the decision. Recommended: archive both. Not done yet.
-2. **Existing users of a CLI subscription.** A user who runs wallfacer on a
-   Claude or Codex subscription pays nothing per token today. After decision 2
-   they pay the platform's model prices. The migration needs a stated position
-   and a release note, not a silent switch.
-3. **Sub-agent roles.** Title, commit message, oversight and test verification
+1. **Whether the rebuilt harness can use a provider credential directly.**
+   The provider path needs the harness to reach a provider without the
+   platform's gateway in between, or through a gateway run locally. Which of
+   these the rebuilt module supports decides how the second row of the table
+   above is built. The harness spec answers it.
+2. **Sub-agent roles.** Title, commit message, oversight and test verification
    run as separate one-shot agents today, each pinned to a harness by an
    environment variable. On one harness they become model calls or spawned
    threads. Which, and on which model, is the harness spec's to decide.

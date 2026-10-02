@@ -43,9 +43,12 @@ dispatched_task_id: null
 >   per-CLI credential flows.
 > - The sub-agent roles (title, commit message, oversight, test) need a home
 >   on the one harness.
-> - A signed-out instance runs no agent, since models come from the platform
->   (decided; see "Signed out" in the umbrella). The harness refuses to start
->   and the interface offers sign-in.
+> - A run needs a model credential from one of two places: a Latere sign-in
+>   (the platform's catalog) or a provider sign-in whose credential the
+>   harness uses directly (decided; see "Model credentials" in the umbrella,
+>   including the constraint that a Claude subscription token cannot feed a
+>   third-party harness). With neither, the harness refuses to start and the
+>   interface offers both sign-ins.
 >
 > The body below is the accurate record of what is shipped on the current
 > pin. It is rewritten once the rebuilt module's embedding surface has been
