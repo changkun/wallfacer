@@ -219,12 +219,13 @@ func (h *Handler) fireRoutine(ctx context.Context, routineID uuid.UUID) {
 
 	prompt := h.buildRoutineInstancePrompt(*routineTask)
 	tags := append(slices.Clone(routineTask.Tags), "spawned-by:"+routineID.String())
-	spawnFlow := flowRegistry().ResolveRoutineFlow(routineTask)
 
+	// The instance is an ordinary task. A routine record written earlier may
+	// still carry RoutineSpawnKind or RoutineSpawnFlow; neither is read, so
+	// such a routine spawns the same task as any other.
 	instance, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  prompt,
-		Kind:    routineTask.RoutineSpawnKind,
-		FlowID:  spawnFlow,
+		Kind:    store.TaskKindTask,
 		Tags:    tags,
 		Timeout: routineTask.Timeout,
 	})

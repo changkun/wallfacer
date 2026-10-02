@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,40 +78,60 @@ func TestCreateRoutine_Valid(t *testing.T) {
 	}
 }
 
-func TestCreateRoutine_AcceptsSpawnFlow(t *testing.T) {
+// TestCreateRoutine_WritesNoSpawnTarget asserts a routine created through the
+// API stores neither a spawn flow nor a spawn kind: every fire spawns an
+// ordinary task, so the record names no target.
+func TestCreateRoutine_WritesNoSpawnTarget(t *testing.T) {
 	h := newTestHandler(t)
 	rec := postRoutine(t, h, map[string]any{
 		"prompt":           "implement routine",
 		"interval_minutes": 30,
-		"spawn_flow":       "implement",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
 	}
-	var resp RoutineResponse
-	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
-	if resp.RoutineSpawnFlow != "implement" {
-		t.Fatalf("spawn flow = %q, want implement", resp.RoutineSpawnFlow)
+	if body := rec.Body.String(); strings.Contains(body, "routine_spawn_flow") || strings.Contains(body, "routine_spawn_kind") {
+		t.Errorf("response carries a spawn target: %s", body)
 	}
-	// Persisted task carries the flow slug.
+	var resp RoutineResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	got, err := h.store.GetTask(context.Background(), resp.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got.RoutineSpawnFlow != "implement" {
-		t.Fatalf("stored RoutineSpawnFlow = %q, want implement", got.RoutineSpawnFlow)
+	if got.RoutineSpawnFlow != "" || got.RoutineSpawnKind != "" {
+		t.Fatalf("stored spawn flow %q and kind %q, want both empty", got.RoutineSpawnFlow, got.RoutineSpawnKind)
 	}
 }
 
-func TestCreateRoutine_RejectsUnknownSpawnFlow(t *testing.T) {
+// TestCreateRoutine_RejectsSpawnTargetFields asserts the create request no
+// longer takes spawn_flow or spawn_kind: either is rejected as an unknown
+// field and no routine is stored.
+func TestCreateRoutine_RejectsSpawnTargetFields(t *testing.T) {
 	h := newTestHandler(t)
-	rec := postRoutine(t, h, map[string]any{
-		"prompt":           "bogus",
-		"interval_minutes": 5,
-		"spawn_flow":       "no-such-flow",
-	})
-	if rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want 422; body=%s", rec.Code, rec.Body.String())
+	for _, field := range []string{"spawn_flow", "spawn_kind"} {
+		t.Run(field, func(t *testing.T) {
+			rec := postRoutine(t, h, map[string]any{
+				"prompt":           "fleet routine",
+				"interval_minutes": 5,
+				field:              "implement",
+			})
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), "unknown field") {
+				t.Errorf("body = %q, want the unknown-field rejection", rec.Body.String())
+			}
+		})
+	}
+	tasks, err := h.store.ListTasks(context.Background(), true)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("stored %d tasks, want none for rejected requests", len(tasks))
 	}
 }
 
@@ -129,18 +150,6 @@ func TestCreateRoutine_RejectsShortInterval(t *testing.T) {
 	rec := postRoutine(t, h, map[string]any{
 		"prompt":           "too fast",
 		"interval_minutes": 0,
-	})
-	if rec.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want 422; body=%s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestCreateRoutine_RejectsUnknownSpawnKind(t *testing.T) {
-	h := newTestHandler(t)
-	rec := postRoutine(t, h, map[string]any{
-		"prompt":           "evil",
-		"interval_minutes": 5,
-		"spawn_kind":       "planning",
 	})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422; body=%s", rec.Code, rec.Body.String())

@@ -15,13 +15,6 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// allowedRoutineSpawnKinds bounds what a user may set as a routine's
-// spawn_kind at the API boundary. It prevents routines from spawning,
-// say, agent-session tasks that would confuse the lifecycle machinery.
-var allowedRoutineSpawnKinds = []store.TaskKind{
-	store.TaskKindTask,
-}
-
 // minRoutineIntervalMinutes guards against "fire every second" misuse.
 // Engine integration still respects RoutineEnabled=false for a hard pause,
 // but the minimum keeps the instance-task churn reasonable.
@@ -39,17 +32,8 @@ type RoutineResponse struct {
 	RoutineEnabled         bool           `json:"routine_enabled"`
 	RoutineNextRun         *time.Time     `json:"routine_next_run,omitempty"`
 	RoutineLastFiredAt     *time.Time     `json:"routine_last_fired_at,omitempty"`
-	// RoutineSpawnKind is the legacy Kind the routine spawns. Kept in
-	// the response for older UIs that still read it; new clients should
-	// read RoutineSpawnFlow instead.
-	RoutineSpawnKind store.TaskKind `json:"routine_spawn_kind,omitempty"`
-	// RoutineSpawnFlow is the flow slug the routine spawns. When a
-	// record has no explicit RoutineSpawnFlow the response populates it
-	// via the legacy-Kind resolver so UIs can render "flow: implement"
-	// uniformly.
-	RoutineSpawnFlow string    `json:"routine_spawn_flow,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	CreatedAt              time.Time      `json:"created_at"`
+	UpdatedAt              time.Time      `json:"updated_at"`
 }
 
 func toRoutineResponse(t store.Task) RoutineResponse {
@@ -62,8 +46,6 @@ func toRoutineResponse(t store.Task) RoutineResponse {
 		RoutineEnabled:         t.RoutineEnabled,
 		RoutineNextRun:         t.RoutineNextRun,
 		RoutineLastFiredAt:     t.RoutineLastFiredAt,
-		RoutineSpawnKind:       t.RoutineSpawnKind,
-		RoutineSpawnFlow:       flowRegistry().ResolveRoutineFlow(&t),
 		CreatedAt:              t.CreatedAt,
 		UpdatedAt:              t.UpdatedAt,
 	}
@@ -95,14 +77,13 @@ func (h *Handler) ListRoutines(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateRoutine handles POST /api/routines. It wraps the generic store
-// creation with routine-specific validation (whitelisted spawn kind,
-// minimum interval), then persists a card with Kind=TaskKindRoutine.
+// creation with routine-specific validation (required prompt, minimum
+// interval), then persists a card with Kind=TaskKindRoutine. Every fire of
+// the card spawns an ordinary task, so the request names no task kind.
 func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Prompt          string   `json:"prompt"`
 		IntervalMinutes int      `json:"interval_minutes"`
-		SpawnKind       string   `json:"spawn_kind"`
-		SpawnFlow       string   `json:"spawn_flow"`
 		Enabled         *bool    `json:"enabled"`
 		Timeout         int      `json:"timeout"`
 		Tags            []string `json:"tags"`
@@ -117,23 +98,6 @@ func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.IntervalMinutes < minRoutineIntervalMinutes {
 		http.Error(w, fmt.Sprintf("interval_minutes must be >= %d", minRoutineIntervalMinutes), http.StatusUnprocessableEntity)
-		return
-	}
-
-	// spawn_flow wins over spawn_kind when both are present. Validate
-	// the flow slug against the flow registry and, for back-compat,
-	// still validate any explicitly-provided spawn_kind against the
-	// allowlist.
-	spawnFlow := req.SpawnFlow
-	if spawnFlow != "" {
-		if _, known := flowRegistry().Get(spawnFlow); !known {
-			http.Error(w, fmt.Sprintf("spawn_flow %q is not a known flow", spawnFlow), http.StatusUnprocessableEntity)
-			return
-		}
-	}
-	spawnKind := store.TaskKind(req.SpawnKind)
-	if spawnFlow == "" && !slices.Contains(allowedRoutineSpawnKinds, spawnKind) {
-		http.Error(w, fmt.Sprintf("spawn_kind %q is not allowed", req.SpawnKind), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -154,8 +118,6 @@ func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 		Tags:                   req.Tags,
 		RoutineIntervalSeconds: req.IntervalMinutes * 60,
 		RoutineEnabled:         enabled,
-		RoutineSpawnKind:       spawnKind,
-		RoutineSpawnFlow:       spawnFlow,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -165,8 +127,6 @@ func (h *Handler) CreateRoutine(w http.ResponseWriter, r *http.Request) {
 		"kind":             "routine:created",
 		"interval_seconds": task.RoutineIntervalSeconds,
 		"enabled":          task.RoutineEnabled,
-		"spawn_kind":       string(task.RoutineSpawnKind),
-		"spawn_flow":       task.RoutineSpawnFlow,
 	})
 	httpjson.Write(w, http.StatusCreated, toRoutineResponse(*task))
 }

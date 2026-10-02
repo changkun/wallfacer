@@ -167,13 +167,11 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 
 // CreateTask creates a new task in backlog status.
 //
-// The deprecated `sandbox` and `sandbox_by_activity` fields are no
-// longer accepted on the POST body. Harness (Claude vs Codex) is
-// now selected by pinning the agent a flow step references, and
-// the per-task workspace default can still be changed via PATCH
-// /api/tasks/{id} after creation. Requests that include either
-// deprecated field get a 400 with a pointer to the new model so
-// callers can migrate.
+// The `sandbox` and `sandbox_by_activity` fields are not accepted on
+// the POST body. A task's harness, and its per-activity harness map,
+// are set via PATCH /api/tasks/{id} after creation; without one the
+// task follows the env file's WALLFACER_SANDBOX_* settings. Requests
+// that include either field get a 400 that names the PATCH path.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Prompt             string                               `json:"prompt"`
@@ -183,7 +181,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Sandbox            *harness.ID                          `json:"sandbox,omitempty"`
 		SandboxByActivity  map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 		Kind               store.TaskKind                       `json:"kind"`
-		Flow               string                               `json:"flow"`
 		Tags               []string                             `json:"tags"`
 		MaxCostUSD         float64                              `json:"max_cost_usd"`
 		MaxInputTokens     int                                  `json:"max_input_tokens"`
@@ -197,13 +194,13 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Sandbox != nil {
 		http.Error(w,
-			"the \"sandbox\" field is no longer accepted on POST /api/tasks; pin the harness on the agent a flow step references (Agents tab → Clone → Harness: codex), or set the task's sandbox via PATCH /api/tasks/{id} after creation",
+			"the \"sandbox\" field is not accepted on POST /api/tasks; set the task's harness via PATCH /api/tasks/{id} after creation",
 			http.StatusBadRequest)
 		return
 	}
 	if len(req.SandboxByActivity) > 0 {
 		http.Error(w,
-			"the \"sandbox_by_activity\" field is no longer accepted on POST /api/tasks; per-activity routing lives on the agent definition now (Agents tab → Harness)",
+			"the \"sandbox_by_activity\" field is not accepted on POST /api/tasks; set the task's per-activity harnesses via PATCH /api/tasks/{id} after creation",
 			http.StatusBadRequest)
 		return
 	}
@@ -227,7 +224,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Tags:               req.Tags,
 		MountWorktrees:     req.MountWorktrees,
 		Kind:               req.Kind,
-		FlowID:             req.Flow,
 		MaxCostUSD:         req.MaxCostUSD,
 		MaxInputTokens:     req.MaxInputTokens,
 		ModelOverride:      req.Model,
@@ -267,7 +263,6 @@ type batchTaskInput struct {
 	Tags              []string                              `json:"tags"`
 	Sandbox           *harness.ID                           `json:"sandbox,omitempty"`
 	SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
-	Flow              string                                `json:"flow"`
 	Kind              store.TaskKind                        `json:"kind"`
 	MountWorktrees    bool                                  `json:"mount_worktrees"`
 	DependsOnRefs     []string                              `json:"depends_on_refs"`
@@ -347,20 +342,18 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Reject the deprecated sandbox / sandbox_by_activity fields.
-	// Batch callers migrate the same way POST /api/tasks callers do:
-	// pin the harness on the agent a flow step references, or set
-	// the per-task sandbox via PATCH /api/tasks/{id} after the
-	// batch lands.
+	// 3. Reject the sandbox / sandbox_by_activity fields. Batch callers
+	// set a task's harness the same way POST /api/tasks callers do:
+	// via PATCH /api/tasks/{id} after the batch lands.
 	for i, t := range req.Tasks {
 		if t.Sandbox != nil {
 			ref := batchRefLabel(t.Ref, i)
-			http.Error(w, fmt.Sprintf("ref %q: \"sandbox\" is no longer accepted on POST /api/tasks/batch; pin the harness on the agent a flow step references", ref), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("ref %q: \"sandbox\" is not accepted on POST /api/tasks/batch; set the task's harness via PATCH /api/tasks/{id} after creation", ref), http.StatusBadRequest)
 			return
 		}
 		if t.SandboxByActivity != nil {
 			ref := batchRefLabel(t.Ref, i)
-			http.Error(w, fmt.Sprintf("ref %q: \"sandbox_by_activity\" is no longer accepted on POST /api/tasks/batch", ref), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("ref %q: \"sandbox_by_activity\" is not accepted on POST /api/tasks/batch; set the task's per-activity harnesses via PATCH /api/tasks/{id} after creation", ref), http.StatusBadRequest)
 			return
 		}
 	}
@@ -533,7 +526,6 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			Tags:           t.Tags,
 			MountWorktrees: t.MountWorktrees,
 			Kind:           t.Kind,
-			FlowID:         t.Flow,
 			DependsOn:      depStrs,
 			SpecSourcePath: t.SpecSourcePath,
 		}

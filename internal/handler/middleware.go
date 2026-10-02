@@ -198,7 +198,7 @@ func IsLoopbackPeer(remoteAddr string) bool {
 func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
-	case "/", "/favicon.ico", "/install", "/dashboard", "/agent-graph", "/agents", "/workflows", "/flows",
+	case "/", "/favicon.ico", "/install", "/dashboard",
 		"/routines", "/analytics", "/chat", "/plan", "/whiteboard", "/artifacts", "/mission", "/map", "/settings", "/docs":
 		return true
 	}

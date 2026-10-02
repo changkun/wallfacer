@@ -1200,20 +1200,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetCoordinationStatus": h.GetCoordinationStatus,
 		"SetCoordinationOptIn":  h.SetCoordinationOptIn,
 
-		// Agents catalog (read + user-authored CRUD).
-		"ListAgents":  h.ListAgents,
-		"GetAgent":    h.GetAgent,
-		"CreateAgent": h.CreateAgent,
-		"UpdateAgent": h.UpdateAgent,
-		"DeleteAgent": h.DeleteAgent,
-
-		// Flows catalog (read + user-authored CRUD).
-		"ListFlows":  h.ListFlows,
-		"GetFlow":    h.GetFlow,
-		"CreateFlow": h.CreateFlow,
-		"UpdateFlow": h.UpdateFlow,
-		"DeleteFlow": h.DeleteFlow,
-
 		// Routines.
 		"ListRoutines":          h.ListRoutines,
 		"CreateRoutine":         h.CreateRoutine,

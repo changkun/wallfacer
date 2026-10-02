@@ -9,7 +9,7 @@ import (
 	"latere.ai/x/pkg/httpjson"
 )
 
-// traceNode is one agent in an agentic run's trace graph. It is the thin,
+// traceNode is one agent in an in-process run's trace graph. It is the thin,
 // frontend-facing projection of the topos trace node persisted opaquely on the
 // task (see internal/agentgraph and Task.Trace). Status is "running", "done",
 // or "failed".
@@ -23,15 +23,16 @@ type traceNode struct {
 }
 
 // traceEdge is one handoff between agents. Kind is "delegate", "deliver", or
-// "next".
+// "next". A native run records no edge; traces stored by earlier multi-agent
+// runs carry them and are served unchanged.
 type traceEdge struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	Kind string `json:"kind"`
 }
 
-// taskTraceResp is the GET /api/tasks/{id}/trace body: the agent-graph of a
-// single agentic run. Nodes and edges are always non-nil so the frontend can
+// taskTraceResp is the GET /api/tasks/{id}/trace body: the agent graph of a
+// single in-process run. Nodes and edges are always non-nil so the frontend can
 // render an empty graph without nil checks; a task with no trace yields both
 // empty.
 type taskTraceResp struct {
@@ -39,11 +40,12 @@ type taskTraceResp struct {
 	Edges []traceEdge `json:"edges"`
 }
 
-// TaskTrace returns the trace sub-graph of an agentic-flow run for a task.
-// The stored trace is an opaque JSON string written by the runner from the
-// topos result (capitalized keys, no json tags); this handler reparses it into
-// the thin lowercase-keyed shape the UI consumes. A task with no trace (every
-// non-agentic task, or one whose run has not produced a graph yet) returns
+// TaskTrace returns the trace sub-graph of a task's run on the in-process
+// topos harness. The stored trace is an opaque JSON string written by the
+// runner from the topos result (capitalized keys, no json tags); this handler
+// reparses it into the thin lowercase-keyed shape the UI consumes. A task with
+// no trace (every subprocess-harness task, or one whose run has not produced a
+// graph yet) returns
 // empty nodes and edges with 200, so the client renders nothing without special
 // casing. json.Unmarshal matches keys case-insensitively, so the capitalized
 // stored keys bind to the lowercase-tagged fields directly.

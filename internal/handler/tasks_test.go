@@ -322,10 +322,9 @@ func TestCreateTask_Success(t *testing.T) {
 	}
 }
 
-// TestCreateTask_RejectsSandboxField covers the retirement of the
-// per-task sandbox field on POST. Harness choice now lives on the
-// agent a flow step references; per-task overrides are applied
-// via PATCH /api/tasks/{id} after creation.
+// TestCreateTask_RejectsSandboxField covers the per-task sandbox field
+// on POST: it is rejected, and the error names PATCH /api/tasks/{id},
+// where a task's harness is set after creation.
 func TestCreateTask_RejectsSandboxField(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	body := `{"prompt": "build a thing", "sandbox": "codex"}`
@@ -340,9 +339,9 @@ func TestCreateTask_RejectsSandboxField(t *testing.T) {
 	}
 }
 
-// TestCreateTask_RejectsSandboxByActivity is the sibling guard
-// for the old per-activity sandbox map. Same migration guidance
-// applies: use the Harness pin on the agent definition.
+// TestCreateTask_RejectsSandboxByActivity is the sibling guard for the
+// per-activity sandbox map: rejected on POST, with the error naming
+// PATCH /api/tasks/{id} as the place to set it.
 func TestCreateTask_RejectsSandboxByActivity(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	body := `{"prompt": "build a thing", "sandbox_by_activity": {"implementation": "codex"}}`
@@ -351,6 +350,9 @@ func TestCreateTask_RejectsSandboxByActivity(t *testing.T) {
 	h.CreateTask(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "PATCH") {
+		t.Errorf("expected error body to name the PATCH path; got %q", w.Body.String())
 	}
 }
 
@@ -3677,9 +3679,8 @@ drain:
 
 // TestBatchCreateTasks_ReturnsTasksAndDeps verifies that batch-created
 // tasks already contain their prompt and dependency fields in the 201
-// response without requiring a re-fetch. Sandbox is no longer part of
-// the batch payload — harness choice lives on the agent a flow step
-// references.
+// response without requiring a re-fetch. Sandbox is not part of the
+// batch payload; a task's harness is set via PATCH after creation.
 func TestBatchCreateTasks_ReturnsTasksAndDeps(t *testing.T) {
 	h := newTestHandler(t)
 
@@ -4553,24 +4554,39 @@ func TestAutoPromote_PromotesAfterOrphanedDepCleared(t *testing.T) {
 	}
 }
 
-// TestCreateTask_FlowFieldPersisted asserts explicit flow request
-// bodies round-trip to the stored task without mutation.
-func TestCreateTask_FlowFieldPersisted(t *testing.T) {
+// TestCreateTask_RejectsFlowField asserts that the task create and batch
+// create requests no longer carry a fleet: a body naming one is rejected as
+// an unknown field and no task is stored.
+func TestCreateTask_RejectsFlowField(t *testing.T) {
 	h := newTestHandler(t)
-	body := `{"prompt": "refine this", "flow": "refine-only", "timeout": 5}`
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.CreateTask(w, req)
-
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	cases := []struct {
+		name   string
+		path   string
+		body   string
+		handle func(http.ResponseWriter, *http.Request)
+	}{
+		{"create", "/api/tasks", `{"prompt": "do this", "flow": "custom-fleet", "timeout": 5}`, h.CreateTask},
+		{"batch", "/api/tasks/batch", `{"tasks":[{"ref":"A","prompt":"do this","flow":"custom-fleet"}]}`, h.BatchCreateTasks},
 	}
-	var task store.Task
-	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
-		t.Fatalf("decode: %v", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			w := httptest.NewRecorder()
+			tc.handle(w, req)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), `unknown field "flow"`) {
+				t.Errorf("body = %q, want the unknown-field rejection", w.Body.String())
+			}
+		})
 	}
-	if task.FlowID != "refine-only" {
-		t.Errorf("FlowID = %q, want refine-only", task.FlowID)
+	tasks, err := h.store.ListTasks(context.Background(), true)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("stored %d tasks, want none for rejected requests", len(tasks))
 	}
 }
 

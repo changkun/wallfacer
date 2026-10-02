@@ -183,6 +183,63 @@ func TestRefineRoutesRemoved(t *testing.T) {
 	}
 }
 
+// TestFleetRoutesRemoved verifies that the API mux has no route for
+// user-authored agents or fleets: every method on /api/agents and /api/flows,
+// with and without a slug, matches no pattern and answers 404, and the
+// contract declares none of them.
+func TestFleetRoutesRemoved(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer s.Close()
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+
+	var removed []struct{ method, path string }
+	for _, base := range []string{"/api/agents", "/api/flows"} {
+		removed = append(removed,
+			struct{ method, path string }{http.MethodGet, base},
+			struct{ method, path string }{http.MethodPost, base},
+			struct{ method, path string }{http.MethodGet, base + "/implement"},
+			struct{ method, path string }{http.MethodPut, base + "/implement"},
+			struct{ method, path string }{http.MethodDelete, base + "/implement"},
+		)
+	}
+	for _, rt := range removed {
+		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
+			req := httptest.NewRequest(rt.method, rt.path, nil)
+			if _, pattern := mux.Handler(req); pattern != "" {
+				t.Fatalf("%s %s matched pattern %q, want no match", rt.method, rt.path, pattern)
+			}
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			if w.Code != http.StatusNotFound {
+				t.Errorf("%s %s returned %d, want 404", rt.method, rt.path, w.Code)
+			}
+		})
+	}
+
+	for _, route := range apicontract.Routes {
+		if strings.HasPrefix(route.Pattern, "/api/agents") || strings.HasPrefix(route.Pattern, "/api/flows") {
+			t.Errorf("contract still declares %s %s (%s)", route.Method, route.Pattern, route.Name)
+		}
+	}
+}
+
 // TestGitHubRoutesRemoved verifies that the API mux has no GitHub route:
 // neither the connection surface under /api/github nor the task pull-request
 // surface under /api/tasks/{id}/pr. Wallfacer makes no call to GitHub, so each

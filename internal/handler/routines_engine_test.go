@@ -181,11 +181,62 @@ func TestFireRoutine_CreatesAndRunsInstanceTask(t *testing.T) {
 	}
 }
 
+// TestFireRoutine_StoredSpawnTargetSpawnsOrdinaryTask covers a routine
+// record written before fleets were removed: it still names a spawn flow and
+// a spawn kind. Firing it spawns an ordinary task that names no fleet, and
+// hands that task to the runner like any other instance.
+func TestFireRoutine_StoredSpawnTargetSpawnsOrdinaryTask(t *testing.T) {
+	mock := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+	installRoutineEngine(h, nil, h.fireRoutine)
+
+	ctx := context.Background()
+	routineTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:                 "triage the backlog",
+		Timeout:                30,
+		Kind:                   store.TaskKindRoutine,
+		RoutineIntervalSeconds: 3600,
+		RoutineEnabled:         true,
+		RoutineSpawnFlow:       "review-fleet",
+		RoutineSpawnKind:       "idea-agent",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask (routine): %v", err)
+	}
+
+	h.fireRoutine(ctx, routineTask.ID)
+
+	tasks, err := s.ListTasks(ctx, false)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	var instances []store.Task
+	for _, task := range tasks {
+		if !task.IsRoutine() {
+			instances = append(instances, task)
+		}
+	}
+	if len(instances) != 1 {
+		t.Fatalf("spawned %d instances, want 1", len(instances))
+	}
+	instance := instances[0]
+	if instance.Kind != store.TaskKindTask {
+		t.Errorf("instance Kind = %q, want an ordinary task", instance.Kind)
+	}
+	if instance.FlowID != "" {
+		t.Errorf("instance FlowID = %q, want none", instance.FlowID)
+	}
+	if instance.Status != store.TaskStatusInProgress {
+		t.Errorf("instance status = %q, want in_progress", instance.Status)
+	}
+	if calls := mock.RunCalls(); len(calls) != 1 || calls[0] != instance.ID {
+		t.Fatalf("expected 1 RunBackground call for the instance, got %+v", calls)
+	}
+}
+
 // TestFireRoutine_SpawnsOrdinaryInstance verifies that firing a routine
 // spawns a normal instance task (Kind=task), promotes it to in_progress,
-// and hands it to the runner. This is the routines regression guard for
-// the idea-agent removal: routines fire against ordinary flows with no
-// idea-agent special-casing.
+// and hands it to the runner, with no special-casing by routine content.
 func TestFireRoutine_SpawnsOrdinaryInstance(t *testing.T) {
 	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)

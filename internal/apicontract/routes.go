@@ -146,62 +146,6 @@ var Routes = []Route{
 		Tags:        []string{"routines"},
 	},
 
-	// --- Agents ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/agents", Name: "ListAgents",
-		Description: "List all registered sub-agent roles (built-in catalog).",
-		Tags:        []string{"agents"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/agents/{slug}", Name: "GetAgent",
-		Description: "Get one agent's full descriptor including its prompt template body.",
-		Tags:        []string{"agents"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/agents", Name: "CreateAgent",
-		Description: "Create a user-authored agent (rejects slugs that shadow a built-in).",
-		Tags:        []string{"agents"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/agents/{slug}", Name: "UpdateAgent",
-		Description: "Update a user-authored agent; 409 for built-in slugs.",
-		Tags:        []string{"agents"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/agents/{slug}", Name: "DeleteAgent",
-		Description: "Delete a user-authored agent; 409 for built-in slugs.",
-		Tags:        []string{"agents"},
-	},
-
-	// --- Flows ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/flows", Name: "ListFlows",
-		Description: "List all registered flows (built-in catalog).",
-		Tags:        []string{"flows"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/flows/{slug}", Name: "GetFlow",
-		Description: "Get one flow's full descriptor including its step chain and agent names.",
-		Tags:        []string{"flows"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/flows", Name: "CreateFlow",
-		Description: "Create a user-authored flow (rejects slugs that shadow a built-in).",
-		Tags:        []string{"flows"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/flows/{slug}", Name: "UpdateFlow",
-		Description: "Update a user-authored flow; 409 for built-in slugs.",
-		Tags:        []string{"flows"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/flows/{slug}", Name: "DeleteFlow",
-		Description: "Delete a user-authored flow; 409 for built-in slugs.",
-		Tags:        []string{"flows"},
-	},
-
 	// --- Spec tree ---
 
 	{
@@ -567,7 +511,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/trace", Name: "TaskTrace",
-		Description: "Read the agent-graph trace (nodes + edges) of an agentic-flow run.",
+		Description: "Read the trace (nodes + edges) of a run on the in-process topos harness.",
 		Tags:        []string{"tasks"},
 	},
 
