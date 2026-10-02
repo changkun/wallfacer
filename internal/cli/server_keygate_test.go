@@ -31,9 +31,12 @@ func isolateKeyGateEnv(t *testing.T) {
 	} {
 		t.Setenv(k, "")
 	}
+	// AppData is the user config directory on Windows, where the shared token
+	// store lives; without it one test's stored token leaks into the next.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
 }
 
 // keyGateRequest builds a GET for target from peer. bearer, when set, is
