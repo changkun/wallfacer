@@ -45,16 +45,15 @@ func LoadSandboxProxyConfig() SandboxProxyConfig {
 }
 
 // SandboxProxy is constructed once by the CLI boot path and holds the
-// HTTP client plus config. The three trust-plane routes are methods
-// on this struct.
+// HTTP client plus config. The two trust-plane routes, LLMAnthropic and
+// LLMOpenAI, are methods on this struct.
 type SandboxProxy struct {
 	Cfg    SandboxProxyConfig
 	Client *http.Client
 	// Validator validates the inbound sandbox JWT. The JWT is issued
-	// by auth with aud=wallfacer-sandbox-proxy; we additionally
-	// require one of scp=llm:proxy / scp=github:token per route. Nil
-	// means no validator is configured: an enabled proxy then rejects
-	// every request (fail closed).
+	// by auth with aud=wallfacer-sandbox-proxy; both routes additionally
+	// require scp=llm:proxy. Nil means no validator is configured: an
+	// enabled proxy then rejects every request (fail closed).
 	Validator *jwt.Validator
 }
 
