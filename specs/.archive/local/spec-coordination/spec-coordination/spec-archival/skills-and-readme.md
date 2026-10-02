@@ -6,12 +6,12 @@ affects:
   - .claude/skills/wf-spec-validate/skill.md
   - .claude/skills/wf-spec-status/skill.md
   - specs/README.md
-  - specs/spec-coordination/spec-coordination/spec-document-model.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/spec-lifecycle.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/per-spec-validation.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/cross-spec-validation.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/impact-analysis.md
-  - specs/spec-coordination/spec-coordination/spec-document-model/progress-tracking.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/spec-lifecycle.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/per-spec-validation.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/cross-spec-validation.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/impact-analysis.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model/progress-tracking.md
 effort: small
 created: 2026-04-12
 updated: 2026-06-26

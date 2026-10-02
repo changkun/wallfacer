@@ -45,7 +45,7 @@ The following infrastructure is already implemented:
 
 ### Approach: Headless Claude Code over Container Exec
 
-The planning agent is not a custom LLM orchestrator — it wraps Claude Code's headless mode inside the existing planning container. The same `-p <prompt> --output-format stream-json` invocation pattern used by task execution (`internal/runner/container.go`) applies here. Multi-turn conversation uses `--resume <session-id>` to continue the same Claude Code session across user messages. Codex compatibility is out of scope — see `specs/spec-coordination/spec-coordination/spec-planning-ux/planning-codex-compat.md` for a follow-up.
+The planning agent is not a custom LLM orchestrator — it wraps Claude Code's headless mode inside the existing planning container. The same `-p <prompt> --output-format stream-json` invocation pattern used by task execution (`internal/runner/container.go`) applies here. Multi-turn conversation uses `--resume <session-id>` to continue the same Claude Code session across user messages. Codex compatibility is out of scope — see `specs/local/spec-coordination/spec-coordination/spec-planning-ux/planning-codex-compat.md` for a follow-up.
 
 This approach is chosen because:
 - Claude Code already handles conversation context, tool use, file reading/writing, and context window management internally — the server doesn't need to reimplement any of this

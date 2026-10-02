@@ -5,7 +5,7 @@ depends_on: []
 affects:
   - internal/spec/lifecycle.go
   - internal/spec/model.go
-  - specs/spec-coordination/spec-coordination/spec-document-model.md
+  - specs/local/spec-coordination/spec-coordination/spec-document-model.md
 created: 2026-04-12
 updated: 2026-06-26
 author: changkun
