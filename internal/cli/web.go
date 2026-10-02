@@ -3,7 +3,6 @@ package cli
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"flag"
 	"io/fs"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 
 	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/health"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/auth"
@@ -95,22 +95,7 @@ func runWeb(args []string, frontendFS fs.FS) error {
 		mux.HandleFunc("GET /callback", authClient.HandleCallback)
 		mux.HandleFunc("GET /logout", authClient.HandleLogout)
 		mux.HandleFunc("GET /logout/notify", authClient.HandleLogoutNotify)
-		mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
-			user := authClient.UserFromRequest(w, r)
-			if user == nil {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_, _ = w.Write([]byte(`{"error":"not authenticated"}`))
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Cache-Control", "no-store")
-			resp := struct {
-				*oidc.User
-				AuthURL string `json:"auth_url,omitempty"`
-			}{User: user, AuthURL: authClient.AuthURL()}
-			_ = json.NewEncoder(w).Encode(resp)
-		})
+		mux.HandleFunc("GET /api/me", webMeHandler(authClient))
 		slog.Info("auth: OIDC enabled", "auth_url", authCfg.AuthURL)
 	} else {
 		slog.Info("auth: disabled (no AUTH_CLIENT_ID)")
@@ -128,6 +113,35 @@ func runWeb(args []string, frontendFS fs.FS) error {
 
 	slog.Info("wallfacer web started", "addr", *addr)
 	return otel.RunServer(ctx, srv, 10*time.Second, nil)
+}
+
+// The error GET /api/me on the coordinator site answers with when the request
+// carries no session: one code and the one user sentence for it. The status is
+// 401, which the SPA's session store reads as signed out.
+const (
+	codeWebNotSignedIn    = "not_signed_in"
+	messageWebNotSignedIn = "No account is signed in on this browser. Sign in to continue."
+)
+
+// webMeHandler answers GET /api/me on the coordinator site: the signed-in
+// user with the auth service's base URL, or 401 not_signed_in when the
+// request carries no usable session.
+func webMeHandler(authClient *oidc.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := authClient.UserFromRequest(w, r)
+		if user == nil {
+			httpjson.WriteError(w, http.StatusUnauthorized, httpjson.Error{
+				Code:    codeWebNotSignedIn,
+				Message: messageWebNotSignedIn,
+			})
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		httpjson.Write(w, http.StatusOK, struct {
+			*oidc.User
+			AuthURL string `json:"auth_url,omitempty"`
+		}{User: user, AuthURL: authClient.AuthURL()})
+	}
 }
 
 // mountWebProbes mounts the fleet's probe paths (pkg/health) on the web

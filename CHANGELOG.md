@@ -126,6 +126,10 @@ committed: the commit log already holds that.
   commit phase, a recovery note or the notice that a stored fleet no longer
   exists, where it showed only the event's kind or the word "system".
 
+- `GET /api/me` on the coordination site served by `wallfacer web` answers a
+  request with no session 401 in the JSON error envelope with the
+  `not_signed_in` code, where the body was `{"error":"not authenticated"}`.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed
