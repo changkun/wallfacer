@@ -1,6 +1,6 @@
 ---
 title: Spec Workflow as an Installable Plugin
-status: complete
+status: archived
 depends_on: []
 affects:
   - .claude/skills/
@@ -10,7 +10,7 @@ affects:
   - .github/workflows/
 effort: medium
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---

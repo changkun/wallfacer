@@ -1,6 +1,6 @@
 ---
 title: User-Selectable Color Themes
-status: complete
+status: archived
 depends_on:
   - specs/shared/visual-identity/design-tokens.md
 affects:
@@ -15,7 +15,7 @@ affects:
   - docs/guide/configuration.md
 effort: large
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---

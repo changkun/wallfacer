@@ -1,6 +1,6 @@
 ---
 title: Animated Marketing Site Rebuild
-status: complete
+status: archived
 depends_on:
   - specs/shared/visual-identity/design-tokens.md
 affects:
@@ -14,7 +14,7 @@ affects:
   - frontend/public/static/
 effort: large
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---

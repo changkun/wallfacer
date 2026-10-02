@@ -1,6 +1,6 @@
 ---
 title: Indigo-on-Zinc Design Tokens & Type System
-status: complete
+status: archived
 depends_on: []
 affects:
   - frontend/src/styles/tokens.css
@@ -15,7 +15,7 @@ affects:
   - frontend/src/lib/mermaidRender.ts
 effort: large
 created: 2026-07-05
-updated: 2026-07-05
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---

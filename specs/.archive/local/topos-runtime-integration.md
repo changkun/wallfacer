@@ -1,6 +1,6 @@
 ---
 title: Topos Runtime Integration (Embed the Agent-Graph Runtime)
-status: complete
+status: archived
 depends_on: []
 affects:
   - go.mod
@@ -14,7 +14,7 @@ affects:
   - frontend/src/components/map/
 effort: xlarge
 created: 2026-06-28
-updated: 2026-07-18
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -103,7 +103,7 @@ editing the graph edits the underlying agents/flows YAML registries.
   sub-graph inside the Map's `GraphCanvas` (coordinate with the in-progress map work).
 - **M6: unified Agents/Flows graph UI.** Merge the two pages into the agent-graph
   editor over the same YAML registries. (Pairs with the onboarding spec
-  [first-run-onboarding.md](first-run-onboarding.md).)
+  [first-run-onboarding.md](../../local/first-run-onboarding.md).)
 
 ## Test strategy
 
@@ -136,3 +136,40 @@ editing the graph edits the underlying agents/flows YAML registries.
 Builds on the Topos embeddable agent-SDK mesh foundation.
 The runtime is consumed only through the root `topos` package; the engine subpackages
 stay an implementation detail behind the import guard.
+
+## Outcome
+
+Archived 2026-10-02 as complete. Milestones M1 to M5 shipped, each recorded
+above with its commit: the `internal/agentgraph` seam and its import guard
+(`84be42bf`), the in-process execution path for a flow flagged `Agentic`
+(`a8abfa3b`), dynamic and mesh topologies from the flow file (`6b4ce135`), a
+real model through the gateway or a direct key (`2eafc03b`), and the trace
+endpoint with `AgentTrace.vue` (`c832fa8e`).
+
+What came after on the same seam:
+
+- A single-agent entry point, `agentgraph.RunAgent` (`bd5740cc`), and the
+  runner path that sends a task pinned to the native harness through it,
+  `runNativeTopos` (`df9df847`). Both run paths share `driveToposRun`, which
+  also runs the commit pipeline.
+- Live events on the task timeline, in
+  [topos-live-agent-events](topos-live-agent-events.md).
+
+What left this spec:
+
+- **M6, the unified Agents and Flows graph surface**, is carried by
+  [unified-agent-graph-ui](../../local/unified-agent-graph-ui.md) and the
+  design decision in
+  [agent-graph-e2e-design](../../local/agent-graph-e2e-design.md).
+- **Hosted execution**, listed out of scope here, is specified in
+  [topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md).
+
+Not built: bearer-style model credentials (a per-call source; only a static
+key is wired), an adapter from `executor.Backend` to the runtime's sandbox,
+the trace as a sub-graph inside the Map canvas, and a richer mapping from a
+role's capabilities to agent tools.
+
+One constraint for any later work: `go.mod` pins the runtime at a release
+that predates the project's rebuild into a different module shape, with no
+root package. The embed keeps working on the pin. Moving the pin is a
+migration of the seam, not a version bump.

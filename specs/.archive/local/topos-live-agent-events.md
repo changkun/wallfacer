@@ -1,6 +1,6 @@
 ---
 title: Live Agent Events for Topos Runs (Event Seam + Stream + UI)
-status: complete
+status: archived
 depends_on:
   - specs/local/topos-runtime-integration.md
 affects:
@@ -14,7 +14,7 @@ affects:
   - frontend/src/api/types.ts
 effort: xlarge
 created: 2026-06-28
-updated: 2026-06-28
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -211,3 +211,24 @@ this refetch already show the trace live.
 - **OQ-3 — persistence shape.** Sidecar JSONL under the task state dir (proposed)
   vs a capped `Task` field. JSONL avoids unbounded growth in the task record and
   matches how review persists its session artifacts.
+
+## Outcome
+
+Archived 2026-10-02 as complete. All three phases shipped, each recorded above
+with its commits: the observer seam and per-turn assistant text in the runtime,
+forwarding onto the task timeline through `internal/agentgraph`
+(`b6b4ac8f`), and the per-agent transcript in `AgentTrace.vue` (`167b8313`,
+`cb02a2c5`).
+
+The shipped design is smaller than sections D and E planned. There is no
+per-task trace hub, no sidecar JSONL and no dedicated stream endpoint. A run's
+events are task timeline events tagged with their source, kind, node and
+agent, delivered by the existing task stream, and the transcript is built from
+them. That settles OQ-3 (persistence shape) in favor of the timeline.
+
+Not built, and not planned unless the per-turn granularity proves too coarse:
+token-level streaming (OQ-1) and a sequence-cursored stream of its own.
+Decision hooks (OQ-2) stayed out of scope.
+
+The same forwarding path is what a hosted run feeds in
+[topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md).
