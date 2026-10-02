@@ -78,6 +78,10 @@ const (
 	// TerminationSuperseded: the task left waiting while the reviewer ran, so
 	// the findings were not delivered.
 	TerminationSuperseded = "superseded"
+	// TerminationUnreadable: the session's transcript could not be read to
+	// its end, so its state cannot be replayed and the next round starts a new
+	// session instead of failing on it every time.
+	TerminationUnreadable = "unreadable"
 )
 
 // Record is one transcript line.

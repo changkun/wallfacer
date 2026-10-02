@@ -323,6 +323,43 @@ func TestVerify_StartsAfreshAfterLegacyOrSuperseded(t *testing.T) {
 	}
 }
 
+// TestVerify_UnreadableSessionIsClosed: an open session whose transcript is
+// damaged part way cannot be replayed; the next round closes it as unreadable
+// and starts a new session instead of failing on it every time.
+func TestVerify_UnreadableSessionIsClosed(t *testing.T) {
+	dir := t.TempDir()
+	v := New(&fakeRunner{answers: []func(runner.ReviewerInput) (*runner.ReviewerResult, error){
+		answer(runner.ReviewChangesRequested, 1, high),
+		answer(runner.ReviewApprove, 1),
+	}})
+	first, err := verify(t, v, newTask(""), dir, 3, 0)
+	if err != nil || first.Outcome != OutcomeFeedback {
+		t.Fatalf("round 1 = %+v, %v", first, err)
+	}
+	f, err := os.OpenFile(filepath.Join(first.SessionDir, transcriptFile), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(`{"role":"implementer","body":"` + strings.Repeat("a", maxRecordLineBytes) + "\"}\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := verify(t, v, newTask(""), dir, 3, 0)
+	if err != nil {
+		t.Fatalf("Verify on a damaged session: %v", err)
+	}
+	if res.SessionDir == first.SessionDir || res.Round != 1 {
+		t.Errorf("result = %+v, want round 1 in a new session", res)
+	}
+	old, err := Read(first.SessionDir)
+	if old == nil || old.End == nil || old.End.Termination != TerminationUnreadable {
+		t.Errorf("damaged session = %+v (%v), want it ended as unreadable", old, err)
+	}
+}
+
 // TestNewest_PrefersCurrentFormat: the newest session is the current-format
 // one with the greatest id, whatever the earlier engine left beside it.
 func TestNewest_PrefersCurrentFormat(t *testing.T) {

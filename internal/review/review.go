@@ -172,8 +172,19 @@ func (v *Reviewer) Verify(ctx context.Context, in Input) (*Result, error) {
 	now := v.now()
 
 	newest, found, err := Newest(in.StateDir)
-	if err != nil {
+	if err != nil && (newest == nil || !newest.Truncated) {
 		return nil, &Failure{Code: CodeRecordFailed, Err: err}
+	}
+	if err != nil {
+		// The newest session's transcript is damaged part way. Its state
+		// cannot be replayed, so it is closed and this round starts a new
+		// session; failing on it would stall the task's review for good.
+		if newest.End == nil {
+			if ferr := newest.finish(End{TS: now.UTC(), Termination: TerminationUnreadable, Rounds: newest.CompletedRounds(), Tokens: newest.Tokens(), USD: newest.USD()}); ferr != nil {
+				return nil, &Failure{Code: CodeRecordFailed, Err: errors.Join(err, ferr), SessionDir: newest.Dir}
+			}
+		}
+		found = false
 	}
 	var open *Session
 	if found && !newest.Legacy && newest.End == nil {
