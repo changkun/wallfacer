@@ -1,173 +1,145 @@
 ---
-title: Cloud Infrastructure
+title: Hosted Board Deployment
 status: drafted
 depends_on:
-  - specs/foundations/storage-backends.md
   - specs/cloud/latere-integration.md
+  - specs/cloud/latere-integration/topos-remote-executor.md
 affects:
   - deploy/
+  - Dockerfile.wallfacerd
+  - .github/workflows/release.yml
 effort: medium
 created: 2026-03-28
-updated: 2026-06-14
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
-# Cloud Infrastructure
+# Hosted Board Deployment
 
-> **Rescoped 2026-05-30.** This spec previously had wallfacer provision its own
-> K8s sandbox execution (RBAC for Jobs, a dedicated sandbox node pool,
-> NetworkPolicy for sandbox pods, a `K8sBackend` creating Jobs directly). That
-> half is gone: **Cella owns sandbox runtime** - wallfacer dispatches to it
-> through the runtime seam ([latere-integration/cella-runtime.md](latere-integration/cella-runtime.md)),
-> it does not schedule sandboxes itself. What remains is the part that is
-> genuinely wallfacer's: **deploying the task-board server into the existing
-> `latere` cluster**, reusing the proven `wallfacerd` web deployment pattern.
+What it takes to run the task board (`wallfacer run`) as a hosted workload,
+beside the public site and coordinator that are deployed today.
 
-## Problem
+This spec has been rescoped twice. Its first version had wallfacer provision
+its own sandbox execution in the cluster (Jobs, a node pool, network policy).
+Its second version (2026-05-30) removed that and dispatched to a standalone
+sandbox service through a `--executor cella` flag, with workspace files on a
+file data plane. Neither service exists as a separate product any more. Under
+the [platform integration](latere-integration.md), a hosted board has one
+execution path, a hosted agent session, and no sandbox or file-plane
+dependency of its own.
 
-Wallfacer runs locally today - a Go binary on the host, storing task data on the
-local filesystem. To offer a hosted task board under latere.ai, the **task-board
-server** (`wallfacer run`) must be deployed as a workload in the existing DOKS
-`latere` cluster, alongside the other latere.ai services.
+## What is deployed today
 
-The deploy *mechanics* are already proven: the public site (`wallfacer web`)
-ships today as the `wallfacerd` Deployment at `wf.latere.ai`
-(`deploy/prod/{deployment,service,ingress}.yaml`, `Dockerfile.wallfacerd`,
-`.github/workflows/wallfacerd.yml` → `deploy-wallfacerd.yml`). It runs in the
-`latere` namespace with cert-manager TLS, nginx ingress, OTLP export, and
-`AUTH_URL`/`AUTH_REDIRECT_URL` wired to Identity. The task-board server is a
-second workload following the same pattern, plus the one thing the stateless
-website doesn't need: **durable task-data storage**.
+One workload, `wallfacerd`, which runs `wallfacer web` at `wf.latere.ai`:
 
-## What's already deployed vs. what this spec adds
+| Role | Detail |
+|---|---|
+| Public site | The landing page and the documentation |
+| Coordinator | The coordination plane's server role: the WebSocket endpoint local instances dial, the instance registry, and cloud-resident spec comments in Postgres |
+| Sign-in | The public OAuth client against `auth.latere.ai`; the API verifies actor tokens addressed to its own audience and nothing else |
 
-| Component | State |
-|-----------|-------|
-| DOKS cluster, nginx ingress, cert-manager, Spaces, DNS, OTLP telemetry into Dash0 | exists (platform infrastructure) |
-| `wallfacerd` = `wallfacer web` (public site) at `wf.latere.ai` | **deployed** |
-| Deploy pattern (Deployment/Service/Ingress + TLS + OTLP into `latere` ns) | **proven by `wallfacerd`** |
-| **task-board server** (`wallfacer run`) Deployment + PVC for task data | **this spec** |
+Its manifests are a kustomize base with production and staging overlays
+(`deploy/base`, `deploy/prod`, `deploy/staging`), its image is built by
+`Dockerfile.wallfacerd`, and `.github/workflows/release.yml` builds, applies
+and smoke-tests it on a release. It keeps no task data and runs no agent.
 
-## Ownership boundary
+## What a hosted board adds
 
-| Concern | Owner |
-|---------|-------|
-| K8s cluster, node pools, Spaces, DNS, TLS ClusterIssuer | platform infrastructure |
-| **Sandbox runtime** (scheduling, pods, warm pools, egress, hardening, RBAC for Jobs) | **Cella** - consumed via [cella-runtime.md](latere-integration/cella-runtime.md) |
-| Identity / sign-in | Identity (auth.latere.ai), already wired in `wallfacerd` |
-| Workspace files | FS (fs.latere.ai), see [tenant-filesystem.md](tenant-filesystem.md) |
-| Task-board server Deployment, Service, Ingress, PVC, Secret | **wallfacer** (`deploy/`) |
+A second workload from the same image, running `wallfacer run` in cloud mode
+(`WALLFACER_CLOUD=true`: sign-in is forced, and records are scoped to the
+principal and organization).
 
-Wallfacer does **not** add RBAC for Job creation, a sandbox node pool, or a
-sandbox NetworkPolicy - those moved to Cella with the runtime seam.
+| Concern | Hosted board | Owner |
+|---|---|---|
+| Execution | Hosted only. Every task has the execution target `hosted`; the pod has no coding CLI installed and starts no agent process | [topos-remote-executor](latere-integration/topos-remote-executor.md) |
+| Task and spec data | The filesystem store on a volume | this spec |
+| Identity | The same issuer and client the site uses, with a second redirect address | this spec |
+| Repositories | No user checkout exists on the server. See the blocking question below | open |
+| Sandboxes, model keys, budgets | None in the pod | the platform |
 
-## What the task-board server needs in the cluster
+### Workload
 
-### 1. Deployment
+A Deployment modeled on `wallfacerd`, with these differences:
 
-A second Deployment in `latere` running the task-board server, modeled on
-`wallfacerd`. Differences from the website workload:
+- Command `wallfacer run`, serving the board API and UI on `:8080`.
+- A mounted data volume for the store.
+- Resource requests sized for the store and the automation loops, not for
+  the static site's footprint.
+- Environment: `WALLFACER_CLOUD=true`, the `AUTH_*` set the site already
+  carries with the board's own redirect address and audience, the hosted
+  executor's variables (`WALLFACER_AGENTS_URL`, `WALLFACER_HOSTED_MODEL`,
+  `WALLFACER_HOSTED_MAX_COST`), and no provider key. A hosted run's model
+  access is the session's.
+- A Service and an Ingress for the board's host, with the same TLS issuer
+  and ingress class the site uses.
 
-- Command `wallfacer run` (not `web`), serving the board API/UI on `:8080`.
-- Larger resource requests than the website's `10m`/`32Mi` (it holds the store
-  and runs automation loops) - size from load, start modest.
-- A mounted data volume (see PVC below).
-- Runtime executor selects **Cella** in cloud mode (`--executor cella`), not the
-  host agent process, so the pod needs no container runtime or privileged access.
-- Env: LLM creds (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, optional
-  `OPENAI_API_KEY`), `WALLFACER_SERVER_API_KEY`, `WALLFACER_CLOUD=true`,
-  `AUTH_*` (as `wallfacerd` already sets), `CELLA_URL`, and `OTEL_EXPORTER_OTLP_ENDPOINT`.
+### Store
 
-### 2. Service + Ingress + TLS
+`FilesystemBackend` on a `ReadWriteOnce` volume. One replica follows from
+that access mode, and the rollout replaces the pod instead of surging, as the
+site's does. A store that allows more than one replica (Postgres and object
+storage behind `StorageBackend`) stays deferred with the archived storage
+tasks until one replica is the limit that is hit.
 
-ClusterIP Service and an Ingress for the board host (e.g. `app.latere.ai` or a
-subpath), reusing the `letsencrypt-prod` ClusterIssuer and nginx ingress class
-exactly as `wallfacerd` does.
+### Release
 
-### 3. PVC for task data (the one genuinely new piece)
+The existing release workflow gains the second workload: the same image, a
+second `set image`, and a smoke check against the board's host. No second
+image and no second pipeline.
 
-`FilesystemBackend` (already implemented) on a `do-block-storage` PVC mounted
-into the pod:
+## Blocking question: repositories without a user machine
 
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: wallfacer-data
-  namespace: latere
-spec:
-  accessModes: ["ReadWriteOnce"]
-  storageClassName: do-block-storage
-  resources:
-    requests:
-      storage: 20Gi
-```
+The local product assumes the repository is on disk. Worktree setup, the
+diff view, the commit pipeline's rebase and merge, the file explorer and the
+spec tree all read a local checkout. A hosted board has none.
 
-`ReadWriteOnce` ties the server to a single replica - fine for v1. Multi-replica
-(a Postgres/object-storage `StorageBackend`) is deferred; see
-[storage-backends.md](../.archive/foundations/storage-backends.md) (those backend tasks
-are archived until multi-instance scaling is actually needed).
+The hosted executor removes the need for a checkout during the run: the
+session clones and pushes. It does not remove it for everything around the
+run. Two shapes are possible, and choosing one is the first step before any
+manifest is written:
 
-### 4. Secret
+| Shape | How | Cost |
+|---|---|---|
+| **A. Server-side clones** | The board keeps a clone of each workspace repository on its volume, fetched from the platform's git host with a token minted for the signed-in user. The existing worktree, diff and merge code runs unchanged against it | Source code at rest on the board's volume, per user. Volume size grows with repositories. A second audience to mint for |
+| **B. No clone** | The board reads refs, diffs and file contents through the Repos API and merges there. Specs are read and written as repository files through the same API | A second implementation of every git-reading surface. Parity with local is work, not reuse |
 
-A K8s Secret (mirroring `wallfacerd-auth`) supplying the env above.
+A third shape, a board that manages tasks only for local instances and never
+touches a repository, is the coordination plane's remote control and needs no
+hosted board at all. See
+[remote-control](../identity/remote-control.md).
 
-## Manifest structure
+## Not in this spec
 
-```
-deploy/
-├── prod/
-│   ├── deployment.yaml      # wallfacerd (website) - exists
-│   ├── service.yaml         # exists
-│   ├── ingress.yaml         # exists
-│   ├── board-deployment.yaml  # NEW: task-board server
-│   ├── board-service.yaml     # NEW
-│   ├── board-ingress.yaml     # NEW
-│   └── board-pvc.yaml         # NEW: task-data volume
-└── secret.yaml.example      # template for the board Secret
-```
-
-(No `rbac.yaml`, no `networkpolicy.yaml` - sandbox concerns are Cella's.)
+- Sandbox scheduling, node pools, network policy for agent workloads. The
+  platform's.
+- A wallfacer-held model key or provider credential for hosted runs.
+- A per-tenant instance provisioner or router. Archived with
+  [multi-tenant](../.archive/cloud/multi-tenant.md); one board serves every
+  signed-in principal, isolated by the principal and organization scoping
+  that already ships.
+- An external API for the board. Archived with
+  [tenant-api](../.archive/cloud/tenant-api.md).
 
 ## Implementation tasks
 
-| # | Task | Depends on | Effort |
-|---|------|-----------|--------|
-| 1 | Add board `Deployment`/`Service`/`Ingress`/`PVC` manifests under `deploy/prod/`, modeled on `wallfacerd` | runtime seam defined ([cella-runtime.md](latere-integration/cella-runtime.md)) | Small |
-| 2 | Extend the existing `wallfacerd` CI to build/push the board image (or reuse the same image, different command) | - | Small |
-| 3 | Board Ingress host + TLS cert in terraform (DNS A record + Certificate, same pattern as `wf.latere.ai`) | 1 | Small |
-| 4 | E2E: deploy to `latere`, sign in, create a task, run it via Cella, verify task data persists across pod restart | 1, 2, 3, Cella backend | Medium |
-| 5 | Document the deploy workflow (manifests, secrets, terraform additions) | 4 | Small |
+| # | Task | Depends on |
+|---|------|-----------|
+| 1 | Decide the repository shape (A or B) and record the decision here | the product decision in the umbrella's open question 1 |
+| 2 | Board Deployment, Service, Ingress and volume claim in `deploy/base`, patched by the overlays | 1, the hosted executor |
+| 3 | Release workflow: roll the second workload and smoke-test the board's host | 2 |
+| 4 | End to end on staging: sign in, create a task, run it hosted, restart the pod, confirm the task and its timeline persist and the run re-attaches | 2, 3 |
+| 5 | Operator notes for the manifests and the secrets they name | 4 |
 
-## Cost (DigitalOcean, incremental over the existing latere.ai baseline)
+## Open questions
 
-| Item | Cost |
-|------|------|
-| Task-board server pod | +$0 (fits existing node pool) |
-| `wallfacer-data` PVC (20Gi `do-block-storage`) | ~$2/mo |
-| Sandbox compute | **$0 here** - owned and billed by Cella, not this spec |
-
-The sandbox node-pool line items from the previous version are gone: Cella runs
-sandboxes on its own (tainted) pool and accounts for that compute.
-
-## Dependencies
-
-- [storage-backends.md](../.archive/foundations/storage-backends.md) - `FilesystemBackend` on the PVC (complete).
-- [latere-integration.md](latere-integration.md) - the umbrella; the runtime
-  ([cella-runtime.md](latere-integration/cella-runtime.md)) and FS
-  ([tenant-filesystem.md](tenant-filesystem.md)) seams the deployed server consumes.
-- Identity (auth.latere.ai) - already wired into `wallfacerd`; the board server reuses the same `AUTH_*` config.
-
-## What depends on this
-
-- The cloud integration track's runnable surface: once the board server is
-  deployed, the Cella runtime and FS seams have somewhere to run.
-
-## Future work (deferred)
-
-- Postgres + S3 `StorageBackend` for multi-replica scaling (storage tasks are
-  archived until demand exists).
-- Autoscaling / multi-region - terraform concerns, not wallfacer's.
-- Self-hosted deployment guide - the manifests work on any cluster; only
-  StorageClass and Ingress differ.
+1. **Whether to ship it.** The umbrella's open question 1: a hosted board's
+   address and product name are not decided. This spec is the deployment
+   shape for that decision, not a commitment to it.
+2. **Repository shape.** A or B above.
+3. **Organization contexts.** A hosted board is most useful to a team, and
+   the platform does not run an organization's agents yet. Until it does, a
+   hosted board runs tasks in personal contexts only.
+4. **Coordinator placement.** The coordinator lives in the site's workload
+   today. Whether it stays there or moves into the board's workload once one
+   exists affects which workload needs Postgres and the shared cache.
