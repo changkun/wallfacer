@@ -366,7 +366,7 @@ Excluded:
    code.
 4. Stopping wallfacer during a hosted run and starting it again re-attaches:
    no event is applied twice and none is skipped.
-5. Cancelling a hosted task interrupts and ends its session; no session is
+5. Canceling a hosted task interrupts and ends its session; no session is
    left `running` or `idle` for a task that is `cancelled` or `done`.
 6. Feedback on a waiting hosted task continues the same session when it is
    alive and starts a new one from the task branch when it is not.
