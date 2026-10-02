@@ -175,7 +175,7 @@ function stopReviewPoll() {
 }
 
 async function fetchReviewTranscript() {
-  if (!props.task || !props.task.session_id) {
+  if (!props.task || !isReviewable.value) {
     reviewTranscript.value = null;
     return;
   }
@@ -580,6 +580,11 @@ const gitBranches = computed(() => {
   const repos = Object.keys(props.task.worktree_paths || {});
   return repos.length ? repos.join(', ') : '—';
 });
+
+// A task is reviewable when it has a worktree: the reviewer reads the diff,
+// not an agent session, so tasks on every harness qualify. Mirrors the
+// server's reviewable check.
+const isReviewable = computed(() => Object.keys(props.task?.worktree_paths || {}).length > 0);
 
 const gitWorktrees = computed(() => {
   const n = Object.keys(props.task.worktree_paths || {}).length;
@@ -1009,7 +1014,7 @@ async function submitReview() {
         <div class="sheet-head__pills">
           <span class="pill" :class="pillClassFor(status)" data-role="state">{{ status }}</span>
           <span v-if="task.sandbox" class="pill pill-neutral">{{ task.sandbox }}</span>
-          <span v-if="task.review_unresolved === 0" class="pill pill-ok" title="Review: no unresolved attacks">Review: clean</span>
+          <span v-if="task.review_unresolved === 0" class="pill pill-ok" title="Review: no open findings">Review: clean</span>
           <span v-else-if="task.review_unresolved !== undefined" class="pill pill-err" :title="task.review_headline || ''">Review: {{ task.review_unresolved }} unresolved</span>
           <span class="sheet-head__meta">{{ relativeTime(task.updated_at) }}</span>
           <span class="sheet-head__meta" title="Task ID">{{ task.id.slice(0, 8) }}</span>
@@ -1578,7 +1583,7 @@ async function submitReview() {
                 <span class="aside-action__hint">run test verification</span>
               </span>
             </button>
-            <button v-if="isWaiting && task.session_id" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" data-action="review" @click="runAction('review', reviewTask)">
+            <button v-if="isWaiting && isReviewable" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" data-action="review" @click="runAction('review', reviewTask)">
               <span class="aside-action__icon" aria-hidden="true">&#9878;</span>
               <span class="aside-action__body">
                 <span class="aside-action__label">Review</span>

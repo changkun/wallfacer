@@ -138,4 +138,26 @@ describe('TaskDetail action buttons', () => {
     app.unmount();
     host.remove();
   });
+
+  // The reviewer reads the worktree's diff, not an agent session, so a task on
+  // a harness that records no session (the in-process one) is reviewable.
+  it('offers Review on a waiting task with a worktree and no session', async () => {
+    const { app, host } = await mountDetail(
+      makeTask('task-review', { session_id: null, worktree_paths: { '/repo': '/wt/repo' } }),
+    );
+
+    expect(host.querySelector('button[data-action="review"]')).toBeTruthy();
+
+    app.unmount();
+    host.remove();
+  });
+
+  it('offers no Review on a waiting task without a worktree', async () => {
+    const { app, host } = await mountDetail(makeTask('task-no-wt', { session_id: 'sess-1' }));
+
+    expect(host.querySelector('button[data-action="review"]')).toBeNull();
+
+    app.unmount();
+    host.remove();
+  });
 });
