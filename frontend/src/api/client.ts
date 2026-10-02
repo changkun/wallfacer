@@ -1,11 +1,38 @@
+// ApiError is a failed API call: the HTTP status, the parsed body, the sentence
+// to show (message), and the server's stable error code. code is set when the
+// body is the error envelope and is '' otherwise; callers branch on it instead
+// of matching the message. The envelope's developer detail stays on body.
 export class ApiError extends Error {
   status: number;
   body: unknown;
-  constructor(status: number, body: unknown, message: string) {
+  code: string;
+  constructor(status: number, body: unknown, message: string, code = '') {
     super(message);
     this.status = status;
     this.body = body;
+    this.code = code;
   }
+}
+
+// text returns v trimmed when it is a string, and '' for anything else.
+function text(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+// errorFields reads the message and the code out of a failed response's body.
+// Handlers report errors three ways: the envelope
+// {"error": {"code", "message", "details"}} (httpjson.WriteError), a flat JSON
+// body with a `message` or a string `error` field, and a plain-text body via
+// http.Error. Either field is '' when the body does not carry it.
+function errorFields(data: unknown): { message: string; code: string } {
+  if (typeof data === 'string') return { message: text(data), code: '' };
+  if (!data || typeof data !== 'object') return { message: '', code: '' };
+  const obj = data as Record<string, unknown>;
+  if (obj.error && typeof obj.error === 'object') {
+    const envelope = obj.error as Record<string, unknown>;
+    return { message: text(envelope.message), code: text(envelope.code) };
+  }
+  return { message: text(obj.message) || text(obj.error), code: '' };
 }
 
 // getServerApiKey reads the local-mode server API key injected into the page.
@@ -61,17 +88,9 @@ export async function api<T = unknown>(
     try { data = JSON.parse(text); } catch { data = text; }
   }
   if (!res.ok) {
-    let msg = res.statusText;
-    // Prefer a server-provided message. Handlers report errors two ways: a JSON
-    // body with a `message`/`error` field, or a plain-text body via http.Error.
-    if (data && typeof data === 'object') {
-      const obj = data as Record<string, unknown>;
-      const m = obj.message ?? obj.error;
-      if (typeof m === 'string' && m.trim()) msg = m.trim();
-    } else if (typeof data === 'string' && data.trim()) {
-      msg = data.trim();
-    }
-    throw new ApiError(res.status, data, msg);
+    // Prefer a server-provided message over the status text.
+    const { message, code } = errorFields(data);
+    throw new ApiError(res.status, data, message || res.statusText, code);
   }
   return data as T;
 }

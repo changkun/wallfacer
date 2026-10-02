@@ -74,6 +74,40 @@ describe('api error messages', () => {
     await expect(api('POST', '/api/x')).rejects.toMatchObject({ message: 'thread locked' });
   });
 
+  it('surfaces the message and the code of an error envelope', async () => {
+    const message = 'Sign-in by browser redirect is off because Wallfacer is not running on its configured port.';
+    vi.stubGlobal('fetch', mockFetch(503, 'Service Unavailable', JSON.stringify({
+      error: {
+        code: 'redirect_sign_in_unavailable',
+        message,
+        details: { redirect_url: 'http://localhost:8080/callback', bound_port: 53211 },
+      },
+    }), 'application/json'));
+    const err = await api('POST', '/api/me/switch-org', { org_id: '' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 503, message, code: 'redirect_sign_in_unavailable' });
+    // The developer detail stays on the parsed body.
+    expect((err as ApiError).body).toMatchObject({ error: { details: { bound_port: 53211 } } });
+  });
+
+  it('keeps the code of an envelope that carries no message', async () => {
+    vi.stubGlobal('fetch', mockFetch(503, 'Service Unavailable',
+      JSON.stringify({ error: { code: 'redirect_sign_in_unavailable' } }), 'application/json'));
+    await expect(api('GET', '/api/x')).rejects.toMatchObject({
+      message: 'Service Unavailable',
+      code: 'redirect_sign_in_unavailable',
+    });
+  });
+
+  it('leaves the code empty for the string error form and for plain text', async () => {
+    vi.stubGlobal('fetch', mockFetch(409, 'Conflict',
+      JSON.stringify({ error: 'thread locked' }), 'application/json'));
+    await expect(api('POST', '/api/x')).rejects.toMatchObject({ message: 'thread locked', code: '' });
+
+    vi.stubGlobal('fetch', mockFetch(503, 'Service Unavailable', 'auth not configured', 'text/plain'));
+    await expect(api('GET', '/api/x')).rejects.toMatchObject({ message: 'auth not configured', code: '' });
+  });
+
   it('falls back to the status text when the body is empty', async () => {
     vi.stubGlobal('fetch', mockFetch(500, 'Internal Server Error', '', 'text/plain'));
     await expect(api('GET', '/api/x')).rejects.toMatchObject({ message: 'Internal Server Error' });
