@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -87,7 +88,9 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 // SSE and WebSocket paths use a ?token= query parameter instead of the
 // Authorization header because EventSource and WebSocket APIs do not support
 // custom request headers. UI shell routes and embedded assets are public so
-// the browser can load before it reads the injected local API key.
+// the browser can load before it reads the injected local API key. The
+// redirect sign-in passes without the key for a peer on this machine (see
+// signInRoute).
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
@@ -108,6 +111,10 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			// with no user data, and a scraper cannot present the key.
 			if ((r.Method == http.MethodGet || r.Method == http.MethodHead) && publicUIPath(r.URL.Path)) ||
 				(r.Method == http.MethodGet && r.URL.Path == "/metrics") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if signInRoute(r) && IsLoopbackPeer(r.RemoteAddr) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -137,6 +144,39 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// signInRoute reports whether r is one of the two requests of the redirect
+// sign-in: GET /login, which sends the browser to the issuer, and GET
+// /callback, which the issuer sends it back to. Both are browser navigations,
+// which cannot carry an Authorization header, and a signed-out browser has no
+// session to pass the key check with either.
+//
+// The middleware admits them only from a peer on this machine. A session
+// passes the key check, so a peer on another host that could reach both
+// routes would sign in with an account of its own and hold a session the key
+// no longer stops. A loopback peer is handed the key with the index page, so
+// admitting it grants nothing it could not already present.
+//
+// /logout and /logout/notify are not listed: besides expiring the caller's
+// cookie they clear the token store shared with the CLI, which signs the
+// whole machine out, and a signed-in browser reaches /logout through its
+// session.
+func signInRoute(r *http.Request) bool {
+	return r.Method == http.MethodGet && (r.URL.Path == "/login" || r.URL.Path == "/callback")
+}
+
+// IsLoopbackPeer reports whether remoteAddr, a host:port TCP peer address as
+// in http.Request.RemoteAddr, is a loopback IP: the caller runs on this
+// machine. It reads the peer address and never a forwarded header, so a
+// reverse proxy on another host does not make its clients loopback.
+func IsLoopbackPeer(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // publicUIPath admits only embedded assets and known client-side routes.

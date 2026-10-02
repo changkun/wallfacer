@@ -43,6 +43,13 @@ committed: the commit log already holds that.
   are off there, the account menu says why, and device-code sign-in works as
   before.
 
+- A signed-out browser on the machine Wallfacer runs on reaches sign-in by
+  browser redirect: `/login` and `/callback` answered
+  `401 {"error":"unauthorized"}`, because a local instance always has a
+  server key and a page navigation cannot present it. A browser on another
+  host still needs a session or the key there, and signs in with a device
+  code.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

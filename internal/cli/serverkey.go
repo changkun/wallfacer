@@ -4,7 +4,6 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"latere.ai/x/pkg/bearer"
 
 	"latere.ai/x/wallfacer/internal/auth"
+	"latere.ai/x/wallfacer/internal/handler"
 )
 
 // serverAPIKeyFile is the file under the config dir that holds the server
@@ -80,15 +80,5 @@ func indexKeyAllowed(r *http.Request, key string) bool {
 	if tok := r.URL.Query().Get("token"); tok != "" && bearer.Equal(tok, key) {
 		return true
 	}
-	return isLoopbackRemote(r.RemoteAddr)
-}
-
-// isLoopbackRemote reports whether a host:port peer address is a loopback IP.
-func isLoopbackRemote(remoteAddr string) bool {
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		host = remoteAddr
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	return handler.IsLoopbackPeer(r.RemoteAddr)
 }

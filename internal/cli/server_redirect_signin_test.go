@@ -162,6 +162,12 @@ func TestInitServer_PortFallback_RedirectSignInOff(t *testing.T) {
 	withKey.Header.Set("Authorization", "Bearer "+key)
 	wantRedirectSignInUnavailable(t, "GET /login with the server key", serve(sc, withKey))
 
+	// A signed-out browser on this machine gets the same answer, not the
+	// server key check's 401.
+	anon := httptest.NewRequest(http.MethodGet, "/login", nil)
+	anon.RemoteAddr = "127.0.0.1:52100"
+	wantRedirectSignInUnavailable(t, "GET /login, signed out, from this machine", serve(sc, anon))
+
 	// The org switch ends in /login, so it is refused before it gives up the
 	// session the browser holds.
 	switchOrg := httptest.NewRequest(http.MethodPost, "/api/me/switch-org", strings.NewReader(`{"org_id":""}`))
@@ -243,5 +249,37 @@ func TestInitServer_RequestedPortBound_RedirectSignInOn(t *testing.T) {
 	}
 	if !configFlag(t, sc, key) {
 		t.Error("auth_redirect_enabled = false on the requested port, want true")
+	}
+
+	// A signed-out browser on this machine: a navigation carries neither the
+	// server key nor a session, and still has to reach the issuer and come
+	// back through /callback.
+	anon := httptest.NewRequest(http.MethodGet, "/login", nil)
+	anon.RemoteAddr = "127.0.0.1:52100"
+	w = serve(sc, anon)
+	if w.Code != http.StatusFound {
+		t.Fatalf("GET /login, signed out, from this machine: status = %d, want 302; body %s", w.Code, w.Body.String())
+	}
+	if loc := w.Header().Get("Location"); !strings.Contains(loc, want) {
+		t.Errorf("signed out: Location %q missing %q", loc, want)
+	}
+	// With no flow cookie the callback restarts the sign-in; what matters
+	// here is that the handler, not the server key check, answers.
+	back := httptest.NewRequest(http.MethodGet, "/callback?code=c&state=s", nil)
+	back.RemoteAddr = "127.0.0.1:52100"
+	w = serve(sc, back)
+	if w.Code != http.StatusFound || w.Header().Get("Location") != "/login" {
+		t.Errorf("GET /callback, signed out, from this machine: status = %d Location %q, want 302 to /login; body %s",
+			w.Code, w.Header().Get("Location"), w.Body.String())
+	}
+
+	// A peer on another host could finish a sign-in of its own here and hold
+	// a session that passes the key check, so it does not start one.
+	for _, target := range []string{"/login", "/callback?code=c&state=s"} {
+		remote := httptest.NewRequest(http.MethodGet, target, nil)
+		remote.RemoteAddr = "192.168.1.20:52100"
+		if w := serve(sc, remote); w.Code != http.StatusUnauthorized {
+			t.Errorf("GET %s, signed out, from another host: status = %d, want 401", target, w.Code)
+		}
 	}
 }

@@ -220,6 +220,56 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 	}
 }
 
+// TestBearerAuthMiddleware_SignInRoutes covers the redirect sign-in behind the
+// server key. A browser cannot put the key on a navigation, so GET /login and
+// GET /callback pass for a peer on this machine, the peer the index page hands
+// the key to anyway. A peer on another host stays behind the key: a sign-in it
+// completed would carry its own session past the key check. /logout and
+// /logout/notify clear the machine's stored token as well as the caller's
+// cookie, so they keep the key for every peer.
+func TestBearerAuthMiddleware_SignInRoutes(t *testing.T) {
+	const (
+		loopback = "127.0.0.1:52100"
+		remote   = "192.168.1.20:52100"
+	)
+	next := BearerAuthMiddleware("generated-local-key")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	tests := []struct {
+		name   string
+		method string
+		target string
+		peer   string
+		want   int
+	}{
+		{"login from this machine", http.MethodGet, "/login", loopback, http.StatusNoContent},
+		{"login with an org from this machine", http.MethodGet, "/login?org_id=org-b", loopback, http.StatusNoContent},
+		{"callback from this machine", http.MethodGet, "/callback?code=c&state=s", loopback, http.StatusNoContent},
+		{"login from this machine over IPv6", http.MethodGet, "/login", "[::1]:52100", http.StatusNoContent},
+		{"login from another host", http.MethodGet, "/login", remote, http.StatusUnauthorized},
+		{"callback from another host", http.MethodGet, "/callback?code=c&state=s", remote, http.StatusUnauthorized},
+		{"login by POST", http.MethodPost, "/login", loopback, http.StatusUnauthorized},
+		{"login by HEAD", http.MethodHead, "/login", loopback, http.StatusUnauthorized},
+		{"callback by POST", http.MethodPost, "/callback", loopback, http.StatusUnauthorized},
+		{"path under login", http.MethodGet, "/login/x", loopback, http.StatusUnauthorized},
+		{"unclean path to login", http.MethodGet, "/api/../login", loopback, http.StatusUnauthorized},
+		{"logout from this machine", http.MethodGet, "/logout", loopback, http.StatusUnauthorized},
+		{"logout notify from this machine", http.MethodGet, "/logout/notify", loopback, http.StatusUnauthorized},
+		{"api from this machine", http.MethodGet, "/api/config", loopback, http.StatusUnauthorized},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.target, nil)
+			req.RemoteAddr = tc.peer
+			rec := httptest.NewRecorder()
+			next.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("%s %s from %s: status = %d, want %d", tc.method, tc.target, tc.peer, rec.Code, tc.want)
+			}
+		})
+	}
+}
+
 // TestBearerAuthMiddleware_ClaimsBypass confirms that a request whose
 // context already carries a validated principal (populated upstream by
 // auth.OptionalAuth in cloud mode) skips the static-key check. Keeps

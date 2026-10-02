@@ -48,10 +48,11 @@ on:
 
 An operator-set `AUTH_REDIRECT_URL` is exempt: it names the address the
 deployment is reached on, which need not be the bound port. The device-code
-flow needs no redirect and works on any port. On a local instance `/login`
-is reached only by a request that carries a session or the server key (the
-server-key check answers an anonymous browser 401 first), which makes the org
-switch of a signed-in user the path that reached the issuer.
+flow needs no redirect and works on any port. On a local instance `GET /login`
+and `GET /callback` pass the server-key check for a browser on the same
+machine, signed in or not, so both a first sign-in and an org switch reach
+these answers. A peer on another host reaches them only with a session or the
+server key.
 
 Still open: sign-in by browser redirect, and with it the in-app org switch,
 does not work on a fallback port. Deriving the redirect from the *bound* port
