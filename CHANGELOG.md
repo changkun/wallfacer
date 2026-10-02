@@ -60,6 +60,10 @@ committed: the commit log already holds that.
   one. The previous session stayed in the browser, so a switch abandoned at
   the sign-in page left the account menu in the old organization.
 
+- A review transcript that cannot be read to its end is marked incomplete in
+  the task's verification panel, and the server logs the reason, where the
+  rounds before the unreadable part were shown as the whole debate.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

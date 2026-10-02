@@ -9,6 +9,9 @@ const running = computed(() => props.transcript?.running ?? false);
 const config = computed(() => props.transcript?.config ?? null);
 const outcome = computed(() => props.transcript?.outcome ?? null);
 const forks = computed(() => props.transcript?.forks ?? []);
+// Set when the server could not read the transcript file to its end: the forks
+// hold the rounds before that point and later rounds are missing.
+const truncated = computed(() => props.transcript?.truncated ?? false);
 
 // A run exists if there is a live trajectory or a persisted verdict on the task.
 const hasRun = computed(() => forks.value.length > 0 || props.task.review_unresolved !== undefined);
@@ -93,6 +96,10 @@ function toggleFork(i: number) {
         <span v-if="reviewCost > 0">${{ reviewCost.toFixed(2) }}</span>
       </div>
     </div>
+
+    <p v-if="truncated" class="review__truncated" role="status">
+      This transcript is incomplete: part of it could not be read, and later rounds are not shown.
+    </p>
 
     <!-- Trajectory: each fork is a debate thread -->
     <div v-if="forks.length" class="review__forks">
@@ -192,6 +199,15 @@ function toggleFork(i: number) {
   margin-top: 0.45rem;
   font-size: 0.72rem;
   color: var(--ink-3);
+}
+
+.review__truncated {
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--r-sm);
+  font-size: 0.78rem;
+  color: var(--warn);
+  background: var(--tint-amber);
 }
 
 .review__forks { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.6rem; }

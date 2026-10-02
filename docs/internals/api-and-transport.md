@@ -99,7 +99,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
 | `POST /api/tasks/{id}/review` | Trigger an adversarial review verification run for a waiting task |
-| `GET /api/tasks/{id}/review/transcript` | Review run transcript |
+| `GET /api/tasks/{id}/review/transcript` | Review run transcript. `truncated: true` when the transcript file could not be read to its end (an I/O error, or a record over the line cap `maxReviewTranscriptLineBytes` in `internal/handler/review_transcript.go`); `forks` then holds the rounds before that point, and the server logs the error with the session directory |
 | `GET /api/tasks/{id}/trace` | Agent trace graph recorded by an agentic (topos) run |
 | `GET /api/tasks/{id}/pr` | Pull-request status for the task branch |
 | `POST /api/tasks/{id}/pr` | Create a pull request from the task branch (brokered GitHub credential) |

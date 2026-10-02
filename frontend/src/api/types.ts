@@ -226,6 +226,9 @@ export interface ReviewTranscript {
   config?: ReviewRunConfig;
   outcome?: ReviewOutcome;
   forks: ReviewFork[];
+  // Set when the server could not read the transcript to its end; forks then
+  // holds only the rounds before that point.
+  truncated?: boolean;
 }
 
 // Runtime environment captured at the start of a task run (reproducibility
