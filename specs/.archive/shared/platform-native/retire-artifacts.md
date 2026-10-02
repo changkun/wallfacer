@@ -1,6 +1,6 @@
 ---
 title: Retire the Artifacts Gallery
-status: drafted
+status: archived
 depends_on:
   - specs/shared/platform-native.md
 affects:
@@ -22,13 +22,13 @@ dispatched_task_id: null
 # Retire the Artifacts Gallery
 
 A decision of the maintainer on 2026-10-02, recorded under
-[platform-native](../platform-native.md): wallfacer does not need its own
+[platform-native](../../../shared/platform-native.md): wallfacer does not need its own
 artifacts feature, because the Latere platform's Apps capability hosts web
 pages from a repository. A removal, not a rewrite.
 
 ## What goes
 
-The feature [static-artifacts](../../.archive/local/static-artifacts.md)
+The feature [static-artifacts](../../local/static-artifacts.md)
 shipped: a gallery at `/artifacts` that lists the self-contained HTML files
 under `<workspace>/artifacts/` and previews them, served by
 `GET /artifact/{path...}` and listed by `GET /api/artifacts`.
@@ -88,6 +88,29 @@ under `<workspace>/artifacts/` and previews them, served by
 
 ## Related
 
-[live-serve](../../local/live-serve.md), building and running developed
+[live-serve](../../../local/live-serve.md), building and running developed
 software from within wallfacer, is the larger cousin of this feature and is
 designed but not built. Its fate is a separate decision.
+
+## Outcome
+
+Archived 2026-10-02 as complete. Shipped in five commits on main
+(`2a136971` frontend, `90b54036` screenshot scenes, `a9274d07` HTTP,
+`7a37a36b` docs, `56b92c6c` a test follow-up).
+
+Where it differed from the text above:
+
+- **Only the API path answers 404.** `GET /api/artifacts` answers 404 in the
+  error envelope with code `not_found`. `GET /artifact/{path...}` and
+  `/artifacts` fall through to the console's catch-all and get the SPA shell
+  with 200, like any other unknown non-API path; the console then renders its
+  not-found page. A test on the full server holds both, and checks that no
+  response carries a workspace file's body.
+- **Hard loads of `/artifacts`** on a keyed instance without an identity get
+  401 like any other unknown path, since it left the public UI list; only
+  in-app navigation reaches the not-found page.
+- **The `/artifacts/` entry left `.gitignore`.** It ignored the directory in
+  wallfacer's own checkout, which only mattered while wallfacer served it.
+- **No task or prompt code referred to the feature.** The word in
+  `internal/handler/tasks_autoimplement.go` and `internal/speccomment/types.go`
+  means a file a run produces, not this gallery.

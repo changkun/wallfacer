@@ -18,6 +18,13 @@ dispatched_task_id: null
 
 # Static Artifacts - Serve Self-Contained HTML from Wallfacer
 
+> **Removed 2026-10-02.** The gallery, its two routes and its rail entry
+> are deleted by
+> [retire-artifacts](../shared/platform-native/retire-artifacts.md), under
+> [platform-native](../../shared/platform-native.md): a page meant to be seen
+> is pushed to a repository on the Latere platform, whose Apps capability
+> builds and hosts it. The text below describes what shipped before that.
+
 ## Problem
 
 Agents and users produce self-contained HTML deliverables - slide decks, reports, dashboards, one-off visualizations. Today there is no way to open one inside Wallfacer: the file lands in the repo and must be opened by hand from a file browser. The desired flow is direct: ask in chat for a deck, the agent writes it into the repo, and it opens in the app with one click.

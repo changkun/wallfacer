@@ -35,7 +35,7 @@ There is also no way to keep a development server running while iterating across
 - **Worktrees**: Per-task git worktrees provide isolated copies of the codebase on the host (under `<configDir>/worktrees/`). The host process runs with `cmd.Dir` set to the worktree (or workspace) path. See `internal/runner/worktree.go` and `internal/runner/container.go` (`buildHostSpec`, `buildBaseContainerSpec`).
 - **Log streaming**: `GET /api/tasks/{id}/logs` streams the agent process output via SSE, backed by `internal/pkg/livelog`. Works for agent output, not for arbitrary processes.
 - **Env file**: The agent process inherits a merged environment built from `executor.ContainerSpec.EnvFile` (the wallfacer `.env` with LLM tokens, default `<configDir>/.env`) plus `ContainerSpec.Env` overlays. There is no separate app-level env file.
-- **Static artifacts**: self-contained HTML files under `<workspace>/artifacts/` are served and listed in a gallery ([static-artifacts](../.archive/local/static-artifacts.md)). That is the lightweight end of this feature: files only, no build step and no process.
+- **Static artifacts**: the gallery that served self-contained HTML files from `<workspace>/artifacts/` ([static-artifacts](../.archive/local/static-artifacts.md)) was removed on 2026-10-02 ([retire-artifacts](../.archive/shared/platform-native/retire-artifacts.md)). Wallfacer serves no workspace files; a page meant to be seen is published through the platform's Apps capability.
 - **No**: Dev server, build pipeline, long-lived process manager, or any way to run user code as part of a serve session.
 
 > Architecture note: an earlier draft of this spec assumed a container runtime
