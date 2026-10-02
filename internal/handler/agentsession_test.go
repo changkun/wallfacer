@@ -533,7 +533,7 @@ func TestAgentSessionHandler_PersistsRoundUsage(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	raw := agentRoundStdout(120, 40, 15, 5, 0.0123)
-	h.persistAgentRoundUsage(raw)
+	h.persistAgentRoundUsage(raw, harness.Claude)
 
 	key := prompts.WorkspaceDataKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -571,8 +571,8 @@ func TestAgentSessionHandler_IncrementsTurn(t *testing.T) {
 	ws := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
-	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001))
-	h.persistAgentRoundUsage(agentRoundStdout(20, 8, 0, 0, 0.002))
+	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001), harness.Claude)
+	h.persistAgentRoundUsage(agentRoundStdout(20, 8, 0, 0, 0.002), harness.Claude)
 
 	key := prompts.WorkspaceDataKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -592,7 +592,7 @@ func TestAgentSessionHandler_FailedExecDoesNotPersist(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{ws})
 
 	errLine := []byte(`{"type":"result","stop_reason":"end_turn","result":"boom","session_id":"s1","is_error":true,"total_cost_usd":0.001}`)
-	h.persistAgentRoundUsage(errLine)
+	h.persistAgentRoundUsage(errLine, harness.Claude)
 
 	key := prompts.WorkspaceDataKey([]string{ws})
 	recs, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{})
@@ -676,7 +676,7 @@ func TestAgentSessionHandler_AppendErrorDoesNotFailRound(t *testing.T) {
 	h.configDir = blocker
 
 	// Must not panic.
-	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001))
+	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001), harness.Claude)
 }
 
 // TestSendAgentMessage_BothFocusedFields verifies that setting both

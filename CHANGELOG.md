@@ -74,6 +74,10 @@ committed: the commit log already holds that.
   the configured default subprocess harness; each of these failed before with
   "unsupported agent".
 
+- A chat round is recorded in the usage log under the harness that ran it, not
+  always under Claude; rounds on a harness other than Claude are recorded with
+  zero tokens and zero cost, because their usage is not read yet.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

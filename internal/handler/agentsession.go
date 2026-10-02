@@ -579,7 +579,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		// stats/usage dashboards reflect the round even if the commit
 		// pipeline below produces a warning. Best-effort: errors are logged
 		// and never fail the round.
-		h.persistAgentRoundUsage(rawStdout)
+		h.persistAgentRoundUsage(rawStdout, sb)
 
 		// Parse response text and append assistant message (skip errors).
 		if !agentsession.IsErrorResult(rawStdout) {
@@ -798,12 +798,17 @@ func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) 
 	httpjson.Write(w, http.StatusOK, map[string]any{"status": "interrupted"})
 }
 
-// persistAgentRoundUsage parses token and cost usage from a round's
-// raw stdout and appends it to the agent-session usage log for the current
-// workspace group. Failed rounds, missing usage, and missing workspace
-// configuration short-circuit silently. Append errors are logged so a
-// persistence failure never fails the user-facing round.
-func (h *Handler) persistAgentRoundUsage(raw []byte) {
+// persistAgentRoundUsage appends a record of one round, run on harness sb, to
+// the agent-session usage log for the current workspace group. The record is
+// attributed to sb. Token and cost figures are read only from a Claude round:
+// agentsession.ExtractUsage parses Claude's stream-json result line, and the
+// other harnesses' streams either lack a line it accepts or carry usage under
+// different field names, so their rounds are recorded with zero usage rather
+// than with figures read from the wrong fields. Failed rounds, a Claude round
+// with no result line, and missing workspace configuration short-circuit
+// silently. Append errors are logged so a persistence failure never fails the
+// user-facing round.
+func (h *Handler) persistAgentRoundUsage(raw []byte, sb harness.ID) {
 	if agentsession.IsErrorResult(raw) {
 		return
 	}
@@ -811,9 +816,13 @@ func (h *Handler) persistAgentRoundUsage(raw []byte) {
 	if len(workspaces) == 0 || h.configDir == "" {
 		return
 	}
-	usage, ok := agentsession.ExtractUsage(raw)
-	if !ok {
-		return
+	var usage agentsession.RoundUsage
+	if sb == harness.Claude {
+		parsed, ok := agentsession.ExtractUsage(raw)
+		if !ok {
+			return
+		}
+		usage = parsed
 	}
 	// Key by the active workspace's stable DataKey, not by a hash recomputed
 	// from the current folders: editing folders must not strand prior usage.
@@ -831,7 +840,7 @@ func (h *Handler) persistAgentRoundUsage(raw []byte) {
 		CacheCreationTokens:  usage.CacheCreationInputTokens,
 		CostUSD:              usage.CostUSD,
 		StopReason:           usage.StopReason,
-		Sandbox:              harness.Claude,
+		Sandbox:              sb,
 		SubAgent:             store.SandboxActivityAgentSession,
 	}
 	if err := store.AppendAgentSessionUsage(h.configDir, groupKey, rec); err != nil {
