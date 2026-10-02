@@ -24,7 +24,7 @@ type Role struct {
 
 	// Capabilities is a declarative list of what the agent needs
 	// from its execution environment. Values are stable strings
-	// ("workspace.read", "workspace.write", "board.context").
+	// ("workspace.write", "board.context").
 	Capabilities []string
 
 	// Multiturn is advisory metadata: true when the agent
@@ -44,7 +44,6 @@ type Role struct {
 
 // Capability values referenced from built-in descriptors.
 const (
-	CapWorkspaceRead  = "workspace.read"
 	CapWorkspaceWrite = "workspace.write"
 	CapBoardContext   = "board.context"
 )
