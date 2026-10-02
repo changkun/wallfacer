@@ -162,7 +162,7 @@ func (r *Runner) runAgent(
 	}
 
 	// Resolve the sandbox, newest tier first:
-	//   1. role.Harness — a per-call pin a caller sets on a copy of a
+	//   1. role.Harness: a per-call pin a caller sets on a copy of a
 	//      built-in role. Wins over every per-task / env tier so a
 	//      role pinned to "codex" always reaches Codex.
 	//   2. Per-task per-activity override (SandboxByActivity).
