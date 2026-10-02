@@ -209,19 +209,20 @@ func TestGitHubRoutesRemoved(t *testing.T) {
 	reg := metrics.NewRegistry()
 	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
 
-	dummyID := uuid.New().String()
+	const githubBase = "/api/github"
+	taskBase := "/api/tasks/" + uuid.New().String()
 	removed := []struct {
 		method string
 		path   string
 	}{
-		{http.MethodGet, "/api/github/auth/status"},
-		{http.MethodPost, "/api/github/auth/connect"},
-		{http.MethodPost, "/api/github/auth/disconnect"},
-		{http.MethodPost, "/api/github/pulls"},
-		{http.MethodPost, "/api/github/comments"},
-		{http.MethodGet, "/api/tasks/" + dummyID + "/pr"},
-		{http.MethodPost, "/api/tasks/" + dummyID + "/pr"},
-		{http.MethodPost, "/api/tasks/" + dummyID + "/pr/comment"},
+		{http.MethodGet, githubBase + "/auth/status"},
+		{http.MethodPost, githubBase + "/auth/connect"},
+		{http.MethodPost, githubBase + "/auth/disconnect"},
+		{http.MethodPost, githubBase + "/pulls"},
+		{http.MethodPost, githubBase + "/comments"},
+		{http.MethodGet, taskBase + "/pr"},
+		{http.MethodPost, taskBase + "/pr"},
+		{http.MethodPost, taskBase + "/pr/comment"},
 	}
 	for _, rt := range removed {
 		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
@@ -238,7 +239,7 @@ func TestGitHubRoutesRemoved(t *testing.T) {
 	}
 
 	for _, route := range apicontract.Routes {
-		if strings.HasPrefix(route.Pattern, "/api/github") ||
+		if strings.HasPrefix(route.Pattern, githubBase) ||
 			strings.HasSuffix(route.Pattern, "/pr") || strings.Contains(route.Pattern, "/pr/") {
 			t.Errorf("contract still declares %s %s (%s)", route.Method, route.Pattern, route.Name)
 		}

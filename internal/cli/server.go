@@ -257,6 +257,10 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
 
+	// Delete the GitHub token cache under the config dir if one is present:
+	// wallfacer holds no GitHub credential, so the files are unread secrets.
+	removeGitHubTokenCache(configDir, logger.Main)
+
 	// Cloud mode: wire latere.ai sign-in. Both the WALLFACER_CLOUD flag
 	// and the AUTH_* vars resolve from shell env first, .env file
 	// second — users can drop everything in ~/.wallfacer/.env or export

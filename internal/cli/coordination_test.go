@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"latere.ai/x/pkg/authkit/cli"
 	"latere.ai/x/pkg/authkit/oidc"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
@@ -177,6 +179,44 @@ func TestSessionTokenBridgeWrapNil(t *testing.T) {
 	b2.wrap(next).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 	if !called {
 		t.Fatal("wrap with nil store did not pass through to next")
+	}
+}
+
+// TestCoordinationTokenFuncReadsSharedTokenFile proves the connector reads the
+// signed-in user's token from the shared identity token file,
+// <UserConfigDir>/latere/token.json, which the session bridge, the device flow
+// and `wallfacer auth login` write. HOME, XDG_CONFIG_HOME and AppData point at
+// a temp dir so the test never touches the real file on any platform.
+func TestCoordinationTokenFuncReadsSharedTokenFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("AppData", dir)
+
+	want, err := cli.DefaultFileTokenStorePath()
+	if err != nil {
+		t.Fatalf("token path: %v", err)
+	}
+	if !strings.HasPrefix(want, dir) || filepath.Base(want) != "token.json" {
+		t.Fatalf("token path %s is not a token.json under the temp dir %s", want, dir)
+	}
+
+	store := newCoordinationTokenStore()
+	fileStore, ok := store.(*cli.FileTokenStore)
+	if !ok || fileStore.Path != want {
+		t.Fatalf("connector store = %#v, want a file store at %s", store, want)
+	}
+
+	// The session bridge writes the file; a fresh store, as the connector
+	// holds, reads it back.
+	newSessionTokenBridge(nil, store).sync("login-jwt", "", time.Now().Add(time.Hour))
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("no token file at %s after the bridge wrote: %v", want, err)
+	}
+	mint := func(_ context.Context, login string) (string, error) { return "actor-for-" + login, nil }
+	got, ok := coordinationTokenFunc(context.Background(), newCoordinationTokenStore(), nil, mint)()
+	if !ok || got != "actor-for-login-jwt" {
+		t.Fatalf("token = %q, ok = %v; want the actor token minted from the file's login token", got, ok)
 	}
 }
 
