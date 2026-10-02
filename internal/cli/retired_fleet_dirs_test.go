@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -182,8 +183,16 @@ func TestInitServerWarnsAboutRetiredFlowsDir(t *testing.T) {
 	if len(hits) != 1 {
 		t.Fatalf("startup logged %d retired-directory lines, want 1: %q", len(hits), hits)
 	}
-	if !strings.Contains(hits[0], dir) {
-		t.Errorf("warning %q does not name %s", hits[0], dir)
+	// The line is decoded rather than searched, since JSON escapes the
+	// backslashes of a Windows path.
+	var rec struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(hits[0]), &rec); err != nil {
+		t.Fatalf("decode warning %q: %v", hits[0], err)
+	}
+	if rec.Path != dir {
+		t.Errorf("warning path = %q, want %s", rec.Path, dir)
 	}
 	got, err := os.ReadFile(path)
 	if err != nil || !bytes.Equal(got, body) {
