@@ -64,6 +64,16 @@ var agentBindings = map[string]agentBinding{
 		SingleTurn:  true,
 		ParseResult: parseCommitMessageResult,
 	},
+	// The reviewer reads the diff from its prompt and needs no workspace, so it
+	// mounts nothing: that keeps it read-only by construction and lets an
+	// in-process harness run it through launchInProcess.
+	agents.Review.Slug: {
+		Activity:    store.SandboxActivityReview,
+		Timeout:     func(*store.Task) time.Duration { return constants.ReviewAgentTimeout },
+		MountMode:   mountNone,
+		SingleTurn:  true,
+		ParseResult: parseReviewResult,
+	},
 	agents.Implementation.Slug: {
 		Activity: store.SandboxActivityImplementation,
 		Timeout: func(t *store.Task) time.Duration {

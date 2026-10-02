@@ -60,6 +60,7 @@ var embeddedToAPI = map[string]string{
 	"commit.tmpl":               "commit_message",
 	"conflict.tmpl":             "conflict_resolution",
 	"test.tmpl":                 "test_verification",
+	"review.tmpl":               "review",
 	"spec.tmpl":                 "spec",
 	"spec_system_empty.tmpl":    "spec_system_empty",
 	"spec_system_nonempty.tmpl": "spec_system_nonempty",
@@ -73,6 +74,7 @@ var apiToEmbedded = map[string]string{
 	"commit_message":       "commit.tmpl",
 	"conflict_resolution":  "conflict.tmpl",
 	"test_verification":    "test.tmpl",
+	"review":               "review.tmpl",
 	"spec":                 "spec.tmpl",
 	"spec_system_empty":    "spec_system_empty.tmpl",
 	"spec_system_nonempty": "spec_system_nonempty.tmpl",
@@ -87,6 +89,7 @@ var knownNames = []string{
 	"commit_message",
 	"conflict_resolution",
 	"test_verification",
+	"review",
 	"spec",
 	"spec_system_empty",
 	"spec_system_nonempty",
@@ -253,6 +256,8 @@ func mockContextFor(apiName string) (any, bool) {
 		}, true
 	case "test_verification":
 		return TestData{OriginalPrompt: "example prompt"}, true
+	case "review":
+		return ReviewData{Prompt: "example prompt", Round: 1, MaxRounds: 3}, true
 	case "oversight":
 		return struct{ ActivityLog string }{ActivityLog: "example activity log"}, true
 	case "title":
@@ -333,6 +338,20 @@ type TestData struct {
 	Diff           string // optional
 }
 
+// ReviewData holds template variables for the review prompt: what the
+// reviewer reads in one round. PriorFindings and ImplementerReply are set from
+// the second round on, so the reviewer checks whether its earlier findings were
+// addressed instead of reviewing from scratch.
+type ReviewData struct {
+	Prompt           string
+	Criteria         string // optional
+	Diff             string // optional; empty renders as "no changes"
+	Round            int    // 1-based
+	MaxRounds        int
+	PriorFindings    string // optional; the previous round's findings, one per line
+	ImplementerReply string // optional; the task's result after its last turn
+}
+
 // --- Manager methods ---
 
 // TaskPromptRefine renders the task-mode spec-mode agent system prompt.
@@ -363,6 +382,9 @@ func (m *Manager) ConflictResolution(d ConflictData) string { return m.render("c
 
 // TestVerification renders the test verification agent prompt.
 func (m *Manager) TestVerification(d TestData) string { return m.render("test.tmpl", d) }
+
+// Review renders the review agent prompt for one review round.
+func (m *Manager) Review(d ReviewData) string { return m.render("review.tmpl", d) }
 
 // Spec renders the spec-mode agent system prompt.
 func (m *Manager) Spec() string { return m.render("spec.tmpl", nil) }

@@ -34,6 +34,7 @@ type Config struct {
 	ReviewForkCount        int    // WALLFACER_REVIEW_FORKS (0 means use default)
 	ReviewMaxRounds        int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
 	ReviewCostCap          int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
+	ReviewModel            string // WALLFACER_REVIEW_MODEL: the reviewer's model; empty means the review does not run
 	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
@@ -101,6 +102,7 @@ var knownKeys = []string{
 	"WALLFACER_REVIEW_FORKS",
 	"WALLFACER_REVIEW_ROUNDS",
 	"WALLFACER_REVIEW_COST_CAP",
+	"WALLFACER_REVIEW_MODEL",
 	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
 	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
@@ -204,6 +206,8 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.ReviewCostCap = n
 			}
+		case "WALLFACER_REVIEW_MODEL":
+			cfg.ReviewModel = v
 		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
 			// 0 means "all time"; negative values are rejected silently (keeps
 			// the initialized default of 30). WALLFACER_PLANNING_WINDOW_DAYS is
@@ -449,6 +453,7 @@ type Updates struct {
 	ReviewForks          *string
 	ReviewRounds         *string
 	ReviewCostCap        *string
+	ReviewModel          *string
 	OversightInterval    *string
 	ArchivedTasksPerPage *string
 	AutoPush             *string
@@ -481,6 +486,7 @@ func Update(path string, u Updates) error {
 		"WALLFACER_REVIEW_FORKS":            u.ReviewForks,
 		"WALLFACER_REVIEW_ROUNDS":           u.ReviewRounds,
 		"WALLFACER_REVIEW_COST_CAP":         u.ReviewCostCap,
+		"WALLFACER_REVIEW_MODEL":            u.ReviewModel,
 		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,

@@ -64,6 +64,10 @@ type MockRunner struct {
 	// working directory the critic is run in.
 	RunCriticRoundFn func(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 
+	// RunReviewerFn lets tests stub the reviewer. When nil, RunReviewer
+	// returns an approve verdict with no findings.
+	RunReviewerFn func(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
+
 	// GenerateAgentSessionTitleFn lets tests stub the task-free agent-session
 	// thread title generation. When nil, the method returns ("", nil).
 	GenerateAgentSessionTitleFn func(ctx context.Context, firstUserMessage string) (string, error)
@@ -243,6 +247,15 @@ func (m *MockRunner) RunCriticRound(ctx context.Context, prompt string, sb harne
 		return m.RunCriticRoundFn(ctx, prompt, sb, cwd, deadline)
 	}
 	return CriticRoundResult{}, nil
+}
+
+// RunReviewer delegates to RunReviewerFn when set; otherwise it returns an
+// approve verdict with no findings.
+func (m *MockRunner) RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error) {
+	if m.RunReviewerFn != nil {
+		return m.RunReviewerFn(ctx, task, in)
+	}
+	return &ReviewerResult{Answer: ReviewAnswer{Verdict: ReviewApprove}}, nil
 }
 
 // GenerateAgentSessionTitle delegates to GenerateAgentSessionTitleFn when

@@ -1,0 +1,43 @@
+You are reviewing a code change that another model made for the task below. Your job is to find the defects its author missed, not to restate the change.
+
+## Task
+
+{{.Prompt}}
+{{if .Criteria}}
+## Acceptance Criteria
+
+{{.Criteria}}
+{{end -}}
+{{if .PriorFindings}}
+## Your Previous Findings
+
+In the previous round you requested these changes, and the author has taken another turn since. Check whether each one is resolved in the changes below, and report one again only if it still applies.
+
+{{.PriorFindings}}
+{{end -}}
+{{if .ImplementerReply}}
+## The Author's Reply
+
+{{.ImplementerReply}}
+{{end}}
+## Changes
+
+{{if .Diff}}```diff
+{{.Diff}}
+```{{else}}The task branch has no changes against the default branch.{{end}}
+
+## Instructions
+
+This is review round {{.Round}} of at most {{.MaxRounds}}.
+
+Judge the change against the task and the acceptance criteria. Report the defects a maintainer would ask to have fixed before merging: wrong behavior, an unmet requirement, a missing test for new behavior, a security or data-loss risk, an unhandled error. Do not report style preferences.
+
+Each finding has:
+- "severity": "high" for wrong behavior, an unmet requirement, a security or data-loss risk; "medium" for a real defect of limited reach or a missing test; "low" for a minor defect still worth fixing.
+- "claim": one sentence that states the defect and where it is.
+- "location": optional, a file path with an optional line number, such as "internal/foo/bar.go:42".
+
+The verdict is "approve" when nothing must change before merging, and "changes_requested" when at least one finding must be fixed. A "changes_requested" verdict lists at least one finding. An "approve" verdict may list low-severity findings as notes; they are not sent back to the author.
+
+Answer with a single JSON object and nothing else, no prose and no code fences, in exactly this shape:
+{"verdict": "changes_requested", "findings": [{"severity": "high", "claim": "...", "location": "..."}], "summary": "one sentence"}

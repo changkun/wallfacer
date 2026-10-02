@@ -83,6 +83,41 @@ WALLFACER_REVIEW_COST_CAP=120000
 	}
 }
 
+// TestReviewModel_ParseAndUpdate verifies the reviewer model is read from the
+// env file, written by Update, and removed by an empty update.
+func TestReviewModel_ParseAndUpdate(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_REVIEW_MODEL=gpt-5-codex\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.ReviewModel != "gpt-5-codex" {
+		t.Errorf("ReviewModel = %q; want gpt-5-codex", cfg.ReviewModel)
+	}
+
+	model := "claude-opus-4-6"
+	if err := envconfig.Update(path, envconfig.Updates{ReviewModel: &model}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if cfg, err = envconfig.Parse(path); err != nil {
+		t.Fatalf("Parse after update: %v", err)
+	}
+	if cfg.ReviewModel != model {
+		t.Errorf("ReviewModel after update = %q; want %q", cfg.ReviewModel, model)
+	}
+
+	empty := ""
+	if err := envconfig.Update(path, envconfig.Updates{ReviewModel: &empty}); err != nil {
+		t.Fatalf("Update clear: %v", err)
+	}
+	if cfg, err = envconfig.Parse(path); err != nil {
+		t.Fatalf("Parse after clear: %v", err)
+	}
+	if cfg.ReviewModel != "" {
+		t.Errorf("ReviewModel after clear = %q; want empty", cfg.ReviewModel)
+	}
+}
+
 // TestParseExportedKeys verifies that the "export " prefix is stripped from key lines.
 func TestParseExportedKeys(t *testing.T) {
 	content := `export CLAUDE_CODE_OAUTH_TOKEN=exported-oauth

@@ -160,9 +160,11 @@ const (
 	SandboxActivityTest SandboxActivity = "test"
 	// SandboxActivityOversightTest is a usage-attribution-only activity for test oversight generation.
 	SandboxActivityOversightTest SandboxActivity = "oversight-test"
-	// SandboxActivityReview is a usage-attribution-only activity for review
-	// adversarial verification (proposer + critics), so its cost is visible in
-	// the task's usage breakdown rather than untracked.
+	// SandboxActivityReview is the review role's activity: the reviewer's usage
+	// is attributed to it in the task's usage breakdown, and the reviewer's
+	// harness resolves through it like any other role's. It is not offered for
+	// per-task routing (SandboxActivities), so by default the reviewer runs on
+	// the task's harness with the reviewer model.
 	SandboxActivityReview SandboxActivity = "review"
 )
 

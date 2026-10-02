@@ -26,3 +26,14 @@ var CommitMessage = Role{
 	Description:        "Produces a descriptive git commit message from the task prompt and diff.",
 	PromptTemplateName: "commit_message",
 }
+
+// Review is the descriptor for the review sub-agent. It runs on a model other
+// than the task's, reads the task prompt, the acceptance criteria and the
+// task's diff from its prompt (no workspace access), and answers with
+// structured findings and a verdict that the task's next turn can act on.
+var Review = Role{
+	Slug:               "review",
+	Title:              "Review",
+	Description:        "Reviews a task's diff on a second model and reports findings with a verdict.",
+	PromptTemplateName: "review",
+}

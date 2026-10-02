@@ -24,6 +24,11 @@ const OversightAgentTimeout = 3 * time.Minute
 // oversight because the input (diff stat + recent log) is small.
 const CommitMessageAgentTimeout = 90 * time.Second
 
+// ReviewAgentTimeout bounds one reviewer run. The reviewer reads the task's
+// prompt, criteria and diff (capped at MaxDiffBytes) and answers once, so a
+// run longer than this is a stuck harness rather than a long review.
+const ReviewAgentTimeout = 5 * time.Minute
+
 // ---------------------------------------------------------------------------
 // Polling / watcher intervals
 // ---------------------------------------------------------------------------

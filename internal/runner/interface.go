@@ -69,6 +69,12 @@ type Interface interface {
 	// attribute the spend to the task.
 	RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 
+	// RunReviewer runs the review role for a task on the reviewer model and
+	// returns its parsed findings and verdict. It refuses with a
+	// *ReviewRefusal, without launching anything, when the reviewer model is
+	// unset or equals the task's model.
+	RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
+
 	// Agent-session title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.
 	GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error)
