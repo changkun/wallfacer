@@ -15,7 +15,7 @@ import (
 // leaves the process environment as it found it.
 func restoreEnvAfter(t *testing.T) {
 	t.Helper()
-	for _, k := range append([]string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "AppData", "LocalAppData"}, goEnvVars...) {
+	for _, k := range append([]string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "AppData", "LocalAppData", "PATH"}, goEnvVars...) {
 		t.Setenv(k, os.Getenv(k))
 	}
 }
@@ -93,9 +93,12 @@ func TestRunIsolatedPinsGoCachesOutsideTheIsolatedHome(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("unexpected diagnostics: %s", stderr.String())
 	}
+	// TestMain already runs this process under RunIsolated, so the home go env
+	// resolves against here is the outer isolated one; what the assertion pins
+	// is that the values were resolved before the inner isolation moved HOME.
 	for _, k := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
 		if got[k] == "" || Within(got[k], home) {
-			t.Errorf("%s = %q, want the developer's location outside the isolated home %s", k, got[k], home)
+			t.Errorf("%s = %q, want a location resolved before isolation, outside the isolated home %s", k, got[k], home)
 		}
 	}
 }
