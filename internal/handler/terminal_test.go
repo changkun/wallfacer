@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"latere.ai/x/pkg/httpjson"
 
 	"latere.ai/x/wallfacer/internal/pkg/pty"
 	"latere.ai/x/wallfacer/internal/runner"
@@ -87,6 +88,40 @@ func TestTerminalWS_Disabled(t *testing.T) {
 	}
 	if resp != nil && resp.StatusCode != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
+// TestTerminalWS_RefusedInCloudMode asserts a cloud-mode deployment never
+// opens a shell, though WALLFACER_TERMINAL_ENABLED is true: the upgrade is
+// refused with 403 and the terminal_unavailable envelope, and a WebSocket dial
+// fails the same way.
+func TestTerminalWS_RefusedInCloudMode(t *testing.T) {
+	srv, h := newTerminalTestServer(t, "", true)
+	h.SetCloudMode(true)
+
+	rec := httptest.NewRecorder()
+	h.HandleTerminalWS(rec, httptest.NewRequest(http.MethodGet, "/api/terminal/ws", nil))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+	var env httpjson.ErrorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+		t.Fatalf("decode error envelope: %v (%s)", err, rec.Body.String())
+	}
+	if env.Error.Code != "terminal_unavailable" || env.Error.Message != messageTerminalUnavailable {
+		t.Errorf("envelope = %+v, want code terminal_unavailable with the fixed sentence", env.Error)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, resp, err := websocket.Dial(ctx, wsURL, nil)
+	if err == nil {
+		_ = conn.Close(websocket.StatusNormalClosure, "")
+		t.Fatal("dial succeeded: a cloud-mode deployment opened a shell")
+	}
+	if resp == nil || resp.StatusCode != http.StatusForbidden {
+		t.Errorf("dial response = %v, want 403", resp)
 	}
 }
 

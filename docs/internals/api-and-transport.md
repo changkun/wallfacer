@@ -177,7 +177,7 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 
 | Method + Path | Purpose |
 |---|---|
-| `GET /api/terminal/ws` | Interactive host shell over WebSocket (PTY relay). See [WebSocket Terminal](#websocket-terminal). |
+| `GET /api/terminal/ws` | Interactive host shell over WebSocket (PTY relay). Refused with 403 `terminal_unavailable` in cloud mode. See [WebSocket Terminal](#websocket-terminal). |
 | `GET /api/docs` | List embedded docs (`{slug, title, category, order}`), reading-order sorted |
 | `GET /api/docs/{slug...}` | Serve one embedded doc as `text/markdown` (path-traversal guarded) |
 | `GET /api/docs-asset/{path...}` | Serve embedded doc images; only whitelisted image extensions are served |
@@ -353,7 +353,7 @@ The handler (`internal/handler/terminal.go`) manages multiple concurrent shell s
 
 Every session is a host shell rooted at the workspace directory. (Earlier builds could exec into a sandbox container; the shipping host-process runtime has no container to exec into, so the `create_session` message carries no target and always spawns a host shell.)
 
-The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
+The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). A cloud-mode deployment refuses it regardless of that setting, before any other check: the shell would run on the server host as the server's own user, shared by every signed-in principal, so the request answers 403 with the `terminal_unavailable` envelope and `GET /api/config` reports `terminal_enabled: false`. Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
 
 ### Message Protocol
 

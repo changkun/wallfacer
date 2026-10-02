@@ -308,6 +308,11 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	if h.authURL != "" {
 		resp["auth_url"] = h.authURL
 	}
+	// HandleTerminalWS refuses on a cloud-mode deployment whatever the env
+	// setting says, so the terminal is reported off there.
+	if h.cloudMode {
+		resp["terminal_enabled"] = false
+	}
 	if cfg == nil {
 		return resp
 	}
@@ -335,7 +340,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["sandbox_reasons"] = sandboxReasons
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
-	resp["terminal_enabled"] = cfg.TerminalEnabled
+	resp["terminal_enabled"] = cfg.TerminalEnabled && !h.cloudMode
 	resp["agent_session_window_days"] = cfg.AgentSessionWindowDays
 	return resp
 }

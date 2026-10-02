@@ -276,9 +276,29 @@ func isLoopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// The error the terminal answers with on a cloud-mode deployment: one code and
+// the one user sentence for it. The reason travels in the envelope's details.
+const (
+	codeTerminalUnavailable    = "terminal_unavailable"
+	messageTerminalUnavailable = "The terminal is not available on a hosted Wallfacer deployment."
+)
+
 // HandleTerminalWS upgrades to a WebSocket connection and relays I/O
 // between the client and a host shell via a PTY.
+//
+// A cloud-mode deployment refuses it before anything else, whatever
+// WALLFACER_TERMINAL_ENABLED says: cloud mode serves many principals, and the
+// shell would run on the server host as the server's own user, so every
+// signed-in principal would get the same shell on it.
 func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
+	if h.cloudMode {
+		httpjson.WriteError(w, http.StatusForbidden, httpjson.Error{
+			Code:    codeTerminalUnavailable,
+			Message: messageTerminalUnavailable,
+			Details: map[string]any{"reason": "cloud mode serves many principals; a terminal is a shell on the server host"},
+		})
+		return
+	}
 	// Gate on WALLFACER_TERMINAL_ENABLED (defaults to true for local use).
 	if h.envFile != "" {
 		cfg, err := envconfig.Parse(h.envFile)

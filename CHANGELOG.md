@@ -105,6 +105,11 @@ committed: the commit log already holds that.
   key, where it answered 401 unless the caller was signed in as a platform
   administrator; a cloud-mode deployment still requires that role.
 
+- A cloud-mode deployment refuses the terminal with 403
+  `terminal_unavailable` and reports it off in `GET /api/config`, whatever
+  `WALLFACER_TERMINAL_ENABLED` says, where it would have opened a shell on the
+  server host for any signed-in account; a local instance is unchanged.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

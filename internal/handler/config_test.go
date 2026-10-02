@@ -2241,3 +2241,30 @@ func TestApplyBoolToggle(t *testing.T) {
 		}
 	})
 }
+
+// TestGetConfig_TerminalDisabledInCloudMode asserts the config response
+// reports the terminal off on a cloud-mode deployment, which refuses it, and
+// leaves a local instance's setting as configured.
+func TestGetConfig_TerminalDisabledInCloudMode(t *testing.T) {
+	withEnv, _ := newTestHandlerWithEnv(t)
+	for name, h := range map[string]*Handler{"env file": withEnv, "no env file": newTestHandler(t)} {
+		t.Run(name, func(t *testing.T) {
+			terminal := func() any {
+				w := httptest.NewRecorder()
+				h.GetConfig(w, httptest.NewRequest(http.MethodGet, "/api/config", nil))
+				var resp map[string]any
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatalf("decode: %v", err)
+				}
+				return resp["terminal_enabled"]
+			}
+			if got := terminal(); got != true {
+				t.Fatalf("local terminal_enabled = %v, want true", got)
+			}
+			h.SetCloudMode(true)
+			if got := terminal(); got != false {
+				t.Errorf("cloud terminal_enabled = %v, want false", got)
+			}
+		})
+	}
+}

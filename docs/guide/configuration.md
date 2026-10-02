@@ -205,7 +205,7 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |
-| `WALLFACER_TERMINAL_ENABLED` | `true` | Integrated host terminal panel; set `false` to disable |
+| `WALLFACER_TERMINAL_ENABLED` | `true` | Integrated host terminal panel; set `false` to disable. A hosted deployment (`WALLFACER_CLOUD`) never offers the terminal, whatever this is set to |
 | `WALLFACER_WORKSPACES` | | Active workspace folders (colon-separated on Unix, semicolon on Windows) |
 | `WALLFACER_CLOUD` | `false` | Forces sign-in for HTML navigation; sign-in stays available either way |
 
