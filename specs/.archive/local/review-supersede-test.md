@@ -2,7 +2,7 @@
 title: Review Supersedes the Test Step (Verification Gate)
 status: archived
 depends_on:
-  - review-adversarial-verification
+  - specs/local/review-adversarial-verification.md
 affects:
   - internal/store/models.go
   - internal/store/tasks_update.go

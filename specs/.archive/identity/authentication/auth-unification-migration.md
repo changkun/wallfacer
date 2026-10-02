@@ -1,8 +1,7 @@
 ---
 title: wallfacer — Auth Unification Migration (cloud + local-mode device-code)
 status: archived
-depends_on:
-  - "latere-ui/specs/auth-client-v1.8.md"
+depends_on: []
 affects:
   - internal/handler/login.go
   - internal/handler/orgs.go
@@ -121,6 +120,8 @@ mux.Handle("/api/", authkit.Middleware(apiRouter, authn))
 `WALLFACER_SESSION` legacy cookie (verify exact name in `pkg/oidc.LoadConfig` override or hardcode) → unified `__Host-latere-session`. Inline two-step fallback during cutover per parent's cookie/env compat spec.
 
 ### Frontend
+
+The frontend changes depend on the session client and headless `OrgSwitcher` specified in `../latere-ui/specs/auth-client-v1.8.md`, a spec in the `latere-ui` repository.
 
 `frontend/stores/auth.ts:6` — replace bespoke `fetchMe()` with `latere-ui v1.8.0`'s `createSessionStore` + `useSession`. Adopt `AccountMenu` and the new headless `OrgSwitcher`.
 

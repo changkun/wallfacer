@@ -2,7 +2,7 @@
 title: Review Verification Trajectory Streaming
 status: archived
 depends_on:
-  - review-adversarial-verification
+  - specs/local/review-adversarial-verification.md
 affects:
   - internal/handler/execute.go
   - internal/handler/review_transcript.go

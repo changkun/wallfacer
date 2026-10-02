@@ -2,8 +2,8 @@
 title: Unified Transcript Rendering (Raw ↔ Rendered, all harnesses)
 status: archived
 depends_on:
-  - harness-abstraction
-  - review-trajectory-streaming
+  - specs/shared/harness-abstraction.md
+  - specs/local/review-trajectory-streaming.md
 affects:
   - internal/harness/harness.go
   - internal/harness/codex.go
