@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 134,
+  "route_count": 126,
   "routes": [
     {
       "method": "GET",
@@ -911,36 +911,6 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/tasks/{id}/pr",
-      "name": "TaskPRStatus",
-      "description": "The GitHub pull request for the task's branch, or null.",
-      "tags": [
-        "tasks",
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/pr",
-      "name": "CreateTaskPR",
-      "description": "Create (or return the existing) GitHub pull request for the task's branch; repo and base derived from the workspace.",
-      "tags": [
-        "tasks",
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/pr/comment",
-      "name": "TaskPRComment",
-      "description": "Post a comment to the task's pull request.",
-      "tags": [
-        "tasks",
-        "github"
-      ]
-    },
-    {
-      "method": "GET",
       "pattern": "/api/tasks/{id}/logs",
       "name": "StreamLogs",
       "description": "SSE stream of live container logs for a running task.",
@@ -1174,51 +1144,6 @@
       "description": "Cancel the in-flight local-mode device-code flow.",
       "tags": [
         "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/github/auth/status",
-      "name": "GitHubAuthStatus",
-      "description": "GitHub connection state for the principal: connected, login, account, granted permissions, and whether the connect flow is available.",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/github/auth/connect",
-      "name": "GitHubAuthConnect",
-      "description": "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the Latere identity broker.",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/github/auth/disconnect",
-      "name": "GitHubAuthDisconnect",
-      "description": "Disconnect GitHub by clearing the principal's stored token.",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/github/pulls",
-      "name": "GitHubCreatePull",
-      "description": "Create a pull request from head into base; returns the open PR if one already exists for the branch.",
-      "tags": [
-        "github"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/github/comments",
-      "name": "GitHubCreateComment",
-      "description": "Post a conversation comment to a pull request or issue.",
-      "tags": [
-        "github"
       ]
     }
   ]

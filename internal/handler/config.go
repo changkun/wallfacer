@@ -288,7 +288,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"agent_session_window_days": 30,
 		"auth_enabled":              h.auth != nil,
 		"auth_redirect_enabled":     h.auth != nil && !h.redirectSignInOff,
-		"github":                    h.githubStatus(ctx),
 	}
 	if h.authURL != "" {
 		resp["auth_url"] = h.authURL

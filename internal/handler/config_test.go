@@ -532,6 +532,26 @@ func TestGetConfig_OmitsRetiredIdeationSchedulerFields(t *testing.T) {
 	}
 }
 
+// TestGetConfig_HasNoGitHubKey verifies the config response carries no GitHub
+// connection state: wallfacer holds no GitHub credential to report on.
+func TestGetConfig_HasNoGitHubKey(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/config: status %d, want 200", w.Code)
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode config response: %v", err)
+	}
+	if v, ok := resp["github"]; ok {
+		t.Fatalf("config response included key %q = %v", "github", v)
+	}
+}
+
 func TestUpdateConfig_AcceptsRetiredIdeationSchedulerFields(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	body := strings.NewReader(`{"ideation": true, "ideation_interval": 15}`)

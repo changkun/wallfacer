@@ -182,3 +182,65 @@ func TestRefineRoutesRemoved(t *testing.T) {
 		})
 	}
 }
+
+// TestGitHubRoutesRemoved verifies that the API mux has no GitHub route:
+// neither the connection surface under /api/github nor the task pull-request
+// surface under /api/tasks/{id}/pr. Wallfacer makes no call to GitHub, so each
+// of these paths must match no pattern and answer 404.
+func TestGitHubRoutesRemoved(t *testing.T) {
+	workdir := t.TempDir()
+	worktrees := filepath.Join(workdir, "worktrees")
+	if err := os.MkdirAll(worktrees, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	defer s.Close()
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: worktrees,
+		Workspaces:   []string{workdir},
+	})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
+	reg := metrics.NewRegistry()
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+
+	dummyID := uuid.New().String()
+	removed := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/github/auth/status"},
+		{http.MethodPost, "/api/github/auth/connect"},
+		{http.MethodPost, "/api/github/auth/disconnect"},
+		{http.MethodPost, "/api/github/pulls"},
+		{http.MethodPost, "/api/github/comments"},
+		{http.MethodGet, "/api/tasks/" + dummyID + "/pr"},
+		{http.MethodPost, "/api/tasks/" + dummyID + "/pr"},
+		{http.MethodPost, "/api/tasks/" + dummyID + "/pr/comment"},
+	}
+	for _, rt := range removed {
+		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
+			req := httptest.NewRequest(rt.method, rt.path, nil)
+			if _, pattern := mux.Handler(req); pattern != "" {
+				t.Fatalf("%s %s matched pattern %q, want no match", rt.method, rt.path, pattern)
+			}
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			if w.Code != http.StatusNotFound {
+				t.Errorf("%s %s returned %d, want 404", rt.method, rt.path, w.Code)
+			}
+		})
+	}
+
+	for _, route := range apicontract.Routes {
+		if strings.HasPrefix(route.Pattern, "/api/github") ||
+			strings.HasSuffix(route.Pattern, "/pr") || strings.Contains(route.Pattern, "/pr/") {
+			t.Errorf("contract still declares %s %s (%s)", route.Method, route.Pattern, route.Name)
+		}
+	}
+}

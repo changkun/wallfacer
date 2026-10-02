@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -632,5 +633,19 @@ func TestParsePlanMessage(t *testing.T) {
 					c.subject, c.body, n, s, c.round, c.summary)
 			}
 		})
+	}
+}
+
+// TestBuildRevertSubject_MultibyteTruncation guards against slicing a multi-byte
+// summary at a raw byte boundary, which would cut a rune in half.
+func TestBuildRevertSubject_MultibyteTruncation(t *testing.T) {
+	// The leading "a" shifts the 80-byte boundary into the middle of a 3-byte
+	// rune; a raw byte slice would yield invalid UTF-8.
+	got := buildRevertSubject("a"+strings.Repeat("世", 100), 3)
+	if !utf8.ValidString(got) {
+		t.Fatalf("revert subject is not valid UTF-8: %q", got)
+	}
+	if n := utf8.RuneCountInString(got); n > 80 {
+		t.Errorf("subject rune count = %d, want <= 80", n)
 	}
 }

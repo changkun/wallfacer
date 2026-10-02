@@ -32,7 +32,6 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/github"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
@@ -144,7 +143,7 @@ func (sc *ServerComponents) Shutdown() {
 func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *ServerComponents {
 	// Bootstrap telemetry before anything else logs. This registers the
 	// TracerProvider and the W3C propagator for the process, which is what makes
-	// the otel.Transport-wrapped clients in the handler, github, and oauth trees
+	// the otel.Transport-wrapped clients in the handler and oauth trees
 	// emit client spans and send traceparent instead of resolving to noop. The
 	// local colored handler is handed over as Config.Stdout so terminal output is
 	// unchanged while the same records also reach the OTLP log bridge.
@@ -258,17 +257,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
 
-	// GitHub integration: a principal-scoped token store under the config dir
-	// backs /api/github/*. The live broker (the "Latere AI" GitHub App via the
-	// Latere identity service) is wired further down whenever an auth URL is
-	// configured; it activates once the signed-in account has a GitHub
-	// connection. Status and disconnect work against the store either way.
-	if ghStore, gerr := github.NewFileStore(filepath.Join(configDir, "github")); gerr != nil {
-		logger.Main.Warn("github: token store unavailable", "error", gerr)
-	} else {
-		h.SetGitHub(&github.Provider{Store: ghStore})
-	}
-
 	// Cloud mode: wire latere.ai sign-in. Both the WALLFACER_CLOUD flag
 	// and the AUTH_* vars resolve from shell env first, .env file
 	// second — users can drop everything in ~/.wallfacer/.env or export
@@ -380,30 +368,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// It reuses authClient (same OIDC client, so the session cookie it mints on
 	// completion is encrypted with the same key the browser /callback uses) and
 	// the shared file token store (so a device login also lights up the
-	// coordination connector and GitHub broker, and carries over to the `latere`
-	// CLI). Local mode only: cloud deployments force the /login browser flow
-	// (ForceLogin) and have no writable per-user token store, so the endpoints
-	// stay 503 there — which is also the signal the SPA uses to fall back to the
-	// /login redirect instead of showing the device modal.
+	// coordination connector and carries over to the `latere` CLI). Local mode
+	// only: cloud deployments force the /login browser flow (ForceLogin) and
+	// have no writable per-user token store, so the endpoints stay 503 there,
+	// which is also the signal the SPA uses to fall back to the /login redirect
+	// instead of showing the device modal.
 	if !cloudMode && authClient != nil && coordTokenStore != nil {
 		h.SetDeviceAuth(&handler.DeviceAuth{OIDC: authClient, Store: coordTokenStore})
-	}
-
-	// Wire the live GitHub broker: wallfacer fetches the principal's GitHub
-	// token from the identity service's self endpoint using the signed-in user's
-	// OIDC token (the same token the coordination connector reads). With it set,
-	// the /api/github/* connect + read/write surface goes live.
-	if authCfg.AuthURL != "" && coordTokenStore != nil {
-		h.SetGitHubBroker(&github.HTTPBroker{
-			AuthBaseURL: authCfg.AuthURL,
-			TokenSource: func(context.Context) (string, error) {
-				tok, err := coordTokenStore.Load()
-				if err != nil || tok == nil {
-					return "", err
-				}
-				return tok.AccessToken, nil
-			},
-		})
 	}
 
 	// When a dispatched task completes, update the source spec to "complete".
@@ -1318,13 +1289,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ReviewTranscript": withID(h.ReviewTranscript),
 		"TaskTrace":        withID(h.TaskTrace),
 
-		"TaskCommits":   withID(h.TaskCommits),
-		"TaskDiff":      withID(h.TaskDiff),
-		"TaskPRStatus":  withID(h.TaskPRStatus),
-		"CreateTaskPR":  withID(h.CreateTaskPR),
-		"TaskPRComment": withID(h.TaskPRComment),
-		"StreamLogs":    withID(h.StreamLogs),
-		"GetTurnUsage":  withID(h.GetTurnUsage),
+		"TaskCommits":  withID(h.TaskCommits),
+		"TaskDiff":     withID(h.TaskDiff),
+		"StreamLogs":   withID(h.StreamLogs),
+		"GetTurnUsage": withID(h.GetTurnUsage),
 
 		// ServeOutput needs both {id} (UUID) and {filename} path values.
 		"ServeOutput": func(w http.ResponseWriter, r *http.Request) {
@@ -1365,13 +1333,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"AuthDeviceStart":  http.HandlerFunc(h.AuthDeviceStart),
 		"AuthDevicePoll":   http.HandlerFunc(h.AuthDevicePoll),
 		"AuthDeviceCancel": http.HandlerFunc(h.AuthDeviceCancel),
-
-		// GitHub integration auth surface (spec: github-integration #1).
-		"GitHubAuthStatus":     http.HandlerFunc(h.GitHubAuthStatus),
-		"GitHubAuthConnect":    http.HandlerFunc(h.GitHubAuthConnect),
-		"GitHubAuthDisconnect": http.HandlerFunc(h.GitHubAuthDisconnect),
-		"GitHubCreatePull":     http.HandlerFunc(h.GitHubCreatePull),
-		"GitHubCreateComment":  http.HandlerFunc(h.GitHubCreateComment),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes

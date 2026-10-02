@@ -582,21 +582,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/pr", Name: "TaskPRStatus",
-		Description: "The GitHub pull request for the task's branch, or null.",
-		Tags:        []string{"tasks", "github"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/pr", Name: "CreateTaskPR",
-		Description: "Create (or return the existing) GitHub pull request for the task's branch; repo and base derived from the workspace.",
-		Tags:        []string{"tasks", "github"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/pr/comment", Name: "TaskPRComment",
-		Description: "Post a comment to the task's pull request.",
-		Tags:        []string{"tasks", "github"},
-	},
-	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/logs", Name: "StreamLogs",
 		Description: "SSE stream of live container logs for a running task.",
 		Tags:        []string{"tasks", "sse"},
@@ -737,30 +722,5 @@ var Routes = []Route{
 		Method: http.MethodPost, Pattern: "/api/auth/device/cancel", Name: "AuthDeviceCancel",
 		Description: "Cancel the in-flight local-mode device-code flow.",
 		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/github/auth/status", Name: "GitHubAuthStatus",
-		Description: "GitHub connection state for the principal: connected, login, account, granted permissions, and whether the connect flow is available.",
-		Tags:        []string{"github"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/github/auth/connect", Name: "GitHubAuthConnect",
-		Description: "Start the brokered \"Latere AI\" GitHub App install + grant flow. Gated on the Latere identity broker.",
-		Tags:        []string{"github"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/github/auth/disconnect", Name: "GitHubAuthDisconnect",
-		Description: "Disconnect GitHub by clearing the principal's stored token.",
-		Tags:        []string{"github"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/github/pulls", Name: "GitHubCreatePull",
-		Description: "Create a pull request from head into base; returns the open PR if one already exists for the branch.",
-		Tags:        []string{"github"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/github/comments", Name: "GitHubCreateComment",
-		Description: "Post a conversation comment to a pull request or issue.",
-		Tags:        []string{"github"},
 	},
 }
