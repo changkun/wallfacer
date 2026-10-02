@@ -65,7 +65,7 @@ Local Product - 30 shipped, 6 designed and unbuilt, 2 waiting on decisions
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback (old), Spatial Canvas
 
-Shared Design - 6 complete
+Shared Design - 9 complete, 1 part shipped, 3 retired
   ✅ Agent Abstraction             ✅ Host Exec Mode
   ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
   ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
