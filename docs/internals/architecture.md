@@ -359,33 +359,12 @@ Shared utility packages under `internal/pkg/`:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `pkg/atomicfile` | Atomic file writes (temp + rename) | `Write()` |
-| `pkg/cache` | TTL cache with expiration | `TTLCache[K,V]` |
-| `pkg/circuitbreaker` | Circuit breakers (lock-free and backoff variants) | `Breaker`, `BackoffBreaker` |
-| `pkg/cmdexec` | `os/exec` wrapper for git and agent commands, with a rollback-capable step transaction | `Cmd`, `New()`, `Git()`, `Tx`, `NewTx()` |
-| `pkg/dagscorer` | DAG-based task dependency scoring | `Score()` |
-| `pkg/dircp` | Directory tree copy with filters | `Copy()` |
-| `pkg/envutil` | Environment variable parsing with defaults and validation | `Int()`, `IntMin()`, `Duration()` |
-| `pkg/httpjson` | JSON request/response helpers for HTTP handlers | `DecodeBody()`, `DecodeOptionalBody()`, `PathUUID()`, `Write()` |
-| `pkg/keyedmu` | Per-key mutex map for fine-grained locking | `Map[K]` |
-| `pkg/lazyval` | Lazily-computed cached value with invalidation | `Value[T]`, `New()` |
-| `pkg/ndjson` | Newline-delimited JSON file reader/appender | `ReadFile()`, `AppendFile()`, `PreferResultLine()` |
-| `pkg/pagination` | Cursor-based pagination helpers | `Paginate()` |
-| `pkg/pty` | PTY relay for the WebSocket terminal integration | `Open()`, `StartWithSize()`, `Setsize()` |
-| `pkg/pubsub` | Generic fan-out notification hub with replay | `Hub[T]` |
-| `pkg/sanitize` | Slug and rune-safe truncation helpers | `Slug()`, `Truncate()`, `TruncateTrimRight()` |
-| `pkg/set` | Generic set type | `Set[T]`, `New()` |
-| `pkg/sortedkeys` | Sorted map key iteration | `Of()` |
-| `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()` |
-| `pkg/syncmap` | Type-safe generic wrapper around `sync.Map` | `Map[K,V]` |
-| `pkg/tail` | Retains the last N elements of a slice | `Of()` |
-| `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
-| `pkg/uuidutil` | UUID validation helper | `IsValid()` |
-| `pkg/watcher` | Event-loop background watcher | `Start()`, `Config`, `WakeSource` |
-| `pkg/dag` | Generic DAG operations (ReverseEdges, DetectCycles, Reachable) | `ReverseEdges()`, `DetectCycles()`, `Reachable()` |
-| `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader` |
-| `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Validate()`, `CanTransition()`, `Allowed()` |
-| `pkg/tree` | Generic tree data structure with `iter.Seq` walk | `Node[T]`, `Walk()` |
+| `pkg/dagscorer` | Critical-path score of a node in a dependency DAG, used to rank backlog tasks for promotion | `Score()` |
+| `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader.ReadChunk()` |
+| `pkg/pty` | PTY allocation for the WebSocket terminal on macOS and Linux; every call fails on Windows | `Open()`, `StartWithSize()`, `Setsize()` |
+| `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
+
+General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations and repository operations, come from the `latere.ai/x/pkg` module.
 
 ## Handler Organization
 

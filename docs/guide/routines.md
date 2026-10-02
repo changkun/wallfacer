@@ -38,7 +38,7 @@ Deleting a routine stops it permanently and removes the card.
 
 When a routine's timer elapses (or **Run now** is pressed):
 
-1. A fresh instance task is created in Backlog with the routine's prompt.
+1. A fresh instance task is created with the routine's prompt and timeout and moved straight to In Progress; it does not wait in Backlog.
 2. The instance is tagged `spawned-by:<routine-id>`, so all runs of one routine can be found together.
 3. The instance runs the built-in pipeline. A routine stored with a fleet from an earlier release spawns the same ordinary task.
 4. The routine records its last-fired time and re-arms for the next interval.
