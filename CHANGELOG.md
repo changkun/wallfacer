@@ -122,6 +122,10 @@ committed: the commit log already holds that.
   them with that model and budget, as single create does, where the request
   failed with `400 invalid JSON: json: unknown field "model"`.
 
+- The Events tab of a task shows the sentence of a system event, such as a
+  commit phase, a recovery note or the notice that a stored fleet no longer
+  exists, where it showed only the event's kind or the word "system".
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

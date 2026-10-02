@@ -304,6 +304,16 @@ async function fetchEvents() {
   }
 }
 
+// systemEventSummary is the row text of a system event: its sentence, which the
+// server writes to `result` (or to `message` on a budget stop), else its
+// machine `kind` (a routine fire carries only that), else the bare type.
+function systemEventSummary(d: Record<string, unknown>): string {
+  if (typeof d.result === 'string' && d.result) return d.result.slice(0, 120);
+  if (typeof d.message === 'string' && d.message) return d.message.slice(0, 120);
+  if (typeof d.kind === 'string' && d.kind) return d.kind;
+  return 'system';
+}
+
 // One-line summary per event, by type. Mirrors the legacy _renderEventRow.
 function eventSummary(e: TaskEvent): string {
   const d = e.data ?? {};
@@ -312,7 +322,7 @@ function eventSummary(e: TaskEvent): string {
     case 'output': return typeof d.result === 'string' ? d.result.slice(0, 100) : 'output';
     case 'feedback': return typeof d.text === 'string' ? d.text.slice(0, 100) : 'feedback';
     case 'error': return typeof d.error === 'string' ? d.error.slice(0, 120) : (typeof d.message === 'string' ? d.message.slice(0, 120) : 'error');
-    case 'system': return typeof d.kind === 'string' ? d.kind : 'system';
+    case 'system': return systemEventSummary(d);
     default: return e.event_type;
   }
 }
