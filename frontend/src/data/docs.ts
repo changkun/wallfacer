@@ -16,7 +16,6 @@ export const docIndex: DocEntry[] = [
   { slug: 'board', title: "Board", section: "Use Wallfacer", desc: "The task board: lifecycle, dependencies, batch creation, search, the task detail view." },
   { slug: 'chat', title: "Chat", section: "Use Wallfacer", desc: "The dedicated chat surface: sessions, slash commands, @mentions." },
   { slug: 'plan', title: "Plan", section: "Use Wallfacer", desc: "Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations." },
-  { slug: 'agent-graph', title: "Agent Graph", section: "Use Wallfacer", desc: "Defining agents, composing fleets, harness pinning, live traces." },
   { slug: 'routines', title: "Routines", section: "Use Wallfacer", desc: "Scheduled cards that spawn fresh tasks on an interval." },
   { slug: 'whiteboard', title: "Whiteboard", section: "Use Wallfacer", desc: "The free-form drawing canvas." },
   { slug: 'artifacts', title: "Artifacts", section: "Use Wallfacer", desc: "The gallery for self-contained pages produced in the workspace." },

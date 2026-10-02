@@ -204,7 +204,7 @@ Non-git directories are supported as plain mount targets (no worktree, no commit
 
 `StartRoutineEngine` (`internal/handler/routines_engine.go`) drives all scheduled, fire-and-forget routines on the board. It builds a single `routine.Engine` (`latere.ai/x/pkg/routine`) and attaches it to the store change stream: every store change reconciles the engine against the current routine cards.
 
-Each routine card carries `RoutineEnabled` and `RoutineIntervalSeconds`. The reconciler maps an active, enabled card with a positive interval to a `routine.FixedInterval` schedule and registers it; cancelled, done, failed, archived, or disabled cards become `routine.Disabled()` and are dropped. When a routine's timer elapses, the engine invokes `h.fireRoutine`, which spawns a fresh task for that routine's flow.
+Each routine card carries `RoutineEnabled` and `RoutineIntervalSeconds`. The reconciler maps an active, enabled card with a positive interval to a `routine.FixedInterval` schedule and registers it; cancelled, done, failed, archived, or disabled cards become `routine.Disabled()` and are dropped. When a routine's timer elapses, the engine invokes `h.fireRoutine`, which spawns a fresh ordinary task with the routine's prompt.
 
 The `routine` package is stateless about tasks and stores: it owns one `time.AfterFunc` timer per registered UUID and calls back a `FireFunc`. The handler is the only consumer and reconciles the engine via `Register` / `Unregister`. A recurring idea-generation routine is one instance of this primitive (see [Recurring idea generation](#recurring-idea-generation)).
 
@@ -237,7 +237,7 @@ The generator reads the task's trace events, passes them to the Claude API with 
 
 ## Recurring idea generation
 
-There is no dedicated ideation watcher and no separate ideation engine. Recurring idea generation is an ordinary [RoutineEngine](#routineengine) routine tagged `system:ideation`: a routine card on the `implement` flow whose prompt asks the agent to scan the repository and create tasks. Each fire spawns a normal task through the standard task-and-flow dispatch path. Legacy records written before the idea-agent subsystem was removed carry `Kind = "idea-agent"` or `FlowID = "brainstorm"`; both resolve to the default `implement` flow (`internal/flow/registry.go` falls back to `implement` when a pinned slug no longer names a registered flow), so existing routines keep firing.
+There is no dedicated ideation watcher and no separate ideation engine. Recurring idea generation is an ordinary [RoutineEngine](#routineengine) routine tagged `system:ideation`: a routine card whose prompt asks the agent to scan the repository and create tasks. Each fire spawns a normal task that runs the built-in pipeline. Records that carry `Kind = "idea-agent"`, `FlowID = "brainstorm"`, or a routine spawn kind or flow are read as ordinary tasks and routines: dispatch does not read `FlowID`, and the routine engine does not read the spawn fields, so existing routines keep firing.
 
 ## Conflict Resolution
 

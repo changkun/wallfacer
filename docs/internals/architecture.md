@@ -106,29 +106,21 @@ flowchart LR
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
     PubSub --> Review["Auto-review<br/>adversarial verification<br/>on waiting session tasks<br/>(supersedes auto-test when on)"]
-    PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn tasks against a flow"]
+    PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn ordinary tasks"]
 ```
 
 The seven entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`. There is no auto-refiner.
 
-### Agents, flows, and the dispatch layer
+### Agent roles and the dispatch layer
 
-At task execution time the runner consults two registries before it execs any CLI:
+Every task runs one built-in pipeline. `internal/agents/` holds its **Role** descriptors: exactly five built-ins (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`). A role names what an agent is and which prompt template it renders; the runner's binding table (`internal/runner/agent_bindings.go`) holds the dispatch plumbing per slug (activity, mount mode, timeout, result parser). Each role's harness follows the task's harness, its per-activity override, or the `WALLFACER_SANDBOX_*` settings.
 
-- `internal/agents/` holds the **Role** descriptors. Exactly five built-ins ship (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`), plus any user-authored clones loaded from `~/.wallfacer/agents/`. A role pins a harness, declares capabilities, and optionally carries a system-prompt preamble.
-- `internal/flow/` holds **Flow** definitions: ordered step chains that reference roles by slug. One built-in ships (`implement`; `internal/flow/builtins.go`); user flows live under `~/.wallfacer/flows/`. The `implement` flow runs `impl -> test -> parallel(commit-msg, title, oversight)`. Tasks pinned to a since-removed slug (e.g. the retired `brainstorm`) resolve to `implement` (`registry.go`).
+Task execution picks one of two paths (`internal/runner/execute.go`):
 
-Both directories are fsnotify-watched; edits reload the merged registry without restarting the server.
+- a task whose resolved harness is `topos` -> `runNativeTopos`, which runs the task as one in-process agent through `internal/agentgraph`, the seam onto the embedded topos runtime, and persists the resulting trace graph on the task. This path is experimental and opt-in. See [Agent Graph Runtime](agent-graph-runtime.md).
+- every other task -> the turn-loop path in `execute.go` (impl -> test -> commit pipeline with full session-recovery semantics).
 
-Task execution picks one of three dispatch paths (`internal/runner/execute.go`):
-
-- a flow marked `Agentic` -> the in-process topos agent-graph runtime. `internal/agentgraph` is the single seam onto the embedded topos runtime: it compiles the flow plus agents registry into a `topos.Region` and `runAgenticFlow` executes it, persisting the resulting trace graph on the task. The built-in `implement` flow does not set `Agentic`; this path is experimental/opt-in. A task whose resolved harness is `topos` similarly runs through `runNativeTopos` instead of a subprocess.
-- `flow == "implement"` -> the turn-loop path in `execute.go` (impl -> test -> commit pipeline with full session-recovery semantics).
-- any other flow slug -> the flow engine in `internal/flow/engine.go`. It walks steps linearly, fans parallel-sibling groups through an `errgroup`, and launches each role via `Runner.RunAgent`.
-
-In the UI, agent definition and flow composition share a single surface: the Agent Graph page (`/agent-graph`). The former Agents and Flows pages are gone; `/agents`, `/workflows`, and `/flows` redirect to `/agent-graph` (`frontend/src/router.ts`).
-
-See [Agent Graph](../guide/agent-graph.md) for the full user-facing model.
+`Task.FlowID` is a record field kept for stored tasks and is not read for dispatch; a stored task that names a fleet gets one notice on its timeline and runs the same pipeline.
 
 ## Component Responsibilities
 
@@ -337,15 +329,14 @@ Every `internal/` package and its role in the system:
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
 | `adversarial` | Review adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `ReviewVerifier` |
-| `agentgraph` | The single seam onto the embedded topos runtime: compiles a flow + agents registry into a `topos.Region`, executes it, returns final text plus a trace graph | `FromFlow()`, `RunFlow()`, `Runner`, `Trace` |
-| `agents` | Merged built-in + user-authored agent registry backed by YAML under `~/.wallfacer/agents/`; fsnotify reload. Five built-in roles: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Registry`, `Role`, `BuiltinAgents`, `NewMergedRegistry()`, `LoadUserAgents()`, `WriteUserAgent()`, `DeleteUserAgent()` |
+| `agentgraph` | The seam onto the embedded topos runtime: runs one agent in-process for the native `topos` harness and returns final text plus a trace graph in topos-free types | `RunAgent()`, `ModelConfig`, `Result`, `Event`, `Trace` |
+| `agents` | The five built-in role descriptors: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Role`, `BuiltinAgents` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec, auth, web) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `RunAuth()`, `RunWeb()`, `BuildMux()`, `ConfigDir()` |
 | `coordinator` | Cloud coordination plane: the wallfacerd role signed-in local instances connect to over one outbound WebSocket (presence, spec comments, metadata projection) | `Registry`, `CommentStore` (memory + Postgres) |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
-| `flow` | Merged built-in + user-authored flow registry; composes agents into ordered step chains. One built-in flow: `implement`; unregistered slugs resolve to it | `Registry`, `Flow`, `Step`, `NewBuiltinRegistry()` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
@@ -385,16 +376,12 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/sanitize` | Slug and rune-safe truncation helpers | `Slug()`, `Truncate()`, `TruncateTrimRight()` |
 | `pkg/set` | Generic set type | `Set[T]`, `New()` |
 | `pkg/sortedkeys` | Sorted map key iteration | `Of()` |
-| `pkg/slugutil` | Kebab-case identifier validation for user-authored YAML registries | `IsValid()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()` |
 | `pkg/syncmap` | Type-safe generic wrapper around `sync.Map` | `Map[K,V]` |
 | `pkg/tail` | Retains the last N elements of a slice | `Of()` |
 | `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
 | `pkg/uuidutil` | UUID validation helper | `IsValid()` |
 | `pkg/watcher` | Event-loop background watcher | `Start()`, `Config`, `WakeSource` |
-| `pkg/registry` | Merges a built-in catalog with user-authored items keyed by slug; shared by the agent and flow stores | `MergeUnique()`, `ContainsSlug()` |
-| `pkg/yamldir` | Reads YAML definition files from a user directory | `ReadAll()`, `File`, `Remove()` |
-| `pkg/yamlwatch` | Debounces filesystem events on a YAML directory | `Watch()` |
 | `pkg/dag` | Generic DAG operations (ReverseEdges, DetectCycles, Reachable) | `ReverseEdges()`, `DetectCycles()`, `Reachable()` |
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader` |
 | `pkg/statemachine` | Generic state machine with transition validation | `Machine[S]`, `New()`, `Validate()`, `CanTransition()`, `Allowed()` |
@@ -410,8 +397,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
 | `principal.go` | Request principal plumbing used by auth/cloud middleware |, (internal) |
 | `force_login.go` | Force-login gate applied in cloud mode (`Handler.ForceLogin`) |, (internal) |
-| `agents.go` | User-authored agent catalog CRUD backed by `~/.wallfacer/agents/` | `GET/POST /api/agents`, `PUT/DELETE /api/agents/{slug}` |
-| `flows.go` | User-authored flow catalog CRUD backed by `~/.wallfacer/flows/` | `GET/POST /api/flows`, `PUT/DELETE /api/flows/{slug}` |
 | `routines.go` | Routine card CRUD (list, create, update schedule, trigger) | `GET/POST /api/routines`, `PATCH /api/routines/{id}/schedule`, `POST /api/routines/{id}/trigger` |
 | `routines_engine.go` | Scheduler loop that fires routine tasks (user-defined) on their cadence | `StartRoutineEngine()` (internal loop) |
 | `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/me`, `GET /api/auth/orgs`, `PATCH /api/auth/me` |

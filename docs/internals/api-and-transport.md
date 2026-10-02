@@ -38,18 +38,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/routines` | Create a routine card that spawns instance tasks on a fixed interval |
 | `PATCH /api/routines/{id}/schedule` | Update a routine's interval or enabled flag; unset fields left unchanged |
 | `POST /api/routines/{id}/trigger` | Fire a routine immediately, bypassing the schedule; the scheduled cycle continues |
-| **Agents** (sub-agent catalog) | |
-| `GET /api/agents` | List all registered sub-agent roles (built-in catalog plus user-authored) |
-| `GET /api/agents/{slug}` | Get one agent's full descriptor including its prompt template body |
-| `POST /api/agents` | Create a user-authored agent (rejects slugs that shadow a built-in) |
-| `PUT /api/agents/{slug}` | Update a user-authored agent; 409 for built-in slugs |
-| `DELETE /api/agents/{slug}` | Delete a user-authored agent; 409 for built-in slugs |
-| **Flows** (flow catalog) | |
-| `GET /api/flows` | List all registered flows (built-in catalog plus user-authored) |
-| `GET /api/flows/{slug}` | Get one flow's full descriptor including its step chain and agent names |
-| `POST /api/flows` | Create a user-authored flow (rejects slugs that shadow a built-in) |
-| `PUT /api/flows/{slug}` | Update a user-authored flow; 409 for built-in slugs |
-| `DELETE /api/flows/{slug}` | Delete a user-authored flow; 409 for built-in slugs |
 | **Environment configuration** | |
 | `GET /api/env` | Get environment configuration (tokens masked) |
 | `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |
@@ -75,7 +63,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **Task collection (no {id})** | |
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
-| `POST /api/tasks` | Create a new task in the backlog. **Does not accept `sandbox` or `sandbox_by_activity`**; the harness (Claude, Codex, Cursor) is selected by the agent a flow step references, and the per-task override is applied via `PATCH /api/tasks/{id}` after creation. |
+| `POST /api/tasks` | Create a new task in the backlog. **Does not accept `sandbox` or `sandbox_by_activity`**; a task's harness and per-activity harnesses are set via `PATCH /api/tasks/{id}` after creation, and otherwise follow the `WALLFACER_SANDBOX_*` settings. |
 | `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring. Same harness-rejection policy as the singular endpoint. |
 | `POST /api/tasks/generate-titles` | Bulk-generate titles for tasks that lack one |
 | `POST /api/tasks/generate-oversight` | Bulk-generate oversight summaries for eligible tasks |
@@ -100,7 +88,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
 | `POST /api/tasks/{id}/review` | Trigger an adversarial review verification run for a waiting task |
 | `GET /api/tasks/{id}/review/transcript` | Review run transcript. `truncated: true` when the transcript file could not be read to its end (an I/O error, or a record over the line cap `maxReviewTranscriptLineBytes` in `internal/handler/review_transcript.go`); `forks` then holds the rounds before that point, and the server logs the error with the session directory |
-| `GET /api/tasks/{id}/trace` | Agent trace graph recorded by an agentic (topos) run |
+| `GET /api/tasks/{id}/trace` | Agent trace graph recorded by a run on the in-process topos harness |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |

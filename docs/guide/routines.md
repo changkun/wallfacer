@@ -12,7 +12,8 @@ Create routines from the Routines page. The form takes:
 
 - **Prompt**: what each spawned task should do. Write it as a self-contained task prompt; every instance starts fresh with no memory of previous runs.
 - **Interval**: the firing cadence, chosen from presets between 1 minute and 1440 minutes (24 hours). The API enforces a 1 minute minimum to keep instance-task churn reasonable.
-- **Agent graph**: which fleet the spawned tasks execute against (see [Agent Graph](agent-graph.md)). Defaults to `implement`.
+
+Every spawned task runs the built-in pipeline, the same as a task created on the board.
 
 New routines are enabled immediately and arm their first timer on creation.
 
@@ -20,7 +21,7 @@ New routines are enabled immediately and arm their first timer on creation.
 
 Each routine renders as a card with schedule controls in its footer:
 
-- A **routine** badge and the spawn fleet label.
+- A **routine** badge.
 - A live **countdown** to the next scheduled fire, or `paused` when disabled.
 - The **last fired** time, once the routine has fired at least once.
 - An **interval** picker to change the cadence in place.
@@ -39,7 +40,7 @@ When a routine's timer elapses (or **Run now** is pressed):
 
 1. A fresh instance task is created in Backlog with the routine's prompt.
 2. The instance is tagged `spawned-by:<routine-id>`, so all runs of one routine can be found together.
-3. The instance executes against the routine's agent graph. An unknown or since-removed fleet slug resolves to `implement`.
+3. The instance runs the built-in pipeline. A routine stored with a fleet from an earlier release spawns the same ordinary task.
 4. The routine records its last-fired time and re-arms for the next interval.
 
 From that point the instance is an ordinary task: it obeys the same lifecycle, automation, and review flow as anything else on the [board](board.md).
@@ -59,5 +60,4 @@ Earlier releases shipped "ideation" as a distinct scheduled feature with its own
 ## Related pages
 
 - [Board](board.md) for the lifecycle of spawned instance tasks.
-- [Agent Graph](agent-graph.md) for composing the fleet a routine spawns.
 - [Automation](automation.md) for the watchers that pick spawned tasks up automatically.

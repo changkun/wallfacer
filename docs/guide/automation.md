@@ -122,7 +122,6 @@ Triage guidance: transient categories usually clear themselves via auto-retry; r
 ## Related pages
 
 - [Board](board.md) for the task lifecycle these watchers drive.
-- [Agent Graph](agent-graph.md) for the fleets tasks execute against.
 - [Routines](routines.md) for scheduled task creation, which automation deliberately ignores.
 - [Plan](plan.md) for dispatching specs into the board tasks automation picks up.
 - [Oversight](oversight.md) for timelines, verdicts, and cost attribution.

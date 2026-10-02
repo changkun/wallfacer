@@ -22,7 +22,6 @@ Start here for the full reading order.
 - [Board](board.md). The task board: lifecycle, dependencies, batch creation, search, the task detail view.
 - [Chat](chat.md). The dedicated chat surface: sessions, slash commands, @mentions.
 - [Plan](plan.md). Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations.
-- [Agent Graph](agent-graph.md). Defining agents, composing fleets, harness pinning, live traces.
 - [Routines](routines.md). Scheduled cards that spawn fresh tasks on an interval.
 - [Whiteboard](whiteboard.md). The free-form drawing canvas.
 - [Artifacts](artifacts.md). The gallery for self-contained pages produced in the workspace.

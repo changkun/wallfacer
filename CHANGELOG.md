@@ -44,6 +44,14 @@ committed: the commit log already holds that.
   with plain `git` and the host's own credentials, and its pull request is
   opened on the git host.
 
+- User-authored agents and fleets: the Agents page, the agent graph picker in
+  the task composer and on the Routines page, and the `/api/agents` and
+  `/api/flows` routes are gone, and every task and routine runs the built-in
+  pipeline; files under `~/.wallfacer/agents/` and `~/.wallfacer/flows/` stay
+  on disk unread, with one warning at startup when either directory holds a
+  file, and a stored task that names a fleet notes on its timeline that the
+  fleet no longer exists.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when

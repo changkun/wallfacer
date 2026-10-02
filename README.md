@@ -98,16 +98,15 @@ Read more: [Concepts](docs/guide/concepts.md), [Plan](docs/guide/plan.md), and [
 
 ## How execution is structured
 
-Wallfacer runs every task through a small, composable set of primitives:
+Wallfacer runs every task through one built-in pipeline:
 
-- **Agents** are sub-roles (impl, test, commit-msg, title, oversight), each with a harness pin (Claude, Codex, Cursor, OpenCode, or Pi), capabilities, and an optional system prompt.
-- **Flows** compose agents into an ordered pipeline. The built-in is `implement`.
-- **Tasks** pick a flow; the runner walks the flow's step chain.
-- **Routines** spawn tasks against a flow on a schedule. A scheduled routine running an ordinary prompt covers recurring idea generation.
+- **Tasks** run implementation turns in their own git worktree, then a test, then a commit message, title, and oversight summary. A task's instructions come from the repository's instruction files (AGENTS.md, CLAUDE.md) and its prompt.
+- **Agent roles** carry the pipeline: impl, test, commit-msg, title, and oversight. Each runs on the task's harness (Claude, Codex, Cursor, OpenCode, or Pi), and a per-role setting can route one role to a different harness.
+- **Routines** spawn ordinary tasks on a schedule. A scheduled routine running an ordinary prompt covers recurring idea generation.
 
-User-authored agents and fleets live as YAML under `~/.wallfacer/{agents,flows}/` and are edited on the unified **Agent Graph** surface (the old Agents and Flows pages merged into it). Clone a built-in to pin it to a harness, override its system prompt, or insert a review step, without restarting the server. Task prompts are refined in place from Plan mode.
+Task prompts are refined in place from Plan mode.
 
-Read more: [Agent Graph](docs/guide/agent-graph.md).
+Read more: [Concepts](docs/guide/concepts.md) and [Configuration](docs/guide/configuration.md).
 
 ## Product Tour
 
@@ -138,15 +137,13 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 - **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
-Five composable sub-agent roles (each pinned to any installed harness) arrange into flows (`implement`, plus user-authored clones) that can be inspected or rewritten from the sidebar.
-
 ## Roadmap
 
 Development is organized into three parallel tracks with shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
 
 **Foundations** (complete): Execution backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
 
-**Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection), agents and flows (composable sub-agent pipelines), routine tasks (scheduled spawns), file and image attachments, host mounts, oversight risk scoring, visual verification, live serve.
+**Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection), routine tasks (scheduled spawns), file and image attachments, host mounts, oversight risk scoring, visual verification, live serve.
 
 **Cloud Platform**: Two axes over the Latere platform. Axis A, the coordination plane (signed-in local instances connect over one outbound connection for presence, spec comments, and metadata projection; local stays the source of truth). Axis B, demand-gated remote execution: a task chosen to run remotely runs as a hosted agent session on the platform, and its repository travels by git.
 
@@ -170,7 +167,6 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
 | [Chat](docs/guide/chat.md) | Chat sessions, slash commands, @mentions |
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
-| [Agent Graph](docs/guide/agent-graph.md) | Agents, fleets, harness pinning, live traces |
 | [Routines](docs/guide/routines.md) | Scheduled cards that spawn tasks on an interval |
 | [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
 | [Artifacts](docs/guide/artifacts.md) | Serve and open self-contained HTML pages from the workspace |
@@ -197,7 +193,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Auth & Identity](docs/internals/auth-and-identity.md) | OIDC, device sign-in, principal context, cloud mode |
 | [Service Identity](docs/internals/service-identity.md) | Wallfacer's slice of the latere.ai family identity shape: the sandbox-proxy inbound audience, per-route scopes, fail-closed validator |
 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers, routines |
-| [Agent Graph Runtime](docs/internals/agent-graph-runtime.md) | Embedded topos runtime, agentic execution, live traces |
+| [Agent Graph Runtime](docs/internals/agent-graph-runtime.md) | Embedded topos runtime, the native in-process harness, live traces |
 | [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |

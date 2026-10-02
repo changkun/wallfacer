@@ -220,8 +220,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive agent launch failures before the circuit breaker opens |
 | `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
 | `WALLFACER_WORKTREE_GC_INTERVAL` | `24h` | Interval between worktree garbage collection runs (duration syntax, e.g. `6h`) |
-| `WALLFACER_FLOWS_DIR` | `~/.wallfacer/flows` | Directory scanned for user flow descriptors; loaded at startup, merged with the built-ins, and reloaded when the directory changes |
-| `WALLFACER_AGENTS_DIR` | `~/.wallfacer/agents` | Directory scanned for user agent descriptors; loaded and reloaded the same way |
 | `WALLFACER_PROMPT_HISTORY_LIMIT` | | Cap on retained prompt revisions per task |
 | `WALLFACER_RETRY_HISTORY_LIMIT` | | Cap on retained retry records per task |
 | `WALLFACER_REFINE_SESSIONS_LIMIT` | | Cap on retained refine sessions per task |
@@ -296,7 +294,6 @@ Press `?` anywhere to open this reference in the app. Shortcuts without modifier
 - [Getting Started](getting-started.md): installation and first run
 - [Concepts](concepts.md): the mental model and primitives
 - [Automation](automation.md): toggles, retries, and guard rails
-- [Agent Graph](agent-graph.md): custom agents, flows, and harness pinning
 - [Workspaces](workspaces.md): folder sets and per-workspace settings
 - [Architecture](../internals/architecture.md): internals for contributors
 

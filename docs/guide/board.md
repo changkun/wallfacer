@@ -58,7 +58,6 @@ When a task fails, the failure is categorized: `timeout`, `budget_exceeded`, `wo
 Click **+ New Task** in the Backlog header, or press **n** anywhere on the board. The composer offers:
 
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
-- **Agent graph**: which flow the task runs, populated from the flow catalog. The default is the built-in **implement** flow; custom graphs come from the [Agent Graph](agent-graph.md) page and lead/mesh graphs are marked experimental.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
 - **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), a **Depends on** picker, and a harness override.
@@ -196,7 +195,6 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 - [Plan](plan.md): author and dispatch specs that become board tasks
 - [Chat](chat.md): conversational planning with the same agent engine
 - [Mission Control](mission-control.md): the combined spec and task dependency graph
-- [Agent Graph](agent-graph.md): define agents and compose the graphs tasks run
 - [Automation](automation.md): watchers, retry budgets, and circuit breakers
 - [Oversight](oversight.md): summaries, usage, cost, and timing analytics
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings

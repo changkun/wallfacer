@@ -12,9 +12,7 @@ For the cloud control plane (identity, tenancy, deployment topology), see [Auth 
 
 [Architecture](architecture.md)
 
-System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the agents + flows dispatch layer (merged YAML registries, the flow engine, and how the runner picks between the turn loop, the engine, and the agentic topos path). Package map covering all `internal/` and `internal/pkg/` packages. Handler organization table. Start here to build a mental model of how all the pieces fit together.
-
-For a user-facing treatment of the same primitives (how to clone an agent, what the Harness pin does, recipes), see the [Agent Graph](../guide/agent-graph.md) guide.
+System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the dispatch layer (the five built-in roles, their runner bindings, and how the runner picks between the turn loop and the native in-process topos path). Package map covering all `internal/` and `internal/pkg/` packages. Handler organization table. Start here to build a mental model of how all the pieces fit together.
 
 ### 2. Data & Storage
 
@@ -58,7 +56,7 @@ Background watchers, the autoimplement promotion loop, auto-test, auto-review, a
 
 [Agent Graph Runtime](agent-graph-runtime.md)
 
-The embedded topos runtime: the `internal/agentgraph` import seam and its boundary test, model resolution (fake / Lux gateway / direct key), the two execution paths (agentic flows and the native in-process `topos` harness), trace persistence and the live trace mapping onto the task timeline, and the agent/flow CRUD surface behind `/agent-graph`.
+The embedded topos runtime: the `internal/agentgraph` import seam and its boundary test, model resolution (fake / Lux gateway / direct key), the native in-process `topos` harness and how the runner dispatches to it, trace persistence and the live trace mapping onto the task timeline, and the sub-agent roles of an in-process task.
 
 ### 9. Plan Mode
 

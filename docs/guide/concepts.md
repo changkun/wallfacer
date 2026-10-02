@@ -58,21 +58,17 @@ Five built-in agent roles cover the task pipeline:
 - **Oversight**: writes a review summary of what the agent did.
 - **Commit message**: writes the final commit.
 
-Custom agents can be defined, cloned, given custom system prompts, and pinned to a specific harness on the [Agent Graph](agent-graph.md) page.
-
-### Fleet and agent graph
-
-The Agent Graph page is the composition surface: it defines agents and wires them into flows. One built-in flow exists, **Implement**: implementation, then testing, then a parallel finishing step (commit message, title, oversight). Every task runs a flow; unknown or legacy flow names resolve to Implement. Custom flows built on the canvas can be selected per task or per routine.
-
-An experimental in-process execution path (Topos) can run agent graphs natively without spawning a subprocess harness. It is opt-in, currently API-key only, and does not support session resume; treat it as a preview. See [Agent Graph](agent-graph.md).
+Every task runs the same built-in pipeline: implementation, then testing, then a parallel finishing step (commit message, title, oversight). The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
 
 ### Routine
 
-A routine is a scheduled card: a prompt, an interval, and an agent graph to spawn. The routine itself stays in the backlog and is excluded from automation and archiving; each time it fires, it spawns a fresh instance task that runs the chosen flow. See [Routines](routines.md).
+A routine is a scheduled card: a prompt and an interval. The routine itself stays in the backlog and is excluded from automation and archiving; each time it fires, it spawns a fresh instance task that runs the built-in pipeline. See [Routines](routines.md).
 
 ### Harness
 
-A harness is the coding CLI that executes an agent turn. Five subprocess harnesses are supported: **Claude** (default), **Codex**, **Cursor**, **OpenCode**, and **Pi**, plus the experimental in-process **Topos**. Harness selection is layered: a task-level or per-activity setting wins over the per-activity environment override, which wins over the global default, which falls back to Claude. Agent definitions can also pin a harness. Credentials and routing are covered in [Configuration](configuration.md#harness-tab).
+A harness is the coding CLI that executes an agent turn. Five subprocess harnesses are supported: **Claude** (default), **Codex**, **Cursor**, **OpenCode**, and **Pi**, plus the experimental in-process **Topos**. Harness selection is layered: a task-level or per-activity setting wins over the per-activity environment override, which wins over the global default, which falls back to Claude. Credentials and routing are covered in [Configuration](configuration.md#harness-tab).
+
+A task pinned to Topos runs as a single agent inside the Wallfacer process, in the task's worktree, and shows its run as a trace on the task. The path is opt-in, needs an API key as its model credential (a run without one is refused before it starts), and does not support session resume; treat it as a preview.
 
 ### Worktree isolation
 
@@ -103,7 +99,6 @@ The value of the spectrum is spending attention where it matters and delegating 
 
 - [Getting Started](getting-started.md): installation and the first task
 - [Board](board.md), [Chat](chat.md), [Plan](plan.md): the three main working surfaces
-- [Agent Graph](agent-graph.md): custom agents and flows
 - [Automation](automation.md) and [Routines](routines.md): the autopilot level
 - [Configuration](configuration.md): settings, environment variables, shortcuts
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

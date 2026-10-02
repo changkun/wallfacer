@@ -113,9 +113,9 @@ Execution for the subprocess harnesses is host-process. The runner execs the sel
 
 ### Activity routing
 
-`Runner.runAgent()` resolves the effective harness per agent run, newest tier first (`internal/runner/agent.go:179-194`):
+`Runner.runAgent()` resolves the effective harness per agent run, newest tier first (`internal/runner/agent.go:164-178`):
 
-1. **Agent/role harness pin** (`role.Harness` if set and valid). This top tier wins over every per-task and env tier, so a role authored or cloned with harness `codex` always reaches Codex regardless of task or env settings.
+1. **Role harness pin** (`role.Harness` if set and valid). The built-in role descriptors leave it empty; a caller that must reach a particular harness sets it on a copy of a built-in role for one call. This top tier wins over every per-task and env tier, so a role pinned to `codex` always reaches Codex regardless of task or env settings.
 2. **Per-task per-activity override, deprecated** (`task.SandboxByActivity[activity]` if set and valid). Back-compat only: new tasks do not populate this map (matching `data-and-storage.md`), but the runner still reads it when present.
 3. **Per-task default** (`task.Sandbox` if set and valid).
 4. **Env-file per-activity setting** (`WALLFACER_SANDBOX_<ACTIVITY>`, e.g. `WALLFACER_SANDBOX_TESTING=codex`).
