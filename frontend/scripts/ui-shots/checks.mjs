@@ -620,16 +620,6 @@ SCENES['whiteboard'] = async (page) => {
   expect('whiteboard', !!(await page.$('.excalidraw')), 'Excalidraw did not mount');
 };
 
-// Artifacts: the tool bar over a preview, or the empty state.
-SCENES['artifacts'] = async (page) => {
-  await page.goto(base + '/artifacts', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(900);
-  const frame = await page.$('.af-frame');
-  const empty = await page.$('.af-empty .eyebrow');
-  expect('artifacts', !!frame || !!empty, 'neither a preview nor the empty state rendered');
-  if (frame) expect('artifacts', !!(await page.$('.af-bar .btn')), 'tool bar carries no buttons');
-};
-
 // Docs: the nav is 260 wide on the sunk surface and the reading column is at
 // most 76ch.
 SCENES['docs'] = async (page) => {

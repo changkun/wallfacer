@@ -391,22 +391,6 @@ const tasks = [
   },
 ];
 
-// Artifacts are self-contained pages under <workspace>/artifacts; one deck
-// gives the Artifacts surface a preview instead of the empty state.
-const ARTIFACT_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Q3 roadmap</title>
-<style>
-  body { margin: 0; font-family: system-ui, sans-serif; background: #f4f2ee; color: #1b1916; }
-  section { min-height: 100vh; display: grid; place-items: center; padding: 48px; box-sizing: border-box; }
-  h1 { font-size: 56px; margin: 0 0 12px; letter-spacing: -0.02em; }
-  p { font-size: 22px; color: #4c4842; max-width: 40ch; text-align: center; }
-  .k { color: #c45a33; }
-</style></head>
-<body>
-<section><div><h1>Q3 <span class="k">roadmap</span></h1><p>Three bets: device sign-in everywhere, the redesigned console, and routines that keep the backlog honest.</p></div></section>
-</body></html>
-`;
-
 // A minimal ready oversight summary, attached to terminal-state tasks so the
 // task-detail oversight panel renders representative content.
 const oversightFor = (t) => ({
@@ -454,10 +438,6 @@ if (existsSync(specsSrc)) {
   rmSync(join(wsDir, 'specs'), { recursive: true, force: true });
   cpSync(specsSrc, join(wsDir, 'specs'), { recursive: true });
 }
-
-// The artifact lives beside the specs in the workspace.
-mkdirSync(join(wsDir, 'artifacts'), { recursive: true });
-writeFileSync(join(wsDir, 'artifacts', 'q3-roadmap.html'), ARTIFACT_HTML);
 
 // Wipe and rewrite the group dir so state is idempotent/regenerable.
 rmSync(groupDir, { recursive: true, force: true });

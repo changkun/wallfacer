@@ -61,7 +61,7 @@ node snap.mjs --list                                                     # surfa
 
 Surfaces: `board`, `switcher`, `palette`, `picker`, `terminal`, `explorer`,
 `task-detail`, `settings`, `analytics`, `overview-spec`, `oversight`, `plan`,
-`chat`, `routines`, `mission`, `whiteboard`, `docs`, `artifacts`. Prints JSON `[{name, file, errors}]` so callers can detect page
+`chat`, `routines`, `mission`, `whiteboard`, `docs`. Prints JSON `[{name, file, errors}]` so callers can detect page
 errors.
 
 Works against any local-mode origin: the embedded SPA on the booted server
@@ -109,7 +109,7 @@ promises (rail and topbar sizes, card radii, column widths, dialog widths,
 reading-column width) and the material (no `backdrop-filter`, meta text
 contrast in both themes): `board`, `shell`, `switcher`, `picker`, `no-glass`,
 `contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `dock`,
-`analytics`, `routines`, `mission`, `whiteboard`, `artifacts`, `docs`. Every
+`analytics`, `routines`, `mission`, `whiteboard`, `docs`. Every
 scene runs in its own browser context so nothing one scene persists (a route,
 a popup, a dock layout) reaches the next.
 Add a scene by appending to the `SCENES` table in `checks.mjs`. Playwright runs
@@ -135,4 +135,4 @@ landing-page pairs under `frontend/public/static/`, and the README images under
 ```
 
 The seed gives each surface content: tasks in every state with traces and an
-oversight summary, a routine, an artifact, and the repo's own spec tree.
+oversight summary, a routine, and the repo's own spec tree.
