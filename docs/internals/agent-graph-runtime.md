@@ -113,6 +113,8 @@ A task's sub-agent roles inherit its harness, and the executor cannot launch an 
 
 An in-process role run needs the same model credential as the task itself and fails with `ErrNoModelCredential` without one. It reports no usage to the runner, so these roles add nothing to the task's usage ledger.
 
+A chat thread's title has no task to inherit a harness from. `Runner.GenerateAgentSessionTitle` (`internal/runner/title.go`) takes the env file's title harness (`WALLFACER_SANDBOX_TITLE`), then its default harness (`WALLFACER_DEFAULT_SANDBOX`), then `harness.Default()`, and runs the title role through `runAgent` with that harness as the role's pin. A `topos` default therefore reaches `launchInProcess` like the title of a `topos` task, and a subprocess default takes the executor path with the same spec as before.
+
 ## Agent and Flow CRUD Behind /agent-graph
 
 The Agent Graph page defines agents and composes graphs against two CRUD surfaces:

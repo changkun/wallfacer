@@ -91,6 +91,10 @@ committed: the commit log already holds that.
   API is refused with `harness_unavailable_in_chat` instead of failing after
   it was accepted with "unsupported agent".
 
+- A chat thread gets a generated title when the default harness is `topos`:
+  the title runs in-process, as a `topos` task's title does, where it failed
+  before with "unsupported agent".
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -73,6 +72,12 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 // chat thread from its opening user message, using the lightweight title model.
 // Task-free, like GenerateCommitMessage: it records no spans or usage. A blank
 // model response returns ("", nil) and should be treated as "no title".
+//
+// It runs the title role through runAgent, the path a task's title takes, so an
+// in-process harness runs through the agent-graph seam rather than the
+// executor, which cannot launch one. With no task to route by, the harness is
+// the env file's title harness, else its default harness, else
+// harness.Default(); it is handed to runAgent as the role's harness pin.
 func (r *Runner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error) {
 	if strings.TrimSpace(firstUserMessage) == "" {
 		return "", nil
@@ -81,33 +86,20 @@ func (r *Runner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage
 	defer cancel()
 
 	sb := r.sandboxFromEnvForActivity(activityTitle)
-	if sb == "" {
-		sb = harness.Claude
+	if !sb.IsValid() {
+		sb = harness.Default()
 	}
-	model := r.titleModelFromEnvForSandbox(sb)
-	containerName := "wallfacer-planttitle-" + uuid.NewString()[:8]
-	titlePrompt := r.promptsMgr.Title(firstUserMessage)
-	labels := map[string]string{"wallfacer.task.activity": "title_planning"}
+	role := agents.Title
+	role.Harness = string(sb)
 
-	spec := r.buildBaseContainerSpec(containerName, model, sb)
-	spec.Labels = labels
-	spec.Cmd = buildAgentCmd(titlePrompt, model)
-
-	handle, err := r.backend.Launch(ctx, spec)
+	res, err := r.runAgent(ctx, role, nil, r.promptsMgr.Title(firstUserMessage), runAgentOpts{
+		ContainerName: "wallfacer-planttitle-" + uuid.NewString()[:8],
+		Labels:        map[string]string{"wallfacer.task.activity": "title_planning"},
+		ModelResolver: r.titleModelFromEnvForSandbox,
+	})
 	if err != nil {
-		return "", fmt.Errorf("launch agent-session title container: %w", err)
+		return "", fmt.Errorf("agent-session title: %w", err)
 	}
-	rawStdout, _ := io.ReadAll(handle.Stdout())
-	_, _ = io.ReadAll(handle.Stderr())
-	_, _ = handle.Wait()
-
-	raw := strings.TrimSpace(string(rawStdout))
-	if raw == "" {
-		return "", fmt.Errorf("empty title output")
-	}
-	output, err := r.parseAgentStream(sb, raw)
-	if err != nil {
-		return "", fmt.Errorf("parse title output: %w", err)
-	}
-	return strings.TrimSpace(strings.Trim(strings.TrimSpace(output.Result), `"'`)), nil
+	title, _ := res.Parsed.(string)
+	return title, nil
 }
