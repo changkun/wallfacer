@@ -216,7 +216,9 @@ func (b *sessionTokenBridge) capture(r *http.Request) {
 
 // sync writes the session's token to the store, skipping the file I/O when the
 // access token is unchanged since the last write. Split from capture so the
-// dedup + save path is unit-testable without a real cookie session.
+// dedup + save path is unit-testable without a real cookie session. A failed
+// save is logged and the token is not remembered as written, so the next
+// request carrying it tries again; the request itself proceeds either way.
 func (b *sessionTokenBridge) sync(accessToken, refreshToken string, expiry time.Time) {
 	if accessToken == "" {
 		return
@@ -224,11 +226,14 @@ func (b *sessionTokenBridge) sync(accessToken, refreshToken string, expiry time.
 	if last, ok := b.last.Load().(string); ok && last == accessToken {
 		return
 	}
-	_ = b.store.Save(&oauth2.Token{
+	if err := b.store.Save(&oauth2.Token{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		Expiry:       expiry,
-	})
+	}); err != nil {
+		logger.Main.Warn("coordination: persist session token failed", "err", err)
+		return
+	}
 	b.last.Store(accessToken)
 }
 
@@ -270,7 +275,13 @@ func coordinationTokenFunc(ctx context.Context, store cli.TokenStore, oidcClient
 			if err != nil || nt == nil || nt.AccessToken == "" {
 				return "", false
 			}
-			_ = store.Save(nt)
+			// The refreshed token is valid for this dial whether or not it
+			// persists. A failed save is logged: the stored refresh token
+			// may have been rotated out by this refresh, in which case the
+			// next refresh fails and the connector reports signed out.
+			if err := store.Save(nt); err != nil {
+				logger.Main.Warn("coordination: persist refreshed login token failed", "err", err)
+			}
 			login = nt.AccessToken
 		default:
 			return "", false

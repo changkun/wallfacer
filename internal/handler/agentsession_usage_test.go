@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -120,5 +123,57 @@ func TestSendAgentMessage_AttributesUsageToTheTurnHarness(t *testing.T) {
 					got.InputTokens, got.OutputTokens, got.CostUSD, tc.wantInput, tc.wantOutput, tc.wantCost)
 			}
 		})
+	}
+}
+
+// TestPersistAgentRoundUsage_LogsUnreadableLog asserts a usage log that cannot
+// be read is reported, not taken as empty: the round's turn index is the count
+// of records already logged, so an unreadable log is logged as a warning and
+// the round is not appended under a turn index it cannot know.
+func TestPersistAgentRoundUsage_LogsUnreadableLog(t *testing.T) {
+	ws := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{ws})
+	key := prompts.WorkspaceDataKey([]string{ws})
+
+	// One logged round, then a line longer than the reader's line limit, so
+	// the log exists and cannot be read.
+	if err := store.AppendAgentSessionUsage(h.configDir, key, store.TurnUsageRecord{Turn: 1, Sandbox: harness.Claude}); err != nil {
+		t.Fatalf("AppendAgentSessionUsage: %v", err)
+	}
+	path := store.AgentSessionUsagePath(h.configDir, key)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatalf("open usage log: %v", err)
+	}
+	if _, err := f.WriteString(strings.Repeat("x", 128*1024) + "\n"); err != nil {
+		t.Fatalf("write oversized line: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("close usage log: %v", err)
+	}
+	if _, err := store.ReadAgentSessionUsage(h.configDir, key, time.Time{}); err == nil {
+		t.Fatal("fixture: usage log is readable, want a read error")
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read usage log: %v", err)
+	}
+
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	h.persistAgentRoundUsage(agentRoundStdout(10, 5, 0, 0, 0.001), harness.Claude)
+
+	if !strings.Contains(logs.String(), "read round usage") {
+		t.Errorf("no warning for the unreadable usage log; logs:\n%s", logs.String())
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read usage log: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("usage log grew by %d bytes; want no record appended under an unknown turn index", len(after)-len(before))
 	}
 }

@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,6 +20,7 @@ import (
 	"latere.ai/x/pkg/authkit/oidc"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
+	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -217,6 +220,87 @@ func TestCoordinationTokenFuncReadsSharedTokenFile(t *testing.T) {
 	got, ok := coordinationTokenFunc(context.Background(), newCoordinationTokenStore(), nil, mint)()
 	if !ok || got != "actor-for-login-jwt" {
 		t.Fatalf("token = %q, ok = %v; want the actor token minted from the file's login token", got, ok)
+	}
+}
+
+// flakySaveStore is a cli.TokenStore whose Save fails while failSave is set.
+type flakySaveStore struct {
+	fakeTokenStore
+	failSave bool
+	saves    int
+}
+
+func (s *flakySaveStore) Save(t *oauth2.Token) error {
+	s.saves++
+	if s.failSave {
+		return errors.New("disk full")
+	}
+	return s.fakeTokenStore.Save(t)
+}
+
+// captureMainLog points logger.Main at a buffer for the rest of the test.
+func captureMainLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := logger.Main
+	logger.Main = slog.New(slog.NewTextHandler(&buf, nil))
+	t.Cleanup(func() { logger.Main = prev })
+	return &buf
+}
+
+// TestSessionTokenBridgeSyncSaveFailure asserts a failed save is logged and
+// retried: the token is not remembered as written, so the next request with
+// the same session token saves it again once the store accepts writes.
+func TestSessionTokenBridgeSyncSaveFailure(t *testing.T) {
+	logs := captureMainLog(t)
+	store := &flakySaveStore{failSave: true}
+	b := newSessionTokenBridge(nil, store)
+	exp := time.Now().Add(time.Hour)
+
+	b.sync("at1", "rt1", exp)
+	if !strings.Contains(logs.String(), "disk full") {
+		t.Errorf("save failure not logged; logs:\n%s", logs.String())
+	}
+
+	store.failSave = false
+	b.sync("at1", "rt1", exp)
+	if store.saves != 2 {
+		t.Fatalf("saves = %d, want 2: a token whose save failed must be saved again", store.saves)
+	}
+	if store.tok == nil || store.tok.AccessToken != "at1" {
+		t.Fatalf("store holds %+v, want the session token after the retry", store.tok)
+	}
+}
+
+// TestCoordinationTokenFuncRefreshSaveFailure asserts a refreshed login token
+// that cannot be persisted is logged, and the connector still presents the
+// actor token minted from the refreshed login token.
+func TestCoordinationTokenFuncRefreshSaveFailure(t *testing.T) {
+	logs := captureMainLog(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"fresh-jwt","refresh_token":"rt2","token_type":"Bearer","expires_in":3600}`))
+	}))
+	t.Cleanup(srv.Close)
+	client := oidc.New(oidc.Config{AuthURL: srv.URL, ClientID: "wallfacer"})
+
+	store := &flakySaveStore{failSave: true}
+	store.tok = &oauth2.Token{AccessToken: "stale", RefreshToken: "rt1", Expiry: time.Now().Add(-time.Hour)}
+	mint := func(_ context.Context, login string) (string, error) { return "actor-for-" + login, nil }
+
+	got, ok := coordinationTokenFunc(context.Background(), store, client, mint)()
+	if !ok || got != "actor-for-fresh-jwt" {
+		t.Fatalf("token = %q, ok = %v; want the actor token minted from the refreshed login token", got, ok)
+	}
+	if store.saves != 1 {
+		t.Errorf("saves = %d, want 1", store.saves)
+	}
+	if !strings.Contains(logs.String(), "disk full") {
+		t.Errorf("refreshed-token save failure not logged; logs:\n%s", logs.String())
 	}
 }
 

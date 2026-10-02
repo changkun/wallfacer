@@ -828,8 +828,8 @@ func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) 
 // different field names, so their rounds are recorded with zero usage rather
 // than with figures read from the wrong fields. Failed rounds, a Claude round
 // with no result line, and missing workspace configuration short-circuit
-// silently. Append errors are logged so a persistence failure never fails the
-// user-facing round.
+// silently. Read and append errors are logged so a persistence failure never
+// fails the user-facing round.
 func (h *Handler) persistAgentRoundUsage(raw []byte, sb harness.ID) {
 	if agentsession.IsErrorResult(raw) {
 		return
@@ -852,7 +852,15 @@ func (h *Handler) persistAgentRoundUsage(raw []byte, sb harness.ID) {
 	if groupKey == "" {
 		return
 	}
-	existing, _ := store.ReadAgentSessionUsage(h.configDir, groupKey, time.Time{})
+	// The turn index is the count of rounds already logged. A log that exists
+	// but cannot be read gives no count, and every reader of the log fails on
+	// it the same way, so the round is logged as unrecorded rather than
+	// appended under a turn index that would restart at 1.
+	existing, err := store.ReadAgentSessionUsage(h.configDir, groupKey, time.Time{})
+	if err != nil {
+		slog.Warn("agentsession: failed to read round usage; round not recorded", "error", err)
+		return
+	}
 	rec := store.TurnUsageRecord{
 		Turn:                 len(existing) + 1,
 		Timestamp:            time.Now().UTC(),
