@@ -30,7 +30,7 @@ Credentials, models, and routing for the coding CLIs. A warning banner appears o
 - **OpenCode**: no key field; the `opencode` CLI manages provider credentials itself (`opencode auth login`).
 - **Pi**: no key field; the `pi` CLI reads provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the same environment.
 
-The **Global Harness Routing** section selects the default harness (`WALLFACER_DEFAULT_SANDBOX`). Per-activity overrides route implementation, testing, title, oversight, and commit message generation to different harnesses via the `WALLFACER_SANDBOX_*` variables below. Task-level harness selection (set when creating or editing a card) wins over all of these. Save and Revert buttons apply or discard pending edits; saved values are written to `~/.wallfacer/.env`.
+The **Global Harness Routing** section selects the default harness (`WALLFACER_DEFAULT_SANDBOX`) and the **Review model** (`WALLFACER_REVIEW_MODEL`), the model Review runs its reviewer on; it must differ from the task's model, or the review does not run (see [Automation](automation.md#review-on-a-second-model)). Per-activity overrides route implementation, testing, title, oversight, and commit message generation to different harnesses via the `WALLFACER_SANDBOX_*` variables below. Task-level harness selection (set when creating or editing a card) wins over all of these. Save and Revert buttons apply or discard pending edits; saved values are written to `~/.wallfacer/.env`.
 
 Tasks run as host processes with the account's full permissions; the tab shows this warning while active. Run Wallfacer only on trusted machines.
 
@@ -194,9 +194,9 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
 | `WALLFACER_AUTO_PUSH` | `false` | Automatic `git push` after commits |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push fires |
-| `WALLFACER_REVIEW_FORKS` | `1` | Independent critic forks per Review verification run |
-| `WALLFACER_REVIEW_ROUNDS` | `3` | Per-fork debate round cap |
-| `WALLFACER_REVIEW_COST_CAP` | `50000` | Soft token budget per Review run |
+| `WALLFACER_REVIEW_MODEL` | | The model Review runs its reviewer on; must differ from the task's model, or the review does not run |
+| `WALLFACER_REVIEW_ROUNDS` | `3` | Reviewer runs per Review session |
+| `WALLFACER_REVIEW_COST_CAP` | `50000` | Reviewer token budget per Review session, checked between rounds |
 | `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window for session cost analytics; 0 = all time. `WALLFACER_PLANNING_WINDOW_DAYS` is a deprecated alias |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |

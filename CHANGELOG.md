@@ -12,6 +12,14 @@ committed: the commit log already holds that.
 
 ### Changed
 
+- Review checks a waiting task's change with a second model on the task's own
+  harness: a reviewer on the model set as `WALLFACER_REVIEW_MODEL` (the
+  **Review model** field on the Harness settings tab) reports findings and a
+  verdict, requested changes go back to the task as feedback for up to
+  `WALLFACER_REVIEW_ROUNDS` rounds, every harness with a worktree is covered
+  rather than only Claude tasks with a session, and with no reviewer model set,
+  or the task's own, the review does not run and the task timeline says why.
+
 - gRPC-Go v1.83.2, past GO-2026-6443 (GHSA-2v4p-qf9q-27wj), in which a gRPC
   xDS server crashes on a request that carries neither an `:authority` nor a
   Host header; Wallfacer runs no gRPC server and the affected code is not
@@ -36,6 +44,10 @@ committed: the commit log already holds that.
   overrode the shared layout, are removed.
 
 ### Removed
+
+- `WALLFACER_REVIEW_FORKS` and the `review_forks` field of `/api/env`: a review
+  runs one reviewer, so there are no forks to count; a line left in
+  `~/.wallfacer/.env` is ignored, and `PUT /api/env` refuses the field.
 
 - The GitHub integration: Settings has no GitHub tab, tasks and specs show no
   pull request, the `/api/github/*` and `/api/tasks/{id}/pr` routes and the

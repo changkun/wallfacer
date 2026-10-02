@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer operates anywhere on the spectrum from fully manual to fully hands-off. At one end, every card is dragged by hand and every result reviewed before commit. At the other, the backlog is loaded, every toggle is on, and tasks execute, verify, submit, and push without intervention. This page covers the toggles, the background watchers behind them, adversarial verification with Review, and the safety systems that keep hands-off operation from running away.
+Wallfacer operates anywhere on the spectrum from fully manual to fully hands-off. At one end, every card is dragged by hand and every result reviewed before commit. At the other, the backlog is loaded, every toggle is on, and tasks execute, verify, submit, and push without intervention. This page covers the toggles, the background watchers behind them, review on a second model, and the safety systems that keep hands-off operation from running away.
 
 ## The automation toggles
 
@@ -14,7 +14,7 @@ Five switches drive the pipeline. They live in the board's **Automation** popove
 | Catch up | `autosync` | Rebase waiting tasks onto the default branch |
 | Push | `autopush` | Push completed commits upstream |
 
-A sixth switch, `review`, enables adversarial verification (below). It is stored in the same runtime configuration but is not part of the board popover; toggle it through the configuration API (`PUT /api/config` with `{"review": true}`). A manual per-task **Review** action is also available on the task detail actions rail.
+A sixth switch, `review`, enables Review on a second model (below). It is stored in the same runtime configuration but is not part of the board popover; toggle it through the configuration API (`PUT /api/config` with `{"review": true}`). A manual per-task **Review** action is also available on the task detail actions rail.
 
 Each toggle arms one server-side watcher. The watchers wake on store changes and on periodic tickers (30 to 60 seconds), scoped to the currently viewed workspace.
 
@@ -51,7 +51,7 @@ Waiting tasks that have not been verified (`LastTestResult` empty), have all wor
 Verified waiting tasks move to done automatically. The gate depends on the verifier in play:
 
 - **Test gate** (default): the task's last test result is `pass`. As a shortcut, a task that ended naturally (`end_turn` stop reason) and was never tested qualifies, but only while auto-test is off; with auto-test on, testing runs first.
-- **Review gate**: when Review supersedes the test agent for a task, the gate is a clean Review verdict (zero unresolved attacks). The test-pass and natural-completion shortcuts do not apply.
+- **Review gate**: when Review supersedes the test agent for a task, the gate is a Review approval (no open findings). The test-pass and natural-completion shortcuts do not apply.
 
 In addition, every worktree must be up to date with the default branch and free of merge conflicts. Tasks with a session go through the commit pipeline (committing state, commit message generation); sessionless tasks move straight to done. Tasks that failed testing are never auto-submitted.
 
@@ -63,26 +63,33 @@ Every 30 seconds, waiting tasks whose worktrees have fallen behind the default b
 
 After the commit pipeline completes, each workspace repo whose local branch is at least the threshold number of commits ahead of upstream gets a `git push`. Configure with `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD` (default threshold 1), or from the Execution settings tab. Push results land on the task timeline.
 
-## Adversarial verification with Review
+## Review on a second model
 
-Review replaces the single test agent with a structured debate about the change. A **proposer** (always Claude, forked from the task's session) defends the work; one or more **critics** (rotating Claude and Codex for perspective diversity) attack it over multiple rounds. Attacks a proposer cannot rebut remain *unresolved*.
+Review checks a waiting task's change with a second model. A **reviewer** runs on the model set as `WALLFACER_REVIEW_MODEL` (the **Review model** field on the Harness settings tab), on the harness the task runs on, and reads the task prompt, the acceptance criteria, and the task's diff against the default branch. It answers with findings, each a severity (high, medium, or low) and a one-sentence claim, and a verdict: approve, or changes requested.
+
+When the reviewer requests changes, its findings go to the task as feedback, the same way feedback typed on a waiting task does, and the task takes another turn. When the task waits again, the reviewer reviews the new diff with its earlier findings and the task's reply in view. A review session ends when:
+
+- the reviewer approves: the task carries no open findings, and auto-submit can proceed;
+- the last allowed round still requests changes, or the reviewer token budget is spent: the findings of the last round stay open, and the most severe one becomes the task's review headline.
+
+Open findings at the end of a session are a hard barrier: the task stays parked in waiting and is not auto-resumed. Clearing the barrier is a human act, either confirming the work or resuming with feedback, which discards the verdict and starts a new review session once the task waits again.
 
 Scope and behavior:
 
-- Review supersedes the test agent **only for tasks with a session** (Review forks the session to build the proposer). Sessionless tasks fall back to the regular test agent even with Review on.
-- Eligible waiting tasks are verified automatically when the `review` toggle is on; at most 2 Review runs execute concurrently, outside the regular task caps.
-- A clean verdict (zero unresolved attacks) lets auto-submit proceed. Any unresolved attack is a hard barrier: the task stays parked in waiting and is not auto-resumed. Clearing the barrier is a human act, either confirming the work or resuming with steering, which discards the verdict and triggers fresh re-verification.
-- The full debate transcript, verdict, and cost render in the task detail's Adversarial Verification panel; Review spend is attributed to the task's usage breakdown.
+- A review needs a second model. When `WALLFACER_REVIEW_MODEL` is unset, or names the model the task runs on, the review does not run: the task timeline says why, once, and the task carries no verdict, so with Review on it is not auto-submitted.
+- Review supersedes the test agent for every waiting task that has a worktree, on any harness. A task without a worktree has no diff to review and falls back to the regular test agent.
+- Eligible waiting tasks are reviewed automatically when the `review` toggle is on. One round runs at a time per task, and at most 2 rounds run at once across tasks, outside the regular task caps.
+- A reviewer run that fails, or answers in a form that cannot be read, does not use up a round: the task timeline says so, and the round is retried once the auto-review breaker's backoff has passed.
+- The reviewer reads the diff from its prompt, capped at 16,000 bytes, and runs without access to the workspace, so it cannot change the task's worktree.
+- The task detail's Verification tab shows each round's findings, the feedback sent, and the task's reply. Reviewer spend is attributed to the task's usage breakdown under `review`. A task on the in-process Topos harness reports no usage yet, so its review is bounded by the round limit alone.
 
-Depth knobs, as environment variables:
+Settings, as environment variables:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `WALLFACER_REVIEW_FORKS` | 1 | Independent critic forks per run |
-| `WALLFACER_REVIEW_ROUNDS` | 3 | Round cap per fork (attack, rebuttal, re-assessment) |
-| `WALLFACER_REVIEW_COST_CAP` | 50000 | Soft token budget per run |
-
-The defaults are a minimum-cost floor, not a recommended depth; fewer than 3 rounds would end a debate before the critic sees the rebuttal.
+| `WALLFACER_REVIEW_MODEL` | unset | The reviewer's model; must differ from the task's |
+| `WALLFACER_REVIEW_ROUNDS` | 3 | Reviewer runs per review session; the task gets at most one turn fewer on requested changes |
+| `WALLFACER_REVIEW_COST_CAP` | 50000 | Reviewer token budget per review session (input plus output tokens), checked between rounds |
 
 ## Circuit breakers and safety valves
 

@@ -86,8 +86,8 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
-| `POST /api/tasks/{id}/review` | Trigger an adversarial review verification run for a waiting task |
-| `GET /api/tasks/{id}/review/transcript` | Review run transcript. `truncated: true` when the transcript file could not be read to its end (an I/O error, or a record over the line cap `maxReviewTranscriptLineBytes` in `internal/handler/review_transcript.go`); `forks` then holds the rounds before that point, and the server logs the error with the session directory |
+| `POST /api/tasks/{id}/review` | Run one review round for a waiting task, whatever the review toggle says; 400 with code `review_no_worktree` for a task without a worktree, 409 while a round is in flight |
+| `GET /api/tasks/{id}/review/transcript` | The task's newest review session: `rounds` (each with the reviewer's answer, failed attempts, the feedback sent and the task's reply), `outcome` once the session ended (termination, open findings, headline, tokens, skip reason), the current `config`, and `running` from the in-flight set. `legacy: true` with empty `rounds` for a session the earlier debate engine recorded. `truncated: true` when the transcript could not be read to its end (an I/O error, or a record over the line cap in `internal/review/record.go`); `rounds` then holds the rounds before that point, and the server logs the error |
 | `GET /api/tasks/{id}/trace` | Agent trace graph recorded by a run on the in-process topos harness |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |

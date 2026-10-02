@@ -80,7 +80,7 @@ When the agent pauses or finishes, the task lands in **Waiting**. From there:
 | **Submit feedback** | Send a message (with `@` file mentions); the agent resumes in the same session. |
 | **Mark as Done** | Trigger the commit pipeline and merge the changes. |
 | **Test** | Launch a verification agent, optionally with acceptance criteria. |
-| **Review** | Run adversarial verification (experimental, see below). |
+| **Review** | Run one review round on a second model (see below). |
 | **Sync** | Rebase the task's worktree onto the latest default branch without merging. |
 | **Raise budget** | Shown when a cost or token limit was hit; adjust the limit and continue. |
 | **Cancel** | Discard the worktree and move to Cancelled; history and logs are preserved. |
@@ -160,7 +160,7 @@ While a task is waiting, each line in the **Changes** tab gets a gutter button t
 
 The **Test** action launches a separate verification agent against the task's worktree; it runs the relevant checks and reports a pass or fail verdict shown as a badge on the card. Acceptance criteria can be supplied when starting the run, and repeated runs overwrite the previous verdict.
 
-**Review** is an experimental adversarial verification layer, off by default and enabled as a runtime toggle. It forks proposer/critic debates over the change (fork count, rounds, and cost cap are configured via `WALLFACER_REVIEW_FORKS`, `WALLFACER_REVIEW_ROUNDS`, and `WALLFACER_REVIEW_COST_CAP`). The Verification tab shows its status, configuration, verdict headline, and the per-fork debate threads. When Review is enabled and the task has an agent session, its verdict supersedes the plain test verdict as the auto-submit gate; see [Automation](automation.md).
+**Review** checks the change with a second model, off by default and enabled as a runtime toggle. A reviewer on the model set as `WALLFACER_REVIEW_MODEL` reads the task, its acceptance criteria and its diff, and answers with findings and a verdict; requested changes go back to the task as feedback, and the next turn's diff is reviewed again, up to `WALLFACER_REVIEW_ROUNDS` rounds and within `WALLFACER_REVIEW_COST_CAP` reviewer tokens. The Verification tab shows the review's status, its configuration, and each round's findings, the feedback sent and the task's reply. When Review is enabled and the task has a worktree, its verdict supersedes the plain test verdict as the auto-submit gate; see [Automation](automation.md).
 
 ### Timeline
 

@@ -16,7 +16,7 @@ The integration is experimental and opt-in. An ordinary task keeps the multi-tur
 | `agentgraph.Event` | `topos.Event` | One live observation (assistant text, tool use); `PayloadJSON` stays opaque |
 | `agentgraph.ModelConfig` / `ModelMode` | `topos.ModelOptions` / `ModelKind` | Host-side model selection; mapped in exactly one function, `modelOptions` |
 
-The root package `latere.ai/x/topos` is the supported runtime surface. `TestWallfacerImportsOnlyRootTopos` (`internal/agentgraph/boundary_test.go`) runs `go list` over every package, test imports included, and fails if a wallfacer package imports a topos subpackage (`latere.ai/x/topos/...`) without being the designated seam for it. The only designated seam today is `internal/adversarial`, for the adversarial review engine. This keeps the runtime an implementation detail: the engine can restructure internally without touching wallfacer, and no second seam can grow by accident.
+The root package `latere.ai/x/topos` is the supported runtime surface. `TestWallfacerImportsOnlyRootTopos` (`internal/agentgraph/boundary_test.go`) runs `go list` over every package, test imports included, and fails if a wallfacer package imports a topos subpackage (`latere.ai/x/topos/...`) without being the designated seam for it. No wallfacer package is a designated seam today: the review runs on the runner's own review role and imports no topos subpackage, which `TestNoPackageImportsToposAdversarial` (`internal/review`) also checks. This keeps the runtime an implementation detail: the engine can restructure internally without touching wallfacer, and no second seam can grow by accident.
 
 The seam's entrypoint is `RunAgent`: one agent named `name`, with an optional system prompt, run on the model a `ModelConfig` selects, with tools rooted in an optional worktree and live events delivered to an optional observer. It returns `agentgraph.ErrNoModelCredential` for a `ModelConfig` that carries no credential, before a runner is built, so nothing executes in the working directory. `NewRunner` additionally refuses `topos.Options` that select no model, because the runtime would resolve those to its test model. `runOptions` (`model.go`) is the only place that names `topos.Options`.
 
@@ -95,7 +95,7 @@ A task's sub-agent roles inherit its harness, and the executor cannot launch an 
 
 | Role | What runs it for a `topos` task |
 |---|---|
-| Title, oversight, test oversight, commit message (prompt-only, mount mode none) | `launchInProcess`: a one-agent `agentgraph.RunAgent` with no worktree. The role's binding parses the run's final text like a subprocess result. Title and oversight request the title model (`CLAUDE_TITLE_MODEL`, falling back to `CLAUDE_DEFAULT_MODEL`). |
+| Title, oversight, test oversight, commit message, review (prompt-only, mount mode none) | `launchInProcess`: a one-agent `agentgraph.RunAgent` with no worktree. The role's binding parses the run's final text like a subprocess result. Title and oversight request the title model (`CLAUDE_TITLE_MODEL`, falling back to `CLAUDE_DEFAULT_MODEL`); review requests the reviewer model (`WALLFACER_REVIEW_MODEL`). |
 | Testing (a test run) | The configured default subprocess harness. `sandboxForTaskActivity` (`internal/runner/container.go`) skips any tier that names an in-process harness for the testing activity, because verification is driven by the subprocess turn loop. |
 | Implementation | `runNativeTopos`, not `runAgent`: the whole task runs as the native agent described above. |
 
