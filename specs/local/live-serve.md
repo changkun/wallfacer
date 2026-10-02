@@ -1,6 +1,6 @@
 ---
 title: "Live Serve - Build and Run Developed Software from Wallfacer"
-status: stale
+status: drafted
 depends_on: []
 affects:
   - internal/store/models.go
@@ -11,7 +11,7 @@ affects:
   - frontend/src/components/ServePanel.vue
 effort: large
 created: 2026-03-25
-updated: 2026-07-18
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -28,13 +28,14 @@ There is also no way to keep a development server running while iterating across
 
 ---
 
-## Current State (as of 2026-06-14)
+## Current State (as of 2026-10-02)
 
-- **Task execution**: Runs the agent CLI (Claude/Codex) directly as a host process via `internal/executor` (`HostBackend`). There are no containers. The agent reads/writes code but never builds or runs the resulting software.
+- **Task execution**: Runs the selected harness CLI (Claude Code, Codex, Cursor, OpenCode or Pi) directly as a host process via `internal/executor` (`HostBackend`); the native harness runs in-process instead. There are no containers. The agent reads/writes code but never builds or runs the resulting software.
 - **Process lifecycle**: Each task turn launches one host process (an `os/exec.Cmd` wrapped by `executor.Handle`), torn down after the agent finishes the turn.
 - **Worktrees**: Per-task git worktrees provide isolated copies of the codebase on the host (under `<configDir>/worktrees/`). The host process runs with `cmd.Dir` set to the worktree (or workspace) path. See `internal/runner/worktree.go` and `internal/runner/container.go` (`buildHostSpec`, `buildBaseContainerSpec`).
 - **Log streaming**: `GET /api/tasks/{id}/logs` streams the agent process output via SSE, backed by `internal/pkg/livelog`. Works for agent output, not for arbitrary processes.
 - **Env file**: The agent process inherits a merged environment built from `executor.ContainerSpec.EnvFile` (the wallfacer `.env` with LLM tokens, default `<configDir>/.env`) plus `ContainerSpec.Env` overlays. There is no separate app-level env file.
+- **Static artifacts**: self-contained HTML files under `<workspace>/artifacts/` are served and listed in a gallery ([static-artifacts](../.archive/local/static-artifacts.md)). That is the lightweight end of this feature: files only, no build step and no process.
 - **No**: Dev server, build pipeline, long-lived process manager, or any way to run user code as part of a serve session.
 
 > Architecture note: an earlier draft of this spec assumed a container runtime
@@ -334,7 +335,7 @@ The discovery prompt is rendered from `internal/prompts/serve-discover.tmpl` and
 6. Identify the working subdirectory if the app does not live at the repo root, and propose `work_dir`.
 7. Output exactly one JSON block matching the `ServeConfig` schema: `{"build_cmd": "...", "run_cmd": "...", "pre_cmd": "...", "port": N, "env": {...}, "work_dir": "..."}`.
 
-The runner parses the agent's output, extracts the JSON block (reusing the NDJSON/agent-output parsing already used by ideation, `internal/runner/parse.go` / `ideate_parse.go`), and stores it as the proposed config. The `env` field from discovery contains only variable *names* with empty/placeholder values; the user fills in actual secrets in the serve panel.
+The runner parses the agent's output, extracts the JSON block (reusing the agent-output parsing in `internal/runner/parse.go`, which prefers the result line of an NDJSON stream), and stores it as the proposed config. The `env` field from discovery contains only variable *names* with empty/placeholder values; the user fills in actual secrets in the serve panel.
 
 ### Auto-Rebuild Mode
 
@@ -352,11 +353,11 @@ This is implemented entirely host-side in `internal/runner/serve.go`. There is n
 
 ## UI
 
-The vanilla `ui/` tree is gone; the frontend is Vue under `frontend/src/`. Live Serve is a new Vue component plus a small entry point in the sidebar.
+The vanilla `ui/` tree is gone; the frontend is Vue under `frontend/src/`. Live Serve is a new Vue component plus a small entry point in the rail.
 
 ### Entry Point
 
-Add a "Serve" control to the sidebar (`frontend/src/components/Sidebar.vue`) and/or a task action in `TaskDetail.vue`. The control shows:
+Add a "Serve" control to the rail (`frontend/src/components/AppRail.vue`) and/or a task action in `TaskDetail.vue`. The control shows:
 - **Idle state**: Play icon + "Serve"
 - **Discovering state**: Spinner + "Detecting..."
 - **Running state**: Green dot + "Serving on :PORT" (clickable to open `http://localhost:PORT`)
@@ -366,7 +367,7 @@ Clicking when idle opens the serve panel. Clicking when running opens the serve 
 
 ### Serve Panel - `frontend/src/components/ServePanel.vue` (new)
 
-A panel/modal (styled with `frontend/src/styles/tokens.css`, consistent with `SettingsModal.vue` and the `components/settings/` editors) with three sections:
+A panel/modal (styled with `frontend/src/styles/tokens.css`, consistent with the `components/settings/` tabs and the panel shapes in `frontend/src/styles/primitives.css`) with three sections:
 
 1. **Scope selector**: Radio for "Workspace" (default) or "Task". When "Task" is selected, a dropdown lists tasks that have a worktree.
 
@@ -484,11 +485,11 @@ The fingerprint is `prompts.InstructionsKey(workspaces)` (sorted workspace paths
 |------|--------|
 | `internal/prompts/serve-discover.tmpl` (new) | System prompt template for the command-discovery agent (embedded + override, per `internal/prompts/doc.go`) |
 | `internal/prompts` | Add a `RenderServeDiscover` method on the prompt Manager |
-| `internal/runner/serve_discover.go` (new) | `RunDiscovery`: launch a one-shot agent process (pattern from `runIdeationEphemeral`), parse the JSON block from output |
+| `internal/runner/serve_discover.go` (new) | `RunDiscovery`: launch a one-shot agent process through `runOneShotContainer` (`internal/runner/commit.go`, the launch, drain and parse path the commit-message generator uses), parse the JSON block from output |
 | `internal/runner/serve_discover.go` | Config caching (fingerprint to JSON file under `<configDir>/serve-configs/`) |
 | `internal/runner/serve_discover_test.go` (new) | Test JSON extraction from mock agent output, cache round-trip, secret stripping |
 
-**Effort:** Medium. Agent launch reuses ephemeral-ideation patterns; JSON extraction reuses `ideate_parse.go`.
+**Effort:** Medium. Agent launch reuses `runOneShotContainer`; JSON extraction reuses `internal/runner/parse.go`.
 
 ### Phase 4 - API endpoints + handler
 
@@ -516,11 +517,11 @@ The fingerprint is `prompts.InstructionsKey(workspaces)` (sorted workspace paths
 |------|--------|
 | `frontend/src/components/ServePanel.vue` (new) | Serve panel: scope selector, config editor sub-tabs, log view, action buttons |
 | `frontend/src/stores/serve.ts` (new) | Pinia store for serve session state + SSE handling |
-| `frontend/src/components/Sidebar.vue` | "Serve" entry point with state-driven label/icon |
+| `frontend/src/components/AppRail.vue` | "Serve" entry point with state-driven label/icon |
 | `frontend/src/components/TaskDetail.vue` | Optional per-task "Serve this worktree" action |
 | `frontend/src/api` (generated client) | Regenerated via `make api-contract` so the new routes are typed |
 
-**Effort:** Medium. New panel + log view, following `SettingsModal.vue` / `InstructionsEditor.vue` / `TerminalPanel.vue` patterns.
+**Effort:** Medium. New panel + log view, following the `components/settings/` tabs and `TerminalPanel.vue` patterns.
 
 ### Phase 7 - SSE integration + polish
 
@@ -538,7 +539,7 @@ The fingerprint is `prompts.InstructionsKey(workspaces)` (sorted workspace paths
 |------|--------|
 | `internal/apicontract/` | Regenerate via `make api-contract` |
 | `docs/guide/configuration.md` | Document `WALLFACER_SERVE_*` env vars |
-| `docs/guide/board-and-tasks.md` | Document the serve feature in the task workflow |
+| `docs/guide/board.md` | Document the serve feature in the task workflow |
 | `CLAUDE.md` | Add serve routes to the API Routes section |
 
 **Effort:** Low.
@@ -554,11 +555,11 @@ The fingerprint is `prompts.InstructionsKey(workspaces)` (sorted workspace paths
 | `containerRegistry` singleton handle | `internal/runner/registry.go` | Tracking the serve process for log streaming and stop |
 | `livelog` SSE tailing + keepalive | `internal/pkg/livelog`, `internal/handler/stream.go` | `GET /api/serve/logs` |
 | SSE delta broadcast | `internal/handler/stream.go` | Serve session updates over the task SSE stream |
-| Ephemeral agent run | `internal/runner/ideate.go` (`runIdeationEphemeral`) | Discovery agent launch |
-| Agent-output / NDJSON parsing | `internal/runner/parse.go`, `ideate_parse.go` | Extracting the discovery JSON block |
+| One-shot agent run | `internal/runner/commit.go` (`runOneShotContainer`) | Discovery agent launch |
+| Agent-output / NDJSON parsing | `internal/runner/parse.go` | Extracting the discovery JSON block |
 | Workspace fingerprint | `internal/prompts/instructions.go` (`InstructionsKey`) | Discovery config cache keying |
 | File-backed session store | `internal/store/oversight.go` | `SaveServeSession` / `GetServeSession` |
-| Settings/instructions editor | `frontend/src/components/SettingsModal.vue`, `InstructionsEditor.vue` | Serve config editor + serve.env editor |
+| Settings tabs | `frontend/src/components/settings/` | Serve config editor + serve.env editor |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: "Terminal UI - Full TUI Mode for Wallfacer"
-status: stale
+status: drafted
 depends_on: []
 affects:
   - internal/tui/
@@ -10,7 +10,7 @@ affects:
   - internal/cli/server.go
 effort: xlarge
 created: 2026-03-30
-updated: 2026-06-28
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -33,9 +33,9 @@ Beyond environment constraints, many power users simply prefer terminal interfac
 
 ---
 
-## Current State (as of 2026-06-14)
+## Current State (as of 2026-10-02)
 
-- **Web UI**: A Vue SPA under `frontend/src/`, built to `frontend/dist/` and embedded into the binary via `//go:embed all:frontend/dist` in `main.go`. Components live under `frontend/src/components/` (task board via `TaskCard.vue`, `TaskComposer.vue`, `TaskDetail.vue`, `ExplorerPanel.vue`, `TerminalPanel.vue`, `StatusBar.vue`, etc.) with Pinia stores under `frontend/src/stores/` (`tasks.ts`, `planning.ts`, `auth.ts`, `boot.ts`). The vanilla `ui/` HTML/JS tree has been deleted. The SPA is a pure API client; the server holds no per-page render logic.
+- **Web UI**: A Vue SPA under `frontend/src/`, built to `frontend/dist/` and embedded into the binary via `//go:embed all:frontend/dist` in `main.go`. Components live under `frontend/src/components/` (task board via `TaskCard.vue`, `TaskComposer.vue`, `TaskDetail.vue`, `ExplorerPanel.vue`, `TerminalPanel.vue`, `Topbar.vue`, etc.) with Pinia stores under `frontend/src/stores/` (`tasks.ts`, `agentSession.ts`, `auth.ts`, `workspaces.ts`). The vanilla `ui/` HTML/JS tree has been deleted. The SPA is a pure API client; the server holds no per-page render logic.
 - **CLI subcommands** (dispatched from `main.go`):
   - `wallfacer run` - starts the embedded task board server (`internal/cli/server.go`) and, unless `-no-browser` is passed, opens the Vue SPA in a browser.
   - `wallfacer status` - prints a static board snapshot to the terminal; `wallfacer status -watch` clears and reprints every 2 seconds until Ctrl-C.
@@ -501,7 +501,7 @@ The TUI should render the first frame within 200ms. This means:
 - **Embedded terminal** (shell inside the TUI): Running a PTY within a Bubble Tea app is possible but complex. Users can use tmux panes or the web terminal for shell access. Deferred.
 - **Split-view multiple tasks**: Showing logs for two tasks side-by-side. Useful but adds significant layout complexity. Deferred.
 - **File explorer**: Browsing workspace files in the TUI. The web UI's `ExplorerPanel.vue` is mouse-oriented and doesn't translate well to terminal. Users have `ls`, `tree`, and their editor. Deferred.
-- **Planning chat / spec tree**: The web UI's planning surfaces (`frontend/src/components/plan/`, `internal/planner/`) are out of scope for the first TUI release. Deferred.
+- **Planning chat / spec tree**: The web UI's planning surfaces (`frontend/src/components/plan/`, `internal/agentsession/`) are out of scope for the first TUI release. Deferred.
 - **Drag-and-drop reordering**: Not possible in a terminal. Task ordering is managed via `s` (start) to promote, or PATCH with position field.
 
 ---

@@ -1,6 +1,6 @@
 ---
 title: Task Prompt File and Image Attachments
-status: stale
+status: drafted
 depends_on: []
 affects:
   - internal/store/models.go
@@ -16,7 +16,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-06-14
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -113,6 +113,23 @@ Subsequent auto-continue turns send an empty prompt and are unchanged. Feedback 
 - **TaskDetail.vue**: when `task.attachments` is non-empty, render a section listing each attachment with a thumbnail/icon, size, and a link to `GET /api/tasks/{id}/attachments/{filename}`. Backlog tasks get a per-file delete control calling `DELETE` and refreshing.
 - **Feedback composer**: the waiting-task feedback form gets the same drop zone; on submit, upload files first, then post the feedback message.
 
+### Harnesses and execution targets
+
+The mechanism is a file in the working directory plus a prompt stanza, so it
+does not depend on which harness runs the task. Every harness wallfacer
+launches (the five CLI harnesses and the in-process native one) runs with the
+primary worktree as its working directory and has a file-read tool. Image and
+PDF understanding is the model's, so the stanza names each file's type and
+leaves the choice of tool to the agent. The wording in the stanza above says
+"Read tool" because that is its name in most harnesses; a harness with a
+different name for it still finds the files by path.
+
+A task whose execution target is hosted
+([topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md))
+is out of scope here. Its session clones a pushed branch, and `.attachments/`
+is excluded from git on purpose, so staged files never reach it. Sending
+attachments to a hosted session is that spec's concern.
+
 ## Phasing and Acceptance Criteria
 
 1. **Store**: `Attachment` struct and `Task.Attachments` field; `SaveAttachment` / `DeleteAttachment`; unit tests cover sanitize, dedupe, and the size/count caps.
@@ -120,7 +137,7 @@ Subsequent auto-continue turns send an empty prompt and are unchanged. Feedback 
 3. **Runner**: worktree staging plus first-turn prompt stanza; tests assert files land at `<worktree>/.attachments/<name>`, the stanza appears only on turn 1, and attachments are excluded from the task diff.
 4. **Frontend**: composer drop zone, chips, sequential upload on create; detail-view listing and backlog delete; feedback-form drop zone.
 
-Each phase is a self-contained commit with tests. A bug fix (per CLAUDE.md) ships with a regression test that fails without the fix.
+Each phase is a self-contained commit with tests. A bug fix (per AGENTS.md) ships with a regression test that fails without the fix.
 
 ## Non-Goals
 

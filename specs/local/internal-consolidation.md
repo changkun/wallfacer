@@ -12,7 +12,7 @@ affects:
   - internal/executor/
 effort: large
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -99,10 +99,9 @@ launch/drain/parse, but several call sites bypass them.
   `force bool` (or a validate predicate) so persistence stays single-sourced.
   Risk: medium (the state-machine guard is exactly what differs).
 - Byte-identical alias functions to collapse (mechanical, low risk):
-  `visibilityPrincipal` vs `ownerPrincipal` (`internal/handler/workspace_crud.go:70`),
-  `Registry.Leave` vs `LeaveRegistration` (`internal/coordinator/registry.go:133`).
-  (`getenvOr`, `cloneTask`/`deepCloneTask` were already handled or intentionally
-  retained.)
+  `visibilityPrincipal` vs `ownerPrincipal` (`internal/handler/workspace_crud.go:71`).
+  (`Registry.Leave` vs `LeaveRegistration`, `getenvOr`, and
+  `cloneTask`/`deepCloneTask` were already handled or intentionally retained.)
 - `internal/agentsession` `selectActiveThread` helper: the "clear active, then
   set active to the first non-archived thread" selection is copied three times
   in `sessions.go`. Risk: low.

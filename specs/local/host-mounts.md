@@ -1,6 +1,6 @@
 ---
 title: Per-Task Host Path References
-status: stale
+status: drafted
 depends_on:
   - specs/foundations/file-explorer.md
 affects:
@@ -13,7 +13,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-03-25
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -40,7 +40,13 @@ Two consequences shape this feature:
 
 2. **Read-only is no longer enforced by the runtime.** With a container boundary gone, there is no `ro` mount option and no sandbox to confine the agent. "Read-only" can only be advisory (a hint in the prompt stanza). The sensitive-path blocklist (`/etc`, `~/.ssh`, ...) no longer *blocks* the agent from reading those paths; it only governs what wallfacer is willing to advertise as a registered reference. This feature is prompt-context ergonomics, not an isolation boundary. See Open Questions.
 
-`internal/runner/container.go:container_host_mode_test.go` (the existing host-mode tests) is the reference for how WorkDir, board context, and sibling worktrees are surfaced today: via `WALLFACER_*` env vars and turn-1 prompt text, not volumes.
+`internal/runner/container_host_mode_test.go` (the existing host-mode tests) is the reference for how WorkDir, board context, and sibling worktrees are surfaced today: via `WALLFACER_*` env vars and turn-1 prompt text, not volumes.
+
+3. **A path reference is local.** A task whose execution target is hosted
+   ([topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md))
+   runs on a machine that has none of the host's filesystem. Host path
+   references apply to the local target only; a hosted dispatch of a task that
+   has them is refused with a message that names them.
 
 ---
 
