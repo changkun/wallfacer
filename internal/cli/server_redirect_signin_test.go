@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,6 +60,27 @@ func runServerOn(t *testing.T, port int, env string) (*ServerComponents, string)
 	}, testFS(t), testFS(t))
 	t.Cleanup(sc.Shutdown)
 	return sc, configDir
+}
+
+// runServerOnFreePort boots the run tree on a port that was free a moment
+// before, so the server binds the port it asked for and its default redirect
+// URL names it. It skips the test when another process took the port in
+// between.
+func runServerOnFreePort(t *testing.T) (sc *ServerComponents, configDir string, port int) {
+	t.Helper()
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	port = ln.Addr().(*net.TCPAddr).Port
+	if err := ln.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	sc, configDir = runServerOn(t, port, "# empty\n")
+	if sc.ActualPort != port {
+		t.Skipf("port %d was taken between release and bind; server fell back to %d", port, sc.ActualPort)
+	}
+	return sc, configDir, port
 }
 
 // sessionCookies mints the session cookie a signed-in browser holds for the
@@ -151,7 +173,7 @@ func TestInitServer_PortFallback_RedirectSignInOff(t *testing.T) {
 	cookies := sessionCookies(t, occupied, configDir)
 
 	// A signed-in browser: the session cookie carries the request past the
-	// server key check, which is how an org switch reaches /login.
+	// server key check.
 	signedIn := httptest.NewRequest(http.MethodGet, "/login?org_id=", nil)
 	for _, c := range cookies {
 		signedIn.AddCookie(c)
@@ -222,19 +244,7 @@ func TestInitServer_PortFallback_ExplicitRedirectKeepsSignIn(t *testing.T) {
 // instance: the requested port binds, the default redirect URL names it, and
 // /login sends the browser to the issuer.
 func TestInitServer_RequestedPortBound_RedirectSignInOn(t *testing.T) {
-	// Learn a free port, release it, and ask the server for it.
-	ln, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	port := ln.Addr().(*net.TCPAddr).Port
-	if err := ln.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
-	sc, configDir := runServerOn(t, port, "# empty\n")
-	if sc.ActualPort != port {
-		t.Skipf("port %d was taken between release and bind; server fell back to %d", port, sc.ActualPort)
-	}
+	sc, configDir, port := runServerOnFreePort(t)
 	key := readServerAPIKey(configDir)
 
 	req := httptest.NewRequest(http.MethodGet, "/login", nil)
@@ -281,5 +291,66 @@ func TestInitServer_RequestedPortBound_RedirectSignInOn(t *testing.T) {
 		if w := serve(sc, remote); w.Code != http.StatusUnauthorized {
 			t.Errorf("GET %s, signed out, from another host: status = %d, want 401", target, w.Code)
 		}
+	}
+}
+
+// TestInitServer_OrgSwitch_ClearsSessionAndReachesLogin covers an org switch
+// on a local instance from start to the issuer. The instance serves plain
+// HTTP, so the session lives under the cookie name without the "__Host-"
+// prefix; the switch expires that cookie, and the navigation to /login that
+// follows, now without a session, still passes the server key check from this
+// machine and carries the target context to the issuer.
+func TestInitServer_OrgSwitch_ClearsSessionAndReachesLogin(t *testing.T) {
+	sc, configDir, port := runServerOnFreePort(t)
+	cookies := sessionCookies(t, port, configDir)
+	if len(cookies) != 1 {
+		t.Fatalf("session cookies = %v, want one", cookies)
+	}
+	held := cookies[0].Name
+
+	switchOrg := httptest.NewRequest(http.MethodPost, "/api/me/switch-org", strings.NewReader(`{"org_id":""}`))
+	switchOrg.Header.Set("Content-Type", "application/json")
+	switchOrg.RemoteAddr = "127.0.0.1:52100"
+	switchOrg.AddCookie(cookies[0])
+	w := serve(sc, switchOrg)
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST /api/me/switch-org: status = %d, want 200; body %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Redirect string `json:"redirect"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode switch answer: %v; body %s", err, w.Body.String())
+	}
+	if body.Redirect != "/login?org_id=" {
+		t.Fatalf("redirect = %q, want /login?org_id=", body.Redirect)
+	}
+	expired := false
+	for _, c := range w.Result().Cookies() {
+		if c.Name == held && c.MaxAge < 0 {
+			expired = true
+		}
+	}
+	if !expired {
+		t.Errorf("POST /api/me/switch-org: Set-Cookie = %v, want %s expired", w.Header().Values("Set-Cookie"), held)
+	}
+
+	// The browser follows the redirect with the session gone.
+	follow := httptest.NewRequest(http.MethodGet, body.Redirect, nil)
+	follow.RemoteAddr = "127.0.0.1:52100"
+	w = serve(sc, follow)
+	if w.Code != http.StatusFound {
+		t.Fatalf("GET %s without a session: status = %d, want 302; body %s", body.Redirect, w.Code, w.Body.String())
+	}
+	loc, err := url.Parse(w.Header().Get("Location"))
+	if err != nil {
+		t.Fatalf("parse Location: %v", err)
+	}
+	if !strings.HasPrefix(loc.String(), "https://auth.latere.ai/authorize") {
+		t.Errorf("Location = %q, want the issuer's authorize endpoint", loc)
+	}
+	// Present and empty: the issuer reads that as the personal context.
+	if vs, ok := loc.Query()["org_id"]; !ok || len(vs) != 1 || vs[0] != "" {
+		t.Errorf("Location %q: org_id = %v (present %v), want present and empty", loc, vs, ok)
 	}
 }

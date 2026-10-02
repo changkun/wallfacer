@@ -212,8 +212,30 @@ func (h *Handler) doOrgSwitch(w http.ResponseWriter, r *http.Request) (string, b
 			return "", false
 		}
 	}
-	oidc.ClearSession(w)
+	h.clearSession(w)
 	return "/login?org_id=" + req.OrgID, true
+}
+
+// sessionClearer is the optional subset of AuthProvider that expires the
+// session cookie under the name and Secure setting the provider set it with.
+// *oidc.Client satisfies it via its ClearSession method; test doubles that
+// set no cookie of their own do not.
+type sessionClearer interface {
+	ClearSession(http.ResponseWriter)
+}
+
+// clearSession expires the caller's session cookie through the provider that
+// set it. Over plain HTTP (a local instance) the client stores the session
+// without the "__Host-" name prefix and the Secure attribute, which browsers
+// refuse there, and the package-level oidc.ClearSession names only the
+// prefixed cookie, so it would leave that session in the browser. A provider
+// without the method falls back to the package-level default name.
+func (h *Handler) clearSession(w http.ResponseWriter) {
+	if c, ok := h.auth.(sessionClearer); ok {
+		c.ClearSession(w)
+		return
+	}
+	oidc.ClearSession(w)
 }
 
 // SwitchOrg is the canonical active-org switch (POST /api/me/switch-org) the

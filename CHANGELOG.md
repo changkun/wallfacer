@@ -55,6 +55,11 @@ committed: the commit log already holds that.
   GitHub connection as soon as the sign-in completes. It sent the browser to
   `/login`, which a local instance answered with `401`.
 
+- Switching organization on a local instance ends the session of the previous
+  organization before the browser leaves for sign-in, as it does on a hosted
+  one. The previous session stayed in the browser, so a switch abandoned at
+  the sign-in page left the account menu in the old organization.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

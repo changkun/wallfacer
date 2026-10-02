@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/authkit/oidc"
@@ -256,6 +259,80 @@ func TestPatchAuthMe_EmptyOrgIDSwitchesToPersonal(t *testing.T) {
 	}
 	if !cleared {
 		t.Error("session cookie not cleared on switch-to-personal")
+	}
+}
+
+// TestOrgSwitch_PlainHTTP_ClearsTheSessionTheBrowserHolds covers a local
+// instance, which serves plain HTTP: there the client stores the session under
+// the cookie name without the "__Host-" prefix, and the switch has to expire
+// that cookie, not the prefixed default. A cookie jar stands in for the
+// browser, so the assertion is on the session it still presents afterwards.
+func TestOrgSwitch_PlainHTTP_ClearsTheSessionTheBrowserHolds(t *testing.T) {
+	endpoints := map[string]func(*Handler, http.ResponseWriter, *http.Request){
+		"SwitchOrg":   (*Handler).SwitchOrg,
+		"PatchAuthMe": (*Handler).PatchAuthMe,
+	}
+	origin, err := url.Parse("http://localhost:8080/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, endpoint := range endpoints {
+		t.Run(name, func(t *testing.T) {
+			client := oidc.New(oidc.Config{
+				AuthURL:         "https://auth.latere.ai",
+				ClientID:        "wallfacer",
+				RedirectURL:     "http://localhost:8080/callback",
+				CookieKey:       "0123456789abcdef0123456789abcdef",
+				InsecureCookies: true,
+			})
+			if client == nil {
+				t.Fatal("oidc.New returned nil for a public browser client")
+			}
+			h := newTestHandler(t)
+			h.SetAuth(client)
+
+			// The browser signs in: it holds the cookie the client set.
+			jar, err := cookiejar.New(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			signIn := httptest.NewRecorder()
+			if err := client.SetSession(signIn, &oidc.Session{
+				// Not a JWT, so the handler's token refresh resolves no user
+				// and makes no call to the issuer.
+				AccessToken: "access-token",
+				Expiry:      time.Now().Add(time.Hour),
+				User:        oidc.User{Identity: authkit.Identity{Sub: "u-1", OrgID: "org-a"}},
+			}); err != nil {
+				t.Fatalf("set session: %v", err)
+			}
+			jar.SetCookies(origin, signIn.Result().Cookies())
+
+			// An empty org_id is the switch to the personal context; it needs
+			// no membership lookup at the issuer.
+			req := httptest.NewRequest(http.MethodPost, "/api/me/switch-org", bytes.NewBufferString(`{"org_id":""}`))
+			for _, c := range jar.Cookies(origin) {
+				req.AddCookie(c)
+			}
+			if _, err := client.GetSession(req); err != nil {
+				t.Fatalf("the browser holds no session before the switch: %v", err)
+			}
+			w := httptest.NewRecorder()
+			endpoint(h, w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+			}
+			jar.SetCookies(origin, w.Result().Cookies())
+
+			after := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+			for _, c := range jar.Cookies(origin) {
+				after.AddCookie(c)
+			}
+			if sess, err := client.GetSession(after); err == nil {
+				t.Errorf("after the switch the browser still presents the session of %s in %s; Set-Cookie = %v",
+					sess.User.Sub, sess.User.OrgID, w.Header().Values("Set-Cookie"))
+			}
+		})
 	}
 }
 
