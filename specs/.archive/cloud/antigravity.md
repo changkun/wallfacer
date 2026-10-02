@@ -1,6 +1,6 @@
 ---
 title: Google Antigravity as a Remote Executor
-status: drafted
+status: archived
 depends_on:
   - specs/.archive/shared/harness-abstraction.md
 affects:
@@ -20,6 +20,17 @@ dispatched_task_id: null
 
 # Google Antigravity as a Remote Executor
 
+> **Archived 2026-10-02. Retired as: outdated, and outside what wallfacer
+> is becoming.** This spec dispatches a task to another vendor's hosted
+> agents. The maintainer decided the same day that wallfacer runs one
+> harness, on the Latere platform for a remote run
+> ([platform-native](../../shared/platform-native.md)), and named this spec as
+> no longer important. Remote execution is the
+> [hosted executor](../../cloud/latere-integration/topos-remote-executor.md) alone.
+>
+> The text below is kept as written for the record. Its comparison with the
+> Latere executor reflects that spec as it stood on 2026-10-02.
+
 ## Problem
 
 Google ships [Antigravity](https://antigravity.google), an agentic developer platform with a desktop IDE, CLI, and — most relevant here — an **Interactions API** on Gemini (`POST /v1beta/interactions` with `agent: "antigravity-preview-..."`). For users with a Google Cloud / Gemini API account, wallfacer should be able to dispatch a coding task to Antigravity instead of running the harness locally. This widens the set of execution backends beyond Anthropic / OpenAI / Latere and matches users who already have Gemini billing set up.
@@ -33,10 +44,10 @@ This is the third executor category in the harness-abstraction layering:
 | Category | Examples | Harness selectable | Implements |
 |---|---|---|---|
 | Harness-running | host (default) | yes (Claude Code, Codex, Cursor, …) | `Executor` + composes a `Harness` |
-| Self-contained, Latere | [hosted agent session](latere-integration/topos-remote-executor.md) | no (the platform's loop; a mode of the native harness) | a session-shaped run on the runner's `driveToposRun` seam |
+| Self-contained, Latere | [hosted agent session](../../cloud/latere-integration/topos-remote-executor.md) | no (the platform's loop; a mode of the native harness) | a session-shaped run on the runner's `driveToposRun` seam |
 | Self-contained, third-party | Claude Managed Agents, Antigravity | no (fixed) | `Executor`, ignores `Harness` |
 
-**Dependency status:** [harness-abstraction](../.archive/shared/harness-abstraction.md) shipped and archived, but only the harness-running path — `executor.Backend` in `internal/executor/backend.go` currently exposes just `Launch`/`List`, i.e. the argv-based launch used by host, Codex, Cursor, OpenCode, Pi. No self-contained dispatch method (`Dispatch(ctx, req) (Handle, error)` or equivalent, taking a `harness.Request` directly) exists yet. That seam is a prerequisite this spec shares with [claude-managed-agents](claude-managed-agents.md); implementation must add it (extend `Backend` or introduce a parallel interface) before either self-contained executor can land.
+**Dependency status:** [harness-abstraction](../shared/harness-abstraction.md) shipped and archived, but only the harness-running path — `executor.Backend` in `internal/executor/backend.go` currently exposes just `Launch`/`List`, i.e. the argv-based launch used by host, Codex, Cursor, OpenCode, Pi. No self-contained dispatch method (`Dispatch(ctx, req) (Handle, error)` or equivalent, taking a `harness.Request` directly) exists yet. That seam is a prerequisite this spec shares with [claude-managed-agents](claude-managed-agents.md); implementation must add it (extend `Backend` or introduce a parallel interface) before either self-contained executor can land.
 
 ## Selection
 
@@ -88,7 +99,7 @@ Antigravity's Interactions API has **no first-class repo or worktree primitive**
 | **A. Agent `git clone`s inside the sandbox** | No upload step; works for any public-clonable repo. | Requires the workspace to be a git repo with a remote the sandbox can reach; private repos need a token injection. |
 | **B. Pre-step: wallfacer pushes worktree to a temp branch on the user's remote, agent clones that** | Works for any local worktree state. | Adds a push step; pollutes the remote with temp branches. |
 
-**v1 picks A.** Workspace must be a git repo with a reachable remote. The Latere [hosted executor](latere-integration/topos-remote-executor.md) picks the other trade, a pushed task branch, because its session holds a push credential for the platform's git host; this sandbox has no such credential path. System instructions (workspace `AGENTS.md`) are sent as a mounted skill file via the Antigravity skill-files mechanism.
+**v1 picks A.** Workspace must be a git repo with a reachable remote. The Latere [hosted executor](../../cloud/latere-integration/topos-remote-executor.md) picks the other trade, a pushed task branch, because its session holds a push credential for the platform's git host; this sandbox has no such credential path. System instructions (workspace `AGENTS.md`) are sent as a mounted skill file via the Antigravity skill-files mechanism.
 
 ## Auth
 
@@ -146,4 +157,4 @@ Capabilities{
 
 ## Why a separate spec from Claude Managed Agents
 
-Both are self-contained executors, but the tenant infra, auth, harness, model, and capability matrix all differ. Bundling would mean a single spec with two parallel narratives — harder to review, harder to dispatch. Same rationale as splitting [topos-remote-executor](latere-integration/topos-remote-executor.md) from [claude-managed-agents](claude-managed-agents.md).
+Both are self-contained executors, but the tenant infra, auth, harness, model, and capability matrix all differ. Bundling would mean a single spec with two parallel narratives — harder to review, harder to dispatch. Same rationale as splitting [topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md) from [claude-managed-agents](claude-managed-agents.md).

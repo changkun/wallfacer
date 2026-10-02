@@ -1,6 +1,6 @@
 ---
 title: Claude Managed Agents as a Remote Executor
-status: drafted
+status: archived
 depends_on:
   - specs/.archive/shared/harness-abstraction.md
 affects:
@@ -20,15 +20,26 @@ dispatched_task_id: null
 
 # Claude Managed Agents as a Remote Executor
 
+> **Archived 2026-10-02. Retired as: outdated, and outside what wallfacer
+> is becoming.** This spec dispatches a task to another vendor's hosted
+> agents. The maintainer decided the same day that wallfacer runs one
+> harness, on the Latere platform for a remote run
+> ([platform-native](../../shared/platform-native.md)), and named this spec as
+> no longer important. Remote execution is the
+> [hosted executor](../../cloud/latere-integration/topos-remote-executor.md) alone.
+>
+> The text below is kept as written for the record. Its comparison with the
+> Latere executor reflects that spec as it stood on 2026-10-02.
+
 ## Problem
 
 Anthropic ships a managed agent platform ([platform.claude.com/docs/en/managed-agents](https://platform.claude.com/docs/en/managed-agents/overview)) where agents run on Anthropic-hosted (or self-hosted) sandboxes, with state, files, and event history persisted server-side. Wallfacer should be able to dispatch a task to Managed Agents so users with an Anthropic API account can offload long-running runs without operating their own infrastructure — and so wallfacer becomes a control plane that targets the most natural Anthropic-side execution surface.
 
 ## Shape
 
-Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. The Latere [hosted executor](latere-integration/topos-remote-executor.md) has the same shape: a remote service runs its own agent loop, and wallfacer dispatches a request and follows its events. For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
+Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. The Latere [hosted executor](../../cloud/latere-integration/topos-remote-executor.md) has the same shape: a remote service runs its own agent loop, and wallfacer dispatches a request and follows its events. For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
 
-Implication for [harness-abstraction.md](../.archive/shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host executor composes `Executor` with a `Harness`; the Managed Agents executor *is* both. The Latere hosted executor meets the same problem and does not extend `executor.Backend`: it supplies a session-shaped run to the runner's `driveToposRun` seam, which already carries typed events, a final result, and the task state machine. Evaluate that seam for this executor before adding a dispatch method to `Backend`.
+Implication for [harness-abstraction.md](../shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host executor composes `Executor` with a `Harness`; the Managed Agents executor *is* both. The Latere hosted executor meets the same problem and does not extend `executor.Backend`: it supplies a session-shaped run to the runner's `driveToposRun` seam, which already carries typed events, a final result, and the task state machine. Evaluate that seam for this executor before adding a dispatch method to `Backend`.
 
 ## Selection
 
@@ -114,7 +125,7 @@ Capabilities{
 - `internal/executor/claude_managed_agents.go` implementing the executor.
 - Agent-definition caching (hash-keyed reuse of `/v1/agents` resources).
 - SSE consumption with reconnect on transient failure.
-- Self-hosted sandbox container lifecycle (this is the one place wallfacer keeps a "run a container" code path post-[host-default](../.archive/shared/host-default.md) — but it's the Managed Agents sandbox image from Anthropic, not wallfacer's own agent image).
+- Self-hosted sandbox container lifecycle (this is the one place wallfacer keeps a "run a container" code path post-[host-default](../shared/host-default.md) — but it's the Managed Agents sandbox image from Anthropic, not wallfacer's own agent image).
 - `--executor claude-managed-agents` CLI selection.
 - Settings UI surface and `wallfacer doctor` checks.
 - `docs/cloud/claude-managed-agents.md` user guide.
@@ -139,7 +150,7 @@ Capabilities{
 
 - Should wallfacer reuse a single long-lived "wallfacer agent" definition across tasks, or one per (system prompt + tools) hash? Lean toward hash-keyed reuse — agent definitions are cheap to create and reuse maximizes Anthropic-side caching.
 - If a task's sub-agent needs to call Latere services, what does the Managed Agents sandbox present? The family answer is the dispatching user's own token, audienced to the service being called; auth mints no credential that stands for a user. Confirm the sandbox can receive one before this ships.
-- Does this replace the [oauth-token-setup](../.archive/local/oauth-token-setup.md) Claude path for users who pick Managed Agents? No — Managed Agents needs a billing-capable API key, not an OAuth subscription token. Document the distinction clearly.
+- Does this replace the [oauth-token-setup](../local/oauth-token-setup.md) Claude path for users who pick Managed Agents? No — Managed Agents needs a billing-capable API key, not an OAuth subscription token. Document the distinction clearly.
 
 ## Why a separate spec from the Latere hosted executor
 
