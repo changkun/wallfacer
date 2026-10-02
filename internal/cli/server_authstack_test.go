@@ -40,7 +40,7 @@ func stackWithValidator(t *testing.T, v *jwt.Validator, apiKey string, captured 
 		*captured = c
 		w.WriteHeader(http.StatusOK)
 	})
-	inner := handler.BearerAuthMiddleware(apiKey)(next)
+	inner := handler.BearerAuthMiddleware(apiKey, true)(next)
 	return auth.OptionalAuth(v, inner)
 }
 
@@ -72,9 +72,16 @@ func mintRSAKeyAndJWKS(t *testing.T) (*rsa.PrivateKey, *httptest.Server) {
 	return key, srv
 }
 
-// signJWT produces a valid JWT using the RSA key. exp controls the
-// expiration time so tests can make "valid" or "expired" tokens.
+// signJWT produces a valid JWT for the audience "my-client" using the RSA
+// key. exp controls the expiration time so tests can make "valid" or
+// "expired" tokens.
 func signJWT(t *testing.T, key *rsa.PrivateKey, sub string, exp time.Time) string {
+	t.Helper()
+	return signJWTFor(t, key, sub, "my-client", exp)
+}
+
+// signJWTFor is signJWT with the audience the token is addressed to.
+func signJWTFor(t *testing.T, key *rsa.PrivateKey, sub, aud string, exp time.Time) string {
 	t.Helper()
 	kidHash := sha256.Sum256(key.N.Bytes())
 	kid := base64.RawURLEncoding.EncodeToString(kidHash[:])[:8]
@@ -82,7 +89,7 @@ func signJWT(t *testing.T, key *rsa.PrivateKey, sub string, exp time.Time) strin
 	payload, _ := json.Marshal(map[string]any{
 		"sub":            sub,
 		"iss":            "https://auth.latere.ai",
-		"aud":            "my-client",
+		"aud":            aud,
 		"exp":            float64(exp.Unix()),
 		"iat":            float64(time.Now().Unix()),
 		"principal_type": "user",

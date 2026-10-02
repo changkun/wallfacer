@@ -55,8 +55,8 @@ committed: the commit log already holds that.
 - A signed-out browser on the machine Wallfacer runs on reaches sign-in by
   browser redirect, where `/login` and `/callback` answered
   `401 {"error":"unauthorized"}` because a page navigation cannot present the
-  server key; a browser on another host still needs a session or the key
-  there, and signs in with a device code.
+  server key; a browser on another host still needs the key there, and
+  signs in with a device code.
 
 - Switching organization on a local instance ends the session of the previous
   organization before the browser leaves for sign-in, as it does on a hosted
@@ -81,6 +81,10 @@ committed: the commit log already holds that.
 - A chat round is recorded in the usage log under the harness that ran it, not
   always under Claude; rounds on a harness other than Claude are recorded with
   zero tokens and zero cost, because their usage is not read yet.
+
+- A client on another host needs the server key to reach the API of a local
+  instance whatever account it is signed in with; a sign-in stands in for the
+  key only on the machine Wallfacer runs on, and on a cloud-mode deployment.
 
 ## v0.6.1 - 2026-09-26
 

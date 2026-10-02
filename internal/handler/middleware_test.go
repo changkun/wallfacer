@@ -155,7 +155,7 @@ func TestBearerAuthMiddleware(t *testing.T) {
 		{name: "logs sse query token", method: http.MethodGet, target: "/api/tasks/123/logs?token=secret", want: http.StatusNoContent},
 	}
 
-	mw := BearerAuthMiddleware("secret")
+	mw := BearerAuthMiddleware("secret", false)
 	next := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -186,7 +186,7 @@ func TestBearerAuthMiddleware(t *testing.T) {
 }
 
 func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
-	next := BearerAuthMiddleware("generated-local-key")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	next := BearerAuthMiddleware("generated-local-key", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	public := []string{
@@ -232,7 +232,7 @@ func TestBearerAuthMiddleware_SignInRoutes(t *testing.T) {
 		loopback = "127.0.0.1:52100"
 		remote   = "192.168.1.20:52100"
 	)
-	next := BearerAuthMiddleware("generated-local-key")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	next := BearerAuthMiddleware("generated-local-key", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	tests := []struct {
@@ -270,30 +270,63 @@ func TestBearerAuthMiddleware_SignInRoutes(t *testing.T) {
 	}
 }
 
-// TestBearerAuthMiddleware_ClaimsBypass confirms that a request whose
-// context already carries a validated principal (populated upstream by
-// auth.OptionalAuth in cloud mode) skips the static-key check. Keeps
-// cookie-only and JWT-bearer clients working in a deployment that also
-// sets WALLFACER_SERVER_API_KEY for scripts.
-func TestBearerAuthMiddleware_ClaimsBypass(t *testing.T) {
-	var served bool
-	mw := BearerAuthMiddleware("secret")
-	next := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		served = true
-		w.WriteHeader(http.StatusNoContent)
-	}))
-
-	// No Authorization header, but claims are already in context — should pass.
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "user-xyz"}))
-	w := httptest.NewRecorder()
-	next.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204 (claims bypass)", w.Code)
+// TestBearerAuthMiddleware_IdentityBypass covers a request whose context
+// already carries a validated principal (populated upstream by
+// auth.CookieAuth or auth.OptionalAuth). In cloud mode the identity stands in
+// for the static key from any peer, so cookie-only and JWT-bearer clients
+// work in a deployment that also sets WALLFACER_SERVER_API_KEY for scripts.
+// Outside cloud mode it does so only for a peer on this machine, which the
+// index page hands the key to anyway; a peer on another host needs the key
+// whatever identity it presents, on JSON routes and streaming paths alike.
+func TestBearerAuthMiddleware_IdentityBypass(t *testing.T) {
+	const (
+		loopback = "127.0.0.1:52100"
+		remote   = "192.168.1.20:52100"
+	)
+	tests := []struct {
+		name     string
+		cloud    bool
+		peer     string
+		target   string
+		bearer   string
+		identity bool
+		want     int
+	}{
+		{"local, identity, this machine", false, loopback, "/api/config", "", true, http.StatusNoContent},
+		{"local, identity, this machine over IPv6", false, "[::1]:52100", "/api/config", "", true, http.StatusNoContent},
+		{"local, identity, this machine, stream", false, loopback, "/api/terminal/ws", "", true, http.StatusNoContent},
+		{"local, identity, another host", false, remote, "/api/config", "", true, http.StatusUnauthorized},
+		{"local, identity, another host, terminal", false, remote, "/api/terminal/ws", "", true, http.StatusUnauthorized},
+		{"local, identity, another host, task logs", false, remote, "/api/tasks/123/logs", "", true, http.StatusUnauthorized},
+		{"local, identity, another host, logout", false, remote, "/logout", "", true, http.StatusUnauthorized},
+		{"local, identity and key, another host", false, remote, "/api/config", "secret", true, http.StatusNoContent},
+		{"local, identity and query key, another host, terminal", false, remote, "/api/terminal/ws?token=secret", "", true, http.StatusNoContent},
+		{"local, no identity, this machine", false, loopback, "/api/config", "", false, http.StatusUnauthorized},
+		{"cloud, identity, another host", true, remote, "/api/config", "", true, http.StatusNoContent},
+		{"cloud, identity, another host, stream", true, remote, "/api/terminal/ws", "", true, http.StatusNoContent},
+		{"cloud, no identity, another host", true, remote, "/api/config", "", false, http.StatusUnauthorized},
+		{"cloud, key, another host", true, remote, "/api/config", "secret", false, http.StatusNoContent},
 	}
-	if !served {
-		t.Fatal("next handler not invoked")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			next := BearerAuthMiddleware("secret", tc.cloud)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			req := httptest.NewRequest(http.MethodGet, tc.target, nil)
+			req.RemoteAddr = tc.peer
+			if tc.bearer != "" {
+				req.Header.Set("Authorization", "Bearer "+tc.bearer)
+			}
+			if tc.identity {
+				req = req.WithContext(auth.WithIdentity(req.Context(), &authkit.Identity{Sub: "user-xyz"}))
+			}
+			rec := httptest.NewRecorder()
+			next.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("GET %s from %s (cloud=%v, identity=%v): status = %d, want %d",
+					tc.target, tc.peer, tc.cloud, tc.identity, rec.Code, tc.want)
+			}
+		})
 	}
 }
 

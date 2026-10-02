@@ -91,7 +91,23 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 // the browser can load before it reads the injected local API key. The
 // redirect sign-in passes without the key for a peer on this machine (see
 // signInRoute).
-func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
+//
+// A request that already carries an identity from the session cookie or a
+// bearer JWT (populated upstream by auth.CookieAuth and auth.OptionalAuth)
+// passes without the key in two cases only:
+//
+//   - cloudMode is set. Sign-in is forced there and data is scoped per
+//     principal, so the identity is the credential and the key stays an
+//     optional credential for scripts.
+//   - The TCP peer is loopback. The index page already hands such a peer the
+//     key (see indexKeyAllowed in internal/cli), so the identity grants it
+//     nothing it could not present anyway.
+//
+// On an instance that is not in cloud mode, a peer on another host therefore
+// needs the server key whatever identity it presents: an identity says who
+// the caller is, not that the operator admitted them, and a local instance
+// does not scope its data to the principal.
+func BearerAuthMiddleware(apiKey string, cloudMode bool) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
 		// No API key configured — authentication is disabled.
@@ -118,11 +134,9 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			// A request already authenticated by the upstream JWT
-			// middleware (cloud mode) bypasses the static-key check.
-			// Keeps cookie-only and JWT-bearer clients working even
-			// when WALLFACER_SERVER_API_KEY is set for script access.
-			if _, ok := auth.PrincipalFromContext(r.Context()); ok {
+			// An identity stands in for the key in cloud mode and for a
+			// peer on this machine; see the function comment.
+			if _, ok := auth.PrincipalFromContext(r.Context()); ok && (cloudMode || IsLoopbackPeer(r.RemoteAddr)) {
 				next.ServeHTTP(w, r)
 				return
 			}

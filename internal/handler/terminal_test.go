@@ -65,7 +65,7 @@ func newTerminalTestServer(t *testing.T, apiKey string, terminalEnabled bool) (*
 	mux := http.NewServeMux()
 	var handler http.Handler = http.HandlerFunc(h.HandleTerminalWS)
 	if apiKey != "" {
-		handler = BearerAuthMiddleware(apiKey)(http.HandlerFunc(h.HandleTerminalWS))
+		handler = BearerAuthMiddleware(apiKey, false)(http.HandlerFunc(h.HandleTerminalWS))
 	}
 	mux.Handle("/api/terminal/ws", handler)
 

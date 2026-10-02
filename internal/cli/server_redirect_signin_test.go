@@ -172,9 +172,10 @@ func TestInitServer_PortFallback_RedirectSignInOff(t *testing.T) {
 	key := readServerAPIKey(configDir)
 	cookies := sessionCookies(t, occupied, configDir)
 
-	// A signed-in browser: the session cookie carries the request past the
-	// server key check.
+	// A signed-in browser on this machine: the session cookie carries the
+	// request past the server key check.
 	signedIn := httptest.NewRequest(http.MethodGet, "/login?org_id=", nil)
+	signedIn.RemoteAddr = "127.0.0.1:52100"
 	for _, c := range cookies {
 		signedIn.AddCookie(c)
 	}
@@ -194,6 +195,7 @@ func TestInitServer_PortFallback_RedirectSignInOff(t *testing.T) {
 	// session the browser holds.
 	switchOrg := httptest.NewRequest(http.MethodPost, "/api/me/switch-org", strings.NewReader(`{"org_id":""}`))
 	switchOrg.Header.Set("Content-Type", "application/json")
+	switchOrg.RemoteAddr = "127.0.0.1:52100"
 	for _, c := range cookies {
 		switchOrg.AddCookie(c)
 	}

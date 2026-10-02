@@ -160,7 +160,7 @@ Cloud Identity is wired in `RunServer` (`internal/cli/server.go`). The request h
 - `handler.CSRFMiddleware(hostPort)`, unconditional CSRF protection (no skip flag).
 - `auth.CookieAuth(authClient, next)`, two args; resolves an `Identity` from the session cookie. There is no separate jwt validator argument and no CSRF skip.
 - `auth.OptionalAuth(jwtValidator, next)`, populates the principal from a bearer JWT when present, without forcing auth.
-- `handler.BearerAuthMiddleware(serverAPIKey)`, static-key check that is bypassed once an identity is already populated, so a cookie-only browser request succeeds.
+- `handler.BearerAuthMiddleware(serverAPIKey, cloudMode)`, static-key check that an already populated identity satisfies in cloud mode, so a cookie-only browser request succeeds, and outside cloud mode only for a loopback peer; a peer on another host of a local instance needs the key whatever identity it presents.
 - `Handler.ForceLogin(mux)`, applied only when `cloudMode` is true; a local `wallfacer run` stays reachable anonymously.
 - `auth.RequireSuperadmin(next)`, a per-route admin gate (`server.go:921`), not part of the global chain.
 

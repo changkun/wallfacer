@@ -563,9 +563,11 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// Both identity paths converge on the same *Identity context key: JWT wins
 	// when a Bearer header is present (OptionalAuth runs first, downstream
 	// from the cookie path), CookieAuth fills in when no Bearer was sent.
-	// BearerAuth downstream bypasses its static-key check once an identity is
-	// populated so a cookie-only browser request succeeds even in a deployment
-	// that also sets WALLFACER_SERVER_API_KEY for scripts.
+	// BearerAuth downstream accepts that identity in place of the static key
+	// in cloud mode, so a cookie-only browser request succeeds in a deployment
+	// that also sets WALLFACER_SERVER_API_KEY for scripts. Outside cloud mode it
+	// accepts the identity only from a loopback peer: a peer on another host
+	// needs the server key whatever identity it presents.
 	// Sign-in is always available (the login button), but only *forced* in
 	// cloud/hosted mode. A local `wallfacer run` leaves the board reachable
 	// anonymously; the user signs in only if they choose to.
@@ -573,7 +575,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	if cloudMode {
 		srvHandler = h.ForceLogin(mux)
 	}
-	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(srvHandler)
+	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey, cloudMode)(srvHandler)
 	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
 	srvHandler = auth.CookieAuth(authClient, srvHandler)
 	// Mirror the UI cookie login's token into the connector's store so signing in
