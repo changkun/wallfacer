@@ -1,6 +1,6 @@
 ---
 title: Provider credentials in the system keyring
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/envconfig/

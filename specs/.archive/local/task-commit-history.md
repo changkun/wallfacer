@@ -1,6 +1,6 @@
 ---
 title: Task commit history across feedback turns
-status: complete
+status: archived
 depends_on: []
 affects:
   - internal/store/
