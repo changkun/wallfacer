@@ -1,6 +1,6 @@
 ---
 title: Unified Agent-Graph UI (merge Agents and Flows)
-status: stale
+status: archived
 depends_on:
   - specs/local/topos-runtime-integration.md
 affects:
@@ -12,20 +12,28 @@ affects:
   - internal/flow/
 effort: xlarge
 created: 2026-06-28
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
-> **Superseded.** The agent-graph consolidation is the decision of record.
-> Topos owns the
-> agent-graph model; wallfacer consumes `latere.ai/x/topos/graph` (via
-> `internal/agentgraph`) and retires its duplicate flow runtime. The canvas UI
-> this spec built stays; the flow-runtime teardown it planned is folded into
-> that consolidation. Status stays `stale` (the spec vocabulary has no
-> `superseded` state).
-
 # Feature: Unified Agent-Graph UI (merge Agents and Flows)
+
+> **Archived 2026-10-02: shipped.** The single agent-graph surface this spec
+> set out to build is in the code at `/agent-graph`, and the Agents and Flows
+> pages it replaced are deleted. The [Outcome](#outcome-2026-10-02) section
+> records what shipped, what shipped differently, and what was dropped.
+>
+> A note placed here on 2026-07-18 called this spec superseded by a
+> consolidation of the agent-graph model onto `latere.ai/x/topos/graph`. That
+> consolidation changed how a flow is compiled for the embedded runtime
+> (`internal/agentgraph/graph.go`) and left the surface as this spec built it.
+> The note also said wallfacer retires its flow runtime; `internal/flow` and
+> its engine are still in the tree and still run.
+>
+> The text between this note and the Outcome is kept as written. Its commit
+> hashes for M6.1 and M6.2a do not resolve in this repository; the Outcome
+> cites the ones that do.
 
 ## Goal
 
@@ -206,3 +214,105 @@ is thin (e.g. a combined read for the editor); prefer the existing agents/flows 
 
 The UX merge that motivated the whole topos effort. Builds entirely on shipped pieces:
 the agents/flows YAML registries, the M3 flow fields, and the M5 trace endpoint.
+
+## Outcome (2026-10-02)
+
+**Summary.** Implemented directly between 2026-06-28 and 2026-06-30, with a
+restyle on 2026-09-05. One page, `frontend/src/views/AgentGraphPage.vue` at
+`/agent-graph`, holds the agent registry, the fleet editor, and the run
+overlay. `FlowsPage.vue`, `AgentsPage.vue`, and `flows.css` are deleted;
+`/agents`, `/workflows`, and `/flows` redirect to `/agent-graph`
+(`frontend/src/router.ts`), and the rail has one entry, labeled "Agents"
+(`frontend/src/lib/nav.ts`). The surface is documented in
+[docs/guide/agent-graph.md](../../../docs/guide/agent-graph.md).
+
+**What shipped.**
+
+- **M6.1, read-only scaffold** (`b4b9a472`, `eb200bdb`): the route, the page,
+  the searchable palette, the fleet picker, and
+  `frontend/src/components/AgentGraphCanvas.vue`, a focused SVG renderer
+  separate from the Map's `GraphCanvas`. `GET /api/flows` serializes the
+  `agentic`, `dynamic`, `topology`, and `max_handoff_depth` fields.
+- **M6.2a, writable execution fields** (`b3e676ce`): `POST` and `PUT
+  /api/flows` accept and validate those fields
+  (`internal/handler/flows.go`).
+- **M6.2b to M6.2d, editing** (`e0c9f05b`, `26bfb956`, `feca2eec`): clone a
+  built-in or edit a user fleet into a draft, drag an agent from the palette
+  to add it, remove a node, and persist through the flow CRUD. The draft model
+  is `frontend/src/lib/flowDraft.ts`.
+- **M6.3, run overlay** (`a8445918`): a run picker lists the selected fleet's
+  tasks that carry a trace, and `GET /api/tasks/{id}/trace` colors each agent
+  node by its status in that run.
+- **M6.4, parity and cutover** (`dd4afc5a`, `63e1e833`, `8a04ce68`,
+  `e8639f7a`, `3d9b534a`, `d1b264f9`): delete a user fleet with an inline
+  confirm; redirect `/workflows` and `/flows` and drop the Workflows nav
+  entry; delete `FlowsPage.vue` and `flows.css`; extract
+  `frontend/src/components/AgentEditor.vue` and embed it in the page as a
+  dialog; delete `AgentsPage.vue`, redirect `/agents`, and collapse the nav to
+  one entry.
+- **Start from blank** (`8a5311c8`): a "New fleet" action opens an empty
+  draft, so a fleet is no longer clone-only.
+- **Restyle** (`15d8e13e`, `50f72e8e`): the split-pane styles left over from
+  the Agents page were removed, and the page moved onto the console design
+  system's rows, cards, and tokens under
+  [console-redesign/agent-graph](../../shared/console-redesign/agent-graph.md).
+
+**What shipped differently, and why.**
+
+- **Route.** The provisional `/agents` became `/agent-graph`; `/agents` is a
+  redirect. The page was built beside the old pages first, and the name stayed
+  when they were retired.
+- **The fleet reframe replaced the pipeline editor** (`da84d6e2`,
+  `272f6fac`). After M6.2 the canvas was rebuilt around a lead and its
+  members. The parallel-grouping and reorder gestures of M6.2e and M6.2f
+  (`013c28f9`, `5be3ebee`) were removed in that rebuild, and their draft
+  operations (`setParallel`, `clearParallel`, `stagesOf`, `moveStage`) were
+  deleted as unused in `4908717d`. A draft in fixed-sequence coordination can
+  add and remove agents; it cannot reorder them, group them in parallel, or
+  mark one optional. A cloned fleet keeps the grouping it was cloned with.
+- **One coordination control instead of three toggles** (`da84d6e2`). The
+  Agentic and Dynamic toggles and the topology select of M6.2d became a single
+  select, Fixed sequence, Lead delegates, or Open mesh, mapped onto the same
+  flow fields by `coordinationOf` and `setCoordination`. The handoff-depth
+  input shows for Open mesh only.
+- **Agent editing is in place, not a route jump** (`3d9b534a`). M6.2g
+  (`8943c4f4`) routed a double-click to `/agents?agent=<slug>`. The editor is
+  now a dialog over the canvas, opened by double-clicking a palette row or a
+  node, or by "New agent". This is what let the Agents page be deleted, which
+  M6.4 as written kept.
+- **Parallel agents draw as a fan** (`c6593a66`). The reframe had flattened a
+  fixed sequence into a line. The canvas now groups steps into stages by the
+  transitive closure of `run_in_parallel_with`, so the built-in `implement`
+  fleet shows commit message, title, and oversight side by side.
+- **Positions.** In the two delegating modes a node can be dragged anywhere.
+  The position is stored per fleet in the browser's `localStorage`, not in the
+  flow, so it does not travel with the fleet.
+- **Vocabulary.** The page and its controls say "fleet" (`0f02e232`); the task
+  composer and the routine form say "Agent graph"; the API and the YAML
+  directory say "flow". The run graph was renamed from "lineage" to "trace"
+  across the API, the store, and the UI (`9bed1f6b`, `dbc0896e`).
+- **Delegating modes are labeled experimental** (`66a9a757`), following the
+  execution findings in
+  [agent-graph-e2e-design](../../local/agent-graph-e2e-design.md). That spec
+  tracks what the label says against what the runner does.
+
+**Dropped.**
+
+- Connecting nodes to set order. Edges are derived from the coordination mode
+  and the step list; none can be drawn or deleted.
+- The pipeline gestures listed above (reorder and parallel grouping).
+- Marking a step optional from the canvas. M6.2 listed it; no slice built it.
+- A topology indicator on the canvas as a separate element. The coordination
+  label above the canvas carries it.
+
+**Tests.** `frontend/src/views/AgentGraphPage.test.ts`,
+`frontend/src/components/AgentGraphCanvas.test.ts`, and
+`frontend/src/lib/flowDraft.test.ts` cover rendering a fleet and a fixed
+sequence, clone and edit, remove, promote to lead, the coordination control,
+the run overlay, delete, and the blank draft.
+
+**Follow-ups.** The remaining authoring work (editable edges, undo, positions
+saved with the fleet, the link from a task to its fleet) is carried by
+[agent-graph-e2e-design](../../local/agent-graph-e2e-design.md). First-run
+guidance for this surface is
+[first-run-onboarding](../../local/first-run-onboarding.md).
