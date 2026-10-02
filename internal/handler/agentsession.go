@@ -31,6 +31,27 @@ const (
 	messageHarnessUnavailableInChat = "The selected harness cannot run in chat. Choose another harness for this chat."
 )
 
+// The error a chat turn answers with when the thread's saved session state
+// (its resume id and mode pin) cannot be read or written: one code and the
+// one user sentence for it. The thread id, the operation and the underlying
+// error travel in the envelope's details.
+const (
+	codeChatSessionUnavailable    = "chat_session_unavailable"
+	messageChatSessionUnavailable = "The chat thread's saved state could not be read or written, so the message was not sent. Try again, or start a new chat."
+)
+
+// writeChatSessionError logs a failed read ("load") or write ("save") of a
+// thread's session state under the request's context and answers it with
+// 500 in the chat_session_unavailable envelope.
+func writeChatSessionError(w http.ResponseWriter, r *http.Request, threadID, op string, err error) {
+	slog.ErrorContext(r.Context(), "agentsession: thread session state", "thread", threadID, "op", op, "error", err)
+	httpjson.WriteError(w, http.StatusInternalServerError, httpjson.Error{
+		Code:    codeChatSessionUnavailable,
+		Message: messageChatSessionUnavailable,
+		Details: map[string]any{"thread": threadID, "op": op, "error": err.Error()},
+	})
+}
+
 // selectSpecSystemPrompt returns the spec-mode prompt prefix
 // appropriate for the current workspace state: the "empty" variant when
 // no non-archived parseable specs exist across any mounted workspace,
@@ -361,7 +382,11 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check thread mode pin — reject if the incoming message is for the wrong mode.
-	existingSess, _ := cs.LoadSession()
+	existingSess, err := cs.LoadSession()
+	if err != nil {
+		writeChatSessionError(w, r, threadID, "load", err)
+		return
+	}
 	if existingSess.FocusedTask != "" && req.FocusedSpec != "" {
 		httpjson.Write(w, http.StatusConflict, map[string]any{
 			"error": "thread is pinned to task-mode; focused_spec not allowed",
@@ -373,6 +398,26 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 			"error": "thread is pinned to spec-mode; focused_task not allowed",
 		})
 		return
+	}
+
+	// Pin thread mode before exec so the mode is durable even if exec crashes.
+	// The pin is written before the user message is appended, so a failed
+	// write refuses the turn with nothing stored. turnSess is the session
+	// state this request leaves on disk; the turn's goroutine falls back to it
+	// when it cannot re-read the file. At most one of focusedTaskID and
+	// req.FocusedSpec is set (checked above), so the pin names one mode.
+	turnSess := existingSess
+	unpinned := existingSess.FocusedTask == "" && existingSess.FocusedSpec == ""
+	if unpinned && (focusedTaskID != "" || req.FocusedSpec != "") {
+		turnSess = agentsession.ResumeInfo{
+			SessionID:   existingSess.SessionID,
+			FocusedTask: focusedTaskID,
+			FocusedSpec: req.FocusedSpec,
+		}
+		if err := cs.SaveSession(turnSess); err != nil {
+			writeChatSessionError(w, r, threadID, "save", err)
+			return
+		}
 	}
 
 	// Append user message to conversation store.
@@ -389,21 +434,6 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if tm := h.threadsManager(); tm != nil {
 		tm.Touch(threadID)
-	}
-
-	// Pin thread mode before exec so the mode is durable even if exec crashes.
-	if existingSess.FocusedTask == "" && existingSess.FocusedSpec == "" {
-		if focusedTaskID != "" {
-			_ = cs.SaveSession(agentsession.ResumeInfo{
-				SessionID:   existingSess.SessionID,
-				FocusedTask: focusedTaskID,
-			})
-		} else if req.FocusedSpec != "" {
-			_ = cs.SaveSession(agentsession.ResumeInfo{
-				SessionID:   existingSess.SessionID,
-				FocusedSpec: req.FocusedSpec,
-			})
-		}
 	}
 
 	// Expand slash commands before building exec args.
@@ -468,10 +498,10 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		cmd = append(cmd, "--disallowedTools", "Write,Edit,MultiEdit,NotebookEdit")
 	}
 
-	// Resume existing session if available.
-	sess, _ := cs.LoadSession()
-	if sess.SessionID != "" {
-		cmd = append(cmd, "--resume", sess.SessionID)
+	// Resume existing session if available. turnSess holds the session id read
+	// above; the pin write kept it unchanged.
+	if turnSess.SessionID != "" {
+		cmd = append(cmd, "--resume", turnSess.SessionID)
 	}
 
 	// Auto-start the agent session if not already running.
@@ -484,6 +514,36 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 
 	h.agentSession.SetBusy(true, threadID)
 	ll := h.agentSession.StartLiveLog()
+
+	// loadTurnSession re-reads the thread's session state from the turn's
+	// goroutine. On a read failure it logs and returns turnSess, the state this
+	// request wrote, so the save that follows keeps the mode pin instead of
+	// clearing it.
+	loadTurnSession := func() agentsession.ResumeInfo {
+		info, err := cs.LoadSession()
+		if err != nil {
+			slog.Error("agentsession: read thread session after the turn; keeping the request's mode pin",
+				"thread", threadID, "error", err)
+			return turnSess
+		}
+		return info
+	}
+	// saveTurnSession writes the thread's session state from the turn's
+	// goroutine and logs a failure. The reply is still recorded; the next turn
+	// resumes whatever session id the file still holds.
+	saveTurnSession := func(info agentsession.ResumeInfo) {
+		if err := cs.SaveSession(info); err != nil {
+			slog.Error("agentsession: save thread session after the turn", "thread", threadID, "error", err)
+		}
+	}
+	// appendTurnMessage records a message from the turn's goroutine and logs
+	// a failure; the response has already been sent, so there is no caller to
+	// return it to.
+	appendTurnMessage := func(msg agentsession.Message) {
+		if err := cs.AppendMessage(msg); err != nil {
+			slog.Error("agentsession: record turn message", "thread", threadID, "role", msg.Role, "error", err)
+		}
+	}
 
 	// Run exec in background goroutine. Use a detached context because the
 	// HTTP request context is cancelled as soon as the 202 response is sent.
@@ -510,8 +570,14 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 
 		// Tee stdout into the live log so SSE consumers can stream it.
 		tee := io.TeeReader(handle.Stdout(), ll)
-		rawStdout, _ := io.ReadAll(tee)
-		stderr, _ := io.ReadAll(handle.Stderr())
+		rawStdout, readErr := io.ReadAll(tee)
+		if readErr != nil {
+			slog.Error("agentsession: read agent stdout", "thread", threadID, "error", readErr)
+		}
+		stderr, readErr := io.ReadAll(handle.Stderr())
+		if readErr != nil {
+			slog.Error("agentsession: read agent stderr", "thread", threadID, "error", readErr)
+		}
 		// Non-zero exits must not become blank or apparently successful replies.
 		if code, err := handle.Wait(); err != nil || code != 0 {
 			slog.Error("agent exited non-zero", "code", code, "error", err,
@@ -527,12 +593,12 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		// that spec-mode remains pinned across free-form (non-focused) messages.
 		sessionID := agentsession.ExtractSessionID(rawStdout)
 		if sessionID != "" {
-			pinned, _ := cs.LoadSession()
+			pinned := loadTurnSession()
 			savedSpec := req.FocusedSpec
 			if savedSpec == "" {
 				savedSpec = pinned.FocusedSpec
 			}
-			_ = cs.SaveSession(agentsession.ResumeInfo{
+			saveTurnSession(agentsession.ResumeInfo{
 				SessionID:   sessionID,
 				LastActive:  time.Now().UTC(),
 				FocusedSpec: savedSpec,
@@ -545,8 +611,8 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		if agentsession.IsErrorResult(rawStdout) && agentsession.IsStaleSessionError(rawStdout) {
 			slog.Warn("agentsession: stale session, retrying with history context")
 			// Preserve mode pin while clearing the stale session ID.
-			pinned, _ := cs.LoadSession()
-			_ = cs.SaveSession(agentsession.ResumeInfo{
+			pinned := loadTurnSession()
+			saveTurnSession(agentsession.ResumeInfo{
 				FocusedSpec: pinned.FocusedSpec,
 				FocusedTask: pinned.FocusedTask,
 			})
@@ -565,8 +631,14 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			retryTee := io.TeeReader(retryHandle.Stdout(), ll2)
-			rawStdout, _ = io.ReadAll(retryTee)
-			retryStderr, _ := io.ReadAll(retryHandle.Stderr())
+			rawStdout, readErr = io.ReadAll(retryTee)
+			if readErr != nil {
+				slog.Error("agentsession: read agent retry stdout", "thread", threadID, "error", readErr)
+			}
+			retryStderr, readErr := io.ReadAll(retryHandle.Stderr())
+			if readErr != nil {
+				slog.Error("agentsession: read agent retry stderr", "thread", threadID, "error", readErr)
+			}
 			if code, err := retryHandle.Wait(); err != nil || code != 0 {
 				slog.Error("agent retry exited non-zero", "code", code, "error", err,
 					"stderr", sanitize.Truncate(string(retryStderr), agentStderrLogRunes))
@@ -578,12 +650,12 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 
 			sessionID = agentsession.ExtractSessionID(rawStdout)
 			if sessionID != "" {
-				pinned2, _ := cs.LoadSession()
+				pinned2 := loadTurnSession()
 				savedSpec2 := req.FocusedSpec
 				if savedSpec2 == "" {
 					savedSpec2 = pinned2.FocusedSpec
 				}
-				_ = cs.SaveSession(agentsession.ResumeInfo{
+				saveTurnSession(agentsession.ResumeInfo{
 					SessionID:   sessionID,
 					LastActive:  time.Now().UTC(),
 					FocusedSpec: savedSpec2,
@@ -640,7 +712,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 					for _, sysMsg := range processDirectives(
 						scaffoldWs, directives, req.FocusedSpec, now,
 					) {
-						_ = cs.AppendMessage(sysMsg)
+						appendTurnMessage(sysMsg)
 					}
 				}
 				// Commit any spec writes from this round to git so the undo
@@ -670,7 +742,7 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if resultText != "" {
-				_ = cs.AppendMessage(agentsession.Message{
+				appendTurnMessage(agentsession.Message{
 					Role:        "assistant",
 					Content:     resultText,
 					Timestamp:   time.Now().UTC(),
