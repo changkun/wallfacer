@@ -28,6 +28,4 @@ deploy/prebuilt/wallfacer
 go.work
 go.work.sum
 
-# Runtime-served static artifacts (decks, reports); user content, not source.
-/artifacts/
 frontend/coverage-js/

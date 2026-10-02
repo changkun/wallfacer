@@ -24,7 +24,6 @@ Start here for the full reading order.
 - [Plan](plan.md). Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations.
 - [Routines](routines.md). Scheduled cards that spawn fresh tasks on an interval.
 - [Whiteboard](whiteboard.md). The free-form drawing canvas.
-- [Artifacts](artifacts.md). The gallery for self-contained pages produced in the workspace.
 
 ### Operate
 

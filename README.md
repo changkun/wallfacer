@@ -169,7 +169,6 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
 | [Routines](docs/guide/routines.md) | Scheduled cards that spawn tasks on an interval |
 | [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
-| [Artifacts](docs/guide/artifacts.md) | Serve and open self-contained HTML pages from the workspace |
 
 **Operate**
 

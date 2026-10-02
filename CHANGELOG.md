@@ -52,6 +52,12 @@ committed: the commit log already holds that.
   file, and a stored task that names a fleet notes on its timeline that the
   fleet no longer exists.
 
+- The Artifacts gallery: the console has no Artifacts page, and the
+  `/api/artifacts` and `/artifact/{path...}` routes are gone; files under a
+  workspace's `artifacts/` directory stay where they are, and a page meant to
+  be seen is published by pushing it to a repository on the Latere platform,
+  whose Apps capability builds and hosts it.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when

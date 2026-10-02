@@ -18,7 +18,6 @@ export const docIndex: DocEntry[] = [
   { slug: 'plan', title: "Plan", section: "Use Wallfacer", desc: "Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations." },
   { slug: 'routines', title: "Routines", section: "Use Wallfacer", desc: "Scheduled cards that spawn fresh tasks on an interval." },
   { slug: 'whiteboard', title: "Whiteboard", section: "Use Wallfacer", desc: "The free-form drawing canvas." },
-  { slug: 'artifacts', title: "Artifacts", section: "Use Wallfacer", desc: "The gallery for self-contained pages produced in the workspace." },
   { slug: 'automation', title: "Automation", section: "Operate", desc: "Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers." },
   { slug: 'oversight', title: "Oversight", section: "Operate", desc: "Oversight summaries, timelines, logs, diff review, cost and usage analytics." },
   { slug: 'mission-control', title: "Mission Control", section: "Operate", desc: "The unified spec and task graph, acting on the pipeline." },
