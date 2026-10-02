@@ -94,9 +94,10 @@ Git Workflow - local git; the GitHub half is retired
   ⊘ GitHub Integration, Brokered Token, Pull Requests on Tasks,
     Repo Selection, Read Surface, Cloud Remote Fix (retired 2026-10-02)
 
-Platform-native - four decisions of 2026-10-02 (the active program)
+Platform-native - five decisions of 2026-10-02 (the active program)
   ○ Platform-Native Wallfacer (umbrella)
   ✅ Retire Agent Fleets (done)          ✅ Remove GitHub Integration (done)
+  ○ Retire the Artifacts Gallery (removal; pages go through Apps)
   ◐ Topos as the Only Harness (opt-in shipped; migration specified in 4 phases)
   ○ Sessions That Spawn and Fork (vague; decides what a hosted board hosts)
 ```
@@ -134,13 +135,14 @@ demand-gated, with the coordination connection and spec comments shipped.
 
 ## Platform-Native
 
-The active program: four decisions of 2026-10-02 that make wallfacer an application on the Latere platform with one harness. Two are removals, one is a migration, one is a design question.
+The active program: five decisions of 2026-10-02 that make wallfacer an application on the Latere platform with one harness. Two are removals, one is a migration, one is a design question.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
+| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The five decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
 | ↳ [retire-agent-fleets.md](.archive/shared/platform-native/retire-agent-fleets.md) | **Complete** | Removed 2026-10-02: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; a stored fleet name gets one timeline notice; leftover definition directories get one startup warning. |
 | ↳ [remove-github-integration.md](.archive/shared/platform-native/remove-github-integration.md) | **Complete** | Removed 2026-10-02: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes and `internal/github`. Plain git push is untouched; the first start after upgrade deletes the cached tokens. |
+| ↳ [retire-artifacts.md](shared/platform-native/retire-artifacts.md) | Drafted | Removal: the artifacts gallery, its two routes and its rail entry. Pages an agent makes are published through the platform's Apps capability with a push; files under `<workspace>/artifacts/` stay untouched. |
 | ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
 
 The migration itself is [topos-native-harness.md](shared/topos-native-harness.md) in Shared Design.

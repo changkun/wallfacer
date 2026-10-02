@@ -22,7 +22,7 @@ dispatched_task_id: null
 
 # Platform-Native Wallfacer: One Harness, No Fleets, No GitHub
 
-Umbrella for four decisions the maintainer made on 2026-10-02, after the spec
+Umbrella for five decisions the maintainer made on 2026-10-02, after the spec
 tree was reviewed against the code. Together they change what wallfacer is:
 from a board that drives third-party coding CLIs through user-authored agent
 pipelines, to an application on the Latere platform that runs one harness and
@@ -36,6 +36,7 @@ lets agents organize themselves at run time.
 | 2 | **One harness.** Migrate to the rebuilt Topos harness and make it the only one. | "Clean use of the Latere platform and the Topos harness. No Claude Code, no Codex, but just allow model switches." | [topos-native-harness](topos-native-harness.md) |
 | 3 | **Rethink the board before hosting it.** | A hosted board "is something we need to think about how to make this scale". An execution board "is nice but has some problems such as sharing context, messages, awareness to each other"; in Claude Code "an agent can spawn a subagent, can fork itself to inherit the entire context thread". | [sessions-that-spawn-and-fork](platform-native/sessions-that-spawn-and-fork.md) |
 | 4 | **Remove GitHub.** No GitHub connection in wallfacer for now. | "Once the whole Latere platform is more stable and mature, GitHub connection is more or less just connected by a connector." | [remove-github-integration](../.archive/shared/platform-native/remove-github-integration.md) |
+| 5 | **Retire the artifacts gallery.** Pages are published through the platform's Apps capability. | "Artifacts is also a feature probably don't need at all. We have Apps in latere platform, so we could simply use that." | [retire-artifacts](platform-native/retire-artifacts.md) |
 
 ## Before and after
 
