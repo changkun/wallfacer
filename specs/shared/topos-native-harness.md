@@ -8,6 +8,7 @@ affects:
   - go.mod
   - internal/agentgraph/
   - internal/adversarial/
+  - internal/handler/tasks_autoimplement.go
   - internal/runner/
   - internal/agentsession/
   - internal/harness/
@@ -156,7 +157,7 @@ model a task runs on, and the small model the one-shot roles use.
 | Title, commit message | One-shot CLI calls | A single tool-less turn on the small model |
 | Oversight | A one-shot CLI call over the activity | A single tool-less turn on the small model, reading the session's events |
 | Chat and planning | A CLI subprocess per turn through `internal/agentsession` | A session per thread, on the workspace, resumed across turns |
-| Adversarial review | `internal/adversarial` on the pinned module's `adversarial` package | Moved to the review engine's own module, `latere.ai/x/agon`, with its critics and proposer on the seam |
+| Adversarial review | `internal/adversarial`, a debate engine from the pinned module, with a Claude-only proposer and critics rotated across CLI harnesses for model diversity | Two models on the one harness. A reviewer session on a model different from the task's reads the task's diff and reports findings; the task's own session answers them; rounds and cost are bounded by the existing review settings. The diversity the engine bought by switching harnesses comes from switching models, which the neutral harness makes a configuration value. No separate review engine: `internal/adversarial` and its dependency on the pinned module's `adversarial` package are removed |
 
 Every role's tokens and cost come from the session's model request events,
 which closes the native run's usage gap.
@@ -194,12 +195,11 @@ progress elsewhere.
 | Phase | Content | Why first |
 |---|---|---|
 | 0 | [Retire fleets](platform-native/retire-agent-fleets.md) and [remove GitHub](platform-native/remove-github-integration.md) | The delegating-fleet engine is written against the old module's API and cannot move; removing it first means the seam carries one path |
-| 1 | Move `internal/adversarial` to `latere.ai/x/agon` | It imports the old module's `adversarial` package, and one module path can be pinned at one version only |
-| 2 | Move the seam to the rebuilt module: the task's implementation session, Latere and provider credentials, events and usage, approvals, interrupt and resume, the scripted model in tests. The `topos` harness choice now means the rebuilt harness | The base everything else stands on |
-| 3 | Every role on the seam: test verification, title, commit message, oversight, chat and planning. The model switch in the composer and chat. Provider credential shapes verified | After this nothing needs a CLI |
-| 4 | Remove the CLI harnesses: the five adapters and the fake one in `internal/harness`, the subprocess executor and its per-CLI launchers, CLI binary discovery, per-role harness settings, the harness picker and logos, the CLI checks in `wallfacer doctor`, and the docs. `Task.Sandbox` stays as a record field and is ignored | Last, so no release has fewer working paths than the one before |
+| 1 | Move the seam to the rebuilt module: the task's implementation session, Latere and provider credentials, events and usage, approvals, interrupt and resume, the scripted model in tests. The `topos` harness choice now means the rebuilt harness. The review is rebuilt as two models on the seam in the same phase, because `internal/adversarial` imports the old module and one module path can be pinned at one version only | The base everything else stands on |
+| 2 | Every other role on the seam: test verification, title, commit message, oversight, chat and planning. The model switch in the composer and chat. Provider credential shapes verified | After this nothing needs a CLI |
+| 3 | Remove the CLI harnesses: the five adapters and the fake one in `internal/harness`, the subprocess executor and its per-CLI launchers, CLI binary discovery, per-role harness settings, the harness picker and logos, the CLI checks in `wallfacer doctor`, and the docs. `Task.Sandbox` stays as a record field and is ignored | Last, so no release has fewer working paths than the one before |
 
-Phase 4 ships with a release note that says plainly what changed for a user
+Phase 3 ships with a release note that says plainly what changed for a user
 who ran wallfacer on a Claude or Codex subscription: the Claude path is now a
 Latere sign-in or an Anthropic API key.
 
@@ -222,9 +222,11 @@ Latere sign-in or an Anthropic API key.
 8. Title, commit message, oversight, test verification, chat and planning all
    run without starting a subprocess; a test asserts the executor is not
    called.
-9. After phase 4, `internal/harness` and `internal/executor` hold no CLI
+9. A review runs its reviewer on a model different from the task's, and
+   `internal/adversarial` no longer exists.
+10. After phase 3, `internal/harness` and `internal/executor` hold no CLI
    adapter, and the frontend has no harness picker.
-10. The Go suite, the frontend suite and `make ui-test` pass, with the
+11. The Go suite, the frontend suite and `make ui-test` pass, with the
     scripted model in every test that runs an agent.
 
 ## Asks of the Topos project
@@ -248,8 +250,11 @@ would otherwise carry.
    sign-in or an API key.
 2. **Client ids.** Whether wallfacer needs OAuth client registrations of its
    own with each provider.
-3. **The small model.** Which catalog model the one-shot roles default to,
-   and what they use on a provider sign-in.
+3. **The small model and the reviewer model.** Which catalog models the
+   one-shot roles and the reviewer default to, and what they use on a
+   provider sign-in, where only one provider's models may be available. A
+   reviewer on the same provider's other model keeps some diversity; the
+   reviewer on the task's own model is refused.
 4. **Pin policy.** How often the pin moves and what a bump must pass.
 
 ## Out of scope
