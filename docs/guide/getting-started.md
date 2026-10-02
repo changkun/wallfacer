@@ -58,10 +58,9 @@ Pages that need a workspace show a folder picker on first visit. Pick one or mor
 Sign-in is available but never required; the board is fully functional anonymously. Signing in adds:
 
 - Spec comment sync across machines through the coordination connector.
-- The GitHub connection, borrowed from the latere.ai account, which enables opening pull requests from the board.
 - Identity attribution on tasks and events, plus organization switching.
 
-To sign in, open the account menu at the bottom of the sidebar (below Docs and Settings) and choose **Sign in via latere.ai**. A modal shows a short device code and a verification URL; confirm the code in the browser and the session completes automatically. The **Sign in via latere.ai** button on the GitHub tab in Settings starts the same sign-in. Where the device flow is unavailable, the UI falls back to a browser redirect through `/login`. A second instance on the same machine starts on a free port when its own is taken; the browser redirect and organization switching are off there, the account menu says why, and the device code works as usual (see [Configuration](configuration.md#sign-in-and-cloud-oidc)). On headless machines, run `wallfacer auth login` instead; the token is stored at the shared latere location and carries over to the web UI.
+To sign in, open the account menu at the bottom of the sidebar (below Docs and Settings) and choose **Sign in via latere.ai**. A modal shows a short device code and a verification URL; confirm the code in the browser and the session completes automatically. Where the device flow is unavailable, the UI falls back to a browser redirect through `/login`. A second instance on the same machine starts on a free port when its own is taken; the browser redirect and organization switching are off there, the account menu says why, and the device code works as usual (see [Configuration](configuration.md#sign-in-and-cloud-oidc)). On headless machines, run `wallfacer auth login` instead; the token is stored at the shared latere location and carries over to the web UI.
 
 ## First task, end to end
 
@@ -73,7 +72,7 @@ The board has four columns: Backlog, In Progress, Waiting, and Done.
 4. When the agent finishes, the card moves to Waiting. Open the **Changes** tab to review the diff. Leave comments directly on diff lines to send feedback; the task resumes with the comments as instructions.
 5. Accept the work by clicking **Done** (or pressing `d` on the focused card). The task passes through a brief committing phase where the commit message agent writes the commit, then lands in Done.
 
-Failed tasks carry a failure category and can be retried or sent back to Backlog. The [Board](board.md) guide covers verification, feedback, and pull requests in depth.
+Failed tasks carry a failure category and can be retried or sent back to Backlog. The [Board](board.md) guide covers verification and feedback in depth.
 
 ## Where data lives
 
@@ -87,7 +86,6 @@ Everything is stored under `~/.wallfacer/`:
 | `worktrees/` | Per-task git worktrees |
 | `prompts/` | User overrides for system prompt templates |
 | `agent-sessions/` | Chat and plan session history |
-| `github/` | GitHub connection cache |
 | `cookie-key` | Session cookie encryption key |
 | `tmp/` | Scratch space |
 

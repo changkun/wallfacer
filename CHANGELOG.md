@@ -35,6 +35,15 @@ committed: the commit log already holds that.
   Topos, Cella, Lux and Drive entries. Wallfacer's own footer rules, which
   overrode the shared layout, are removed.
 
+### Removed
+
+- The GitHub integration: Settings has no GitHub tab, tasks and specs show no
+  pull request, the `/api/github/*` and `/api/tasks/{id}/pr` routes and the
+  `github` field of `GET /api/config` are gone, and the first start deletes
+  the GitHub token cache in `~/.wallfacer/github/`; a branch is still pushed
+  with plain `git` and the host's own credentials, and its pull request is
+  opened on the git host.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when
@@ -48,11 +57,6 @@ committed: the commit log already holds that.
   `401 {"error":"unauthorized"}` because a page navigation cannot present the
   server key; a browser on another host still needs a session or the key
   there, and signs in with a device code.
-
-- The **Sign in via latere.ai** button on the GitHub tab in Settings signs in
-  the way the account menu does, by device code in a modal, instead of sending
-  the browser to `/login`, and shows the GitHub connection as soon as the
-  sign-in completes.
 
 - Switching organization on a local instance ends the session of the previous
   organization before the browser leaves for sign-in, as it does on a hosted

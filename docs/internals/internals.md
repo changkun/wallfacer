@@ -44,7 +44,7 @@ Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics
 
 [Auth & Identity](auth-and-identity.md)
 
-Identity end to end: OIDC browser login and the session cookie, the RFC 8628 device flow (in-UI modal, `wallfacer auth` CLI, shared token store), the middleware chain, principal context and actor attribution, what sign-in enables (coordination connector, GitHub broker, org switching), and cloud mode (forced login, org isolation, superadmin gates, the sandbox trust-plane proxy, wallfacerd).
+Identity end to end: OIDC browser login and the session cookie, the RFC 8628 device flow (in-UI modal, `wallfacer auth` CLI, shared token store), the middleware chain, principal context and actor attribution, what sign-in enables (coordination connector, org switching), and cloud mode (forced login, org isolation, superadmin gates, the sandbox trust-plane proxy, wallfacerd).
 
 For wallfacer's slice of the latere.ai family identity shape (the `wallfacer-sandbox-proxy` inbound audience, its per-route scopes, and the fail-closed validator), see [Service identity](service-identity.md).
 

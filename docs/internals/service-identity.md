@@ -12,9 +12,9 @@ The family holds one invariant across every service boundary:
 
 In wallfacer's terms:
 
-- **Authority derives from the owner.** A sandbox JWT presented to wallfacer names the owning user through its `sub`. Wallfacer resolves the owning principal from that claim before it acts (for git, that principal is what auth uses to pick the right installation).
+- **Authority derives from the owner.** A sandbox JWT presented to wallfacer names the owning user through its `sub`. Wallfacer resolves the owning principal from that claim before it acts.
 - **The owner is who the token says.** Wallfacer reads the presented token and does not manufacture authority of its own on the inbound path.
-- **A product's tokens stay with their issuer.** Wallfacer's own outbound service token targets auth, not a third product. When wallfacer mints a GitHub installation token, it calls auth's installation-token endpoint with its service token and hands back only the scoped result.
+- **A product's tokens stay with their issuer.** Wallfacer presents no service token of its own on the trust plane and mints no credential for another product, GitHub included: the proxy substitutes the provider keys it holds.
 
 ## Inbound contract: the sandbox-proxy audience
 
@@ -39,7 +39,7 @@ The proxy presents no credential of its own to any other service: it substitutes
 
 The validator is fail closed. If the JWT validator is not configured, the trust plane cannot establish who is calling, so it rejects the request with `503` rather than admitting it as anonymous-but-authorized. An unconfigured validator never becomes an open door.
 
-This is the floor beneath the whole edge: the proxy only forwards to a real upstream (an LLM provider, or auth's installation-token endpoint) once a caller has proven identity against the declared audience and carries the route's scope. Absent the configuration to check that, nothing is forwarded.
+This is the floor beneath the whole edge: the proxy only forwards to a real upstream (an LLM provider) once a caller has proven identity against the declared audience and carries the route's scope. Absent the configuration to check that, nothing is forwarded.
 
 The trust-plane routes are also gated on the proxy being enabled at all: without a provider key the routes answer `503` before any JWT check, which is the permanent state of a local, single-user run.
 

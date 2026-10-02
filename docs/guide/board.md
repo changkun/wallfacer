@@ -126,7 +126,7 @@ Press **Cmd+K** (Ctrl+K) to open the palette. It combines fuzzy local task searc
 
 ## Task detail view
 
-Click any card to open the detail view. A left rail carries the header (status, tags, elapsed time, cost, short ID), settings, dependency and PR panels, and the action buttons; the main pane switches between six tabs.
+Click any card to open the detail view. A left rail carries the header (status, tags, elapsed time, cost, short ID), settings, the dependency panel, and the action buttons; the main pane switches between six tabs.
 
 ![Task detail view with the tab bar and actions rail](images/task-detail.png)
 
@@ -166,10 +166,6 @@ The **Test** action launches a separate verification agent against the task's wo
 ### Timeline
 
 The **Timeline** tab renders every recorded span (worktree setup, agent turns, commits) as a Gantt-style flamegraph with idle time compressed, plus a detail table. Aggregated timing lives on the Analytics page; see [Oversight](oversight.md).
-
-## Pull requests
-
-When a task has a branch and GitHub is connected, the **PR panel** in the detail rail offers **Create PR** (for tasks not yet done), a state badge (open, closed, merged) linking to the pull request, and a comment box that posts to the PR. GitHub connectivity is borrowed from the signed-in latere.ai account; see [Configuration](configuration.md) for connecting.
 
 ## Automation menu
 

@@ -182,7 +182,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers |
 | [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, analytics |
 | [Mission Control](docs/guide/mission-control.md) | Unified spec and task graph, acting on the pipeline |
-| [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches, GitHub |
+| [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |
 | [Configuration](docs/guide/configuration.md) | Settings, env vars, harnesses, CLI, shortcuts |
 
 **Build On (Internals)** is the deep reference for how the system works. Start at **[Technical Internals](docs/internals/internals.md)**.

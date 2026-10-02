@@ -1,6 +1,6 @@
 # Workspaces and Git
 
-A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board, chat sessions, the whiteboard, and analytics are all scoped per workspace. This guide covers the workspace model, day-to-day workspace management, the git machinery underneath task execution, and the GitHub integration.
+A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board, chat sessions, the whiteboard, and analytics are all scoped per workspace. This guide covers the workspace model, day-to-day workspace management, and the git machinery underneath task execution.
 
 ## The workspace model
 
@@ -58,7 +58,7 @@ See [Git Worktrees](../internals/git-worktrees.md) for the commit pipeline and c
 
 For git workspaces, the header shows a status chip per repository: name, current branch, and ahead/behind counts, refreshed by a server-sent stream every few seconds.
 
-- **Push** appears when local commits are ahead of the upstream and runs `git push`.
+- **Push** appears when local commits are ahead of the upstream and runs `git push` with the host's own git configuration and credentials. Wallfacer does not open pull requests; a pull request for a pushed branch is opened on the git host.
 - **Sync** appears when the workspace is behind and runs a fetch plus rebase onto the upstream.
 - **Rebase on main** appears on feature branches and rebases the current branch onto the remote default branch.
 
@@ -82,31 +82,6 @@ Two background mechanisms keep the worktree directory healthy:
 ### Non-git folders
 
 Folders that are not git repositories still get change tracking: the task works on a snapshot copy backed by a local git repository, the diff is captured from the snapshot, and changes are extracted back to the original folder on completion. The Changes tab works the same way as for git repositories.
-
-## GitHub integration
-
-Wallfacer does not run its own GitHub OAuth flow. It borrows the GitHub connection from the signed-in latere.ai account, where connections are managed centrally.
-
-Gate: GitHub features require both a signed-in latere.ai account and a GitHub connection on that account. Without either, the GitHub surface stays disabled.
-
-### Settings > GitHub
-
-The GitHub tab in Settings reflects the borrowed connection:
-
-- Not signed in: a prompt to sign in via latere.ai.
-- Signed in, not connected: a link to connect GitHub on the latere.ai account page.
-- Signed in and connected: the connected GitHub login and a link to manage connections at latere.ai.
-
-The API mirrors this: `GET /api/github/auth/status` reports availability, connection state, login, permissions, and expiry; `POST /api/github/auth/connect` returns the install URL for the latere.ai GitHub App flow; `POST /api/github/auth/disconnect` clears the borrowed token.
-
-### What it enables
-
-With a connection in place, the task detail modal shows a PR panel for tasks whose branch was pushed to a github.com repository:
-
-- **Create PR** opens a pull request for the task branch; the title defaults from the task and the body from its commit message.
-- The panel shows the PR's link and state, and posts comments to the PR from the task view.
-
-Repository-level endpoints for creating pulls and comments exist for automation (`POST /api/github/pulls`, `POST /api/github/comments`).
 
 ## See also
 

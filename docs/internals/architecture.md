@@ -346,7 +346,6 @@ Every `internal/` package and its role in the system:
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
 | `flow` | Merged built-in + user-authored flow registry; composes agents into ordered step chains. One built-in flow: `implement`; unregistered slugs resolve to it | `Registry`, `Flow`, `Step`, `NewBuiltinRegistry()` |
-| `github` | GitHub integration: principal-scoped token store for the brokered "Latere AI" GitHub App credential, API client, PR/comment read-write surfaces | `Store`, `HTTPBroker`, `Client` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
@@ -438,8 +437,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
 | `terminal.go` | WebSocket terminal relay for the host shell | `GET /api/terminal/ws` |
 | `device_auth.go` | Local device-code sign-in (RFC 8628) against the latere.ai auth service; the done-poll mints the session cookie | `POST /api/auth/device/start`, `GET /api/auth/device/poll`, `POST /api/auth/device/cancel` |
-| `github.go` / `github_auth.go` / `github_write.go` | GitHub connection status and brokered write surfaces | `GET /api/github/auth/status`, `POST /api/github/auth/connect`, `POST /api/github/pulls`, `POST /api/github/comments` |
-| `tasks_pr.go` | Task-level pull-request panel operations | `GET/POST /api/tasks/{id}/pr`, `POST /api/tasks/{id}/pr/comment` |
 | `whiteboard.go` | Per-workspace whiteboard document persistence | `GET /api/whiteboard`, `PUT /api/whiteboard` |
 | `graph.go` | Unified spec+task dependency graph for Mission Control | `GET /api/graph` |
 | `speccomments.go` / `commentrelay.go` | Inline spec comments and the coordination relay | `GET/POST /api/spec-comments`, `GET /api/spec-comments/stream`, `GET /api/coordination/status`, `POST /api/coordination/opt-in` |

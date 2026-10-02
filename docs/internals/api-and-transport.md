@@ -101,9 +101,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/tasks/{id}/review` | Trigger an adversarial review verification run for a waiting task |
 | `GET /api/tasks/{id}/review/transcript` | Review run transcript. `truncated: true` when the transcript file could not be read to its end (an I/O error, or a record over the line cap `maxReviewTranscriptLineBytes` in `internal/handler/review_transcript.go`); `forks` then holds the rounds before that point, and the server logs the error with the session directory |
 | `GET /api/tasks/{id}/trace` | Agent trace graph recorded by an agentic (topos) run |
-| `GET /api/tasks/{id}/pr` | Pull-request status for the task branch |
-| `POST /api/tasks/{id}/pr` | Create a pull request from the task branch (brokered GitHub credential) |
-| `POST /api/tasks/{id}/pr/comment` | Comment on the task's pull request |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |
@@ -163,12 +160,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/auth/device/start` | Start a device-code flow; returns the user code and verification URI |
 | `GET /api/auth/device/poll` | Poll the in-flight flow; returns `{status: idle\|pending\|done\|denied\|expired}`. The `done` response also sets the session cookie (minted from the issued token via `oidc.SessionFromToken`), so a subsequent `/api/me` reflects the sign-in. |
 | `POST /api/auth/device/cancel` | Cancel the in-flight device-code flow |
-| **GitHub** (brokered through the signed-in latere.ai account's GitHub App connection) | |
-| `GET /api/github/auth/status` | Connection status: available/connected, login, account, permissions, expiry, manage URL |
-| `POST /api/github/auth/connect` | Return the install URL on the auth service to connect GitHub; no wallfacer-side OAuth dance |
-| `POST /api/github/auth/disconnect` | Drop the stored brokered token for the calling principal |
-| `POST /api/github/pulls` | Create a pull request |
-| `POST /api/github/comments` | Create an issue/PR comment |
 
 ### Triggering Task Execution
 

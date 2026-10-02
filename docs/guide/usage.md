@@ -32,7 +32,7 @@ Start here for the full reading order.
 - [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
 - [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, cost and usage analytics.
 - [Mission Control](mission-control.md). The unified spec and task graph, acting on the pipeline.
-- [Workspaces](workspaces.md). Workspace management, git integration, branches, GitHub.
+- [Workspaces](workspaces.md). Workspace management, git integration, branches.
 - [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference, keyboard shortcuts.
 
 ## Common Workflows

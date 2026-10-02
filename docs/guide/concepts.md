@@ -14,7 +14,7 @@ On the [Plan](plan.md) page, ideas crystallize into specs: structured markdown d
 
 ### Board: managed execution
 
-The [Board](board.md) is where most day-to-day work happens. Each card is a concrete, trackable task. Starting a task runs the built-in Implement pipeline in an isolated worktree; results wait for review before landing. Diff comments, verification runs, and pull requests all attach to the card.
+The [Board](board.md) is where most day-to-day work happens. Each card is a concrete, trackable task. Starting a task runs the built-in Implement pipeline in an isolated worktree; results wait for review before landing. Diff comments and verification runs attach to the card.
 
 ### Autopilot: automation
 

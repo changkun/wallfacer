@@ -4,7 +4,7 @@ Wallfacer is configured through the Settings page, environment variables in `~/.
 
 ## Settings page
 
-Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The page has five tabs.
+Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The page has four tabs.
 
 ### Execution tab
 
@@ -54,16 +54,6 @@ OpenRouter, and select a provider model using
 [OpenRouter's OpenCode setup](https://openrouter.ai/docs/cookbook/coding-agents/opencode-integration).
 Use the configured default or enter its provider/model identifier on the task.
 Wallfacer passes the model through to OpenCode.
-
-### GitHub tab
-
-Shows the GitHub connection state. Wallfacer does not run its own GitHub OAuth flow; the connection is borrowed from the signed-in latere.ai account:
-
-- Signed out: an explanation and a **Sign in via latere.ai** button.
-- Signed in, not connected: a **Connect GitHub at latere.ai** link that opens the install flow on the account page.
-- Connected: the connected login and a **Manage connections at latere.ai** link.
-
-Once connected, tasks can open pull requests and post PR comments from the task detail panel. See [Board](board.md).
 
 ### About tab
 
@@ -259,7 +249,6 @@ A plain `wallfacer run` fills these with the public secret-less client against `
 | `~/.wallfacer/worktrees/` | Per-task git worktrees |
 | `~/.wallfacer/prompts/` | System prompt template overrides |
 | `~/.wallfacer/agent-sessions/` | Chat and Plan session history |
-| `~/.wallfacer/github/` | GitHub connection cache |
 | `~/.wallfacer/cookie-key` | Session cookie encryption key |
 | `~/.wallfacer/tmp/` | Scratch space |
 | `<UserConfigDir>/latere/token.json` | latere.ai sign-in token, shared with the `latere` CLI |
