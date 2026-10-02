@@ -69,6 +69,11 @@ committed: the commit log already holds that.
   `ANTHROPIC_API_KEY` and where to set it, no worktree is created, nothing runs
   or is committed, and the harness is reported unusable until a key is set.
 
+- A task pinned to the `topos` harness gets a generated title and an oversight
+  summary, which run in-process like its commit message, and its test run uses
+  the configured default subprocess harness; each of these failed before with
+  "unsupported agent".
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

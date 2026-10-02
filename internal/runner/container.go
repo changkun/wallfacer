@@ -237,20 +237,29 @@ func (r *Runner) sandboxForTask(task *store.Task) harness.ID {
 // (harness.Default(), the final fallback). Keying the fallback on Default() rather
 // than a literal harness.Claude is what lets the native default change without
 // touching this resolver.
+//
+// The testing activity never resolves to an in-process harness. A test run is a
+// verification step driven by the subprocess turn loop, which an in-process
+// harness cannot serve, so a tier that names one is skipped for testing and the
+// next tier decides. A task pinned to topos is therefore verified by the
+// configured default subprocess harness.
 func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) harness.ID {
 	if task == nil {
 		return harness.Default()
 	}
 	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
+	skip := func(sb harness.ID) bool {
+		return activity == activityTesting && harness.InProcess(sb)
+	}
 	if task.SandboxByActivity != nil {
-		if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
+		if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() && !skip(sb) {
 			return sb
 		}
 	}
-	if task.Sandbox.IsValid() {
+	if task.Sandbox.IsValid() && !skip(task.Sandbox) {
 		return task.Sandbox
 	}
-	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
+	if sb := r.sandboxFromEnvForActivity(activity); sb != "" && !skip(sb) {
 		return sb
 	}
 	return harness.Default()

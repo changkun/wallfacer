@@ -101,6 +101,18 @@ Each surfaces as a `store.EventTypeSystem` event whose data carries `result` (th
 - `AuthEnv` returns an empty map: credentials resolve in-process through the model config, not via subprocess env injection.
 - `Capabilities` reports `SupportsSystemPrompt` and `EmitsUsage` only. No resume, no MCP: a native topos task cannot continue a previous session, and MCP servers configured for CLI harnesses do not apply.
 
+### Sub-Agent Roles of an In-Process Task
+
+A task's sub-agent roles inherit its harness, and the executor cannot launch an in-process one (`HostBackend.Launch` returns "unsupported agent"). `Runner.runAgent` (`internal/runner/agent.go`) therefore routes by what the role needs:
+
+| Role | What runs it for a `topos` task |
+|---|---|
+| Title, oversight, test oversight, commit message (prompt-only, mount mode none) | `launchInProcess`: a one-agent `agentgraph.RunAgent` with no worktree. The role's binding parses the run's final text like a subprocess result. Title and oversight request the title model (`CLAUDE_TITLE_MODEL`, falling back to `CLAUDE_DEFAULT_MODEL`). |
+| Testing (a test run) | The configured default subprocess harness. `sandboxForTaskActivity` (`internal/runner/container.go`) skips any tier that names an in-process harness for the testing activity, because verification is driven by the subprocess turn loop. |
+| Any other role that mounts the workspace | Refused by `launchInProcess` with an error naming the harness. Only the flow engine can request one for a `topos` task. |
+
+An in-process role run needs the same model credential as the task itself and fails with `ErrNoModelCredential` without one. It reports no usage to the runner, so these roles add nothing to the task's usage ledger.
+
 ## Agent and Flow CRUD Behind /agent-graph
 
 The Agent Graph page defines agents and composes graphs against two CRUD surfaces:

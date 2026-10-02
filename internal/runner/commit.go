@@ -14,7 +14,6 @@ import (
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
 
-	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
@@ -607,13 +606,8 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		RecentLog: recentLog,
 	})
 
-	// A task on the in-process native harness (topos) cannot run the commit-msg
-	// agent through the host subprocess backend, so drive it in-process via the
-	// same agent-graph seam the task itself used.
-	if task != nil && harness.InProcess(r.sandboxForTask(task)) {
-		return r.generateCommitMessageInProcess(ctx, taskID, task.ID.String(), commitPrompt)
-	}
-
+	// runAgent runs the role in-process when the task's harness is in-process
+	// (topos), so such a task gets a real message as well.
 	res, err := r.runAgent(ctx, roleCommitMessage, task, commitPrompt, runAgentOpts{
 		EmitSpanEvents: true,
 		TrackUsage:     true,
@@ -629,31 +623,6 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		return "", newCommitMessageGenerationError("blank result")
 	}
 
-	return msg, nil
-}
-
-// generateCommitMessageInProcess produces a commit message via the in-process
-// topos harness (agentgraph) for tasks whose sandbox the host subprocess backend
-// cannot launch. The run is prompt-only (no worktree tools); sanitizeCommitMessage
-// normalizes the output as on the host path. Every failure, a missing model
-// config included, is wrapped with ErrCommitMessageGeneration so the commit
-// halts instead of proceeding without a message; the cause stays in the chain.
-func (r *Runner) generateCommitMessageInProcess(ctx context.Context, taskID uuid.UUID, sessionID, commitPrompt string) (string, error) {
-	cfg, err := r.agenticModelConfig()
-	if err != nil {
-		logger.Runner.Warn("commit message generation (in-process): no model config", "task", taskID, "error", err)
-		return "", fmt.Errorf("%w: %w", ErrCommitMessageGeneration, err)
-	}
-	res, err := agentgraph.RunAgent(ctx, sessionID, cfg, "commit-msg", "", commitPrompt, "", nil)
-	if err != nil {
-		logger.Runner.Warn("commit message generation (in-process) failed", "task", taskID, "error", err)
-		return "", newCommitMessageGenerationError("%v", err)
-	}
-	msg := sanitizeCommitMessage(res.Final)
-	if msg == "" {
-		logger.Runner.Warn("commit message generation (in-process): blank result", "task", taskID)
-		return "", newCommitMessageGenerationError("blank result")
-	}
 	return msg, nil
 }
 
