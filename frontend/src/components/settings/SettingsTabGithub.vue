@@ -2,21 +2,33 @@
 // GitHub settings tab. wallfacer does not connect GitHub itself -- connections
 // are managed centrally at auth.latere.ai (the connectors hub). This tab only
 // reflects state derived from the latere.ai sign-in:
-//   - not signed in       -> prompt to sign in via latere.ai
+//   - not signed in       -> prompt to sign in via latere.ai, by the same
+//                            flow as the account menu (useSignIn)
 //   - signed in, connected -> show the borrowed connection + a manage link
 //   - signed in, not connected -> link to connect GitHub at auth.latere.ai
-import { computed, onMounted } from 'vue';
+import { computed, watch } from 'vue';
 import { useGithubStore } from '../../stores/github';
 import { useAuthStore } from '../../stores/auth';
+import { useSignIn } from '../../composables/useSignIn';
+import DeviceSignInModal from '../DeviceSignInModal.vue';
 
 const github = useGithubStore();
 const auth = useAuthStore();
+const signIn = useSignIn();
+const { modalOpen: signInModalOpen, modalProps: signInModalProps } = signIn;
 
 const signedIn = computed(() => !!auth.me);
 
-onMounted(() => {
-  if (signedIn.value) void github.fetchStatus();
-});
+// The connection belongs to the signed-in account, so it is read when the tab
+// opens signed in and again when a sign-in completes while the tab is open (a
+// device-code sign-in does not reload the page).
+watch(
+  signedIn,
+  (v) => {
+    if (v) void github.fetchStatus();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -33,7 +45,7 @@ onMounted(() => {
           <span class="set-row__help">GitHub is connected once in your latere.ai account and shared across latere products.</span>
         </div>
         <div class="set-row__end">
-          <button class="btn sm" @click="auth.login()">Sign in via latere.ai</button>
+          <button class="btn sm" @click="signIn.start()">Sign in via latere.ai</button>
         </div>
       </div>
       <template v-else-if="github.connected">
@@ -60,6 +72,13 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <DeviceSignInModal
+      v-if="signInModalOpen"
+      v-bind="signInModalProps"
+      @cancel="signIn.cancel()"
+      @retry="signIn.start()"
+    />
   </div>
 </template>
 

@@ -50,6 +50,11 @@ committed: the commit log already holds that.
   host still needs a session or the key there, and signs in with a device
   code.
 
+- The **Sign in via latere.ai** button on the GitHub tab in Settings signs in
+  the way the account menu does, by device code in a modal, and shows the
+  GitHub connection as soon as the sign-in completes. It sent the browser to
+  `/login`, which a local instance answered with `401`.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

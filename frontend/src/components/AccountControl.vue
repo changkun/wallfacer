@@ -5,7 +5,7 @@
 // per-row spinner, and hosts theme + language via the shared AccountPrefs in
 // the menu's #prefs slot. Same pattern as the other latere.ai products so the
 // chrome matches.
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem, type Principal } from 'latere-ui';
@@ -13,8 +13,7 @@ import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem, typ
 import { useAuthStore } from '../stores/auth';
 import { accountRole } from '../lib/accountRole';
 import { usePrefsStore, type Locale } from '../stores/prefs';
-import { useTaskStore } from '../stores/tasks';
-import { useDeviceSignIn } from '../composables/useDeviceSignIn';
+import { useSignIn } from '../composables/useSignIn';
 import DeviceSignInModal from './DeviceSignInModal.vue';
 
 withDefaults(
@@ -27,7 +26,6 @@ withDefaults(
 );
 
 const auth = useAuthStore();
-const tasks = useTaskStore();
 
 // Derive the account role so the shared AccountMenu renders the role badge +
 // dropdown descriptor (as in lux). null in anonymous local-run mode.
@@ -45,37 +43,11 @@ const router = useRouter();
 const { theme, locale } = storeToRefs(prefs);
 const switching = ref<string | null>(null);
 
-// Local-mode sign-in uses the RFC 8628 device-code flow: onLogin starts it and,
-// when device sign-in is unavailable (cloud deployments answer 503), falls back
-// to the shared store's browser /login redirect, unless the server reports that
-// redirect off (see redirectSignIn). A completed flow refreshes the
-// principal so the menu re-renders as signed-in, then clears the modal.
-const device = useDeviceSignIn();
-const {
-  status: deviceStatus,
-  userCode: deviceUserCode,
-  verificationUri: deviceVerificationUri,
-  verificationUriComplete: deviceVerificationUriComplete,
-  error: deviceError,
-} = device;
-
-// The server reports in /api/config whether the browser redirect behind /login
-// can complete on this instance; it cannot when the server is bound to a port
-// its redirect URL does not name (a second instance on one machine). There the
-// modal shows the reason in place of every redirect to /login. An absent flag
-// reads as available.
-const redirectSignIn = computed(() => tasks.config?.auth_redirect_enabled !== false);
-
-function onLogin() {
-  void device.loginOrFallback(redirectSignIn.value ? auth.login : device.failRedirectUnavailable);
-}
-
-watch(device.status, async (s) => {
-  if (s === 'done') {
-    await auth.fetchMe();
-    window.setTimeout(() => device.reset(), 1200);
-  }
-});
+// Sign-in is the shared flow in useSignIn: device code first, the browser
+// redirect to /login as the fallback, and the reason in the modal where the
+// server reports that redirect off.
+const signIn = useSignIn();
+const { modalOpen: signInModalOpen, modalProps: signInModalProps } = signIn;
 
 const localeOptions: LocaleOption[] = [
   { code: 'en', label: 'EN', name: 'English' },
@@ -85,8 +57,8 @@ const localeOptions: LocaleOption[] = [
 function onSwitch(id: string) {
   // An org switch completes through /login, so it is not started where that
   // redirect is off; the session and its org stay as they are.
-  if (!redirectSignIn.value) {
-    device.failRedirectUnavailable();
+  if (!signIn.redirectEnabled.value) {
+    signIn.failRedirectUnavailable();
     return;
   }
   switching.value = id;
@@ -106,7 +78,7 @@ function onSetLocale(code: string) {
     :switching-org-id="switching"
     @switch-org="onSwitch"
     @logout="auth.logout()"
-    @login="onLogin()"
+    @login="signIn.start()"
     @navigate="(p: string) => router.push(p)"
   >
     <template #prefs>
@@ -121,13 +93,9 @@ function onSetLocale(code: string) {
   </AccountMenu>
 
   <DeviceSignInModal
-    v-if="deviceStatus !== 'idle' && deviceStatus !== 'starting'"
-    :status="deviceStatus"
-    :user-code="deviceUserCode"
-    :verification-uri="deviceVerificationUri"
-    :verification-uri-complete="deviceVerificationUriComplete"
-    :error="deviceError"
-    @cancel="device.cancel()"
-    @retry="onLogin()"
+    v-if="signInModalOpen"
+    v-bind="signInModalProps"
+    @cancel="signIn.cancel()"
+    @retry="signIn.start()"
   />
 </template>

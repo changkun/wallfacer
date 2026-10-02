@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Presentational modal for the local-mode device-code sign-in. State and the
-// start/poll/cancel flow live in useDeviceSignIn (owned by AccountControl); this
-// renders the user code, the verification link, and the terminal states, and
-// emits cancel / retry. Styling mirrors ConfirmDialog.vue.
+// start/poll/cancel flow live in useDeviceSignIn, which each sign-in control
+// owns through useSignIn; this renders the user code, the verification link,
+// and the terminal states, and emits cancel / retry. Styling mirrors
+// ConfirmDialog.vue.
 import { computed } from 'vue';
 import { useT } from '../i18n';
 import type { DeviceSignInStatus } from '../composables/useDeviceSignIn';
