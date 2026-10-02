@@ -9,7 +9,7 @@ affects:
   - internal/cloud/
 effort: small
 created: 2026-04-12
-updated: 2026-05-30
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -29,6 +29,15 @@ dispatched_task_id: null
 > payment is introduced" — a thin read-only view over Identity's billing state,
 > to be specced when that feature is actually scheduled. The charge-idempotency
 > mechanism in this spec is no longer wallfacer's concern. Retained for context.
+>
+> **Closed 2026-10-02: wallfacer has no billing surface, planned or optional.**
+> The read-only subscription and usage view the paragraph above held open is
+> dropped. Wallfacer charges for nothing and shows no plan, invoice, wallet or
+> subscription. Money on the Latere platform is the platform's: its console
+> holds the wallet, the plan and the spending limits, and a hosted agent
+> session is billed there. What wallfacer shows is cost, as a number on a task:
+> an estimate from token counts for a local run, and the amount the platform
+> reports for a hosted one. Nothing replaces this spec.
 
 ## Problem
 

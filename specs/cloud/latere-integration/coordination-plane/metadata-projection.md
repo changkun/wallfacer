@@ -167,7 +167,8 @@ every connected instance's pushes:
   after a **90-day** window. History dashboards beyond 90 days read from the
   rollups, not raw events.
 - **Usage rollups:** kept long-term (daily/weekly buckets) since they are small
-  and are the billing/visibility value. Default cap: 13 months of buckets.
+  and are the cost-visibility value. They feed no charge: wallfacer bills for
+  nothing. Default cap: 13 months of buckets.
 - On instance disconnect the projection is retained (history does not vanish
   when a laptop closes); it is refreshed on the next reconnect via the rebuild
   path.

@@ -119,6 +119,12 @@ runtime, sandbox runtime, model key custody and routing, file storage, git
 hosting, budgets, or billing. Each is a platform concern reached through one
 of the calls above or not reached at all.
 
+Billing in particular has no wallfacer surface, built or planned. Wallfacer
+charges for nothing and shows no plan, invoice, wallet or subscription; those
+are in the platform's console. Wallfacer shows cost as a figure on a task: an
+estimate from token counts for a local run, and the amount the platform
+reports for a hosted one.
+
 ## Credentials
 
 One sign-in covers everything. The login session's token is the issuer's and

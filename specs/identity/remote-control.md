@@ -8,7 +8,7 @@ affects:
   - internal/handler/
 effort: large
 created: 2026-04-19
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -120,11 +120,12 @@ capabilities. Remote control rides it; it picks no transport of its own.
 
 Restated so this does not creep back into them:
 
-- **Paid-features gate.** Remote control is identity, not billing.
+- **Paid-features gate.** Remote control is gated by identity alone. Wallfacer
+  has no billing surface and no paid tier to gate on.
 - **Session sync / mirror.** The local instance stays source of truth for its
   task data. The coordinator relays; it does not mirror.
-- **Billing hook.** Remote viewing produces no charge of its own; local runs
-  still cost on local credentials.
+- **Metering.** Remote viewing is not metered and produces no charge; local
+  runs still cost on local credentials.
 
 ## Out of scope for this spec
 
