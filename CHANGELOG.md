@@ -30,8 +30,7 @@ committed: the commit log already holds that.
   `latere.ai/x/pkg` v0.90.2. pkg v0.90.2 names the service resource with
   semantic conventions v1.43.0, the schema of this SDK; with an older schema
   the two conflict when merged and the server disables telemetry export at start.
-  `latere.ai/x/topos` is at v0.7.0, the last release with the adversarial
-  review and graph packages Wallfacer uses; the earlier pin does not build
+  `latere.ai/x/topos` is at v0.7.0, since the earlier pin does not build
   against pkg v0.90.2.
 
 - The shared footer and product switcher follow latere-ui v1.30.1. The

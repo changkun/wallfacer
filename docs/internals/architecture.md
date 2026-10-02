@@ -105,7 +105,7 @@ flowchart LR
     PubSub --> Submitter["Auto-submitter<br/>waiting to done<br/>when test passed<br/>+ conflict-free"]
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
-    PubSub --> Review["Auto-review<br/>adversarial verification<br/>on waiting session tasks<br/>(supersedes auto-test when on)"]
+    PubSub --> Review["Auto-review<br/>a second model reviews<br/>waiting tasks with a worktree<br/>(supersedes auto-test when on)"]
     PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn ordinary tasks"]
 ```
 
@@ -328,7 +328,6 @@ Every `internal/` package and its role in the system:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `adversarial` | Review adversarial verification: forks a task's session into proposer/critic runs and reduces to a verdict | `ReviewVerifier` |
 | `agentgraph` | The seam onto the embedded topos runtime: runs one agent in-process for the native `topos` harness and returns final text plus a trace graph in topos-free types | `RunAgent()`, `ModelConfig`, `Result`, `Event`, `Trace` |
 | `agents` | The five built-in role descriptors: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Role`, `BuiltinAgents` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
@@ -343,6 +342,7 @@ Every `internal/` package and its role in the system:
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus in-process `topos`; replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Topos`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
+| `review` | Review of a waiting task's change by a reviewer on a second model: one round per call, findings sent back as feedback until approval, the round limit or the token budget; the session record lives beside the worktree | `Verifier`, `New()`, `Newest()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
 | `webserver` | Serves the SPA embedded from `frontend/dist` and the catch-all routes beside the API | `MountSPA()`, `SPAFallback()`, `MountCatchAll()` |
