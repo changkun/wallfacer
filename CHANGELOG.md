@@ -12,6 +12,11 @@ committed: the commit log already holds that.
 
 ### Changed
 
+- gRPC-Go v1.83.2, past GO-2026-6443 (GHSA-2v4p-qf9q-27wj), in which a gRPC
+  xDS server crashes on a request that carries neither an `:authority` nor a
+  Host header; Wallfacer runs no gRPC server and the affected code is not
+  reachable from it, so earlier releases were not exposed.
+
 - OpenTelemetry Go v1.46.0, with the log modules at v0.22.0, the slog bridge at
   v0.20.1 and otelhttp at v0.71.0, past GO-2026-6615 and GO-2026-6505, and
   `latere.ai/x/pkg` v0.90.2. pkg v0.90.2 names the service resource with
