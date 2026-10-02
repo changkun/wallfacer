@@ -3745,6 +3745,55 @@ func TestBatchCreateTasks_RejectsSandboxField(t *testing.T) {
 	}
 }
 
+// TestBatchCreateTasks_AppliesModelAndBudget verifies that a batch task
+// accepts the model override and the two budget limits single create
+// takes, and that each lands on the stored task, while a task that sends
+// none keeps the defaults.
+func TestBatchCreateTasks_AppliesModelAndBudget(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"tasks":[
+		{"ref":"A","prompt":"task A","model":"claude-opus-4","max_cost_usd":2.5,"max_input_tokens":40000},
+		{"ref":"B","prompt":"task B"}
+	]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		RefToID map[string]string `json:"ref_to_id"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	a, err := h.store.GetTask(context.Background(), uuid.MustParse(resp.RefToID["A"]))
+	if err != nil {
+		t.Fatalf("get A: %v", err)
+	}
+	if a.ModelOverride == nil || *a.ModelOverride != "claude-opus-4" {
+		t.Errorf("A ModelOverride = %v, want claude-opus-4", a.ModelOverride)
+	}
+	if a.MaxCostUSD != 2.5 {
+		t.Errorf("A MaxCostUSD = %v, want 2.5", a.MaxCostUSD)
+	}
+	if a.MaxInputTokens != 40000 {
+		t.Errorf("A MaxInputTokens = %d, want 40000", a.MaxInputTokens)
+	}
+
+	b, err := h.store.GetTask(context.Background(), uuid.MustParse(resp.RefToID["B"]))
+	if err != nil {
+		t.Fatalf("get B: %v", err)
+	}
+	if b.ModelOverride != nil || b.MaxCostUSD != 0 || b.MaxInputTokens != 0 {
+		t.Errorf("B = model %v cost %v tokens %d, want no override and no limits",
+			b.ModelOverride, b.MaxCostUSD, b.MaxInputTokens)
+	}
+}
+
 // TestBatchCreateTasks_EmitsOneDeltaPerTask verifies that each batch task
 // emits exactly one SSE delta.
 func TestBatchCreateTasks_EmitsOneDeltaPerTask(t *testing.T) {

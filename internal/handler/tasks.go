@@ -165,6 +165,25 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 	return filtered
 }
 
+// taskModelBudget is the per-task model override and budget that both
+// POST /api/tasks and each task of POST /api/tasks/batch accept. Both
+// request types embed it, so the JSON fields and their mapping onto the
+// stored task are defined once.
+type taskModelBudget struct {
+	MaxCostUSD     float64 `json:"max_cost_usd"`
+	MaxInputTokens int     `json:"max_input_tokens"`
+	Model          string  `json:"model"`
+}
+
+// apply copies the model override and the budget limits into opts. The
+// store normalizes them: a negative limit becomes unlimited and a blank
+// model leaves the global default in effect.
+func (b taskModelBudget) apply(opts *store.TaskCreateOptions) {
+	opts.MaxCostUSD = b.MaxCostUSD
+	opts.MaxInputTokens = b.MaxInputTokens
+	opts.ModelOverride = b.Model
+}
+
 // CreateTask creates a new task in backlog status.
 //
 // The `sandbox` and `sandbox_by_activity` fields are not accepted on
@@ -174,6 +193,7 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 // that include either field get a 400 that names the PATCH path.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
+		taskModelBudget
 		Prompt             string                               `json:"prompt"`
 		Criteria           string                               `json:"criteria"`
 		Timeout            int                                  `json:"timeout"`
@@ -182,9 +202,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		SandboxByActivity  map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 		Kind               store.TaskKind                       `json:"kind"`
 		Tags               []string                             `json:"tags"`
-		MaxCostUSD         float64                              `json:"max_cost_usd"`
-		MaxInputTokens     int                                  `json:"max_input_tokens"`
-		Model              string                               `json:"model"`
 		ScheduledAt        *time.Time                           `json:"scheduled_at,omitempty"`
 		CustomPassPatterns []string                             `json:"custom_pass_patterns,omitempty"`
 		CustomFailPatterns []string                             `json:"custom_fail_patterns,omitempty"`
@@ -224,13 +241,11 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Tags:               req.Tags,
 		MountWorktrees:     req.MountWorktrees,
 		Kind:               req.Kind,
-		MaxCostUSD:         req.MaxCostUSD,
-		MaxInputTokens:     req.MaxInputTokens,
-		ModelOverride:      req.Model,
 		ScheduledAt:        req.ScheduledAt,
 		CustomPassPatterns: req.CustomPassPatterns,
 		CustomFailPatterns: req.CustomFailPatterns,
 	}
+	req.apply(&opts)
 	if p := principalFromRequest(r); p != nil {
 		opts.CreatedBy = p.Sub
 		opts.OrgID = p.OrgID
@@ -254,8 +269,10 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 // Sandbox + SandboxByActivity are typed as pointers so the handler
 // can distinguish "not sent" (nil) from "explicitly empty" and
 // reject callers that still pass the deprecated fields rather than
-// silently dropping them.
+// silently dropping them. The embedded taskModelBudget carries the
+// model override and budget limits as POST /api/tasks takes them.
 type batchTaskInput struct {
+	taskModelBudget
 	Ref               string                                `json:"ref"`
 	Prompt            string                                `json:"prompt"`
 	Criteria          string                                `json:"criteria"`
@@ -529,6 +546,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			DependsOn:      depStrs,
 			SpecSourcePath: t.SpecSourcePath,
 		}
+		t.apply(&batchOpts)
 		if p := principalFromRequest(r); p != nil {
 			batchOpts.CreatedBy = p.Sub
 			batchOpts.OrgID = p.OrgID

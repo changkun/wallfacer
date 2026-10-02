@@ -118,6 +118,10 @@ committed: the commit log already holds that.
   `WALLFACER_TERMINAL_ENABLED` says, where it would have opened a shell on the
   server host for any signed-in account; a local instance is unchanged.
 
+- Creating tasks in batch mode with a model or a cost or token budget creates
+  them with that model and budget, as single create does, where the request
+  failed with `400 invalid JSON: json: unknown field "model"`.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed
