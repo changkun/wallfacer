@@ -70,7 +70,7 @@ Shared Design - 9 complete, 1 part shipped, 3 retired
   ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
   ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
   ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
-  ◐ Topos as Native Harness (opt-in harness shipped; default flip open)
+  ◐ Topos as the Only Harness (opt-in shipped; migration specified)
   ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
   ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
   ✅ Spec Workflow Plugin (spec@latere-ai; mirrored here behind a drift gate)
@@ -97,7 +97,7 @@ Git Workflow - local git; the GitHub half is retired
 Platform-native - four decisions of 2026-10-02 (the active program)
   ○ Platform-Native Wallfacer (umbrella)
   ○ Retire Agent Fleets (removal)       ○ Remove GitHub Integration (removal)
-  ◐ Topos as the Only Harness (opt-in shipped; migration and rewrite pending)
+  ◐ Topos as the Only Harness (opt-in shipped; migration specified in 5 phases)
   ○ Sessions That Spawn and Fork (vague; decides what a hosted board hosts)
 ```
 
@@ -114,7 +114,7 @@ Four decisions followed the review the same day, recorded in
    ([retire-agent-fleets](shared/platform-native/retire-agent-fleets.md)).
 2. **One harness.** Migrate to the rebuilt Topos module and make it the only
    harness, with platform models and a model switch; no CLI harnesses
-   ([topos-native-harness](shared/topos-native-harness.md), rewrite pending).
+   ([topos-native-harness](shared/topos-native-harness.md)).
 3. **Rethink the board before hosting it.** Agents that spawn and fork at run
    time instead of isolated tasks
    ([sessions-that-spawn-and-fork](shared/platform-native/sessions-that-spawn-and-fork.md), vague).
@@ -143,7 +143,7 @@ The active program: four decisions of 2026-10-02 that make wallfacer an applicat
 | ↳ [remove-github-integration.md](shared/platform-native/remove-github-integration.md) | Drafted | Removal: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes, `internal/github`. Plain git push is untouched. Cached tokens are deleted on first start. |
 | ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
 
-The migration itself is [topos-native-harness.md](shared/topos-native-harness.md) in Shared Design, whose rewrite is pending.
+The migration itself is [topos-native-harness.md](shared/topos-native-harness.md) in Shared Design.
 
 ---
 
@@ -296,7 +296,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [extensible-prompts.md](.archive/shared/extensible-prompts.md) | **Archived** | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. Archived: superseded by the Topos agent-document model (the discoverable/composable unit is now the `topos.latere.ai/v1` agent document, with the `harness/skills` layer for capabilities); what remains in `internal/prompts/` is internal harness plumbing that benefits from staying typed and compiled. Was its prompt-provider for the archived `agent-abstraction`. |
 | [agent-session-vocabulary.md](.archive/shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](.archive/shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
-| [topos-native-harness.md](shared/topos-native-harness.md) | Drafted | Both | The opt-in native harness is shipped on the current runtime pin: a task pinned to `topos` runs in-process in its worktree and commits. **Scope changed 2026-10-02, rewrite pending:** it becomes the only harness, on the rebuilt runtime module, with platform models and a model switch; the CLI adapters, the subprocess executor and the per-CLI credential flows are removed. See [platform-native](shared/platform-native.md). |
+| [topos-native-harness.md](shared/topos-native-harness.md) | Drafted | Both | **The migration.** Every agent wallfacer runs (implementation, test verification, title, commit message, oversight, chat, planning, review) moves onto the rebuilt Topos module, embedded behind one seam, with models from the Latere catalog or a provider sign-in and a model switch; then the five CLI adapters, the subprocess executor and the per-CLI plumbing are removed. Phases 0 to 4, starting after the fleet and GitHub removals; the opt-in native harness on the current pin is its shipped base. |
 | [visual-identity.md](.archive/shared/visual-identity.md) | **Complete** | Both | Umbrella: replace the Anthropic/Claude-like identity (cream `#f4f1ea`, terracotta `#c45a33`/`#d97757`, Instrument Serif) with an indigo-on-zinc system, rebuild the marketing site with animation/interactive graphics, and tear down + rewrite the drifted docs. Token names stay stable; three children below. |
 | ↳ [visual-identity/design-tokens.md](.archive/shared/visual-identity/design-tokens.md) | **Complete** | Both | New palette + all-sans/mono type system in `tokens.css` (values only, names stable), base.css token-block reconciliation, Space Grotesk + bundled JetBrains Mono, in-repo `.wallfacer-brand` override, retheme of the four `data-theme`-observing components, full ui-shots light+dark sweep. |
 | ↳ [visual-identity/marketing-site.md](.archive/shared/visual-identity/marketing-site.md) | **Complete** | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |

@@ -33,7 +33,7 @@ lets agents organize themselves at run time.
 | # | Decision | In the maintainer's words | Spec |
 |---|---|---|---|
 | 1 | **Retire fleets.** No user-authored agents or fleets. | Wallfacer becomes "some sort of application later that can spawn or create agents on the fly, like Claude Code's workflow". | [retire-agent-fleets](platform-native/retire-agent-fleets.md) |
-| 2 | **One harness.** Migrate to the rebuilt Topos harness and make it the only one. | "Clean use of the Latere platform and the Topos harness. No Claude Code, no Codex, but just allow model switches." | [topos-native-harness](topos-native-harness.md), to be rewritten against the rebuilt module |
+| 2 | **One harness.** Migrate to the rebuilt Topos harness and make it the only one. | "Clean use of the Latere platform and the Topos harness. No Claude Code, no Codex, but just allow model switches." | [topos-native-harness](topos-native-harness.md) |
 | 3 | **Rethink the board before hosting it.** | A hosted board "is something we need to think about how to make this scale". An execution board "is nice but has some problems such as sharing context, messages, awareness to each other"; in Claude Code "an agent can spawn a subagent, can fork itself to inherit the entire context thread". | [sessions-that-spawn-and-fork](platform-native/sessions-that-spawn-and-fork.md) |
 | 4 | **Remove GitHub.** No GitHub connection in wallfacer for now. | "Once the whole Latere platform is more stable and mature, GitHub connection is more or less just connected by a connector." | [remove-github-integration](platform-native/remove-github-integration.md) |
 
