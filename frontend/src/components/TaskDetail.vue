@@ -22,7 +22,6 @@ import ReviewVerification from './ReviewVerification.vue';
 import AgentTrace from './AgentTrace.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
-import TaskPrPanel from './TaskPrPanel.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
 import { harnessLabel, supportedHarnesses } from '../lib/harness';
@@ -1525,10 +1524,6 @@ async function submitReview() {
               <span class="pill" :class="pillClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
               <span class="dep-row__label">{{ d.label }}</span>
             </button>
-          </section>
-
-          <section class="mdl-section mdl-section--pr">
-            <TaskPrPanel :task="props.task" />
           </section>
 
           <!-- Actions: a stack of explicit rows, each with a glyph, a label and

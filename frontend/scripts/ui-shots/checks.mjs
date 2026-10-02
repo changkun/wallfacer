@@ -464,7 +464,7 @@ SCENES['settings'] = async (page) => {
     const rights = ends.map((e) => Math.round(e.right));
     expect('settings', Math.max(...rights) - Math.min(...rights) <= 1, `row controls not right-aligned: ${[...new Set(rights)].join(',')}`);
   }
-  for (const tab of ['appearance', 'sandbox', 'github', 'about', 'execution']) {
+  for (const tab of ['appearance', 'sandbox', 'about', 'execution']) {
     await page.click(`[data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(250);
     if (tab === 'appearance') {

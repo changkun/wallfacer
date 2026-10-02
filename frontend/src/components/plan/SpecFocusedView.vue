@@ -10,7 +10,6 @@ import { useRouter } from 'vue-router';
 import { useAgentStore } from '../../stores/agentSession';
 import { useTaskStore } from '../../stores/tasks';
 import { useToastStore } from '../../stores/toast';
-import { useGithubPrStore } from '../../stores/githubPr';
 import { useDialogStore } from '../../stores/dialog';
 import FloatingToc from './FloatingToc.vue';
 import SpecCommentsLayer from './SpecCommentsLayer.vue';
@@ -188,14 +187,6 @@ function openDispatchedTask() {
   if (!dispatchedTaskId.value) return;
   void router.push({ path: '/', query: { task: dispatchedTaskId.value } });
 }
-
-// The spec's PR is the PR of its dispatched task; surface a link when present.
-const prStore = useGithubPrStore();
-const specPr = computed(() =>
-  dispatchedTaskId.value ? prStore.prFor(dispatchedTaskId.value) : undefined);
-watch(dispatchedTaskId, (id) => {
-  if (id && prStore.prFor(id) === undefined) void prStore.fetchTaskPR(id);
-}, { immediate: true });
 
 const metaParts = computed(() => {
   const out: string[] = [];
@@ -545,14 +536,6 @@ defineExpose({ dispatchFocused, breakdownFocused });
           :title="`Linked task ${dispatchedTaskId} — click to open on board`"
           @click="openDispatchedTask"
         >→ task {{ dispatchedTaskId.slice(0, 8) }}</button>
-        <a
-          v-if="specPr"
-          class="pill pill-brand sf-dispatched-pill"
-          :href="specPr.html_url"
-          target="_blank"
-          rel="noopener"
-          :title="`Pull request #${specPr.number} (${specPr.state})`"
-        >PR #{{ specPr.number }} · {{ specPr.state }}</a>
         <span class="sf-spacer" />
         <button
           v-if="showUnstale"

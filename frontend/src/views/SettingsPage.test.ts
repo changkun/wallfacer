@@ -29,6 +29,14 @@ describe('SettingsPage', () => {
     app.unmount(); host.remove();
   });
 
+  it('offers no GitHub tab, and a github query opens the default tab', async () => {
+    const { host, app } = await mount('?tab=github');
+    const keys = Array.from(host.querySelectorAll('.tab')).map((el) => el.getAttribute('data-tab'));
+    expect(keys).toEqual(['execution', 'appearance', 'sandbox', 'about']);
+    expect(host.querySelector('.tab.on')!.getAttribute('data-tab')).toBe('execution');
+    app.unmount(); host.remove();
+  });
+
   it('switching tabs updates the query and swaps the body', async () => {
     const { host, app, router } = await mount();
     (host.querySelector('[data-tab="about"]') as HTMLButtonElement).click();

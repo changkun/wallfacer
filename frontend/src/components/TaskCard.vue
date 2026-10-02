@@ -12,7 +12,6 @@ import { cardActionsFor, primaryCardAction, CARD_ACTION_DEFS, type CardAction } 
 import AppSelect from './AppSelect.vue';
 import HarnessLogo from './HarnessLogo.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
-import { useGithubPrStore } from '../stores/githubPr';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { useNow } from '../composables/useNow';
 import { routineCountdown as routineCountdownFor, routineLastFired as routineLastFiredFor } from '../lib/routineTime';
@@ -52,17 +51,6 @@ const uiStore = useUiStore();
 const justDispatched = ref(false);
 let pulseHandle: ReturnType<typeof setTimeout> | null = null;
 
-const prStore = useGithubPrStore();
-
-// PR signal: the task branch's PR state. Reads the per-task PR cache;
-// populated by the fetch below for branched tasks.
-const prBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
-  const pr = prStore.prFor(props.task.id);
-  if (!pr) return null;
-  const cls = pr.state === 'open' ? 'pill-ok' : pr.state === 'merged' ? 'pill-pub' : 'pill-err';
-  return { label: `#${pr.number} ${pr.state}`, cls, title: `Pull request #${pr.number} (${pr.state})` };
-});
-
 onMounted(() => {
   if (uiStore.dispatchedIds.has(props.task.id)) {
     justDispatched.value = true;
@@ -70,11 +58,6 @@ onMounted(() => {
       justDispatched.value = false;
       uiStore.consumeDispatched(props.task.id);
     }, 1500);
-  }
-  // Populate the PR badge for tasks that have a branch (only a subset of the
-  // board), so the card can show PR state without opening the task.
-  if (props.task.branch_name && prStore.prFor(props.task.id) === undefined) {
-    void prStore.fetchTaskPR(props.task.id);
   }
 });
 
@@ -307,7 +290,6 @@ const signals = computed<Signal[]>(() => {
   if (failureBadge.value) out.push({ label: failureBadge.value, cls: 'pill-err', title: 'Failure reason: ' + props.task.failure_category });
   if (depBadge.value) out.push({ label: depBadgeText.value, cls: depBadgeClass.value, title: depBadgeTitle.value });
   if (scheduledLabel.value) out.push({ label: scheduledLabel.value, cls: 'pill-neutral', title: 'Scheduled start' });
-  if (prBadge.value) out.push(prBadge.value);
   return out;
 });
 const qualifier = computed(() => signals.value[0] ?? null);

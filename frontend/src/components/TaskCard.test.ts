@@ -9,6 +9,7 @@ import { createPinia } from 'pinia';
 vi.mock('../api/client', () => ({ api: vi.fn(async () => ({})), ApiError: class extends Error {} }));
 
 import TaskCard from './TaskCard.vue';
+import { api } from '../api/client';
 import type { Task } from '../api/types';
 
 function task(over: Partial<Task>): Task {
@@ -72,6 +73,16 @@ describe('TaskCard', () => {
     expect(state.classList.contains('pill-run')).toBe(true);
     expect(state.classList.contains('pulse')).toBe(true);
     expect(host.querySelector('.task-card__rank')!.textContent).toBe('#3');
+    app.unmount(); host.remove();
+  });
+
+  it('a task with a branch requests no pull-request state', async () => {
+    vi.mocked(api).mockClear();
+    const { host, app } = await mountCard(task({ status: 'waiting', branch_name: 'task/t1', session_id: 's' }));
+    await nextTick();
+    const paths = vi.mocked(api).mock.calls.map((c) => String(c[1]));
+    expect(paths.filter((p) => p.includes('/pr'))).toEqual([]);
+    expect(host.textContent).not.toMatch(/pull request/i);
     app.unmount(); host.remove();
   });
 });

@@ -252,9 +252,6 @@
   display: flex;
   flex-direction: column;
 }
-.sheet-aside .mdl-section--pr:empty {
-  display: none;
-}
 .sheet-aside .mdl-h {
   display: flex;
   align-items: center;

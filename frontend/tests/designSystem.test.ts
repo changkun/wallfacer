@@ -182,7 +182,7 @@ describe('primitives.css defines the shared classes', () => {
   const tokenOnly = [
     'src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css',
     'src/styles/modal.css', 'src/styles/task-detail.css', 'src/styles/diffs.css', 'src/styles/syntax.css', 'src/styles/mermaid.css',
-    'src/components/TaskDetail.vue', 'src/components/TaskPrPanel.vue', 'src/components/AgentTrace.vue',
+    'src/components/TaskDetail.vue', 'src/components/AgentTrace.vue',
     'src/components/ReviewVerification.vue', 'src/components/SpanFlamegraph.vue', 'src/components/TaskCard.vue',
     'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue',
     'src/views/ChatPage.vue', 'src/components/plan/SessionList.vue', 'src/components/plan/SpecChatPopup.vue', 'src/components/plan/ChatModelBadge.vue',
@@ -190,7 +190,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/views/PlanPage.vue', 'src/components/plan/SpecTreePanel.vue', 'src/components/plan/SpecFocusedView.vue', 'src/components/plan/SpecCommentsLayer.vue',
     'src/components/plan/FloatingToc.vue', 'src/styles/spec-mode/prose-toc.css',
     'src/styles/settings-page.css', 'src/views/SettingsPage.vue', 'src/components/settings/SettingsTabExecution.vue', 'src/components/settings/SettingsTabAppearance.vue',
-    'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabGithub.vue', 'src/components/settings/SettingsTabAbout.vue',
+    'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabAbout.vue',
     'src/components/settings/SettingToggle.vue', 'src/components/AppSelect.vue', 'src/components/HarnessSelect.vue',
     'src/views/AgentGraphPage.vue', 'src/components/AgentGraphCanvas.vue', 'src/components/AgentEditor.vue', 'src/styles/agents.css', 'src/components/SystemPromptsManager.vue',
     'src/styles/command-palette.css', 'src/styles/workspace-picker.css', 'src/styles/explorer.css', 'src/styles/dock.css',
