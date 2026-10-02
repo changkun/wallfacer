@@ -454,8 +454,9 @@ func TestArtifactRoutesRemoved(t *testing.T) {
 		if err := json.Unmarshal(rr.Body.Bytes(), &env); err != nil {
 			t.Fatalf("decode envelope: %v (%q)", err, rr.Body.String())
 		}
-		if env.Error.Code != codeAPINotFound {
-			t.Fatalf("error code = %q, want %q", env.Error.Code, codeAPINotFound)
+		// The wire code is spelled out so that renaming it fails a test.
+		if env.Error.Code != "not_found" {
+			t.Fatalf("error code = %q, want %q", env.Error.Code, "not_found")
 		}
 	})
 
