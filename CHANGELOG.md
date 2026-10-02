@@ -161,6 +161,11 @@ committed: the commit log already holds that.
   signed-in browser on either, now answering 401 with the `sign_in_required`
   error envelope.
 
+- On a cloud-mode deployment no browser's session reaches the host's shared
+  token store and the coordination connector does not run, so spec comments
+  are not synced through that server and `GET /api/coordination/status`
+  reports coordination unavailable; a local instance is unchanged.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

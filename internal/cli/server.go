@@ -347,30 +347,50 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	// Coordination plane (dial side): hold one outbound WebSocket to the cloud
 	// coordinator while signed in and opted in, for cross-machine spec-comment
-	// collaboration. The connector self-gates (off by default), so this is safe
-	// to start unconditionally; nothing dials until both the token and the
-	// opt-in are present.
+	// collaboration. The connector self-gates (off by default), so nothing dials
+	// until both the token and the opt-in are present.
+	//
+	// The relay is installed in every mode. Only the connector feeds it, so
+	// without one it stays empty: the comment list is empty, a submitted
+	// comment answers 503 coordination unavailable, and the browser's comment
+	// stream connects and idles rather than retrying a refused request.
 	commentRelay := handler.NewCommentRelay()
 	h.SetCommentRelay(commentRelay)
-	// The connector reads its token from this store; the session bridge writes the
-	// UI cookie login's token into the SAME store, so signing in via the board
-	// enables coordination without a separate `wallfacer auth login`.
+	// The connector reads its token from this store, the host's shared identity
+	// token store (also read and written by `wallfacer auth login`, the device
+	// sign-in and the `latere` command).
 	coordTokenStore := newCoordinationTokenStore()
-	coordBridge := newSessionTokenBridge(authClient, coordTokenStore)
-	coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay, coordTokenStore,
-		authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID, Audience: apiAudience},
-		logger.Main)
-	h.SetCoordinationToggle(coordGate)
-	// Signing out clears the coordination token: the connector's gate then drops
-	// the live WebSocket and stops re-dialing, so nothing is pulled while signed
-	// out. The token store is shared with `wallfacer auth login`, so this also
-	// ends a CLI session on this machine (single-user instance).
-	if coordTokenStore != nil {
-		h.SetCoordinationLogout(func() {
-			if err := coordTokenStore.Clear(); err != nil {
-				logger.Main.Warn("coordination: clear token on logout failed", "err", err)
-			}
-		})
+	// coordBridge copies a signed-in browser's session token into that store.
+	// It stays nil in cloud mode, where wrap passes requests through untouched.
+	var coordBridge *sessionTokenBridge
+	if cloudMode {
+		// A cloud-mode deployment serves many principals, while the connector
+		// and the store each hold one person's sign-in. So on a cloud-mode
+		// deployment no browser's session reaches the host's shared token
+		// store, the connector does not run, the coordination status reports
+		// it unavailable, and a browser's sign-out leaves the store alone.
+		logger.Main.Info("coordination: connector off in cloud mode; spec comments are not synced through this server")
+	} else {
+		// On a local single-user instance the board's sign-in is the user's
+		// sign-in: the bridge writes the UI cookie login's token into the
+		// store, so signing in via the board enables coordination without a
+		// separate `wallfacer auth login`.
+		coordBridge = newSessionTokenBridge(authClient, coordTokenStore)
+		coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay, coordTokenStore,
+			authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID, Audience: apiAudience},
+			logger.Main)
+		h.SetCoordinationToggle(coordGate)
+		// Signing out clears the coordination token: the connector's gate then
+		// drops the live WebSocket and stops re-dialing, so nothing is pulled
+		// while signed out. The token store is shared with `wallfacer auth
+		// login`, so this also ends a CLI session on this machine.
+		if coordTokenStore != nil {
+			h.SetCoordinationLogout(func() {
+				if err := coordTokenStore.Clear(); err != nil {
+					logger.Main.Warn("coordination: clear token on logout failed", "err", err)
+				}
+			})
+		}
 	}
 
 	// Wire the RFC 8628 device-code sign-in driver behind /api/auth/device/*.
@@ -585,6 +605,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	srvHandler = auth.CookieAuth(authClient, srvHandler)
 	// Mirror the UI cookie login's token into the connector's store so signing in
 	// via the board enables the outbound coordination connection automatically.
+	// coordBridge is nil in cloud mode, and wrap then returns the handler as is.
 	srvHandler = coordBridge.wrap(srvHandler)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	// otel.Handler is the outermost wrapper: it starts the server span, sets the

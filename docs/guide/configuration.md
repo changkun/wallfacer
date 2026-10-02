@@ -223,7 +223,7 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_PROMPT_HISTORY_LIMIT` | | Cap on retained prompt revisions per task |
 | `WALLFACER_RETRY_HISTORY_LIMIT` | | Cap on retained retry records per task |
 | `WALLFACER_REFINE_SESSIONS_LIMIT` | | Cap on retained refine sessions per task |
-| `WALLFACER_COORDINATION` | on | Set `0` to disable the coordination connector when signed in |
+| `WALLFACER_COORDINATION` | on | Set `0` to disable the coordination connector when signed in. The connector runs on a local instance only; a cloud-mode deployment (`WALLFACER_CLOUD`) does not start it |
 | `WALLFACER_COORDINATION_URL` | derived | Override the coordination endpoint for staging or self-hosted deployments |
 | `WALLFACER_DATABASE_URL` | | Postgres DSN for cloud-mode spec comment storage |
 

@@ -93,8 +93,9 @@ func loadOptIn(path string) bool {
 
 // startCoordinationClient wires and runs the outbound coordination connector in
 // a goroutine. It returns the gate so the settings layer can toggle opt-in. The
-// connector self-gates on sign-in (a stored token) and opt-in, so calling this
-// unconditionally is safe: nothing dials until both hold.
+// connector self-gates on sign-in (a stored token) and opt-in: nothing dials
+// until both hold. initServer starts it on a local instance only; a cloud-mode
+// deployment serves many principals and runs no connector.
 func startCoordinationClient(ctx context.Context, configDir string, wsMgr *workspace.Manager, relay *handler.CommentRelay, tokenStore cli.TokenStore, authCfg authConfigForRefresh, logger *slog.Logger) *coordinationGate {
 	gate := &coordinationGate{path: filepath.Join(configDir, "coordination-opt-in")}
 	gate.optedIn.Store(loadOptIn(gate.path))
@@ -182,6 +183,11 @@ func newCoordinationTokenStore() cli.TokenStore {
 // still see "coordination unavailable". On any authenticated request the bridge
 // copies the session's (already-refreshed) access + refresh token to the store,
 // so signing in via the UI enables the outbound connection automatically.
+//
+// initServer installs the bridge on a local single-user instance only, where
+// the board's sign-in and the host's sign-in belong to the same person. On a
+// cloud-mode deployment no browser's session reaches the host's shared token
+// store.
 type sessionTokenBridge struct {
 	client *oidc.Client
 	store  cli.TokenStore
