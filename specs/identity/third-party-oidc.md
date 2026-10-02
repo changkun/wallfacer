@@ -9,7 +9,7 @@ affects:
   - internal/envconfig/
 effort: large
 created: 2026-04-19
-updated: 2026-06-14
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -38,9 +38,10 @@ Make any RFC-6749 / OIDC-core provider able to terminate wallfacer's
 login flow, without wallfacer owning a parallel OIDC implementation.
 The platform `authkit/oidc` RP stays the only relying party; the work is
 to configure it (and, where it falls short, extend it upstream) so it
-can point at a non-latere.ai issuer. Latere.ai mode
-(`WALLFACER_CLOUD=true`, `AUTH_URL=https://auth.latere.ai`) stays the
-default.
+can point at a non-latere.ai issuer. Signing in against
+`https://auth.latere.ai` stays the default: a plain `wallfacer run` offers it
+through the public client with no configuration, and `WALLFACER_CLOUD=true`
+only forces it.
 
 ## Design space
 
@@ -70,9 +71,17 @@ The real gaps either path has to close, wherever the config surface
 ends up living:
 
 - A claim mapping from provider-native claims to wallfacer's internal
-  principal (`sub`, `email`, `name`, `picture`, `org_id`, `scp`,
-  `platform_admin` role). Some providers don't surface `org_id`; deployments
-  that need org scoping will have to map a group / role claim instead.
+  principal (`sub`, `email`, `org_id`, and the `roles` claim that carries
+  `platform_admin` and the caller's roles in the organization). Some providers
+  don't surface `org_id`; deployments that need org scoping will have to map a
+  group / role claim instead.
+- Actor tokens. A signed-in instance mints a token addressed to each service
+  it calls (`oidc.Client.ActorToken`), which is how it reaches the coordinator
+  today and how it would reach the Latere platform. A third-party issuer mints
+  nothing of the kind, so under one, the coordination plane and hosted
+  execution are unavailable unless the issuer side of that contract is also
+  specified. v1 of this spec covers sign-in to the instance and nothing that
+  leaves it.
 - Cookie naming. The session and flow cookie names
   (`__Host-latere-session`, `__Host-latere-flow`) and the `__Host-`
   prefix handling are owned by the platform `authkit/oidc`, so any
@@ -99,15 +108,14 @@ ends up living:
 ## Deployment posture
 
 Until this ships, self-hosted non-latere.ai deployments continue to
-use `WALLFACER_SERVER_API_KEY` as a single shared bearer token.
-`WALLFACER_CLOUD=false` remains the unauthenticated local mode. Once
-this ships, a third combination opens up:
+use `WALLFACER_SERVER_API_KEY` as a single shared bearer token. Once
+this ships, a third issuer row opens up:
 
-| `WALLFACER_CLOUD` | `AUTH_URL` | Behavior |
-|-------------------|------------|----------|
-| `false` | (unset) | Local / API key path (unchanged) |
-| `true` | `https://auth.latere.ai` | latere.ai flow (default) |
-| `true` | any OIDC issuer | Third-party OIDC flow |
+| `AUTH_URL` | `WALLFACER_CLOUD` unset | `WALLFACER_CLOUD=true` |
+|------------|-------------------------|------------------------|
+| (unset) | Anonymous board; sign-in to latere.ai offered through the public client | Sign-in to latere.ai forced |
+| `https://auth.latere.ai` | Same, with the configured client | Same, forced |
+| any OIDC issuer | Sign-in to that issuer offered | Sign-in to that issuer forced |
 
 ## What this spec does NOT answer
 
@@ -122,9 +130,11 @@ this ships, a third combination opens up:
 
 ## Dependencies
 
-- Authentication Phase 2 is complete: JWT middleware, principal
-  context (`auth.Identity`, resolved from a Bearer JWT or the session
-  cookie), org-scoped data, and `WALLFACER_CLOUD` are all in place.
-- No cloud-track spec depends on this; cloud always uses latere.ai.
+- Authentication is complete: JWT middleware, principal context
+  (`authkit.Identity`, resolved from a Bearer JWT or the session cookie),
+  org-scoped data, sign-in by default, and `WALLFACER_CLOUD` are all in
+  place.
+- No cloud-track spec depends on this; the coordination plane and hosted
+  execution always use latere.ai.
 - Unblocks: credible self-hosting story for non-latere.ai operators;
   org-scoped multi-user deployments outside latere.ai infra.

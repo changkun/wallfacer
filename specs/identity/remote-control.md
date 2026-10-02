@@ -1,6 +1,6 @@
 ---
 title: Remote control of signed-in local wallfacer instances
-status: stale
+status: drafted
 depends_on:
   - specs/cloud/latere-integration/coordination-plane.md
 affects:
@@ -45,7 +45,7 @@ Remote control is the **command-router capability** that rides that shared
 connection. It is not a separate wire. What stays here is everything specific
 to routing a UI action to a chosen instance and running it safely: the control
 UI, the instance picker, offline handling, per-action authorization, per-action
-audit, the action set, and the `remote-control` opt-out scope.
+audit, the action set, and the remote-control opt-out.
 
 ## Control UI (wf.latere.ai)
 
@@ -90,9 +90,9 @@ API.
 Connection-level auth happens upstream (the JWT on the WSS, validated by the
 coordinator). That is necessary but not sufficient. When a routed command
 arrives, the instance invokes the target route through its **own** handler
-chain, so the same per-route JWT and scope checks a local request goes through
-run again, instance-side. Remote control adds no authenticated path that
-skips them. The principal is already on every request (`auth.Claims`), so
+chain, so the same per-route authentication and authorization checks a local
+request goes through run again, instance-side. Remote control adds no authenticated path that
+skips them. The principal is already on every request (`authkit.Identity`), so
 per-action authorization needs no new identity work.
 
 ## Audit
@@ -102,13 +102,17 @@ and the source IP of the control-plane client, distinct from a local-board
 action. The record names the action and the target `instance_id`. This is the
 command-router's responsibility, recorded instance-side at invocation.
 
-## Opt-out scope
+## Opt-out
 
-`remote-control` is its own scope (`scp`), separate from sign-in. A user who is
-signed in (so presence and projection may be enabled) can still refuse remote
-command execution. With the scope absent, the instance accepts no routed
-actions: it answers the connection, but the command router rejects every
-action. Opt-out is per-instance, evaluated instance-side.
+Remote command execution has its own switch, separate from sign-in and from
+the coordination opt-in. A user who is signed in and connected (so presence and
+projection may be enabled) can still refuse remote command execution. The
+switch is an instance-side setting, persisted the way the coordination opt-in
+is. It is not a token scope: identities carry roles and no scopes, and a
+credential that outlives a change of mind is the wrong place for this choice.
+With the switch off, the instance accepts no routed actions: it keeps the
+connection, and the command router rejects every action. Opt-out is
+per-instance, evaluated instance-side.
 
 ## Design space
 

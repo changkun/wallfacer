@@ -186,7 +186,7 @@ The user's browser on wf.latere.ai (or a phone) lists their online instances and
 routes an action (view board, dispatch, cancel) to a chosen instance over the
 connection. Supersedes the transport design in
 [remote-control](../../identity/remote-control.md); that spec's registry,
-routing, per-action audit, and `remote-control` opt-out scope all land here as
+routing, per-action audit, and remote-control opt-out all land here as
 the command-router capability rather than a separate wire.
 
 ### 3. Metadata projection
@@ -315,3 +315,5 @@ in-app toggle). The gate governs each user's `wallfacer run`, not the
 detail and divergences. **Presence, metadata projection, remote control, and the
 multi-replica Valkey `Directory`** remain unbuilt (the connection, registry, and
 `Directory` seam are in place for them); `replicas` stays at 1 (`memDirectory`).
+
+Unchanged as of 2026-10-02. Each child now opens with its own state note.
