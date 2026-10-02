@@ -364,7 +364,7 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/pty` | PTY allocation for the WebSocket terminal on macOS and Linux; every call fails on Windows | `Open()`, `StartWithSize()`, `Setsize()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
-General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations and repository operations, come from the `latere.ai/x/pkg` module.
+General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations and git operations, come from the `latere.ai/x/pkg` module.
 
 ## Handler Organization
 
