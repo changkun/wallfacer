@@ -61,8 +61,7 @@ node snap.mjs --list                                                     # surfa
 
 Surfaces: `board`, `switcher`, `palette`, `picker`, `terminal`, `explorer`,
 `task-detail`, `settings`, `analytics`, `overview-spec`, `oversight`, `plan`,
-`chat`, `routines`, `agents`, `flows`, `mission`, `whiteboard`, `docs`,
-`artifacts`. Prints JSON `[{name, file, errors}]` so callers can detect page
+`chat`, `routines`, `mission`, `whiteboard`, `docs`, `artifacts`. Prints JSON `[{name, file, errors}]` so callers can detect page
 errors.
 
 Works against any local-mode origin: the embedded SPA on the booted server
@@ -109,10 +108,10 @@ Scenes, one per console surface, each asserting the geometry its design
 promises (rail and topbar sizes, card radii, column widths, dialog widths,
 reading-column width) and the material (no `backdrop-filter`, meta text
 contrast in both themes): `board`, `shell`, `switcher`, `picker`, `no-glass`,
-`contrast`, `task-detail`, `chat`, `plan`, `settings`, `agents`, `palette`,
-`dock`, `analytics`, `routines`, `mission`, `whiteboard`, `artifacts`,
-`docs`, plus a `flows` smoke. Every scene runs in its own browser context so
-nothing one scene persists (a route, a popup, a dock layout) reaches the next.
+`contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `dock`,
+`analytics`, `routines`, `mission`, `whiteboard`, `artifacts`, `docs`. Every
+scene runs in its own browser context so nothing one scene persists (a route,
+a popup, a dock layout) reaches the next.
 Add a scene by appending to the `SCENES` table in `checks.mjs`. Playwright runs
 from the same throwaway `/tmp` sandbox as `snap.mjs` (never under `frontend/`,
 which would break the vite-ssg build).

@@ -69,8 +69,6 @@ const SURFACES = {
   plan: { route: '/plan?spec=specs/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
   chat: { route: '/chat', steps: [{ wait: 900 }] },
   routines: { route: '/routines', steps: [{ wait: 800 }] },
-  agents: { route: '/agents', steps: [{ wait: 800 }] },
-  flows: { route: '/flows', steps: [{ wait: 800 }] },
   mission: { route: '/mission', steps: [{ wait: 1200 }] },
   whiteboard: { route: '/whiteboard', steps: [{ wait: 2000 }] },
   docs: { route: '/docs', steps: [{ wait: 800 }] },
