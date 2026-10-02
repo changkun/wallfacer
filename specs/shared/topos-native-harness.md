@@ -14,7 +14,7 @@ affects:
   - frontend/src/styles/app/buttons-hero.css
 effort: xlarge
 created: 2026-06-30
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -28,8 +28,8 @@ and the default execution path going forward, so a fresh wallfacer run is powere
 the latere.ai-native runtime rather than the Claude Code CLI. Claude Code and every
 other harness (Codex, Cursor, OpenCode, Pi) remain registered and selectable; only the
 hardcoded *default* changes. The native harness runs in-process and offline for local
-use, and offers logged-in users an option to execute on the Topos agent cloud platform
-with Cella remote workspaces.
+use, and offers signed-in users the option to run the same task as a hosted agent
+session on the Latere platform.
 
 This is the harness-layer counterpart to the already-shipped
 [[topos-runtime-integration]] (which embedded Topos as a *separate* multi-agent runtime
@@ -97,9 +97,9 @@ flowchart TD
   resolve -->|claude/codex/.../pi| cli[Subprocess harness<br/>BuildArgv + ParseEvent]
   resolve -->|topos default| topos[In-process Topos harness]
   topos --> region[single-agent one-node Region<br/>scales up to agentgraph mesh]
-  region --> mode{auth state}
-  mode -->|not logged in| local[local Lux + sandbox/local]
-  mode -->|logged in| cloud[Topos cloud /v1 + Cella remote workspace]
+  region --> mode{execution target}
+  mode -->|local, the default| local[in-process runtime in the task worktree]
+  mode -->|hosted, signed in| cloud[hosted agent session<br/>api.latere.ai/v1/agents]
   topos --> ev[topos.Event → canonical harness Event] --> stream[same Activity/timeline + trace trace]
 ```
 
@@ -140,25 +140,30 @@ same engine at different region sizes.
   (`../latere-cli/.../topos_claude_auth.go` shows model-credential use is distinct from
   the harness).
 
-### 3. Auth-gated local/cloud execution + sandbox wiring
+### 3. Local and hosted execution
 
-The harness resolves an execution mode from login state. The swap is which
-`sandbox.Provider` (and model/control plane) is injected; the agent documents are
-identical ("author once, run local or cloud").
+> **Revised 2026-10-02.** This component first injected a remote sandbox provider
+> into the in-process runtime, so the loop ran on the user's machine and its tools
+> ran in a remote workspace. Latere consolidated its services into one platform,
+> and in cloud mode wallfacer calls the platform's Agents capability and nothing
+> beneath it ([platform integration](../cloud/latere-integration.md)). The loop and
+> its machine now move together or not at all.
 
-| Mode | Trigger | Control plane | Model creds | Execution backend |
-|------|---------|---------------|-------------|-------------------|
-| Local (default) | not logged in | in-process embedded `latere.ai/x/topos` | local Lux (`luxd` stateless / BYO keys) | topos `sandbox/local` |
-| Cloud | logged into latere.ai | Topos cloud platform `/v1` | metered Lux | Cella remote workspaces (via topos `sandbox/cella`) |
+A task on the native harness has an execution target. The swap is where the whole
+run happens, not which sandbox the local loop reaches.
 
-- The seam is `topos.Options.Sandbox sandbox.Provider` (`topos/topos.go:200`). Local mode
-  injects `sandbox/local`; cloud mode injects the `sandbox/cella` provider pointed at a
-  remote workspace.
-- Mirror `../latere-cli`'s `topos_provider.go` / `topos_local.go` for provider and
-  credential resolution rather than re-deriving it.
-- Local mode must work fully offline with no latere.ai dependency (the default path).
-- Cloud mode is an **opt-in** for logged-in users; it must never become a silent
-  requirement (OQ-2: how/where the user chooses local vs cloud per run or per workspace).
+| Target | Available when | Where the loop runs | Model access | Where tools act |
+|--------|----------------|---------------------|--------------|-----------------|
+| `local` (default) | always | in-process, the embedded runtime | the configured gateway or provider key | the task's worktree |
+| `hosted` | signed in | a hosted agent session at `api.latere.ai/v1/agents` | the session's, billed by the platform | the session's own workload |
+
+- The hosted run, its field on the task, the dispatch sequence, the event mapping and
+  the data-boundary confirmation are specified in
+  [topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md). This
+  spec owns the harness surface the choice is drawn on.
+- `local` must work fully offline with no Latere dependency. It is the default path.
+- `hosted` is an **opt-in** for signed-in users and must never become a silent
+  requirement. Signing in does not change a task's target.
 
 ### 4. UI / branding surfacing
 
@@ -188,16 +193,19 @@ Surface the native-harness identity:
 - Config / env: a default-harness override (the `Default()` doc-comment's "configurable"
   follow-up) defaulting to `topos`; a local-vs-cloud execution selector for logged-in
   users.
-- No new HTTP routes required for local mode; cloud mode consumes the Topos platform
-  `/v1` (owned by Topos), not a new wallfacer route.
+- No new HTTP routes required for local mode; a hosted run consumes the platform's
+  Agents API, not a new wallfacer route.
 
 ## Error Handling
 
 - The Claude-only token-limit fallback must not be silently lost when the default is not
   Claude; the native harness defines its own degradation (e.g., surface the Lux/cloud
   error, optional fallback to a configured subprocess harness).
-- Cloud mode unreachable (offline, not logged in, platform error) degrades to local mode
-  with a clear signal, never a hard failure of an otherwise-local-capable run.
+- A hosted dispatch that cannot start (offline, not signed in, a platform refusal) fails
+  with the platform's reason and leaves the task ready to run again under either target.
+  It does not switch targets on its own: a silent move to `local` would run a task on a
+  machine the user did not choose for it, and a silent move to `hosted` would push a
+  repository the user did not choose to send.
 - Topos observer/runtime panics are already `recover()`-guarded in the SDK
   ([[topos-live-agent-events]] Phase 1); the harness bridge must not reintroduce a crash
   path.
@@ -212,8 +220,9 @@ Surface the native-harness identity:
 - **Decoupling audit**: tests asserting the runner uses the resolved/default harness, not
   a literal `harness.Claude`, at each former hardcoded site; the token-limit fallback
   still fires for a Claude-pinned task.
-- **Local/cloud selection**: the correct `sandbox.Provider` and model creds are injected
-  per auth state; local mode runs with no cloud dependency.
+- **Local/hosted selection**: a `local` task runs in-process with no platform call; a
+  `hosted` task is offered only when signed in. The hosted run's own tests are in
+  [topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md).
 - **Back-compat**: existing pinned tasks serialize/run byte-identically; the import-guard
   test still passes (only the agentgraph bridge names topos).
 - **Frontend**: `.topos-brand` renders; `AgentTrace.vue` shows the wordmark; non-topos
@@ -224,9 +233,9 @@ Surface the native-harness identity:
 - **OQ-1 RESOLVED (2026-06-30).** Approach **A** — in-process harness: generalize the
   seam, reuse the agentgraph embed, map `topos.Event` → canonical `Event`. CLI subprocess
   over `latere` (B) is rejected; no subprocess boundary for the native path.
-- **OQ-2.** Where the user chooses local vs cloud execution — per run, per workspace, or
-  a global setting — and the default for a logged-in user (local unless explicitly opted
-  into cloud).
+- **OQ-2 RESOLVED (2026-10-02).** The execution target is a per-task field with a
+  workspace-level default for new tasks, `local` unless the user changed it. What remains
+  open is where the selector sits next to the harness picker.
 - **OQ-3.** Retroactivity of the default flip for existing unpinned tasks (new-runs-only
   vs retroactive).
 - **OQ-4.** Relationship to [[topos-runtime-integration]] M6 (unified Agents/Flows graph
@@ -276,9 +285,9 @@ co-dev `go.work`; **standalone/CI is gated on the topos release** (push+tag
    and run the verification/test step (wallfacer owns the worktree + git, so this
    is wallfacer-side, no topos change). Today the run edits the worktree but walks
    the state machine through `committing` without committing.
-2. **Auth-gated local/cloud.** Resolve the execution mode from login state
-   (local `sandbox/local` default vs logged-in Topos cloud + Cella `sandbox/cella`
-   remote workspace) — Component 3 above.
+2. **Local and hosted targets.** Draw the execution-target selector for signed-in
+   users (Component 3 above). The hosted run itself is
+   [topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md).
 3. **`Default()` flip + `defaultSandbox` UI default** — flip `registry.go`
    `Default()` to `Topos` and the `config.go` `defaultSandbox` pre-selection,
    ONLY after 0–1 land, else real task runs stop committing code. Update

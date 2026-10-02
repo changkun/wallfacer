@@ -2,7 +2,7 @@
 title: Claude Managed Agents as a Remote Executor
 status: drafted
 depends_on:
-  - specs/shared/harness-abstraction.md
+  - specs/.archive/shared/harness-abstraction.md
 affects:
   - internal/executor/
   - internal/runner/
@@ -13,7 +13,7 @@ affects:
   - docs/cloud/
 effort: large
 created: 2026-06-01
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -26,9 +26,9 @@ Anthropic ships a managed agent platform ([platform.claude.com/docs/en/managed-a
 
 ## Shape
 
-Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. This differs from the [topos-remote-executor](latere-integration/topos-remote-executor.md), which dispatches to a remote service that *runs* a wallfacer-selected harness (Claude Code, Codex, Cursor, …). For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
+Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. The Latere [hosted executor](latere-integration/topos-remote-executor.md) has the same shape: a remote service runs its own agent loop, and wallfacer dispatches a request and follows its events. For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
 
-Implication for [harness-abstraction.md](../.archive/shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host and Topos executors compose `Executor` with a `Harness`; the Managed Agents executor *is* both.
+Implication for [harness-abstraction.md](../.archive/shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host executor composes `Executor` with a `Harness`; the Managed Agents executor *is* both. The Latere hosted executor meets the same problem and does not extend `executor.Backend`: it supplies a session-shaped run to the runner's `driveToposRun` seam, which already carries typed events, a final result, and the task state machine. Evaluate that seam for this executor before adding a dispatch method to `Backend`.
 
 ## Selection
 
@@ -123,7 +123,7 @@ Capabilities{
 
 - Cloud-sandbox mode (server-side git clone, no local worktree) — follow-up.
 - Multimodal input (images, attachments) — uses Anthropic Files API; deferred.
-- Per-task selection of executor — process-wide via `--executor` in v1 like Topos.
+- Per-task selection of executor — process-wide via `--executor` in v1. The Latere hosted executor selects per task; aligning the two is a follow-up.
 - ZDR / HIPAA compatibility — Managed Agents is ineligible per Anthropic; document the constraint and refuse to run if a future `WALLFACER_ZDR=true` flag is set.
 
 ## Risks
@@ -141,16 +141,17 @@ Capabilities{
 - If a task's sub-agent needs to call Latere services, what does the Managed Agents sandbox present? The family answer is the dispatching user's own token, audienced to the service being called; auth mints no credential that stands for a user. Confirm the sandbox can receive one before this ships.
 - Does this replace the [oauth-token-setup](../.archive/local/oauth-token-setup.md) Claude path for users who pick Managed Agents? No — Managed Agents needs a billing-capable API key, not an OAuth subscription token. Document the distinction clearly.
 
-## Why a separate spec from Topos
+## Why a separate spec from the Latere hosted executor
 
 Both are remote executors, but they have different shapes:
 
-| Dimension | Topos | Claude Managed Agents |
+| Dimension | Latere hosted executor | Claude Managed Agents |
 |---|---|---|
-| Harness selectable | Yes (Topos runs the chosen harness) | No (fixed Managed Agents harness) |
+| Harness selectable | No (the platform's own loop; a mode of wallfacer's native harness) | No (fixed Managed Agents harness) |
 | Tenant infra | Latere | Anthropic |
 | Auth | Latere session | Anthropic API key |
-| Workspace transport v1 | Git push to remote | Self-hosted sandbox mount |
-| Composes with `harness.Harness` | Yes | No (replaces it) |
+| Workspace transport v1 | A task branch pushed to the platform's git host; the session's branch fetched back | Self-hosted sandbox mount |
+| Model | Any model of the platform's catalog | Anthropic models |
+| Composes with `harness.Harness` | No | No (replaces it) |
 
 Bundling would conflate two unrelated integrations with different code paths, auth, and product positions.

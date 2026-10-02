@@ -13,7 +13,7 @@ affects:
   - docs/cloud/
 effort: large
 created: 2026-06-01
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -32,7 +32,8 @@ This is the third executor category in the harness-abstraction layering:
 
 | Category | Examples | Harness selectable | Implements |
 |---|---|---|---|
-| Harness-running | host (default), Topos | yes (Claude Code, Codex, Cursor, …) | `Executor` + composes a `Harness` |
+| Harness-running | host (default) | yes (Claude Code, Codex, Cursor, …) | `Executor` + composes a `Harness` |
+| Self-contained, Latere | [hosted agent session](latere-integration/topos-remote-executor.md) | no (the platform's loop; a mode of the native harness) | a session-shaped run on the runner's `driveToposRun` seam |
 | Self-contained, third-party | Claude Managed Agents, Antigravity | no (fixed) | `Executor`, ignores `Harness` |
 
 **Dependency status:** [harness-abstraction](../.archive/shared/harness-abstraction.md) shipped and archived, but only the harness-running path — `executor.Backend` in `internal/executor/backend.go` currently exposes just `Launch`/`List`, i.e. the argv-based launch used by host, Codex, Cursor, OpenCode, Pi. No self-contained dispatch method (`Dispatch(ctx, req) (Handle, error)` or equivalent, taking a `harness.Request` directly) exists yet. That seam is a prerequisite this spec shares with [claude-managed-agents](claude-managed-agents.md); implementation must add it (extend `Backend` or introduce a parallel interface) before either self-contained executor can land.
@@ -87,7 +88,7 @@ Antigravity's Interactions API has **no first-class repo or worktree primitive**
 | **A. Agent `git clone`s inside the sandbox** | No upload step; works for any public-clonable repo. | Requires the workspace to be a git repo with a remote the sandbox can reach; private repos need a token injection. |
 | **B. Pre-step: wallfacer pushes worktree to a temp branch on the user's remote, agent clones that** | Works for any local worktree state. | Adds a push step; pollutes the remote with temp branches. |
 
-**v1 picks A** — same trade as the [topos-remote-executor](latere-integration/topos-remote-executor.md). Workspace must be a git repo with a reachable remote. System instructions (workspace `AGENTS.md`) are sent as a mounted skill file via the Antigravity skill-files mechanism.
+**v1 picks A.** Workspace must be a git repo with a reachable remote. The Latere [hosted executor](latere-integration/topos-remote-executor.md) picks the other trade, a pushed task branch, because its session holds a push credential for the platform's git host; this sandbox has no such credential path. System instructions (workspace `AGENTS.md`) are sent as a mounted skill file via the Antigravity skill-files mechanism.
 
 ## Auth
 
@@ -135,7 +136,7 @@ Capabilities{
 | Lifecycle verbs (cancel, delete) undocumented | Surface long-running tasks as best-effort; expose a "session abandoned" UX when wallfacer can't actively cancel. Revisit when Google documents the verbs. |
 | Event taxonomy drift | `KindUnknown` fallback; structured logging of unknown types so the schema can be filled in over time. |
 | No MCP / no first-class skill injection | Workspace `AGENTS.md` is the only system-prompt vehicle; document the constraint vs Claude Managed Agents' richer tool/MCP surface. |
-| Workspace must be a git repo with a reachable remote | Doctor check; clear error message; mirrors Topos v1 constraint. |
+| Workspace must be a git repo with a reachable remote | Doctor check; clear error message; the Latere hosted executor has a constraint of the same kind (a remote on the platform's git host). |
 
 ## Open Questions
 
