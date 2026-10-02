@@ -50,6 +50,8 @@ make test-all       # Everything CI runs: the bar, the frontend suite and typech
 
 The Go gates live in [`latere-ai/ci-gate`](https://github.com/latere-ai/ci-gate), pinned in `go.mod` as a tool. `go tool lateregate list` prints which gates apply and which are waived, with the reason. `go tool lateregate <gate>` runs one gate on its own, and a single gate ignores the waivers, so the Makefile names only the whole bar. The decisions this repository has made about the bar are in `.lateregate.yaml`.
 
+Tests run with an isolated home. Every package whose tests reach a per-user location (`internal/cli`, `internal/handler`, `internal/runner`) calls `testenv.RunIsolated` from its `TestMain`, which points `HOME` and the per-user config, data and cache directories at a temporary directory, so a test run never touches the latere sign-in token shared with the `latere` command line or `~/.wallfacer`. A guard test in `internal/cli` fails when the isolation is missing.
+
 ### Tests that skip without setup
 
 Some packages skip silently when their dependency is absent, so a green

@@ -1,9 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -11,15 +11,11 @@ import (
 	"latere.ai/x/pkg/authkit/cli"
 )
 
-// TestRunAuthLogout_RemovesToken verifies the logout subcommand calls
-// Clear on the configured FileTokenStore so subsequent whoami reports
-// "not signed in".
+// TestRunAuthLogout_RemovesToken verifies the logout subcommand removes the
+// token file at the default store path, so a subsequent whoami reports "not
+// signed in". TestMain isolates the per-user config directory, so the default
+// path lies in a temporary home rather than at the user's real sign-in.
 func TestRunAuthLogout_RemovesToken(t *testing.T) {
-	dir := t.TempDir()
-	// Redirect the user config dir to a tempdir so the test does not
-	// touch ~/.config/latere/token.json on a real machine.
-	t.Setenv("XDG_CONFIG_HOME", dir)
-
 	storePath, err := cli.DefaultFileTokenStorePath()
 	if err != nil {
 		t.Fatal(err)
@@ -31,13 +27,16 @@ func TestRunAuthLogout_RemovesToken(t *testing.T) {
 	if err := store.Save(&oauth2.Token{AccessToken: "tok"}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := os.Stat(storePath); err != nil {
+		t.Fatalf("token not written to %s: %v", storePath, err)
+	}
 
 	if err := runAuthLogout(); err != nil {
 		t.Fatalf("runAuthLogout: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "latere", "token.json")); !os.IsNotExist(err) {
-		t.Fatalf("token still present after logout: %v", err)
+	if _, err := os.Stat(storePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("token still present at %s after logout: %v", storePath, err)
 	}
 }
 

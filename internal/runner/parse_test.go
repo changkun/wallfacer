@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"latere.ai/x/wallfacer/internal/testenv"
 )
 
 var update = flag.Bool("update", false, "regenerate golden files instead of comparing")
@@ -21,7 +23,11 @@ func TestMain(m *testing.M) {
 		return
 	}
 	flag.Parse()
-	os.Exit(m.Run())
+	// Tests must never touch the user's real configuration: a runner built
+	// without AgentsDir or FlowsDir creates ~/.wallfacer/agents and
+	// ~/.wallfacer/flows. A re-executed fake command inherits the isolated
+	// environment, so the branch above needs none of its own.
+	os.Exit(testenv.RunIsolated(m))
 }
 
 // parseGolden wraps the result of parseOutput for golden-file comparison.
