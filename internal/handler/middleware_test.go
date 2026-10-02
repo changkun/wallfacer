@@ -192,7 +192,7 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 	public := []string{
 		"/", "/assets/app-123.js", "/assets/app-123.css", "/fonts/ui.woff2", "/static/overview.png", "/favicon.ico",
 		"/install", "/dashboard", "/routines", "/analytics",
-		"/chat", "/plan", "/whiteboard", "/artifacts", "/mission", "/map", "/settings", "/docs", "/docs/guide/start",
+		"/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs", "/docs/guide/start",
 	}
 	for _, target := range public {
 		for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost} {
@@ -209,10 +209,11 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 			})
 		}
 	}
-	// The paths of the removed agents page and its former aliases are no
-	// client-side route any more, so they get no public pass.
+	// The paths of the removed agents page and its former aliases, and of the
+	// removed artifacts gallery, are no client-side route any more, so they
+	// get no public pass.
 	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/artifact/private.html", "/internal/sandbox-proxy/llm/anthropic/v1/messages", "/assets/../api/config", "/static/../artifact/private.html",
-		"/agent-graph", "/agents", "/workflows", "/flows"} {
+		"/agent-graph", "/agents", "/workflows", "/flows", "/artifacts"} {
 		t.Run("protected"+target, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			next.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))

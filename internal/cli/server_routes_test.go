@@ -1,21 +1,28 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/fs"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
+	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/metrics"
 
 	"latere.ai/x/wallfacer/internal/apicontract"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store/storetest"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestContractRoutes_AllRegisteredInMux verifies that every route declared in
@@ -298,6 +305,186 @@ func TestGitHubRoutesRemoved(t *testing.T) {
 	for _, route := range apicontract.Routes {
 		if strings.HasPrefix(route.Pattern, githubBase) ||
 			strings.HasSuffix(route.Pattern, "/pr") || strings.Contains(route.Pattern, "/pr/") {
+			t.Errorf("contract still declares %s %s (%s)", route.Method, route.Pattern, route.Name)
+		}
+	}
+}
+
+// fileState is what treeState records for one entry: enough to tell a file
+// or directory that was rewritten, replaced, or re-permissioned from one left
+// alone.
+type fileState struct {
+	mode    fs.FileMode
+	size    int64
+	modTime int64
+	body    string
+}
+
+// treeState records every entry under root, keyed by its slash path relative
+// to root. A directory's modification time changes when an entry is created
+// in it or removed from it, so the map also catches additions and deletions.
+func treeState(t *testing.T, root string) map[string]fileState {
+	t.Helper()
+	out := map[string]fileState{}
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		st := fileState{mode: info.Mode(), size: info.Size(), modTime: info.ModTime().UnixNano()}
+		if !d.IsDir() {
+			b, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			st.body = string(b)
+		}
+		out[filepath.ToSlash(rel)] = st
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root, err)
+	}
+	return out
+}
+
+// TestArtifactRoutesRemoved starts the server over a workspace whose
+// artifacts/ directory holds pages and checks that nothing serves or touches
+// them. GET /api/artifacts matches no route and answers 404 in the API error
+// envelope. GET /artifact/<path> and GET /artifacts are paths outside /api
+// that no route serves, so they get the SPA shell like any other, and the
+// console renders its not-found page there; no response carries a file's
+// bytes. After shutdown every entry under artifacts/ is unchanged. Requests
+// go through the full handler chain with the server key, so each answer is
+// the mux's and not the bearer middleware's.
+func TestArtifactRoutesRemoved(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("AppData", home)
+	t.Setenv("AUTH_REDIRECT_URL", "")
+	t.Setenv("WALLFACER_CLOUD", "")
+
+	// The workspace path is resolved so it compares equal to the path the
+	// workspace manager reports (t.TempDir sits behind a symlink on macOS).
+	ws, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatalf("resolve workspace dir: %v", err)
+	}
+	const marker = "artifact-file-body"
+	pages := map[string]string{
+		"deck.html":  "<title>Deck</title><h1>" + marker + " deck</h1>",
+		"sub/r.html": "<p>" + marker + " nested</p>",
+		"notes.md":   marker + " notes",
+	}
+	artifactsDir := filepath.Join(ws, "artifacts")
+	for rel, body := range pages {
+		p := filepath.Join(artifactsDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(p), err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", p, err)
+		}
+	}
+	before := treeState(t, artifactsDir)
+
+	// Startup restores the most recent saved workspace from workspaces.json.
+	configDir := t.TempDir()
+	if err := workspace.SaveGroups(configDir, []workspace.Workspace{{Folders: []string{ws}}}); err != nil {
+		t.Fatalf("save workspace: %v", err)
+	}
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	sc := initServer(configDir, ServerConfig{
+		LogFormat: "text",
+		Addr:      ":0",
+		DataDir:   filepath.Join(configDir, "data"),
+		EnvFile:   envFile,
+	}, stubVueFS(t), testFS(t))
+	shutdown := sync.OnceFunc(sc.Shutdown)
+	t.Cleanup(shutdown)
+	key := readServerAPIKey(configDir)
+	if key == "" {
+		t.Fatal("startup persisted no server API key")
+	}
+
+	get := func(path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+key)
+		rr := httptest.NewRecorder()
+		sc.Srv.Handler.ServeHTTP(rr, req)
+		return rr
+	}
+
+	// The start restored the workspace, so any route that reads a workspace
+	// directory would see the files under its artifacts/ directory.
+	cfg := get("/api/config")
+	if cfg.Code != http.StatusOK {
+		t.Fatalf("GET /api/config = %d, want 200; body %q", cfg.Code, cfg.Body.String())
+	}
+	var config struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	if err := json.Unmarshal(cfg.Body.Bytes(), &config); err != nil {
+		t.Fatalf("decode /api/config: %v", err)
+	}
+	if !slices.Contains(config.Workspaces, ws) {
+		t.Fatalf("active workspaces = %v, want them to include %s", config.Workspaces, ws)
+	}
+
+	t.Run("GET /api/artifacts", func(t *testing.T) {
+		rr := get("/api/artifacts")
+		if rr.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404; body %q", rr.Code, rr.Body.String())
+		}
+		if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+			t.Fatalf("Content-Type = %q, want application/json", ct)
+		}
+		var env httpjson.ErrorEnvelope
+		if err := json.Unmarshal(rr.Body.Bytes(), &env); err != nil {
+			t.Fatalf("decode envelope: %v (%q)", err, rr.Body.String())
+		}
+		if env.Error.Code != codeAPINotFound {
+			t.Fatalf("error code = %q, want %q", env.Error.Code, codeAPINotFound)
+		}
+	})
+
+	for _, path := range []string{"/artifact/deck.html", "/artifact/sub/r.html", "/artifact/notes.md", "/artifacts"} {
+		t.Run("GET "+path, func(t *testing.T) {
+			rr := get(path)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200 (SPA shell); body %q", rr.Code, rr.Body.String())
+			}
+			if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+				t.Fatalf("Content-Type = %q, want text/html", ct)
+			}
+			body := rr.Body.String()
+			if !strings.Contains(body, "window.__WALLFACER__") {
+				t.Fatalf("body is not the SPA shell: %q", body)
+			}
+			if strings.Contains(body, marker) {
+				t.Fatalf("response carries a workspace file's bytes: %q", body)
+			}
+		})
+	}
+
+	shutdown()
+	if after := treeState(t, artifactsDir); !maps.Equal(after, before) {
+		t.Errorf("artifacts/ changed across a start:\nbefore %v\nafter  %v", before, after)
+	}
+
+	for _, route := range apicontract.Routes {
+		if strings.Contains(route.Pattern, "artifact") {
 			t.Errorf("contract still declares %s %s (%s)", route.Method, route.Pattern, route.Name)
 		}
 	}

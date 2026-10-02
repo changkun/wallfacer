@@ -194,12 +194,12 @@ func IsLoopbackPeer(remoteAddr string) bool {
 }
 
 // publicUIPath admits only embedded assets and known client-side routes.
-// Workspace artifacts, API data, and internal endpoints still require a key.
+// API data, internal endpoints, and every other path still require a key.
 func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
 	case "/", "/favicon.ico", "/install", "/dashboard",
-		"/routines", "/analytics", "/chat", "/plan", "/whiteboard", "/artifacts", "/mission", "/map", "/settings", "/docs":
+		"/routines", "/analytics", "/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs":
 		return true
 	}
 	return strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/fonts/") ||
