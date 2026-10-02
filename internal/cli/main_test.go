@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 // TestPrintUsage validates that the help text written to stderr contains the
@@ -97,23 +96,33 @@ func TestRunDoctor_WithCredentials(t *testing.T) {
 	}
 }
 
+// browserLauncher returns the launcher openBrowser runs on this platform, and
+// skips the test where openBrowser runs none that a fake on $PATH can stand
+// in for.
+func browserLauncher(t *testing.T) string {
+	t.Helper()
+	switch runtime.GOOS {
+	case "darwin":
+		return "open"
+	case "linux":
+		if isWSL() {
+			t.Skip("openBrowser runs cmd.exe under WSL")
+		}
+		return "xdg-open"
+	default:
+		t.Skipf("openBrowser runs no fake-able launcher on %s", runtime.GOOS)
+		return ""
+	}
+}
+
 // TestOpenBrowser_InvokesPlatformCommand installs a fake browser-open script on
-// $PATH and verifies that openBrowser invokes it with the given URL.
+// $PATH and verifies that openBrowser runs it with the given URL. openBrowser
+// returns only after the launcher exits, so the marker the script writes is
+// there on return however slowly the script runs.
 func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "called")
-	cmd := "xdg-open"
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = "open"
-	case "linux":
-		cmd = "xdg-open"
-	case "windows":
-		t.Skip("openBrowser default is no-op on windows")
-	default:
-		cmd = "open"
-	}
-	script := filepath.Join(root, cmd)
+	script := filepath.Join(root, browserLauncher(t))
 	scriptBody := "#!/bin/sh\n" +
 		"echo \"$1\" > " + marker
 	if err := os.WriteFile(script, []byte(scriptBody+"\n"), 0o755); err != nil {
@@ -124,17 +133,27 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	}
 	t.Setenv("PATH", strings.Join([]string{root, os.Getenv("PATH")}, string(os.PathListSeparator)))
 
-	openBrowser("http://localhost")
+	if err := openBrowser("http://localhost"); err != nil {
+		t.Fatalf("openBrowser: %v", err)
+	}
 
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if _, err := os.Stat(marker); err == nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("expected xdg-open helper to run")
-		}
-		time.Sleep(20 * time.Millisecond)
+	got, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("launcher did not run before openBrowser returned: %v", err)
+	}
+	if strings.TrimSpace(string(got)) != "http://localhost" {
+		t.Fatalf("launcher got %q, want the URL", got)
+	}
+}
+
+// TestOpenBrowser_ReportsMissingLauncher verifies that openBrowser returns an
+// error when the platform launcher is not on $PATH, so the caller can log it.
+func TestOpenBrowser_ReportsMissingLauncher(t *testing.T) {
+	browserLauncher(t)
+	t.Setenv("PATH", t.TempDir())
+
+	if err := openBrowser("http://localhost"); err == nil {
+		t.Fatal("openBrowser with no launcher on PATH returned nil, want an error")
 	}
 }
 

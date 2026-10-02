@@ -87,19 +87,30 @@ func isWSL() bool {
 	return os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != ""
 }
 
-// openBrowser launches the platform's default browser with the given URL.
-// Under WSL, it delegates to cmd.exe so the Windows host browser opens.
-func openBrowser(url string) {
+// openBrowser launches the platform's default browser with the given URL and
+// returns once the launcher exits. Under WSL, it delegates to cmd.exe so the
+// Windows host browser opens. The launcher (open, xdg-open, start) hands the
+// URL to the browser and exits; waiting for it reaps the process and reports
+// a missing or failing launcher. On a platform with no launcher it does
+// nothing and returns nil.
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		_ = exec.Command("open", url).Start()
+		cmd = exec.Command("open", url)
 	case "windows":
-		_ = exec.Command("cmd", "/c", "start", url).Start()
+		cmd = exec.Command("cmd", "/c", "start", url)
 	case "linux":
 		if isWSL() {
-			_ = exec.Command("cmd.exe", "/c", "start", url).Start()
+			cmd = exec.Command("cmd.exe", "/c", "start", url)
 		} else {
-			_ = exec.Command("xdg-open", url).Start()
+			cmd = exec.Command("xdg-open", url)
 		}
+	default:
+		return nil
 	}
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("open browser with %s: %w", cmd.Path, err)
+	}
+	return nil
 }

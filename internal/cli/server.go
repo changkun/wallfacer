@@ -739,7 +739,12 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 		if browserHost == "" || browserHost == "0.0.0.0" || browserHost == "::" || browserHost == "[::]" {
 			browserHost = "localhost"
 		}
-		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, sc.ActualPort))
+		url := fmt.Sprintf("http://%s:%d", browserHost, sc.ActualPort)
+		go func() {
+			if err := openBrowser(url); err != nil {
+				logger.Main.Warn("open browser failed; open the address manually", "url", url, "error", err)
+			}
+		}()
 	}
 
 	if err := sc.Serve(); err != nil {
