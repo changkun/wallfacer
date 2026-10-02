@@ -72,6 +72,29 @@ describe('useDeviceSignIn', () => {
     d.reset();
   });
 
+  it('failRedirectUnavailable as the fallback ends in the error state with its reason', async () => {
+    apiMock.mockRejectedValueOnce(new ApiError(503, null, 'unavailable'));
+    const d = useDeviceSignIn();
+
+    await d.loginOrFallback(d.failRedirectUnavailable);
+
+    expect(d.status.value).toBe('error');
+    expect(d.error.value).toBe('redirect_unavailable');
+  });
+
+  it('failRedirectUnavailable stops an in-flight flow from polling', async () => {
+    apiMock.mockResolvedValueOnce(startBody);
+    const d = useDeviceSignIn();
+    await d.start();
+    apiMock.mockClear();
+
+    d.failRedirectUnavailable();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(d.status.value).toBe('error');
+  });
+
   it('transitions to done when the poll completes', async () => {
     apiMock.mockResolvedValueOnce(startBody);
     const d = useDeviceSignIn();

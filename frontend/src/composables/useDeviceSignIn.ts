@@ -22,8 +22,8 @@ export function useDeviceSignIn() {
   const userCode = ref('');
   const verificationUri = ref('');
   const verificationUriComplete = ref('');
-  // error holds the terminal reason ('denied' | 'expired' | 'failed') for the
-  // modal to localize; empty otherwise.
+  // error holds the terminal reason ('denied' | 'expired' | 'failed' |
+  // 'redirect_unavailable') for the modal to localize; empty otherwise.
   const error = ref('');
 
   let poller: number | undefined;
@@ -116,6 +116,17 @@ export function useDeviceSignIn() {
     reset();
   }
 
+  // failRedirectUnavailable ends in the error state with the reason that the
+  // browser /login redirect cannot complete on this instance. It stands in for
+  // that redirect wherever the server reports it off (auth_redirect_enabled
+  // false in /api/config), so the modal explains instead of the browser
+  // leaving for a sign-in that would not come back.
+  function failRedirectUnavailable() {
+    stopPolling();
+    error.value = 'redirect_unavailable';
+    status.value = 'error';
+  }
+
   // loginOrFallback starts the device flow, or invokes fallback (the browser
   // /login redirect) when device sign-in is unavailable or fails to start.
   async function loginOrFallback(fallback: () => void): Promise<void> {
@@ -138,6 +149,7 @@ export function useDeviceSignIn() {
     poll,
     cancel,
     reset,
+    failRedirectUnavailable,
     loginOrFallback,
   };
 }

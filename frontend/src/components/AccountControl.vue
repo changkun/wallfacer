@@ -13,6 +13,7 @@ import { AccountMenu, AccountPrefs, type LocaleOption, type AccountMenuItem, typ
 import { useAuthStore } from '../stores/auth';
 import { accountRole } from '../lib/accountRole';
 import { usePrefsStore, type Locale } from '../stores/prefs';
+import { useTaskStore } from '../stores/tasks';
 import { useDeviceSignIn } from '../composables/useDeviceSignIn';
 import DeviceSignInModal from './DeviceSignInModal.vue';
 
@@ -26,6 +27,7 @@ withDefaults(
 );
 
 const auth = useAuthStore();
+const tasks = useTaskStore();
 
 // Derive the account role so the shared AccountMenu renders the role badge +
 // dropdown descriptor (as in lux). null in anonymous local-run mode.
@@ -45,7 +47,8 @@ const switching = ref<string | null>(null);
 
 // Local-mode sign-in uses the RFC 8628 device-code flow: onLogin starts it and,
 // when device sign-in is unavailable (cloud deployments answer 503), falls back
-// to the shared store's browser /login redirect. A completed flow refreshes the
+// to the shared store's browser /login redirect, unless the server reports that
+// redirect off (see redirectSignIn). A completed flow refreshes the
 // principal so the menu re-renders as signed-in, then clears the modal.
 const device = useDeviceSignIn();
 const {
@@ -56,8 +59,15 @@ const {
   error: deviceError,
 } = device;
 
+// The server reports in /api/config whether the browser redirect behind /login
+// can complete on this instance; it cannot when the server is bound to a port
+// its redirect URL does not name (a second instance on one machine). There the
+// modal shows the reason in place of every redirect to /login. An absent flag
+// reads as available.
+const redirectSignIn = computed(() => tasks.config?.auth_redirect_enabled !== false);
+
 function onLogin() {
-  void device.loginOrFallback(auth.login);
+  void device.loginOrFallback(redirectSignIn.value ? auth.login : device.failRedirectUnavailable);
 }
 
 watch(device.status, async (s) => {
@@ -73,6 +83,12 @@ const localeOptions: LocaleOption[] = [
 ];
 
 function onSwitch(id: string) {
+  // An org switch completes through /login, so it is not started where that
+  // redirect is off; the session and its org stay as they are.
+  if (!redirectSignIn.value) {
+    device.failRedirectUnavailable();
+    return;
+  }
   switching.value = id;
   void auth.switchOrg(id);
 }

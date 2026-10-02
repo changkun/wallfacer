@@ -25,6 +25,8 @@ const errorMessage = computed(() => {
       return t.value('auth.device.error.denied');
     case 'expired':
       return t.value('auth.device.error.expired');
+    case 'redirect_unavailable':
+      return t.value('auth.redirect_unavailable');
     default:
       return t.value('auth.device.error.generic');
   }

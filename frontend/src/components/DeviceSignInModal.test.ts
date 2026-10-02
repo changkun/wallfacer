@@ -6,6 +6,7 @@ import { nextTick, h, createApp, type App } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import DeviceSignInModal from './DeviceSignInModal.vue';
 import type { DeviceSignInStatus } from '../composables/useDeviceSignIn';
+import { en } from '../i18n/en';
 
 let app: App | null = null;
 let host: HTMLElement;
@@ -73,6 +74,13 @@ describe('DeviceSignInModal', () => {
     (buttons[buttons.length - 1] as HTMLElement).click();
     await nextTick();
     expect(events.retry).toBe(1);
+  });
+
+  it('shows the redirect-unavailable sentence for its reason', async () => {
+    mount({ status: 'error', error: 'redirect_unavailable' });
+    await nextTick();
+    const err = document.body.querySelector('.device-error') as HTMLElement;
+    expect(err.textContent).toBe(en['auth.redirect_unavailable']);
   });
 
   it('emits cancel from the pending cancel button', async () => {

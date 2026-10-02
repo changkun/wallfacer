@@ -301,6 +301,9 @@ export interface ServerConfig {
   default_sandbox: string;
   terminal_enabled: boolean;
   auth_enabled: boolean;
+  // Whether the browser redirect behind /login can complete on this instance.
+  // False when the server is bound to a port its redirect URL does not name.
+  auth_redirect_enabled?: boolean;
   ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -237,8 +239,9 @@ func TestLogin_RedirectSignInOff_AnswersErrorEnvelope(t *testing.T) {
 }
 
 // TestRedirectSignInUnavailable_UserSentence holds the sentence to the user
-// register: present, and free of the addresses and ports that belong in the
-// details.
+// register: present, free of the addresses and ports that belong in the
+// details, and the sentence the SPA shows for the same state, so the code
+// reads the same on both surfaces.
 func TestRedirectSignInUnavailable_UserSentence(t *testing.T) {
 	if messageRedirectSignInUnavailable == "" {
 		t.Fatal("redirect_sign_in_unavailable has no user sentence")
@@ -247,6 +250,13 @@ func TestRedirectSignInUnavailable_UserSentence(t *testing.T) {
 		if strings.Contains(messageRedirectSignInUnavailable, tell) {
 			t.Errorf("user sentence %q carries %q, which belongs in the details", messageRedirectSignInUnavailable, tell)
 		}
+	}
+	en, err := os.ReadFile(filepath.Join("..", "..", "frontend", "src", "i18n", "en.ts"))
+	if err != nil {
+		t.Fatalf("read the SPA's English dictionary: %v", err)
+	}
+	if entry := "'auth.redirect_unavailable': '" + messageRedirectSignInUnavailable + "'"; !strings.Contains(string(en), entry) {
+		t.Errorf("the SPA's English dictionary has no entry %s", entry)
 	}
 }
 

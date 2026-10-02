@@ -17,6 +17,8 @@ export const en: Record<string, string> = {
   'auth.device.error.denied': 'Sign-in was denied.',
   'auth.device.error.expired': 'The code expired. Try again.',
   'auth.device.error.generic': 'Sign-in failed. Try again.',
+  // The server's sentence for the code redirect_sign_in_unavailable.
+  'auth.redirect_unavailable': 'Sign-in by browser redirect is off because Wallfacer is not running on its configured port. Sign in with a device code from the account menu, or restart Wallfacer when that port is free.',
 
   // Wallfacer page
   'wf.hero.eyebrow': 'Autonomous engineering platform',

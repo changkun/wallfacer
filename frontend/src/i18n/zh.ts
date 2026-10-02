@@ -17,6 +17,8 @@ export const zh: Record<string, string> = {
   'auth.device.error.denied': '登录被拒绝。',
   'auth.device.error.expired': '代码已过期，请重试。',
   'auth.device.error.generic': '登录失败，请重试。',
+  // 服务端错误码 redirect_sign_in_unavailable 对应的提示。
+  'auth.redirect_unavailable': 'Wallfacer 没有运行在配置的端口上，浏览器跳转登录已关闭。请在账户菜单中用设备码登录，或等该端口空出后重启 Wallfacer。',
 
   // Wallfacer page
   'wf.hero.eyebrow': '自主工程平台',
