@@ -15,6 +15,7 @@ import (
 
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
+	"latere.ai/x/pkg/httpjson"
 
 	"latere.ai/x/wallfacer/internal/coordinator"
 	"latere.ai/x/wallfacer/internal/spec"
@@ -163,11 +164,13 @@ func (h *Handler) ListSpecComments(w http.ResponseWriter, r *http.Request) {
 	writeCommentJSON(w, map[string]any{"threads": out})
 }
 
-// writeCommentJSON writes v as a JSON 200 response.
+// writeCommentJSON writes v as a JSON 200 response that is never cached.
+// httpjson.Write encodes v before committing the status, so a value that
+// does not encode answers 500 and is logged instead of a 200 with an empty
+// body.
 func writeCommentJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(w).Encode(v)
+	httpjson.Write(w, http.StatusOK, v)
 }
 
 // submitSpecCommentReq is the browser's op. Spec is the spec path relative to

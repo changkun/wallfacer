@@ -327,3 +327,30 @@ func TestCoordinationStatusUnauthorized(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteCommentJSON covers the response helper of the comment and
+// coordination endpoints: a value that encodes answers 200 with the JSON body
+// and no-store caching, and a value that cannot be encoded answers 500 rather
+// than a 200 with an empty body the browser would read as a valid answer.
+func TestWriteCommentJSON(t *testing.T) {
+	w := httptest.NewRecorder()
+	writeCommentJSON(w, map[string]any{"available": false})
+	if w.Code != http.StatusOK {
+		t.Errorf("encodable value: code = %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("encodable value: Cache-Control = %q, want no-store", got)
+	}
+	if got := w.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("encodable value: Content-Type = %q, want application/json", got)
+	}
+	if got := strings.TrimSpace(w.Body.String()); got != `{"available":false}` {
+		t.Errorf("encodable value: body = %q, want {\"available\":false}", got)
+	}
+
+	w = httptest.NewRecorder()
+	writeCommentJSON(w, map[string]any{"threads": make(chan int)})
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("unencodable value: code = %d, want 500; body %q", w.Code, w.Body.String())
+	}
+}

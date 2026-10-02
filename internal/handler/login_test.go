@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,17 +14,93 @@ import (
 
 	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/httpjson"
+
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // fakeMeAuth is an AuthProvider that also implements meBuilder, so AuthMe takes
 // the BuildMe branch (the real-client path) and returns the full principal.
+// err is the error BuildMe returns beside me.
 type fakeMeAuth struct {
 	fakeAuth
-	me *oidc.Me
+	me  *oidc.Me
+	err error
 }
 
 func (f *fakeMeAuth) BuildMe(http.ResponseWriter, *http.Request) (*oidc.Me, error) {
-	return f.me, nil
+	return f.me, f.err
+}
+
+// captureHandlerLog points logger.Handler at a JSON buffer for the rest of
+// the test and returns the buffer.
+func captureHandlerLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	orig := logger.Handler
+	logger.Handler = slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})).With("component", "handler")
+	t.Cleanup(func() { logger.Handler = orig })
+	return &buf
+}
+
+// TestAuthMe_BuildMeFailsWithoutIdentity_AnswersErrorEnvelope covers a BuildMe
+// that resolves no principal and reports an error. That is a failure to load
+// the account, not a signed-out browser, so /api/me must not answer 204: it
+// answers the error envelope with one code, the fixed user sentence, and the
+// error in the developer details.
+func TestAuthMe_BuildMeFailsWithoutIdentity_AnswersErrorEnvelope(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	h.SetAuth(&fakeMeAuth{err: errors.New("userinfo: 503 Service Unavailable")})
+
+	w := httptest.NewRecorder()
+	h.AuthMe(w, httptest.NewRequest(http.MethodGet, "/api/me", nil))
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("code = %d; want 502; body %s", w.Code, w.Body.String())
+	}
+	var env httpjson.ErrorEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatalf("decode: %v; body %s", err, w.Body.String())
+	}
+	// The wire code is spelled out because clients match on the string.
+	if env.Error.Code != "account_unavailable" {
+		t.Errorf("code = %q; want account_unavailable", env.Error.Code)
+	}
+	if env.Error.Message == "" || strings.Contains(env.Error.Message, "503") {
+		t.Errorf("message = %q; want the fixed user sentence, without the developer detail", env.Error.Message)
+	}
+	if got := env.Error.Details["error"]; got != "userinfo: 503 Service Unavailable" {
+		t.Errorf("details.error = %v; want the BuildMe error", got)
+	}
+}
+
+// TestAuthMe_BuildMeDegraded_ServesIdentityAndLogs covers a BuildMe that
+// resolves the principal but reports a degraded downstream call (the profile
+// or the organization list). The identity is still served, and the error is
+// logged rather than dropped.
+func TestAuthMe_BuildMeDegraded_ServesIdentityAndLogs(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	h.SetAuth(&fakeMeAuth{
+		me:  &oidc.Me{Sub: "u-1", Email: "a@b.com"},
+		err: errors.New("/me/orgs: 401 Unauthorized"),
+	})
+	logs := captureHandlerLog(t)
+
+	w := httptest.NewRecorder()
+	h.AuthMe(w, httptest.NewRequest(http.MethodGet, "/api/me", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d; want 200; body %s", w.Code, w.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got["principal_id"] != "u-1" {
+		t.Errorf("principal_id = %v; want u-1", got["principal_id"])
+	}
+	if !strings.Contains(logs.String(), `"level":"WARN"`) || !strings.Contains(logs.String(), "/me/orgs: 401 Unauthorized") {
+		t.Errorf("no warning carrying the BuildMe error was logged; log %q", logs.String())
+	}
 }
 
 // TestAuthMe_BuildMe_IncludesOrgs guards the account-menu contract: /api/me must

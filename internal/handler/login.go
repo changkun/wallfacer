@@ -1,11 +1,12 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/httpjson"
+
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // The error /login and the org switch answer with when the authorization-code
@@ -14,6 +15,14 @@ import (
 const (
 	codeRedirectSignInUnavailable    = "redirect_sign_in_unavailable"
 	messageRedirectSignInUnavailable = "Sign-in by browser redirect is off because Wallfacer is not running on its configured port. Sign in with a device code from the account menu, or restart Wallfacer when that port is free."
+)
+
+// The error /api/me answers with when the session is present but the signed-in
+// account cannot be resolved from the sign-in service. A browser with no
+// session is not an error and keeps the 204.
+const (
+	codeAccountUnavailable    = "account_unavailable"
+	messageAccountUnavailable = "The signed-in account could not be loaded from the sign-in service. Try again in a moment."
 )
 
 // AuthProvider is the subset of *oidc.Client the HTTP handlers need. Kept
@@ -178,17 +187,32 @@ func (h *Handler) AuthMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Real OIDC client: BuildMe resolves /userinfo + /me/orgs off one
-	// up-front token refresh. A degraded error still yields a usable `me`
-	// (identity present, org list possibly empty), so it is non-fatal here.
+	// up-front token refresh. It returns (nil, nil) for a request without a
+	// usable session, (me, nil) on success, and (me, err) when a downstream
+	// call degraded: the identity is present but the profile or the org list
+	// may be missing. A degraded result is still served, and the error is
+	// logged. An error with no identity is a failure to load the account,
+	// which must not read as signed out.
 	if mb, ok := h.auth.(meBuilder); ok {
-		me, _ := mb.BuildMe(w, r)
+		me, err := mb.BuildMe(w, r)
+		if me == nil && err != nil {
+			logger.Handler.Error("AuthMe: account could not be resolved", "error", err)
+			httpjson.WriteError(w, http.StatusBadGateway, httpjson.Error{
+				Code:    codeAccountUnavailable,
+				Message: messageAccountUnavailable,
+				Details: map[string]any{"error": err.Error()},
+			})
+			return
+		}
 		if me == nil {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			logger.Handler.Warn("AuthMe: account resolved with missing profile or organizations", "sub", me.Sub, "error", err)
+		}
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(struct {
+		httpjson.Write(w, http.StatusOK, struct {
 			*oidc.Me
 			PrincipalID string `json:"principal_id"`
 			AuthURL     string `json:"auth_url,omitempty"`
@@ -202,9 +226,8 @@ func (h *Handler) AuthMe(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(w).Encode(struct {
+	httpjson.Write(w, http.StatusOK, struct {
 		Sub     string `json:"sub"`
 		Email   string `json:"email"`
 		Name    string `json:"name"`
