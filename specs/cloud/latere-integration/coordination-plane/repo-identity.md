@@ -10,7 +10,7 @@ affects:
   - frontend/src/
 effort: large
 created: 2026-06-15
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -24,6 +24,18 @@ keys on this, so it is specified before the core is built. It answers the
 question the earlier specs glossed: a wallfacer workspace is a `Group` of folder
 **paths** (`internal/workspace/groups.go`), possibly several repos, so "the
 workspace" is not one git remote.
+
+## State as of 2026-10-02
+
+Built: the canonical remote form (`NormalizeRemoteURL` in
+`internal/coordinator/identity.go`) and the manifest's per-workspace remote,
+which spec comments already key on. Not built: every verification tier below,
+and the durable organization-to-repositories registry. A claimed remote is
+trusted within the organization boundary today.
+
+One correction to the upgrade tier: wallfacer runs no GitHub OAuth flow of its
+own. Its GitHub connection is the signed-in Latere account's, and a
+server-authoritative check would ask through that connection.
 
 ## The collaboration unit is the Repo
 

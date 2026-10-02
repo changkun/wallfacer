@@ -10,7 +10,7 @@ affects:
   - frontend/src/
 effort: xlarge
 created: 2026-06-14
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -23,6 +23,11 @@ coordinator-side **registry** that connection feeds, and the first capability on
 it: **org-wide presence**. Remote control, metadata projection, and spec
 comments are later children that reuse this connection unchanged; they are out
 of scope here except where they constrain the wire shape.
+
+State as of 2026-10-02: the connection and the single-replica registry are
+built (see the state note in [connection](connection-and-presence/connection.md));
+presence, and the multi-replica directory it needs before `replicas` rises
+above 1, are not.
 
 This spec settles the anchor's open question 1 (connection shape) as: long-lived
 WSS, because presence needs push. It does not re-decide anything else; the

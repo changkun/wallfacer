@@ -25,6 +25,20 @@ later leaves that read the registry this one defines. The parent settled the
 shape decisions (long-lived WSS, persisted instance id, git-remote identity,
 relay-not-mirror); this leaf is their implementation contract.
 
+## State as of 2026-10-02
+
+Built, single replica: the outbound connector and its opt-in gate
+(`internal/cli/coordination.go`, `internal/coordinator/client`), the accept
+side with JWT-derived principal and ping-based liveness
+(`internal/coordinator/accept.go`), the manifest and wire codec
+(`internal/coordinator/wire.go`), the persisted instance id, canonical remote
+normalization, and the in-memory registry (`internal/coordinator/registry.go`).
+That covers acceptance criteria 1 to 6.
+
+Not built: the Valkey-backed directory, the cross-replica fan-out and the
+crash-expiry behavior (criteria 7 and 8). The deployment runs one replica on
+the in-memory registry. Everything under "Horizontal scaling" below is design.
+
 ## Package layout
 
 - `internal/coordinator/` (new): the accept side, mounted on the wf.latere.ai

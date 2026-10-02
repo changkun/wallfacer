@@ -53,6 +53,19 @@ Two corrections to the prior framing of this spec:
    exporter is created and no proxy is mounted, so egress is zero. The
    cloud-mode gate is itself the first boundary control.
 
+## State as of 2026-10-02
+
+Built: the cloud-mode gate on browser telemetry (`frontend/src/main.ts`), the
+telemetry proxy mount, and the coordination opt-in gate
+(`coordinationGate` in `internal/cli/coordination.go`), on by default for a
+signed-in instance and off for an anonymous one. What crosses the coordination
+channel today is the manifest and spec comments.
+
+Not built: the span attribute scrubber and allow-list in
+`frontend/src/telemetry.ts`, both regression tests, and the metadata
+projection the coordination allow-list governs. Hosted runs, and so their
+controls, do not exist yet.
+
 ## Scope
 
 Pin down and review what the SPA exports in cloud mode, and keep it reviewable
