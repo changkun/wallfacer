@@ -382,7 +382,10 @@ SCENES['chat-error'] = async (page) => {
   const thread = await created.json();
   try {
     await fixtureRequest(page, 'PATCH', '/api/agent/sessions/' + thread.id, { state: 'active' });
-    const sent = await fixtureRequest(page, 'POST', '/api/agent/messages', { thread: thread.id, message: 'Exercise a failed host launch', harness: 'topos' });
+    // pi is configured to a missing binary by ui-test.sh, so the launch fails
+    // after the message is accepted. An in-process harness is refused before
+    // that, with harness_unavailable_in_chat, and would not reach the bubble.
+    const sent = await fixtureRequest(page, 'POST', '/api/agent/messages', { thread: thread.id, message: 'Exercise a failed host launch', harness: 'pi' });
     expect('chat-error', sent.status() === 202, 'test message was not accepted');
     await page.goto(base + '/chat', { waitUntil: 'load' });
     await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });

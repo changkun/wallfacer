@@ -36,6 +36,9 @@ go build -o "$HOME_DIR/fakeagent" ./internal/executor/testdata/fakeagent/main.go
 {
   printf 'WALLFACER_HOST_CLAUDE_BINARY=%s\n' "$HOME_DIR/fakeagent"
   printf 'WALLFACER_HOST_CODEX_BINARY=%s\n' "$HOME_DIR/fakeagent"
+  # pi points at a path that does not exist, so the chat-error scene has a
+  # harness whose launch fails the same way on every machine.
+  printf 'WALLFACER_HOST_PI_BINARY=%s\n' "$HOME_DIR/missing-agent"
 } >> "$HOME_DIR/.wallfacer/.env"
 
 echo "==> Ensuring playwright sandbox at $PW"
