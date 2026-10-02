@@ -162,7 +162,7 @@ Cloud Identity is wired in `RunServer` (`internal/cli/server.go`). The request h
 - `auth.OptionalAuth(jwtValidator, next)`, populates the principal from a bearer JWT when present, without forcing auth.
 - `handler.BearerAuthMiddleware(serverAPIKey, cloudMode)`, static-key check that an already populated identity satisfies in cloud mode, so a cookie-only browser request succeeds, and outside cloud mode only for a loopback peer; a peer on another host of a local instance needs the key whatever identity it presents.
 - `Handler.ForceLogin(mux)`, applied only when `cloudMode` is true; a local `wallfacer run` stays reachable anonymously.
-- `auth.RequireSuperadmin(next)`, a per-route admin gate (`server.go:921`), not part of the global chain.
+- `auth.RequireSuperadmin(next)`, a per-route admin gate (`adminOnly` in `BuildMux`), applied only when `cloudMode` is true and not part of the global chain.
 
 Tasks carry `CreatedBy` and `OrgID` (`internal/store/models.go`); `TasksForPrincipal` (`internal/store/principal.go`) tenant-filters listings. The principal route is `GET /api/me`; `PATCH /api/auth/me` switches org.
 

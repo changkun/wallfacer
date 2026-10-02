@@ -101,6 +101,10 @@ committed: the commit log already holds that.
   under other methods answers 405 `method_not_allowed`, and a page of the web
   app still loads when its address is opened directly.
 
+- `POST /api/admin/rebuild-index` works on a local instance with the server
+  key, where it answered 401 unless the caller was signed in as a platform
+  administrator; a cloud-mode deployment still requires that role.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

@@ -15,10 +15,10 @@ import (
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
-// fakeAuthProvider satisfies the handler.AuthProvider interface well
-// enough to flip h.HasAuth() to true. The individual method bodies are
-// never called by the routes exercised here; they exist only to
-// satisfy the interface.
+// fakeAuthProvider satisfies the handler.AuthProvider interface, standing
+// in for the OIDC client every run wires. The individual method bodies are
+// never called by the routes exercised here; they exist only to satisfy
+// the interface.
 type fakeAuthProvider struct{}
 
 func (fakeAuthProvider) HandleLogin(http.ResponseWriter, *http.Request)        {}
@@ -31,9 +31,10 @@ func (fakeAuthProvider) UserFromRequest(http.ResponseWriter, *http.Request) *oid
 func (fakeAuthProvider) AuthURL() string { return "https://auth.latere.ai" }
 
 // newSuperadminMuxHandler builds the Handler + BuildMux combo used
-// by the three tests below. apiKey is always empty (no static-key
-// gate); cloud toggles whether SetAuth is called (enabling cloud mode
-// + superadmin enforcement on /api/admin/*).
+// by the tests below. apiKey is always empty (no static-key gate). An
+// auth client is wired in both modes, as initServer wires one on every
+// run; cloud selects cloud mode, which alone puts the superadmin gate on
+// /api/admin/*.
 func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 	t.Helper()
 	workdir := t.TempDir()
@@ -48,11 +49,10 @@ func newSuperadminMuxHandler(t *testing.T, cloud bool) http.Handler {
 		Workspaces:   []string{workdir},
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	if cloud {
-		h.SetAuth(fakeAuthProvider{})
-	}
+	h.SetAuth(fakeAuthProvider{})
+	h.SetCloudMode(cloud)
 	reg := metrics.NewRegistry()
-	return BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	return BuildMux(h, reg, IndexViewData{}, testFS(t), nil, cloud)
 }
 
 // TestAdminRebuildIndex_CloudSuperadmin200 mirrors the spec: cloud
@@ -85,9 +85,10 @@ func TestAdminRebuildIndex_CloudRegular403(t *testing.T) {
 	}
 }
 
-// TestAdminRebuildIndex_LocalMode200 confirms local mode is untouched:
-// no claims, no wrapper, handler still reachable. This is today's
-// behavior and the spec requires it.
+// TestAdminRebuildIndex_LocalMode200 confirms a local instance carries no
+// superadmin gate: with the auth client wired, as on every run, a caller
+// with no identity still reaches the handler. On a local instance the
+// server key gate, upstream of the mux, is what protects the route.
 func TestAdminRebuildIndex_LocalMode200(t *testing.T) {
 	mux := newSuperadminMuxHandler(t, false)
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/rebuild-index", nil)

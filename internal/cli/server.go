@@ -1145,13 +1145,15 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// All per-route middleware (UUID parsing, extra path values) is applied here
 	// so the registration loop below stays trivial.
 	//
-	// adminOnly wraps a handler so cloud deployments require the superadmin
-	// claim; in local mode it is identity. Cloud mode is detected by whether
-	// the Handler has an OIDC client wired (h.HasAuth()) — the same signal
-	// used elsewhere to decide whether cloud surfaces render.
+	// adminOnly wraps a handler so cloud deployments require the
+	// platform-admin role; on a local instance it is identity. The decision
+	// keys on cloudMode, not on whether an OIDC client is wired: every run
+	// wires one so sign-in is available, and a local instance that nobody
+	// signed in to has no identity to carry the role. There the server key
+	// gate upstream of the mux protects admin routes like every other API.
 	adminOnly := func(next http.HandlerFunc) http.HandlerFunc {
-		if !h.HasAuth() {
-			return next // local mode: no claims path exists; pass through
+		if !cloudMode {
+			return next
 		}
 		wrapped := auth.RequireSuperadmin(next)
 		return wrapped.ServeHTTP

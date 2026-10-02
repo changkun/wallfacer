@@ -113,7 +113,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/auth/{provider}/status` | Poll flow status; returns `{state, error?}` |
 | `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
-| `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
+| `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk. In cloud mode it requires the `platform_admin` role; a local instance gates it with the server key like every other route |
 | **Spec tree & graph** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
