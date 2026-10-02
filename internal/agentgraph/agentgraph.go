@@ -11,17 +11,27 @@ package agentgraph
 
 import (
 	"context"
+	"errors"
 
 	"latere.ai/x/topos"
 )
+
+// errNoModelSelected reports topos options that name no model. The runtime
+// resolves such options to its test model, so the seam refuses them: the test
+// model is reachable only by naming it.
+var errNoModelSelected = errors.New("agentgraph: options select no model")
 
 // Runner is wallfacer's wrapper over a topos.Runner.
 type Runner struct {
 	inner *topos.Runner
 }
 
-// NewRunner builds an agent-graph runner from topos options.
+// NewRunner builds an agent-graph runner from topos options. Options that
+// select no model (no kind and no client) return an error.
 func NewRunner(opts topos.Options) (*Runner, error) {
+	if opts.Model.Kind == "" && opts.Model.Client == nil {
+		return nil, errNoModelSelected
+	}
 	r, err := topos.NewRunner(opts)
 	if err != nil {
 		return nil, err

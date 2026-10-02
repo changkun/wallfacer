@@ -63,6 +63,12 @@ committed: the commit log already holds that.
   the task's verification panel, and the server logs the reason, where the
   rounds before the unreadable part were shown as the whole debate.
 
+- A task on the `topos` harness, or on a delegating fleet, is refused before it
+  starts when no model credential is configured: the task fails with the
+  `model_credential_missing` category and one sentence that names
+  `ANTHROPIC_API_KEY` and where to set it, no worktree is created, nothing runs
+  or is committed, and the harness is reported unusable until a key is set.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

@@ -89,7 +89,7 @@ Wallfacer embeds the topos agent-graph runtime as an in-process execution path, 
 Current limitations, stated plainly:
 
 - **Credentials**: only a static `ANTHROPIC_API_KEY` is wired. With `ANTHROPIC_BASE_URL` set, calls route through the configured gateway; without it, directly to the provider. OAuth and bearer tokens (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_AUTH_TOKEN`) are not yet supported on this path.
-- **No key, no problem for demos**: without an API key the runtime falls back to a deterministic fake model, so the execution path can be exercised without spend, but the output is synthetic.
+- **A key is required**: without an `ANTHROPIC_API_KEY`, a topos run is refused before it starts. The task fails with the `model_credential_missing` category, nothing runs in the worktree, and the `topos` harness is reported unusable until a key is set under Settings > Harness.
 - **Capabilities**: system prompts and token usage reporting are supported; session resume and MCP are not.
 - **No durable output for delegating fleets**: delegating runs do not make commits or run verification yet.
 

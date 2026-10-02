@@ -114,6 +114,7 @@ Every failed task carries a failure category, visible on the card and used to de
 | `timeout` | Task exceeded its time limit | No |
 | `budget_exceeded` | Token or cost budget exhausted | No |
 | `agent_error` | The agent itself reported failure | No |
+| `model_credential_missing` | A run on the in-process `topos` harness was refused because no model credential is set; nothing ran | No |
 | `unknown` | Unclassified | No |
 
 Triage guidance: transient categories usually clear themselves via auto-retry; recurring `container_crash` suggests a runtime or credential problem (check `wallfacer doctor`); `agent_error` and `timeout` mean the task needs a better prompt, smaller scope, or manual feedback. Failed-task counts per category are exported on `/metrics` as `wallfacer_failed_tasks_by_category`.

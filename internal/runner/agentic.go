@@ -14,32 +14,40 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/flow"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// agenticModelConfig derives the model selection for an agentic run from
+// agenticModelConfig derives the model selection for an in-process run from
 // wallfacer's global credential settings (the .env file), the same source the
-// container harnesses read. It mirrors the guard the other env-reading runner
-// helpers use: a missing or unparseable env file, or an absent
-// ANTHROPIC_API_KEY, yields the zero ModelConfig, which the agentgraph seam maps
-// to the deterministic fake model (so tests and no-credential dev keep working).
-// A configured ANTHROPIC_BASE_URL routes through Lux (the gateway); a bare key
-// talks to the provider directly. Only the static x-api-key credential is wired
-// for now; Bearer-style tokens (ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN)
-// are deferred (they need a per-call BearerSource).
+// subprocess harnesses read. A configured ANTHROPIC_BASE_URL routes through Lux
+// (the gateway); a bare key talks to the provider directly. Only the static
+// x-api-key credential is wired for now; Bearer-style tokens
+// (ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN) are deferred (they need a
+// per-call BearerSource).
+//
+// Without an ANTHROPIC_API_KEY (no env file, an unreadable one, or one that
+// does not set the key) it returns agentgraph.ErrNoModelCredential, and a
+// secret-store failure returns envconfig.ErrSecretStore: either way the caller
+// has no config to run with. The one exception is a Runner whose allowTestModel
+// is set, which gets the deterministic test model instead of the refusal.
 func (r *Runner) agenticModelConfig() (agentgraph.ModelConfig, error) {
-	if r.envFile == "" {
-		return agentgraph.ModelConfig{}, nil
+	var cfg envconfig.Config
+	if r.envFile != "" {
+		parsed, err := envconfig.Parse(r.envFile)
+		if errors.Is(err, envconfig.ErrSecretStore) {
+			return agentgraph.ModelConfig{}, err
+		}
+		// Parse returns an empty Config on ordinary file errors, which reads
+		// as no credential below.
+		cfg = parsed
 	}
-	cfg, err := envconfig.Parse(r.envFile)
-	if errors.Is(err, envconfig.ErrSecretStore) {
-		return agentgraph.ModelConfig{}, err
-	}
-	// Parse returns an empty Config on ordinary file errors. Those retain the
-	// existing no-credential development behavior; secret-store errors do not.
 	if cfg.APIKey == "" {
-		return agentgraph.ModelConfig{}, nil
+		if r.allowTestModel {
+			return agentgraph.ModelConfig{Mode: agentgraph.ModelModeFake}, nil
+		}
+		return agentgraph.ModelConfig{}, agentgraph.ErrNoModelCredential
 	}
 	mode := agentgraph.ModelModeDirect
 	baseURL := ""
@@ -54,6 +62,40 @@ func (r *Runner) agenticModelConfig() (agentgraph.ModelConfig, error) {
 		BaseURL:  baseURL,
 		APIKey:   cfg.APIKey,
 	}, nil
+}
+
+// toposFailure maps the error of an in-process run onto the task's failure
+// record: the category, the text stored as the task result, and the developer
+// detail kept beside it on the error event. A missing model credential has its
+// own category and the one fixed sentence, with the underlying error as detail;
+// any other error is classified as usual and carries its own text.
+func toposFailure(err error) (category store.FailureCategory, message, detail string) {
+	if errors.Is(err, agentgraph.ErrNoModelCredential) {
+		return store.FailureCategoryModelCredential, harness.ToposCredentialRequired, err.Error()
+	}
+	return classifyFailure(err, false, ""), err.Error(), ""
+}
+
+// failToposRun moves an in-progress task to failed for an in-process run that
+// did not start or did not finish, recording the category, result text, and
+// error event toposFailure derives from err. It applies the auto-retry budget
+// first and leaves the task in backlog when a retry was scheduled.
+func (r *Runner) failToposRun(bgCtx context.Context, taskID uuid.UUID, err error) {
+	logger.Runner.Error("topos run", "task", taskID, "error", err)
+	category, message, detail := toposFailure(err)
+	_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
+	if r.tryAutoRetry(bgCtx, taskID, category) {
+		return
+	}
+	event := map[string]string{"error": message}
+	if detail != "" {
+		event["detail"] = detail
+	}
+	_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+	_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, message, "", "", 0)
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, event)
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+		store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 }
 
 // gatewayRoot reduces the .env's ANTHROPIC_BASE_URL, which is shaped for the
@@ -237,17 +279,7 @@ func (r *Runner) driveToposRun(bgCtx context.Context, taskID uuid.UUID, task sto
 		if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 			return
 		}
-		logger.Runner.Error("topos run", "task", taskID, "error", err)
-		category := classifyFailure(err, false, "")
-		_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
-		if r.tryAutoRetry(bgCtx, taskID, category) {
-			return
-		}
-		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-		_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, err.Error(), "", "", 0)
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
+		r.failToposRun(bgCtx, taskID, err)
 		return
 	}
 

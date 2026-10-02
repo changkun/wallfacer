@@ -25,7 +25,7 @@ import (
 // chain (Optional / RunInParallelWith hints are not expressed by the graph model); a
 // dynamic flow lowers to Autonomy: Dynamic with the topology its coordination
 // selects. Built-in roles leave PromptTmpl empty (they render through the prompts
-// package); an empty system prompt is legal for the fake model and the headless path.
+// package); an empty system prompt is legal for every model and the headless path.
 func FromFlow(f flow.Flow, reg *agents.Registry) (topos.Region, error) {
 	authored, err := FromFlowGraph(f)
 	if err != nil {
@@ -61,9 +61,8 @@ func RunFlow(ctx context.Context, opts topos.Options, f flow.Flow, reg *agents.R
 // task with no multi-agent flow executes as one agent, sharing the same engine,
 // trace, observer, and model selection the multi-agent path uses. name is the
 // agent's trace identity (node ids are <session>/<name>); systemPrompt is its
-// system prompt; onEvent may be nil. Like RunFlowWithModel, an unconfigured
-// ModelConfig transparently uses the deterministic fake model, so tests and
-// no-credential dev keep working.
+// system prompt; onEvent may be nil. Like RunFlowWithModel, a config without a
+// credential returns ErrNoModelCredential before anything runs.
 func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, systemPrompt, prompt, worktree string, onEvent func(Event)) (Result, error) {
 	if name == "" {
 		name = "agent"
@@ -72,7 +71,10 @@ func RunAgent(ctx context.Context, sessionID string, c ModelConfig, name, system
 		Entry:    topos.AgentSpec{Name: name, SystemPrompt: systemPrompt},
 		Autonomy: topos.Pinned,
 	}
-	opts := runOptions(sessionID, c, flow.Flow{})
+	opts, err := runOptions(sessionID, c, flow.Flow{})
+	if err != nil {
+		return Result{}, err
+	}
 	if worktree != "" {
 		// Run the agent's tools in the task's git worktree (the real repo) rather
 		// than a temp dir, so a native run reads and writes actual files. Workdir

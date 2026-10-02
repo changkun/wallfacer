@@ -55,6 +55,7 @@ describe('failureLabel', () => {
     expect(failureLabel('timeout')).toBe('Timeout');
     expect(failureLabel('budget_exceeded')).toBe('Budget');
     expect(failureLabel('container_crash')).toBe('Crash');
+    expect(failureLabel('model_credential_missing')).toBe('No credential');
   });
   it('empty for unknown/missing', () => {
     expect(failureLabel(undefined)).toBe('');

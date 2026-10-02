@@ -29,20 +29,44 @@ func writeEnvFile(t *testing.T, lines string) string {
 // TestAgenticModelConfig covers the runner-side derivation of a ModelConfig from
 // wallfacer's .env credential settings: a bare key selects Direct, a key plus a
 // base URL routes through Lux (passing the URL/key/model through), and the
-// absence of an env file or an Anthropic key yields the zero config (which the
-// seam maps to the fake model). No model is called.
+// absence of an env file or an Anthropic key is refused with
+// ErrNoModelCredential unless the runner opts into the test model. No model is
+// called.
 func TestAgenticModelConfig(t *testing.T) {
-	t.Run("no env file falls back to fake", func(t *testing.T) {
-		r := &Runner{}
-		if cfg := mustAgenticModelConfig(t, r); cfg != (agentgraph.ModelConfig{}) {
-			t.Errorf("config = %+v, want zero (fake)", cfg)
-		}
-	})
+	noCredential := map[string]func(t *testing.T) *Runner{
+		"no env file": func(*testing.T) *Runner { return &Runner{} },
+		"env without anthropic key": func(t *testing.T) *Runner {
+			return &Runner{envFile: writeEnvFile(t, "WALLFACER_AUTO_PUSH=true\n")}
+		},
+		"env file missing on disk": func(t *testing.T) *Runner {
+			return &Runner{envFile: filepath.Join(t.TempDir(), "absent.env")}
+		},
+	}
+	for name, newRunner := range noCredential {
+		t.Run(name+" is refused", func(t *testing.T) {
+			cfg, err := newRunner(t).agenticModelConfig()
+			if !errors.Is(err, agentgraph.ErrNoModelCredential) {
+				t.Fatalf("err = %v, want ErrNoModelCredential", err)
+			}
+			if cfg != (agentgraph.ModelConfig{}) {
+				t.Errorf("config = %+v, want zero alongside the refusal", cfg)
+			}
+		})
 
-	t.Run("env without anthropic key falls back to fake", func(t *testing.T) {
-		r := &Runner{envFile: writeEnvFile(t, "WALLFACER_AUTO_PUSH=true\n")}
-		if cfg := mustAgenticModelConfig(t, r); cfg != (agentgraph.ModelConfig{}) {
-			t.Errorf("config = %+v, want zero (fake)", cfg)
+		t.Run(name+" with the test-model opt-in", func(t *testing.T) {
+			r := newRunner(t)
+			r.allowTestModel = true
+			want := agentgraph.ModelConfig{Mode: agentgraph.ModelModeFake}
+			if cfg := mustAgenticModelConfig(t, r); cfg != want {
+				t.Errorf("config = %+v, want %+v", cfg, want)
+			}
+		})
+	}
+
+	t.Run("a configured key wins over the test-model opt-in", func(t *testing.T) {
+		r := &Runner{envFile: writeEnvFile(t, "ANTHROPIC_API_KEY=sk-test\n"), allowTestModel: true}
+		if got := mustAgenticModelConfig(t, r).Mode; got != agentgraph.ModelModeDirect {
+			t.Errorf("Mode = %q, want direct", got)
 		}
 	})
 
@@ -108,7 +132,7 @@ func TestAgenticModelConfig(t *testing.T) {
 
 // TestRun_AgenticFlowReachesDoneWithTrace dispatches a task whose resolved
 // flow is marked Agentic. The runner must route it through the topos
-// agent-graph runtime (with the deterministic fake model), reach done via the
+// agent-graph runtime (with the deterministic test model), reach done via the
 // normal state machine, record the final text, and persist a trace graph with
 // the expected two-node / one-next-edge shape. No container backend is invoked.
 // TestRun_NativeToposHarnessReachesDoneInProcess covers the native-harness
@@ -120,6 +144,7 @@ func TestAgenticModelConfig(t *testing.T) {
 // since this runner harness does not provision a workspace.
 func TestRun_NativeToposHarnessReachesDoneInProcess(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
+	r.allowTestModel = true
 
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
@@ -170,6 +195,7 @@ func TestRun_NativeToposHarnessReachesDoneInProcess(t *testing.T) {
 
 func TestRun_AgenticFlowReachesDoneWithTrace(t *testing.T) {
 	r, backend, s := newAgentTestRunner(t)
+	r.allowTestModel = true
 	r.agentsReg = agents.NewRegistry(
 		agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
 		agents.Role{Slug: "ag-builder", Title: "Builder", PromptTmpl: "you build"},
@@ -239,12 +265,13 @@ func TestRun_AgenticFlowReachesDoneWithTrace(t *testing.T) {
 func TestRun_NativeToposHarnessCommitsWorktreeEdits(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, r := setupTestRunner(t, []string{repo})
+	r.allowTestModel = true
 	enableCommitMessageGeneration(t, r)
 	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
 
 	ctx := context.Background()
-	// The fake model runs the prompt as a shell command in the worktree, so a
-	// redirect writes a file the agent "created" into the real repo checkout.
+	// With this prompt the test model's scripted tool call writes
+	// topos-marker.txt into the worktree, standing in for an agent's edit.
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  "topos change > topos-marker.txt",
 		Timeout: 5,
@@ -288,6 +315,7 @@ func TestRun_NativeToposHarnessCommitsWorktreeEdits(t *testing.T) {
 func TestRun_AgenticFlowCommitsWorktreeEdits(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, r := setupTestRunner(t, []string{repo})
+	r.allowTestModel = true
 	enableCommitMessageGeneration(t, r)
 	r.agentsReg = agents.NewRegistry(
 		agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
@@ -333,6 +361,103 @@ func TestRun_AgenticFlowCommitsWorktreeEdits(t *testing.T) {
 	}
 }
 
+// TestRun_ToposWithoutModelCredentialIsRefused covers both in-process paths (a
+// task pinned to the topos harness and a delegating fleet) on a runner with no
+// model credential configured. The run must be refused before anything is set
+// up: the task fails with the model-credential category and the fixed
+// sentence, the error event keeps the developer detail in its own field, no
+// worktree is created, and the workspace repository is untouched.
+func TestRun_ToposWithoutModelCredentialIsRefused(t *testing.T) {
+	const wantSentence = harness.ToposCredentialRequired
+
+	cases := []struct {
+		name string
+		opts store.TaskCreateOptions
+	}{
+		{"native run", store.TaskCreateOptions{Prompt: "native change > refused-marker.txt", Timeout: 5, Sandbox: harness.Topos}},
+		{"delegating fleet", store.TaskCreateOptions{Prompt: "fleet change > refused-marker.txt", Timeout: 5, FlowID: "agentic-pair"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := setupTestRepo(t)
+			s, r := setupTestRunner(t, []string{repo})
+			enableCommitMessageGeneration(t, r)
+			r.agentsReg = agents.NewRegistry(
+				agents.Role{Slug: "ag-planner", Title: "Planner", PromptTmpl: "you plan"},
+				agents.Role{Slug: "ag-builder", Title: "Builder", PromptTmpl: "you build"},
+			)
+			r.flows = flow.NewRegistry(flow.Flow{
+				Slug:    "agentic-pair",
+				Name:    "Agentic Pair",
+				Agentic: true,
+				Dynamic: true,
+				Steps:   []flow.Step{{AgentSlug: "ag-planner"}, {AgentSlug: "ag-builder"}},
+			})
+			initialHash := gitRun(t, repo, "rev-parse", "HEAD")
+
+			ctx := context.Background()
+			task, err := s.CreateTaskWithOptions(ctx, tc.opts)
+			if err != nil {
+				t.Fatalf("CreateTask: %v", err)
+			}
+			if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+				t.Fatalf("UpdateTaskStatus: %v", err)
+			}
+
+			r.Run(task.ID, task.Prompt, "", false)
+			r.WaitBackground()
+			s.WaitCompaction()
+
+			updated, err := s.GetTask(ctx, task.ID)
+			if err != nil {
+				t.Fatalf("GetTask: %v", err)
+			}
+			if updated.Status != store.TaskStatusFailed {
+				t.Errorf("status = %q, want failed", updated.Status)
+			}
+			if updated.FailureCategory != store.FailureCategoryModelCredential {
+				t.Errorf("failure category = %q, want %q", updated.FailureCategory, store.FailureCategoryModelCredential)
+			}
+			if updated.Result == nil || *updated.Result != wantSentence {
+				t.Errorf("result = %v, want the fixed sentence %q", updated.Result, wantSentence)
+			}
+			events, err := s.GetEvents(ctx, task.ID)
+			if err != nil {
+				t.Fatalf("GetEvents: %v", err)
+			}
+			var errEvents []map[string]string
+			for _, ev := range events {
+				if ev.EventType != store.EventTypeError {
+					continue
+				}
+				var data map[string]string
+				if err := json.Unmarshal(ev.Data, &data); err != nil {
+					t.Fatalf("unmarshal error event: %v", err)
+				}
+				errEvents = append(errEvents, data)
+			}
+			if len(errEvents) != 1 {
+				t.Fatalf("error events = %v, want exactly one", errEvents)
+			}
+			if errEvents[0]["error"] != wantSentence {
+				t.Errorf("error event message = %q, want %q", errEvents[0]["error"], wantSentence)
+			}
+			if errEvents[0]["detail"] != agentgraph.ErrNoModelCredential.Error() {
+				t.Errorf("error event detail = %q, want %q", errEvents[0]["detail"], agentgraph.ErrNoModelCredential.Error())
+			}
+			if len(updated.WorktreePaths) != 0 {
+				t.Errorf("worktrees = %v, want none for a refused run", updated.WorktreePaths)
+			}
+			if finalHash := gitRun(t, repo, "rev-parse", "HEAD"); finalHash != initialHash {
+				t.Errorf("default branch moved from %s to %s; a refused run must not commit", initialHash, finalHash)
+			}
+			if _, statErr := os.Stat(filepath.Join(repo, "refused-marker.txt")); statErr == nil {
+				t.Error("refused-marker.txt exists in the workspace; a refused run must not run anything")
+			}
+		})
+	}
+}
+
 func mustAgenticModelConfig(t *testing.T, r *Runner) agentgraph.ModelConfig {
 	t.Helper()
 	cfg, err := r.agenticModelConfig()
@@ -346,6 +471,6 @@ func TestAgenticModelConfigRejectsUnavailableSecret(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SECRET_STORE=keyring\nWALLFACER_SECRET_BUNDLE=invalid\n")
 	r := &Runner{envFile: path}
 	if _, err := r.agenticModelConfig(); !errors.Is(err, envconfig.ErrSecretStore) {
-		t.Fatalf("must not fall back to fake model: %v", err)
+		t.Fatalf("err = %v, want ErrSecretStore", err)
 	}
 }

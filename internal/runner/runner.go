@@ -195,6 +195,13 @@ type Runner struct {
 	flows      *flow.Registry
 	flowsDir   string // ~/.wallfacer/flows by default
 	flowEngine *flow.Engine
+
+	// allowTestModel lets an in-process run with no model credential use the
+	// runtime's deterministic test model instead of being refused. It keeps the
+	// in-process paths testable without a credential or a network. Nothing in
+	// RunnerConfig, the env file, or the process environment sets it: only
+	// tests in this package assign it, so every other Runner refuses the run.
+	allowTestModel bool
 }
 
 // ShutdownCtx returns the runner's shutdown context. It is cancelled when

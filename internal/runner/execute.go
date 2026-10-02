@@ -83,9 +83,9 @@ var (
 //  4. err message contains "empty output" or "exit status" → container_crash
 //  5. Default → unknown
 //
-// The worktree_setup and sync_error categories are not returned by this
-// function — they are set directly at their respective call sites where the
-// cause is unambiguous.
+// The worktree_setup, sync_error, and model_credential_missing categories are
+// not returned by this function — they are set directly at their respective
+// call sites where the cause is unambiguous.
 func classifyFailure(err error, isError bool, result string) store.FailureCategory {
 	if err != nil && errors.Is(err, context.DeadlineExceeded) {
 		return store.FailureCategoryTimeout
@@ -279,6 +279,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// harness (opt-in). Test runs keep the subprocess verification path for now.
 	nativeTopos := !task.IsTestRun && harness.InProcess(r.sandboxForTask(task))
 	toposRun := agentic || nativeTopos
+
+	// An in-process run needs a model config. Resolve it here, before the
+	// worktree is set up, so a run that has none (no model credential, or a
+	// secret store that cannot be read) is refused with nothing created and
+	// nothing run on its behalf.
+	if toposRun {
+		if _, cfgErr := r.agenticModelConfig(); cfgErr != nil {
+			statusSet = true
+			r.failToposRun(bgCtx, taskID, cfgErr)
+			return
+		}
+	}
 
 	isTestRun := task.IsTestRun
 

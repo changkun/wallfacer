@@ -202,7 +202,11 @@ const (
 	FailureCategoryContainerCrash FailureCategory = "container_crash"
 	FailureCategoryAgentError     FailureCategory = "agent_error"
 	FailureCategorySyncError      FailureCategory = "sync_error"
-	FailureCategoryUnknown        FailureCategory = "unknown"
+	// FailureCategoryModelCredential marks an in-process run that was refused
+	// because no model credential is configured. Nothing ran, and a retry
+	// cannot succeed until a credential is set, so it has no auto-retry budget.
+	FailureCategoryModelCredential FailureCategory = "model_credential_missing"
+	FailureCategoryUnknown         FailureCategory = "unknown"
 )
 
 // ParseFailureCategory normalizes a string into a known failure category.
@@ -215,6 +219,7 @@ func ParseFailureCategory(raw string) (FailureCategory, bool) {
 		FailureCategoryContainerCrash,
 		FailureCategoryAgentError,
 		FailureCategorySyncError,
+		FailureCategoryModelCredential,
 		FailureCategoryUnknown:
 		return category, true
 	default:

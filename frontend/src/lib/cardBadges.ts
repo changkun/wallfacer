@@ -56,6 +56,7 @@ const FAILURE_LABELS: Record<string, string> = {
   agent_error: 'Agent Error',
   worktree_setup: 'Worktree',
   sync_error: 'Sync',
+  model_credential_missing: 'No credential',
   unknown: '',
 };
 

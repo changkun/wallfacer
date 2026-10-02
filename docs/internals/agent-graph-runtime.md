@@ -2,7 +2,7 @@
 
 Wallfacer embeds the topos runtime SDK (`latere.ai/x/topos`) as an in-process multi-agent execution engine. A topos run compiles a set of agents into a `topos.Region`, executes it inside the wallfacer server process, and returns a final text plus a trace graph of which agent did what and who delegated to whom. This is the execution engine behind the Agent Graph page (`/agent-graph`), agentic flows, and the native `topos` harness.
 
-The integration is deliberately experimental and opt-in. The built-in `implement` flow does **not** run through it: an ordinary task keeps the multi-turn subprocess turn loop documented in [Task Lifecycle](task-lifecycle.md). Only a flow explicitly marked agentic, or a task explicitly pinned to the `topos` harness, reaches this runtime. Current constraints: static API-key credentials only (Bearer/OAuth deferred), transparent fallback to a deterministic fake model when no credential is configured, no session resume, no MCP, and no verification pass after the in-process run. The milestone history lives in `specs/local/topos-runtime-integration.md`.
+The integration is deliberately experimental and opt-in. The built-in `implement` flow does **not** run through it: an ordinary task keeps the multi-turn subprocess turn loop documented in [Task Lifecycle](task-lifecycle.md). Only a flow explicitly marked agentic, or a task explicitly pinned to the `topos` harness, reaches this runtime. Current constraints: static API-key credentials only (Bearer/OAuth deferred), a run with no model credential is refused before it starts, no session resume, no MCP, and no verification pass after the in-process run. The milestone history lives in `specs/local/topos-runtime-integration.md`.
 
 ## The Single Import Seam
 
@@ -18,29 +18,31 @@ The integration is deliberately experimental and opt-in. The built-in `implement
 
 Only the curated root package `latere.ai/x/topos` is a supported surface. `TestWallfacerImportsOnlyRootTopos` (`internal/agentgraph/boundary_test.go`) runs `go list` over every package and fails if any wallfacer package imports a topos engine subpackage (`latere.ai/x/topos/...`). This keeps the runtime an implementation detail: the engine can restructure internally without touching wallfacer, and no second seam can grow by accident.
 
-Consumers on the wallfacer side read the seam's exported entrypoints: `RunFlowWithModel` (multi-agent) and `RunAgent` (single agent). An unconfigured `ModelConfig` selects the deterministic fake model, which is how tests run flows without a credential.
+Consumers on the wallfacer side read the seam's exported entrypoints: `RunFlowWithModel` (multi-agent) and `RunAgent` (single agent). Both return `agentgraph.ErrNoModelCredential` for a `ModelConfig` that carries no credential, before a runner is built, so nothing executes in the working directory. `NewRunner` additionally refuses `topos.Options` that select no model, because the runtime would resolve those to its test model.
 
 ## Model Resolution
 
 `ModelMode` (`internal/agentgraph/model.go`) selects how a run reaches a model:
 
-- `ModelModeFake` (`""`, the zero value): the deterministic, network-free fake model. Any unconfigured or credential-less config lands here.
 - `ModelModeLux` (`"lux"`): a provider reached through Lux, the model gateway. `BaseURL` points at a Lux endpoint and `APIKey` is a Lux virtual key (`lux_*`).
 - `ModelModeDirect` (`"direct"`): a provider endpoint reached directly with a BYO key.
+- `ModelModeFake` (`"fake"`): the runtime's deterministic, network-free test model. It is reachable only by naming it. The zero value of `ModelMode` selects nothing, and no missing credential resolves to this mode.
 
 The runner derives the config in `Runner.agenticModelConfig` (`internal/runner/agentic.go`) from the same `.env` file the subprocess harnesses read:
 
-1. No env file, unparseable env file, or no `ANTHROPIC_API_KEY`: zero `ModelConfig`, which maps to the fake model. Tests and no-credential development keep working.
+1. No env file, unparseable env file, or no `ANTHROPIC_API_KEY`: `agentgraph.ErrNoModelCredential`. `Runner.Run` resolves the config before worktree setup, so the task fails with the `model_credential_missing` category and the fixed sentence `harness.ToposCredentialRequired` as its result, with no worktree created and nothing run. `sandboxUsable` (`internal/handler/sandbox_gate.go`) reports the `topos` harness unusable with the same sentence. A secret-store failure returns `envconfig.ErrSecretStore` and fails the task the same way under its own error text.
 2. `ANTHROPIC_API_KEY` set and `ANTHROPIC_BASE_URL` set: `ModelModeLux` through the gateway. The base URL is the Anthropic door the container harness dials; the runner drops only its trailing `/anthropic` segment and keeps any base path, so `https://api.latere.ai/v1/models/anthropic` becomes the gateway root `https://api.latere.ai/v1/models`.
 3. `ANTHROPIC_API_KEY` set, no base URL: `ModelModeDirect` against the provider.
 
-`CLAUDE_DEFAULT_MODEL` supplies the model id; the provider is always `anthropic` today. The fake fallback is centralized in `modelOptions`: a real-mode config missing a credential also degrades to fake rather than building a guaranteed-401 adapter, so callers never pre-check.
+`CLAUDE_DEFAULT_MODEL` supplies the model id; the provider is always `anthropic` today. The refusal is centralized in `modelOptions`: a real-mode config missing a credential returns `ErrNoModelCredential`, and a credential under an unset or unknown mode is an error as well, so no input degrades to another model.
+
+The test model stays available to tests through an explicit opt-in. Tests of the seam pass `ModelConfig{Mode: ModelModeFake}`. Tests of the runner set the unexported `Runner.allowTestModel` field, which makes `agenticModelConfig` return that config when no key is configured. No `RunnerConfig` field, env-file key, or environment variable sets the field, so a production runner always refuses.
 
 Only the static `x-api-key` credential is wired. Bearer-style credentials (`ANTHROPIC_AUTH_TOKEN` gateway tokens, `CLAUDE_CODE_OAUTH_TOKEN`) require a per-call `BearerSource` and are deferred; a Claude subscription login therefore does not light up the agent-graph runtime, only a raw API key or Lux key does.
 
 ## Flow Compilation
 
-`FromFlow` (`internal/agentgraph/adapter.go`) compiles a wallfacer `flow.Flow` plus the agents registry into a `topos.Region`. The flow's first step becomes the region entry, the remaining steps the ordered peer chain. Each step's `AgentSlug` resolves through the registry into an `agents.Role` and maps onto a `topos.AgentSpec`: the slug is the stable identity (trace node ids are `<session>/<slug>`), `PromptTmpl` becomes the system prompt, and `Capabilities` become permission scopes. Built-in roles leave `PromptTmpl` empty (they render through the prompts package); an empty system prompt is legal for the fake model and the headless path.
+`FromFlow` (`internal/agentgraph/adapter.go`) compiles a wallfacer `flow.Flow` plus the agents registry into a `topos.Region`. The flow's first step becomes the region entry, the remaining steps the ordered peer chain. Each step's `AgentSlug` resolves through the registry into an `agents.Role` and maps onto a `topos.AgentSpec`: the slug is the stable identity (trace node ids are `<session>/<slug>`), `PromptTmpl` becomes the system prompt, and `Capabilities` become permission scopes. Built-in roles leave `PromptTmpl` empty (they render through the prompts package); an empty system prompt is legal for every model and the headless path.
 
 Three flow fields shape the region's autonomy (`internal/flow/flow.go`):
 

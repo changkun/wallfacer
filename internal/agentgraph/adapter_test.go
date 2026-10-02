@@ -2,6 +2,7 @@ package agentgraph_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,11 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/flow"
 )
+
+// testModel names the runtime's deterministic test model. Tests that execute a
+// run pass it explicitly; a config that does not name it and carries no
+// credential is refused.
+var testModel = agentgraph.ModelConfig{Mode: agentgraph.ModelModeFake}
 
 // twoAgentFixture builds a registry + a two-step agentic flow used across the
 // adapter tests.
@@ -103,7 +109,10 @@ func TestFromFlow_DynamicTopology(t *testing.T) {
 func TestRunOptions_MaxHandoffDepth(t *testing.T) {
 	_, f := twoAgentFixture()
 	f.MaxHandoffDepth = 5
-	opts := agentgraph.RunOptions("run-x", agentgraph.ModelConfig{}, f)
+	opts, err := agentgraph.RunOptions("run-x", testModel, f)
+	if err != nil {
+		t.Fatalf("RunOptions: %v", err)
+	}
 	if opts.MaxHandoffDepth != 5 {
 		t.Errorf("MaxHandoffDepth = %d, want 5", opts.MaxHandoffDepth)
 	}
@@ -112,8 +121,29 @@ func TestRunOptions_MaxHandoffDepth(t *testing.T) {
 	}
 
 	f.MaxHandoffDepth = 0
-	if got := agentgraph.RunOptions("run-x", agentgraph.ModelConfig{}, f).MaxHandoffDepth; got != 0 {
-		t.Errorf("zero-depth flow MaxHandoffDepth = %d, want 0 (topos default applies)", got)
+	opts, err = agentgraph.RunOptions("run-x", testModel, f)
+	if err != nil {
+		t.Fatalf("RunOptions: %v", err)
+	}
+	if opts.MaxHandoffDepth != 0 {
+		t.Errorf("zero-depth flow MaxHandoffDepth = %d, want 0 (topos default applies)", opts.MaxHandoffDepth)
+	}
+
+	// A config that selects no model yields no options at all.
+	if _, err := agentgraph.RunOptions("run-x", agentgraph.ModelConfig{}, f); !errors.Is(err, agentgraph.ErrNoModelCredential) {
+		t.Errorf("RunOptions with an unconfigured model: err = %v, want ErrNoModelCredential", err)
+	}
+}
+
+// TestNewRunner_RefusesOptionsWithoutModel covers the constructor guard: topos
+// options that name no model are refused instead of being handed to the
+// runtime, which would resolve them to its test model.
+func TestNewRunner_RefusesOptionsWithoutModel(t *testing.T) {
+	if _, err := agentgraph.NewRunner(topos.Options{SessionID: "run-x"}); err == nil {
+		t.Fatal("NewRunner accepted options that select no model")
+	}
+	if _, err := agentgraph.NewRunner(topos.Options{SessionID: "run-x", Model: topos.ModelOptions{Kind: topos.ModelFake}}); err != nil {
+		t.Fatalf("NewRunner with the test model named explicitly: %v", err)
 	}
 }
 
@@ -135,7 +165,7 @@ func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 	reg, f := twoAgentFixture()
 	var got []agentgraph.Event
 	res, err := agentgraph.RunFlowWithModel(
-		context.Background(), "run-obs", agentgraph.ModelConfig{}, f, reg, "do the thing", "",
+		context.Background(), "run-obs", testModel, f, reg, "do the thing", "",
 		func(ev agentgraph.Event) { got = append(got, ev) },
 	)
 	if err != nil {
@@ -169,13 +199,13 @@ func TestRunFlowWithModel_ObserverReceivesEvents(t *testing.T) {
 }
 
 // TestRunAgent_SingleNode exercises the native-harness entry point: a single
-// agent runs as a one-node pinned region with the deterministic fake model,
+// agent runs as a one-node pinned region with the deterministic test model,
 // producing a non-empty final text, exactly one trace node (<session>/<name>,
 // status done), no edges, and live observer events that join to that node.
 func TestRunAgent_SingleNode(t *testing.T) {
 	var got []agentgraph.Event
 	res, err := agentgraph.RunAgent(
-		context.Background(), "run-native", agentgraph.ModelConfig{}, "implement", "you implement", "do the thing", "",
+		context.Background(), "run-native", testModel, "implement", "you implement", "do the thing", "",
 		func(ev agentgraph.Event) { got = append(got, ev) },
 	)
 	if err != nil {
@@ -213,14 +243,14 @@ func TestRunAgent_SingleNode(t *testing.T) {
 }
 
 // TestRunAgent_WithWorktreeExecutesInRepo proves end-to-end worktree execution:
-// with a worktree set, the run's tools execute in that directory. The fake model
-// runs `echo <prompt>` in the sandbox, so a prompt that redirects to a file lands
-// that file in the worktree — demonstrating the native harness edits the real repo
-// (via topos Options.Workdir).
+// with a worktree set, the run's tools execute in that directory. The test
+// model's scripted tool call writes marker.txt, and the file lands in the
+// worktree, demonstrating the native harness edits the real repo (via topos
+// Options.Workdir).
 func TestRunAgent_WithWorktreeExecutesInRepo(t *testing.T) {
 	worktree := t.TempDir()
 	_, err := agentgraph.RunAgent(
-		context.Background(), "run-wt", agentgraph.ModelConfig{}, "implement", "", "hi > marker.txt", worktree, nil,
+		context.Background(), "run-wt", testModel, "implement", "", "hi > marker.txt", worktree, nil,
 	)
 	if err != nil {
 		t.Fatalf("RunAgent with worktree: %v", err)
@@ -238,7 +268,7 @@ func TestRunFlowWithModel_WithWorktreeExecutesInRepo(t *testing.T) {
 	worktree := t.TempDir()
 	reg, f := twoAgentFixture()
 	_, err := agentgraph.RunFlowWithModel(
-		context.Background(), "run-flow-wt", agentgraph.ModelConfig{}, f, reg,
+		context.Background(), "run-flow-wt", testModel, f, reg,
 		"flow change > marker.txt", worktree, nil,
 	)
 	if err != nil {
@@ -256,7 +286,7 @@ func TestRunFlowWithModel_WithWorktreeExecutesInRepo(t *testing.T) {
 // TestRunAgent_DefaultName falls back to a stable node name when none is given,
 // and works with a nil observer.
 func TestRunAgent_DefaultName(t *testing.T) {
-	res, err := agentgraph.RunAgent(context.Background(), "run-x", agentgraph.ModelConfig{}, "", "", "hi", "", nil)
+	res, err := agentgraph.RunAgent(context.Background(), "run-x", testModel, "", "", "hi", "", nil)
 	if err != nil {
 		t.Fatalf("RunAgent: %v", err)
 	}
@@ -265,7 +295,7 @@ func TestRunAgent_DefaultName(t *testing.T) {
 	}
 }
 
-// TestRunFlowFake exercises the full headless path with the deterministic fake
+// TestRunFlowFake exercises the full headless path with the deterministic test
 // model: a two-agent pinned chain produces a trace with two nodes joined by a
 // single "next" edge, and a non-empty final text.
 func TestRunFlowFake(t *testing.T) {

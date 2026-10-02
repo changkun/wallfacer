@@ -357,6 +357,7 @@ Machine-readable root cause classification for failed tasks:
 | `FailureCategoryContainerCrash` | `"container_crash"` | Agent host process exited unexpectedly |
 | `FailureCategoryAgentError` | `"agent_error"` | Agent returned an error |
 | `FailureCategorySyncError` | `"sync_error"` | Rebase/sync operation failed |
+| `FailureCategoryModelCredential` | `"model_credential_missing"` | In-process run refused before start: no model credential configured |
 | `FailureCategoryUnknown` | `"unknown"` | Unclassified failure |
 
 The `FailureCategoryContainerCrash` symbol and its `"container_crash"` value are legacy vocabulary; the behavior they classify is a host-process exit.

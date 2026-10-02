@@ -635,11 +635,14 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 // generateCommitMessageInProcess produces a commit message via the in-process
 // topos harness (agentgraph) for tasks whose sandbox the host subprocess backend
 // cannot launch. The run is prompt-only (no worktree tools); sanitizeCommitMessage
-// normalizes the output as on the host path.
+// normalizes the output as on the host path. Every failure, a missing model
+// config included, is wrapped with ErrCommitMessageGeneration so the commit
+// halts instead of proceeding without a message; the cause stays in the chain.
 func (r *Runner) generateCommitMessageInProcess(ctx context.Context, taskID uuid.UUID, sessionID, commitPrompt string) (string, error) {
 	cfg, err := r.agenticModelConfig()
 	if err != nil {
-		return "", err
+		logger.Runner.Warn("commit message generation (in-process): no model config", "task", taskID, "error", err)
+		return "", fmt.Errorf("%w: %w", ErrCommitMessageGeneration, err)
 	}
 	res, err := agentgraph.RunAgent(ctx, sessionID, cfg, "commit-msg", "", commitPrompt, "", nil)
 	if err != nil {

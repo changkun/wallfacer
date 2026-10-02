@@ -130,6 +130,7 @@ When a task transitions to `failed`, the runner classifies the failure into one 
 | `container_crash` | Host process exited unexpectedly (legacy category name) |
 | `agent_error` | Agent reported an error in its output |
 | `sync_error` | Rebase/sync operation failed |
+| `model_credential_missing` | In-process (`topos`) run refused before worktree setup because no model credential is configured |
 | `unknown` | Unclassifiable failure |
 
 The category is stored in `Task.FailureCategory` and included in `RetryRecord` when the task is reset for retry.

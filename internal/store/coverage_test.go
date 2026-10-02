@@ -24,6 +24,7 @@ func TestParseFailureCategory_KnownValues(t *testing.T) {
 		FailureCategoryContainerCrash,
 		FailureCategoryAgentError,
 		FailureCategorySyncError,
+		FailureCategoryModelCredential,
 		FailureCategoryUnknown,
 	}
 	for _, cat := range known {

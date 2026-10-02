@@ -19,9 +19,24 @@ func normalizeSandbox(s string) harness.ID {
 // sandboxUsable reports whether the given sandbox type can accept tasks.
 // For Claude, it is always usable. For Codex, the check follows a priority
 // chain: host auth (~/.codex/auth.json) > OPENAI_API_KEY > prior test pass.
+// For Topos, it requires the model credential the in-process harness reads.
 // Returns (usable, reason) where reason explains why it is not usable.
 func (h *Handler) sandboxUsable(sb harness.ID) (bool, string) {
 	s := sb.OrDefault()
+	// Topos runs in-process on the env file's ANTHROPIC_API_KEY, the one
+	// credential its model leg accepts (Runner.agenticModelConfig applies the
+	// same rule when a task runs). The runner refuses a run without it, so the
+	// harness is reported unusable with the sentence that refused task carries.
+	if s == harness.Topos {
+		if h.envFile == "" {
+			return false, harness.ToposCredentialRequired
+		}
+		cfg, err := envconfig.Parse(h.envFile)
+		if err != nil || cfg.APIKey == "" {
+			return false, harness.ToposCredentialRequired
+		}
+		return true, ""
+	}
 	// Claude sandbox is always usable (uses local OAuth or API key from env).
 	if s != harness.Codex {
 		return true, ""
