@@ -9,7 +9,7 @@ affects:
   - internal/cli/web.go
 effort: medium
 created: 2026-04-12
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -151,6 +151,26 @@ spec-comment events. The data boundary governs this channel too. Three controls:
    spec enforces that whatever those leaves enumerate is the only thing that
    crosses, and that an unlisted field is dropped before export.
 
+### Remote execution egress
+
+A third path is drafted and not built: a task whose execution target is
+`hosted` runs as an agent session on the Latere platform
+([hosted executor](latere-integration/topos-remote-executor.md)). Unlike the two
+paths above, it sends content on purpose: the task's prompt, and the task
+branch pushed to a git remote the user already configured. It is governed by a
+different control from an allow-list, because there is nothing to redact:
+
+1. Per-task choice. A task is `local` unless the user set its target to
+   `hosted`. Signing in changes no task's target, and a failed hosted dispatch
+   never falls back to another target on its own.
+2. Named before it leaves. The first hosted dispatch in a workspace asks for
+   confirmation and states what is pushed and where.
+3. Nothing beside the push and the prompt. No environment variable, no local
+   path, and no file outside the pushed history is sent.
+
+The executor spec owns these controls and their tests. This spec owns the
+statement that a `local` task, on any instance, makes no platform call.
+
 ### Coordination channel regression test
 
 A test mirroring the RUM scrubber test, asserting the two invariants:
@@ -214,4 +234,6 @@ A frontend test (`frontend/src/telemetry.test.ts`) that:
   answer: in cloud mode, browser RUM spans over one same-origin proxy route with
   identifiers scrubbed in `telemetry.ts`; and, only if signed in and opted in,
   presence plus an allow-listed metadata projection plus spec comments over the
-  coordination channel. Opted out or anonymous, nothing leaves.
+  coordination channel. Opted out or anonymous, nothing leaves. Once hosted runs
+  exist: additionally, for a task the user set to `hosted`, that task's prompt and
+  its branch.

@@ -9,7 +9,7 @@ affects:
   - frontend/src/
 effort: large
 created: 2026-06-14
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -181,9 +181,9 @@ wallfacerd coordinator. Rejected alternatives and why:
   stuffing wallfacer's derived task/usage read-model into the Identity service
   would make Identity carry wallfacer-domain data it does not own. The
   coordinator owns wallfacer's own concepts, so it owns their projection.
-- **FS (fs.latere.ai).** A file data plane, not a queryable store; dashboards
-  need aggregation queries (group-by member / model / status / time bucket) that
-  a blob plane does not serve.
+- **The platform's Storage capability.** A file store, not a queryable one;
+  dashboards need aggregation queries (group-by member / model / status / time
+  bucket) that a file store does not serve.
 
 The store is **tiered**, because wallfacerd runs multiple replicas (see
 [connection](connection-and-presence/connection.md) horizontal scaling) and the
@@ -203,7 +203,7 @@ read-model must be shared, not per-replica:
   (regenerable by replay); only the durable rollups land in Postgres.
 
 Rejected for the durable tier: Identity org metadata (would absorb
-wallfacer-domain data) and FS (a blob plane, not queryable). It holds only the
+wallfacer-domain data) and the platform's Storage (files, not queryable). It holds only the
 allow-listed metadata, never source or content, so its blast radius is the
 projection only. Retention is the policy decided above (live index indefinitely,
 raw projected events 90 days, rollups 13 months).
@@ -247,3 +247,15 @@ scope by construction (that data never left the instance).
 - **Opt-out / anonymous.** With coordination opt-in off (or anonymous), the tap
   is not started and nothing is pushed (egress zero), mirroring the
   data-boundary cloud-mode gate.
+
+## Open questions
+
+1. **Hosted runs.** A task that runs as a hosted agent session
+   ([hosted executor](../topos-remote-executor.md)) is still a wallfacer task,
+   so its status and usage are projected like any other. Two things differ. Its
+   cost is the amount the platform billed, not an estimate from token counts.
+   And the platform's console already shows that session's cost to the person
+   who started it. The allow-list needs the task's execution target (`local` or
+   `hosted`) so a usage rollup can separate platform spend from provider spend
+   on local runs. Whether the organization view repeats a hosted session's
+   figures or links to the platform's record of it is open.

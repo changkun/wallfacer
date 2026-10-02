@@ -11,7 +11,7 @@ affects:
   - frontend/src/
 effort: xlarge
 created: 2026-06-14
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -19,9 +19,9 @@ dispatched_task_id: null
 # Cloud Coordination Plane
 
 Anchor spec for **Cloud v1 (metadata coordination)**, the lead axis of the
-[latere-integration](../latere-integration.md) track. It resolves that
-umbrella's open question ("does cloud metadata coordination live in a separate
-Latere service, or as a `wallfacer cloud` server mode?") in favor of a
+[latere-integration](../latere-integration.md) track. It settles where cloud
+metadata coordination lives (a separate Latere service, or a mode of
+wallfacer's own server) in favor of a
 coordinator **role on the existing wallfacer cloud server** (`wallfacerd` at
 wf.latere.ai), and the [remote-control](../../identity/remote-control.md) open
 question ("how does a signed-in local instance announce itself?") in favor of a
@@ -51,10 +51,12 @@ The cloud track has two independent axes. This spec is **Axis A** only.
 | Axis | What | Crosses the data boundary? | Status |
 |------|------|----------------------------|--------|
 | **A. Coordination plane** (this spec) | Presence, remote control, metadata projection, collaboration relay. Local stays source of truth. | Metadata + presence + comment anchors only (allow-listed) | Cloud v1, lead |
-| **B. Remote execution** | Dispatch agent *runs* to Cella / Topos / Managed Agents / Antigravity. | Yes, source + worktree leave deliberately | Cloud v2+, demand-gated |
+| **B. Remote execution** | A task runs as a hosted agent session on the Latere platform, or on a third-party agent service. | Yes, the repository leaves deliberately | Cloud v2+, demand-gated |
 
-Axis B ([cella-runtime](cella-runtime.md), [topos](topos-remote-executor.md),
-etc.) is unchanged and out of scope here. The two share only the auth principal.
+Axis B ([hosted executor](topos-remote-executor.md)) is out of scope here. The
+two share only the auth principal. The consolidation of Latere's services into
+one platform reshaped Axis B and left this axis as it was: the coordinator is
+wallfacer's own server role, not a platform capability.
 
 ## Core decision: relay + projection, never mirror
 
@@ -84,8 +86,9 @@ comments and is paid down by a planned git-export path.
 
 ### Why this is not "absorbing"
 
-Consume-don't-absorb forbids wallfacer reimplementing Cella (runtime), FS (file
-plane), Identity (auth), Lux (keys). The coordinator does none of those. It
+The platform integration forbids wallfacer reimplementing what the Latere
+platform owns: identity, sandbox runtime, file storage, model keys, the hosted
+agent runtime. The coordinator does none of those. It
 coordinates **wallfacer's own domain** (specs, tasks, board presence, the
 project graph) across a user's own instances. Coordinating your own concepts is
 wallfacer-owned work, the same way the local server already coordinates one
@@ -136,8 +139,8 @@ flow are in [repo-identity](coordination-plane/repo-identity.md).
 
 wallfacerd runs more than one replica, so an instance's WSS lands on one replica
 (its home) while presence and routing must span all of them. Cross-replica state
-reuses the shared managed **Valkey** (`latere-valkey`, the cache lux/sandboxd
-already co-tenant): a TTL-refreshed instance index plus pub/sub fan-out, namespaced
+reuses the shared managed **Valkey** (`latere-valkey`): a TTL-refreshed instance
+index plus pub/sub fan-out, namespaced
 `wf:coord:*`, config-gated by `WALLFACER_REDIS_URL` with an in-memory
 single-replica fallback for local dev. Valkey is a cache and holds only ephemeral
 coordination state; **durable, authoritative** data (spec comments, the projection
@@ -190,8 +193,8 @@ the command-router capability rather than a separate wire.
 
 Each instance pushes the allow-listed projection (above) so the org gets
 history / usage / team-visibility dashboards without any instance exposing
-source or diffs. This is the umbrella's line-77 "tap TaskEvent, redact to
-allow-list, push" seam, now with a defined destination.
+source or diffs. This is the umbrella's coordination seam (tap `store.TaskEvent`,
+redact to an allow-list, push), with a defined destination.
 
 ### 4. Collaboration: inline spec comments
 
@@ -239,10 +242,10 @@ governed coordination channel," with:
 
 - **Cloud as system of record for local task/spec data.** Never. Relay +
   projection only. (Spec comments are the one scoped, paid-down exception.)
-- **Remote execution** (Axis B): agent runs going to Cella/Topos live in those
-  specs.
+- **Remote execution** (Axis B): a task running as a hosted agent session lives in
+  the [hosted executor](topos-remote-executor.md) spec.
 - **A new Latere service.** The coordinator is a role of wallfacerd, not a new
-  standalone product, and does not absorb Cella/FS/Identity/Lux.
+  standalone product and not a platform capability.
 - **CRDT / live-cursor co-editing of specs or prompts.** Comments are
   append-and-resolve, not collaborative text editing (see multi-user non-goals).
 - **Backing up local task data to the cloud.** Out of scope and counter to the

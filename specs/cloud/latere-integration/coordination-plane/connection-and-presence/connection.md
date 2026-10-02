@@ -9,7 +9,7 @@ affects:
   - internal/auth/
 effort: large
 created: 2026-06-14
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -169,12 +169,12 @@ content data.
 ## Horizontal scaling (multiple replicas)
 
 Cross-replica state reuses the **shared managed Valkey** (`latere-valkey`,
-Redis-compatible, TLS `rediss://`), the same cluster lux and sandboxd already
-co-tenant; wallfacer adds its own `kubernetes_secret` and namespaces every key
+Redis-compatible, TLS `rediss://`), a cluster other Latere services share;
+wallfacer adds its own `kubernetes_secret` and namespaces every key
 under `wf:coord:*`. Config-gated by `WALLFACER_REDIS_URL`: **absent** selects
 `memDirectory` (local dev, current `replicas: 1`, byte-identical to single
 process); **present** selects `redisDirectory`. Parsed with `redis.ParseURL`
-(TLS auto), matching lux/sandboxd.
+(TLS auto).
 
 ### Shared index (Valkey)
 
