@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { harnessLabel, modelLabel } from './harness';
+import { chatHarnesses, harnessLabel, modelLabel } from './harness';
 
 describe('harnessLabel', () => {
   it('brand-cases known harness ids', () => {
@@ -33,5 +33,24 @@ describe('modelLabel', () => {
   });
   it('returns empty for empty input', () => {
     expect(modelLabel('')).toBe('');
+  });
+});
+
+describe('chatHarnesses', () => {
+  it('offers the usable harnesses the chat runtime can launch', () => {
+    expect(chatHarnesses({
+      sandboxes: ['claude', 'codex', 'pi', 'topos'],
+      sandbox_usable: { claude: true, codex: false, pi: true, topos: true },
+      chat_sandboxes: ['claude', 'codex', 'pi'],
+    })).toEqual(['claude', 'pi']);
+  });
+  it('applies only the usable filter while chat_sandboxes is absent', () => {
+    expect(chatHarnesses({
+      sandboxes: ['claude', 'codex'],
+      sandbox_usable: { codex: false },
+    })).toEqual(['claude']);
+  });
+  it('falls back to the full registry before config loads', () => {
+    expect(chatHarnesses(null)).toContain('claude');
   });
 });

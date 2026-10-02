@@ -19,6 +19,8 @@ Only one agent turn runs at a time across all threads (they share a single agent
 
 Type in the composer and press **Enter** to send (**Shift+Enter** for a newline). The arrow next to the send button switches to **Cmd+Enter to send** mode; the preference persists per browser. Responses stream in as the agent produces them, with tool activity (file reads, commands, writes) collapsed under each response. The send button becomes a stop button during streaming; clicking it interrupts the turn while preserving everything streamed so far. Reloading the page mid-turn reattaches to the live stream automatically.
 
+The harness picker beside the send button chooses the harness that runs the thread's turns, and the choice persists per browser. It lists the usable subprocess harnesses only: the in-process `topos` harness runs tasks but has no chat runtime, so it is not offered, and a message sent with it through the API is refused with `harness_unavailable_in_chat`.
+
 ## Quick actions
 
 An empty conversation offers three quick-action chips that pre-fill the composer:

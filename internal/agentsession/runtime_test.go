@@ -385,3 +385,22 @@ func TestBuildContainerSpec_NoEnvFile(t *testing.T) {
 		t.Errorf("EnvFile = %q, want empty when not configured", spec.EnvFile)
 	}
 }
+
+// TestLaunchable asserts the runtime launches every registered subprocess
+// harness and neither an in-process harness nor an unregistered id.
+func TestLaunchable(t *testing.T) {
+	for _, id := range harness.All() {
+		if got, want := Launchable(id), !harness.InProcess(id); got != want {
+			t.Errorf("Launchable(%q) = %v, want %v", id, got, want)
+		}
+	}
+	if Launchable(harness.Topos) {
+		t.Error("Launchable(topos) = true, want false: topos runs in-process")
+	}
+	if !Launchable(harness.Claude) {
+		t.Error("Launchable(claude) = false, want true")
+	}
+	if Launchable("no-such-harness") {
+		t.Error("Launchable of an unregistered id = true, want false")
+	}
+}

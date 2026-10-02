@@ -1,3 +1,5 @@
+import type { ServerConfig } from '../api/types';
+
 // Display metadata for the Tier-A harnesses. The canonical id is the
 // lowercase harness key used by the backend (harness.ID); the label is the
 // brand-cased name shown in the UI.
@@ -55,4 +57,18 @@ export const FALLBACK_HARNESSES = Object.keys(HARNESS_LABELS);
 // empty list). Single source of truth for every harness picker.
 export function supportedHarnesses(sandboxes?: string[] | null): string[] {
   return sandboxes && sandboxes.length ? sandboxes : [...FALLBACK_HARNESSES];
+}
+
+// chatHarnesses returns the harness ids a chat composer offers: the advertised
+// harnesses that are usable (a missing usable flag counts as usable) and that
+// the server lists in chat_sandboxes, the harnesses its chat runtime can
+// launch. Before /api/config loads, chat_sandboxes is absent and only the
+// usable filter applies; the composer re-filters once config arrives.
+export function chatHarnesses(
+  config?: Pick<ServerConfig, 'sandboxes' | 'sandbox_usable' | 'chat_sandboxes'> | null,
+): string[] {
+  const chat = config?.chat_sandboxes;
+  return supportedHarnesses(config?.sandboxes).filter(
+    (id) => config?.sandbox_usable?.[id] !== false && (!chat || chat.includes(id)),
+  );
 }

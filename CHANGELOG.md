@@ -86,6 +86,11 @@ committed: the commit log already holds that.
   instance whatever account it is signed in with; a sign-in stands in for the
   key only on the machine Wallfacer runs on, and on a cloud-mode deployment.
 
+- The chat harness picker no longer offers the `topos` harness, which runs
+  tasks but has no chat runtime, and a chat message sent with it through the
+  API is refused with `harness_unavailable_in_chat` instead of failing after
+  it was accepted with "unsupported agent".
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

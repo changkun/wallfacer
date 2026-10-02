@@ -7,7 +7,7 @@
 import { ref, computed, watch, watchEffect } from 'vue';
 import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
 import { useTaskStore } from '../../stores/tasks';
-import { supportedHarnesses } from '../../lib/harness';
+import { chatHarnesses } from '../../lib/harness';
 import HarnessSelect from '../HarnessSelect.vue';
 
 withDefaults(defineProps<{
@@ -21,17 +21,14 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{ send: [text: string, harness?: string]; interrupt: [] }>();
 
-// Harness override for this composer. '' means "use the agent default". Only
-// installed harnesses are offered (from /api/config sandboxes), and the choice
-// persists across reloads so it sticks per browser.
+// Harness for this composer's turns. The choice persists across reloads so it
+// sticks per browser.
 const store = useTaskStore();
-// Only offer harnesses that are installed AND activated (usable). A missing
-// usable flag is treated as usable so the picker degrades gracefully.
-const harnessOptions = computed(() =>
-  supportedHarnesses(store.config?.sandboxes).filter(
-    (id) => store.config?.sandbox_usable?.[id] !== false,
-  ),
-);
+// Only offer harnesses that are usable AND that the chat runtime can launch
+// (/api/config chat_sandboxes): an in-process harness can be usable for tasks
+// and still have no chat runtime. A missing usable flag counts as usable so
+// the picker degrades gracefully.
+const harnessOptions = computed(() => chatHarnesses(store.config));
 const HARNESS_KEY = 'wallfacer-chat-harness';
 const harness = ref<string>(
   (typeof localStorage !== 'undefined' && localStorage.getItem(HARNESS_KEY)) || '',

@@ -110,6 +110,15 @@ func (p *Runtime) IsRunning() bool {
 	return p.active
 }
 
+// Launchable reports whether the runtime can run a chat turn on harness id.
+// Exec starts every turn as a subprocess through the execution backend, so it
+// launches only a registered harness that has a subprocess form. An
+// in-process harness (harness.InProcess) has no argv and the backend refuses
+// it, so it is not launchable here even when it is usable for tasks.
+func Launchable(id harness.ID) bool {
+	return id.IsValid() && !harness.InProcess(id)
+}
+
 // Exec launches a command as a agent process via the execution
 // backend. Each call spawns a fresh process tagged with the stable
 // agentSessionTaskID for monitor and usage attribution. sb selects the harness

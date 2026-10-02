@@ -21,7 +21,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
-| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits) |
+| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits). `chat_sandboxes` lists the harnesses the chat runtime can launch, a subset of `sandboxes` without the in-process ones. |
 | `PUT /api/config` | Update server configuration (autoimplement, autotest, autosubmit, harness assignments) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
@@ -135,7 +135,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/agent` | Start the agent session (idempotent) |
 | `DELETE /api/agent` | Stop the agent session |
 | `GET /api/agent/messages` | Retrieve conversation history. `?thread=<id>` selects the session; defaults to the active session. |
-| `POST /api/agent/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the session. |
+| `POST /api/agent/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the session. Body `harness` selects the harness for the turn (empty or unknown means the default). A harness the chat runtime cannot launch (`agentsession.Launchable` false: the in-process `topos`) answers 422 `harness_unavailable_in_chat` before the message is stored. |
 | `DELETE /api/agent/messages` | Clear a session's conversation history and resume state (`?thread=<id>`). |
 | `GET /api/agent/messages/stream` | Stream agent response tokens for the in-flight session. Returns 204 when `?thread=<id>` does not match the session that owns the exec. |
 | `POST /api/agent/messages/interrupt` | Interrupt current agent turn. `?thread=<id>` must match the in-flight session or 409. |

@@ -9,6 +9,7 @@ import (
 
 	"latere.ai/x/pkg/httpjson"
 
+	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -59,6 +60,20 @@ func allSandboxesUsable() map[harness.ID]bool {
 		usable[id] = true
 	}
 	return usable
+}
+
+// chatSandboxes returns the harnesses among sandboxes that the chat runtime
+// can launch (agentsession.Launchable), in the same order. The chat composer
+// offers only these: a harness can be usable for tasks, as the in-process
+// topos harness is once a model key is set, and still have no chat runtime.
+func chatSandboxes(sandboxes []harness.ID) []harness.ID {
+	chat := make([]harness.ID, 0, len(sandboxes))
+	for _, id := range sandboxes {
+		if agentsession.Launchable(id) {
+			chat = append(chat, id)
+		}
+	}
+	return chat
 }
 
 // defaultSandbox determines which sandbox type should be pre-selected for new
@@ -270,6 +285,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"prompts_dir":               promptsDir,
 		"sandbox_activities":        store.SandboxActivities,
 		"sandboxes":                 harness.All(),
+		"chat_sandboxes":            chatSandboxes(harness.All()),
 		"default_sandbox":           harness.Claude,
 		"sandbox_usable":            allSandboxesUsable(),
 		"sandbox_reasons":           map[string]string{},
@@ -313,6 +329,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	resp["sandboxes"] = sandboxes
+	resp["chat_sandboxes"] = chatSandboxes(sandboxes)
 	resp["default_sandbox"] = defaultSandbox(*cfg)
 	resp["sandbox_usable"] = sandboxUsable
 	resp["sandbox_reasons"] = sandboxReasons

@@ -301,6 +301,9 @@ export interface ServerConfig {
   sandboxes: string[];
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
   sandbox_usable?: Record<string, boolean>;
+  // Harnesses the chat runtime can launch: the subprocess harnesses. An
+  // in-process harness (topos) can be usable for tasks and still be absent here.
+  chat_sandboxes?: string[];
   default_sandbox: string;
   terminal_enabled: boolean;
   auth_enabled: boolean;
