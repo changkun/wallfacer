@@ -1,381 +1,430 @@
 ---
-title: Agent Graph — end-to-end design and teardown of the legacy flow mechanism
-status: stale
+title: "Agent Graph: end-to-end design and teardown of the legacy flow mechanism"
+status: drafted
 depends_on:
-  - specs/local/unified-agent-graph-ui.md
   - specs/local/topos-runtime-integration.md
 affects:
+  - frontend/src/views/AgentGraphPage.vue
+  - frontend/src/components/AgentGraphCanvas.vue
+  - frontend/src/lib/flowDraft.ts
+  - frontend/src/components/TaskComposer.vue
+  - frontend/src/components/TaskDetail.vue
+  - frontend/src/components/TaskCard.vue
+  - frontend/src/views/RoutinesPage.vue
   - internal/flow/
-  - internal/runner/
-  - internal/agentgraph/
-  - internal/agents/
-  - internal/handler/
-  - frontend/src/
-  - latere.ai/x/topos (possibly)
-effort: xlarge
+  - internal/runner/execute.go
+  - internal/runner/flow_launcher.go
+  - internal/handler/flows.go
+  - internal/handler/routines.go
+  - internal/store/models.go
+  - internal/apicontract/routes.go
+  - docs/guide/agent-graph.md
+effort: large
 created: 2026-06-28
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
-> **Superseded.** The agent-graph consolidation is the decision of record.
-> Topos owns the
-> agent-graph model; wallfacer consumes `latere.ai/x/topos/graph` (via
-> `internal/agentgraph`) and retires its duplicate flow runtime. This spec is
-> retained for history and its teardown plan is folded into that consolidation.
-> Status stays `stale` (the spec vocabulary has no `superseded` state).
+# Agent Graph: end-to-end design and teardown of the legacy flow mechanism
 
-# Agent Graph — end-to-end design and teardown of the legacy flow mechanism
+> **Refreshed 2026-10-02 against the code. Not accepted.** The first version
+> of this spec (2026-06-28) asked for acceptance before any code.
+> Implementation started the same day and ran for three days, and the
+> description of the system the spec started from stopped being true. This
+> version describes the code as it is, lists what shipped, and keeps the
+> design for what remains. Whether the remainder is wanted is the decision in
+> the next section.
 
-## Why this document
+## Decision this spec is waiting on
 
-The agent-graph UI was built in isolation and does not cohere with how tasks
-actually run. Author review surfaced concrete breakage (parallel agents drawn as
-a false linear order), missing interactions (no way to re-add a removed agent,
-no edge editing in mesh, sequence frozen while fleets are free-form), and the
-deeper gap: the graph is not wired to the task board, and the board still speaks
-"flow". This document reevaluates the whole surface against the code as it
-actually is, defines a coherent end-to-end target, specifies one consistent
-editing model, and plans a solid teardown of the old and suboptimal mechanism.
-No code is written until this design is accepted.
+Accept the remaining work below as the plan for the agent-graph surface, or
+withdraw the spec.
 
-## Current reality (grounded in the code, not assumptions)
+- **Accept** means the spec moves to `validated` and
+  [Remaining work](#remaining-work) is dispatched in the order given there.
+  Open questions 1 and 2 need an answer first, because two of the items
+  change what a task run does to a repository.
+- **Withdraw** means the spec is archived. The shipped surface is already
+  recorded in
+  [unified-agent-graph-ui](../.archive/local/unified-agent-graph-ui.md) and in
+  the user guide. The two defects under
+  [Findings](#findings-that-change-the-design) would still need an owner; the
+  rest of the remaining work is dropped until it is specced again.
 
-### Three execution engines, one of them the real workhorse
+A note of 2026-07-18 marked this spec superseded by a consolidation of the
+agent-graph model onto `latere.ai/x/topos/graph`. What that consolidation
+changed in this repository is the compile path: `agentgraph.FromFlow` builds
+a `graph.Graph`, resolves agent references against the registry, and lowers
+it to a runtime region (`9233cff7`, `9eac7051`, `172363d9`). It did not retire
+`internal/flow`, which is still the stored form of a fleet and still has a
+running engine. The note is removed because it described a teardown that did
+not happen.
 
-Dispatch lives in `internal/runner/execute.go` (~L206-280). A task's flow slug
-resolves via `flow.Registry.ResolveForTask` (FlowID, else legacy Kind, else
-`implement`), then branches:
+## What this spec is for
 
-1. **Agentic / topos fleet** — `flow.Agentic == true` -> `runAgenticFlow`
-   (`internal/runner/agentic.go`) -> `agentgraph.RunFlowWithModel` ->
-   `topos.Region` (entry + peers, pinned or dynamic). Persists trace. **Fully
-   wired end to end, but used only by test fixtures.** No built-in flow is
-   agentic; the only way to get an agentic flow is to author one via
-   `POST /api/flows {agentic:true}`, which only the agent-graph editor does.
-2. **Legacy flow engine** — non-agentic, non-`implement` -> `flow.engine.Execute`
-   (`internal/flow/engine.go`): walks `buildParallelGroups(steps)`, running
-   parallel siblings concurrently via `errgroup`. **No such flow exists in
-   production** (the only built-in is `implement`), so this path is effectively
-   dormant.
-3. **Legacy multi-turn loop** — `flowSlug == "implement"` stays in the runner's
-   own multi-turn agent loop (not the engine). **This is what actually runs for
-   every real task**, since `implement` is the only built-in and the default.
+One primitive, the **agent graph**: a named set of agents with a lead and a
+coordination policy. A task is handed to a graph, enters at the lead, and is
+worked to an outcome. The spec covers the whole path: authoring the graph,
+choosing it on the board, running it, seeing the run on the graph, and
+removing the older flow mechanism where the graph replaces it.
 
-So the workhorse (`implement`) runs on neither the flow engine nor the topos
-fleet path. The "fleet" the agent-graph edits is a model the default task never
-touches.
+- **Agent.** A role: prompt, tools, harness. Authored once and reused.
+- **Agent graph.** A lead, members, and a coordination: *deterministic*
+  (ordered stages, agents in a stage run together) or *delegating* (the lead
+  hands off to members, or any agent hands off to any other).
+- **Task.** Work assigned to one agent graph.
+- **Run and trace.** The executed graph: a status per agent and the
+  delegations that happened.
 
-### Three overlapping surfaces, split vocabulary
+In the code the agent graph is a `flow.Flow` (`internal/flow/flow.go`),
+stored as YAML under `~/.wallfacer/flows/`, served at `/api/flows`, and
+called a fleet on the page that edits it.
 
-- **Agents** (`AgentsPage.vue`, `/agents`) — agent CRUD.
-- **Workflows** (`FlowsPage.vue`, `/workflows`, nav label "Workflows") — flow
-  CRUD as a form/step composer.
-- **Agent Graph** (`AgentGraphPage.vue`, `/agent-graph`) — the new visual fleet
-  editor; also edits flows, additionally exposing agentic/topology.
+## Current state (verified 2026-10-02)
 
-FlowsPage and AgentGraphPage both edit flows (form vs canvas). AgentGraphPage
-links out to AgentsPage to edit an agent. Terminology is split four ways: nav
-**Workflows**, route **flows**, backend **flow**, new UI **fleet**.
+### Four execution paths
 
-### The board is not wired to fleets
+`Runner.Run` (`internal/runner/execute.go`) resolves the task's fleet with
+`flow.Registry.ResolveForTask` (the task's `FlowID` when it names a
+registered fleet, otherwise `implement`) and then branches.
 
-`TaskComposer.vue` has a "Flow" dropdown (default `implement`) that sends a
-`flow` slug -> stored as `Task.FlowID`. It never exposes agentic/topology, so a
-user cannot create a delegating-fleet task from the board; they create tasks
-blind to how they will run. `Task.flow_id` is stored but never shown. There is
-no task -> graph link; the agent-graph can list a fleet's runs but the board
-does not point back.
+```mermaid
+flowchart TD
+  run[Runner.Run] --> resolve[ResolveForTask]
+  resolve --> q1{fleet is agentic?}
+  q1 -->|no, and slug is not implement| engine[flow.Engine.Execute<br/>one Runner.RunAgent per step]
+  engine --> done1[waiting, committing, done<br/>no worktree, no commit pipeline]
+  q1 -->|otherwise| wt[worktree setup]
+  wt --> q2{fleet is agentic?}
+  q2 -->|yes| agentic[runAgenticFlow<br/>agentgraph.RunFlowWithModel]
+  q2 -->|no| q3{resolved harness is in-process<br/>and not a test run?}
+  q3 -->|yes| native[runNativeTopos<br/>agentgraph.RunAgent]
+  q3 -->|no| loop[subprocess turn loop]
+  agentic --> drive[driveToposRun<br/>trace, then Runner.Commit]
+  native --> drive
+```
 
-### Dead / vestigial
+| Path | Reached by | Worktree | Commit pipeline | Oversight and test runs |
+|------|------------|----------|-----------------|-------------------------|
+| Turn loop | the built-in `implement` fleet, the default for every task | yes | yes | yes |
+| Flow engine | a user fleet that is not agentic | no | no | no |
+| `runAgenticFlow` | a user fleet saved as agentic | yes | yes | no |
+| `runNativeTopos` | a task whose resolved harness is `topos` | yes | yes | no |
 
-`flow.SpawnKind` and `Task.RoutineSpawnKind` are retained for YAML wire
-compatibility but unused. Legacy `Kind`-> flow mapping survives only to keep old
-records dispatching. `TaskKindPlanning`/`TaskKindRoutine` are not mapped by the
-resolver (fall through to `implement`).
+- **Turn loop.** The built-in `implement` fleet (`internal/flow/builtins.go`)
+  is not agentic and is excluded from the flow engine by name, so it runs the
+  runner's own multi-turn loop: a worktree per task, the periodic oversight
+  worker, test runs, and the commit pipeline.
+- **Flow engine.** `flow.Engine.Execute` (`internal/flow/engine.go`) walks
+  the steps in groups and launches each through `Runner.RunAgent`
+  (`internal/runner/flow_launcher.go`). The branch runs and returns before
+  worktree setup. `Runner.RunAgent` passes no worktree override, so
+  `buildHostSpec` (`internal/runner/container.go`) sets the working directory
+  of a write-capable agent to the workspace folder itself. After the engine
+  returns, the task is walked through `waiting`, `committing`, and `done`
+  with no call to `Runner.Commit`. `TestRun_CustomFlowExecutesViaEngine`
+  covers the dispatch.
+- **Embedded runtime, multi-agent.** `runAgenticFlow`
+  (`internal/runner/agentic.go`) compiles the fleet into one region and runs
+  it in the task's worktree.
+- **Embedded runtime, single agent.** `runNativeTopos` runs one agent in the
+  task's worktree. It is reached by a task whose harness resolves to `topos`,
+  through a pin on the task or a setting in the env file. `harness.Default()`
+  returns `Claude`, so no task reaches it unasked.
 
-## Spike S outcome (2026-06-29): NO-GO on engine convergence
+Both embedded-runtime paths end in `driveToposRun`, which forwards live
+events to the task timeline, stores the final text and the trace, and then
+calls `Runner.Commit` when the task has a worktree (`7e351855` for the single
+agent, `291cc45d` for fleets). The task never rests in `waiting`: the walk to
+`done` and the merge happen in one call. These runs start no oversight worker
+and no test step, and store an empty session id. They authenticate with a
+static API key only, and with no key they do not fail: they run the runtime's
+test model and commit its result. Refusing such a run is Remaining item 3 of
+[topos-native-harness](../shared/topos-native-harness.md).
 
-The feasibility spike ran. **Topos cannot replace the `implement` loop without a
-redesign, not a port.** The agentic/topos path (`runAgenticFlow` ->
-`agentgraph` -> topos):
+In the UI a fleet becomes agentic through the coordination control.
+`setCoordination` (`frontend/src/lib/flowDraft.ts`) sets `agentic` when a
+draft is switched to Lead delegates or Open mesh and leaves it unchanged when
+switched to Fixed sequence. A new fleet starts non-agentic. So a fleet first
+composed in Fixed sequence runs on the flow engine, a delegating fleet runs
+on the embedded runtime, and a fleet switched from a delegating mode back to
+Fixed sequence stays agentic and runs on the embedded runtime as a pinned
+chain. The page labels the first and the third alike, as Fixed sequence,
+because `coordinationOf` reads only `dynamic` and `topology`.
 
-- creates **no git worktrees** (the worktree<->topos-sandbox adapter is explicitly
-  deferred, `agentgraph/model.go`), so code changes never reach the host repo;
-- runs **no commit pipeline**, **no test verification**, **no oversight**, **no
-  review** -- and persists an **empty SessionID** (`runner/agentic.go`) that
-  structurally breaks the handler's review / auto-submit / commit machinery;
-- **races to `done`** via hollow state writes, bypassing the handler verification
-  the legacy path relies on.
+### The surface
 
-Worktrees, the commit pipeline, oversight, and review are all wallfacer-specific
-runner/handler code (`runner/worktree.go`, `runner/commit.go`,
-`runner/oversight.go`, `handler/tasks_autoimplement.go`), orthogonal to topos's
-generic multi-agent-graph orchestration. Moving them in is foundational work
-(an `executor.Backend` topos-sandbox adapter, git abstraction, session
-persistence across topos runs, output capture) -- a redesign.
+One page, `frontend/src/views/AgentGraphPage.vue` at `/agent-graph`, reached
+from the rail entry "Agents". `/agents`, `/workflows`, and `/flows` redirect
+to it. The left column is the agent registry with an embedded editor
+(`AgentEditor.vue`); the center is the canvas
+(`frontend/src/components/AgentGraphCanvas.vue`).
 
-**Consequences (settle the open questions):**
+- A draft is opened by "New fleet", by cloning a built-in, or by editing a
+  user fleet. While it is open: drag an agent from the palette to add it,
+  remove a node, promote a member to lead (delegating modes), pick the
+  coordination, name it, save or cancel.
+- Edges are derived, not stored. Fixed sequence connects consecutive stages,
+  where a stage is the set of steps joined by `run_in_parallel_with`. Lead
+  delegates draws lead to member; Open mesh adds a chain between members.
+- In the delegating modes a node can be dragged. Its position is kept in the
+  browser's `localStorage` under `agc-pos:<slug>` and is not part of the
+  fleet. In Fixed sequence nodes do not move.
+- A draft has no undo. Cancel discards the whole draft.
+- Fixed sequence has no gesture for reordering, for grouping steps in
+  parallel, or for marking a step optional. A cloned fleet keeps the grouping
+  it was cloned with.
+- A run picker lists the selected fleet's tasks that carry a trace and colors
+  the nodes by the chosen run's status.
 
-1. **A4 is ruled out** for now. The legacy flow engine and the `implement`
-   multi-turn loop are **not removable** -- they are the working execution
-   path. The end state is the staged plan's fallback: **two clean
-   coordination semantics under one surface** (deterministic DAG = the real
-   production path; delegating = a distinct mode), one dispatch, no engine
-   teardown.
-2. **The delegating/agentic coordination is EXPERIMENTAL** until the
-   worktree-sandbox adapter exists. Today it produces a transcript + trace but
-   **no durable commits and no verification** -- so the agent-graph UI must not
-   present a delegating graph as a production-ready way to run a real task. This
-   is the genuine "suboptimal design" left to address: either gate/label the
-   delegating mode as experimental, or build the adapter (a separate, large
-   feature -- not part of this cleanup).
-3. **Deterministic graphs are the production path.** `implement` (legacy loop)
-   and any multi-step non-agentic flow (flow engine -> containers/worktrees) run
-   real, committable work. The agent-graph surface should center these and treat
-   delegation as opt-in/experimental.
+### Board wiring
 
-## The core decision: what is the primitive, and how many execution engines
+- The task composer has an "Agent graph" select, default `implement`, and
+  shows the chosen fleet's coordination with an "experimental" tag for the
+  delegating modes (`a1d88cce`). It sends the slug as `flow`, stored as
+  `Task.FlowID`.
+- The routine form has the same select and sends `spawn_flow`
+  (`Task.RoutineSpawnFlow`).
+- A task does not show which fleet it ran. `flow_id` is on the API type and
+  no card or detail view renders it. The task detail renders the trace
+  (`AgentTrace.vue`) for a task that has one. The agent-graph page takes no
+  route parameter, so nothing can link to a fleet or to a run on it.
 
-The founding goal (define agents; define how they talk; let them discover and
-delegate; spawn subagent graphs) points at one primitive: an **agent graph** — a
-named set of agents with a lead and a coordination policy, that a task is handed
-to and that works the task to an outcome. The honest tension is execution:
+### Data model, API, and names
 
-- The **delegation fleet** (topos) is what the user wants conceptually, but the
-  proven coding workhorse (`implement`) is the legacy multi-turn loop, which also
-  owns worktrees, the commit pipeline, review verification, and oversight. Topos
-  runs agents but has not been shown to replicate that wallfacer-specific
-  machinery.
-- The **deterministic DAG** (steps + parallel) is clear and proven for ordered
-  work, but it is the "flow/pipeline" framing the author finds confusing.
+- `flow.SpawnKind` and the legacy `Kind` to fleet mapping are gone
+  (`9155fa35`, `8a04ce68`). `TaskKind` has three values: task, planning,
+  routine.
+- `Task.RoutineSpawnKind` remains, marked deprecated. `POST /api/routines`
+  still accepts `spawn_kind`, whose only allowed value is the plain task
+  kind; the routine engine copies it onto each spawned task's `Kind`; and
+  `RoutinesPage.vue` and `TaskCard.vue` fall back to `routine_spawn_kind` for
+  a label.
+- The API is `/api/flows`; there is no `/api/agent-graphs`. Fleets load from
+  `~/.wallfacer/flows/` (`WALLFACER_FLOWS_DIR`); there is no `agent-graphs`
+  directory.
+- The same thing has four names: "Agents" on the rail, "fleet" on the page
+  (`0f02e232`), "Agent graph" in the composer and the routine form, and
+  "flow" in the API, the YAML, and the Go packages.
 
-**Recommendation — default path: ship the coherent surface; gate the engine
-convergence.** The author's actual pain is entirely in authoring and wiring: the
-editor is unoperable, parallel is drawn wrong, mesh connections cannot be edited,
-the board is not wired, "flow" is everywhere, nothing is cleaned up. **None of
-that requires touching execution.** So the default, low-risk path delivers the
-whole felt improvement while the proven `implement` loop keeps running untouched:
+### The embedded runtime's module
 
-- One authoring primitive: the **agent graph**. It carries its **coordination** —
-  *delegating* (lead/mesh) or *deterministic* (ordered DAG with parallel groups,
-  the simple case). Both are "agent graphs"; edges differ in meaning and are
-  labeled.
-- A task runs on a chosen agent graph; the board picks a graph (not a "flow"),
-  shows its coordination, and links back to the run on the graph.
-- One consistent free-form editing model (below) that fixes every review gap.
-- The surface absorbs the agents + flows pages; "flow" disappears from the UI.
+`go.mod` pins `latere.ai/x/topos v0.7.0`. `internal/agentgraph` imports its
+root package and `latere.ai/x/topos/graph`; a boundary test keeps every other
+package off the runtime. The upstream project restarted its repository on
+2026-09-26. The v0.7.0 packages are no longer on its main branch and remain
+available at their tags. Any item below that needs a change in the runtime is
+therefore work against a pre-rebuild module, and moving the pin to a
+post-rebuild release is a migration of its own that this spec does not
+design.
 
-This is milestones A1–A3 and it changes no execution path. It is the bulk of the
-value and carries the least risk.
+## Shipped
 
-**Engine convergence is the north star, but gated and contingent — not the
-headline.** Converging all three engines onto topos (making `implement` a graph
-that runs through topos, tearing out the flow engine and the special multi-turn
-loop) is the biggest cleanup payoff and matches the "one engine" ideal, but the
-author did not ask for it directly and it is the riskiest thing here. It is
-gated by a feasibility spike (S) that asks whether topos can carry the
-`implement` loop's duties (worktree, commit pipeline, review, oversight, multi-turn
-coding). **If S returns yes**, A4 converges execution and tears the legacy
-engines out. **If S returns no, that is not a failure**: the honest end state is
-two clean coordination semantics (deterministic DAG + delegating fleet) under one
-surface and one dispatch — a perfectly good target. Either way the user-facing
-product (A1–A3) is already coherent and shipped before the execution question is
-forced.
+| Milestone | What | Evidence |
+|-----------|------|----------|
+| A1, in part | Parallel agents in a deterministic graph draw as one stage, not a chain | `c6593a66`, `deterministicStages` in `AgentGraphCanvas.vue` |
+| A1, in part | Free positioning in the delegating modes; promote to lead; remove; the palette always lists every agent, so a removed agent can be dragged back | `272f6fac`, `da84d6e2` |
+| A2 | Agent editing folded into the graph page; Flows and Agents pages deleted; one rail entry; redirects from the old routes | `63e1e833`, `8a04ce68`, `3d9b534a`, `d1b264f9` |
+| A2, in part | "Flow" and "Workflows" removed from the composer, the routine form, and the page. One message remains: adding a duplicate agent reports it "is already a step in this flow" | `63e1e833`, `0f02e232`; `onDropAgent` in `AgentGraphPage.vue` |
+| A3, in part | Composer and routines pick an agent graph; the composer shows its coordination | `63e1e833`, `a1d88cce` |
+| S | Feasibility spike for running `implement` on the embedded runtime, 2026-06-29: no-go | `75a50cb2`; see [Spike S](#spike-s-what-it-found-and-what-changed-since) |
+| A4' | Delegating modes labeled experimental in the editor, on the canvas, and in the composer | `66a9a757`, `a1d88cce` |
+| A5, in part | `flow.SpawnKind` removed; legacy kind resolution removed; the three raw toggles replaced by one coordination control | `9155fa35`, `8a04ce68`, `da84d6e2` |
 
-## Target end-to-end
+The page-level record, including what the editor dropped along the way, is
+the Outcome of
+[unified-agent-graph-ui](../.archive/local/unified-agent-graph-ui.md).
 
-### Concept
+## Findings that change the design
 
-- **Agent** — a role (prompt + tools + harness). Authored once; reusable.
-- **Agent graph** — a named graph of agents: a **lead** (the entry that receives
-  the task), members, and a **coordination policy**. Replaces "flow" entirely.
-- **Task** — work assigned to an agent graph. Enters at the lead; the graph works
-  it to an outcome; the run's trace is the graph lit up by what actually
-  happened.
-- **Run / trace** — the executed graph (status per node, real delegations).
+### 1. A fixed-sequence user fleet is not the production path
 
-### Authoring surface (one surface)
+The first version of this spec, the editor, the composer tooltip, and
+[the guide](../../docs/guide/agent-graph.md) all say a deterministic graph
+runs "real, committable work" with worktrees and commits. That holds for the
+built-in `implement` fleet on the turn loop. It does not hold for a user
+fleet in Fixed sequence, which runs on the flow engine: no worktree is
+created, write-capable agents work in the workspace folder directly, and the
+task reaches `done` without the commit pipeline. A clone of `implement`
+therefore behaves differently from `implement`.
 
-The Agent Graph page is the single authoring surface and absorbs both
-AgentsPage and FlowsPage:
+### 2. The experimental label states the opposite of what the runner does
 
-- **Left: agent library.** Create/edit/clone/delete agents inline (absorb
-  AgentsPage's editor as a panel, so there is no separate page and no cross-page
-  navigation just to tweak a prompt).
-- **Center: the graph canvas.** Compose the graph: drag agents in, set the lead,
-  draw edges, pick coordination. One consistent, free-form canvas (see editing
-  model). The canvas IS the graph definition.
-- The graph persists through one CRUD (the flow store, renamed in concept to the
-  graph store; see teardown for the rename plan).
+The label says a delegating fleet "does not yet make durable commits or run
+verification". Since `291cc45d` a delegating fleet runs in the task's
+worktree and is committed and merged by `driveToposRun`. The second half is
+still true: no test step, no oversight. And the commit is not gated: the run
+merges without stopping in `waiting`.
 
-### Board integration (the missing wire)
+### Spike S: what it found and what changed since
 
-- The composer picks an **agent graph**, not a "flow"; the label and the data
-  speak the same word. Default is the built-in `implement` graph.
-- A task card / detail shows which graph it ran and links to the graph with its
-  run overlaid (the M6.3 overlay, reached from the task, not only from the graph
-  page).
-- Whether a task runs delegating or deterministic is a property of the chosen
-  graph, not a hidden surprise — the composer shows the graph's coordination.
-- **Routines** spawn against a graph the same way the composer does:
-  `RoutineSpawnFlow` becomes `routine_spawn_graph` (an agent-graph id), and the
-  routine creator reuses the same graph picker. Old routines carrying a flow slug
-  resolve to the graph of the same id via the migration below.
+Spike S (2026-06-29) asked whether the embedded runtime could carry the
+duties of the `implement` loop. It answered no, on four counts. Their state
+today:
 
-### Execution (staged convergence on topos)
+| Finding in the spike | Today |
+|----------------------|-------|
+| No worktree; edits never reach the repository | Resolved. The runtime's working directory is the task worktree (`73ed429c`, `291cc45d`) and its file tools are confined to it (`b53c98b9`) |
+| No commit pipeline | Resolved. `driveToposRun` calls `Runner.Commit` (`7e351855`, `291cc45d`) |
+| No test verification, no oversight, no review | Open |
+| Empty session id; the run goes to `done` without the checks a waiting task gets | Open |
 
-- Short term: dispatch keeps the existing branches but is presented coherently;
-  the agent-graph the user sees matches the engine that runs it (a deterministic
-  graph renders order/parallel; a delegating graph renders delegation).
-- Target: a single topos-based engine. The spike (Milestone S below) decides the
-  timeline. The legacy flow engine (`internal/flow/engine.go`) and the special
-  `implement` multi-turn loop are the teardown targets.
+The spike's conclusion, that the turn loop stays, still describes the code.
+Its premise, that the embedded runtime cannot produce durable work, does not.
+Closing the two open rows is the work
+[topos-native-harness](../shared/topos-native-harness.md) tracks as
+verification parity; this spec does not duplicate it.
 
-### Vocabulary (one word)
+### Spike E: answered by the model's shape
 
-Pick one user-facing term and use it everywhere: **agent graph** (with "fleet"
-as acceptable shorthand in prose, never in UI chrome). Eliminate "flow" and
-"workflow" from all UI, routes, and (eventually) the API. See teardown.
+Spike E asked whether the runtime can express arbitrary delegation between
+agents. The history holds no record of it being run. Reading the pinned
+module answers it: a
+`graph.Region` is a coordination value (`sequence`, `lead`, or `mesh`), an
+entry, and a list of peers. `graph.Edge` connects one region to another, not
+one agent to another, and `agentgraph.FromFlowGraph` compiles every fleet
+into a single region. Per-agent delegation edges cannot be stored or run
+without a change to the runtime.
 
-## The unified editing model (answers the review gaps)
+## Remaining work
 
-One model for the canvas, applied in every coordination mode — no special-casing:
+Ordered so that the two defects come first. Each item changes no more than
+it names.
 
-- **Free-form everywhere.** Every node is freely positioned by dragging, in all
-  modes (including the deterministic graph). Positions are part of the graph
-  definition and persist with it (promoted out of localStorage into the saved
-  model, so layout travels and is not lost). The auto-layout is only the initial
-  placement for a graph that has no saved positions.
-- **Parallel rendered as parallel, never as false order.** In a deterministic
-  graph, agents with no ordering between them (the `implement` commit-msg / title
-  / oversight trio) render as a parallel fan from their common predecessor — not
-  a line. The edge meaning in a deterministic graph is "then / feeds", and
-  concurrent siblings share a rank. The current linear flattening is a bug to
-  delete.
-- **Edges are first-class and editable** (directly answers "open mesh — how do I
-  change connections?"). Draw an edge by dragging from a node's out-port to
-  another node; delete by selecting the edge. In a delegating graph an edge means
-  "may delegate to"; in a deterministic graph it means "runs after / feeds". This
-  requires storing **explicit edges** for delegating graphs rather than only a
-  `topology` enum (mesh / orchestrator-worker become presets that seed edges, not
-  the only expressible shapes). This is a hard requirement, not a nicety, and it
-  is **gated by spike E** (below): arbitrary delegation adjacency likely needs
-  extending the topos `Region` model (today: entry + peers + topology enum) to a
-  per-agent reachability directory. If E shows topos cannot express arbitrary
-  adjacency cheaply, A1's "edges are first-class" promise is blocked and the
-  fallback is the two presets plus enable/disable per preset edge — the author
-  must know this before A1 promises free edge editing.
-- **Add / remove / undo are obvious.** Removing a node moves it back to the
-  palette (it is not destroyed); re-adding is dragging it back, and there is an
-  explicit undo for graph edits. The palette always shows every agent, so nothing
-  is ever stranded.
-- **Lead is explicit and movable** (already have promote-to-lead); the lead is
-  the task entry in every mode.
-- **Review is not a graph node.** Review is the Testing agent's internal verification
-  (critic/proposer rounds), surfaced as a detail of the test node (a badge /
-  drill-in), not a box on the graph. Document this in the node detail so it stops
-  reading as a missing concept.
+### R1. Make the labels true
 
-## Teardown of the old and suboptimal design (first-class, not an afterthought)
+Change the copy in `AgentGraphPage.vue`, `AgentGraphCanvas.vue`,
+`TaskComposer.vue`, and `docs/guide/agent-graph.md` so that it states what
+the runner does: a delegating fleet commits and merges on completion and
+runs no tests and no oversight; a fixed-sequence user fleet is described
+according to the answer to open question 1. No execution change.
 
-Staged so the tree compiles and the product stays usable at each step; nothing
-destructive lands before its replacement is proven.
+### R2. Give a fixed-sequence user fleet a defined repository contract
 
-1. **Surface teardown.** Fold AgentsPage's editor into the agent-graph library
-   panel; retire `FlowsPage.vue` and its `/workflows` + `/flows` routes
-   (redirect to the agent graph); collapse the sidebar's Agents + Workflows +
-   Agent Graph into a single entry. Delete `FlowsPage.vue` once the graph surface
-   has full parity (it now has clone/edit/save/delete; remaining: agent CRUD
-   inline). Keep the components in git history; remove from the build.
-2. **Terminology teardown.** Remove every user-facing "flow"/"workflow" string
-   (inventory exists: `TaskComposer.vue`, `Sidebar.vue`, `FlowsPage.vue`,
-   `RoutinesPage.vue`, `router.ts`) and rename to "agent graph". Stage the API
-   rename (`/api/flows` -> `/api/agent-graphs`, `Task.flow` -> `graph`) behind a
-   compatibility shim, then drop the shim.
-3. **Execution teardown (gated on spike S).** If topos can carry the `implement`
-   duties: delete `internal/flow/engine.go` (the dormant flow engine), delete the
-   special `implement` multi-turn loop branch in `execute.go`, and make
-   `implement` a built-in agent graph that runs through `agentgraph`/topos. This
-   is the big one and the main payoff of the cleanup — one engine, not three.
-4. **Data-model teardown.** Remove `flow.SpawnKind`, `Task.RoutineSpawnKind`, and
-   the legacy `Kind`->flow mapping once no records depend on them (a one-time
-   migration normalizes old rows to an explicit graph id). Collapse `TaskKind` to
-   what is actually dispatched.
-5. **Vestigial UI teardown.** Remove the localStorage position hack once
-   positions live in the saved graph; remove the agentic/dynamic/topology raw
-   controls in favor of the coordination + edge-editing model; remove dead flow
-   badges / pickers.
+Blocked on open question 1. Whichever answer is chosen, the result is that a
+clone of `implement` saved without changes does to a repository what
+`implement` does, or the editor says plainly that it does not.
 
-6. **On-disk + records migration (concrete, not just "a shim").** Users have
-   `~/.wallfacer/flows/*.yaml` and tasks/routines carrying flow slugs. The
-   migration: the loader reads `flows/` and a new `agent-graphs/` dir (writing the
-   latter going forward), treating a flow YAML as a graph definition of the same
-   id (positions/edges default from coordination); `/api/flows` stays as an alias
-   of `/api/agent-graphs` for one release with a deprecation log, then is removed;
-   `Task.FlowID` / `RoutineSpawnFlow` are read as graph ids (same string), so no
-   row rewrite is required — only the field is renamed in new writes. A one-time
-   pass normalizes any record whose slug names a since-removed flow to `implement`
-   (the fallback already exists in `ResolveForTask`).
+### R3. Task to graph
 
-Each teardown step ships with a regression test proving the capability survives
-(per the repo's test rule) and a `make build` gate.
+- The task detail names the fleet the task ran on. The card shows it when it
+  is not `implement`.
+- `/agent-graph` accepts the fleet and the run as route query parameters, and
+  the task detail links to the page with both set, so the run overlay is
+  reachable from the task and not only from the page's run picker.
 
-## Milestones (sequenced; design-review gates the build)
+### R4. Editing model
 
-- **D: this design.** Accepted by the author before any code. The default path is
-  A1 -> A2 -> A3 (the felt fix, no execution change); A4 is gated and optional.
-- **E: topos edge-adjacency spike.** Can the topos `Region` model express
-  arbitrary per-agent delegation adjacency cheaply (needed for editable mesh
-  connections)? Output gates how far A1's edge editing goes (full free edges vs
-  presets + per-edge enable). Run before A1 promises free edge editing.
-- **A1: editing model fix (no execution change).** Parallel-as-parallel,
-  free-form everywhere, editable edges (scope set by spike E), add/remove/undo,
-  review-as-detail. Makes the editor correct and operable. **Highest user value,
-  lowest risk — do first.**
-- **A2: surface + terminology unification.** Fold agent CRUD into the graph
-  library; retire FlowsPage; one nav entry; "agent graph" everywhere (UI first,
-  API alias).
-- **A3: board wiring.** Composer + routines pick an agent graph (showing
-  coordination); task shows + links its run on the graph; default `implement`.
-- **S: execution feasibility spike (gates A4). DONE -> NO-GO** (2026-06-29).
-  Topos cannot carry the `implement` job without a redesign (no worktrees, no
-  commit pipeline, no review/oversight; races to done). See "Spike S outcome".
-- **A4: RULED OUT.** The flow engine and the `implement` loop stay (the working
-  path). End state = two clean coordination semantics under one surface.
-- **A4': delegating-mode honesty (replaces A4).** The delegating/agentic path
-  produces no durable commits today, so the surface must mark it EXPERIMENTAL and
-  center deterministic graphs as the production path; do not present a delegating
-  graph as a ready way to run a real task. Building the worktree-sandbox adapter
-  to make delegation real is a separate large feature, out of scope here.
-- **A5: final cleanup.** Data-model + records migration, API alias drop,
-  vestigial UI removal (localStorage positions, raw agentic toggles), dead-code
-  sweep.
+One model in every coordination mode.
 
-## Open questions for the author
+- **Undo** for edits to a draft (add, remove, promote, coordination change),
+  scoped to the open draft.
+- **Positions saved with the fleet.** Move node positions out of
+  `localStorage` into the stored fleet so a layout travels with it. The
+  automatic layout is the placement for a fleet with no saved positions.
+  This adds a field to `flow.Flow`, its YAML form, and the `/api/flows`
+  shapes.
+- **Order and parallel grouping in a deterministic graph.** The stored model
+  already expresses both (`Steps` order and `RunInParallelWith`). The editor
+  lost its gestures for them in the fleet rebuild. Restore them as edge
+  edits: an edge means "runs after", and agents with no edge between them
+  share a stage. Include the optional flag on a node.
+- **Lead in a deterministic graph.** The first step is the entry in every
+  mode. Mark it and let it be changed in Fixed sequence as it can be in the
+  delegating modes.
+- **Review is not a node.** Review is the Testing agent's verification
+  rounds. Show it as a detail of the test node so its absence from the graph
+  does not read as a missing step.
+- **Editable delegation edges: not planned.** Blocked by the model, per
+  Spike E. The two presets (Lead delegates, Open mesh) remain the expressible
+  shapes. Revisit only against a runtime that stores per-agent adjacency.
 
-1. **(Gating — answer this first.) One model or two semantics?** This decides
-   whether A4 exists and what `implement` becomes (Q4). The plan recommends:
-   ship A1-A3 either way (no execution change), then let spike S decide A4 — keep
-   the proven `implement` loop until topos is shown to replace it, and accept
-   "two clean coordination semantics under one surface" as a perfectly good end
-   state if S says no. Confirm this staging, or say if you want to commit up front
-   to one-engine-on-topos as a hard requirement (raises risk, front-loads S).
-2. **Editable arbitrary delegation edges** likely needs a topos `Region` change
-   (from topology-enum to explicit adjacency). Acceptable to touch topos, or keep
-   to the orchestrator-worker / mesh presets for now?
-3. **Agents page**: fold entirely into the graph surface (no `/agents`), or keep
-   `/agents` as a secondary list? Plan assumes fold-in.
-4. **`implement` semantics**: it is a multi-turn coding loop, not a clean
-   single-turn fan. When it becomes a graph, is it a one-node graph (the coding
-   agent) that then delegates to test/commit/title/oversight, or a fixed
-   deterministic graph? This shapes both rendering and execution.
+### R5. One word
 
-## Notes
+Blocked on open question 3. Apply the chosen word to the rail entry, the
+page, the composer, the routine form, and the guide.
 
-This supersedes the framing in `unified-agent-graph-ui.md` (which built the
-editor before the board/execution wiring and before the fleet reframe was
-validated against the real engines). That spec's shipped pieces (palette, canvas,
-CRUD, run overlay, fleet rendering) are reused; this document re-roots them in an
-end-to-end model and an explicit teardown.
+### R6. Data model and API
+
+- Remove `Task.RoutineSpawnKind`, the `spawn_kind` request field, the copy in
+  the routine engine, and the two frontend fallbacks to `routine_spawn_kind`.
+  The only value the API admits is the plain task kind, which is also what a
+  spawned task gets when the field is absent, and a routine with no
+  registered spawn fleet already resolves to `implement` through
+  `ResolveRoutineFlow`.
+- Rename the API and the stored field only if open question 3 picks a word
+  other than "flow" for the API as well. If it does: serve the new path, keep
+  `/api/flows` as an alias for one release with a deprecation log line, read
+  both the old and the new directory and write the new one, and read
+  `Task.FlowID` and `RoutineSpawnFlow` as the same string under the new name
+  so no record is rewritten.
+
+Each item ships with a regression test for the behavior it changes.
+
+## Acceptance criteria
+
+- No user-facing string or guide sentence about a coordination mode
+  contradicts what `Runner.Run` does for a fleet in that mode.
+- A user fleet in Fixed sequence either runs in a task worktree and passes
+  through the commit pipeline, or cannot be chosen for a task without a
+  statement that it edits the workspace in place.
+- From a task that ran on a fleet, one click reaches that fleet with that
+  run overlaid.
+- A draft edit can be undone without discarding the draft.
+- A fleet's layout is the same in a second browser.
+- A fixed-sequence draft can be reordered, grouped in parallel, and
+  ungrouped on the canvas, and the saved fleet round-trips those edits.
+- The rail, the page, the composer, the routine form, and the guide use one
+  word for the thing a task runs on.
+- `RoutineSpawnKind` appears nowhere in the tree.
+
+## Out of scope
+
+- Running `implement` on the embedded runtime, and the default-harness
+  change that would do it:
+  [topos-native-harness](../shared/topos-native-harness.md).
+- Test, oversight, and review parity for embedded-runtime runs: same spec.
+- Moving the runtime pin past v0.7.0.
+- Per-agent delegation edges.
+- First-run guidance for the surface:
+  [first-run-onboarding](first-run-onboarding.md).
+
+## Open questions
+
+1. **What should a fixed-sequence user fleet do to a repository?** Options
+   the code supports: (a) move the flow-engine branch after worktree setup,
+   pass the worktree to `Runner.RunAgent`, and call `Runner.Commit` as
+   `driveToposRun` does; (b) save every user fleet as agentic, so a
+   fixed-sequence fleet runs as a pinned chain on the embedded runtime, which
+   already has a worktree and commits, and delete `internal/flow/engine.go`;
+   (c) keep the engine as it is and say so in the UI. Option (b) puts every
+   user fleet on a pre-rebuild module. Option (a) keeps a second executor.
+2. **Should an embedded-runtime run merge without a stop in `waiting`?**
+   Today it does. The turn loop leaves a finished task for review, a test
+   run, or auto-submit. This is a property of `driveToposRun` and is shared
+   with the native harness; the answer applies to both.
+3. **Which word?** The first version chose "agent graph" everywhere and
+   allowed "fleet" in prose only. The page was then moved to "fleet"
+   (`0f02e232`) and the rail to "Agents" (`d1b264f9`). Pick one for the UI,
+   and say whether the API and the YAML directory follow.
+4. **Is the delegating mode still wanted on the v0.7.0 embed?** It works and
+   commits. Every improvement to it is work on a module the upstream project
+   has replaced.
+5. **Not established:** whether any stored fleet in use depends on the flow
+   engine's `InputFrom` or `Optional` semantics, which the embedded runtime's
+   pinned chain does not express (`agentgraph.FromFlow` documents the
+   omission). Option 1(b) drops them.
+
+## History
+
+- 2026-06-28: first version (`cdd22ed6`), reframed the same day to stage the
+  surface work ahead of any execution change (`6f8ee4fd`).
+- 2026-06-28 to 2026-06-30: A1 in part, A2, A3 in part, A4', and parts of A5
+  implemented without the acceptance the first version required.
+- 2026-06-29: Spike S recorded as no-go (`75a50cb2`).
+- 2026-07-18: marked superseded by the graph-model consolidation
+  (`64f82f87`); the compile path moved onto `latere.ai/x/topos/graph`.
+- 2026-07-18 and 2026-08-03: embedded-runtime runs gained the commit
+  pipeline (`7e351855`, `291cc45d`).
+- 2026-10-02: rewritten against the code.
