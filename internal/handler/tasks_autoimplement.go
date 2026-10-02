@@ -20,7 +20,6 @@ import (
 
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
-	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/review"
 	"latere.ai/x/wallfacer/internal/store"
@@ -1190,21 +1189,6 @@ const (
 	reviewMaxRounds = 3
 	reviewCostCap   = 50000
 )
-
-// reviewProposerHarness and reviewCriticHarnessIDs name the harnesses the
-// transcript endpoint reports as the run config.
-const reviewProposerHarness = harness.Claude
-
-var reviewCriticHarnessIDs = []harness.ID{harness.Claude, harness.Codex}
-
-// reviewCriticHarnessNames returns the critic rotation as display strings.
-func reviewCriticHarnessNames() []string {
-	out := make([]string, len(reviewCriticHarnessIDs))
-	for i, id := range reviewCriticHarnessIDs {
-		out[i] = string(id)
-	}
-	return out
-}
 
 // reviewTuning returns the fork count, max rounds, and token cost cap for a
 // review session, applying env overrides over the defaults. A missing or

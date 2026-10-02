@@ -1,57 +1,81 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { Task, ReviewTranscript } from '../api/types';
+import { computed } from 'vue';
+import type { Task, ReviewTranscript, ReviewFinding } from '../api/types';
 import { renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{ task: Task; transcript: ReviewTranscript | null }>();
 
 const running = computed(() => props.transcript?.running ?? false);
+const legacy = computed(() => props.transcript?.legacy ?? false);
 const config = computed(() => props.transcript?.config ?? null);
 const outcome = computed(() => props.transcript?.outcome ?? null);
-const forks = computed(() => props.transcript?.forks ?? []);
-// Set when the server could not read the transcript file to its end: the forks
-// hold the rounds before that point and later rounds are missing.
+const rounds = computed(() => props.transcript?.rounds ?? []);
+// Set when the server could not read the transcript to its end: rounds holds
+// the rounds before that point and later rounds are missing.
 const truncated = computed(() => props.transcript?.truncated ?? false);
 
-// A run exists if there is a live trajectory or a persisted verdict on the task.
-const hasRun = computed(() => forks.value.length > 0 || props.task.review_unresolved !== undefined);
 const unresolved = computed(() => props.task.review_unresolved);
+// A review exists when there is a session on disk or a verdict on the task.
+const hasRun = computed(() => props.transcript !== null || unresolved.value !== undefined);
 
-const status = computed<{ label: string; kind: 'running' | 'clean' | 'issues' | 'idle' }>(() => {
+type StatusKind = 'running' | 'clean' | 'issues' | 'pending' | 'idle';
+const status = computed<{ label: string; kind: StatusKind }>(() => {
   if (running.value) return { label: 'Running', kind: 'running' };
-  if (unresolved.value === undefined) return { label: 'Not run', kind: 'idle' };
-  if (unresolved.value === 0) return { label: 'Clean', kind: 'clean' };
-  return { label: `${unresolved.value} unresolved`, kind: 'issues' };
+  if (unresolved.value === 0) return { label: 'Approved', kind: 'clean' };
+  if (unresolved.value !== undefined) return { label: `${unresolved.value} open`, kind: 'issues' };
+  if (outcome.value?.termination === 'skipped') return { label: 'Did not run', kind: 'idle' };
+  // A session without an outcome is between rounds: the task is taking its
+  // turn on the findings, or a failed attempt waits for its retry.
+  if (props.transcript && !legacy.value && !outcome.value) return { label: 'In progress', kind: 'pending' };
+  return { label: 'Not run', kind: 'idle' };
 });
 
 const reviewCost = computed(() => props.task.usage_breakdown?.review?.cost_usd ?? 0);
 
-function fmtDuration(secs: number): string {
-  if (!secs) return '';
-  if (secs < 60) return `${secs}s`;
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return s ? `${m}m ${s}s` : `${m}m`;
-}
+const outcomeText = computed(() => {
+  const o = outcome.value;
+  if (!o) return '';
+  const n = o.unresolved;
+  const findings = `${n} open finding${n === 1 ? '' : 's'}`;
+  switch (o.termination) {
+    case 'approved':
+      return 'Approved: the reviewer found nothing that must change.';
+    case 'max_rounds':
+      return `${findings} after the last round.`;
+    case 'cost_cap':
+      return `The reviewer token budget is spent, with ${findings}.`;
+    case 'skipped':
+      return o.skip?.message ?? 'The review did not run.';
+    case 'superseded':
+      return 'The task moved on while the reviewer ran, so its findings were not sent.';
+    case 'unreadable':
+      return "Part of this review's record could not be read; the next review starts a new one.";
+    default:
+      return 'The review has ended.';
+  }
+});
+
+const outcomeKind = computed<StatusKind>(() => {
+  const o = outcome.value;
+  if (!o) return 'idle';
+  if (o.termination === 'approved') return 'clean';
+  if (o.unresolved > 0) return 'issues';
+  return 'idle';
+});
 
 function fmtTokens(n: number): string {
   if (!n) return '';
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k tokens` : `${n} tokens`;
 }
 
-const byStatusText = computed(() => {
-  const bs = outcome.value?.by_status;
-  if (!bs) return '';
-  return Object.entries(bs)
-    .filter(([, v]) => v > 0)
-    .map(([k, v]) => `${v} ${k}`)
-    .join(' · ');
-});
+function verdictLabel(v: string): string {
+  if (v === 'approve') return 'Approved';
+  if (v === 'changes_requested') return 'Changes requested';
+  return v;
+}
 
-// Per-fork collapse state; forks default open.
-const collapsed = ref<Record<number, boolean>>({});
-function toggleFork(i: number) {
-  collapsed.value[i] = !collapsed.value[i];
+function findingKey(f: ReviewFinding, i: number): string {
+  return `${i}-${f.severity}-${f.claim}`;
 }
 </script>
 
@@ -60,7 +84,7 @@ function toggleFork(i: number) {
     <header class="review__header">
       <div class="review__title">
         <span class="review__icon" aria-hidden="true">&#9878;</span>
-        <span>Adversarial Verification</span>
+        <span>Review</span>
       </div>
       <span class="review__status" :class="`review__status--${status.kind}`">
         <span v-if="status.kind === 'running'" class="review__dot" aria-hidden="true">&#9679;</span>
@@ -69,67 +93,84 @@ function toggleFork(i: number) {
     </header>
 
     <p v-if="config" class="review__config">
-      {{ config.forks }} critic fork{{ config.forks === 1 ? '' : 's' }} · up to {{ config.max_rounds }} rounds each ·
-      proposer <strong>{{ config.proposer_model }}</strong> ·
-      critics <strong>{{ config.critic_models.join(', ') }}</strong> ·
-      budget {{ Math.round(config.cost_cap / 1000) }}k tokens
+      <template v-if="config.reviewer_model">Reviewer <strong>{{ config.reviewer_model }}</strong></template>
+      <template v-else>No reviewer model is set</template>
+      · up to {{ config.max_rounds }} round{{ config.max_rounds === 1 ? '' : 's' }}
+      · budget {{ Math.round(config.cost_cap / 1000) }}k tokens
     </p>
 
-    <!-- Outcome (after a completed run) -->
-    <div v-if="!running && hasRun" class="review__outcome" :class="`review__outcome--${status.kind}`">
-      <div class="review__verdict">
-        <template v-if="status.kind === 'clean'">No unresolved attacks — the changes survived the debate.</template>
-        <template v-else-if="status.kind === 'issues'">{{ unresolved }} unresolved attack{{ unresolved === 1 ? '' : 's' }} remain.</template>
-        <template v-else>Verification complete.</template>
-      </div>
-      <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
-      <div
-        v-if="task.review_headline && (unresolved ?? 0) > 0"
-        class="review__headline prose-content review-md"
-        v-html="renderMarkdown(task.review_headline)"
-      />
+    <p v-if="legacy" class="review__legacy" role="status">
+      This review was recorded by an earlier version of Wallfacer, and its rounds cannot be shown here.
+    </p>
+
+    <!-- Outcome of an ended session -->
+    <div v-if="outcome && !running" class="review__outcome" :class="`review__outcome--${outcomeKind}`">
+      <div class="review__verdict">{{ outcomeText }}</div>
+      <p v-if="outcome.headline && outcome.unresolved > 0" class="review__headline">{{ outcome.headline }}</p>
       <div class="review__meta">
-        <span v-if="byStatusText">{{ byStatusText }}</span>
-        <span v-if="outcome?.termination">ended: {{ outcome.termination.replace(/_/g, ' ') }}</span>
-        <span v-if="outcome && outcome.wall_seconds">{{ fmtDuration(outcome.wall_seconds) }}</span>
-        <span v-if="outcome && outcome.tokens">{{ fmtTokens(outcome.tokens) }}</span>
+        <span v-if="outcome.rounds">{{ outcome.rounds }} round{{ outcome.rounds === 1 ? '' : 's' }}</span>
+        <span v-if="outcome.tokens">{{ fmtTokens(outcome.tokens) }}</span>
         <span v-if="reviewCost > 0">${{ reviewCost.toFixed(2) }}</span>
       </div>
+    </div>
+    <!-- A verdict on the task without a readable outcome (an earlier version's run) -->
+    <div v-else-if="!running && unresolved !== undefined && !outcome" class="review__outcome" :class="`review__outcome--${unresolved === 0 ? 'clean' : 'issues'}`">
+      <div class="review__verdict">
+        <template v-if="unresolved === 0">Approved: no open findings.</template>
+        <template v-else>{{ unresolved }} open finding{{ unresolved === 1 ? '' : 's' }}.</template>
+      </div>
+      <p v-if="task.review_headline && (unresolved ?? 0) > 0" class="review__headline">{{ task.review_headline }}</p>
     </div>
 
     <p v-if="truncated" class="review__truncated" role="status">
       This transcript is incomplete: part of it could not be read, and later rounds are not shown.
     </p>
 
-    <!-- Trajectory: each fork is a debate thread -->
-    <div v-if="forks.length" class="review__forks">
-      <section v-for="fork in forks" :key="`fork-${fork.index}`" class="review-fork">
-        <button type="button" class="review-fork__head" @click="toggleFork(fork.index)">
-          <span class="review-fork__chevron" :class="{ 'is-collapsed': collapsed[fork.index] }" aria-hidden="true">&#9662;</span>
-          <span class="review-fork__name">Fork {{ fork.index }}</span>
-          <span class="review-fork__count">{{ fork.rounds.length }} round{{ fork.rounds.length === 1 ? '' : 's' }}</span>
-        </button>
-        <div v-show="!collapsed[fork.index]" class="review-fork__thread">
-          <article
-            v-for="r in fork.rounds"
-            :key="`r-${fork.index}-${r.round}-${r.role}`"
-            class="review-msg"
-            :class="`review-msg--${r.role}`"
-          >
-            <header class="review-msg__head">
-              <span class="review-msg__role">{{ r.role === 'critic' ? 'Critic' : 'Proposer' }}</span>
-              <span class="review-msg__round">Round {{ r.round }}</span>
-            </header>
-            <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
-            <div class="review-msg__body prose-content review-md" v-html="renderMarkdown(r.body)" />
-          </article>
+    <!-- Rounds: the reviewer's answer, then the task's turn on its findings -->
+    <div v-if="rounds.length" class="review__rounds">
+      <section v-for="rd in rounds" :key="`round-${rd.round}`" class="review-round">
+        <h4 class="review-round__title">Round {{ rd.round }}</h4>
+
+        <div v-for="(a, i) in rd.failed_attempts ?? []" :key="`fail-${rd.round}-${i}`" class="review-round__failed">
+          {{ a.message }}
+          <details v-if="a.raw" class="review-round__raw">
+            <summary>Reviewer output</summary>
+            <pre>{{ a.raw }}</pre>
+          </details>
         </div>
+
+        <article v-if="rd.reviewer" class="review-msg review-msg--reviewer">
+          <header class="review-msg__head">
+            <span class="review-msg__role">Reviewer</span>
+            <span class="review-verdict" :class="`review-verdict--${rd.reviewer.verdict}`">{{ verdictLabel(rd.reviewer.verdict) }}</span>
+            <span v-if="rd.reviewer.model" class="review-msg__model">{{ rd.reviewer.model }}</span>
+          </header>
+          <ul v-if="rd.reviewer.findings.length" class="review-findings">
+            <li v-for="(f, i) in rd.reviewer.findings" :key="findingKey(f, i)" class="review-finding">
+              <span class="review-sev" :class="`review-sev--${f.severity}`">{{ f.severity }}</span>
+              <span class="review-finding__claim">{{ f.claim }}</span>
+              <code v-if="f.location" class="review-finding__loc">{{ f.location }}</code>
+            </li>
+          </ul>
+          <p v-if="rd.reviewer.summary" class="review-msg__summary">{{ rd.reviewer.summary }}</p>
+        </article>
+
+        <details v-if="rd.feedback" class="review-msg review-msg--feedback">
+          <summary class="review-msg__role">Sent to the task as feedback</summary>
+          <pre class="review-msg__pre">{{ rd.feedback }}</pre>
+        </details>
+
+        <article v-if="rd.reply" class="review-msg review-msg--implementer">
+          <header class="review-msg__head"><span class="review-msg__role">Task's reply</span></header>
+          <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
+          <div class="review-msg__body prose-content review-md" v-html="renderMarkdown(rd.reply)" />
+        </article>
       </section>
     </div>
 
-    <div v-else-if="running" class="review__empty">Verification running… waiting for the first round to land.</div>
+    <div v-else-if="running" class="review__empty">Review running, waiting for the reviewer's answer.</div>
     <div v-else-if="!hasRun" class="review__empty">
-      No adversarial verification has run for this task yet. Trigger <strong>Review</strong> from the actions panel.
+      No review has run for this task yet. Trigger <strong>Review</strong> from the actions panel.
     </div>
   </section>
 </template>
@@ -167,6 +208,7 @@ function toggleFork(i: number) {
   white-space: nowrap;
 }
 .review__status--running { color: var(--run); background: var(--tint-blue); }
+.review__status--pending { color: var(--run); background: var(--tint-blue); }
 .review__status--clean { color: var(--ok); background: var(--tint-green); }
 .review__status--issues { color: var(--warn); background: var(--tint-amber); }
 .review__status--idle { color: var(--ink-3); background: var(--tint-neutral); }
@@ -181,6 +223,16 @@ function toggleFork(i: number) {
 }
 .review__config strong { color: var(--ink); font-weight: 600; }
 
+.review__legacy,
+.review__truncated {
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--r-sm);
+  font-size: 0.78rem;
+}
+.review__legacy { color: var(--ink-2); background: var(--tint-neutral); }
+.review__truncated { color: var(--warn); background: var(--tint-amber); }
+
 .review__outcome {
   margin-top: 0.75rem;
   padding: 0.6rem 0.7rem;
@@ -191,7 +243,7 @@ function toggleFork(i: number) {
 .review__outcome--clean { border-left-color: var(--ok); }
 .review__outcome--issues { border-left-color: var(--warn); }
 .review__verdict { font-size: 0.82rem; font-weight: 600; }
-.review__headline { margin-top: 0.35rem; font-size: 0.8rem; }
+.review__headline { margin: 0.35rem 0 0; font-size: 0.8rem; }
 .review__meta {
   display: flex;
   flex-wrap: wrap;
@@ -201,71 +253,78 @@ function toggleFork(i: number) {
   color: var(--ink-3);
 }
 
-.review__truncated {
-  margin: 0.75rem 0 0;
-  padding: 0.45rem 0.6rem;
-  border-radius: var(--r-sm);
-  font-size: 0.78rem;
-  color: var(--warn);
-  background: var(--tint-amber);
-}
-
-.review__forks { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.review-fork {
+.review__rounds { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.review-round {
   border: 1px solid var(--rule);
   border-radius: var(--r-sm);
-  overflow: hidden;
-  background: var(--bg-card);
-}
-.review-fork__head {
+  padding: 0.55rem 0.6rem;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.5rem;
-  width: 100%;
-  padding: 0.45rem 0.6rem;
-  background: var(--bg-hover);
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  color: var(--ink);
-  text-align: left;
 }
-.review-fork__chevron {
-  font-size: 0.7rem;
-  color: var(--ink-3);
-  transition: transform 0.15s ease;
-  line-height: 1;
+.review-round__title { margin: 0; font-size: 0.8rem; font-weight: 600; }
+.review-round__failed { margin: 0; font-size: 0.78rem; color: var(--warn); }
+.review-round__raw { margin-top: 0.25rem; color: var(--ink-2); }
+.review-round__raw pre,
+.review-msg__pre {
+  margin: 0.3rem 0 0;
+  font-size: 0.74rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
-.review-fork__chevron.is-collapsed { transform: rotate(-90deg); }
-.review-fork__name { font-weight: 600; font-size: 0.8rem; }
-.review-fork__count { font-size: 0.72rem; color: var(--ink-3); }
 
-.review-fork__thread { padding: 0.55rem 0.6rem; display: flex; flex-direction: column; gap: 0.55rem; }
 .review-msg {
   border-left: 2px solid var(--rule-2);
   padding-left: 0.6rem;
 }
-.review-msg--critic { border-left-color: var(--err); }
-.review-msg--proposer { border-left-color: var(--ok); }
+.review-msg--reviewer { border-left-color: var(--accent); }
+.review-msg--feedback { border-left-color: var(--rule-2); }
+.review-msg--implementer { border-left-color: var(--ok); }
 .review-msg__head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.45rem;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.25rem;
 }
 .review-msg__role {
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  color: var(--ink-2);
 }
-.review-msg--critic .review-msg__role { color: var(--err); }
-.review-msg--proposer .review-msg__role { color: var(--ok); }
-.review-msg__round { font-size: 0.7rem; color: var(--ink-3); }
+summary.review-msg__role { cursor: pointer; }
+.review-msg__model { font-size: 0.7rem; color: var(--ink-3); }
+.review-msg__summary { margin: 0.3rem 0 0; font-size: 0.78rem; color: var(--ink-2); }
 .review-msg__body { font-size: 0.82rem; }
 
-/* Round bodies are full markdown documents; tame their headings so a leading
-   "# Critic 1 …" doesn't render as a page-sized title inside the thread. */
+.review-verdict {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--r-pill);
+}
+.review-verdict--approve { color: var(--ok); background: var(--tint-green); }
+.review-verdict--changes_requested { color: var(--warn); background: var(--tint-amber); }
+
+.review-findings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.review-finding { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; font-size: 0.8rem; }
+.review-finding__loc { font-size: 0.72rem; color: var(--ink-3); }
+.review-sev {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.02rem 0.35rem;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  background: var(--tint-neutral);
+}
+.review-sev--high { color: var(--err); background: var(--tint-red); }
+.review-sev--medium { color: var(--warn); background: var(--tint-amber); }
+
+/* Replies are full markdown documents; tame their headings so a leading
+   heading doesn't render as a page-sized title inside the round. */
 .review-md :deep(h1),
 .review-md :deep(h2),
 .review-md :deep(h3),

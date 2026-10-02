@@ -112,7 +112,8 @@ export interface Task {
   parent_task_id?: string | null;
   spec_source_path?: string;
   environment?: ExecutionEnvironment | null;
-  // Review adversarial-verification results. Absent = not yet run.
+  // Review verdict: open findings when the last review session ended (0 =
+  // approved). Absent = no review has finished since the task's last turn.
   review_unresolved?: number;
   review_headline?: string;
   // Present (non-empty string) only for tasks that ran on the in-process
@@ -145,38 +146,67 @@ export interface TaskTrace {
   edges: TraceEdge[];
 }
 
-// Review verification trajectory (GET /api/tasks/{id}/review/transcript).
-export interface ReviewRound {
-  round: number;
-  role: 'critic' | 'proposer' | string;
-  body: string;
+// Review transcript (GET /api/tasks/{id}/review/transcript): the task's newest
+// review session, round by round.
+export interface ReviewFinding {
+  severity: 'high' | 'medium' | 'low' | string;
+  claim: string;
+  location?: string;
+}
+export interface ReviewerAnswer {
+  verdict: 'approve' | 'changes_requested' | string;
+  findings: ReviewFinding[];
+  summary?: string;
+  model?: string;
+  harness?: string;
+  tokens?: number;
   ts: string;
 }
-export interface ReviewFork {
-  index: number;
-  rounds: ReviewRound[];
+export interface ReviewFailedAttempt {
+  code: string;
+  message: string;
+  // The reviewer's output when it answered in a form that could not be read.
+  raw?: string;
+  ts: string;
+}
+export interface ReviewRound {
+  round: number;
+  reviewer?: ReviewerAnswer;
+  failed_attempts?: ReviewFailedAttempt[];
+  // The message the findings were sent to the task in.
+  feedback?: string;
+  // The task's reply after the turn the feedback started.
+  reply?: string;
 }
 export interface ReviewRunConfig {
-  forks: number;
   max_rounds: number;
   cost_cap: number;
-  proposer_model: string;
-  critic_models: string[];
+  // Empty when WALLFACER_REVIEW_MODEL is not set.
+  reviewer_model: string;
+}
+export interface ReviewSkip {
+  code: string;
+  message: string;
+  detail?: string;
 }
 export interface ReviewOutcome {
-  termination: string;
-  total_attacks: number;
-  by_status: Record<string, number>;
-  wall_seconds: number;
+  termination: 'approved' | 'max_rounds' | 'cost_cap' | 'skipped' | 'superseded' | 'unreadable' | string;
+  rounds: number;
+  unresolved: number;
+  headline?: string;
   tokens: number;
+  usd: number;
+  skip?: ReviewSkip;
 }
 export interface ReviewTranscript {
   session_id: string;
   running: boolean;
+  // Recorded by an earlier version of the review; its rounds are not shown.
+  legacy?: boolean;
   config?: ReviewRunConfig;
   outcome?: ReviewOutcome;
-  forks: ReviewFork[];
-  // Set when the server could not read the transcript to its end; forks then
+  rounds: ReviewRound[];
+  // Set when the server could not read the transcript to its end; rounds then
   // holds only the rounds before that point.
   truncated?: boolean;
 }

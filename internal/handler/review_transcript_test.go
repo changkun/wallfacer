@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,108 +13,92 @@ import (
 
 	"github.com/google/uuid"
 
+	"latere.ai/x/wallfacer/internal/review"
+	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// writeReviewSession lays down a synthetic review session dir under the task's
-// worktree .review, mirroring what review writes incrementally during a run.
-func writeReviewSession(t *testing.T, worktree, sessionID string, withEnd bool) {
+// getReviewTranscript serves the transcript for id and returns the status and
+// the raw body.
+func getReviewTranscript(t *testing.T, h *Handler, id uuid.UUID) (int, []byte) {
 	t.Helper()
-	stateDir := reviewStateDir(worktree) // <parent>/.review
-	rounds := filepath.Join(stateDir, "sessions", sessionID, "forks", "critic-1", "rounds")
-	if err := os.MkdirAll(rounds, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	sessionDir := filepath.Join(stateDir, "sessions", sessionID)
-	if err := os.WriteFile(filepath.Join(rounds, "r1-critic.md"), []byte("## attack\nnil deref in foo"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(rounds, "r2-proposer.md"), []byte("rebuttal: guarded above"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	transcript := `{"ts":"2026-06-27T00:00:01Z","fork":1,"round":1,"role":"critic","path":"forks/critic-1/rounds/r1-critic.md","ms":10}
-{"ts":"2026-06-27T00:00:02Z","fork":1,"round":2,"role":"proposer","path":"forks/critic-1/rounds/r2-proposer.md","ms":12}
-`
-	if err := os.WriteFile(filepath.Join(sessionDir, "transcript.jsonl"), []byte(transcript), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if withEnd {
-		end := `{"termination":{"reason":"steady_state"},"stats":{"total_attacks":3,"by_status":{"conceded":2,"open":1},"tokens_used":4200,"wall_seconds":92}}`
-		if err := os.WriteFile(filepath.Join(sessionDir, "end.json"), []byte(end), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	w := httptest.NewRecorder()
+	h.ReviewTranscript(w, httptest.NewRequest(http.MethodGet, "/api/tasks/"+id.String()+"/review/transcript", nil), id)
+	return w.Code, w.Body.Bytes()
 }
 
-func TestReviewTranscript_ReturnsForkRounds(t *testing.T) {
-	h := newTestHandler(t)
-	s, ok := h.currentStore()
-	if !ok {
-		t.Fatal("no current store")
-	}
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "p", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	worktree := filepath.Join(t.TempDir(), "wt", "repo")
-	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{filepath.Dir(worktree): worktree}, "branch"); err != nil {
-		t.Fatalf("UpdateTaskWorktrees: %v", err)
-	}
-	writeReviewSession(t, worktree, "sess-01", false /* no end.json yet */)
+// fetchTranscript serves the transcript for id and decodes the 200 body.
+func fetchTranscript(t *testing.T, h *Handler, id uuid.UUID) reviewTranscriptResp {
+	t.Helper()
+	code, body := getReviewTranscript(t, h, id)
+	return decodeTranscript(t, code, body)
+}
 
-	// While the run is in flight (reserved slot), running=true.
+// decodeTranscript decodes a 200 transcript body.
+func decodeTranscript(t *testing.T, code int, body []byte) reviewTranscriptResp {
+	t.Helper()
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", code, body)
+	}
+	var resp reviewTranscriptResp
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return resp
+}
+
+// TestReviewTranscript_ReturnsRounds runs a two-round session through the real
+// review loop and reads it back: each round carries the reviewer's answer, the
+// feedback the findings went out in and the task's reply, and the ended
+// session carries its outcome and the configuration it ran under.
+func TestReviewTranscript_ReturnsRounds(t *testing.T) {
+	answers := []*runner.ReviewerResult{changes(400, findingHigh, findingLow), approve()}
+	h, s, _ := reviewLoopHandler(t, "WALLFACER_REVIEW_MODEL=reviewer-model\n", func(in runner.ReviewerInput) (*runner.ReviewerResult, error) {
+		return answers[in.Round-1], nil
+	})
+	ctx := context.Background()
+	task := waitingTaskForReview(t, s, "")
+
+	if err := h.runReview(ctx, s, task); err != nil {
+		t.Fatalf("round 1: %v", err)
+	}
+	// Mid-session, while a round runs: running, one round, no outcome yet.
 	if !h.beginReview(task.ID) {
 		t.Fatal("beginReview should reserve the slot")
 	}
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/review/transcript", nil)
-	w := httptest.NewRecorder()
-	h.ReviewTranscript(w, req, task.ID)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	mid := fetchTranscript(t, h, task.ID)
+	if !mid.Running || len(mid.Rounds) != 1 || mid.Outcome != nil {
+		t.Errorf("mid-session = running %v, %d rounds, outcome %+v; want running, 1 round, no outcome", mid.Running, len(mid.Rounds), mid.Outcome)
 	}
-	var resp reviewTranscriptResp
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if !resp.Running {
-		t.Error("expected running=true while the in-flight slot is held")
-	}
-	if resp.Config == nil || resp.Config.Forks != reviewForkCount || resp.Config.MaxRounds != reviewMaxRounds {
-		t.Errorf("config = %+v, want forks=%d rounds=%d", resp.Config, reviewForkCount, reviewMaxRounds)
-	}
-	if len(resp.Config.CriticModels) == 0 || resp.Config.ProposerModel == "" {
-		t.Errorf("config models missing: %+v", resp.Config)
-	}
-	if len(resp.Forks) != 1 || len(resp.Forks[0].Rounds) != 2 {
-		t.Fatalf("forks/rounds = %+v, want 1 fork with 2 rounds", resp.Forks)
-	}
-	r1, r2 := resp.Forks[0].Rounds[0], resp.Forks[0].Rounds[1]
-	if r1.Role != "critic" || r1.Round != 1 || r1.Body == "" {
-		t.Errorf("round1 = %+v, want critic R1 with body", r1)
-	}
-	if r2.Role != "proposer" || r2.Round != 2 || r2.Body != "rebuttal: guarded above" {
-		t.Errorf("round2 = %+v, want proposer R2 with body", r2)
-	}
-
-	// Run finishes: release the slot and write end.json → running=false + outcome.
 	h.endReview(task.ID)
-	writeReviewSession(t, worktree, "sess-01", true)
-	w2 := httptest.NewRecorder()
-	h.ReviewTranscript(w2, httptest.NewRequest(http.MethodGet, "/x", nil), task.ID)
-	var resp2 reviewTranscriptResp
-	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
-		t.Fatalf("decode 2: %v", err)
+
+	task = finishTurn(t, s, task.ID, "fixed the nil map")
+	if err := h.runReview(ctx, s, task); err != nil {
+		t.Fatalf("round 2: %v", err)
 	}
-	if resp2.Running {
-		t.Error("expected running=false after the slot is released")
+
+	resp := fetchTranscript(t, h, task.ID)
+	if resp.Running || resp.Legacy || resp.Truncated {
+		t.Errorf("flags = running %v legacy %v truncated %v, want all false", resp.Running, resp.Legacy, resp.Truncated)
 	}
-	if resp2.Outcome == nil || resp2.Outcome.Termination != "steady_state" || resp2.Outcome.TotalAttacks != 3 {
-		t.Errorf("outcome = %+v, want steady_state with 3 attacks", resp2.Outcome)
+	if c := resp.Config; c == nil || c.MaxRounds != 3 || c.CostCap != 50000 || c.ReviewerModel != "reviewer-model" {
+		t.Errorf("config = %+v, want 3 rounds, 50000 tokens, reviewer-model", resp.Config)
 	}
-	if resp2.Outcome.WallSeconds != 92 || resp2.Outcome.ByStatus["conceded"] != 2 {
-		t.Errorf("outcome stats = %+v", resp2.Outcome)
+	if len(resp.Rounds) != 2 {
+		t.Fatalf("rounds = %d, want 2: %+v", len(resp.Rounds), resp.Rounds)
+	}
+	r1, r2 := resp.Rounds[0], resp.Rounds[1]
+	if r1.Round != 1 || r1.Reviewer == nil || r1.Reviewer.Verdict != runner.ReviewChangesRequested || len(r1.Reviewer.Findings) != 2 {
+		t.Errorf("round 1 reviewer = %+v", r1.Reviewer)
+	}
+	if !strings.Contains(r1.Feedback, findingHigh.Claim) || r1.Reply != "fixed the nil map" {
+		t.Errorf("round 1 feedback %q, reply %q", r1.Feedback, r1.Reply)
+	}
+	if r2.Round != 2 || r2.Reviewer == nil || r2.Reviewer.Verdict != runner.ReviewApprove || r2.Feedback != "" {
+		t.Errorf("round 2 = %+v", r2)
+	}
+	if o := resp.Outcome; o == nil || o.Termination != review.TerminationApproved || o.Rounds != 2 || o.Unresolved != 0 || o.Tokens != 400 {
+		t.Errorf("outcome = %+v, want approved after 2 rounds, 400 tokens", resp.Outcome)
 	}
 }
 
@@ -124,133 +109,144 @@ func TestReviewTranscript_404WhenNoSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	w := httptest.NewRecorder()
-	h.ReviewTranscript(w, req, task.ID)
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 with no review session, got %d", w.Code)
+	if code, _ := getReviewTranscript(t, h, task.ID); code != http.StatusNotFound {
+		t.Errorf("expected 404 with no review session, got %d", code)
 	}
 }
 
-// reviewTaskWithSession creates a task with a worktree that holds one review
-// session (two rounds in fork 1) and returns the task ID and the session dir.
-func reviewTaskWithSession(t *testing.T, h *Handler) (uuid.UUID, string) {
+// writeLegacySession lays down a session the earlier debate engine wrote:
+// forks of critic and proposer rounds in markdown files, and an end.json of
+// its own shape.
+func writeLegacySession(t *testing.T, stateDir, id string) {
 	t.Helper()
-	s, ok := h.currentStore()
-	if !ok {
-		t.Fatal("no current store")
+	sessionDir := filepath.Join(stateDir, "sessions", id)
+	rounds := filepath.Join(sessionDir, "forks", "critic-1", "rounds")
+	if err := os.MkdirAll(rounds, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	ctx := context.Background()
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "p", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
+	files := map[string]string{
+		filepath.Join(rounds, "r1-critic.md"):         "## attack\nnil deref in foo",
+		filepath.Join(sessionDir, "transcript.jsonl"): `{"ts":"2026-06-27T00:00:01Z","fork":1,"round":1,"role":"critic","path":"forks/critic-1/rounds/r1-critic.md","ms":10}` + "\n",
+		filepath.Join(sessionDir, "end.json"):         `{"termination":{"reason":"steady_state"},"stats":{"total_attacks":3,"tokens_used":4200}}`,
 	}
-	worktree := filepath.Join(t.TempDir(), "wt", "repo")
-	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{filepath.Dir(worktree): worktree}, "branch"); err != nil {
-		t.Fatalf("UpdateTaskWorktrees: %v", err)
-	}
-	writeReviewSession(t, worktree, "sess-01", false)
-	return task.ID, filepath.Join(reviewStateDir(worktree), "sessions", "sess-01")
-}
-
-// getReviewTranscript serves the transcript for id and returns the decoded
-// body. The body is decoded as a map so the test reads the wire field names.
-func getReviewTranscript(t *testing.T, h *Handler, id uuid.UUID) map[string]any {
-	t.Helper()
-	w := httptest.NewRecorder()
-	h.ReviewTranscript(w, httptest.NewRequest(http.MethodGet, "/api/tasks/"+id.String()+"/review/transcript", nil), id)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
-	}
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	return resp
-}
-
-// roundCount is the number of rounds across the forks of a transcript body.
-func roundCount(t *testing.T, resp map[string]any) int {
-	t.Helper()
-	n := 0
-	forks, _ := resp["forks"].([]any)
-	for _, f := range forks {
-		fork, ok := f.(map[string]any)
-		if !ok {
-			t.Fatalf("fork = %v, want an object", f)
+	for path, body := range files {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
 		}
-		rounds, _ := fork["rounds"].([]any)
-		n += len(rounds)
 	}
-	return n
 }
 
-// TestReviewTranscript_LineOverCapIsReportedTruncated covers a transcript with
-// a record longer than the scanner's line cap. The scanner stops there, so the
-// rounds after it are never read; the response has to say the transcript is
-// incomplete instead of presenting the rounds before the line as the whole
-// debate.
-func TestReviewTranscript_LineOverCapIsReportedTruncated(t *testing.T) {
-	h := newTestHandler(t)
-	id, sessionDir := reviewTaskWithSession(t, h)
+// TestReviewTranscript_LegacySessionDegrades proves a session the earlier
+// engine left on disk is served as legacy with no rounds, rather than failing
+// the route or being misread as rounds of the current review.
+func TestReviewTranscript_LegacySessionDegrades(t *testing.T) {
+	h, s, _ := reviewLoopHandler(t, "", func(runner.ReviewerInput) (*runner.ReviewerResult, error) { return approve(), nil })
+	task := waitingTaskForReview(t, s, "")
+	writeLegacySession(t, reviewStateDir(primaryWorktree(task.WorktreePaths)), "sess-01")
 
-	f, err := os.OpenFile(filepath.Join(sessionDir, "transcript.jsonl"), os.O_APPEND|os.O_WRONLY, 0)
+	code, body := getReviewTranscript(t, h, task.ID)
+	resp := decodeTranscript(t, code, body)
+	if !resp.Legacy || resp.SessionID != "sess-01" || len(resp.Rounds) != 0 || resp.Outcome != nil {
+		t.Errorf("legacy session = %+v, want legacy, its id, no rounds, no outcome", resp)
+	}
+	if !strings.Contains(string(body), `"rounds":[]`) {
+		t.Errorf("body %s: rounds must be an empty array, not null", body)
+	}
+
+	// The next review starts its own session, and the route reads that one.
+	if err := h.runReview(context.Background(), s, task); err != nil {
+		t.Fatalf("runReview: %v", err)
+	}
+	resp = fetchTranscript(t, h, task.ID)
+	if resp.Legacy || len(resp.Rounds) != 1 {
+		t.Errorf("after a new review = %+v, want the new session's round", resp)
+	}
+}
+
+// TestReviewTranscript_SkipAndFailedAttempts proves a skipped review reports
+// its reason as the outcome, and a failed attempt shows in its round with the
+// fixed sentence and the reviewer's raw answer.
+func TestReviewTranscript_SkipAndFailedAttempts(t *testing.T) {
+	t.Run("skip", func(t *testing.T) {
+		h, s, _ := reviewLoopHandler(t, "", func(runner.ReviewerInput) (*runner.ReviewerResult, error) {
+			return nil, &runner.ReviewRefusal{Code: runner.ReviewRefusedModelUnset, Detail: "WALLFACER_REVIEW_MODEL is empty"}
+		})
+		task := waitingTaskForReview(t, s, "")
+		if err := h.runReview(context.Background(), s, task); err != nil {
+			t.Fatalf("runReview: %v", err)
+		}
+		resp := fetchTranscript(t, h, task.ID)
+		o := resp.Outcome
+		if o == nil || o.Termination != review.TerminationSkipped || o.Skip == nil || o.Skip.Code != runner.ReviewRefusedModelUnset || o.Skip.Message == "" {
+			t.Errorf("outcome = %+v, want the skip with its code and sentence", o)
+		}
+	})
+
+	t.Run("failed attempt", func(t *testing.T) {
+		h, s, _ := reviewLoopHandler(t, "", func(runner.ReviewerInput) (*runner.ReviewerResult, error) {
+			return nil, fmt.Errorf("review: %w", &runner.ReviewOutputError{Raw: "it looks fine", Reason: "no JSON object"})
+		})
+		task := waitingTaskForReview(t, s, "")
+		if err := h.runReview(context.Background(), s, task); err == nil {
+			t.Fatal("runReview returned nil for a failed round")
+		}
+		resp := fetchTranscript(t, h, task.ID)
+		if len(resp.Rounds) != 1 || len(resp.Rounds[0].FailedAttempts) != 1 || resp.Rounds[0].Reviewer != nil {
+			t.Fatalf("rounds = %+v, want round 1 with one failed attempt and no answer", resp.Rounds)
+		}
+		a := resp.Rounds[0].FailedAttempts[0]
+		if a.Code != review.CodeOutputInvalid || a.Raw != "it looks fine" || !strings.Contains(a.Message, "could not be read") {
+			t.Errorf("failed attempt = %+v", a)
+		}
+		if resp.Outcome != nil {
+			t.Error("a failed attempt leaves the session open; there is no outcome yet")
+		}
+	})
+}
+
+// TestReviewTranscript_TruncatedIsReported covers a transcript with a record
+// longer than the read cap: the rounds before it are served and the response
+// says the transcript is incomplete.
+func TestReviewTranscript_TruncatedIsReported(t *testing.T) {
+	h, s, _ := reviewLoopHandler(t, "", func(runner.ReviewerInput) (*runner.ReviewerResult, error) {
+		return changes(10, findingHigh), nil
+	})
+	task := waitingTaskForReview(t, s, "")
+	if err := h.runReview(context.Background(), s, task); err != nil {
+		t.Fatalf("runReview: %v", err)
+	}
+	sess, found, err := review.Newest(reviewStateDir(primaryWorktree(task.WorktreePaths)))
+	if err != nil || !found {
+		t.Fatalf("Newest: %v %v", found, err)
+	}
+	f, err := os.OpenFile(filepath.Join(sess.Dir, "transcript.jsonl"), os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlong := `{"ts":"2026-06-27T00:00:03Z","fork":1,"round":3,"role":"critic","path":"` +
-		strings.Repeat("a", maxReviewTranscriptLineBytes+1) + `"}` + "\n"
-	after := `{"ts":"2026-06-27T00:00:04Z","fork":1,"round":4,"role":"proposer","path":"forks/critic-1/rounds/r2-proposer.md","ms":9}` + "\n"
-	if _, err := f.WriteString(overlong + after); err != nil {
+	overlong := `{"round":1,"role":"implementer","body":"` + strings.Repeat("a", 9<<20) + "\"}\n"
+	if _, err := f.WriteString(overlong + `{"round":2,"role":"reviewer","verdict":"approve"}` + "\n"); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	resp := getReviewTranscript(t, h, id)
-	if got := roundCount(t, resp); got != 2 {
-		t.Errorf("rounds = %d, want the 2 read before the overlong line", got)
+	code, body := getReviewTranscript(t, h, task.ID)
+	resp := decodeTranscript(t, code, body)
+	if !resp.Truncated {
+		t.Error("truncated = false, want true: the round 2 record follows the overlong line")
 	}
-	if resp["truncated"] != true {
-		t.Errorf("truncated = %v, want true: round 4 follows the overlong line and was not read", resp["truncated"])
-	}
-}
-
-// TestReviewTranscript_CompleteIsNotTruncated pins the wire shape of the common
-// case: a transcript read to its end carries no truncated field.
-func TestReviewTranscript_CompleteIsNotTruncated(t *testing.T) {
-	h := newTestHandler(t)
-	id, _ := reviewTaskWithSession(t, h)
-
-	resp := getReviewTranscript(t, h, id)
-	if got := roundCount(t, resp); got != 2 {
-		t.Errorf("rounds = %d, want 2", got)
-	}
-	if v, present := resp["truncated"]; present {
-		t.Errorf("truncated = %v, want the field absent", v)
-	}
-}
-
-// TestReadReviewTranscript_ReadErrorIsReturned covers a read that fails for a
-// reason other than the line cap: the error comes back with the path, and a
-// transcript that does not exist yet is not an error.
-func TestReadReviewTranscript_ReadErrorIsReturned(t *testing.T) {
-	missing := t.TempDir()
-	if forks, err := readReviewTranscript(missing); err != nil || forks != nil {
-		t.Errorf("no transcript yet: forks = %v, err = %v, want nil, nil", forks, err)
+	if len(resp.Rounds) != 1 || resp.Rounds[0].Reviewer == nil {
+		t.Errorf("rounds = %+v, want the round read before the overlong line", resp.Rounds)
 	}
 
-	// A directory opens but cannot be read as a file.
-	unreadable := t.TempDir()
-	if err := os.Mkdir(filepath.Join(unreadable, "transcript.jsonl"), 0o755); err != nil {
-		t.Fatal(err)
+	// A transcript read to its end carries no truncated field.
+	h2, s2, _ := reviewLoopHandler(t, "", func(runner.ReviewerInput) (*runner.ReviewerResult, error) { return approve(), nil })
+	task2 := waitingTaskForReview(t, s2, "")
+	if err := h2.runReview(context.Background(), s2, task2); err != nil {
+		t.Fatalf("runReview: %v", err)
 	}
-	_, err := readReviewTranscript(unreadable)
-	if err == nil {
-		t.Fatal("err = nil, want the read error")
-	}
-	if !strings.Contains(err.Error(), filepath.Join(unreadable, "transcript.jsonl")) {
-		t.Errorf("err = %v, want it to name the transcript path", err)
+	if _, body := getReviewTranscript(t, h2, task2.ID); strings.Contains(string(body), `"truncated"`) {
+		t.Errorf("complete transcript body %s carries a truncated field", body)
 	}
 }

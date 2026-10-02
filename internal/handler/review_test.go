@@ -225,7 +225,11 @@ func waitingTaskForReview(t *testing.T, s *store.Store, sessionID string) store.
 	if err := s.UpdateTaskResult(ctx, task.ID, "done", sessionID, "end_turn", 1); err != nil {
 		t.Fatalf("UpdateTaskResult: %v", err)
 	}
-	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{t.TempDir(): t.TempDir()}, "branch"); err != nil {
+	// The worktree sits in a directory of its own, as <worktreesDir>/<taskID>/
+	// does in production, so each task's review state directory (the
+	// worktree's sibling) is its own.
+	worktree := filepath.Join(t.TempDir(), "repo")
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{t.TempDir(): worktree}, "branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
 	fresh, err := s.GetTask(ctx, task.ID)

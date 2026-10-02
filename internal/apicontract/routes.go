@@ -501,12 +501,12 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/tasks/{id}/review", Name: "ReviewTask",
-		Description: "Trigger adversarial review verification for a task.",
+		Description: "Run one review round for a waiting task on the reviewer model.",
 		Tags:        []string{"tasks"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/review/transcript", Name: "ReviewTranscript",
-		Description: "Read the review verification trajectory (per-fork, per-round transcripts).",
+		Description: "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
 		Tags:        []string{"tasks"},
 	},
 	{

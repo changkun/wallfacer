@@ -778,7 +778,7 @@
       "method": "POST",
       "pattern": "/api/tasks/{id}/review",
       "name": "ReviewTask",
-      "description": "Trigger adversarial review verification for a task.",
+      "description": "Run one review round for a waiting task on the reviewer model.",
       "tags": [
         "tasks"
       ]
@@ -787,7 +787,7 @@
       "method": "GET",
       "pattern": "/api/tasks/{id}/review/transcript",
       "name": "ReviewTranscript",
-      "description": "Read the review verification trajectory (per-fork, per-round transcripts).",
+      "description": "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
       "tags": [
         "tasks"
       ]
