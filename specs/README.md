@@ -59,8 +59,9 @@ Local Product - 30 shipped, 6 designed and unbuilt, 1 vague
 
   Designed, unbuilt, not scheduled
     ○ Task Prompt Attachments      ○ Scoped Command Registry
-    ○ Host Path References         ○ Live Serve
-    ○ Terminal UI (TUI mode)       ○ Internal Consolidation
+    ○ Host Path References         ○ Terminal UI (TUI mode)
+    ○ Internal Consolidation
+    ⊘ Live Serve (retired 2026-10-02; web apps preview through Apps)
 
   ⊘ superseded by the Vue/host rewrite: File Attachments,
     File Panel Viewer, Inline Diff Feedback (old), Spatial Canvas
@@ -94,7 +95,7 @@ Git Workflow - local git; the GitHub half is retired
   ⊘ GitHub Integration, Brokered Token, Pull Requests on Tasks,
     Repo Selection, Read Surface, Cloud Remote Fix (retired 2026-10-02)
 
-Platform-native - five decisions of 2026-10-02 (the active program)
+Platform-native - six decisions of 2026-10-02 (the active program)
   ○ Platform-Native Wallfacer (umbrella)
   ✅ Retire Agent Fleets (done)          ✅ Remove GitHub Integration (done)
   ✅ Retire the Artifacts Gallery (done; pages go through Apps)
@@ -135,11 +136,11 @@ demand-gated, with the coordination connection and spec comments shipped.
 
 ## Platform-Native
 
-The active program: five decisions of 2026-10-02 that make wallfacer an application on the Latere platform with one harness. Two are removals, one is a migration, one is a design question.
+The active program: six decisions of 2026-10-02 that make wallfacer an application on the Latere platform with one harness. Three are removals of shipped code, one retires an unbuilt design, one is a migration, one is a design question.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The five decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
+| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The six decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
 | ↳ [retire-agent-fleets.md](.archive/shared/platform-native/retire-agent-fleets.md) | **Complete** | Removed 2026-10-02: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; a stored fleet name gets one timeline notice; leftover definition directories get one startup warning. |
 | ↳ [remove-github-integration.md](.archive/shared/platform-native/remove-github-integration.md) | **Complete** | Removed 2026-10-02: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes and `internal/github`. Plain git push is untouched; the first start after upgrade deletes the cached tokens. |
 | ↳ [retire-artifacts.md](.archive/shared/platform-native/retire-artifacts.md) | **Complete** | Removed 2026-10-02: the artifacts gallery, `GET /api/artifacts`, `GET /artifact/{path...}` and the rail entry. The API path answers 404; the other two get the console's not-found page. Files under `<workspace>/artifacts/` stay untouched; pages are published through the platform's Apps capability. |
@@ -222,7 +223,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [internal-consolidation.md](local/internal-consolidation.md) | Drafted | Behavior-preserving refactors surfaced by a codebase audit: a handler mutate-commit helper family, a runner `failTask` terminal-state helper, a shared one-shot LLM-call + NDJSON-parse path, one source of truth for the prompts template-name set, and workspace storage-identity out of the prompts package. Unbuilt; the audit's mechanical cleanups already landed. |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the flat slash-command registry (`internal/agentsession/commands.go`, no scope field today, served at `GET /api/agent/commands`) to a surface-agnostic package with per-scope catalogs (planning, task_create, task_waiting) so the board composer gets its own `/` commands. Unbuilt. |
 | [host-mounts.md](local/host-mounts.md) | Drafted | Per-task host path references surfaced to the agent in the first-turn prompt. Nothing is mounted or copied under host execution; read-only is advisory. Local execution target only. Unbuilt. |
-| [live-serve.md](local/live-serve.md) | Drafted | Build and run developed software from within Wallfacer: a serve session per workspace or task, an agent that discovers the build and run commands, app secrets in a separate env file, opt-in rebuild on change, a log panel. Needs a raw-command launch seam on the executor backend. Unbuilt; its files-only end, [static-artifacts](.archive/local/static-artifacts.md), shipped and was removed. |
+| [live-serve.md](.archive/local/live-serve.md) | **Archived** | Build and run developed software from within Wallfacer: serve sessions, build discovery, app secrets, a log panel. Never built; retired on 2026-10-02 because web apps are previewed through the platform's Apps capability. Apps hosts static sites only; a server process runs in the console's terminal. |
 | [agent-resource-governance.md](.archive/local/agent-resource-governance.md) | **Complete** | Stop Test/Review from pegging the machine: host agents run in their own process group throttled to background priority (macOS `PRIO_DARWIN_BG`, Linux nice), a global `WALLFACER_MAX_AGENTS` budget (opt-in), review defaulted to its floor (1 fork / 3 rounds), and forks/rounds/cost-cap/nice/budget surfaced in the Execution settings tab via `/api/env`. OQ-3 (darwin child-backgrounding permission) pending empirical confirmation. |
 | [terminal-ui.md](local/terminal-ui.md) | Drafted | Full TUI mode over the same HTTP API: interactive terminal board, log streaming, task lifecycle via Bubble Tea (`internal/tui/`). Unbuilt. |
 | [archive-active-task-guard.md](.archive/local/archive-active-task-guard.md) | **Complete** | Spec archive guard blocks only when a dispatched task is still active; terminal (done/failed/cancelled) or stale links no longer 409. Fixes a complete tree refusing to archive. |
@@ -260,7 +261,6 @@ graph LR
     DRC[Diff Review Comments]
     TC[Test Criteria]
     VV[Visual Verification]
-    LS[Live Serve]
     OTS[OAuth Token Setup ✅]
     TUI[Terminal UI]
     PA[Pixel Agents ✅]
@@ -411,7 +411,7 @@ Task revert is unbuilt and independent. Intent-commits is fully realized.
 **Within local product:**
 - Spec coordination is complete (document model, planning UX, archival, chat-first mode, planning threads, and the state control plane / drift detection all shipped; the drift pipeline's agent-backed tester is wired but gated behind `WALLFACER_DRIFT_TESTER`, off by default).
 - Editor tabs (inline-file-panel), inline-diff-feedback, test-criteria, chat-model-transparency and the dockable terminal shipped. Static-artifacts shipped too and was removed on 2026-10-02.
-- Five feature specs (task-prompt-attachments, scoped-command-registry, host-mounts, live-serve, terminal-ui) and one refactor spec (internal-consolidation) are designed, checked against the code on 2026-10-02, and unbuilt. None is scheduled; each is dispatchable after validation.
+- Four feature specs (task-prompt-attachments, scoped-command-registry, host-mounts, terminal-ui) and one refactor spec (internal-consolidation) are designed, checked against the code on 2026-10-02, and unbuilt. None is scheduled; each is dispatchable after validation.
 - The agent graph is retired. The unified page shipped, the audit found that only the built-in turn loop carries the full guarantees, and the maintainer chose removal over completion; it was removed on 2026-10-02.
 
 **Within cloud platform:**

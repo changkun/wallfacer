@@ -29,7 +29,7 @@ dispatched_task_id: null
 
 Agents and users produce self-contained HTML deliverables - slide decks, reports, dashboards, one-off visualizations. Today there is no way to open one inside Wallfacer: the file lands in the repo and must be opened by hand from a file browser. The desired flow is direct: ask in chat for a deck, the agent writes it into the repo, and it opens in the app with one click.
 
-This is the lightweight end of [live-serve.md](../../local/live-serve.md). That spec (stale, unbuilt) covers running and building developed software - dev servers, build pipelines, long-lived processes. Static artifacts need none of that: no build step, no process, no port. Just static files served over the app's existing HTTP server. Applications that need a backend remain future work under live-serve.
+This is the lightweight end of [live-serve.md](live-serve.md). That spec (stale, unbuilt) covers running and building developed software - dev servers, build pipelines, long-lived processes. Static artifacts need none of that: no build step, no process, no port. Just static files served over the app's existing HTTP server. Applications that need a backend remain future work under live-serve.
 
 ## Scope
 
@@ -110,4 +110,4 @@ Still open, as the spec said it would be: artifacts are served from the app's
 own origin, which is acceptable for a local single-user instance and is not
 for a hosted or principal-scoped one. A hosted board must move them to a
 separate origin before it serves any. Build steps and processes remain
-[live-serve](../../local/live-serve.md)'s.
+[live-serve](live-serve.md)'s.

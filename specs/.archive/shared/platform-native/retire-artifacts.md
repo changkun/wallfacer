@@ -88,9 +88,9 @@ under `<workspace>/artifacts/` and previews them, served by
 
 ## Related
 
-[live-serve](../../../local/live-serve.md), building and running developed
-software from within wallfacer, is the larger cousin of this feature and is
-designed but not built. Its fate is a separate decision.
+[live-serve](../../local/live-serve.md), building and running developed
+software from within wallfacer, was the larger cousin of this feature. It was
+designed but never built, and it was retired the same day for the same reason.
 
 ## Outcome
 

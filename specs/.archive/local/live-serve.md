@@ -1,6 +1,6 @@
 ---
 title: "Live Serve - Build and Run Developed Software from Wallfacer"
-status: drafted
+status: archived
 depends_on: []
 affects:
   - internal/store/models.go
@@ -17,6 +17,22 @@ dispatched_task_id: null
 ---
 
 # Live Serve - Build and Run Developed Software from Wallfacer
+
+> **Archived 2026-10-02. Retired as: replaced by the platform's Apps
+> capability.** The maintainer decided that wallfacer does not build and run
+> developed software itself (decision 6 under
+> [platform-native](../../shared/platform-native.md)). A web app an agent
+> builds is pushed to a repository on the Latere platform, and Apps builds a
+> preview of every push at an address of its own.
+>
+> Apps hosts static sites only: it runs no server process, and it refuses a
+> tree with a `Dockerfile`, a `start` script, or a `go.mod` and other server
+> manifests. A backend, a CLI tool or a dev server against an unpushed
+> worktree is not covered by Apps; locally the console's terminal runs it in
+> the workspace or the task's worktree.
+>
+> Nothing of this spec was built, so nothing is removed. The text below is
+> kept as written for the record.
 
 ---
 
@@ -35,7 +51,7 @@ There is also no way to keep a development server running while iterating across
 - **Worktrees**: Per-task git worktrees provide isolated copies of the codebase on the host (under `<configDir>/worktrees/`). The host process runs with `cmd.Dir` set to the worktree (or workspace) path. See `internal/runner/worktree.go` and `internal/runner/container.go` (`buildHostSpec`, `buildBaseContainerSpec`).
 - **Log streaming**: `GET /api/tasks/{id}/logs` streams the agent process output via SSE, backed by `internal/pkg/livelog`. Works for agent output, not for arbitrary processes.
 - **Env file**: The agent process inherits a merged environment built from `executor.ContainerSpec.EnvFile` (the wallfacer `.env` with LLM tokens, default `<configDir>/.env`) plus `ContainerSpec.Env` overlays. There is no separate app-level env file.
-- **Static artifacts**: the gallery that served self-contained HTML files from `<workspace>/artifacts/` ([static-artifacts](../.archive/local/static-artifacts.md)) was removed on 2026-10-02 ([retire-artifacts](../.archive/shared/platform-native/retire-artifacts.md)). Wallfacer serves no workspace files; a page meant to be seen is published through the platform's Apps capability.
+- **Static artifacts**: the gallery that served self-contained HTML files from `<workspace>/artifacts/` ([static-artifacts](static-artifacts.md)) was removed on 2026-10-02 ([retire-artifacts](../shared/platform-native/retire-artifacts.md)). Wallfacer serves no workspace files; a page meant to be seen is published through the platform's Apps capability.
 - **No**: Dev server, build pipeline, long-lived process manager, or any way to run user code as part of a serve session.
 
 > Architecture note: an earlier draft of this spec assumed a container runtime

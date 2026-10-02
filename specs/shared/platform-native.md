@@ -22,7 +22,7 @@ dispatched_task_id: null
 
 # Platform-Native Wallfacer: One Harness, No Fleets, No GitHub
 
-Umbrella for five decisions the maintainer made on 2026-10-02, after the spec
+Umbrella for six decisions the maintainer made on 2026-10-02, after the spec
 tree was reviewed against the code. Together they change what wallfacer is:
 from a board that drives third-party coding CLIs through user-authored agent
 pipelines, to an application on the Latere platform that runs one harness and
@@ -37,6 +37,7 @@ lets agents organize themselves at run time.
 | 3 | **Rethink the board before hosting it.** | A hosted board "is something we need to think about how to make this scale". An execution board "is nice but has some problems such as sharing context, messages, awareness to each other"; in Claude Code "an agent can spawn a subagent, can fork itself to inherit the entire context thread". | [sessions-that-spawn-and-fork](platform-native/sessions-that-spawn-and-fork.md) |
 | 4 | **Remove GitHub.** No GitHub connection in wallfacer for now. | "Once the whole Latere platform is more stable and mature, GitHub connection is more or less just connected by a connector." | [remove-github-integration](../.archive/shared/platform-native/remove-github-integration.md) |
 | 5 | **Retire the artifacts gallery.** Pages are published through the platform's Apps capability. | "Artifacts is also a feature probably don't need at all. We have Apps in latere platform, so we could simply use that." | [retire-artifacts](../.archive/shared/platform-native/retire-artifacts.md) |
+| 6 | **Retire live serve.** Wallfacer does not build and run developed software; a web app is previewed through Apps. Apps hosts static sites only, so a server process is run in the console's terminal. | "Live serve is replaced by latere apps." | [live-serve](../.archive/local/live-serve.md) (unbuilt, archived) |
 
 ## Before and after
 
