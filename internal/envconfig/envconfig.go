@@ -31,7 +31,6 @@ type Config struct {
 	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
 	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
-	ReviewForkCount        int    // WALLFACER_REVIEW_FORKS (0 means use default)
 	ReviewMaxRounds        int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
 	ReviewCostCap          int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
 	ReviewModel            string // WALLFACER_REVIEW_MODEL: the reviewer's model; empty means the review does not run
@@ -99,7 +98,6 @@ var knownKeys = []string{
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
-	"WALLFACER_REVIEW_FORKS",
 	"WALLFACER_REVIEW_ROUNDS",
 	"WALLFACER_REVIEW_COST_CAP",
 	"WALLFACER_REVIEW_MODEL",
@@ -193,10 +191,6 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_AUTO_PUSH_THRESHOLD":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.AutoPushThreshold = n
-			}
-		case "WALLFACER_REVIEW_FORKS":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.ReviewForkCount = n
 			}
 		case "WALLFACER_REVIEW_ROUNDS":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
@@ -450,7 +444,6 @@ type Updates struct {
 	MaxTestParallel      *string
 	MaxAgents            *string
 	AgentNice            *string
-	ReviewForks          *string
 	ReviewRounds         *string
 	ReviewCostCap        *string
 	ReviewModel          *string
@@ -483,7 +476,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
 		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
 		"WALLFACER_AGENT_NICE":              u.AgentNice,
-		"WALLFACER_REVIEW_FORKS":            u.ReviewForks,
 		"WALLFACER_REVIEW_ROUNDS":           u.ReviewRounds,
 		"WALLFACER_REVIEW_COST_CAP":         u.ReviewCostCap,
 		"WALLFACER_REVIEW_MODEL":            u.ReviewModel,

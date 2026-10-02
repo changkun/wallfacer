@@ -113,7 +113,7 @@ func (h *Handler) ReviewTranscript(w http.ResponseWriter, r *http.Request, id uu
 		return
 	}
 
-	_, rounds, costCap := h.reviewTuning()
+	rounds, costCap := h.reviewTuning()
 	resp := reviewTranscriptResp{
 		SessionID: sess.ID,
 		// Authoritative: the live in-flight set, not an on-disk signal.

@@ -52,19 +52,15 @@ UNKNOWN_KEY=ignored
 	}
 }
 
-// TestParseReviewTuning verifies the review token-dial knobs are read, and that a
+// TestParseReviewTuning verifies the review bounds are read, and that a
 // non-positive value is ignored (leaving the field zero so the default applies).
 func TestParseReviewTuning(t *testing.T) {
-	content := `WALLFACER_REVIEW_FORKS=3
-WALLFACER_REVIEW_ROUNDS=6
+	content := `WALLFACER_REVIEW_ROUNDS=6
 WALLFACER_REVIEW_COST_CAP=120000
 `
 	cfg, err := envconfig.Parse(writeEnvFile(t, content))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.ReviewForkCount != 3 {
-		t.Errorf("ReviewForkCount = %d; want 3", cfg.ReviewForkCount)
 	}
 	if cfg.ReviewMaxRounds != 6 {
 		t.Errorf("ReviewMaxRounds = %d; want 6", cfg.ReviewMaxRounds)
@@ -74,12 +70,12 @@ WALLFACER_REVIEW_COST_CAP=120000
 	}
 
 	// Non-positive values are rejected, leaving zero (default applies downstream).
-	cfg2, err := envconfig.Parse(writeEnvFile(t, "WALLFACER_REVIEW_FORKS=0\nWALLFACER_REVIEW_ROUNDS=-1\n"))
+	cfg2, err := envconfig.Parse(writeEnvFile(t, "WALLFACER_REVIEW_ROUNDS=-1\nWALLFACER_REVIEW_COST_CAP=0\n"))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if cfg2.ReviewForkCount != 0 || cfg2.ReviewMaxRounds != 0 {
-		t.Errorf("non-positive values should be ignored, got forks=%d rounds=%d", cfg2.ReviewForkCount, cfg2.ReviewMaxRounds)
+	if cfg2.ReviewMaxRounds != 0 || cfg2.ReviewCostCap != 0 {
+		t.Errorf("non-positive values should be ignored, got rounds=%d cap=%d", cfg2.ReviewMaxRounds, cfg2.ReviewCostCap)
 	}
 }
 

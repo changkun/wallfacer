@@ -1181,26 +1181,27 @@ func (h *Handler) tryAutoReview(ctx context.Context) {
 	}
 }
 
-// reviewForkCount is the number of independent critic forks per run.
-// reviewMaxRounds is the per-session round cap. reviewCostCap is the soft
-// token budget.
+// Review session bounds, used when the env file sets none.
+//
+// reviewMaxRounds is the number of reviewer runs per session: three gives the
+// task two turns on requested changes, each re-reviewed, before the session
+// ends with what is still open. reviewCostCap is the reviewer token budget per
+// session (input plus output tokens of the reviewer runs; the task's own turns
+// are held to the task's budget instead). It is checked between rounds, so a
+// round already running finishes.
 const (
-	reviewForkCount = 1
 	reviewMaxRounds = 3
 	reviewCostCap   = 50000
 )
 
-// reviewTuning returns the fork count, max rounds, and token cost cap for a
+// reviewTuning returns the round limit and the reviewer token budget of a
 // review session, applying env overrides over the defaults. A missing or
 // non-positive env value keeps the default.
-func (h *Handler) reviewTuning() (forks, rounds, costCap int) {
-	forks, rounds, costCap = reviewForkCount, reviewMaxRounds, reviewCostCap
+func (h *Handler) reviewTuning() (rounds, costCap int) {
+	rounds, costCap = reviewMaxRounds, reviewCostCap
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil {
-		return forks, rounds, costCap
-	}
-	if cfg.ReviewForkCount > 0 {
-		forks = cfg.ReviewForkCount
+		return rounds, costCap
 	}
 	if cfg.ReviewMaxRounds > 0 {
 		rounds = cfg.ReviewMaxRounds
@@ -1208,7 +1209,7 @@ func (h *Handler) reviewTuning() (forks, rounds, costCap int) {
 	if cfg.ReviewCostCap > 0 {
 		costCap = cfg.ReviewCostCap
 	}
-	return forks, rounds, costCap
+	return rounds, costCap
 }
 
 // primaryWorktree returns the task's worktree path chosen deterministically
@@ -1251,7 +1252,7 @@ func (h *Handler) runReview(ctx context.Context, s *store.Store, t store.Task) e
 		return nil
 	}
 	cwd := primaryWorktree(t.WorktreePaths)
-	_, rounds, costCap := h.reviewTuning()
+	rounds, costCap := h.reviewTuning()
 
 	res, err := h.verifier.Verify(ctx, review.Input{
 		Task:          &t,

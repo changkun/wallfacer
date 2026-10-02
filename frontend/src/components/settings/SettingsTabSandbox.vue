@@ -33,6 +33,7 @@ const defaultModel = ref('');
 const titleModel = ref('');
 const codexDefaultModel = ref('');
 const codexTitleModel = ref('');
+const reviewModel = ref('');
 const defaultSandbox = ref('');
 
 const claudeModels = computed(() => claudeModelsFor(claudeBaseUrl.value));
@@ -92,6 +93,7 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   titleModel.value = cfg?.title_model || '';
   codexDefaultModel.value = cfg?.codex_default_model || '';
   codexTitleModel.value = cfg?.codex_title_model || '';
+  reviewModel.value = cfg?.review_model || '';
   defaultSandbox.value = cfg?.default_sandbox || '';
   claudeTestStatus.value = '';
   claudeTestReauth.value = false;
@@ -122,6 +124,7 @@ function buildSavePayload(): EnvUpdatePayload {
   body.title_model = titleModel.value.trim();
   body.codex_default_model = codexDefaultModel.value.trim();
   body.codex_title_model = codexTitleModel.value.trim();
+  body.review_model = reviewModel.value.trim();
   body.default_sandbox = defaultSandbox.value.trim();
   // Activity-specific routing is retired — send empty map so the server
   // clears any legacy WALLFACER_SANDBOX_* entries.
@@ -649,6 +652,15 @@ const defaultSandboxOptions = computed(() => [
         </div>
         <div class="set-row__end">
           <AppSelect v-model="defaultSandbox" :options="defaultSandboxOptions" aria-label="Default Harness" />
+        </div>
+      </div>
+      <div class="set-row set-row--stack">
+        <div class="set-row__main">
+          <span class="set-row__label">Review model <code>WALLFACER_REVIEW_MODEL</code></span>
+          <span class="set-row__help">The model Review runs its reviewer on, on the task's harness. It must differ from the task's model; with no model set, or the task's own, the review does not run and the task timeline says why.</span>
+        </div>
+        <div class="set-row__end">
+          <input id="env-review-model" v-model="reviewModel" type="text" class="field mono" placeholder="e.g. gpt-5-codex" autocomplete="off" />
         </div>
       </div>
     </div>

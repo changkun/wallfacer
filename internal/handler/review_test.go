@@ -564,21 +564,18 @@ func TestRunReview_FailedRoundOpensBreaker(t *testing.T) {
 func TestReviewTuning_MinimalDefaultsAndOverride(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
 
-	forks, rounds, costCap := h.reviewTuning()
-	if forks != 1 || rounds != 3 {
-		t.Errorf("default tuning = forks %d, rounds %d; want 1 fork, 3 rounds", forks, rounds)
-	}
-	if costCap != 50000 {
-		t.Errorf("default cost cap = %d, want 50000", costCap)
+	rounds, costCap := h.reviewTuning()
+	if rounds != 3 || costCap != 50000 {
+		t.Errorf("default tuning = %d rounds, cap %d; want 3 rounds, 50000", rounds, costCap)
 	}
 
-	envBody := "WALLFACER_REVIEW_FORKS=2\nWALLFACER_REVIEW_ROUNDS=6\nWALLFACER_REVIEW_COST_CAP=120000\n"
+	envBody := "WALLFACER_REVIEW_ROUNDS=6\nWALLFACER_REVIEW_COST_CAP=120000\n"
 	if err := os.WriteFile(envPath, []byte(envBody), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	forks, rounds, costCap = h.reviewTuning()
-	if forks != 2 || rounds != 6 || costCap != 120000 {
-		t.Errorf("override tuning = forks %d, rounds %d, cap %d; want 2, 6, 120000", forks, rounds, costCap)
+	rounds, costCap = h.reviewTuning()
+	if rounds != 6 || costCap != 120000 {
+		t.Errorf("override tuning = %d rounds, cap %d; want 6, 120000", rounds, costCap)
 	}
 }
 

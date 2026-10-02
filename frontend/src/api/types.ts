@@ -312,9 +312,10 @@ export interface EnvConfig {
   max_test_parallel_tasks: number;
   max_agents: number;
   agent_nice: number;
-  review_forks: number;
   review_rounds: number;
   review_cost_cap: number;
+  // The reviewer's model (WALLFACER_REVIEW_MODEL); empty when unset.
+  review_model: string;
   oversight_interval: number;
   archived_tasks_per_page: number;
   auto_push_enabled: boolean;
@@ -339,9 +340,9 @@ export interface EnvUpdatePayload {
   max_test_parallel_tasks?: number;
   max_agents?: number;
   agent_nice?: number;
-  review_forks?: number;
   review_rounds?: number;
   review_cost_cap?: number;
+  review_model?: string;
   oversight_interval?: number;
   archived_tasks_per_page?: number;
   auto_push_enabled?: boolean;

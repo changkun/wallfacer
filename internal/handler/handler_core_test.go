@@ -204,9 +204,9 @@ func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
 	}
 }
 
-// TestEnvConfig_ResourceGovernanceRoundTrip proves the new resource knobs
-// (max_agents, agent_nice, review forks/rounds/cost-cap) report their defaults on
-// GET and persist through PUT.
+// TestEnvConfig_ResourceGovernanceRoundTrip proves the resource knobs
+// (max_agents, agent_nice, review rounds, cost cap and model) report their
+// defaults on GET and persist through PUT.
 func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 
@@ -220,10 +220,11 @@ func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 		return resp
 	}
 
-	// Defaults: minimum review floor, backend default nice, unlimited budget.
+	// Defaults: review bounds, no reviewer model, backend default nice,
+	// unlimited budget.
 	d := get()
-	if d.ReviewForks != 1 || d.ReviewRounds != 3 || d.ReviewCostCap != 50000 {
-		t.Errorf("review defaults = forks %d rounds %d cap %d; want 1/3/50000", d.ReviewForks, d.ReviewRounds, d.ReviewCostCap)
+	if d.ReviewRounds != 3 || d.ReviewCostCap != 50000 || d.ReviewModel != "" {
+		t.Errorf("review defaults = rounds %d cap %d model %q; want 3/50000/empty", d.ReviewRounds, d.ReviewCostCap, d.ReviewModel)
 	}
 	if d.AgentNice != executor.DefaultAgentNice {
 		t.Errorf("agent_nice default = %d, want %d", d.AgentNice, executor.DefaultAgentNice)
@@ -233,7 +234,7 @@ func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 	}
 
 	// Persist new values via PUT.
-	body := `{"max_agents":4,"agent_nice":15,"review_forks":2,"review_rounds":5,"review_cost_cap":80000}`
+	body := `{"max_agents":4,"agent_nice":15,"review_rounds":5,"review_cost_cap":80000,"review_model":"gpt-5-codex"}`
 	w := httptest.NewRecorder()
 	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body)))
 	if w.Code != http.StatusNoContent {
@@ -242,9 +243,20 @@ func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
 
 	// GET reflects the persisted values.
 	g := get()
-	if g.MaxAgents != 4 || g.AgentNice != 15 || g.ReviewForks != 2 || g.ReviewRounds != 5 || g.ReviewCostCap != 80000 {
-		t.Errorf("after PUT = max_agents %d nice %d forks %d rounds %d cap %d; want 4/15/2/5/80000",
-			g.MaxAgents, g.AgentNice, g.ReviewForks, g.ReviewRounds, g.ReviewCostCap)
+	if g.MaxAgents != 4 || g.AgentNice != 15 || g.ReviewRounds != 5 || g.ReviewCostCap != 80000 || g.ReviewModel != "gpt-5-codex" {
+		t.Errorf("after PUT = max_agents %d nice %d rounds %d cap %d model %q; want 4/15/5/80000/gpt-5-codex",
+			g.MaxAgents, g.AgentNice, g.ReviewRounds, g.ReviewCostCap, g.ReviewModel)
+	}
+}
+
+// TestUpdateEnvConfig_ReviewForksIsGone pins the removal of the review fork
+// count: a single reviewer has no forks, so the setting is no longer accepted.
+func TestUpdateEnvConfig_ReviewForksIsGone(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"review_forks":2}`)))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("PUT review_forks = %d, want 400 for an unknown field", w.Code)
 	}
 }
 

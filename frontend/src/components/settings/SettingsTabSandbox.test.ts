@@ -40,6 +40,22 @@ describe('provider credential storage', () => {
     expect(select.value).toBe('keyring');
   });
 
+  it('shows the saved review model and saves an edited one', async () => {
+    mock.api.mockImplementation(async (method: string) => {
+      if (method === 'PUT') return null;
+      return { secret_store: 'file', default_sandbox: 'claude', review_model: 'gpt-5-codex' };
+    });
+    const host = await mount();
+    const input = host.querySelector<HTMLInputElement>('#env-review-model')!;
+    expect(input.value).toBe('gpt-5-codex');
+    input.value = ' claude-opus-4-6 ';
+    input.dispatchEvent(new Event('input'));
+    const save = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Save harness configuration')!;
+    save.click();
+    await settle();
+    expect(mock.api).toHaveBeenCalledWith('PUT', '/api/env', expect.objectContaining({ review_model: 'claude-opus-4-6' }));
+  });
+
   it('shows a failed initial read and prevents overwriting an unreadable configuration', async () => {
     mock.api.mockRejectedValue(new Error('Credential bundle unavailable'));
     const host = await mount();
