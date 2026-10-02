@@ -176,7 +176,7 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 | `/internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic). Forwards only `POST /v1/messages` and `POST /v1/messages/count_tokens`; every other path 404s |
 | `/internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI). Forwards only `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/embeddings`, `GET /v1/models`; every other path 404s |
 | `/` | Serves the embedded SPA index on `GET` and `HEAD` for every path no other route matches outside `/api`, so client-side routes survive a hard load. Other methods answer 405 with an `Allow` header. Method-agnostic because ServeMux would treat `GET /` and the `/api/` catch-all as conflicting patterns |
-| `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/cli/spa_api.go`) |
+| `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/webserver/catchall.go`, which `wallfacer web` mounts too) |
 | `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |
 | `GET /static/` | Embedded SPA assets served without the cache wrapper |
 | `GET /favicon.ico` | Embedded favicon, 404 when the build did not produce one |

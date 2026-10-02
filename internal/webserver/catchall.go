@@ -1,4 +1,4 @@
-package cli
+package webserver
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 	"latere.ai/x/pkg/httpjson"
 )
 
-// The catch-all patterns mountVueSPA registers. spaCatchAll takes every path
+// The catch-all patterns MountCatchAll registers. spaCatchAll takes every path
 // no other route matches; apiCatchAll and apiRoot take the unmatched paths
 // under /api, which an API client must see answered as an API error rather
 // than with the SPA shell. All three are method-agnostic: ServeMux treats
@@ -37,6 +37,19 @@ const (
 var probeMethods = []string{
 	http.MethodGet, http.MethodHead, http.MethodPost,
 	http.MethodPut, http.MethodPatch, http.MethodDelete,
+}
+
+// MountCatchAll registers the catch-all routes of a server that serves the SPA
+// beside an API: serveIndex answers GET and HEAD on every path no other route
+// matches, so a hard load of a client route renders the app, and an unmatched
+// path under /api answers 404 (or 405 when a route serves the path under other
+// methods) in the error envelope, never the shell. Every route registered with
+// a path more specific than "/" or "/api/" keeps its requests, whenever it is
+// registered.
+func MountCatchAll(mux *http.ServeMux, serveIndex http.HandlerFunc) {
+	mux.HandleFunc(spaCatchAll, spaFallback(mux, serveIndex))
+	mux.HandleFunc(apiCatchAll, apiFallback(mux))
+	mux.HandleFunc(apiRoot, apiFallback(mux))
 }
 
 // allowedMethods returns the methods for which a route other than the
@@ -81,10 +94,9 @@ func apiFallback(mux *http.ServeMux) http.HandlerFunc {
 }
 
 // spaFallback serves the SPA shell for GET and HEAD on every path no other
-// route matches, so a hard load of a client route renders the app. Other
-// methods answer 405 with an Allow header naming GET, HEAD and any method a
-// route serves on the path, as ServeMux answered when the catch-all was
-// "GET /".
+// route matches. Other methods answer 405 with an Allow header naming GET,
+// HEAD and any method a route serves on the path, as ServeMux answered when
+// the catch-all was "GET /".
 func spaFallback(mux *http.ServeMux, serveIndex http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {

@@ -130,6 +130,12 @@ committed: the commit log already holds that.
   request with no session 401 in the JSON error envelope with the
   `not_signed_in` code, where the body was `{"error":"not authenticated"}`.
 
+- The coordination site served by `wallfacer web` answers a request to a path
+  under `/api` that no endpoint serves with 404 `not_found` in the JSON error
+  envelope, or 405 `method_not_allowed` when the path takes other methods, as
+  `wallfacer run` does, where it answered a `GET` with the web app's page and
+  200.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

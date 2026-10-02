@@ -37,6 +37,7 @@ import (
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
+	"latere.ai/x/wallfacer/internal/webserver"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
 
@@ -771,8 +772,8 @@ func stripSSGContent(html string) string {
 // paths under /api. Every route BuildMux registers is more specific than the
 // catch-alls, so it keeps its requests. A hard load of a client route gets the
 // shell; an unmatched /api path gets a JSON 404 (or 405 when a route serves the
-// path under other methods), never the shell. See spa_api.go for why the
-// catch-alls are method-agnostic.
+// path under other methods), never the shell. See webserver.MountCatchAll for
+// why the catch-alls are method-agnostic.
 func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMode bool) {
 	dist, err := fs.Sub(vueDist, "frontend/dist")
 	if err != nil {
@@ -832,9 +833,7 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 	files := http.FS(dist)
 	fileServer := http.FileServer(files)
 	cachedFileServer := withAssetCache(fileServer)
-	mux.HandleFunc(spaCatchAll, spaFallback(mux, serveVueIndex))
-	mux.HandleFunc(apiCatchAll, apiFallback(mux))
-	mux.HandleFunc(apiRoot, apiFallback(mux))
+	webserver.MountCatchAll(mux, serveVueIndex)
 	mux.Handle("GET /assets/", cachedFileServer)
 	mux.Handle("GET /fonts/", cachedFileServer)
 	mux.Handle("GET /static/", fileServer)

@@ -84,8 +84,8 @@ func runWeb(args []string, frontendFS fs.FS) error {
 	mux.Handle("GET /api/coordination/ws", auth.Auth(jwtValidator, http.HandlerFunc(coord.HandleWS)))
 
 	// Same-origin RUM ingest for the SPA; forwards browser OTLP to the
-	// in-cluster collector. POST-scoped to avoid a ServeMux conflict with the
-	// SPA's GET / fallback.
+	// in-cluster collector. POST-scoped because OTLP over HTTP exports by
+	// POST; any other method falls through to the SPA catch-all's 405.
 	mux.Handle("POST /v1/telemetry/", otel.TelemetryProxy("/v1/telemetry"))
 
 	mountWebProbes(mux)

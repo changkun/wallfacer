@@ -134,7 +134,7 @@ Task execution picks one of two paths (`internal/runner/execute.go`):
 
 **Harness** (`internal/harness/`), Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus the in-process `topos` harness. `harness.Default()` returns Claude. The `cursor` harness adapts the `cursor-agent` CLI and emits Claude-style stream-json.
 
-**Webserver** (`internal/webserver/`), Serves the SPA embedded from `frontend/dist` and passed in as an `fs.FS` (`MountSPA`, `internal/webserver/spa.go`); falls through to `index.html` for client-side routes.
+**Webserver** (`internal/webserver/`), Serves the SPA embedded from `frontend/dist` and passed in as an `fs.FS` (`MountSPA`, `internal/webserver/spa.go`). It owns the catch-all routes that both `wallfacer run` and `wallfacer web` mount (`MountCatchAll`, `internal/webserver/catchall.go`): `index.html` for client-side routes on `GET` and `HEAD`, and the JSON error envelope for a path under `/api` that no route serves.
 
 **Frontend** (`frontend/`), Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia). Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
@@ -345,7 +345,7 @@ Every `internal/` package and its role in the system:
 | `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
-| `webserver` | Serves the SPA embedded from `frontend/dist` | `MountSPA()` |
+| `webserver` | Serves the SPA embedded from `frontend/dist` and the catch-all routes beside the API | `MountSPA()`, `SPAFallback()`, `MountCatchAll()` |
 | `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |

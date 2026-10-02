@@ -44,13 +44,16 @@ func MountSPA(mux *http.ServeMux, frontendFS fs.FS) bool {
 	return true
 }
 
-// SPAFallback registers a catch-all GET handler that serves index.html for client-side routing.
+// SPAFallback registers the catch-all routes (see MountCatchAll): index.html
+// for client-side routing on every path no other route matches, and the
+// error envelope for an unmatched path under /api.
 func SPAFallback(mux *http.ServeMux, frontendFS fs.FS) {
 	dist, err := fs.Sub(frontendFS, "frontend/dist")
 	if err != nil {
+		slog.Warn("spa: no dist embedded; no catch-all routes mounted", "err", err)
 		return
 	}
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, _ *http.Request) {
+	MountCatchAll(mux, func(w http.ResponseWriter, _ *http.Request) {
 		serveSPAIndex(w, dist)
 	})
 }
