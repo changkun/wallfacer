@@ -336,21 +336,20 @@ Every `internal/` package and its role in the system:
 | `coordinator` | Cloud coordination plane: the wallfacerd role signed-in local instances connect to over one outbound WebSocket (presence, spec comments, metadata projection) | `Registry`, `CommentStore` (memory + Postgres) |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
-| `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus in-process `topos`; replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Topos`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
-| `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
+| `oteltest` | Test-only: installs a recording OpenTelemetry SDK and a trace-header-recording HTTP server, so instrumentation is checked by the spans it ends and the `traceparent` that reaches the server | `Install()`, `SpanNames()`, `NewServer()`, `Server` |
 | `review` | Review of a waiting task's change by a reviewer on a second model: one round per call, findings sent back as feedback until approval, the round limit or the token budget; the session record lives beside the worktree | `Verifier`, `New()`, `Newest()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
+| `testenv` | Test-only: runs a package's tests with the per-user directories pointed at a temporary directory and the coding-agent CLIs removed from `PATH`, so tests never touch the real sign-in or configuration and never launch a real agent | `RunIsolated()`, `AgentCLIs`, `AgentCLIsOnPath()`, `Within()` |
 | `webserver` | Serves the SPA embedded from `frontend/dist` and the catch-all routes beside the API | `MountSPA()`, `SPAFallback()`, `MountCatchAll()` |
 | `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
-| `routine` | Routine scheduler engine that fires routine-kind tasks (user-defined) on their configured cadence | `Engine`, `NewEngine()`, `Register()`, `Unregister()`, `Trigger()` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; seven-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
 | `speccomment` | Domain types for inline spec comments (the coordinator-authoritative collaboration artifact of the coordination plane) | `Comment`, `Thread`, `Anchor`, `NewID()` |
 | `prompts` | System prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Manager`, `NewManager()`, `WorkspaceDataKey()`, `NewDataKey()` |
@@ -364,7 +363,7 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/pty` | PTY allocation for the WebSocket terminal on macOS and Linux; every call fails on Windows | `Open()`, `StartWithSize()`, `Setsize()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
-General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations and git operations, come from the `latere.ai/x/pkg` module.
+General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, git operations (`gitutil`), the Prometheus-compatible metrics registry (`metrics`) and the routine scheduler engine (`routine`), come from the `latere.ai/x/pkg` module.
 
 ## Handler Organization
 

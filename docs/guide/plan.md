@@ -96,7 +96,13 @@ Independent of the pipeline, the explorer offers staleness tooling: **Rescan sta
 
 Selecting text in a rendered spec (three or more characters) raises a **Comment** button that opens a composer anchored to the selection. Threads render as cards in a right-hand margin rail, aligned with their anchor lines; anchors that can no longer be located fall back to gutter markers, and a triage panel lists orphaned or outdated threads for resolution. Threads support reply, resolve, and reopen.
 
-Comments are stored server-side and stream live to other open views. With a signed-in account and coordination enabled, comments sync across machines through the coordination connector; when signed out or with coordination off, the layer disables itself silently. See [Configuration](configuration.md) for sign-in.
+Comments are stored server-side and stream live to other open views. What the spec view shows depends on sign-in and on coordination:
+
+- **Signed out**: the spec renders with no comment controls.
+- **Signed in, coordination off**: a banner above the spec says spec comments are off and offers **Enable**, which turns coordination on for the instance. No other comment controls appear until it is on.
+- **Signed in, coordination on**: comments sync across machines through the coordination connector. A bar above the spec shows the open-comment count, **Show resolved**, a control to hide or show the margin rail, the triage entry when threads need triage, and the connection state (synced, connecting, or why it is not connected).
+
+A cloud-mode deployment runs no coordination connector and shows no comment controls. Threads are keyed by the repository's git remote, so a spec in a folder without a remote takes no comments. See [Configuration](configuration.md) for sign-in and `WALLFACER_COORDINATION`.
 
 ## Free-form specs
 
