@@ -24,7 +24,7 @@ Configuration resolution (`resolveAuthConfig`):
 
 **Principal endpoint.** `GET /api/me` (`Handler.AuthMe`) returns 204 for no session, or the latere-ui Principal shape (identity, avatar, active org, org list) assembled by `oidc.BuildMe` off a single up-front token refresh, plus `principal_id` and `auth_url` so the shared AccountMenu renders the avatar and org switcher.
 
-**Front-channel logout.** When a user signs out centrally at the auth service, it loads `/logout/notify` on every signed-in origin via a hidden iframe; wallfacer clears the local session cookie and returns 200. The endpoint is safe to load unauthenticated. Both `Logout` and `LogoutNotify` also clear the coordination token first, so signing out stops the connector (see below).
+**Front-channel logout.** When a user signs out centrally at the auth service, it loads `/logout/notify` on every signed-in origin via a hidden iframe; wallfacer clears the local session cookie and returns 200. The handler requires no session, but on an instance with a server key the request has to pass the key check first (see BearerAuth below), and a frame loaded from another site carries neither the key nor the `SameSite=Lax` session cookie, so there it is answered 401 and the local session stays. Both `Logout` and `LogoutNotify` also clear the coordination token first, so signing out stops the connector (see below).
 
 ### Device flow (RFC 8628)
 
