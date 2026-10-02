@@ -2,7 +2,7 @@
 // topbar's crumb, so a destination is named the same way in both places.
 
 export type NavIcon =
-  | 'chat' | 'plan' | 'whiteboard' | 'artifacts' | 'board'
+  | 'chat' | 'plan' | 'whiteboard' | 'board'
   | 'routines' | 'map' | 'terminal' | 'analytics' | 'docs' | 'settings';
 
 export interface NavItem {
@@ -27,7 +27,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'chat', label: 'Chat', to: '/chat', icon: 'chat' },
       { id: 'plan', label: 'Plan', to: '/plan', icon: 'plan' },
       { id: 'whiteboard', label: 'Whiteboard', to: '/whiteboard', icon: 'whiteboard' },
-      { id: 'artifacts', label: 'Artifacts', to: '/artifacts', icon: 'artifacts' },
       { id: 'board', label: 'Board', to: '/', icon: 'board' },
       { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
       { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },

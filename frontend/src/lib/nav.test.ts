@@ -22,6 +22,12 @@ describe('nav model', () => {
     expect(navLabel('/agent-graph')).toBe('');
   });
 
+  it('has no row for the removed artifacts gallery', () => {
+    const items = NAV_GROUPS.flatMap((g) => g.items);
+    expect(items.some((i) => i.id === 'artifacts' || i.label === 'Artifacts' || i.to === '/artifacts')).toBe(false);
+    expect(navLabel('/artifacts')).toBe('');
+  });
+
   it('pins exactly one group to the bottom and gives every other group an eyebrow', () => {
     const pinned = NAV_GROUPS.filter((g) => g.pin === 'bottom');
     expect(pinned).toHaveLength(1);

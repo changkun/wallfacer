@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { NOT_FOUND_ROUTE, localRoutes } from './router';
+import { routeToRestore } from './lib/lastRoute';
 
 function metaFor(path: string): boolean {
   const r = localRoutes.find((route) => route.path === path);
@@ -33,6 +34,19 @@ describe('localRoutes not-found fallback', () => {
     for (const path of ['/agent-graph', '/agents', '/workflows', '/flows']) {
       expect(router.resolve(path).name, path).toBe(NOT_FOUND_ROUTE);
     }
+  });
+
+  it('resolves the removed artifacts gallery to the not-found page', () => {
+    expect(router.resolve('/artifacts').name).toBe(NOT_FOUND_ROUTE);
+  });
+
+  // main.ts restores the last route only when it resolves to a console page;
+  // this is the predicate it passes, so a stored /artifacts keeps a cold
+  // launch on the board instead of landing on the not-found page.
+  it('does not restore a stored /artifacts on a cold launch', () => {
+    const routable = (path: string) => router.resolve(path).name !== NOT_FOUND_ROUTE;
+    expect(routeToRestore('/', '/artifacts', routable)).toBeNull();
+    expect(routeToRestore('/', '/routines', routable)).toBe('/routines');
   });
 
   it('resolves console pages to themselves', () => {
