@@ -3,7 +3,6 @@ package handler
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -19,11 +18,11 @@ import (
 	"latere.ai/x/pkg/statemachine"
 	"latere.ai/x/pkg/watcher"
 
-	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/review"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -1114,16 +1113,23 @@ func (h *Handler) endReview(id uuid.UUID) {
 	h.reviewMu.Unlock()
 }
 
-// reviewSupersedesTest reports whether review replaces the test agent for this task:
-// review is enabled and the task has a session review can fork from. Used to skip
-// auto-test for the task and to gate auto-submit on the review verdict instead of
-// the test verdict. Non-session tasks fall back to the test agent.
-func (h *Handler) reviewSupersedesTest(t *store.Task) bool {
-	return h.ReviewEnabled() && t.SessionID != nil && *t.SessionID != ""
+// reviewable reports whether a task has what a review reads: a worktree whose
+// diff against the default branch is the change under review. The reviewer
+// needs no agent session, so tasks on every harness qualify.
+func reviewable(t *store.Task) bool {
+	return len(t.WorktreePaths) > 0
 }
 
-// isReviewRunning reports whether an review verification run is currently executing
-// for the task. This is the authoritative "running" signal (the real-time
+// reviewSupersedesTest reports whether review replaces the test agent for this
+// task: review is enabled and the task is reviewable. Used to skip auto-test
+// for the task and to gate auto-submit on the review verdict instead of the
+// test verdict.
+func (h *Handler) reviewSupersedesTest(t *store.Task) bool {
+	return h.ReviewEnabled() && reviewable(t)
+}
+
+// isReviewRunning reports whether a review round is currently executing for
+// the task. This is the authoritative "running" signal (the real-time
 // in-flight set), independent of on-disk artifacts.
 func (h *Handler) isReviewRunning(id uuid.UUID) bool {
 	h.reviewMu.Lock()
@@ -1133,18 +1139,19 @@ func (h *Handler) isReviewRunning(id uuid.UUID) bool {
 }
 
 // reviewCandidate pairs a waiting task with the store that owns it, captured at
-// scan time. The owning store is threaded through to the completion write so a
-// workspace-group switch during the multi-minute run cannot redirect the
-// result to a different store (which would silently drop it).
+// scan time. The owning store is threaded through to the completion write and
+// the feedback delivery so a workspace-group switch during the run cannot
+// redirect them to a different store (which would silently drop them).
 type reviewCandidate struct {
 	task  store.Task
 	store *store.Store
 }
 
-// tryAutoReview scans all waiting tasks that have a SessionID and have not yet
-// been verified by review (ReviewUnresolved == nil), then fires a goroutine for
-// each that is not already running and fits within maxConcurrentReview. Does
-// nothing when review is disabled or its circuit breaker is open.
+// tryAutoReview scans the waiting tasks that are reviewable and have no review
+// verdict yet (ReviewUnresolved == nil), then fires a goroutine for each that
+// is not already running and fits within maxConcurrentReview. Each goroutine
+// runs one review round. Does nothing when review is disabled or its circuit
+// breaker is open.
 func (h *Handler) tryAutoReview(ctx context.Context) {
 	if !h.ReviewEnabled() {
 		return
@@ -1155,7 +1162,7 @@ func (h *Handler) tryAutoReview(ctx context.Context) {
 
 	var candidates []reviewCandidate
 	h.forCurrentStore(func(s *store.Store, _ []string) {
-		for _, t := range s.ListWaitingTasksWithSession(ctx) {
+		for _, t := range s.ListWaitingTasksForReview(ctx) {
 			candidates = append(candidates, reviewCandidate{task: t, store: s})
 		}
 	})
@@ -1168,7 +1175,7 @@ func (h *Handler) tryAutoReview(ctx context.Context) {
 		go func() {
 			defer h.endReview(c.task.ID)
 			if err := h.runReview(ctx, c.store, c.task); err != nil {
-				logger.Handler.Warn("review: verification run failed",
+				logger.Handler.Warn("review: round failed",
 					"task", c.task.ID, "error", err)
 			}
 		}()
@@ -1176,26 +1183,16 @@ func (h *Handler) tryAutoReview(ctx context.Context) {
 }
 
 // reviewForkCount is the number of independent critic forks per run.
-// reviewMaxRounds is the per-fork round cap. reviewCostCap is the soft token budget.
-// These are the minimum-cost floor, not a recommended depth: one fork (a single
-// actor/critic pair, Claude-only — the second {Claude, Codex} fork is opt-in) and
-// the shortest meaningful debate. Review alternates roles by round parity (odd =
-// critic, even = proposer), so 3 rounds is one full cycle: attack, rebuttal,
-// re-assessment. Fewer would never let the critic see the rebuttal, leaving a
-// fixed attack spuriously "unresolved" — which the supersede-test barrier then
-// parks for human review. Users expand depth via env (WALLFACER_REVIEW_FORKS /
-// _ROUNDS / _COST_CAP) or the Execution settings tab.
+// reviewMaxRounds is the per-session round cap. reviewCostCap is the soft
+// token budget.
 const (
 	reviewForkCount = 1
 	reviewMaxRounds = 3
 	reviewCostCap   = 50000
 )
 
-// reviewProposerHarness and reviewCriticHarnessIDs are the single source of truth
-// for which harnesses drive review's roles. NewHandler builds the verifier from
-// them and the transcript endpoint reports them as the run config, so the two
-// never drift. The proposer is always Claude (fork-session is Claude-native);
-// critics rotate the listed harnesses by fork index for perspective diversity.
+// reviewProposerHarness and reviewCriticHarnessIDs name the harnesses the
+// transcript endpoint reports as the run config.
 const reviewProposerHarness = harness.Claude
 
 var reviewCriticHarnessIDs = []harness.ID{harness.Claude, harness.Codex}
@@ -1209,8 +1206,8 @@ func reviewCriticHarnessNames() []string {
 	return out
 }
 
-// reviewTuning returns the fork count, max rounds, and token cost cap for an review
-// run, applying env overrides over the conservative defaults. A missing or
+// reviewTuning returns the fork count, max rounds, and token cost cap for a
+// review session, applying env overrides over the defaults. A missing or
 // non-positive env value keeps the default.
 func (h *Handler) reviewTuning() (forks, rounds, costCap int) {
 	forks, rounds, costCap = reviewForkCount, reviewMaxRounds, reviewCostCap
@@ -1240,54 +1237,11 @@ func primaryWorktree(worktreePaths map[string]string) string {
 	return slices.Min(slices.Collect(maps.Values(worktreePaths)))
 }
 
-// reviewEndFile is the minimal subset of review's session end.json that carries
-// the aggregate token usage (over proposer + critics). Mirrors review's
-// state.EndFile.Stats schema; only the fields we attribute are decoded.
-type reviewEndFile struct {
-	Stats struct {
-		TokenUsage *struct {
-			Input       int `json:"input_tokens"`
-			Output      int `json:"output_tokens"`
-			CacheRead   int `json:"cache_read_input_tokens"`
-			CacheCreate int `json:"cache_creation_input_tokens"`
-		} `json:"token_usage"`
-	} `json:"stats"`
-}
-
-// readReviewUsage reads the token breakdown from <sessionDir>/end.json, the
-// artifact review writes at the end of a run. Returns a zero TaskUsage (no tokens)
-// when the file is missing or unparseable — cost is attributed separately by
-// the caller, so a missing end.json degrades to cost-only attribution.
-func readReviewUsage(sessionDir string) store.TaskUsage {
-	if sessionDir == "" {
-		return store.TaskUsage{}
-	}
-	b, err := os.ReadFile(filepath.Join(sessionDir, "end.json"))
-	if err != nil {
-		return store.TaskUsage{}
-	}
-	var ef reviewEndFile
-	if err := json.Unmarshal(b, &ef); err != nil || ef.Stats.TokenUsage == nil {
-		return store.TaskUsage{}
-	}
-	return store.TaskUsage{
-		InputTokens:          ef.Stats.TokenUsage.Input,
-		OutputTokens:         ef.Stats.TokenUsage.Output,
-		CacheReadInputTokens: ef.Stats.TokenUsage.CacheRead,
-		CacheCreationTokens:  ef.Stats.TokenUsage.CacheCreate,
-	}
-}
-
-// reviewUsageNonZero reports whether a TaskUsage carries any spend worth recording.
-func reviewUsageNonZero(u store.TaskUsage) bool {
-	return u.InputTokens > 0 || u.OutputTokens > 0 || u.CacheReadInputTokens > 0 ||
-		u.CacheCreationTokens > 0 || u.CostUSD > 0
-}
-
-// reviewStateDir returns the .review state directory for a run. It lives beside the
-// worktree in the shared per-task dir (<worktreesDir>/<taskID>/.review), not
-// inside it, so debate scratch is never staged by `git add -A`, never appears
-// in generateWorktreeDiff, and is cleaned up with the task's worktree dir.
+// reviewStateDir returns the .review state directory for a task. It lives
+// beside the worktree in the shared per-task dir
+// (<worktreesDir>/<taskID>/.review), not inside it, so the review record is
+// never staged by `git add -A`, never appears in generateWorktreeDiff, and is
+// cleaned up with the task's worktree dir.
 func reviewStateDir(worktreePath string) string {
 	if worktreePath == "" {
 		return ""
@@ -1295,96 +1249,124 @@ func reviewStateDir(worktreePath string) string {
 	return filepath.Join(filepath.Dir(worktreePath), ".review")
 }
 
-// runReview executes one review adversarial verification run for a task and
-// persists the result onto the given store (captured at scan time so a group
-// switch mid-run cannot redirect the write). The task must have a non-nil
-// SessionID and at least one worktree path. Returns nil on success; on error
-// the ReviewUnresolved field is left nil so the next tick retries.
+// runReview runs one review round for a task and acts on its outcome, writing
+// to the given store (captured at scan time so a group switch mid-run cannot
+// redirect the write):
+//
+//   - feedback: the findings go to the task through the feedback path, the
+//     path a person's feedback takes, so it works on every harness; the next
+//     round runs when the task waits again;
+//   - finished: the verdict is persisted, if the task is still waiting;
+//   - skipped: the reason goes on the timeline once, and the verdict stays
+//     unset, so a task whose auto-submit waits on the review keeps waiting.
+//
+// A failed round leaves the verdict unset and opens the auto-review breaker,
+// so the retry waits out the breaker's backoff.
 func (h *Handler) runReview(ctx context.Context, s *store.Store, t store.Task) error {
-	if t.SessionID == nil || *t.SessionID == "" {
+	if !reviewable(&t) {
 		return nil
 	}
-	if len(t.WorktreePaths) == 0 {
-		return nil
-	}
-
 	cwd := primaryWorktree(t.WorktreePaths)
-	diff := generateWorktreeDiff(t.WorktreePaths)
+	_, rounds, costCap := h.reviewTuning()
 
-	forks, rounds, costCap := h.reviewTuning()
-
-	input := wadversarial.VerifyInput{
-		TaskPrompt:    t.Prompt,
-		Criteria:      t.Criteria, // anchors critics to the same acceptance bar as the test agent
-		SessionID:     *t.SessionID,
-		DiffPatch:     diff,
-		Cwd:           cwd,
+	res, err := h.verifier.Verify(ctx, review.Input{
+		Task:          &t,
+		Diff:          generateWorktreeDiff(t.WorktreePaths),
 		StateDir:      reviewStateDir(cwd),
-		ForkCount:     forks,
 		MaxRounds:     rounds,
 		CostCapTokens: costCap,
-	}
-
-	// Surface the run on the task timeline so a manual or auto trigger gives
-	// immediate, visible feedback (the run itself takes minutes in the
-	// background; without this the UI looks inert until it finishes).
-	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-		"result": fmt.Sprintf("Review: adversarial verification started (%d critics, up to %d rounds).", forks, rounds),
+		// Surface the round on the timeline as it starts: a reviewer takes a
+		// while, and without this a manual or auto trigger looks inert.
+		OnStart: func(round, maxRounds int) {
+			h.insertEventOrLogTo(ctx, s, t.ID, store.EventTypeSystem, map[string]string{
+				"result": fmt.Sprintf("Review: round %d of at most %d started.", round, maxRounds),
+			})
+		},
 	})
-
-	result, err := h.verifier.Verify(ctx, input)
 	if err != nil {
 		h.breakers["auto-review"].recordFailure(&t.ID, err.Error())
-		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": "Review: verification failed: " + err.Error(),
+		h.insertEventOrLogTo(ctx, s, t.ID, store.EventTypeSystem, map[string]string{
+			"result": review.FailureMessage(err),
 		})
 		return err
 	}
 	h.breakers["auto-review"].recordSuccess()
-	if result == nil {
-		// Verifier skipped (e.g., no session). Do not mark as run.
+
+	switch res.Outcome {
+	case review.OutcomeSkipped:
+		if res.SkipRecorded {
+			h.insertEventOrLogTo(ctx, s, t.ID, store.EventTypeSystem, map[string]string{
+				"result": res.Skip.Message,
+			})
+		}
+		return nil
+	case review.OutcomeFeedback:
+		if err := h.sendReviewFeedback(ctx, s, t.ID, res); err != nil {
+			h.breakers["auto-review"].recordFailure(&t.ID, err.Error())
+			return err
+		}
 		return nil
 	}
 
-	// Attribute the run's complete usage to the task so review spend shows in the
-	// usage breakdown instead of being untracked. Tokens come from review's
-	// session end.json (the aggregate over proposer + critics); cost is the USD
-	// review reports. This runs before the still-waiting guard because the spend
-	// happened regardless of whether the result is persisted below.
-	usage := readReviewUsage(result.SessionDir)
-	usage.CostUSD = result.USD
-	if reviewUsageNonZero(usage) {
-		if uErr := s.AccumulateSubAgentUsage(ctx, t.ID, store.SandboxActivityReview, usage); uErr != nil {
-			logger.Handler.Warn("review: accumulate usage", "task", t.ID, "error", uErr)
-		}
-	}
-
-	// Only persist if the task is still waiting: a run that completes after the
-	// task was resumed, submitted, or failed would otherwise stamp a stale
+	// Only persist if the task is still waiting: a round that completes after
+	// the task was resumed, submitted, or failed would otherwise stamp a stale
 	// result onto a task whose worktree has already moved on.
 	ft, err := s.GetTask(ctx, t.ID)
-	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting {
+	if err != nil {
+		return err
+	}
+	if ft == nil || ft.Status != store.TaskStatusWaiting {
 		return nil
 	}
-	if err := s.UpdateTaskReview(ctx, t.ID, result.Unresolved, result.Headline, result.SessionDir); err != nil {
+	if err := s.UpdateTaskReview(ctx, t.ID, res.Unresolved, res.Headline, res.SessionDir); err != nil {
 		return err
 	}
 
-	// Verdict gate. A clean verdict lets autoimplement proceed (auto-submit checks
-	// ReviewUnresolved == 0); any unresolved attack is a hard barrier — the task
-	// stays parked in waiting and autoimplement does not auto-resume it. Clearing the
-	// barrier is a human act: confirm the work, or resume with steering, which
-	// calls ClearReviewResult and triggers fresh re-verification. (Autoimplement used
-	// to auto-resume with the attacks as feedback up to MaxReviewRetries; that loop
-	// was removed in favor of explicit human confirmation.)
-	if result.Unresolved == 0 {
-		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": "Review: verification clean — no unresolved attacks.",
-		})
-	} else {
-		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": fmt.Sprintf("Review: %d unresolved attack(s); task halted for review — confirm or resume with steering to re-verify.", result.Unresolved),
-		})
+	// Verdict gate. An approval lets autoimplement proceed (auto-submit checks
+	// ReviewUnresolved == 0). Open findings at the end of a session are a hard
+	// barrier: the task stays parked in waiting, and clearing it is a human
+	// act: confirm the work, or resume with feedback, which clears the verdict
+	// and starts a new review session when the task waits again.
+	h.insertEventOrLogTo(ctx, s, t.ID, store.EventTypeSystem, map[string]string{
+		"result": reviewFinishedMessage(res),
+	})
+	return nil
+}
+
+// reviewFinishedMessage is the timeline sentence for a finished session.
+func reviewFinishedMessage(res *review.Result) string {
+	switch {
+	case res.Unresolved == 0:
+		return "Review: approved, no open findings."
+	case res.Termination == review.TerminationCostCap:
+		return fmt.Sprintf("Review: the reviewer token budget is spent with %d open finding(s); the task is halted for review. Confirm the work, or resume it with feedback to review again.", res.Unresolved)
+	default:
+		return fmt.Sprintf("Review: %d open finding(s) after the last round; the task is halted for review. Confirm the work, or resume it with feedback to review again.", res.Unresolved)
+	}
+}
+
+// sendReviewFeedback delivers a round's findings to the task through the
+// feedback path. It holds promoteMu, the lock every waiting-task transition
+// takes, and re-checks that the task is still waiting: one that moved on while
+// the reviewer ran has a different diff now, so the session is ended as
+// superseded instead and the next review starts afresh.
+func (h *Handler) sendReviewFeedback(ctx context.Context, s *store.Store, taskID uuid.UUID, res *review.Result) error {
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
+
+	ft, err := s.GetTask(ctx, taskID)
+	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting {
+		if serr := review.Supersede(res.SessionDir, time.Now()); serr != nil {
+			logger.Handler.Warn("review: end superseded session", "task", taskID, "error", serr)
+		}
+		return err
+	}
+	note := fmt.Sprintf("Review: round %d requested changes with %d finding(s); the findings were sent to the task as feedback.", res.Round, len(res.Findings))
+	if err := h.resumeWaitingTaskWithFeedbackOnStoreLocked(ctx, s, ft, res.Feedback, store.TriggerAutoReview, note); err != nil {
+		if serr := review.Supersede(res.SessionDir, time.Now()); serr != nil {
+			logger.Handler.Warn("review: end superseded session", "task", taskID, "error", serr)
+		}
+		return err
 	}
 	return nil
 }

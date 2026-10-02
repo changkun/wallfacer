@@ -428,11 +428,12 @@ type Task struct {
 	RoutineSpawnKind TaskKind `json:"routine_spawn_kind,omitempty"`
 	RoutineSpawnFlow string   `json:"routine_spawn_flow,omitempty"`
 
-	// Review adversarial-verification fields. Set by tryAutoAdon / the
-	// manual /api/tasks/{id}/review trigger after a run completes.
-	// nil ReviewUnresolved means review has not run for this task.
-	// 0 means it ran and found no unresolved attacks (clean).
-	// >0 means open disputes remain; ReviewHeadline holds the claim text.
+	// Review verdict fields, set when a review session finishes (auto-review
+	// or the manual /api/tasks/{id}/review trigger) and cleared on resume.
+	// nil ReviewUnresolved means no review has finished since the last turn.
+	// 0 means the reviewer approved.
+	// >0 is the number of open findings; ReviewHeadline holds the most severe
+	// one's claim. ReviewSessionDir is the session's record directory.
 	ReviewUnresolved *int   `json:"review_unresolved,omitempty"`
 	ReviewHeadline   string `json:"review_headline,omitempty"`
 	ReviewSessionDir string `json:"review_session_dir,omitempty"`
@@ -575,6 +576,7 @@ const (
 	TriggerAutoTest    Trigger = "auto_test"    // auto-tester initiated a test run
 	TriggerAutoSubmit  Trigger = "auto_submit"  // auto-submitter marked a waiting task as done
 	TriggerFeedback    Trigger = "feedback"     // user feedback resumed a waiting task
+	TriggerAutoReview  Trigger = "auto_review"  // the review sent its findings to a waiting task as feedback
 	TriggerSync        Trigger = "sync"         // worktree sync/rebase operation
 	TriggerRecovery    Trigger = "recovery"     // server startup recovery of orphaned tasks
 	TriggerSystem      Trigger = "system"       // internal system action

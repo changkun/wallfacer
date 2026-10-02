@@ -186,6 +186,14 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	if !ok {
 		return nil
 	}
+	return h.resumeWaitingTaskWithFeedbackOnStoreLocked(ctx, s, task, message, trigger, systemMessage)
+}
+
+// resumeWaitingTaskWithFeedbackOnStoreLocked is resumeWaitingTaskWithFeedbackLocked
+// on a given store, for callers that captured the task's store before a
+// long-running step (the review) and must not follow a workspace-group switch
+// to another one. Must be called with promoteMu held.
+func (h *Handler) resumeWaitingTaskWithFeedbackOnStoreLocked(ctx context.Context, s *store.Store, task *store.Task, message string, trigger store.Trigger, systemMessage string) error {
 	if err := s.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
 		return err
 	}
@@ -194,7 +202,9 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	}
 	// Clear the review verdict: it was computed against the pre-resume diff and is
 	// stale once this resumed run lands new commits, so the task should be
-	// re-verified after it returns to waiting.
+	// reviewed again after it returns to waiting. Whether that continues the
+	// open review session (the review sent this feedback) or starts a new one
+	// is decided by the session record, not here.
 	if err := s.ClearReviewResult(ctx, task.ID); err != nil {
 		return err
 	}
@@ -207,13 +217,13 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 		return err
 	}
 
-	h.insertEventOrLog(ctx, task.ID, store.EventTypeFeedback, map[string]string{
+	h.insertEventOrLogTo(ctx, s, task.ID, store.EventTypeFeedback, map[string]string{
 		"message": message,
 	})
-	h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange,
+	h.insertEventOrLogTo(ctx, s, task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, trigger, nil))
 	if systemMessage != "" {
-		h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{
+		h.insertEventOrLogTo(ctx, s, task.ID, store.EventTypeSystem, map[string]string{
 			"result": systemMessage,
 		})
 	}
@@ -753,10 +763,16 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
-// ReviewTask triggers adversarial review verification for a waiting task.
-// The task must be in waiting status and have a non-nil SessionID.
-// The run happens asynchronously; 202 Accepted is returned immediately with
-// the planned state directory path so callers can poll or watch .review/.
+// The error a manual review trigger returns for a task with nothing to review.
+const (
+	codeReviewNoWorktree    = "review_no_worktree"
+	messageReviewNoWorktree = "This task has no worktree, so there is no change to review."
+)
+
+// ReviewTask runs one review round for a waiting task, whatever the review
+// toggle says. The task must be waiting and have a worktree. The round runs
+// asynchronously; 202 Accepted is returned immediately with the task's review
+// state directory, and the transcript route shows the round as it lands.
 func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	s, ok := h.requireStore(w)
 	if !ok {
@@ -772,8 +788,11 @@ func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, "only waiting tasks can be verified by review", http.StatusConflict)
 		return
 	}
-	if task.SessionID == nil || *task.SessionID == "" {
-		http.Error(w, "task has no session ID (claude fork-session required)", http.StatusBadRequest)
+	if !reviewable(task) {
+		httpjson.WriteError(w, http.StatusBadRequest, httpjson.Error{
+			Code:    codeReviewNoWorktree,
+			Message: messageReviewNoWorktree,
+		})
 		return
 	}
 
@@ -784,16 +803,15 @@ func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Compute the planned state directory for the response. The engine will
-	// create a session subdirectory inside it; the exact path is set on the
-	// task after the run completes via UpdateTaskReview. It lives beside the
-	// worktree (not inside it) so it is never committed — see reviewStateDir.
+	// The review writes its session under the state directory; the session's
+	// path is set on the task when the session finishes. It lives beside the
+	// worktree (not inside it) so it is never committed, see reviewStateDir.
 	stateDir := reviewStateDir(primaryWorktree(task.WorktreePaths))
 
 	go func() {
 		defer h.endReview(id)
 		if err := h.runReview(context.Background(), s, *task); err != nil {
-			logger.Handler.Warn("review: manual verification run failed",
+			logger.Handler.Warn("review: manual round failed",
 				"task", id, "error", err)
 		}
 	}()

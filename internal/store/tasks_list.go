@@ -186,17 +186,18 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 	return page, total, hasMoreBefore, hasMoreAfter, nil
 }
 
-// ListWaitingTasksWithSession returns all waiting tasks that have a non-nil
-// SessionID and have not yet been run through review (ReviewUnresolved == nil).
-// Used by tryAutoReview to find tasks eligible for adversarial verification.
-func (s *Store) ListWaitingTasksWithSession(_ context.Context) []Task {
+// ListWaitingTasksForReview returns the waiting tasks a review can run on and
+// that have no review verdict yet (ReviewUnresolved == nil): those with at
+// least one worktree, whose diff is the change under review. Used by
+// tryAutoReview to find the tasks due a review round.
+func (s *Store) ListWaitingTasksForReview(_ context.Context) []Task {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	var result []Task
 	for id := range s.tasksByStatus[TaskStatusWaiting] {
 		t := s.tasks[id]
-		if t == nil || t.SessionID == nil || *t.SessionID == "" {
+		if t == nil || len(t.WorktreePaths) == 0 {
 			continue
 		}
 		if t.ReviewUnresolved != nil {

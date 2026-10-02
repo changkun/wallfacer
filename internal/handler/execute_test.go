@@ -11,7 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
+	"latere.ai/x/pkg/httpjson"
+
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -293,12 +294,12 @@ func TestReviewTask_RejectsNonWaiting(t *testing.T) {
 	}
 }
 
-func TestReviewTask_RejectsTaskWithoutSession(t *testing.T) {
+func TestReviewTask_RejectsTaskWithoutWorktree(t *testing.T) {
 	h := newTestHandler(t)
 	// verifier returns immediately so the goroutine doesn't block
-	h.verifier = &mockVerifier{result: nil}
+	h.verifier = &mockVerifier{result: finished(0, "")}
 
-	id := createWaitingTask(t, h, "no-session task")
+	id := createWaitingTask(t, h, "no-worktree task")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/review", nil)
 	req.SetPathValue("id", id.String())
@@ -307,18 +308,26 @@ func TestReviewTask_RejectsTaskWithoutSession(t *testing.T) {
 	h.ReviewTask(w, req, id)
 
 	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for task without session, got %d", w.Code)
+		t.Errorf("expected 400 for task without worktree, got %d", w.Code)
+	}
+	var env httpjson.ErrorEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatalf("decode error body: %v", err)
+	}
+	if env.Error.Code != codeReviewNoWorktree || env.Error.Message != messageReviewNoWorktree {
+		t.Errorf("error = %+v, want code %q with its fixed message", env.Error, codeReviewNoWorktree)
 	}
 }
 
-func TestReviewTask_Accepts202ForWaitingTaskWithSession(t *testing.T) {
+// TestReviewTask_Accepts202ForWaitingTaskWithWorktree: a review needs a
+// worktree, not an agent session, so a task without a session is accepted.
+func TestReviewTask_Accepts202ForWaitingTaskWithWorktree(t *testing.T) {
 	h := newTestHandler(t)
-	h.verifier = &mockVerifier{result: &wadversarial.VerifyResult{Unresolved: 0}}
+	h.verifier = &mockVerifier{result: finished(0, "")}
 
 	id := createWaitingTask(t, h, "verify-me")
-	// Set a session ID on the task.
-	if err := h.store.UpdateTaskResult(context.Background(), id, "done", "session-abc", "end_turn", 1); err != nil {
-		t.Fatalf("UpdateTaskResult: %v", err)
+	if err := h.store.UpdateTaskWorktrees(context.Background(), id, map[string]string{t.TempDir(): t.TempDir()}, "branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/review", nil)

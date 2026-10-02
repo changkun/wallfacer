@@ -122,13 +122,18 @@ func TestRunReviewer_RunsOnReviewerModel(t *testing.T) {
 		`{"verdict":"changes_requested","findings":[{"severity":"high","claim":"the handler returns 500 on HEAD"}]}`)}}
 	task := newReviewTask(t, s)
 
+	started := 0
 	res, err := r.RunReviewer(context.Background(), task, ReviewerInput{
 		Round: 2, MaxRounds: 3, Diff: "+func health() {}",
 		PriorFindings:    []ReviewFinding{{Severity: ReviewSeverityMedium, Claim: "no test for /health"}},
 		ImplementerReply: "added the test",
+		OnStart:          func() { started++ },
 	})
 	if err != nil {
 		t.Fatalf("RunReviewer: %v", err)
+	}
+	if started != 1 {
+		t.Errorf("OnStart called %d times, want 1", started)
 	}
 	if res.Model != "reviewer-model" {
 		t.Errorf("Model = %q, want reviewer-model", res.Model)
@@ -212,7 +217,11 @@ func TestRunReviewer_RefusesWithoutASecondModel(t *testing.T) {
 				tc.prepare(task)
 			}
 
-			_, err := r.RunReviewer(context.Background(), task, ReviewerInput{Round: 1, MaxRounds: 3})
+			started := 0
+			_, err := r.RunReviewer(context.Background(), task, ReviewerInput{Round: 1, MaxRounds: 3, OnStart: func() { started++ }})
+			if started != 0 {
+				t.Errorf("OnStart called %d times for a refused review, want 0", started)
+			}
 			var refusal *ReviewRefusal
 			if !errors.As(err, &refusal) {
 				t.Fatalf("err = %v, want a *ReviewRefusal", err)

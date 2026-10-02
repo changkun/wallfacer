@@ -17,13 +17,13 @@ import (
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/routine"
 
-	wadversarial "latere.ai/x/wallfacer/internal/adversarial"
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/oauth"
+	"latere.ai/x/wallfacer/internal/review"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -147,14 +147,14 @@ type Handler struct {
 	autopush      atomic.Bool
 	reviewEnabled atomic.Bool
 
-	// verifier drives adversarial post-run verification (review). It is set
-	// once in NewHandler and never mutated; ReviewEnabled() is the runtime gate.
-	verifier wadversarial.Verifier
+	// verifier runs the post-run review, one round per call. It is set once in
+	// NewHandler and never mutated; ReviewEnabled() is the runtime gate.
+	verifier review.Verifier
 
-	// reviewInFlight tracks tasks with an review run currently executing, so a
-	// task that takes minutes to verify is not re-launched on every watcher
-	// tick (ReviewUnresolved is only written when the run finishes). Guarded by
-	// reviewMu, which also enforces the maxConcurrentReview cap atomically.
+	// reviewInFlight tracks tasks with a review round currently executing, so
+	// a round is not re-launched on every watcher tick (ReviewUnresolved is
+	// only written when the session finishes). Guarded by reviewMu, which also
+	// enforces the maxConcurrentReview cap atomically.
 	reviewMu       sync.Mutex
 	reviewInFlight map[uuid.UUID]struct{}
 
@@ -300,8 +300,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		return cfg.MaxTestParallelTasks
 	})
 	// Initialize the review verifier once; ReviewEnabled() is the runtime gate.
-	// Critics rotate the configured harnesses per fork for perspective diversity.
-	h.verifier = wadversarial.NewReviewVerifier(r, reviewCriticHarnessIDs...)
+	h.verifier = review.New(r)
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)
@@ -725,10 +724,10 @@ func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }
 // SetAutotest enables or disables auto-test mode.
 func (h *Handler) SetAutotest(enabled bool) { h.autotest.Store(enabled) }
 
-// ReviewEnabled returns whether adversarial verification (review) is active.
+// ReviewEnabled returns whether the automatic review of waiting tasks is active.
 func (h *Handler) ReviewEnabled() bool { return h.reviewEnabled.Load() }
 
-// SetReview enables or disables adversarial verification (review).
+// SetReview enables or disables the automatic review of waiting tasks.
 func (h *Handler) SetReview(enabled bool) { h.reviewEnabled.Store(enabled) }
 
 // AutosubmitEnabled returns whether auto-submit mode is active.

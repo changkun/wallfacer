@@ -4,24 +4,31 @@ import (
 	"testing"
 )
 
-func TestListWaitingTasksWithSession_ReturnsEligible(t *testing.T) {
-	s := newTestStore(t)
+// waitingTaskWithWorktree creates a waiting task with one worktree, the
+// minimum a review reads.
+func waitingTaskWithWorktree(t *testing.T, s *Store, prompt string) *Task {
+	t.Helper()
 	ctx := bg()
-
-	// Create a waiting task with a SessionID.
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "task-with-session", Timeout: 15})
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: prompt, Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusWaiting); err != nil {
 		t.Fatalf("ForceUpdateTaskStatus: %v", err)
 	}
-	sid := "session-abc"
-	if err := s.UpdateTaskResult(ctx, task.ID, "done", sid, "end_turn", 1); err != nil {
-		t.Fatalf("UpdateTaskResult: %v", err)
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{"/repo": "/wt/repo"}, "task/x"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
+	return task
+}
 
-	got := s.ListWaitingTasksWithSession(ctx)
+// TestListWaitingTasksForReview_ReturnsEligible: a waiting task with a
+// worktree is due a review whether or not its harness reported a session.
+func TestListWaitingTasksForReview_ReturnsEligible(t *testing.T) {
+	s := newTestStore(t)
+	task := waitingTaskWithWorktree(t, s, "no-session")
+
+	got := s.ListWaitingTasksForReview(bg())
 	if len(got) != 1 {
 		t.Fatalf("expected 1 task, got %d", len(got))
 	}
@@ -30,12 +37,13 @@ func TestListWaitingTasksWithSession_ReturnsEligible(t *testing.T) {
 	}
 }
 
-func TestListWaitingTasksWithSession_ExcludesNoSession(t *testing.T) {
+// TestListWaitingTasksForReview_ExcludesNoWorktree: a task without a worktree
+// has no diff to review.
+func TestListWaitingTasksForReview_ExcludesNoWorktree(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	// Task without session ID.
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "no-session", Timeout: 15})
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "no-worktree", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -43,32 +51,20 @@ func TestListWaitingTasksWithSession_ExcludesNoSession(t *testing.T) {
 		t.Fatalf("ForceUpdateTaskStatus: %v", err)
 	}
 
-	got := s.ListWaitingTasksWithSession(ctx)
+	got := s.ListWaitingTasksForReview(ctx)
 	if len(got) != 0 {
 		t.Errorf("expected 0 tasks, got %d", len(got))
 	}
 }
 
-func TestListWaitingTasksWithSession_ExcludesAlreadyRun(t *testing.T) {
+func TestListWaitingTasksForReview_ExcludesAlreadyRun(t *testing.T) {
 	s := newTestStore(t)
-	ctx := bg()
-
-	// Task with session ID but ReviewUnresolved already set.
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "already-run", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusWaiting); err != nil {
-		t.Fatalf("ForceUpdateTaskStatus: %v", err)
-	}
-	if err := s.UpdateTaskResult(ctx, task.ID, "done", "session-xyz", "end_turn", 1); err != nil {
-		t.Fatalf("UpdateTaskResult: %v", err)
-	}
-	if err := s.UpdateTaskReview(ctx, task.ID, 0, "", ""); err != nil {
+	task := waitingTaskWithWorktree(t, s, "already-run")
+	if err := s.UpdateTaskReview(bg(), task.ID, 0, "", ""); err != nil {
 		t.Fatalf("UpdateTaskReview: %v", err)
 	}
 
-	got := s.ListWaitingTasksWithSession(ctx)
+	got := s.ListWaitingTasksForReview(bg())
 	if len(got) != 0 {
 		t.Errorf("expected 0 tasks after review already run, got %d", len(got))
 	}
@@ -78,21 +74,12 @@ func TestClearReviewResult_MakesTaskReeligible(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "resumed", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusWaiting); err != nil {
-		t.Fatalf("ForceUpdateTaskStatus: %v", err)
-	}
-	if err := s.UpdateTaskResult(ctx, task.ID, "done", "session-xyz", "end_turn", 1); err != nil {
-		t.Fatalf("UpdateTaskResult: %v", err)
-	}
+	task := waitingTaskWithWorktree(t, s, "resumed")
 	// Review ran: task is excluded from the eligible set.
 	if err := s.UpdateTaskReview(ctx, task.ID, 2, "boom", "/sessions/1"); err != nil {
 		t.Fatalf("UpdateTaskReview: %v", err)
 	}
-	if got := s.ListWaitingTasksWithSession(ctx); len(got) != 0 {
+	if got := s.ListWaitingTasksForReview(ctx); len(got) != 0 {
 		t.Fatalf("expected 0 eligible while verdict set, got %d", len(got))
 	}
 
@@ -108,7 +95,7 @@ func TestClearReviewResult_MakesTaskReeligible(t *testing.T) {
 		t.Errorf("review fields not cleared: unresolved=%v headline=%q dir=%q",
 			fresh.ReviewUnresolved, fresh.ReviewHeadline, fresh.ReviewSessionDir)
 	}
-	if got := s.ListWaitingTasksWithSession(ctx); len(got) != 1 {
+	if got := s.ListWaitingTasksForReview(ctx); len(got) != 1 {
 		t.Errorf("expected task re-eligible after clear, got %d", len(got))
 	}
 }

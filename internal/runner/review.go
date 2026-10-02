@@ -185,6 +185,10 @@ type ReviewerInput struct {
 	Diff             string
 	PriorFindings    []ReviewFinding // the previous round's findings; empty on round 1
 	ImplementerReply string          // the task's result after its last turn; empty on round 1
+	// OnStart, when set, is called once the review is cleared to run (the
+	// reviewer model is set and differs from the task's), right before the
+	// reviewer launches. A refused review never calls it.
+	OnStart func()
 }
 
 // ReviewerResult is one completed reviewer run: the answer, the model and
@@ -231,6 +235,9 @@ func (r *Runner) RunReviewer(ctx context.Context, task *store.Task, in ReviewerI
 		PriorFindings:    FormatReviewFindings(in.PriorFindings),
 		ImplementerReply: strings.TrimSpace(in.ImplementerReply),
 	})
+	if in.OnStart != nil {
+		in.OnStart()
+	}
 	res, err := r.runAgent(ctx, agents.Review, task, prompt, runAgentOpts{
 		EmitSpanEvents: true,
 		TrackUsage:     true,

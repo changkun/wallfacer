@@ -217,9 +217,10 @@ func (s *Store) UpdateTaskTrace(_ context.Context, id uuid.UUID, traceJSON strin
 	})
 }
 
-// UpdateTaskReview persists review adversarial-verification results onto a task.
-// unresolved is 0 for a clean run; headline holds the highest-contention claim.
-// sessionDir is the absolute path to the .review/sessions/<id>/ folder.
+// UpdateTaskReview persists a finished review session onto a task. unresolved
+// is the number of open findings at the end (0 when the reviewer approved);
+// headline is the most severe open finding's claim. sessionDir is the absolute
+// path to the session's .review/sessions/<id>/ folder.
 func (s *Store) UpdateTaskReview(_ context.Context, id uuid.UUID, unresolved int, headline, sessionDir string) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.ReviewUnresolved = &unresolved
