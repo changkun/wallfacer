@@ -35,6 +35,14 @@ committed: the commit log already holds that.
   Topos, Cella, Lux and Drive entries. Wallfacer's own footer rules, which
   overrode the shared layout, are removed.
 
+### Fixed
+
+- A second Wallfacer instance on one machine, which starts on a free port when
+  its own is taken, no longer sends the browser to a sign-in that returns to
+  the first instance: sign-in by browser redirect and organization switching
+  are off there, the account menu says why, and device-code sign-in works as
+  before.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

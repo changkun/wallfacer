@@ -151,7 +151,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `PATCH /api/agent/sessions/{id}` | Mutate a session. Body `{name}` renames; `{state}` transitions it; `archived` hides it from the tab bar (409 if in-flight), `visible` restores it, `active` records the UI's active session. |
 | `DELETE /api/agent/sessions/{id}` | Delete a session and its stored conversation |
 | **Principal & sign-in** (available by default against `auth.latere.ai`; `WALLFACER_CLOUD=true` only forces login, anonymous local use stays first-class) | |
-| `GET /login` | Begin the hosted sign-in flow |
+| `GET /login` | Begin the hosted sign-in flow. Answers 503 with the error `redirect_sign_in_unavailable` on an instance bound to a port its default redirect URL does not name; the org switch below answers the same error there, before clearing the session |
 | `GET /callback` | OAuth2 authorization-code callback; sets the session cookie |
 | `GET /logout` | Clear the session cookie and redirect to the sign-in page |
 | `GET /logout/notify` | Front-channel logout: clear the local cookie when the user signs out centrally |

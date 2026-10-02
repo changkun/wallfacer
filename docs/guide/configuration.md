@@ -243,6 +243,8 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 
 A plain `wallfacer run` fills these with the public secret-less client against `https://auth.latere.ai`; explicit values take precedence. `AUTH_URL`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_REDIRECT_URL`, `AUTH_COOKIE_KEY` (auto-generated at `~/.wallfacer/cookie-key` for the public client), `AUTH_ISSUER`, and `AUTH_JWKS_URL`. `WALLFACERD_ADDR` sets the cloud server address. Cloud deployment details are in [Auth & Identity](../internals/auth-and-identity.md).
 
+`AUTH_REDIRECT_URL` defaults to `http://localhost:<port>/callback` for the requested listen port. When that port is taken, for instance by another Wallfacer instance on the same machine, `wallfacer run` starts on a free port and the default callback URL no longer leads to it. Sign-in by browser redirect is off on such an instance: the server logs a warning at startup, `/login` and organization switching answer the error `redirect_sign_in_unavailable`, and the account menu shows the reason. Device-code sign-in from the account menu and `wallfacer auth login` work on any port. An explicitly set `AUTH_REDIRECT_URL` is used as given, whatever port the server is on.
+
 ### Flags as environment variables
 
 `LOG_FORMAT`, `ADDR`, `DATA_DIR`, and `ENV_FILE` mirror the `wallfacer run` flags of the same names.
