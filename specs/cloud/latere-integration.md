@@ -3,144 +3,254 @@ title: Latere Platform Integration
 status: drafted
 depends_on:
   - specs/identity/authentication.md
-  - specs/foundations/sandbox-backends.md
-  - specs/foundations/storage-backends.md
 affects:
   - internal/executor/
-  - internal/store/
-  - internal/auth/
-  - internal/workspace/
   - internal/runner/
+  - internal/agentgraph/
+  - internal/auth/
+  - internal/coordinator/
 effort: large
 created: 2026-05-30
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Latere Platform Integration
 
+Umbrella for the cloud track. It states what the Latere platform is, which
+parts of it wallfacer calls, and which earlier integration designs are
+retired. Read it before any other spec under `specs/cloud/`.
+
 ## Problem
 
-Wallfacer is a Latere product, but today it runs as a self-contained binary
-that knows nothing about the rest of the Latere ecosystem. Identity sign-in
-(Phase 2) is the only integration that has shipped. Meanwhile the platform has
-grown standalone services that own concerns wallfacer's older cloud specs
-proposed to build from scratch:
+Wallfacer is a Latere application that runs as a self-contained local binary.
+The first version of this umbrella (2026-05) planned one thin client per
+Latere service, because each service was then a product of its own with its
+own host: an identity provider, a sandbox runtime, a file data plane, a model
+gateway, and a tool registry. Five leaf specs followed that shape, one per
+service.
 
-- **Identity** (auth.latere.ai) - OIDC, JWTs, orgs, teams, service accounts,
-  Stripe billing. A plain OIDC provider: it says who is calling and in
-  which org, and nothing else.
-- **Cella** (cella.latere.ai) - K8s sandbox execution, warm pools, durable
-  workspaces, credential vault, per-sandbox identity JWTs.
-- **FS** (fs.latere.ai) - two-tier file data plane (Spaces cold + PVC hot);
-  `/files/*` is live, `/workspaces/*` is planned.
-- **Lux** - model key custody and routing.
-- **MCP Registry** - approved tool catalog.
-- **`latere.ai/x/pkg`** - shared Go libraries (`authkit` with its `jwt`
-  and `oidc` subpackages, `scopes`, `otel`, `audit`); already a wallfacer
-  dependency.
+Latere has since consolidated those services into **one platform**:
 
-This umbrella defines **how wallfacer integrates with those services** so that
-the local-first product keeps working unchanged while cloud mode gains
-ecosystem value incrementally.
+| Surface | Address | What it is |
+|---|---|---|
+| Console | `https://platform.latere.ai` | One sign-in and one navigation over every capability, with the developer documentation |
+| API origin | `https://api.latere.ai/v1/<capability>` | One host for every API, partitioned by capability prefix |
+| Issuer | `https://auth.latere.ai` | Identity, organizations, and the one credential every capability accepts |
+| Git transport | `https://code.latere.ai` | Clone and push for the Repos capability |
+
+| Capability | Prefix | What it is |
+|---|---|---|
+| Agents | `/v1/agents` | Hosted agents: versioned configurations, the sessions held with them, and the triggers that start sessions |
+| Models | `/v1/models` | One address for every model provider, with policy, cost and audit |
+| Repos | `/v1/repos` | Git repositories |
+| Environments | `/v1/environments` | Sandboxed workloads with a durable workspace |
+| Storage | `/v1/storage` | Files, versions, shares and workspaces |
+| Apps | `/v1/apps` | Web applications hosted from a repository |
+
+The per-service hosts the old leaves targeted no longer answer, and the
+platform composes its own capabilities: a hosted agent session opens its own
+workload in Environments, clones from Repos, calls Models, and is billed
+under one budget. Three of the five old leaves designed a second copy of that
+composition inside wallfacer (sandbox creation, credential custody, worktree
+transport). They are archived, and this umbrella replaces their premise.
+
+## The rule: one client of the Agents capability
+
+In cloud mode wallfacer dispatches work to **Agents** and to nothing beneath
+it. Wallfacer never creates a sandbox, never stores a file in Storage on a
+task's behalf, never holds a provider key for a remote run, and never moves a
+worktree into a remote machine. The session does each of those for itself,
+under the platform's authorization and budget.
+
+| Capability | Called by wallfacer | For |
+|---|---|---|
+| Identity | yes, shipped | Sign-in, the principal (`Sub`, `OrgID`), and one actor token per service called |
+| Agents | yes, drafted | Remote execution: a task runs as a hosted session ([topos-remote-executor.md](latere-integration/topos-remote-executor.md)) |
+| Repos | git transport only | The remote a dispatched task's branch is pushed to and the session's branch is fetched from, with plain `git`; no API call |
+| Models | yes, shipped, local runs only | An optional gateway for a local harness or the embedded agent runtime, configured as a base URL and a key |
+| Environments | no | The session's workload is the platform's |
+| Storage | no | Nothing in wallfacer's task or spec model is a platform file |
+| Apps | no | No spec. A task whose outcome is a web app would reach Apps through its repository, not through a wallfacer call |
+
+Why the rule holds:
+
+- **One place composes resources.** Sandbox lifetime, credential injection at
+  the workload's egress, repository delivery, model access and the budget are
+  one mechanism in the platform. A second composition in wallfacer would need
+  the same guarantees and a second audit trail.
+- **The session owns its workspace.** A coding harness needs a git working
+  tree on local disk. The session clones one and pushes a branch; nothing is
+  mounted and nothing is staged, so no file plane sits between wallfacer and
+  the run.
+- **Local mode is unaffected.** A local harness that points at Models is a
+  model client like any other. No job sits above a process on the user's
+  machine, so there is nothing to bypass.
 
 ## Two axes
 
-Cloud work splits into two independent axes that share only the auth principal.
-Conflating them muddied the older specs; they are now named separately.
+Cloud work has two independent axes that share only the signed-in principal.
 
-| Axis | What | Boundary | Status | Anchor |
-|------|------|----------|--------|--------|
-| **A. Coordination plane** | Signed-in local instances hold one outbound connection to a coordinator role on wallfacerd (wf.latere.ai). Presence, remote control, metadata projection, collaboration relay. **Local stays source of truth.** | Allow-listed metadata + presence + comment anchors only | **Cloud v1, lead** | [coordination-plane.md](latere-integration/coordination-plane.md) |
-| **B. Remote execution** | Dispatch agent *runs* to Cella / Topos / Managed Agents / Antigravity. | Source + worktree leave deliberately | Cloud v2+, demand-gated | [cella-runtime.md](latere-integration/cella-runtime.md) |
+| Axis | What | What leaves the machine | Status | Anchor |
+|------|------|-------------------------|--------|--------|
+| **A. Coordination plane** | Signed-in local instances hold one outbound connection to a coordinator role on wallfacer's own server. Presence, remote control, metadata projection, collaboration relay. Local stays source of truth | Allow-listed metadata, presence, and spec comments | Connection and spec comments shipped; the rest drafted | [coordination-plane.md](latere-integration/coordination-plane.md) |
+| **B. Remote execution** | A task runs as a hosted agent session on the platform | The repository the task works on, deliberately and per task | Drafted, gated by demand | [topos-remote-executor.md](latere-integration/topos-remote-executor.md) |
 
-Axis A is the north star's "Cloud v1 is metadata coordination": local-first
-sync, not hosted execution. It is **relay + projection, never mirror** (the
-coordinator is never authoritative for local task data). Axis B crosses the data
-boundary on purpose and is the later, opt-in phase. The rest of this umbrella
-catalogs the per-service seams both axes draw on.
+Axis A is wallfacer's own domain (specs, tasks, board presence across a
+user's own instances) and is not a platform capability. The consolidation
+does not change it. Axis B is where the consolidation applies: it was two
+parallel executors (a sandbox backend and an agent backend) plus a file
+plane, and is now one executor over `/v1/agents`.
 
-## Principle: consume, don't absorb
+Two third-party remote executors,
+[claude-managed-agents.md](claude-managed-agents.md) and
+[antigravity.md](antigravity.md), sit beside Axis B. They dispatch to another
+vendor's hosted agents and are independent of the Latere platform.
 
-The Latere product boundary for wallfacer states:
+## What wallfacer owns
 
-> Wallfacer is the autonomous engineering control plane. It should consume
-> Latere platform services in cloud mode rather than absorbing them. Cloud v1
-> is metadata coordination, not cloud execution.
+Wallfacer **owns** the spec model, the task lifecycle, the agent graph,
+oversight, the git and worktree workflow, autonomy controls, the local-first
+experience, and coordination among a user's own instances.
 
-Wallfacer **owns**: the spec model, task lifecycle, agents/flows, oversight,
-git/worktree workflow, autonomy controls, and local-first UX. Wallfacer **does
-not own** runtime infrastructure (Cella), identity (Identity), the file data
-plane (FS), model keys (Lux), or the MCP catalog (Registry). Each integration
-is a thin client over a service boundary, never a reimplementation.
+Wallfacer **does not own** identity, authorization policy, the hosted agent
+runtime, sandbox runtime, model key custody and routing, file storage, git
+hosting, budgets, or billing. Each is a platform concern reached through one
+of the calls above or not reached at all.
+
+## Credentials
+
+One sign-in covers everything. The login session's token is the issuer's and
+is addressed to no service. For each service it calls, wallfacer mints a
+short-lived **actor token** from that session, addressed to the service's
+audience (`oidc.Client.ActorToken`). The coordination connector already works
+this way for the coordinator's audience
+(`coordinationMinter` in `internal/cli/coordination.go`). A platform call
+mints for the audience `api.latere.ai`.
+
+Consequences:
+
+- Wallfacer adds no token-exchange endpoint and stores no platform key. A
+  refresh is a new mint from the session.
+- No credential stands for the user. A hosted session acts with the agent's
+  own identity, bounded by what the person who started it may do; wallfacer's
+  token reaches the Agents API and nothing of the session's.
+- Authorization is decided by the platform for the person behind the token.
+  Wallfacer decides nothing about a platform resource. It shows a refusal as
+  the platform states it: the `code`, the fixed `message`, and the `details`.
 
 ## Integration seams
 
-Each seam is either an interface that already exists in wallfacer (cloud impl
-slots in, local stays default) or a new thin adapter. Selection is config-gated
-(`WALLFACER_CLOUD` + the relevant service URL); a nil/absent client means the
-seam is inert and local behavior is byte-identical to today.
+Each seam is config-gated. With no sign-in and no platform configuration the
+seam is inert and local behavior is byte-identical to a build without it.
 
-| Seam | Latere service | Wallfacer interface | Status | Spec |
-|------|----------------|---------------------|--------|------|
-| **Identity** | auth.latere.ai | `internal/auth` middleware + `authkit/jwt` and `authkit/oidc`; `authkit.Identity{Sub,OrgID}` principal | ✅ shipped (Phase 1+2) | [identity/authentication.md](../.archive/identity/authentication.md) |
-| **Runtime** | Cella | `executor.Backend` (today: Host only; the cloud impl slots in as a third executor) | drafted | [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md) |
-| **Cella wire client** | Cella | a shared Go client published by Cella, consumed by Wallfacer's `CellaBackend` and Topos's `cella.Provider` | drafted | [latere-integration/shared-cella-client.md](latere-integration/shared-cella-client.md) |
-| **File data plane** | FS | `internal/workspace` + `internal/runner` (worktree staging) | drafted; **blocked on FS Workspace API** | [tenant-filesystem.md](tenant-filesystem.md) |
-| **Deploy** | Latere platform infrastructure (DOKS) | thin deploy module + `pkg/otel` OTLP emit | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |
-| **Model keys** | Lux | credential injection into task env | future | - (specced when scheduled) |
-| **MCP catalog** | MCP Registry | approved-tool resolution | future | - |
-| **Coordination plane** (presence, remote control, metadata projection, collaboration) | coordinator role on wallfacerd (wf.latere.ai) | one outbound connection per signed-in instance; tap `store.TaskEvent`, redact to an allow-list, push | **drafted (Cloud v1 lead)** | [latere-integration/coordination-plane.md](latere-integration/coordination-plane.md) |
+| Seam | Platform side | Wallfacer side | Status | Spec |
+|------|---------------|----------------|--------|------|
+| **Identity** | `auth.latere.ai` | `internal/auth` middleware over `authkit/jwt` and `authkit/oidc`; `authkit.Identity{Sub,OrgID}` principal | shipped | [authentication.md](../.archive/identity/authentication.md) |
+| **Models for local runs** | `/v1/models` | The harness's base-URL variable and key in the env file; `agentgraph.ModelConfig` in Lux mode, with `gatewayRoot` in `internal/runner/agentic.go` deriving the gateway root from the harness-shaped URL | shipped | none needed |
+| **Remote execution** | `/v1/agents` | One remote executor that runs a task as a session and maps the session's events onto the task timeline | drafted | [topos-remote-executor.md](latere-integration/topos-remote-executor.md) |
+| **Coordination plane** | none; wallfacer's own server role | One outbound connection per signed-in, opted-in instance; a `store.TaskEvent` tap redacted to an allow-list | part shipped | [coordination-plane.md](latere-integration/coordination-plane.md) |
+| **Hosted board** | the cluster the board is deployed into | A second workload beside the public site, with a volume for task data | drafted | [cloud-infrastructure.md](cloud-infrastructure.md) |
+| **Data boundary** | none | The gates and allow-lists on every path that leaves the machine | drafted | [data-boundary-enforcement.md](data-boundary-enforcement.md) |
 
 ## Design rules
 
-1. **Local-first is invariant.** No seam may change local-anonymous behavior.
-   The default build with no Latere services configured runs exactly as today
-   (host agent process + filesystem store + no auth).
-2. **Config-gated, nil-safe selection.** Mirror the existing pattern: cloud
-   wiring activates only when `WALLFACER_CLOUD=true` and the service's config is
-   present; otherwise the client is nil and call sites short-circuit (the way
-   `AuthProvider`/`jwtValidator` already do).
-3. **Interface first.** Prefer implementing an existing wallfacer interface
-   (`executor.Backend`, `store.StorageBackend`, `handler.AuthProvider`) over
-   inventing a new one. Extract a new seam only where none fits.
-4. **Data boundary holds.** Anything leaving the machine obeys
-   [data-boundary-enforcement.md](data-boundary-enforcement.md):
-   metadata may leave; source, diffs, secrets, and repo paths may not. Cloud
-   *execution* (Cella) deliberately crosses this boundary and is therefore a
-   later, explicitly opt-in phase - not part of metadata coordination.
-5. **One service, one owner.** If a Latere service owns a concern, wallfacer
-   consumes it and does not keep a parallel implementation.
+1. **Local-first is invariant.** No seam changes local-anonymous behavior.
+   The default build with no sign-in runs a host agent process over a
+   filesystem store with no network dependency on Latere.
+2. **Config-gated, nil-safe selection.** A seam activates only when its
+   configuration is present. Otherwise its client is nil and call sites
+   short-circuit, the way `AuthProvider` and `jwtValidator` already do.
+3. **One origin, addressed by capability root.** A platform call goes to a
+   capability's root, by default under `https://api.latere.ai/v1/`. The
+   configurable unit is the root (for example the Agents root), because a
+   self-hosted core serves the same routes at the root of its own address.
+   No code names a per-service host.
+4. **Interface first.** A seam implements an interface wallfacer already has
+   (`executor.Backend`, the `agentgraph` runner seam, `handler.AuthProvider`)
+   before it introduces a new one.
+5. **Data boundary holds.** Anything leaving the machine obeys
+   [data-boundary-enforcement.md](data-boundary-enforcement.md): metadata may
+   leave on the coordination channel; source, diffs, agent output, secrets
+   and repository paths may not. Remote execution sends a repository off the
+   machine on purpose, so it is opt-in per task and names what leaves before
+   it leaves.
+6. **One owner per concern.** Where the platform owns a concern, wallfacer
+   calls it and keeps no parallel implementation.
+7. **The platform's contract passes through.** Errors keep the platform's
+   envelope, lists use its cursors, and every create carries an
+   `Idempotency-Key`. Wallfacer does not translate them into a vocabulary of
+   its own.
 
 ## Phasing
 
-- **Phase 1 - done.** Identity sign-in + JWT + principal/org model.
-- **Phase 2 - Axis A, coordination plane (Cloud v1).** The
-  [coordination-plane](latere-integration/coordination-plane.md) anchor: one
-  outbound connection per signed-in instance carrying presence, remote control,
-  the metadata projection, and the collaboration relay. Local stays source of
-  truth. This is the lead because it delivers cross-instance value (presence,
-  team visibility, spec comments) without crossing the source/diff boundary.
-- **Phase 3+ - Axis B, remote execution (gated by demand & FS Workspace API).**
-  Cella execution, FS workspace staging, model-key routing via Lux. A
-  sandbox that calls back carries the dispatching user's own token,
-  audienced to the service it calls. The runtime seam ([cella-runtime.md](latere-integration/cella-runtime.md))
-  is its lead, behind the existing `executor.Backend` interface.
+- **Phase 1, done.** Identity sign-in, JWT validation, the principal and
+  organization model, per-account isolation of local projects and tasks.
+- **Phase 2, in progress: Axis A.** The outbound connection and
+  cloud-resident spec comments shipped. Presence, the metadata projection and
+  remote control are drafted on the same connection.
+- **Phase 3, drafted: Axis B.** One executor over the Agents capability. It
+  is gated by demand, and by two platform conditions the executor spec
+  tracks: sessions run for personal agents only until an organization's
+  agents can be given a budget, and a session's push credential covers the
+  platform's git host only.
+
+## Retired by the consolidation
+
+| Retired | Was | Now |
+|---|---|---|
+| [cella-runtime.md](../.archive/cloud/latere-integration/cella-runtime.md) | A `CellaBackend` creating sandboxes at a standalone sandbox host, with secrets through its vault | Not built. The session opens its own workload |
+| [shared-cella-client.md](../.archive/cloud/latere-integration/shared-cella-client.md) | A sandbox wire client shared with the agent runtime | No wallfacer caller remains |
+| [tenant-filesystem.md](../.archive/cloud/tenant-filesystem.md) | Staging worktrees through a file plane's workspace API | The file plane is gone; a session clones and pushes |
+| [tenant-api.md](../.archive/cloud/tenant-api.md) | A wallfacer-issued API key per tenant | One platform key for every capability; wallfacer keeps no key store |
+| Model keys as a future seam | Credential injection into the task environment | Shipped as plain configuration for local runs; a hosted session's model access is the platform's |
+| Tool catalog as a future seam | Resolving approved tools from a registry service | No such service. A hosted agent's tools are part of its configuration |
+
+Earlier retirements ([multi-tenant.md](../.archive/cloud/multi-tenant.md),
+[billing-idempotency.md](../.archive/cloud/billing-idempotency.md)) stand for
+the same reason: the concern is the platform's.
+
+### Shipped code left without a caller
+
+One piece of the retired design was built. The sandbox proxy
+(`internal/handler/sandbox_proxy.go`, routes under
+`/internal/sandbox-proxy/llm/`) lets a cloud sandbox that wallfacer created
+reach a model provider without holding the provider's key: the sandbox
+presents a service token for the audience `wallfacer-sandbox-proxy`, and the
+proxy substitutes the key. It has no caller: nothing mints that token and no
+sandbox exists to present it.
+
+Under this umbrella nothing ever will. A hosted session's model access is its
+own, through the platform, and its workload never calls wallfacer. Removing
+the proxy, its routes, its audience, and the page that documents it
+(`docs/internals/service-identity.md`) is a code change with its own commit
+and tests. It is listed here so the removal is a decision, not an oversight.
 
 ## Boundaries
 
-- Do **not** build runtime scheduling, identity, file storage, model-key
-  custody, or an MCP catalog inside wallfacer - those are owned by Cella,
-  Identity, FS, Lux, and the Registry respectively.
-- Do **not** gate or alter local execution behind any of these seams.
-- This umbrella defines *contracts and selection*; each leaf spec carries the
-  concrete adapter design, tests, and docs.
+- Do **not** build sandbox scheduling, identity, file storage, model-key
+  custody, git hosting, or billing inside wallfacer.
+- Do **not** call a capability beneath Agents on behalf of a remote run.
+- Do **not** gate or alter local execution behind any seam.
+- This umbrella defines the contract and the selection rule. Each leaf
+  carries its own design, tests and docs.
 
 ## Open questions
 
-- Does cloud "metadata coordination" (history/usage/team visibility) live in a
-  separate Latere service, or as a `wallfacer cloud` server mode? Decides
-  whether a `metadata-sync.md` leaf is needed and where its store lives.
-- How do worktrees reach a remote Cella sandbox (FS Workspace API vs git
-  push/pull vs Cella durable workspace)? Owned by the runtime + FS leaves.
+1. **Hosted board.** Whether wallfacer runs as a hosted task board, at which
+   address, and under which product name is a product decision that is not
+   made here. [cloud-infrastructure.md](cloud-infrastructure.md) carries the
+   deployment shape so the decision has something concrete to accept or
+   reject.
+2. **Projection overlap.** The platform already records a hosted session's
+   tokens and cost. The Axis A metadata projection carries usage for local
+   runs. Whether an organization's dashboard reads both, and where it lives,
+   is open in
+   [metadata-projection.md](latere-integration/coordination-plane/metadata-projection.md).
+3. **Repositories outside the platform's git host.** A hosted session clones
+   a repository on another host without a credential, so only a public one,
+   and cannot push to it. The executor spec states the v1 answer (a
+   repository on the platform's git host); a GitHub-hosted workflow is open
+   in
+   [cloud-remote-fix.md](../intent/github-integration/cloud-remote-fix.md).
