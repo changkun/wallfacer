@@ -1,6 +1,6 @@
 ---
 title: RBAC Scope Matrix
-status: stale
+status: archived
 depends_on:
   - specs/identity/multi-user-collaboration.md
   - specs/identity/authentication.md
@@ -11,14 +11,36 @@ affects:
   - internal/handler/
 effort: medium
 created: 2026-06-14
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # RBAC Scope Matrix
 
-The lead child of [multi-user-collaboration.md](../multi-user-collaboration.md). The collaboration parent depends on a working authorization surface before presence, audit, optimistic concurrency, or private threads are meaningful: without role gating, every signed-in org member can mutate every task. This spec defines the canonical permission matrix and wires it onto the routes, on top of the already-shipped primitives.
+> **Archived 2026-10-02. Retired as: the mechanism this spec maps onto no
+> longer exists.** The matrix assigns admin, editor and viewer behavior to
+> three scopes (`wallfacer:read`, `wallfacer:write`, `wallfacer:admin`) read
+> from `Identity.Scopes` and enforced by a `RequireScope` wrapper. Both are
+> gone: the shared identity type carries no scopes, and the unwired
+> `RequireScope` scaffold was removed from `internal/auth/authorize.go`
+> (`7c4f8674`). `RequireSuperadmin` remains and gates the platform-admin
+> routes.
+>
+> The premise also reversed. This spec chose scopes because "a role claim does
+> not exist". One does now: an identity's `Roles` carry the caller's roles in
+> the active organization (`owner`, `admin`, `member`) beside
+> `platform_admin`.
+>
+> The need is unchanged and stays with the parent,
+> [multi-user-collaboration](../../../identity/multi-user-collaboration.md): who in an
+> organization may mutate what. When that is picked up, the matrix is written
+> against organization roles, and whether wallfacer defines a viewer below
+> `member` is decided there.
+>
+> The text below is kept as written for the record.
+
+The lead child of [multi-user-collaboration.md](../../../identity/multi-user-collaboration.md). The collaboration parent depends on a working authorization surface before presence, audit, optimistic concurrency, or private threads are meaningful: without role gating, every signed-in org member can mutate every task. This spec defines the canonical permission matrix and wires it onto the routes, on top of the already-shipped primitives.
 
 ## Current State (shipped)
 

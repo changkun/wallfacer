@@ -16,12 +16,56 @@ affects:
   - docs/guide/
 effort: xlarge
 created: 2026-04-18
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Multi-User Collaboration (Org-Scoped Board)
+
+> **Stale as of 2026-10-02.** The goal stands: members of one organization
+> working on one board with attribution, permissions and awareness of each
+> other. The text below is wrong in these places, and a refresh waits on one
+> decision.
+>
+> What is false today:
+>
+> - **The tenant model.** The spec assumes one hosted instance per
+>   organization, provisioned and hibernated by an infrastructure layer, with
+>   a process that is single-organization. No such layer exists, and one
+>   instance now serves several contexts: a signed-in instance scopes
+>   workspaces and tasks to the active personal account or organization
+>   ([local-account-isolation](../.archive/identity/local-account-isolation.md)),
+>   and browser-facing reads and mutations are gated on workspace visibility.
+>   The hosted board, if it ships, is one board for every principal
+>   ([cloud-infrastructure](../cloud/cloud-infrastructure.md)).
+> - **Authorization.** Every reference to `Identity.Scopes`, to
+>   `auth.RequireScope`, and to the scope-based matrix. Identities carry no
+>   scopes and the wrapper was removed. They carry the caller's organization
+>   roles (`owner`, `admin`, `member`), which the matrix should be rewritten
+>   against. The lead child that held it is archived:
+>   [rbac-matrix](../.archive/identity/multi-user-collaboration/rbac-matrix.md).
+> - **Presence.** Sections "Presence", "Activity focus" and the wire protocol
+>   describe process-local presence. Presence moved to the coordination plane
+>   and aggregates across instances
+>   ([presence](../cloud/latere-integration/coordination-plane/connection-and-presence/presence.md)).
+> - **The endpoint matrix.** It lists the ideation routes, which were removed
+>   with the idea-agent subsystem, and `/api/planning/*`, which is now
+>   `/api/agent/*`.
+> - **UI file names.** `PlanningChatPanel.vue`, `SettingsModal.vue` and
+>   `StatusBar.vue` are gone; the surfaces are `AgentChatPanel.vue` and
+>   `ChatComposer.vue`, the settings page and its tabs, and `Topbar.vue`.
+>   `internal/planner/` is `internal/agentsession/`.
+>
+> What still holds: the identity plumbing recorded as done (steps 1 and 2 of
+> the implementation order), the actor model for automation loops, the audit
+> log, optimistic concurrency, private threads, and the non-goals.
+>
+> The blocking decision: whether a hosted board ships at all (open question 1
+> of the [platform integration](../cloud/latere-integration.md)). In-instance
+> collaboration matters only when several people share one instance, which
+> today happens nowhere. For people on separate local instances, the same
+> needs are met by the coordination plane, which is the active design.
 
 ## Problem
 
