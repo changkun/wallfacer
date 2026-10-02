@@ -18,7 +18,7 @@ affects:
   - frontend/src/stores/github.ts
 effort: xlarge
 created: 2026-06-26
-updated: 2026-06-26
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
@@ -143,7 +143,7 @@ graph TD
   GC -->|REST/GraphQL| GH[(api.github.com)]
   TS -->|principal-scoped| ST[(store)]
   H -.consumes.-> ID[coordinator.NormalizeRemoteURL / repo-identity]
-  H -.later, gated.-> EX[Executor seam: Cella/Topos]
+  H -.later, gated.-> EX[Hosted executor: platform Agents]
   style EX stroke-dasharray: 5 5
 ```
 
@@ -212,10 +212,12 @@ explicitly widened in the child.
 #### 5. Cloud clone + remote fix (later, gated)
 
 Codex-style: clone a selected repo and run agents in a cloud sandbox with no
-local checkout. This depends on the **Cloud Axis B Executor seam**
-([cella-runtime.md](../cloud/latere-integration/cella-runtime.md),
-[topos-remote-executor.md](../cloud/latere-integration/topos-remote-executor.md)),
-which is demand-gated and not yet built. Specced as a dependent later phase so
+local checkout. This depends on the **Cloud Axis B Executor seam**, which is one
+executor over the Latere platform's Agents capability
+([topos-remote-executor.md](../cloud/latere-integration/topos-remote-executor.md)),
+demand-gated and not yet built. A hosted session holds a push credential for the
+platform's git host only, so a GitHub repository also needs a route there; the
+child spec carries that question. Specced as a dependent later phase so
 the local/headless OAuth + read/write surface (components 1-4) ships
 independently of remote execution.
 
@@ -372,7 +374,7 @@ Strategy only; per-component test plans live in the children.
 | 2 | [repo-selection](github-integration/repo-selection.md) | List accessible user/org repos, pick one, resolve to `host/owner/repo` | #1, repo-identity | medium | drafted |
 | 3 | [read-surface](github-integration/read-surface.md) | List PRs/issues, detail + comments, REST/GraphQL, rate-limit, caching | #1 | large | drafted |
 | 4 | [pull-request](github-integration/pull-request.md) | Create PR via API (supersedes `gh`) + comment on PR/issue | #1, #2 | medium | drafted |
-| 5 | [cloud-remote-fix](github-integration/cloud-remote-fix.md) | Clone + run agents in a cloud sandbox, no local checkout (gated) | #1, cella-runtime, topos | large | vague |
+| 5 | [cloud-remote-fix](github-integration/cloud-remote-fix.md) | Clone + run agents in a cloud sandbox, no local checkout (gated) | #1, hosted executor | large | vague |
 
 ```mermaid
 graph LR
