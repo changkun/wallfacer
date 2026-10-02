@@ -44,21 +44,20 @@ committed: the commit log already holds that.
   before.
 
 - A signed-out browser on the machine Wallfacer runs on reaches sign-in by
-  browser redirect: `/login` and `/callback` answered
-  `401 {"error":"unauthorized"}`, because a local instance always has a
-  server key and a page navigation cannot present it. A browser on another
-  host still needs a session or the key there, and signs in with a device
-  code.
+  browser redirect, where `/login` and `/callback` answered
+  `401 {"error":"unauthorized"}` because a page navigation cannot present the
+  server key; a browser on another host still needs a session or the key
+  there, and signs in with a device code.
 
 - The **Sign in via latere.ai** button on the GitHub tab in Settings signs in
-  the way the account menu does, by device code in a modal, and shows the
-  GitHub connection as soon as the sign-in completes. It sent the browser to
-  `/login`, which a local instance answered with `401`.
+  the way the account menu does, by device code in a modal, instead of sending
+  the browser to `/login`, and shows the GitHub connection as soon as the
+  sign-in completes.
 
 - Switching organization on a local instance ends the session of the previous
   organization before the browser leaves for sign-in, as it does on a hosted
-  one. The previous session stayed in the browser, so a switch abandoned at
-  the sign-in page left the account menu in the old organization.
+  one, so a switch abandoned at the sign-in page no longer leaves the account
+  menu in the old organization.
 
 - A review transcript that cannot be read to its end is marked incomplete in
   the task's verification panel, and the server logs the reason, where the
