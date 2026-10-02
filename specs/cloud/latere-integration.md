@@ -257,6 +257,7 @@ and tests. It is listed here so the removal is a decision, not an oversight.
 3. **Repositories outside the platform's git host.** A hosted session clones
    a repository on another host without a credential, so only a public one,
    and cannot push to it. The executor spec states the v1 answer (a
-   repository on the platform's git host); a GitHub-hosted workflow is open
-   in
-   [cloud-remote-fix.md](../intent/github-integration/cloud-remote-fix.md).
+   repository on the platform's git host). A repository on another host is
+   out of scope until the platform offers a connector for it: wallfacer
+   removed its own GitHub integration on 2026-10-02
+   ([remove-github-integration](../shared/platform-native/remove-github-integration.md)).

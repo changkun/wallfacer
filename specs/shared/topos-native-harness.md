@@ -25,6 +25,31 @@ dispatched_task_id: null
 
 # Topos as Native Harness
 
+> **Scope changed 2026-10-02; rewrite pending.** This spec makes the native
+> harness the default while every CLI harness stays selectable, on the
+> runtime module wallfacer pins today. The maintainer decided the same day to
+> go further ([platform-native](platform-native.md), decision 2): migrate to
+> the rebuilt runtime module and make it the only harness, with models from
+> the Latere platform and the user switching models. No Claude Code, no
+> Codex, no other CLI.
+>
+> What that changes here:
+>
+> - "Remaining before `Default()` changes" becomes "remaining before the CLI
+>   adapters are removed". The five items still apply and are joined by the
+>   module migration itself.
+> - Component 2 (decoupling from Claude Code as the default) becomes removal
+>   of `internal/harness`'s CLI adapters, the subprocess executor, and the
+>   per-CLI credential flows.
+> - The sub-agent roles (title, commit message, oversight, test) need a home
+>   on the one harness.
+> - What a signed-out instance can do needs an answer, since models come from
+>   the platform.
+>
+> The body below is the accurate record of what is shipped on the current
+> pin. It is rewritten once the rebuilt module's embedding surface has been
+> read against wallfacer's seam.
+
 ## Overview
 
 Make Topos (`latere.ai/x/topos`) wallfacer's first-class **native agent harness**
@@ -354,7 +379,7 @@ To add with the remaining work:
 - **OQ-4 RESOLVED by what shipped.** The native single-agent harness shares the
   harness registry and pickers, not the agent-graph editor. It did not wait on the
   agent-graph surface, which is recorded in
-  [agent-graph-e2e-design](../local/agent-graph-e2e-design.md).
+  [agent-graph-e2e-design](../.archive/local/agent-graph-e2e-design.md).
 - **OQ-5.** Should the default change while the embed is pinned to the pre-rebuild
   module, or only after the pin moves? Flipping first makes every ordinary task run
   on a module the upstream project has replaced.
@@ -362,7 +387,7 @@ To add with the remaining work:
   or fall back to a configured subprocess harness.
 - **OQ-7.** Should a native run stop in `waiting` before the commit pipeline, as a
   subprocess run does? Today it merges on completion. The same question is open
-  for fleets in [agent-graph-e2e-design](../local/agent-graph-e2e-design.md).
+  for fleets in [agent-graph-e2e-design](../.archive/local/agent-graph-e2e-design.md).
 - **Not established.** No test covers what title generation or a test run does
   today for a task pinned to `topos`. Reading the code, `sandboxForTaskActivity`
   returns the task's pin for every activity and `HostBackend.Launch` has no case

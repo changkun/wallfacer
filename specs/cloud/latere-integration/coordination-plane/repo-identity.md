@@ -33,9 +33,7 @@ which spec comments already key on. Not built: every verification tier below,
 and the durable organization-to-repositories registry. A claimed remote is
 trusted within the organization boundary today.
 
-One correction to the upgrade tier: wallfacer runs no GitHub OAuth flow of its
-own. Its GitHub connection is the signed-in Latere account's, and a
-server-authoritative check would ask through that connection.
+The upgrade tier below is struck: wallfacer holds no GitHub credential.
 
 ## The collaboration unit is the Repo
 
@@ -126,6 +124,12 @@ repo. No per-user GitHub check. Coarser (org-wide, not per-repo), but zero GitHu
 dependency.
 
 ### Upgrade: per-user GitHub OAuth (server-authoritative)
+
+> Struck 2026-10-02. Wallfacer removed its GitHub integration
+> ([remove-github-integration](../../../shared/platform-native/remove-github-integration.md)),
+> so this tier has no token to check with. A server-authoritative check
+> returns when the platform offers a connector for the git host, and is
+> specified then. The two tiers above are the model.
 
 For orgs wanting the coordinator to verify access **server-side** rather than
 trust the client: reuse Identity's existing GitHub federated login

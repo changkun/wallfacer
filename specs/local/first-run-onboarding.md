@@ -42,18 +42,19 @@ dispatched_task_id: null
 >   and a browser check holds the first two in place (`56c7098b`).
 >   `WorkspaceRequired.vue` still says only "Pick a workspace to begin".
 >
-> Two decisions block a refresh to `drafted`, and both are the maintainer's.
+> One decision blocks a refresh to `drafted`, and it is the maintainer's.
 >
 > 1. **The first useful action.** A new user can start from the Board (a
 >    task), from Plan (a spec), or from Chat. The Board and Plan each carry
 >    their own empty-state copy. A guided first run needs one of them chosen
 >    as the path, or a statement that there is none and the work is copy only.
-> 2. **Whether agents and fleets belong in the first run.** Every task runs on
->    the built-in `implement` fleet without the user opening the agent-graph
->    page. What that page should teach depends on its vocabulary and on which
->    coordination modes are presented as ready, and both are open in
->    [agent-graph-e2e-design](agent-graph-e2e-design.md), which is itself not
->    accepted.
+>
+> Decided 2026-10-02: **agents and fleets are not part of a first run.** The
+> agent-graph page is being removed
+> ([retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md)),
+> so the half of this stub about teaching it has no subject. What remains is
+> the first decision above, and it is best taken after the harness migration,
+> when a first run also means signing in and choosing a model.
 
 ## Goal
 

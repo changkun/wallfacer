@@ -114,8 +114,9 @@ default, and the zero value) and `hosted`. A workspace-level default selects
 the initial value for new tasks; the composer shows the choice only when the
 instance is signed in. A task pinned to a CLI harness has no `hosted` option.
 
-Flows that delegate between several agents (`runAgenticFlow`) stay local in
-v1. A hosted session is one agent.
+A hosted session is one agent. User-authored fleets, the only other shape a
+task could take, are retired
+([retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md)).
 
 Where the selector is drawn and how it reads next to the harness picker
 belongs to [topos-native-harness](../../shared/topos-native-harness.md),
@@ -347,9 +348,8 @@ Excluded:
 - The Agents API itself. This spec consumes the published document at
   `/v1/agents/openapi.yaml`.
 - Multi-agent flows, multi-repository tasks, and test or review runs.
-- Repositories that have no remote on the platform's git host. See
-  [cloud-remote-fix](../../intent/github-integration/cloud-remote-fix.md) for
-  the GitHub case.
+- Repositories that have no remote on the platform's git host. They wait
+  for a platform connector; wallfacer has no GitHub integration of its own.
 - Organization contexts, until the platform runs an organization's agents.
 - Triggers. A routine that fires on a schedule keeps running locally.
 - Any call to Environments, Storage or Models on a hosted run's behalf.

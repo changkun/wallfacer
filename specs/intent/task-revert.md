@@ -318,8 +318,8 @@ task on every change, so the new fields reach the UI without a new channel.
 - Reverting several tasks in one action.
 - Undoing a revert. A retry of the task back to backlog starts it over.
 - Interactive conflict resolution by the user.
-- Closing or updating a pull request opened for the task
-  ([pull-request](github-integration/pull-request.md)).
+- Anything on a git host. Wallfacer has no GitHub integration; a pull
+  request the user opened for the task is theirs to close.
 
 ---
 
