@@ -610,7 +610,7 @@ var Routes = []Route{
 		Tags:        []string{"auth"},
 	},
 
-	// --- Latere.ai sign-in (cloud mode only; mounted when WALLFACER_CLOUD=true) ---
+	// --- Latere.ai sign-in (mounted on every run; WALLFACER_CLOUD only forces it) ---
 
 	{
 		Method: http.MethodGet, Pattern: "/login", Name: "Login",

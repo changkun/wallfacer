@@ -29,10 +29,10 @@ func ok204() http.Handler {
 	})
 }
 
-// newAuthHandler builds a Handler with auth enabled via the same
-// fakeAuthProvider already used in the superadmin test; a regular
-// newTestHandler yields h.HasAuth() == false which would make
-// ForceLogin collapse to identity.
+// newAuthHandler builds a Handler with a sign-in provider wired, as every
+// run wires one, via the same fakeAuthProvider the superadmin test uses. A
+// bare newTestHandler wires none (h.HasAuth() == false), which makes
+// ForceLogin identity.
 func newAuthHandler(t *testing.T) *Handler {
 	t.Helper()
 	h := newTestHandler(t)
@@ -134,10 +134,12 @@ func TestForceLogin_AuthenticatedPassesThrough(t *testing.T) {
 	}
 }
 
-// TestForceLogin_LocalModeIsIdentity confirms the middleware is a
-// no-op when h.HasAuth() is false, matching today's anonymous local
-// deployment behavior.
-func TestForceLogin_LocalModeIsIdentity(t *testing.T) {
+// TestForceLogin_NoSignInProviderIsIdentity confirms the middleware is a
+// no-op when no sign-in provider is wired (h.HasAuth() is false): /login
+// would answer 503 there, so redirecting to it would strand the browser.
+// A local instance does not reach this branch; the CLI never installs
+// ForceLogin outside cloud mode.
+func TestForceLogin_NoSignInProviderIsIdentity(t *testing.T) {
 	h := newTestHandler(t) // no SetAuth
 	mw := h.ForceLogin(ok204())
 
@@ -147,7 +149,7 @@ func TestForceLogin_LocalModeIsIdentity(t *testing.T) {
 	mw.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204 (local mode pass)", w.Code)
+		t.Fatalf("status = %d, want 204 (no provider: pass through)", w.Code)
 	}
 }
 

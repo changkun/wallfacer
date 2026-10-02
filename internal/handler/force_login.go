@@ -46,10 +46,11 @@ var unprotectedPrefixes = []string{
 }
 
 // ForceLogin returns a middleware that redirects unauthenticated
-// HTML navigation to /login?next=<original-path>. The redirect only
-// fires when:
+// HTML navigation to /login?next=<original-path>. The CLI installs it
+// only in cloud mode (WALLFACER_CLOUD); a local instance never forces
+// sign-in. The redirect only fires when:
 //
-//   - `Handler.HasAuth()` is true (cloud mode), AND
+//   - a sign-in provider is wired (`Handler.HasAuth()`), AND
 //   - no *authkit.Identity is in context, AND
 //   - the request is a GET, AND
 //   - the Accept header indicates HTML navigation (contains
@@ -61,7 +62,11 @@ var unprotectedPrefixes = []string{
 // fetch layer typically handles that with a page reload that then
 // hits the redirect.
 //
-// Local mode collapses this to identity via `HasAuth() == false`.
+// With no sign-in provider wired the middleware is identity: /login
+// would answer 503, so a redirect there would strand the browser. This
+// matches Login, AuthMe and Logout, which also handle a Handler built
+// without SetAuth. Every run wires a provider, so in the server that
+// branch is not reached.
 func (h *Handler) ForceLogin(next http.Handler) http.Handler {
 	if !h.HasAuth() {
 		return next

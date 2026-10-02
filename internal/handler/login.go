@@ -34,8 +34,9 @@ type AuthProvider interface {
 }
 
 // SetAuth installs an OIDC sign-in provider. Pass nil to leave auth
-// unconfigured (the default). Called from the CLI boot path when
-// WALLFACER_CLOUD=true and oidc.New returns a valid client.
+// unconfigured (the default). The CLI boot path calls it on every run,
+// local and cloud alike, and refuses to start when oidc.New returns no
+// client.
 func (h *Handler) SetAuth(p AuthProvider) {
 	h.auth = p
 	if p != nil {
@@ -87,9 +88,12 @@ func (h *Handler) SetCloudMode(enabled bool) {
 	h.cloudMode = enabled
 }
 
-// HasAuth reports whether a cloud-mode OIDC client is wired. Used by
-// server-side wiring to decide whether to apply authorization wrappers
-// (e.g. RequireSuperadmin) to individual routes.
+// HasAuth reports whether a sign-in provider (the OIDC client) is wired,
+// that is, whether a browser can sign in. Every run wires one, local and
+// cloud alike, so HasAuth says nothing about the mode: a decision that
+// differs between a local instance and a hosted deployment keys on
+// cloudMode (SetCloudMode). It is false only for a Handler built without
+// SetAuth.
 func (h *Handler) HasAuth() bool { return h.auth != nil }
 
 // Login redirects the browser to the auth service's authorize endpoint.

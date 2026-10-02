@@ -165,9 +165,10 @@ type Handler struct {
 
 	oauthManager *oauth.Manager
 
-	// auth provides latere.ai OIDC sign-in when cloud mode is active. Nil
-	// (untyped) means auth is not configured; handlers short-circuit to 503
-	// or 204 accordingly. Wired via SetAuth from the CLI boot path.
+	// auth provides latere.ai OIDC sign-in. The CLI boot path wires it via
+	// SetAuth on every run, local and cloud alike. Nil (untyped) means auth
+	// is not configured, which only a Handler built without SetAuth sees;
+	// handlers short-circuit to 503 or 204 accordingly.
 	auth AuthProvider
 	// cloudMode is true for a multi-tenant cloud deployment (WALLFACER_CLOUD).
 	// It gates forced login and workspace data-path scoping — NOT project/task
