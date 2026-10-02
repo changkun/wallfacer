@@ -11,12 +11,49 @@ affects:
   - docs/guide/getting-started.md
 effort: large
 created: 2026-06-28
-updated: 2026-06-28
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Feature: First-Run Onboarding & Agent-Graph Discoverability
+
+> **Stale as of 2026-10-02:** the text below is the 2026-06-28 stub, unchanged.
+> These statements in it are false today.
+>
+> - **"Blocked on the SDK foundation."** The embedded runtime, its trace, and
+>   its live events shipped (`topos-runtime-integration`,
+>   `topos-live-agent-events`, both complete). Nothing upstream blocks this
+>   spec.
+> - **"Replace the separate Agents and Flows pages with the unified graph."**
+>   Done. One page at `/agent-graph` holds the agent registry and the fleet
+>   editor, and `AgentsPage.vue` and `FlowsPage.vue`, both listed under
+>   `affects`, are deleted (`d1b264f9`, `8a04ce68`). The record is
+>   [unified-agent-graph-ui](../.archive/local/unified-agent-graph-ui.md).
+> - **"Pinned vs dynamic regions, the peer directory."** The page does not
+>   show regions or a peer directory. It shows one coordination choice per
+>   fleet: Fixed sequence, Lead delegates, or Open mesh.
+> - **"Live trace in the Map/`GraphCanvas`."** A run's trace renders in the
+>   task detail (`AgentTrace.vue`), on the task timeline, and as a run overlay
+>   on the agent-graph page. Mission Control does not render it.
+> - **"Not just 'Pick a workspace'."** Partly addressed outside this spec:
+>   the workspace dialog says what a workspace is (`188f5daa`), an empty Plan
+>   names the next steps (`261df08e`), an empty Board opens the task composer,
+>   and a browser check holds the first two in place (`56c7098b`).
+>   `WorkspaceRequired.vue` still says only "Pick a workspace to begin".
+>
+> Two decisions block a refresh to `drafted`, and both are the maintainer's.
+>
+> 1. **The first useful action.** A new user can start from the Board (a
+>    task), from Plan (a spec), or from Chat. The Board and Plan each carry
+>    their own empty-state copy. A guided first run needs one of them chosen
+>    as the path, or a statement that there is none and the work is copy only.
+> 2. **Whether agents and fleets belong in the first run.** Every task runs on
+>    the built-in `implement` fleet without the user opening the agent-graph
+>    page. What that page should teach depends on its vocabulary and on which
+>    coordination modes are presented as ready, and both are open in
+>    [agent-graph-e2e-design](agent-graph-e2e-design.md), which is itself not
+>    accepted.
 
 ## Goal
 
