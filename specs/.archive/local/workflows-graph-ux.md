@@ -1,6 +1,6 @@
 ---
 title: Workflows Graph UX
-status: stale
+status: archived
 depends_on:
   - specs/local/agents-and-flows.md
 affects:
@@ -11,19 +11,51 @@ affects:
   - docs/guide/
 effort: large
 created: 2026-06-15
-updated: 2026-07-16
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
-> **Superseded.** The agent-graph consolidation is the decision of record.
-> Topos owns the
-> agent-graph model; wallfacer consumes `latere.ai/x/topos/graph` (via
-> `internal/agentgraph`) and retires its duplicate flow runtime. This
-> workflow/flow UX framing is superseded by the `/agent-graph` surface. Status
-> stays `stale` (the spec vocabulary has no `superseded` state).
-
 # Workflows Graph UX
+
+> **Archived 2026-10-02. Retired as: the page this spec redraws no longer
+> exists.** The first half shipped on 2026-06-15 (`f5b71dbe`, recorded in the
+> Outcome at the end): the tab was renamed to Workflows and a flow rendered as
+> a read-only pipeline. Two weeks later the agent-graph surface replaced the
+> page. `63e1e833` redirected `/workflows` and `/flows` to `/agent-graph` and
+> removed the Workflows nav entry, and `8a04ce68` deleted `FlowsPage.vue` and
+> `flows.css`. The deferred half, editing on the canvas, has nothing left to
+> edit.
+>
+> What replaced each part:
+>
+> - **The Workflows name.** The rail entry is "Agents" and opens
+>   `/agent-graph`. The page calls the thing a fleet; the task composer and
+>   the routine form call it an agent graph. `/workflows` and `/flows` still
+>   resolve, as redirects (`frontend/src/router.ts`).
+> - **The pipeline canvas.** `frontend/src/components/AgentGraphCanvas.vue`
+>   draws a fixed-sequence fleet as stages left to right, with agents that run
+>   together stacked in one stage (`c6593a66`).
+> - **The step editor** (drag to reorder, mark optional, group in parallel).
+>   Deleted with the page. The fleet editor in
+>   `frontend/src/views/AgentGraphPage.vue` adds and removes agents and sets
+>   the lead and the coordination mode. Reorder and parallel grouping were
+>   built there as node drags (`013c28f9`, `5be3ebee`) and removed when the
+>   canvas was rebuilt around a lead and its members (`da84d6e2`). Nothing
+>   sets `optional` from the UI today.
+> - **The per-node harness badge.** An agent's harness pin shows on its row in
+>   the palette, not on the canvas node.
+> - **The open question** (fold the Agents tab in, or keep it separate). The
+>   agent editor is embedded in the agent-graph page and the Agents page is
+>   deleted (`3d9b534a`, `d1b264f9`).
+> - **Docs.** [docs/guide/agent-graph.md](../../../docs/guide/agent-graph.md).
+>
+> The record of the surface that replaced this one is
+> [unified-agent-graph-ui](unified-agent-graph-ui.md). A note placed here on
+> 2026-07-18 attributed the supersession to a consolidation of the agent-graph
+> model onto `latere.ai/x/topos/graph`; the page was already gone by then.
+>
+> The text below is kept as written for the record.
 
 ## Overview
 
