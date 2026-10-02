@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/spec"
@@ -59,10 +58,6 @@ type MockRunner struct {
 
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
-
-	// RunCriticRoundFn lets tests stub review critic invocations and assert the
-	// working directory the critic is run in.
-	RunCriticRoundFn func(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error)
 
 	// RunReviewerFn lets tests stub the reviewer. When nil, RunReviewer
 	// returns an approve verdict with no findings.
@@ -238,15 +233,6 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 		return m.AssessDriftFn(ctx, specBody, affects, changedFiles, diff)
 	}
 	return spec.DriftVerdict{}, nil
-}
-
-// RunCriticRound delegates to RunCriticRoundFn when set; otherwise it returns
-// a zero result so callers that do not exercise the critic path are unaffected.
-func (m *MockRunner) RunCriticRound(ctx context.Context, prompt string, sb harness.ID, cwd string, deadline time.Duration) (CriticRoundResult, error) {
-	if m.RunCriticRoundFn != nil {
-		return m.RunCriticRoundFn(ctx, prompt, sb, cwd, deadline)
-	}
-	return CriticRoundResult{}, nil
 }
 
 // RunReviewer delegates to RunReviewerFn when set; otherwise it returns an

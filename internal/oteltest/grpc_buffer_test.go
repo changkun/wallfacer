@@ -1,4 +1,7 @@
-package adversarial
+// gRPC reaches the wallfacer binary through the OpenTelemetry OTLP exporters,
+// so the guard on the pinned gRPC version lives beside the OpenTelemetry test
+// support.
+package oteltest
 
 import (
 	"bytes"
