@@ -166,6 +166,10 @@ committed: the commit log already holds that.
   are not synced through that server and `GET /api/coordination/status`
   reports coordination unavailable; a local instance is unchanged.
 
+- `wallfacer run -addr` with an address that has no port, such as
+  `-addr 127.0.0.1`, stops at startup with an error naming the address, where
+  the server listened on every network interface at a random port.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

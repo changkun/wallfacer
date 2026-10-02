@@ -550,8 +550,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	// Bind the listening socket. If the requested port is taken (e.g. another
 	// wallfacer instance), fall back to an OS-assigned free port so the server
-	// still starts rather than failing outright.
-	host, _, _ := net.SplitHostPort(cfg.Addr)
+	// still starts rather than failing outright. An address that does not
+	// parse stops startup: read as an empty host, the fallback would bind
+	// every interface.
+	host, err := listenHost(cfg.Addr)
+	if err != nil {
+		logger.Fatal("listen", "error", err)
+	}
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		logger.Main.Warn("requested address unavailable, finding free port", "addr", cfg.Addr, "error", err)
@@ -756,22 +761,47 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 	defer sc.Stop()
 
 	if !*noBrowser {
-		host, _, _ := net.SplitHostPort(*addr)
-		browserHost := host
-		if browserHost == "" || browserHost == "0.0.0.0" || browserHost == "::" || browserHost == "[::]" {
-			browserHost = "localhost"
+		if url, err := browserURL(*addr, sc.ActualPort); err != nil {
+			logger.Main.Warn("open browser skipped; open the board's address manually", "error", err)
+		} else {
+			go func() {
+				if err := openBrowser(url); err != nil {
+					logger.Main.Warn("open browser failed; open the address manually", "url", url, "error", err)
+				}
+			}()
 		}
-		url := fmt.Sprintf("http://%s:%d", browserHost, sc.ActualPort)
-		go func() {
-			if err := openBrowser(url); err != nil {
-				logger.Main.Warn("open browser failed; open the address manually", "url", url, "error", err)
-			}
-		}()
 	}
 
 	if err := sc.Serve(); err != nil {
 		logger.Fatal("server", "error", err)
 	}
+}
+
+// listenHost returns the host part of a listen address such as ":8080" or
+// "127.0.0.1:8080". An address without a port, such as "127.0.0.1", is an
+// error naming the address, so a caller reports it instead of reading the
+// host as empty, which means every interface.
+func listenHost(addr string) (string, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", fmt.Errorf("listen address %q: %w", addr, err)
+	}
+	return host, nil
+}
+
+// browserURL is the address the browser opens for a server asked to listen on
+// addr and bound to port. A wildcard or empty host becomes localhost, since a
+// browser cannot dial a wildcard address.
+func browserURL(addr string, port int) (string, error) {
+	host, err := listenHost(addr)
+	if err != nil {
+		return "", err
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, strconv.Itoa(port)), nil
 }
 
 // stripSSGContent disables vite-ssg hydration and injects a script that
