@@ -7,7 +7,6 @@ depends_on:
 affects:
   - go.mod
   - internal/agentgraph/
-  - internal/adversarial/
   - internal/handler/tasks_autoimplement.go
   - internal/runner/
   - internal/agentsession/
@@ -58,10 +57,16 @@ an opt-in:
 | `runNativeTopos` and `driveToposRun`: live events onto the task timeline, final text and trace stored, the commit pipeline run | `df9df847`, `7e351855`, `291cc45d` |
 | The commit message generated in-process for such a task | `7604ab29` |
 | The trace in the task detail, with the Topos wordmark | `c7ce346f`; `AgentTrace.vue` |
+| Phase 1a: review as two models. A built-in `review` role on `WALLFACER_REVIEW_MODEL` (refused when it equals the task's model) reads the prompt, criteria and diff and answers with findings and a verdict; requested changes go back as feedback for up to `WALLFACER_REVIEW_ROUNDS` rounds within `WALLFACER_REVIEW_COST_CAP`; every task with a worktree is reviewable, on any harness. `internal/adversarial` and the import of the old module's `adversarial` package are gone | `8fc8830f`, `760e43ab`, `d6dcb3d7`, `e18a45cd`, `58d2f818`, `f327e717`, `2caafe94`, `34185beb`; `internal/review/`, `internal/runner/review.go` |
 
 What it lacks, and what this spec closes: test verification, oversight, usage
 and cost, limits, a stop in `waiting`, sub-agent roles on the same harness,
 and a credential other than a static key.
+
+The review runs on the role path today, so it inherits the role's limits: the
+reviewer gets the diff in its prompt, capped at 16 KB, and has no access to
+the worktree, so it cannot build or run tests as the old critic could. A
+reviewer session on the seam with read access to the worktree is phase 2.
 
 ## The rebuilt module, as wallfacer would use it
 
@@ -189,13 +194,13 @@ them; see [sessions-that-spawn-and-fork](platform-native/sessions-that-spawn-and
 
 ## Phases
 
-Each phase leaves the tree building and the suites green. Phase 0 is in
-progress elsewhere.
+Each phase leaves the tree building and the suites green. Phases 0 and 1a
+are done.
 
 | Phase | Content | Why first |
 |---|---|---|
-| 0 | [Retire fleets](../.archive/shared/platform-native/retire-agent-fleets.md) and [remove GitHub](../.archive/shared/platform-native/remove-github-integration.md) | The delegating-fleet engine is written against the old module's API and cannot move; removing it first means the seam carries one path |
-| 1a | Rebuild the review as two models on the runner's existing role path: a built-in reviewer role on a model different from the task's, its findings fed back to the task through the feedback path, bounded rounds and cost. `internal/adversarial` and its import of the old module's `adversarial` package go | One module path can be pinned at one version only, and the rebuilt module has no `adversarial` package; doing the review first, on the role path, decouples it from the module move |
+| 0 (done) | [Retire fleets](../.archive/shared/platform-native/retire-agent-fleets.md) and [remove GitHub](../.archive/shared/platform-native/remove-github-integration.md) | The delegating-fleet engine is written against the old module's API and cannot move; removing it first means the seam carries one path |
+| 1a (done) | Rebuild the review as two models on the runner's existing role path: a built-in reviewer role on a model different from the task's, its findings fed back to the task through the feedback path, bounded rounds and cost. `internal/adversarial` and its import of the old module's `adversarial` package go | One module path can be pinned at one version only, and the rebuilt module has no `adversarial` package; doing the review first, on the role path, decouples it from the module move |
 | 1b | Move the seam to the rebuilt module: the task's implementation session, events and usage, interrupt, the scripted model in tests, and the in-process roles. The `topos` harness choice now means the rebuilt harness. The credential stays today's static key in this step | The base everything else stands on |
 | 2 | Every other role on the seam: test verification, chat and planning, and the reviewer. The task lifecycle on a session: a stop in `waiting`, feedback as the next message of the same session, approvals, re-attach after a restart. The model switch in the composer and chat. The two credential sources: a Latere model key and a provider sign-in | After this nothing needs a CLI |
 | 3 | Remove the CLI harnesses: the five adapters and the fake one in `internal/harness`, the subprocess executor and its per-CLI launchers, CLI binary discovery, per-role harness settings, the harness picker and logos, the CLI checks in `wallfacer doctor`, and the docs. `Task.Sandbox` stays as a record field and is ignored | Last, so no release has fewer working paths than the one before |
