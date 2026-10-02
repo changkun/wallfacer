@@ -2,6 +2,7 @@ package harness
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -95,5 +96,19 @@ func TestToposAuthEnvEmpty(t *testing.T) {
 	}
 	if len(env) != 0 {
 		t.Errorf("AuthEnv = %v, want empty", env)
+	}
+}
+
+// TestToposCredentialRequiredIsOneSentence holds the user-facing refusal to
+// a single sentence that names the credential and where to set it.
+func TestToposCredentialRequiredIsOneSentence(t *testing.T) {
+	msg := ToposCredentialRequired
+	if !strings.HasSuffix(msg, ".") || strings.Contains(msg, ". ") {
+		t.Errorf("%q is not a single sentence", msg)
+	}
+	for _, want := range []string{"ANTHROPIC_API_KEY", "Settings > Harness"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("%q does not mention %q", msg, want)
+		}
 	}
 }

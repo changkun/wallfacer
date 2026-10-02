@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -32,7 +33,13 @@ func (h *Handler) sandboxUsable(sb harness.ID) (bool, string) {
 			return false, harness.ToposCredentialRequired
 		}
 		cfg, err := envconfig.Parse(h.envFile)
-		if err != nil || cfg.APIKey == "" {
+		if err != nil {
+			// An unreadable env file yields no credential, as it does for
+			// the runner; the cause is logged for the operator.
+			slog.Warn("topos usability: read env configuration", "error", err)
+			return false, harness.ToposCredentialRequired
+		}
+		if cfg.APIKey == "" {
 			return false, harness.ToposCredentialRequired
 		}
 		return true, ""

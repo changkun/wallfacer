@@ -23,7 +23,7 @@ func InProcess(id ID) bool { return id == Topos }
 // that has no model credential. The runner stores it as the result of the task
 // it refuses, and the harness selector reports it as the reason Topos is
 // unusable, so both surfaces say the same thing.
-const ToposCredentialRequired = "The topos harness requires a model credential. Set ANTHROPIC_API_KEY under Settings > Harness."
+const ToposCredentialRequired = "The topos harness requires a model credential: set ANTHROPIC_API_KEY under Settings > Harness."
 
 // toposHarness is the native, in-process latere.ai harness. It is a registry
 // citizen so the config/UI selector, default resolution, and per-task pinning
