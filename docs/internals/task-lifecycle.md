@@ -281,7 +281,7 @@ Tasks can declare dependencies on other tasks via `DependsOn []string` (a list o
 
 1. **Ref uniqueness**: Each task in the batch can have a symbolic `ref` string. Duplicate refs are rejected.
 
-2. **Prompt validation**: Every task must have a non-empty prompt.
+2. **Prompt and pattern validation**: Every task must have a non-empty prompt, and every entry of its `custom_pass_patterns` and `custom_fail_patterns` must compile as a regular expression.
 
 3. **Field validation**: The request body is decoded strictly, so an unknown field (including the `flow` field earlier releases accepted) is rejected with a 400. The `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400 that names `PATCH /api/tasks/{id}`, where a task's harness is set after creation.
 

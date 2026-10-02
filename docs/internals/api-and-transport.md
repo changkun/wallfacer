@@ -64,7 +64,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
 | `POST /api/tasks` | Create a new task in the backlog. **Does not accept `sandbox` or `sandbox_by_activity`**; a task's harness and per-activity harnesses are set via `PATCH /api/tasks/{id}` after creation, and otherwise follow the `WALLFACER_SANDBOX_*` settings. |
-| `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring. Same harness-rejection policy as the singular endpoint. |
+| `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring. Each task takes the fields the singular endpoint takes, plus `ref`, `depends_on_refs` and `spec_source_path`. Same harness-rejection policy as the singular endpoint. |
 | `POST /api/tasks/generate-titles` | Bulk-generate titles for tasks that lack one |
 | `POST /api/tasks/generate-oversight` | Bulk-generate oversight summaries for eligible tasks |
 | `GET /api/tasks/search` | Search tasks by keyword |

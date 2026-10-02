@@ -165,23 +165,45 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 	return filtered
 }
 
-// taskModelBudget is the per-task model override and budget that both
-// POST /api/tasks and each task of POST /api/tasks/batch accept. Both
-// request types embed it, so the JSON fields and their mapping onto the
-// stored task are defined once.
-type taskModelBudget struct {
-	MaxCostUSD     float64 `json:"max_cost_usd"`
-	MaxInputTokens int     `json:"max_input_tokens"`
-	Model          string  `json:"model"`
+// taskCreateFields are the fields of a new task that both POST /api/tasks
+// and each task of POST /api/tasks/batch accept. Both request types embed
+// it, so the JSON fields and their mapping onto the stored task are defined
+// once and a field single create takes cannot be missing from batch create.
+// Each request type adds only what differs: batch create's ref, dependency
+// refs and spec source path, and the sandbox fields both reject in their
+// own shape.
+type taskCreateFields struct {
+	Prompt             string         `json:"prompt"`
+	Criteria           string         `json:"criteria"`
+	Timeout            int            `json:"timeout"`
+	MountWorktrees     bool           `json:"mount_worktrees"`
+	Kind               store.TaskKind `json:"kind"`
+	Tags               []string       `json:"tags"`
+	ScheduledAt        *time.Time     `json:"scheduled_at,omitempty"`
+	CustomPassPatterns []string       `json:"custom_pass_patterns,omitempty"`
+	CustomFailPatterns []string       `json:"custom_fail_patterns,omitempty"`
+	MaxCostUSD         float64        `json:"max_cost_usd"`
+	MaxInputTokens     int            `json:"max_input_tokens"`
+	Model              string         `json:"model"`
 }
 
-// apply copies the model override and the budget limits into opts. The
-// store normalizes them: a negative limit becomes unlimited and a blank
-// model leaves the global default in effect.
-func (b taskModelBudget) apply(opts *store.TaskCreateOptions) {
-	opts.MaxCostUSD = b.MaxCostUSD
-	opts.MaxInputTokens = b.MaxInputTokens
-	opts.ModelOverride = b.Model
+// apply copies the fields into opts. The store normalizes the model and the
+// budget: a negative limit becomes unlimited and a blank model leaves the
+// global default in effect. The caller validates the prompt and the custom
+// patterns first.
+func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
+	opts.Prompt = f.Prompt
+	opts.Criteria = f.Criteria
+	opts.Timeout = f.Timeout
+	opts.MountWorktrees = f.MountWorktrees
+	opts.Kind = f.Kind
+	opts.Tags = f.Tags
+	opts.ScheduledAt = f.ScheduledAt
+	opts.CustomPassPatterns = f.CustomPassPatterns
+	opts.CustomFailPatterns = f.CustomFailPatterns
+	opts.MaxCostUSD = f.MaxCostUSD
+	opts.MaxInputTokens = f.MaxInputTokens
+	opts.ModelOverride = f.Model
 }
 
 // CreateTask creates a new task in backlog status.
@@ -193,18 +215,9 @@ func (b taskModelBudget) apply(opts *store.TaskCreateOptions) {
 // that include either field get a 400 that names the PATCH path.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		taskModelBudget
-		Prompt             string                               `json:"prompt"`
-		Criteria           string                               `json:"criteria"`
-		Timeout            int                                  `json:"timeout"`
-		MountWorktrees     bool                                 `json:"mount_worktrees"`
-		Sandbox            *harness.ID                          `json:"sandbox,omitempty"`
-		SandboxByActivity  map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
-		Kind               store.TaskKind                       `json:"kind"`
-		Tags               []string                             `json:"tags"`
-		ScheduledAt        *time.Time                           `json:"scheduled_at,omitempty"`
-		CustomPassPatterns []string                             `json:"custom_pass_patterns,omitempty"`
-		CustomFailPatterns []string                             `json:"custom_fail_patterns,omitempty"`
+		taskCreateFields
+		Sandbox           *harness.ID                          `json:"sandbox,omitempty"`
+		SandboxByActivity map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	}](w, r)
 	if !ok {
 		return
@@ -234,17 +247,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts := store.TaskCreateOptions{
-		Prompt:             req.Prompt,
-		Criteria:           req.Criteria,
-		Timeout:            req.Timeout,
-		Tags:               req.Tags,
-		MountWorktrees:     req.MountWorktrees,
-		Kind:               req.Kind,
-		ScheduledAt:        req.ScheduledAt,
-		CustomPassPatterns: req.CustomPassPatterns,
-		CustomFailPatterns: req.CustomFailPatterns,
-	}
+	var opts store.TaskCreateOptions
 	req.apply(&opts)
 	if p := principalFromRequest(r); p != nil {
 		opts.CreatedBy = p.Sub
@@ -266,22 +269,16 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 // batchTaskInput describes a single task in a BatchCreateTasks request.
 //
-// Sandbox + SandboxByActivity are typed as pointers so the handler
-// can distinguish "not sent" (nil) from "explicitly empty" and
+// The embedded taskCreateFields carries every field POST /api/tasks takes
+// for a new task. Sandbox + SandboxByActivity are typed as pointers so the
+// handler can distinguish "not sent" (nil) from "explicitly empty" and
 // reject callers that still pass the deprecated fields rather than
-// silently dropping them. The embedded taskModelBudget carries the
-// model override and budget limits as POST /api/tasks takes them.
+// silently dropping them.
 type batchTaskInput struct {
-	taskModelBudget
+	taskCreateFields
 	Ref               string                                `json:"ref"`
-	Prompt            string                                `json:"prompt"`
-	Criteria          string                                `json:"criteria"`
-	Timeout           int                                   `json:"timeout"`
-	Tags              []string                              `json:"tags"`
 	Sandbox           *harness.ID                           `json:"sandbox,omitempty"`
 	SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
-	Kind              store.TaskKind                        `json:"kind"`
-	MountWorktrees    bool                                  `json:"mount_worktrees"`
 	DependsOnRefs     []string                              `json:"depends_on_refs"`
 	SpecSourcePath    string                                `json:"spec_source_path"`
 }
@@ -347,14 +344,19 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		refToIdx[t.Ref] = i
 	}
 
-	// 2. Validate prompts.
-	for _, t := range req.Tasks {
+	// 2. Validate prompts and the custom test-verdict patterns, which
+	//    POST /api/tasks rejects with the same message.
+	for i, t := range req.Tasks {
 		if strings.TrimSpace(t.Prompt) == "" {
 			ref := t.Ref
 			if ref == "" {
 				ref = "<unnamed>"
 			}
 			http.Error(w, fmt.Sprintf("ref %q: prompt is required", ref), http.StatusBadRequest)
+			return
+		}
+		if err := validateCustomPatterns(t.CustomPassPatterns, t.CustomFailPatterns); err != nil {
+			http.Error(w, fmt.Sprintf("ref %q: %v", batchRefLabel(t.Ref, i), err), http.StatusBadRequest)
 			return
 		}
 	}
@@ -537,12 +539,6 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 
 		batchOpts := store.TaskCreateOptions{
 			ID:             preAssignedIDs[idx],
-			Prompt:         t.Prompt,
-			Criteria:       t.Criteria,
-			Timeout:        t.Timeout,
-			Tags:           t.Tags,
-			MountWorktrees: t.MountWorktrees,
-			Kind:           t.Kind,
 			DependsOn:      depStrs,
 			SpecSourcePath: t.SpecSourcePath,
 		}

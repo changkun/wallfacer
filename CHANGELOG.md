@@ -170,6 +170,11 @@ committed: the commit log already holds that.
   `-addr 127.0.0.1`, stops at startup with an error naming the address, where
   the server listened on every network interface at a random port.
 
+- Creating tasks through `POST /api/tasks/batch` with a schedule or custom
+  test pass and fail patterns creates them with that schedule and those
+  patterns, as single create does, where the request failed with
+  `400 invalid JSON: json: unknown field "scheduled_at"`.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed

@@ -3794,6 +3794,87 @@ func TestBatchCreateTasks_AppliesModelAndBudget(t *testing.T) {
 	}
 }
 
+// TestBatchCreateTasks_AppliesScheduleAndTestPatterns verifies that a batch
+// task accepts the schedule and the custom test-verdict patterns single create
+// takes, and that each lands on the stored task, while a task that sends none
+// keeps no schedule and no patterns.
+func TestBatchCreateTasks_AppliesScheduleAndTestPatterns(t *testing.T) {
+	h := newTestHandler(t)
+
+	at := time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
+	body := `{"tasks":[
+		{"ref":"A","prompt":"task A","scheduled_at":"` + at.Format(time.RFC3339) + `",
+		 "custom_pass_patterns":["^ok\\b"],"custom_fail_patterns":["^FAIL"]},
+		{"ref":"B","prompt":"task B"}
+	]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		RefToID map[string]string `json:"ref_to_id"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	a, err := h.store.GetTask(context.Background(), uuid.MustParse(resp.RefToID["A"]))
+	if err != nil {
+		t.Fatalf("get A: %v", err)
+	}
+	if a.ScheduledAt == nil || !a.ScheduledAt.Equal(at) {
+		t.Errorf("A ScheduledAt = %v, want %v", a.ScheduledAt, at)
+	}
+	if len(a.CustomPassPatterns) != 1 || a.CustomPassPatterns[0] != `^ok\b` {
+		t.Errorf("A CustomPassPatterns = %q, want [^ok\\b]", a.CustomPassPatterns)
+	}
+	if len(a.CustomFailPatterns) != 1 || a.CustomFailPatterns[0] != "^FAIL" {
+		t.Errorf("A CustomFailPatterns = %q, want [^FAIL]", a.CustomFailPatterns)
+	}
+
+	b, err := h.store.GetTask(context.Background(), uuid.MustParse(resp.RefToID["B"]))
+	if err != nil {
+		t.Fatalf("get B: %v", err)
+	}
+	if b.ScheduledAt != nil || len(b.CustomPassPatterns) != 0 || len(b.CustomFailPatterns) != 0 {
+		t.Errorf("B = scheduled %v pass %q fail %q, want no schedule and no patterns",
+			b.ScheduledAt, b.CustomPassPatterns, b.CustomFailPatterns)
+	}
+}
+
+// TestBatchCreateTasks_InvalidTestPatternRejectsWholeBatch verifies that a
+// custom pattern that does not compile fails the batch in preflight with a
+// 400 naming the task, before any task is created, as single create rejects
+// it.
+func TestBatchCreateTasks_InvalidTestPatternRejectsWholeBatch(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"tasks":[
+		{"ref":"A","prompt":"task A","custom_pass_patterns":["^ok"]},
+		{"ref":"B","prompt":"task B","custom_fail_patterns":["(unclosed"]}
+	]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if msg := w.Body.String(); !strings.Contains(msg, `ref "B"`) || !strings.Contains(msg, "custom_fail_pattern") {
+		t.Errorf("body = %q, want it to name ref B and the invalid custom_fail_pattern", msg)
+	}
+	tasks, err := h.store.ListTasks(context.Background(), true)
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("a rejected batch created %d tasks, want 0", len(tasks))
+	}
+}
+
 // TestBatchCreateTasks_EmitsOneDeltaPerTask verifies that each batch task
 // emits exactly one SSE delta.
 func TestBatchCreateTasks_EmitsOneDeltaPerTask(t *testing.T) {
