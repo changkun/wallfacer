@@ -48,7 +48,7 @@ dispatched_task_id: null
 > - **The open question** (fold the Agents tab in, or keep it separate). The
 >   agent editor is embedded in the agent-graph page and the Agents page is
 >   deleted (`3d9b534a`, `d1b264f9`).
-> - **Docs.** [docs/guide/agent-graph.md](../../../docs/guide/agent-graph.md).
+> - **Docs.** docs/guide/agent-graph.md (`docs/guide/agent-graph.md`, removed 2026-10-02).
 >
 > The record of the surface that replaced this one is
 > [unified-agent-graph-ui](unified-agent-graph-ui.md). A note placed here on

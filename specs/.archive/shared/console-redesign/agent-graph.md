@@ -1,6 +1,6 @@
 ---
 title: Agent Graph
-status: complete
+status: archived
 depends_on:
   - specs/shared/console-redesign/shell.md
 affects:
@@ -11,12 +11,22 @@ affects:
   - frontend/src/styles/agents.css
 effort: medium
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-10-02
 author: changkun
 dispatched_task_id: null
 ---
 
 # Agent Graph
+
+> **Archived 2026-10-02. Retired as: the page it restyled was removed.** This
+> child of the console redesign shipped and was complete. The agent-graph page,
+> its canvas and its editor drawer were deleted when user-authored agents and
+> fleets were retired
+> ([retire-agent-fleets](../platform-native/retire-agent-fleets.md)). The
+> run trace that stays (`AgentTrace.vue`) keeps the design tokens this spec put
+> on it.
+>
+> The text below is kept as written for the record.
 
 ## Overview
 

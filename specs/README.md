@@ -50,7 +50,7 @@ Local Product - 30 shipped, 6 designed and unbuilt, 1 vague
   ✅ Test Criteria                 ✅ Visual Verification (in CI)
   ✅ Adversarial Review            ✅ Workspace Model
 
-  Agent graph (shipped; being retired, see Platform-native)
+  Agent graph (retired 2026-10-02, see Platform-native)
     ✅ Topos Runtime Integration M1-M5  ✅ Topos Live Agent Events
     ✅ Unified Agent Graph UI (one page; Agents and Flows pages deleted)
     ⊘ Workflows Graph UX (its page was deleted)
@@ -74,7 +74,7 @@ Shared Design - 9 complete, 1 part shipped, 3 retired
   ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
   ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
   ✅ Spec Workflow Plugin (spec@latere-ai; mirrored here behind a drift gate)
-  ✅ Console Redesign (replichai system: neutral canvas, clay accent, matte; 11/11 children shipped)
+  ✅ Console Redesign (replichai system: neutral canvas, clay accent, matte; 11 children shipped, agent-graph child retired with its page)
 
 Cloud Platform - two axes over one Latere platform (api.latere.ai)
   ○ Latere Platform Integration (umbrella; one client of the Agents capability)
@@ -96,7 +96,7 @@ Git Workflow - local git; the GitHub half is retired
 
 Platform-native - four decisions of 2026-10-02 (the active program)
   ○ Platform-Native Wallfacer (umbrella)
-  ○ Retire Agent Fleets (removal)       ✅ Remove GitHub Integration (done)
+  ✅ Retire Agent Fleets (done)          ✅ Remove GitHub Integration (done)
   ◐ Topos as the Only Harness (opt-in shipped; migration specified in 4 phases)
   ○ Sessions That Spawn and Fork (vague; decides what a hosted board hosts)
 ```
@@ -111,7 +111,7 @@ Four decisions followed the review the same day, recorded in
 
 1. **Retire fleets.** No user-authored agents or fleets; the page, the two
    engines only fleets reach, and the two CRUD APIs are removed
-   ([retire-agent-fleets](shared/platform-native/retire-agent-fleets.md)).
+   ([retire-agent-fleets](.archive/shared/platform-native/retire-agent-fleets.md)).
 2. **One harness.** Migrate to the rebuilt Topos module and make it the only
    harness, with platform models and a model switch; no CLI harnesses
    ([topos-native-harness](shared/topos-native-harness.md)).
@@ -139,7 +139,7 @@ The active program: four decisions of 2026-10-02 that make wallfacer an applicat
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The four decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
-| ↳ [retire-agent-fleets.md](shared/platform-native/retire-agent-fleets.md) | Drafted | Removal: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; the native single-agent path, the run trace and Mission Control stay. User files are left on disk unread; record fields are kept and ignored. |
+| ↳ [retire-agent-fleets.md](.archive/shared/platform-native/retire-agent-fleets.md) | **Complete** | Removed 2026-10-02: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; a stored fleet name gets one timeline notice; leftover definition directories get one startup warning. |
 | ↳ [remove-github-integration.md](.archive/shared/platform-native/remove-github-integration.md) | **Complete** | Removed 2026-10-02: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes and `internal/github`. Plain git push is untouched; the first start after upgrade deletes the cached tokens. |
 | ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
 
@@ -238,7 +238,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [workflows-graph-ux.md](.archive/local/workflows-graph-ux.md) | **Archived** | Renamed Flows to Workflows and drew a read-only pipeline (2026-06-15). Retired when the agent-graph page replaced `FlowsPage` two weeks later, before its on-canvas editing was built. |
 | [remove-idea-agent-subsystem.md](.archive/local/remove-idea-agent-subsystem.md) | **Complete** | Full teardown of the idea-agent (brainstorm) auto-ideation engine and the test-only flow: removed across runner/handler/flow/agents/store/envconfig/constants/apicontract/frontend/docs. Accepted feature loss; clears vestigial flow paths ahead of the agent-graph convergence. |
 | [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | Stub for a guided first run. Agents and fleets are out of it (decided 2026-10-02). One decision remains, which first action is the path, best taken after the harness migration, when a first run also means signing in and choosing a model. |
-| [agents-and-flows/refinements.md](.archive/local/agents-and-flows/refinements.md) | **Archived** | Post-ship follow-ups: split-pane UI redesign, token-based CSS restyle, `Role.PromptTmpl` runtime wiring, a dedicated [`docs/guide/agent-graph.md`](../docs/guide/agent-graph.md) guide, and a cross-reference repair across 12 docs. |
+| [agents-and-flows/refinements.md](.archive/local/agents-and-flows/refinements.md) | **Archived** | Post-ship follow-ups: split-pane UI redesign, token-based CSS restyle, `Role.PromptTmpl` runtime wiring, a dedicated `docs/guide/agent-graph.md` guide (removed with the fleets, 2026-10-02), and a cross-reference repair across 12 docs. |
 
 Archived local specs (superseded or dropped) are listed in the [Archive](#local-archived-superseded-or-dropped) section below.
 
@@ -311,7 +311,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | ↳ [console-redesign/chat.md](shared/console-redesign/chat.md) | **Complete** | Both | One message list, composer card, session rows and popup shared by `/chat`, Plan and the floating popup; tool calls read like agent-trace rows. |
 | ↳ [console-redesign/plan.md](shared/console-redesign/plan.md) | **Complete** | Both | Spec tree on nav-row geometry with ramp status dots, focused view as a 76ch reading column with a frontmatter card and lifecycle buttons, comments layer on cards; 1,300 scoped lines rebuilt. |
 | ↳ [console-redesign/settings.md](shared/console-redesign/settings.md) | **Complete** | Both | Underline tabs and one card per section with label/help/control rows; Appearance picks mode and the six-palette roster including `paper`; `settings-modal.css` and `forms.css` deleted. |
-| ↳ [console-redesign/agent-graph.md](shared/console-redesign/agent-graph.md) | **Complete** | Both | Agent list rows, SVG nodes drawn to card geometry from tokens, 420px editor drawer with rows; zero hex literals. |
+| ↳ [console-redesign/agent-graph.md](.archive/shared/console-redesign/agent-graph.md) | **Archived** | Both | Shipped as part of the console redesign, then retired 2026-10-02 with the page it restyled, when fleets were removed. |
 | ↳ [console-redesign/panels-and-overlays.md](shared/console-redesign/panels-and-overlays.md) | **Complete** | Both | Three shapes (`.pop`, `.dialog`, docked panel) for the command palette, workspace picker/editor, confirm, toasts, shortcuts, device sign-in, trash, dock, terminal, explorer, editor tabs and file editor; blur-free scrims. |
 | ↳ [console-redesign/secondary-screens.md](shared/console-redesign/secondary-screens.md) | **Complete** | Both | Analytics boundary cards and a `chartPalette()` helper, routine rows, Mission Control canvas on the ramp (48 hex literals to zero), whiteboard frame, artifact grid, local docs on the shared prose column. |
 | ↳ [console-redesign/verification-and-docs.md](shared/console-redesign/verification-and-docs.md) | **Complete** | Both | Delete the alias block, `make ui-test` in CI, seed and snapshot every surface light+dark via `regen.sh`, regenerate guide and README images, configuration guide roster and status-bar references updated. |

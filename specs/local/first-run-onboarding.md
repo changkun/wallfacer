@@ -51,7 +51,7 @@ dispatched_task_id: null
 >
 > Decided 2026-10-02: **agents and fleets are not part of a first run.** The
 > agent-graph page is being removed
-> ([retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md)),
+> ([retire-agent-fleets](../.archive/shared/platform-native/retire-agent-fleets.md)),
 > so the half of this stub about teaching it has no subject. What remains is
 > the first decision above, and it is best taken after the harness migration,
 > when a first run also means signing in and choosing a model.

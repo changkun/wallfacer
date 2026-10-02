@@ -31,7 +31,7 @@ dispatched_task_id: null
 > **Withdrawn and archived 2026-10-02. Retired as: the surface this design
 > completes is being removed.** The maintainer decided the same day to retire
 > user-authored agents and fleets
-> ([retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md),
+> ([retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md),
 > under [platform-native](../../shared/platform-native.md)), so the remaining
 > work this spec plans (true labels, a repository contract for fixed-sequence
 > fleets, undo, saved positions, sequence editing, one vocabulary) has no
@@ -258,7 +258,7 @@ the Outcome of
 ### 1. A fixed-sequence user fleet is not the production path
 
 The first version of this spec, the editor, the composer tooltip, and
-[the guide](../../../docs/guide/agent-graph.md) all say a deterministic graph
+the guide (`docs/guide/agent-graph.md`, removed 2026-10-02) all say a deterministic graph
 runs "real, committable work" with worktrees and commits. That holds for the
 built-in `implement` fleet on the turn loop. It does not hold for a user
 fleet in Fixed sequence, which runs on the flow engine: no worktree is

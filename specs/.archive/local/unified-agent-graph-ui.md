@@ -224,7 +224,7 @@ overlay. `FlowsPage.vue`, `AgentsPage.vue`, and `flows.css` are deleted;
 `/agents`, `/workflows`, and `/flows` redirect to `/agent-graph`
 (`frontend/src/router.ts`), and the rail has one entry, labeled "Agents"
 (`frontend/src/lib/nav.ts`). The surface is documented in
-[docs/guide/agent-graph.md](../../../docs/guide/agent-graph.md).
+docs/guide/agent-graph.md (`docs/guide/agent-graph.md`, removed 2026-10-02).
 
 **What shipped.**
 
@@ -255,7 +255,7 @@ overlay. `FlowsPage.vue`, `AgentsPage.vue`, and `flows.css` are deleted;
 - **Restyle** (`15d8e13e`, `50f72e8e`): the split-pane styles left over from
   the Agents page were removed, and the page moved onto the console design
   system's rows, cards, and tokens under
-  [console-redesign/agent-graph](../../shared/console-redesign/agent-graph.md).
+  [console-redesign/agent-graph](../shared/console-redesign/agent-graph.md).
 
 **What shipped differently, and why.**
 
@@ -317,4 +317,4 @@ saved with the fleet, the link from a task to its fleet) is carried by
 guidance for this surface is
 [first-run-onboarding](../../local/first-run-onboarding.md).
 
-Later, 2026-10-02: user-authored agents and fleets were retired, and with them the page and engines this spec delivered. See [retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md).
+Later, 2026-10-02: user-authored agents and fleets were retired, and with them the page and engines this spec delivered. See [retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md).

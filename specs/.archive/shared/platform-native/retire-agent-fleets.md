@@ -1,6 +1,6 @@
 ---
 title: Retire User-Authored Agents and Fleets
-status: drafted
+status: archived
 depends_on:
   - specs/shared/platform-native.md
 affects:
@@ -23,9 +23,9 @@ dispatched_task_id: null
 
 # Retire User-Authored Agents and Fleets
 
-Decision 1 of [platform-native](../platform-native.md). A removal, not a
+Decision 1 of [platform-native](../../../shared/platform-native.md). A removal, not a
 rewrite. It follows the shape of the earlier
-[idea-agent removal](../../.archive/local/remove-idea-agent-subsystem.md).
+[idea-agent removal](../../local/remove-idea-agent-subsystem.md).
 
 ## Goal
 
@@ -39,7 +39,7 @@ two CRUD APIs behind the page are deleted.
 - **The premise moved.** Defining an agent is the platform's job now, and
   arranging agents in advance is the opposite of where the product is going:
   an agent that spawns and forks what it needs at run time
-  ([sessions-that-spawn-and-fork](sessions-that-spawn-and-fork.md)).
+  ([sessions-that-spawn-and-fork](../../../shared/platform-native/sessions-that-spawn-and-fork.md)).
 - **The implementation does not hold.** Four execution paths sit behind one
   page with different guarantees. A fixed-sequence user fleet runs in the
   workspace folder and never commits. A delegating fleet merges with no test
@@ -199,11 +199,11 @@ agent that spawns and forks at run time.
 
 ## Bookkeeping
 
-- [agent-graph-e2e-design](../../.archive/local/agent-graph-e2e-design.md):
+- [agent-graph-e2e-design](../../local/agent-graph-e2e-design.md):
   withdrawn and archived with this spec. Its two findings (a fixed-sequence
   fleet that never commits; copy that misstates what delegating fleets do)
   are closed by the removal.
-- [first-run-onboarding](../../local/first-run-onboarding.md): its second
+- [first-run-onboarding](../../../local/first-run-onboarding.md): its second
   blocking decision resolves the other way. Agents and fleets are not part of
   a first run.
 - `specs/shared/console-redesign/agent-graph.md`: its subject disappears.
@@ -211,7 +211,7 @@ agent that spawns and forks at run time.
   shipped children and one retired.
 - Archived Outcomes of `unified-agent-graph-ui`, `topos-runtime-integration`
   and `agents-and-flows` each get one line pointing here.
-- [hosted executor](../../cloud/latere-integration/topos-remote-executor.md):
+- [hosted executor](../../../cloud/latere-integration/topos-remote-executor.md):
   its sentence that delegating flows stay local becomes moot.
 
 ## Out of scope
@@ -219,3 +219,37 @@ agent that spawns and forks at run time.
 - The harness migration and the removal of the CLI adapters.
 - Any new authoring surface.
 - What a task's agent may spawn at run time.
+
+## Outcome
+
+Archived 2026-10-02 as complete. Shipped in seven commits on main
+(`6587657c` frontend, `e29c532d` screenshot scenes, `a4663953` HTTP,
+`45a38047` runner, `4804c399` packages, `0ee84715` docs, `bfae478b` a comment
+follow-up).
+
+Where it differed from the text above:
+
+- **A local not-found page.** The console had no catch-all route, so a
+  removed path rendered nothing. `LocalNotFoundPage.vue` now renders inside the
+  shell, and the last-route restore skips a stored path that no longer
+  resolves, so a user last on `/agent-graph` lands on the board.
+- **Hard loads of the old paths** on a keyed instance without an identity get
+  401 like any other unknown path, since they left the public UI list; only
+  in-app navigation reaches the not-found page.
+- **`spawn_kind` went too**, with its allow-list and the two routine response
+  fields; both request fields now answer 400 as unknown.
+- **`agents.Role.Harness` stays.** The chat-title fix pins the title role's
+  harness through it, so it is now a per-call harness pin for a built-in role.
+  `agents.Registry` and its constructors went, since only fleet code used them.
+  A test holds every built-in role to a runner binding.
+- **The overrides `WALLFACER_FLOWS_DIR` and `WALLFACER_AGENTS_DIR` went** with
+  the directory resolution. The startup warning checks the default locations,
+  so a user who had set an override gets no warning.
+- **The removed-fleet notice is once per task**, deduplicated on its kind, so a
+  retry or resume does not repeat it.
+- **Order:** the routine change landed with the HTTP step, because routines
+  read the flow registry; the guide images went with the guide.
+- **More docs than listed:** the routines, board, configuration and automation
+  guides, and seven internals pages.
+- `make ui-test` was not run by the implementing agent; the frontend CI job
+  runs it on the push.

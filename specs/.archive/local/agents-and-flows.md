@@ -653,4 +653,4 @@ in the agent memory so future changes hold the line.
   → rewritten to `RoutineSpawnFlow: brainstorm` once, idempotent on
   restart.
 
-Later, 2026-10-02: user-authored agents and fleets were retired, and with them the page and engines this spec delivered. See [retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md).
+Later, 2026-10-02: user-authored agents and fleets were retired, and with them the page and engines this spec delivered. See [retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md).

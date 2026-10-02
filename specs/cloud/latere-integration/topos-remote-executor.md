@@ -116,7 +116,7 @@ instance is signed in. A task pinned to a CLI harness has no `hosted` option.
 
 A hosted session is one agent. User-authored fleets, the only other shape a
 task could take, are retired
-([retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md)).
+([retire-agent-fleets](../../.archive/shared/platform-native/retire-agent-fleets.md)).
 
 Where the selector is drawn and how it reads next to the harness picker
 belongs to [topos-native-harness](../../shared/topos-native-harness.md),
