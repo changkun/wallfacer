@@ -175,6 +175,10 @@ committed: the commit log already holds that.
   patterns, as single create does, where the request failed with
   `400 invalid JSON: json: unknown field "scheduled_at"`.
 
+### Security
+
+- Built with Go 1.27.2 and golang.org/x/net v0.60.0, which fix GO-2026-6611, GO-2026-6612, GO-2026-6613 and GO-2026-6617.
+
 ## v0.6.1 - 2026-09-26
 
 ### Fixed
