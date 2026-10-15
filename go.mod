@@ -59,7 +59,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
-	latere.ai/x/ci-gate v0.53.0 // indirect
+	latere.ai/x/ci-gate v0.54.0 // indirect
 )
 
 tool latere.ai/x/ci-gate/cmd/lateregate
