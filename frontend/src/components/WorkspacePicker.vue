@@ -168,7 +168,7 @@ function addFolder(path: string) {
 }
 
 // Open the host OS native folder chooser and add the picked folder to the list.
-// When no native picker is available (501: cloud/headless/unknown platform) we
+// When no native picker is available (501: headless or unknown platform) we
 // fall back to the in-app directory browser shown below.
 async function pickFolderNative() {
   try {

@@ -1,0 +1,82 @@
+/* Global element rules and the shared .btn base. main.ts loads this after the
+   component stylesheets, so where it overlaps base.css (body, links, headings)
+   and primitives.css (.btn), these declarations win. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; overflow-x: clip; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+}
+
+a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: var(--accent-hover); }
+
+img, svg { display: block; }
+
+h1, h2, h3, h4 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--text);
+    letter-spacing: -0.025em;
+}
+h1 { font-size: 2.5rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.15rem; }
+h1 em, h2 em {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+}
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Product wordmarks: gradient text. brand-override.css sets the typeface. */
+.wallfacer-brand {
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 0.15em;
+}
+/* The native latere.ai agent runtime. Gradient (teal -> olive -> amber)
+   matches the .topos-brand wordmark in the agents/topos surfaces so the
+   identity is consistent across products. */
+.topos-brand {
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, #55707a 0%, #6f8a56 58%, #a07045 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 0.15em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+}

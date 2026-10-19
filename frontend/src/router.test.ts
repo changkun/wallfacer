@@ -4,15 +4,15 @@
 // (e.g. the Plan chat rendering under "No workspace"), so pin the wiring.
 import { describe, it, expect } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
-import { NOT_FOUND_ROUTE, localRoutes } from './router';
+import { NOT_FOUND_ROUTE, routes } from './router';
 
 function metaFor(path: string): boolean {
-  const r = localRoutes.find((route) => route.path === path);
+  const r = routes.find((route) => route.path === path);
   if (!r) throw new Error(`route ${path} not found`);
   return r.meta?.needsWorkspace === true;
 }
 
-describe('localRoutes workspace gating', () => {
+describe('routes workspace gating', () => {
   it('marks every workspace-scoped view as needsWorkspace', () => {
     for (const path of ['/', '/analytics', '/chat', '/plan', '/mission', '/map']) {
       expect(metaFor(path), `${path} should require a workspace`).toBe(true);
@@ -26,8 +26,8 @@ describe('localRoutes workspace gating', () => {
   });
 });
 
-describe('localRoutes not-found fallback', () => {
-  const router = createRouter({ history: createMemoryHistory(), routes: localRoutes });
+describe('routes not-found fallback', () => {
+  const router = createRouter({ history: createMemoryHistory(), routes });
 
   it('resolves the removed agents page and its former aliases to the not-found page', () => {
     for (const path of ['/agent-graph', '/agents', '/workflows', '/flows']) {

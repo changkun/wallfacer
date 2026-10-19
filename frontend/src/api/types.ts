@@ -1,25 +1,3 @@
-export interface Me {
-  sub: string;
-  email: string;
-  name: string;
-  picture?: string;
-  auth_url?: string;
-}
-
-// Local-mode RFC 8628 device-code sign-in. POST /api/auth/device/start returns
-// the code + verification URL; GET /api/auth/device/poll reports progress.
-export interface DeviceStartResponse {
-  verification_uri: string;
-  verification_uri_complete?: string;
-  user_code: string;
-  expires_in: number;
-}
-
-export interface DevicePollResponse {
-  status: 'idle' | 'pending' | 'done' | 'denied' | 'expired' | 'failed';
-  error?: string;
-}
-
 export type TaskStatus = 'backlog' | 'in_progress' | 'waiting' | 'committing' | 'done' | 'failed' | 'cancelled';
 
 // --- Unified spec+task graph (GET /api/graph) ---
@@ -282,10 +260,6 @@ export interface ServerConfig {
   chat_sandboxes?: string[];
   default_sandbox: string;
   terminal_enabled: boolean;
-  auth_enabled: boolean;
-  // Whether the browser redirect behind /login can complete on this instance.
-  // False when the server is bound to a port its redirect URL does not name.
-  auth_redirect_enabled?: boolean;
   ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }

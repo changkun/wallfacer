@@ -1,17 +1,14 @@
 <script setup lang="ts">
 // The console rail: brand row, workspace chip, palette trigger, nav groups,
-// presence, account. Wallfacer owns this chrome rather than composing the
+// presence. Wallfacer owns this chrome rather than composing the
 // shared package rail; the geometry is the design system's nav row and
 // the rail sits on the deep ground with no border, so the seam between it and
 // the content card is a depth, not a line. See specs/shared/console-redesign/shell.md.
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { ProductSwitcher } from 'latere-ui';
-import AccountControl from './AccountControl.vue';
 import WorkspaceChip from './WorkspaceChip.vue';
 import NavIcon from './NavIcon.vue';
 import { useTaskStore } from '../stores/tasks';
-import { useAuthStore } from '../stores/auth';
 import { useUiStore } from '../stores/ui';
 import { derivePresence } from '../lib/presence';
 import { hasUnseen } from '../lib/unread';
@@ -25,13 +22,9 @@ const emit = defineEmits<{ toggle: []; workspaces: []; palette: [] }>();
 
 const route = useRoute();
 const store = useTaskStore();
-const auth = useAuthStore();
 const ui = useUiStore();
 
-// Sign-in is available whenever the server wired an OIDC client (the default
-// for `wallfacer run`). Drives the account control at the foot.
-const authEnabled = computed(() => store.config?.auth_enabled === true);
-const presence = computed(() => derivePresence(store.inProgress, auth.me));
+const presence = computed(() => derivePresence(store.inProgress));
 
 // The Board row carries the live count (running + waiting) the status bar used
 // to show, and an unread dot when new tasks arrived while the board was not on
@@ -64,12 +57,6 @@ function onNavigate() {
   // A tap on a drawer row closes the drawer; a click on the desktop rail is a no-op.
   ui.closeRail();
 }
-
-watch(
-  authEnabled,
-  (enabled) => { if (enabled && !auth.loaded) void auth.fetchMe(); },
-  { immediate: true },
-);
 </script>
 
 <template>
@@ -92,7 +79,6 @@ watch(
         </span>
         <span class="rail-name wallfacer-brand">Wallfacer</span>
       </RouterLink>
-      <ProductSwitcher v-if="!collapsed" current="wallfacer" size="sm" class="rail-products" />
       <button
         type="button"
         class="icon-btn sm rail-fold-btn"
@@ -168,17 +154,12 @@ watch(
           v-for="p in presence"
           :key="p.id"
           class="rail-presence-item"
-          :class="'rail-presence-item--' + p.kind"
-          :title="p.kind === 'agent' ? 'Running agent' : 'You'"
+          title="Running agent"
         >
           <span class="pill-dot" aria-hidden="true" />
           <span class="rail-presence-name">{{ p.label }}</span>
         </div>
       </div>
     </nav>
-
-    <div class="rail-foot">
-      <AccountControl v-if="authEnabled" placement="bottom-start" />
-    </div>
   </aside>
 </template>

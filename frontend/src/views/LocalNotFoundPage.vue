@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // The console's not-found page: the local router's catch-all renders it for
 // any address no console page serves, inside the console shell so the rail
-// stays available. The cloud build has its own NotFoundPage with the site
-// layout.
+// stays available.
 import { RouterLink } from 'vue-router';
 </script>
 

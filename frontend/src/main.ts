@@ -29,7 +29,7 @@ import './styles/mission.css';
 import './styles/syntax.css';
 import './styles/utilities.css';
 import './styles/scroll-fade.css';
-import './styles/app.css';
+import './styles/globals.css';
 import './styles/brand-override.css';
 import { vScrollFade } from './directives/scrollFade';
 
@@ -37,11 +37,10 @@ export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) =>
   app.use(createPinia());
   app.directive('scrollfade', vScrollFade);
 
-  // Remember where the user left off (local mode only — cloud `/` is the
-  // marketing page). Persist each navigation, then on a cold launch that
-  // landed on the default board restore the last route. A stale path degrades
-  // gracefully; see lib/lastRoute.ts.
-  if (isClient && typeof window !== 'undefined' && window.__WALLFACER__?.mode === 'local') {
+  // Remember where the user left off. Persist each navigation, then on a cold
+  // launch that landed on the default board restore the last route. A stale
+  // path degrades gracefully; see lib/lastRoute.ts.
+  if (isClient) {
     // Capture the stored route before afterEach overwrites it with the initial
     // landing (which fires for the first navigation too).
     const previous = storedRoute();
@@ -54,19 +53,5 @@ export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) =>
       );
       if (target) void router.replace(target).catch(() => {});
     });
-  }
-  // Browser RUM: only enable in cloud mode — that's the only deployment
-  // where the backend exposes /v1/telemetry/* (TelemetryProxy). Local-mode
-  // binaries (and dev) have no proxy, so initializing here would spam the
-  // console with 405s from every OTLP batch.
-  if (
-    isClient &&
-    import.meta.env.PROD &&
-    typeof window !== 'undefined' &&
-    window.__WALLFACER__?.mode === 'cloud'
-  ) {
-    // Lazy: otel + zone.js (~130 kB) would otherwise bloat the eager entry
-    // chunk for every user, including local mode where telemetry never runs.
-    void import('./telemetry').then(({ initTelemetry }) => initTelemetry('wallfacer-spa'));
   }
 });

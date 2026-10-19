@@ -72,7 +72,7 @@ onMounted(async () => {
 });
 
 // Keep ?ws=<id> in the URL in sync with the active workspace so a copied link
-// reopens the same project (important in cloud mode). router.replace avoids
+// reopens the same project. router.replace avoids
 // polluting history; the equality guard prevents a feedback loop with the
 // activate-from-URL path above.
 watch(() => workspaces.activeId, (id) => {

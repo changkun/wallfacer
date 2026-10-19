@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import { RouterView, useRouter } from 'vue-router';
 import AppLayout from './layouts/AppLayout.vue';
 import WorkspaceRequired from './components/WorkspaceRequired.vue';
@@ -12,13 +12,6 @@ const router = useRouter();
 // workspace is visible to this session, matching the board's empty state.
 const blockForWorkspace = useWorkspaceGate();
 
-const isLocal = computed(() => {
-  if (typeof window !== 'undefined' && window.__WALLFACER__) {
-    return window.__WALLFACER__.mode === 'local';
-  }
-  return false;
-});
-
 // Migrate legacy hash-mode bookmarks (#<uuid>, #plan/<path>) to history routes.
 onMounted(() => {
   if (typeof window === 'undefined' || !window.location.hash) return;
@@ -30,9 +23,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <AppLayout v-if="isLocal" v-slot="{ connected, connState }">
+  <AppLayout v-slot="{ connected, connState }">
     <WorkspaceRequired v-if="blockForWorkspace" />
     <RouterView v-else :connected="connected" :conn-state="connState" />
   </AppLayout>
-  <RouterView v-else />
 </template>

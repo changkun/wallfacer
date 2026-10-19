@@ -1,7 +1,7 @@
 // snap.mjs — screenshot named wallfacer UI surfaces at retina 2x.
 //
 // Self-contained Playwright capture (does not depend on .parity/, which is
-// throwaway). Injects local-mode boot config so the SPA renders the board.
+// throwaway). Injects the boot config so the SPA renders the board.
 //
 // Usage:
 //   node snap.mjs --base http://localhost:8099 --out /tmp/wf-shots
@@ -89,7 +89,7 @@ if (arg('list', false) === true) {
 const names = only && only !== true ? String(only).split(',').map((s) => s.trim()) : Object.keys(SURFACES);
 mkdirSync(outDir, { recursive: true });
 
-const BOOT = { mode: 'local', serverApiKey: '', version: 'dev' };
+const BOOT = { serverApiKey: '', version: 'dev' };
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
 // Inject boot config and pin the theme (prefs.ts reads wallfacer-theme on init).

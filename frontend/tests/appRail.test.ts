@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApp, nextTick, ref } from 'vue';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import { createPinia } from 'pinia';
-import { LATERE_PRODUCTS } from 'latere-ui';
 
 // These tests cover rail rendering. WorkspaceChip's live subscription is
 // exercised separately; happy-dom has no EventSource implementation.
@@ -17,8 +16,7 @@ import { NAV_GROUPS } from '../src/lib/nav';
 // The rail is wallfacer's own chrome (specs/shared/console-redesign/shell.md).
 // These guard what moved when it replaced latere-ui's ConsoleSidebar: every
 // destination still renders as a row, the fold hides the words and keeps the
-// icons, the product switcher still sits in the head, and the Board row
-// carries the live count the status bar used to show.
+// icons, and the Board row carries the live count the status bar used to show.
 async function mountRail(collapsed: boolean, path = '/') {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -62,18 +60,10 @@ describe('AppRail', () => {
     app.unmount(); host.remove();
   });
 
-  it('folds to icons: the rail carries the fold class and no product switcher', async () => {
+  it('folds to icons: the rail carries the fold class', async () => {
     const { host, app } = await mountRail(true);
     expect(host.querySelector('.app-rail')!.classList.contains('app-rail--fold')).toBe(true);
-    expect(host.querySelector('.lu-ps')).toBeNull();
     expect(host.querySelectorAll('.nav-ico').length).toBeGreaterThan(0);
-    app.unmount(); host.remove();
-  });
-
-  it('renders the shared ProductSwitcher in the open head with a registered slug', async () => {
-    const { host, app } = await mountRail(false);
-    expect(host.querySelector('.lu-ps')).toBeTruthy();
-    expect(LATERE_PRODUCTS.map((p) => p.slug)).toContain('wallfacer');
     app.unmount(); host.remove();
   });
 

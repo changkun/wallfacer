@@ -1,6 +1,6 @@
 // Remembers the route the user last visited so a cold app launch can return
-// them there instead of always dropping onto the board. Only the local-mode
-// app uses this (cloud `/` is the marketing page); see main.ts for the wiring.
+// them there instead of always dropping onto the board; see main.ts for the
+// wiring.
 //
 // We store the full path (including query), so the focused spec (`?spec=`),
 // open task (`?task=`), and editor tab (`?tab=`) come back for free. A stale

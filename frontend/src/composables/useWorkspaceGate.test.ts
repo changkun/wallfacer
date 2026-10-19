@@ -1,7 +1,7 @@
 // Integration guard for the workspace gate that fixes the reported leak:
 // navigating to a workspace-scoped route (e.g. /plan) with no visible
 // workspace must block, while a workspace-independent route (/settings) and
-// the workspace-present case must not. Drives the real localRoutes meta + the
+// the workspace-present case must not. Drives the real routes meta + the
 // real store through the composable App.vue consumes.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createApp, defineComponent, h, nextTick, type App } from 'vue';
@@ -13,7 +13,7 @@ import {
   type RouteRecordRaw,
 } from 'vue-router';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
-import { localRoutes } from '../router';
+import { routes } from '../router';
 import { useWorkspaceGate } from './useWorkspaceGate';
 import { useTaskStore } from '../stores/tasks';
 import type { ServerConfig } from '../api/types';
@@ -29,7 +29,7 @@ const Harness = defineComponent({
 
 // Stub every page so the router resolves without importing real views,
 // preserving each route's path + meta (which the gate reads).
-const stubRoutes: RouteRecordRaw[] = localRoutes.map((r) => ({
+const stubRoutes: RouteRecordRaw[] = routes.map((r) => ({
   path: r.path,
   meta: r.meta,
   component: Harness,

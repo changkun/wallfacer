@@ -27,7 +27,7 @@ function arg(name, fallback) {
 
 const base = arg('base', 'http://localhost:8099');
 const only = arg('only', '');
-const BOOT = { mode: 'local', serverApiKey: '', version: 'dev' };
+const BOOT = { serverApiKey: '', version: 'dev' };
 
 // APIRequestContext does not inherit the local server key from the page.
 async function fixtureRequest(page, method, path, data) {

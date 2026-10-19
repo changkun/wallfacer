@@ -23,10 +23,7 @@ export default defineConfig({
     fs: { allow: ['..'] },
     proxy: {
       // WF_PROXY overrides the backend target for dev (default: local wallfacer run on :8080).
-      '/api':      { target: wfProxy, changeOrigin: true },
-      '/login':    wfProxy,
-      '/callback': wfProxy,
-      '/logout':   wfProxy,
+      '/api': { target: wfProxy, changeOrigin: true },
     },
   },
   build: {

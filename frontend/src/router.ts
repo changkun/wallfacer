@@ -1,13 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router';
 
-const cloudRoutes: RouteRecordRaw[] = [
-  { path: '/', component: () => import('./views/ProductPage.vue') },
-  { path: '/install', component: () => import('./views/InstallPage.vue') },
-  { path: '/dashboard', component: () => import('./views/BoardPage.vue') },
-  { path: '/:pathMatch(.*)*', component: () => import('./views/NotFoundPage.vue') },
-];
-
-// NOT_FOUND_ROUTE names the local catch-all, so a caller can tell whether a
+// NOT_FOUND_ROUTE names the catch-all, so a caller can tell whether a
 // path resolves to a real console page (see the last-route restore in main.ts).
 export const NOT_FOUND_ROUTE = 'not-found';
 
@@ -16,7 +9,7 @@ export const NOT_FOUND_ROUTE = 'not-found';
 // so the board, plan/chat, analytics, etc. stay consistent with /api/config's
 // "no workspace" state. Settings, docs and the not-found page are
 // workspace-independent.
-export const localRoutes: RouteRecordRaw[] = [
+export const routes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/BoardPage.vue'), meta: { needsWorkspace: true } },
   { path: '/analytics', component: () => import('./views/AnalyticsPage.vue'), meta: { needsWorkspace: true } },
   // /chat is the dedicated chat surface; /plan is the spec-mode page (kept as
@@ -35,12 +28,3 @@ export const localRoutes: RouteRecordRaw[] = [
   // renders the not-found page inside the console shell.
   { path: '/:pathMatch(.*)*', name: NOT_FOUND_ROUTE, component: () => import('./views/LocalNotFoundPage.vue') },
 ];
-
-function readMode(): 'local' | 'cloud' {
-  if (typeof window !== 'undefined' && window.__WALLFACER__) {
-    return window.__WALLFACER__.mode || 'cloud';
-  }
-  return 'cloud';
-}
-
-export const routes: RouteRecordRaw[] = readMode() === 'local' ? localRoutes : cloudRoutes;

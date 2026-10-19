@@ -55,9 +55,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.rail-products {
-  flex: none;
-}
 .rail-fold-btn {
   flex: none;
 }
@@ -67,7 +64,6 @@
   padding: 0;
 }
 .app-rail--fold .rail-name,
-.app-rail--fold .rail-products,
 .app-rail--fold .rail-search-label,
 .app-rail--fold .rail-search-hint,
 .app-rail--fold .rail-eyebrow,
@@ -257,30 +253,14 @@
 .rail-presence-item .pill-dot {
   width: 7px;
   height: 7px;
-  background: var(--ink-4);
-}
-.rail-presence-item--agent .pill-dot {
   background: var(--ok);
   animation: om-pulse-soft 1.6s ease-in-out infinite;
-}
-.rail-presence-item--self .pill-dot {
-  background: var(--accent);
 }
 .rail-presence-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-}
-
-/* foot */
-.rail-foot {
-  flex: none;
-  padding-top: 8px;
-  border-top: 1px solid var(--rule);
-}
-.rail-foot:empty {
-  display: none;
 }
 
 /* --- Workspace chip --- */
@@ -593,7 +573,6 @@
     box-shadow: var(--sh-pop);
   }
   .app-rail--fold .rail-name,
-  .app-rail--fold .rail-products,
   .app-rail--fold .rail-search-label,
   .app-rail--fold .rail-search-hint,
   .app-rail--fold .rail-eyebrow,
@@ -613,12 +592,4 @@
   .rail-fold-btn {
     display: none;
   }
-}
-
-/* The account menu fills the trigger width in the open rail; in the folded
-   rail the trigger is an icon, so the menu takes a reading width of its own
-   and hangs off the rail's left edge instead of squeezing to 48px. */
-.app-rail--fold .rail-foot .lu-am-up .lu-am-dd {
-  width: 260px;
-  right: auto;
 }

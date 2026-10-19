@@ -196,7 +196,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/styles/command-palette.css', 'src/styles/workspace-picker.css', 'src/styles/explorer.css', 'src/styles/dock.css',
     'src/components/CommandPalette.vue', 'src/components/WorkspacePicker.vue', 'src/components/WorkspaceEditModal.vue', 'src/components/FolderBrowser.vue',
     'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue', 'src/components/KeyboardShortcutsModal.vue',
-    'src/components/DeviceSignInModal.vue', 'src/components/TrashModal.vue', 'src/components/DockWorkspace.vue', 'src/components/TerminalPanel.vue',
+    'src/components/TrashModal.vue', 'src/components/DockWorkspace.vue', 'src/components/TerminalPanel.vue',
     'src/components/ExplorerPanel.vue', 'src/components/editor/EditorTabStrip.vue', 'src/components/editor/FileEditor.vue', 'src/lib/editorTheme.ts',
     'src/styles/analytics.css', 'src/styles/mission.css', 'src/styles/docs.css', 'src/styles/whiteboard.css',
     'src/views/AnalyticsPage.vue', 'src/components/analytics/AnalyticsTabCost.vue', 'src/components/analytics/AnalyticsTabTiming.vue',

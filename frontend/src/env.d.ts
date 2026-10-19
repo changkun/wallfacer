@@ -9,7 +9,6 @@ declare module '*.vue' {
 declare const __WALLFACER_VERSION__: string;
 
 interface WallfacerBootConfig {
-  mode: 'local' | 'cloud';
   serverApiKey: string;
   version: string;
 }

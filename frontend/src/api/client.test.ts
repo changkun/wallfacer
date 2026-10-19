@@ -84,7 +84,7 @@ describe('api error messages', () => {
         details: { redirect_url: 'http://localhost:8080/callback', bound_port: 53211 },
       },
     }), 'application/json'));
-    const err = await api('POST', '/api/me/switch-org', { org_id: '' }).catch((e: unknown) => e);
+    const err = await api('POST', '/api/tasks', { prompt: '' }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 503, message, code: 'redirect_sign_in_unavailable' });
     // The developer detail stays on the parsed body.

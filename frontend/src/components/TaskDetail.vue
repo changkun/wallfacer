@@ -12,7 +12,6 @@ import { useDialogStore } from '../stores/dialog';
 import { statusPill } from '../lib/statusPill';
 import { useToastStore } from '../stores/toast';
 import { useTaskStore } from '../stores/tasks';
-import { useAuthStore } from '../stores/auth';
 import { useDiffCommentsStore } from '../stores/diffComments';
 import { formatBatchFeedback } from '../lib/diffComments';
 import DiffLineRow from './DiffLineRow.vue';
@@ -911,17 +910,9 @@ const isCancelled = computed(() => status.value === 'cancelled');
 const isArchived = computed(() => !!props.task.archived);
 
 // ── Inline diff review comments ─────────────────────────────────────
-// The gutter/editor/panel surface is login-gated on a cloud deployment: there
-// the backend 401s the feedback route without a browser principal
-// (RequirePrincipalMiddleware), and the SPA mirrors that with `canReview`. A
-// local instance accepts feedback signed in or not, so the surface is always on
-// there; sign-in being available (`auth_enabled`, true on every run) does not
-// gate it.
-const auth = useAuthStore();
+// The gutter/editor/panel surface is on for every waiting task.
 const diffComments = useDiffCommentsStore();
-const isCloud = typeof window !== 'undefined' && window.__WALLFACER__?.mode === 'cloud';
-const canReview = computed(() => !isCloud || !!auth.me);
-const reviewing = computed(() => isWaiting.value && canReview.value);
+const reviewing = computed(() => isWaiting.value);
 
 function isCommentable(kind: string): boolean {
   return kind === 'add' || kind === 'del' || kind === 'ctx';

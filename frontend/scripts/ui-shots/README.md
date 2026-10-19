@@ -51,7 +51,7 @@ other states are stable.
 ## snap.mjs
 
 Self-contained Playwright capture (no dependency on `.parity/`, which is
-throwaway). Injects local-mode boot config, screenshots each surface at 2x.
+throwaway). Injects the boot config, screenshots each surface at 2x.
 
 ```bash
 node snap.mjs --base http://localhost:8099 --out /tmp/wf-shots          # all
@@ -64,7 +64,7 @@ Surfaces: `board`, `switcher`, `palette`, `picker`, `terminal`, `explorer`,
 `chat`, `mission`, `whiteboard`, `docs`. Prints JSON `[{name, file, errors}]` so callers can detect page
 errors.
 
-Works against any local-mode origin: the embedded SPA on the booted server
+Works against any console origin: the embedded SPA on the booted server
 (`:8099`), the golden UI (`:8092`), or the Vite dev server (`:5173`).
 
 Flags: `--base` (default `http://localhost:8099`), `--out`
