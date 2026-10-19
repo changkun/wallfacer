@@ -203,6 +203,7 @@ var removedTaskFields = map[string]string{
 	"test_fail_count":       `2`,
 	"custom_pass_patterns":  `["ok"]`,
 	"custom_fail_patterns":  `["FAIL"]`,
+	"criteria":              `"run make test"`,
 }
 
 // removedActivities are sandbox_by_activity keys that records written by

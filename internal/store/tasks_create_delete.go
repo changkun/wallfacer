@@ -21,11 +21,10 @@ import (
 type TaskCreateOptions struct {
 	// Title is the task's display title. When blank after trimming, the
 	// title is derived from Prompt by DeriveTitle.
-	Title    string
-	Prompt   string
-	Criteria string
-	Timeout  int
-	Kind     TaskKind
+	Title   string
+	Prompt  string
+	Timeout int
+	Kind    TaskKind
 	// FlowID sets Task.FlowID, a record field the runner does not read for
 	// dispatch (see Task.FlowID). No handler sets it; it lets a caller build
 	// a record that carries the field, as a stored task may.
@@ -57,7 +56,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		ID:            id,
 		Title:         strings.TrimSpace(opts.Title),
 		Prompt:        opts.Prompt,
-		Criteria:      opts.Criteria,
 		Status:        TaskStatusBacklog,
 		Turns:         0,
 		Timeout:       clampTimeout(opts.Timeout),

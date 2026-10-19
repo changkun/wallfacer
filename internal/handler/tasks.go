@@ -166,7 +166,6 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 type taskCreateFields struct {
 	Title          string         `json:"title"`
 	Prompt         string         `json:"prompt"`
-	Criteria       string         `json:"criteria"`
 	Timeout        int            `json:"timeout"`
 	Kind           store.TaskKind `json:"kind"`
 	Tags           []string       `json:"tags"`
@@ -182,7 +181,6 @@ type taskCreateFields struct {
 func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
 	opts.Title = f.Title
 	opts.Prompt = f.Prompt
-	opts.Criteria = f.Criteria
 	opts.Timeout = f.Timeout
 	opts.Kind = f.Kind
 	opts.Tags = f.Tags
@@ -248,7 +246,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Status            *store.TaskStatus                     `json:"status"`
 		Position          *int                                  `json:"position"`
 		Prompt            *string                               `json:"prompt"`
-		Criteria          *string                               `json:"criteria"`
 		Timeout           *int                                  `json:"timeout"`
 		FreshStart        *bool                                 `json:"fresh_start"`
 		Sandbox           *harness.ID                           `json:"sandbox"`
@@ -320,8 +317,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, criteria, timeout, fresh_start, sandbox, model, and budget for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
+	// Allow editing prompt, timeout, fresh_start, sandbox, model, and budget for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -337,12 +334,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
-		}
-		if req.Criteria != nil {
-			if err := s.UpdateTaskCriteria(r.Context(), id, *req.Criteria); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 		}
 		if req.Sandbox != nil {
 			if err := s.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {

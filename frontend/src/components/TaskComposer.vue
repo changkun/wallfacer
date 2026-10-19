@@ -66,7 +66,6 @@ const promptPlaceholder = 'Describe the task… (Markdown, @ to mention files)';
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
 const model = ref('');
-const criteria = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
 const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'>('');
@@ -122,7 +121,6 @@ function collapse() {
   timeoutCustomMin.value = null;
   showMore.value = false;
   model.value = '';
-  criteria.value = '';
   maxCostUsd.value = null;
   maxInputTokens.value = null;
   sandbox.value = '';
@@ -139,8 +137,7 @@ async function submit() {
   // failure so a network error doesn't lose the user's text.
   removeStored(DRAFT_KEY);
   try {
-    const sharedOpts = {
-      criteria: criteria.value.trim() || undefined,
+    const opts = {
       tags: tags.value.slice(),
       timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
       model: model.value.trim() || undefined,
@@ -148,7 +145,7 @@ async function submit() {
       maxInputTokens: maxInputTokens.value ?? undefined,
     } as const;
 
-    const created = await store.createTask(text, sharedOpts);
+    const created = await store.createTask(text, opts);
     // POST /api/tasks rejects sandbox; the server-side path for per-task
     // sandbox overrides is a follow-up PATCH (see docs/internals/api-and-transport.md).
     if (created?.id && sandbox.value) {
@@ -274,10 +271,6 @@ function onInput(e: Event) {
       </div>
     </div>
     <div v-if="showMore" class="composer__opts">
-      <label class="composer__opt composer__opt--grow">
-        <span class="composer__opt-label">Acceptance criteria</span>
-        <input v-model="criteria" class="field composer__input" type="text" placeholder="what the reviewer should verify (optional)" aria-label="Acceptance criteria" />
-      </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Model</span>
         <input v-model="model" class="field composer__input" type="text" placeholder="override model" aria-label="Model override" />

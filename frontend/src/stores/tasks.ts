@@ -114,7 +114,6 @@ export const useTaskStore = defineStore('tasks', () => {
   async function createTask(
     prompt: string,
     opts?: {
-      criteria?: string;
       timeout?: number;
       tags?: string[];
       model?: string;
@@ -123,7 +122,6 @@ export const useTaskStore = defineStore('tasks', () => {
     },
   ) {
     const body: Record<string, unknown> = { prompt };
-    if (opts?.criteria?.trim()) body.criteria = opts.criteria.trim();
     if (opts?.timeout !== undefined) body.timeout = opts.timeout;
     if (opts?.tags?.length) body.tags = opts.tags;
     if (opts?.model) body.model = opts.model;

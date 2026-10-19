@@ -547,7 +547,6 @@ async function syncTask() {
 // the legacy modal-core editable settings (timeout/tags/budget).
 const editingBacklog = ref(false);
 const editPrompt = ref('');
-const editCriteria = ref('');
 const editPromptPreview = ref(false);
 const editTimeout = ref<number | null>(null);
 const editModel = ref('');
@@ -572,7 +571,6 @@ const editPromptHtml = computed(() => renderResultMarkdown(editPrompt.value || '
 function openBacklogEdit() {
   const t = props.task;
   editPrompt.value = t.prompt ?? '';
-  editCriteria.value = t.criteria ?? '';
   editPromptPreview.value = false;
   editTimeout.value = t.timeout > 0 ? Math.round(t.timeout / 60) : null;
   editModel.value = t.model ?? '';
@@ -589,7 +587,6 @@ async function saveBacklogEdit() {
     const t = props.task;
     const patch: Record<string, unknown> = {};
     if (editPrompt.value.trim() !== (t.prompt ?? '').trim()) patch.prompt = editPrompt.value.trim();
-    if (editCriteria.value.trim() !== (t.criteria ?? '').trim()) patch.criteria = editCriteria.value.trim();
     if (editTimeout.value !== null && editTimeout.value > 0) patch.timeout = editTimeout.value * 60;
     if (editModel.value.trim() !== (t.model ?? '').trim()) patch.model = editModel.value.trim();
     if (editSandbox.value !== (t.sandbox ?? '')) patch.sandbox = editSandbox.value;
@@ -1345,10 +1342,6 @@ async function submitReview() {
                   <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
                   <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
                 </div>
-                <label class="backlog-edit__field">
-                  <span>Acceptance criteria</span>
-                  <textarea v-model="editCriteria" class="field backlog-edit__prompt" rows="3" placeholder="What the reviewer should verify (optional)"></textarea>
-                </label>
                 <label class="backlog-edit__field">
                   <span>Timeout (min)</span>
                   <input v-model.number="editTimeout" class="field" type="number" min="1" placeholder="15" />

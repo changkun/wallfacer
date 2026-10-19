@@ -557,7 +557,7 @@ The store uses a forward-only migration system in `internal/store/migrate.go`. E
 3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
 4. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
 
-Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on`, `title_generating`, `is_test_run`, `last_test_result` or `custom_pass_patterns`, are dropped on load and disappear on the record's next save. A `sandbox_by_activity` entry for an activity that no longer routes (`testing`, `title`) is dropped by the same normalization.
+Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on`, `title_generating`, `is_test_run`, `last_test_result`, `custom_pass_patterns` or `criteria`, are dropped on load and disappear on the record's next save. A `sandbox_by_activity` entry for an activity that no longer routes (`testing`, `title`) is dropped by the same normalization.
 
 If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `3`) and is incremented whenever a new migration step is added.
 

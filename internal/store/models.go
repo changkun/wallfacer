@@ -228,15 +228,10 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion int       `json:"schema_version"`
-	ID            uuid.UUID `json:"id"`
-	Title         string    `json:"title,omitempty"`
-	Prompt        string    `json:"prompt"`
-	// Criteria is user-defined free-form acceptance criteria for the reviewer.
-	// When non-empty it renders into the review prompt. Interpreted by the
-	// agent, not a hard gate. omitempty keeps existing task.json files
-	// deserializing clean.
-	Criteria      string        `json:"criteria,omitempty"`
+	SchemaVersion int           `json:"schema_version"`
+	ID            uuid.UUID     `json:"id"`
+	Title         string        `json:"title,omitempty"`
+	Prompt        string        `json:"prompt"`
 	PromptHistory []string      `json:"prompt_history,omitempty"`
 	RetryHistory  []RetryRecord `json:"retry_history,omitempty"`
 	// ExecutionAttempt survives pruning of older retry records. Zero uses the legacy history length.

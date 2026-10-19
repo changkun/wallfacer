@@ -74,7 +74,7 @@ Click **+ New Task** in the Backlog header. The composer offers:
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
-- **More** expands: acceptance criteria for the reviewer, a model override, budget limits (max cost in USD and max input tokens), and a harness override.
+- **More** expands: a model override, budget limits (max cost in USD and max input tokens), and a harness override.
 
 Every task carries a short **Title** and the full **Prompt**. The title is the first non-blank line of the prompt, with a leading Markdown heading marker removed and shortened at a word boundary when it runs long.
 

@@ -171,16 +171,6 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	})
 }
 
-// UpdateTaskCriteria sets a task's free-form acceptance Criteria. Callers gate
-// this to backlog status (same constraint as editing the prompt); the store
-// records it unconditionally.
-func (s *Store) UpdateTaskCriteria(_ context.Context, id uuid.UUID, criteria string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.Criteria = criteria
-		return nil
-	})
-}
-
 // AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
 // and records the contribution under the named sub-agent in UsageBreakdown.
 // agent should be one of the SandboxActivity constants.
