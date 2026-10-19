@@ -855,35 +855,3 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
 	}
 }
-
-// TestMountVueSPA_NoLandingFlashOnDeepRoutes pins the SSG-strip behavior that
-// keeps a logged-in user from seeing the ProductPage landing flash before Vue
-// swaps in the real route on a deep-link refresh. The prerendered index.html
-// bakes in the "/" route; serving it verbatim paints that markup for a frame,
-// so every path mounts from a blank #app.
-func TestMountVueSPA_NoLandingFlashOnDeepRoutes(t *testing.T) {
-	const indexHTML = `<html><head></head><body>` +
-		`<div id="app" data-server-rendered="true"><section class="product-hero">landing</section></div>` +
-		`<script type="module" src="/assets/app.js"></script></body></html>`
-	dist := fstest.MapFS{
-		"frontend/dist/index.html": {Data: []byte(indexHTML)},
-	}
-
-	mux := http.NewServeMux()
-	mountVueSPA(mux, dist, "k")
-	const cleared = `e.textContent=""` // stripSSGContent's clear script
-
-	// Every route strips the prerender, including "/", and mounts from a
-	// blank #app.
-	for _, path := range []string{"/", "/plan"} {
-		rr := httptest.NewRecorder()
-		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
-		if rr.Code != http.StatusOK {
-			t.Fatalf("GET %s: status %d, want 200", path, rr.Code)
-		}
-		if body := rr.Body.String(); strings.Contains(body, "data-server-rendered") ||
-			!strings.Contains(body, cleared) || !strings.Contains(body, `mode:"local"`) {
-			t.Errorf("GET %s: want stripped shell, got %q", path, body)
-		}
-	}
-}

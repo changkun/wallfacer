@@ -564,20 +564,6 @@ func browserURL(addr string, port int) (string, error) {
 	return "http://" + net.JoinHostPort(host, strconv.Itoa(port)), nil
 }
 
-// stripSSGContent disables vite-ssg hydration and injects a script that
-// clears the pre-rendered HTML before Vue mounts. This prevents the
-// hydration mismatch when the SSG-rendered page (ProductPage for cloud)
-// differs from the client route (BoardPage for local).
-func stripSSGContent(html string) string {
-	html = strings.Replace(html, `data-server-rendered="true"`, "", 1)
-	// Insert a classic (non-deferred) script right before the first module
-	// script. It runs synchronously before Vue's deferred module, clearing
-	// the stale SSG content so Vue does a fresh mount.
-	const clearScript = `<script>var e=document.getElementById("app");if(e)e.textContent=""</script>`
-	html = strings.Replace(html, `<script type="module"`, clearScript+`<script type="module"`, 1)
-	return html
-}
-
 // mountVueSPA overlays Vue SPA routes onto an existing mux, claiming every
 // path no other route matches, the static asset prefixes, and the unmatched
 // paths under /api. Every route BuildMux registers is more specific than the
@@ -596,7 +582,6 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string) {
 		return
 	}
 
-	mode := "local"
 	version := Version
 
 	rawHTML, err := fs.ReadFile(dist, "index.html")
@@ -604,15 +589,13 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string) {
 		logger.Main.Warn("vue-ui: failed to read index.html", "error", err)
 		return
 	}
-	// render bakes the runtime config into the shell. The SSG-prerendered
-	// index.html bakes in the "/" route; every route mounts from a blank #app,
-	// so the prerendered markup is dropped.
+	// render bakes the runtime config into the shell.
 	render := func(apiKey string) string {
 		inject := fmt.Sprintf(
-			`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
-			mode, apiKey, version,
+			`<script>window.__WALLFACER__={serverApiKey:%q,version:%q};</script>`,
+			apiKey, version,
 		)
-		return stripSSGContent(strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1))
+		return strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1)
 	}
 	// Two variants: the key is released only to callers indexKeyAllowed
 	// admits; everyone else gets the shell with an empty serverApiKey.
@@ -643,7 +626,7 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string) {
 		}
 		http.NotFound(w, r)
 	})
-	logger.Main.Info("ui: serving Vue SPA", "mode", mode)
+	logger.Main.Info("ui: serving Vue SPA")
 }
 
 const (
