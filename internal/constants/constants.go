@@ -113,12 +113,6 @@ const DefaultCBThreshold = 5
 const (
 	BodyLimitDefault  int64 = 1 << 20   // 1 MiB
 	BodyLimitFeedback int64 = 512 << 10 // 512 KiB
-	// BodyLimitWhiteboard caps the whiteboard scene PUT. Excalidraw scenes are
-	// typically well under 1 MiB, but embedding images inlines them as base64
-	// data URLs in the scene's files map, which can push a single save to many
-	// megabytes. The whiteboard is a local single-user feature, so a generous
-	// cap is acceptable.
-	BodyLimitWhiteboard int64 = 32 << 20 // 32 MiB
 )
 
 // ExplorerMaxFileSize is the maximum file size the explorer will read (2 MiB).

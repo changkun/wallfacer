@@ -991,10 +991,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateSystemPrompt": h.UpdateSystemPrompt,
 		"DeleteSystemPrompt": h.DeleteSystemPrompt,
 
-		// Whiteboard.
-		"GetWhiteboard": http.HandlerFunc(h.GetWhiteboard),
-		"PutWhiteboard": http.HandlerFunc(h.PutWhiteboard),
-
 		// File explorer.
 		"ExplorerTree":        h.ExplorerTree,
 		"ExplorerStream":      h.ExplorerStream,
@@ -1092,9 +1088,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// System prompt templates.
 		"UpdateSystemPrompt": handler.BodyLimitDefault,
-
-		// Whiteboard scene (allows embedded images, so larger than default).
-		"PutWhiteboard": handler.BodyLimitWhiteboard,
 
 		// Workspace browser.
 		"MkdirWorkspace":  handler.BodyLimitDefault,

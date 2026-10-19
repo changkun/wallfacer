@@ -120,8 +120,7 @@ type Handler struct {
 	workspaces []string
 	// scopedDataDir mirrors the active workspace snapshot's per-workspace-key
 	// data directory (~/.wallfacer/data/<key>/). Empty when no workspace is
-	// configured. Used by workspace-level (non-task) blob storage such as the
-	// whiteboard scene.
+	// configured. activeDataKey reads it when no workspace manager is wired.
 	scopedDataDir string
 	envFile       string
 	startTime     time.Time

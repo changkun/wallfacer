@@ -555,13 +555,6 @@ SCENES['mission'] = async (page) => {
   }
 };
 
-// Whiteboard: Excalidraw mounts on the console theme.
-SCENES['whiteboard'] = async (page) => {
-  await page.goto(base + '/whiteboard', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForSelector('.excalidraw', { timeout: 15000 }).catch(() => {});
-  expect('whiteboard', !!(await page.$('.excalidraw')), 'Excalidraw did not mount');
-};
-
 // Docs: the nav is 260 wide on the sunk surface and the reading column is at
 // most 76ch.
 SCENES['docs'] = async (page) => {

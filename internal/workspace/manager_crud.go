@@ -127,7 +127,7 @@ func (m *Manager) Create(name string, folders []string) (Workspace, error) {
 
 // UpdateFolders replaces a workspace's folder set. This is the membership edit
 // the redesign makes safe: the workspace's id and DataKey are unchanged, so its
-// task store, agent-session transcripts, planning state, and whiteboard stay
+// task store, agent-session transcripts and planning state stay
 // attached. When the workspace is the active one, the live snapshot's paths are
 // refreshed in place WITHOUT reopening the store, and the change is published.
 func (m *Manager) UpdateFolders(id string, folders []string) (Workspace, error) {
@@ -269,7 +269,7 @@ func (m *Manager) SetLimits(id string, maxParallel, maxTestParallel *int) (Works
 }
 
 // Delete removes a workspace and permanently wipes its scoped data — the task
-// store, transcripts, planning state, whiteboard, and agent-session history.
+// store, transcripts, planning state and agent-session history.
 // The active workspace may be deleted: the board auto-switches to the next
 // usable workspace (MRU order), or to the empty "no workspace" state when none
 // remain (which prompts the picker). Idempotent for an unknown id. Returns the

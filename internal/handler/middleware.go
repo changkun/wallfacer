@@ -17,9 +17,8 @@ import (
 // These re-export constants used by MaxBytesMiddleware to enforce per-route
 // request body size limits.
 const (
-	BodyLimitDefault    = constants.BodyLimitDefault
-	BodyLimitFeedback   = constants.BodyLimitFeedback
-	BodyLimitWhiteboard = constants.BodyLimitWhiteboard
+	BodyLimitDefault  = constants.BodyLimitDefault
+	BodyLimitFeedback = constants.BodyLimitFeedback
 )
 
 // MaxBytesMiddleware limits the size of the request body for downstream handlers.
@@ -149,7 +148,7 @@ func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
 	case "/", "/favicon.ico",
-		"/analytics", "/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs":
+		"/analytics", "/chat", "/plan", "/mission", "/map", "/settings", "/docs":
 		return true
 	}
 	return strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/fonts/") ||

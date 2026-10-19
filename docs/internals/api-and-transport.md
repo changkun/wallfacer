@@ -103,9 +103,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/specs/stale-candidates` | List specs flagged as potentially stale by the drift pipeline |
 | `POST /api/specs/dismiss-stale-candidates` | Dismiss all pending stale-candidate flags |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |
-| **Whiteboard** | |
-| `GET /api/whiteboard` | Read the per-workspace whiteboard document |
-| `PUT /api/whiteboard` | Write the per-workspace whiteboard document (dedicated body limit) |
 | **Agent session** | |
 | `GET /api/agent` | Agent session status (running or not) |
 | `POST /api/agent` | Start the agent session (idempotent) |

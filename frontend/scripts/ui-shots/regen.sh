@@ -49,7 +49,7 @@ done
 # Every surface the docs, the landing page, or the README embed. The seed
 # gives each one content (tasks in every state, the repo's own spec tree), so
 # one run refreshes the whole set.
-DOC_SURFACES="board,task-detail,plan,mission,whiteboard,analytics"
+DOC_SURFACES="board,task-detail,plan,mission,analytics"
 SURFACES="$DOC_SURFACES,overview-spec,oversight"
 snap() { node "$PW/snap.mjs" --base "$BASE" --out "$OUT" --only "$SURFACES" "$@"; }
 

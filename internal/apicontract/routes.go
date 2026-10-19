@@ -280,19 +280,6 @@ var Routes = []Route{
 		Tags:        []string{"system-prompts"},
 	},
 
-	// --- Whiteboard ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/whiteboard", Name: "GetWhiteboard",
-		Description: "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
-		Tags:        []string{"whiteboard"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/whiteboard", Name: "PutWhiteboard",
-		Description: "Save the active workspace's whiteboard scene JSON.",
-		Tags:        []string{"whiteboard"},
-	},
-
 	// --- Git workspace operations ---
 
 	{

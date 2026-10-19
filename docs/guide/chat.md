@@ -74,6 +74,5 @@ The conversation header shows a live rollup for the active thread: rounds, input
 
 - [Plan](plan.md): the spec-first surface built on the same engine
 - [Board](board.md): where dispatched specs execute as tasks
-- [Whiteboard](whiteboard.md): free-form sketching alongside conversations
 - [Oversight](oversight.md): usage, token, and cost analytics
 - [Plan Mode internals](../internals/plan-mode.md): session runtime, streaming protocol, and undo plumbing

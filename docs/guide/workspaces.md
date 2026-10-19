@@ -1,10 +1,10 @@
 # Workspaces and Git
 
-A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board, chat sessions, the whiteboard, and analytics are all scoped per workspace. This guide covers the workspace model, day-to-day workspace management, and the git machinery underneath task execution.
+A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board, chat sessions, and analytics are all scoped per workspace. This guide covers the workspace model, day-to-day workspace management, and the git machinery underneath task execution.
 
 ## The workspace model
 
-Each workspace has a stable identity (a UUID assigned once) and a mutable folder set. The identity, not the folder list, owns the task history: renaming a workspace or re-pointing it at different folders keeps every task, session, and whiteboard scene attached to it. Workspaces are persisted in `~/.wallfacer/workspaces.json` (older `workspace-groups.json` installations are migrated automatically on startup).
+Each workspace has a stable identity (a UUID assigned once) and a mutable folder set. The identity, not the folder list, owns the task history: renaming a workspace or re-pointing it at different folders keeps every task and session attached to it. Workspaces are persisted in `~/.wallfacer/workspaces.json` (older `workspace-groups.json` installations are migrated automatically on startup).
 
 Per-workspace settings:
 

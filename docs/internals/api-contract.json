@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 95,
+  "route_count": 93,
   "routes": [
     {
       "method": "GET",
@@ -408,24 +408,6 @@
       "description": "Remove the user override for a built-in system prompt template, restoring the embedded default.",
       "tags": [
         "system-prompts"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/whiteboard",
-      "name": "GetWhiteboard",
-      "description": "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
-      "tags": [
-        "whiteboard"
-      ]
-    },
-    {
-      "method": "PUT",
-      "pattern": "/api/whiteboard",
-      "name": "PutWhiteboard",
-      "description": "Save the active workspace's whiteboard scene JSON.",
-      "tags": [
-        "whiteboard"
       ]
     },
     {

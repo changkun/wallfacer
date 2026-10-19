@@ -164,7 +164,6 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 | [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
 | [Chat](docs/guide/chat.md) | Chat sessions, slash commands, @mentions |
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
-| [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
 
 **Operate**
 
