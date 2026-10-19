@@ -12,7 +12,7 @@ affects:
   - internal/executor/
 effort: large
 created: 2026-07-21
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
@@ -27,10 +27,9 @@ diverge from its siblings. Mechanical cleanups and bug fixes from the same audit
 already landed on `main`; this spec covers only the changes that alter shared
 structure and therefore need review before implementation.
 
-Sequencing note: the runner terminal-state work touches the same files as the
-already-fixed commit-message and PR-repo bugs; land it after those are settled
-on `main` (they are). Confirm each extraction preserves behavior with the
-existing package tests plus a focused test on the new helper.
+Confirm each extraction preserves behavior with the existing package tests
+plus a focused test on the new helper. Line numbers below date from the
+original audit and drift as the files change.
 
 ## Theme 1 — Handler mutate-commit helper family
 
@@ -63,17 +62,12 @@ Best-effort terminal sequences are hand-repeated across the runner.
   StateChange in_progress->failed) repeats ~7 times; only the FailureCategory
   and error text vary. Consolidating guarantees a new fail site cannot forget
   the StateChange event. Risk: medium.
-- Shared auto-push gate helper.
-  Sites: `maybeAutoPush` and `MaybeAutoPushWorkspace` in
-  `internal/runner/commit.go` duplicate the entire gate. Risk: medium.
 
 ## Theme 3 — One-shot LLM-call + NDJSON-parse pipeline
 
 `runOneShotContainer` (runner) and `ndjson.PreferResultLine` already encapsulate
 launch/drain/parse, but several call sites bypass them.
 
-- Route `GenerateAgentSessionTitle` (`internal/runner/title.go:83`) through
-  `runOneShotContainer`.
 - Replace the three hand-rolled backward result-line scans in
   `internal/agentsession/conversation.go:329` with `ndjson.PreferResultLine`.
 - Fold the four `internal/executor/host_*_test.go` launch/drain helpers into one
@@ -82,12 +76,6 @@ launch/drain/parse, but several call sites bypass them.
 
 ## Theme 4 — Single source of truth and layer boundaries
 
-- Prompts template-name set is encoded four times (`embeddedToAPI`,
-  `apiToEmbedded`, `knownNames`, `mockContextFor` in
-  `internal/prompts/prompts.go`). Define one canonical
-  `[]struct{Embedded, API string}` table and derive the maps, known-names set,
-  and mock-context switch from it; add a round-trip completeness test. Risk:
-  medium.
 - Wrong-layer boundary: `WorkspaceDataKey`/`NewDataKey`
   (`internal/prompts/instructions.go:28`) compute workspace storage identity but
   live in the prompts (agent-template) package; the workspace package imports
@@ -97,10 +85,6 @@ launch/drain/parse, but several call sites bypass them.
   (`internal/store/tasks_update.go:15`, `:127`). Extract a private core taking a
   `force bool` (or a validate predicate) so persistence stays single-sourced.
   Risk: medium (the state-machine guard is exactly what differs).
-- Byte-identical alias functions to collapse (mechanical, low risk):
-  `visibilityPrincipal` vs `ownerPrincipal` (`internal/handler/workspace_crud.go:71`).
-  (`Registry.Leave` vs `LeaveRegistration`, `getenvOr`, and
-  `cloneTask`/`deepCloneTask` were already handled or intentionally retained.)
 - `internal/agentsession` `selectActiveThread` helper: the "clear active, then
   set active to the first non-archived thread" selection is copied three times
   in `sessions.go`. Risk: low.
@@ -118,5 +102,3 @@ launch/drain/parse, but several call sites bypass them.
 - Each extracted helper has a single definition and a focused unit test.
 - No behavior change: the affected packages' existing test suites pass
   unchanged, and `make build` / `make lint` stay green.
-- The prompts template-name table has a round-trip test that fails if a template
-  is added to only one derived structure.
