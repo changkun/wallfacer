@@ -345,46 +345,8 @@ func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
-// TestTestVerification_ReturnsNonEmptyRendered verifies that the test
-// verification template renders with all optional fields (criteria, impl
-// result, diff) populated.
-func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
-	mgr := prompts.NewManager(t.TempDir())
-	data := prompts.TestData{
-		OriginalPrompt: "build a widget",
-		Criteria:       "widget must render in < 100ms",
-		ImplResult:     "I implemented the widget",
-		Diff:           "--- a/widget.go\n+++ b/widget.go\n@@ -1 +1 @@",
-	}
-	got := mgr.TestVerification(data)
-	if strings.TrimSpace(got) == "" {
-		t.Error("TestVerification returned empty string")
-	}
-	if strings.Contains(got, "{{") {
-		t.Errorf("TestVerification returned unreplaced template syntax: %q", got)
-	}
-}
-
 // Package-level delegation functions — each verifies that the package-level
 // convenience function delegates to Default and produces non-empty output.
-
-func TestPackageLevelTestVerification_NonEmpty(t *testing.T) {
-	got := prompts.TestVerification(prompts.TestData{OriginalPrompt: "build widget"})
-	if strings.TrimSpace(got) == "" {
-		t.Error("prompts.TestVerification() returned empty string")
-	}
-}
-
-// TestTestVerification_NoCriteria verifies that the test verification template
-// renders when only the required OriginalPrompt is set and all optional fields
-// (Criteria, ImplResult, Diff) are empty.
-func TestTestVerification_NoCriteria(t *testing.T) {
-	mgr := prompts.NewManager(t.TempDir())
-	got := mgr.TestVerification(prompts.TestData{OriginalPrompt: "build something"})
-	if strings.TrimSpace(got) == "" {
-		t.Error("TestVerification without criteria returned empty string")
-	}
-}
 
 // TestRenderSpec verifies that the spec template renders without error
 // and contains key phrases.
@@ -428,19 +390,6 @@ func TestRenderSpec_NoHardcodedTracks(t *testing.T) {
 	}
 	if !strings.Contains(got, "specs/README.md") {
 		t.Errorf("spec prompt should point at specs/README.md for the live tracks")
-	}
-}
-
-// TestTestVerification_VerdictMarkersStatedOnce: the verdict contract names
-// each marker exactly once. Bare example lines duplicating the markers read
-// as output the agent should reproduce, and the parser accepts the marker
-// anywhere, so the single instruction is the whole contract.
-func TestTestVerification_VerdictMarkersStatedOnce(t *testing.T) {
-	got := prompts.NewManager(t.TempDir()).TestVerification(prompts.TestData{OriginalPrompt: "build widget"})
-	for _, marker := range []string{"**PASS**", "**FAIL**"} {
-		if n := strings.Count(got, marker); n != 1 {
-			t.Errorf("%s appears %d times, want 1", marker, n)
-		}
 	}
 }
 

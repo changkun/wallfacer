@@ -68,15 +68,12 @@ export interface Task {
   impact_score?: number;
   failure_category: string;
   fresh_start: boolean;
-  is_test_run: boolean;
-  last_test_result: string;
   session_id: string | null;
   worktree_paths: Record<string, string>;
   usage_breakdown: Record<string, TaskUsage>;
   // Budget guardrails — 0 / missing means unlimited.
   max_cost_usd?: number;
   max_input_tokens?: number;
-  test_run_start_turn?: number;
   scheduled_at?: string | null;
   prompt_history?: string[];
   retry_history?: RetryRecord[];
@@ -186,11 +183,9 @@ export interface Workspace {
   folders: string[];
   dormant: boolean;
   active: boolean;
-  // Per-workspace parallelism overrides. null/absent means "use the global
-  // default". Surfaced as the registry editor's Max parallel / Max test
-  // parallel inputs.
+  // Per-workspace parallelism override. null/absent means "use the global
+  // default". Surfaced as the registry editor's Max parallel input.
   max_parallel?: number | null;
-  max_test_parallel?: number | null;
 }
 
 export interface WorkspaceGroup {
@@ -202,7 +197,6 @@ export interface WorkspaceGroup {
   workspaces: string[];
   key: string;
   max_parallel?: number;
-  max_test_parallel?: number;
 }
 
 export interface ServerConfig {
@@ -214,7 +208,6 @@ export interface ServerConfig {
   workspace_groups?: WorkspaceGroup[];
   prompts_dir?: string;
   autoimplement: boolean;
-  autotest: boolean;
   autosubmit: boolean;
   autosync: boolean;
   autopush: boolean;
@@ -241,7 +234,6 @@ export interface EnvConfig {
   default_sandbox: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks: number;
-  max_test_parallel_tasks: number;
   max_agents: number;
   agent_nice: number;
   review_rounds: number;
@@ -267,7 +259,6 @@ export interface EnvUpdatePayload {
   default_sandbox?: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks?: number;
-  max_test_parallel_tasks?: number;
   max_agents?: number;
   agent_nice?: number;
   review_rounds?: number;
@@ -289,7 +280,7 @@ export interface SandboxTestResponse {
   task_id: string;
   sandbox: string;
   status: string;
-  last_test_result?: string;
+  passed: boolean;
   result?: string;
   stop_reason?: string;
   reauth_available?: boolean;

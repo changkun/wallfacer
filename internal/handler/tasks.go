@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -168,25 +166,23 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 // taskCreateFields are the fields of a new task that POST /api/tasks
 // accepts, with their mapping onto the stored task in apply.
 type taskCreateFields struct {
-	Title              string         `json:"title"`
-	Prompt             string         `json:"prompt"`
-	Criteria           string         `json:"criteria"`
-	Timeout            int            `json:"timeout"`
-	MountWorktrees     bool           `json:"mount_worktrees"`
-	Kind               store.TaskKind `json:"kind"`
-	Tags               []string       `json:"tags"`
-	ScheduledAt        *time.Time     `json:"scheduled_at,omitempty"`
-	CustomPassPatterns []string       `json:"custom_pass_patterns,omitempty"`
-	CustomFailPatterns []string       `json:"custom_fail_patterns,omitempty"`
-	MaxCostUSD         float64        `json:"max_cost_usd"`
-	MaxInputTokens     int            `json:"max_input_tokens"`
-	Model              string         `json:"model"`
+	Title          string         `json:"title"`
+	Prompt         string         `json:"prompt"`
+	Criteria       string         `json:"criteria"`
+	Timeout        int            `json:"timeout"`
+	MountWorktrees bool           `json:"mount_worktrees"`
+	Kind           store.TaskKind `json:"kind"`
+	Tags           []string       `json:"tags"`
+	ScheduledAt    *time.Time     `json:"scheduled_at,omitempty"`
+	MaxCostUSD     float64        `json:"max_cost_usd"`
+	MaxInputTokens int            `json:"max_input_tokens"`
+	Model          string         `json:"model"`
 }
 
 // apply copies the fields into opts. The store normalizes the title, the
 // model and the budget: a blank title is derived from the prompt, a negative
 // limit becomes unlimited, and a blank model leaves the global default in
-// effect. The caller validates the prompt and the custom patterns first.
+// effect. The caller validates the prompt first.
 func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
 	opts.Title = f.Title
 	opts.Prompt = f.Prompt
@@ -196,8 +192,6 @@ func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
 	opts.Kind = f.Kind
 	opts.Tags = f.Tags
 	opts.ScheduledAt = f.ScheduledAt
-	opts.CustomPassPatterns = f.CustomPassPatterns
-	opts.CustomFailPatterns = f.CustomFailPatterns
 	opts.MaxCostUSD = f.MaxCostUSD
 	opts.MaxInputTokens = f.MaxInputTokens
 	opts.ModelOverride = f.Model
@@ -233,10 +227,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.Prompt) == "" {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
-		return
-	}
-	if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s, ok2 := h.requireStore(w)
@@ -282,9 +272,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Model *string `json:"model"`
 		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)
 		// from explicitly-sent "null" (clear the schedule) or a valid time (set it).
-		ScheduledAt        json.RawMessage `json:"scheduled_at"`
-		CustomPassPatterns []string        `json:"custom_pass_patterns,omitempty"`
-		CustomFailPatterns []string        `json:"custom_fail_patterns,omitempty"`
+		ScheduledAt json.RawMessage `json:"scheduled_at"`
 	}](w, r)
 	if !ok {
 		return
@@ -342,8 +330,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, criteria, timeout, fresh_start, mount_worktrees, sandbox, model, budget, and custom patterns for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
+	// Allow editing prompt, criteria, timeout, fresh_start, mount_worktrees, sandbox, model, and budget for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -353,10 +341,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			activity = *req.SandboxByActivity
 		}
 		if err := h.validateRequestedSandboxes(sandbox, activity); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -378,20 +362,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 		if req.Model != nil {
 			if err := s.UpdateTaskModelOverride(r.Context(), id, *req.Model); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		if req.CustomPassPatterns != nil || req.CustomFailPatterns != nil {
-			passP := req.CustomPassPatterns
-			failP := req.CustomFailPatterns
-			if passP == nil {
-				passP = task.CustomPassPatterns
-			}
-			if failP == nil {
-				failP = task.CustomFailPatterns
-			}
-			if err := s.UpdateTaskCustomPatterns(r.Context(), id, passP, failP); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -513,7 +483,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			return
 		}
 		// Enforce concurrency limit for manual backlog → in_progress transitions.
-		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
+		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
 			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, newStatus) {
 				return
 			}
@@ -539,10 +509,10 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		// failed; backlog is handled above). These transitions only flip the
 		// status and consume a concurrency slot — they do NOT launch an agent
 		// worker, leaving the task stuck in_progress with no worker. Resuming a
-		// waiting/failed task must go through ResumeTask/TestTask/SubmitFeedback,
-		// which pair the status flip with a RunBackground launch.
-		if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
-			http.Error(w, "cannot move a task to in_progress via PATCH; use resume, test, or feedback to start a worker", http.StatusBadRequest)
+		// waiting/failed task must go through ResumeTask/SubmitFeedback, which
+		// pair the status flip with a RunBackground launch.
+		if newStatus == store.TaskStatusInProgress {
+			http.Error(w, "cannot move a task to in_progress via PATCH; use resume or feedback to start a worker", http.StatusBadRequest)
 			return
 		}
 
@@ -560,15 +530,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		if oldStatus == store.TaskStatusBacklog || oldStatus == store.TaskStatusWaiting {
 			h.cascadeArchiveThreadsForTask(id.String())
 		}
-
-		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
-			sessionID := ""
-			if !task.FreshStart && task.SessionID != nil {
-				sessionID = *task.SessionID
-			}
-			h.runner.RunBackground(id, task.Prompt, sessionID, false)
-		}
-
 	}
 
 	updated, err := s.GetTask(r.Context(), id)
@@ -635,21 +596,5 @@ func (h *Handler) applyRestore(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	h.cascadeUnarchiveThreadsForTask(id.String())
-	return nil
-}
-
-// validateCustomPatterns compiles each pattern to ensure it is valid RE2 syntax.
-// Returns a 400-friendly error message that includes the offending pattern.
-func validateCustomPatterns(passPatterns, failPatterns []string) error {
-	for _, p := range passPatterns {
-		if _, err := regexp.Compile(p); err != nil {
-			return fmt.Errorf("invalid custom_pass_pattern %q: %v", p, err)
-		}
-	}
-	for _, p := range failPatterns {
-		if _, err := regexp.Compile(p); err != nil {
-			return fmt.Errorf("invalid custom_fail_pattern %q: %v", p, err)
-		}
-	}
 	return nil
 }

@@ -83,14 +83,12 @@ func TestStripEnvInlineComment(t *testing.T) {
 func TestSandboxByActivity(t *testing.T) {
 	cfg := Config{
 		ImplementationSandbox: "claude",
-		TestingSandbox:        "codex",
 		OversightSandbox:      "codex",
 		CommitMessageSandbox:  "codex",
 	}
 	got := cfg.SandboxByActivity()
 	want := map[store.SandboxActivity]string{
 		store.SandboxActivityImplementation: "claude",
-		store.SandboxActivityTesting:        "codex",
 		store.SandboxActivityOversight:      "codex",
 		store.SandboxActivityCommitMessage:  "codex",
 	}
@@ -117,7 +115,7 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	initial := strings.Join([]string{
 		"WALLFACER_DEFAULT_SANDBOX=claude",
 		"WALLFACER_SANDBOX_IMPLEMENTATION=claude",
-		"WALLFACER_SANDBOX_TESTING=codex",
+		"WALLFACER_SANDBOX_COMMIT_MESSAGE=codex",
 		"UNRELATED=keep",
 		"",
 	}, "\n")
@@ -144,9 +142,6 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	}
 	if cfg.ImplementationSandbox != "codex" {
 		t.Errorf("ImplementationSandbox = %q, want codex", cfg.ImplementationSandbox)
-	}
-	if cfg.TestingSandbox != "" {
-		t.Errorf("TestingSandbox should be cleared, got %q", cfg.TestingSandbox)
 	}
 	if cfg.CommitMessageSandbox != "" {
 		t.Errorf("CommitMessageSandbox should be cleared, got %q", cfg.CommitMessageSandbox)

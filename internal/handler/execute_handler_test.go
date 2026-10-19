@@ -190,47 +190,6 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 	}
 }
 
-// TestTestTask_AcquiresPromoteMu verifies TestTask serializes its waiting→
-// in_progress transition under promoteMu, so a concurrent tryAutoSubmit cannot
-// move the task to committing between TestTask's status check and its
-// UpdateTaskTestRun/UpdateTaskStatus writes.
-func TestTestTask_AcquiresPromoteMu(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	id := createWaitingTask(t, h, "implement something")
-
-	promoteMu.Lock()
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/test", strings.NewReader(`{}`))
-	w := httptest.NewRecorder()
-	done := make(chan struct{})
-	go func() {
-		h.TestTask(w, req, id)
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		promoteMu.Unlock()
-		t.Fatal("TestTask completed while promoteMu was held; it does not serialize the waiting transition")
-	case <-time.After(250 * time.Millisecond):
-		// Expected: blocked on promoteMu.Lock() before any write.
-	}
-
-	// Blocked before any write: the test-run flag must not be set yet.
-	if cur, _ := h.store.GetTask(ctx, id); cur.Status != store.TaskStatusWaiting || cur.IsTestRun {
-		promoteMu.Unlock()
-		t.Fatalf("task should be untouched while promoteMu held: status=%s isTestRun=%v", cur.Status, cur.IsTestRun)
-	}
-
-	promoteMu.Unlock()
-	<-done
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 after lock release, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestCompleteTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	id := uuid.New()
@@ -463,7 +422,6 @@ func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}
 	h.SetAutoimplement(true)
-	h.SetAutotest(true)
 	h.SetAutosubmit(true)
 	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
@@ -517,7 +475,7 @@ func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 		t.Fatalf("expected no placeholder commit to land, got %s commits", got)
 	}
 	// User-triggered completion (TriggerUser) does not pause automation.
-	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
+	if !h.AutoimplementEnabled() || !h.AutosubmitEnabled() {
 		t.Fatal("expected automation toggles to remain unchanged on the user-triggered path")
 	}
 }

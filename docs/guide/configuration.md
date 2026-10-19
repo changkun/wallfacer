@@ -8,7 +8,7 @@ Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The
 
 ### Execution tab
 
-- **Automation toggles**: the same five toggles as the board header menu (autoimplement, autotest, autosubmit, autosync, autopush). See [Automation](automation.md).
+- **Automation toggles**: the same four toggles as the board header menu (autoimplement, autosubmit, autosync, autopush). See [Automation](automation.md).
 - **Parallel tasks**: maximum concurrent running tasks (1 to 20). Maps to `WALLFACER_MAX_PARALLEL`.
 - **Archived tasks**: page size for the archived-task list (1 to 200). Maps to `WALLFACER_ARCHIVED_TASKS_PER_PAGE`.
 - **Oversight interval**: minutes between periodic oversight summaries while a task runs (0 to 120; 0 generates summaries only at completion). Maps to `WALLFACER_OVERSIGHT_INTERVAL`.
@@ -61,12 +61,11 @@ Version information, the project link, license, and a read-only system status bl
 
 ## System prompt templates
 
-Built-in Go templates instruct each agent activity. Eight templates exist:
+Built-in Go templates instruct each agent activity. Seven templates exist:
 
 | Template | Purpose |
 |---|---|
 | `commit.tmpl` | Commit message generation |
-| `test.tmpl` | Test verification agent |
 | `oversight.tmpl` | Oversight summary generation |
 | `conflict.tmpl` | Merge conflict resolution |
 | `task_prompt_refine.tmpl` | Task prompt refinement in Plan mode |
@@ -158,7 +157,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | Variable | Default | Description |
 |---|---|---|
 | `WALLFACER_MAX_PARALLEL` | `1` | Concurrent running tasks. Defaults to 1 because the harness CLIs share state under `~/.claude` and `~/.codex`; set explicitly to opt into more |
-| `WALLFACER_MAX_TEST_PARALLEL` | `2` | Concurrent test verification runs |
 | `WALLFACER_MAX_AGENTS` | unlimited | Global budget on concurrent agent processes |
 | `WALLFACER_AGENT_NICE` | | Niceness applied to agent processes; negative disables |
 | `WALLFACER_OVERSIGHT_INTERVAL` | `0` | Minutes between periodic oversight generation (0 = only at completion) |
@@ -171,7 +169,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window for session cost analytics; 0 = all time. `WALLFACER_PLANNING_WINDOW_DAYS` is a deprecated alias |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |
-| `WALLFACER_SANDBOX_TESTING` | | Harness override for test verification |
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |
@@ -236,7 +233,6 @@ Press `?` anywhere to open this reference in the app. Shortcuts without modifier
 | `s` | Start a backlog task |
 | `d` | Mark a waiting task done |
 | `r` | Resume a waiting task with a session, otherwise retry to backlog |
-| `t` | Run test verification |
 | `p` | Open the task in Plan mode |
 | `Escape` | Blur the card |
 

@@ -116,66 +116,6 @@ func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 	}
 }
 
-func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-
-	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
-	_ = os.MkdirAll(outputsDir, 0755)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn": 2}`), 0644)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
-	w := httptest.NewRecorder()
-	h.serveStoredLogsUpTo(w, req, task.ID, 2)
-
-	body := w.Body.String()
-	if !strings.Contains(body, `"turn": 1`) {
-		t.Error("expected turn 1 in response")
-	}
-	if !strings.Contains(body, `"turn": 2`) {
-		t.Error("expected turn 2 in response")
-	}
-	if strings.Contains(body, `"turn": 3`) {
-		t.Error("turn 3 should be excluded (above maxTurn=2)")
-	}
-}
-
-func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-
-	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
-	_ = os.MkdirAll(outputsDir, 0755)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn": 2}`), 0644)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
-	w := httptest.NewRecorder()
-	h.serveStoredLogsFrom(w, req, task.ID, 2)
-
-	body := w.Body.String()
-	if strings.Contains(body, `"turn": 1`) {
-		t.Error("turn 1 should be excluded (at or below fromTurn=2)")
-	}
-	if strings.Contains(body, `"turn": 2`) {
-		t.Error("turn 2 should be excluded (exclusive: fromTurn=2 means >2)")
-	}
-	if !strings.Contains(body, `"turn": 3`) {
-		t.Error("expected turn 3 in response (above fromTurn=2)")
-	}
-}
-
 func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
@@ -727,69 +667,6 @@ func TestStreamLogs_CancelledTaskServesStoredLogs(t *testing.T) {
 	}
 }
 
-// TestStreamLogs_PhaseImplQueryParam verifies that ?phase=impl routes to
-// serveStoredLogsUpTo. With TestRunStartTurn=0 (default), maxTurn=0 means
-// no upper bound and all saved turns are served.
-func TestStreamLogs_PhaseImplQueryParam(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "impl phase test", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
-	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
-	_ = os.MkdirAll(outputsDir, 0755)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=impl", nil)
-	w := httptest.NewRecorder()
-	h.StreamLogs(w, req, task.ID)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200 for impl phase with turn files, got %d", w.Code)
-	}
-	body := w.Body.String()
-	if !strings.Contains(body, `"turn":1`) {
-		t.Error("expected turn 1 in impl phase output")
-	}
-	if !strings.Contains(body, `"turn":2`) {
-		t.Error("expected turn 2 in impl phase output")
-	}
-}
-
-// TestStreamLogs_PhaseTestQueryParam verifies that ?phase=test routes to
-// serveStoredLogsFrom for non-running tasks.
-func TestStreamLogs_PhaseTestQueryParam(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test phase test", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
-	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
-	_ = os.MkdirAll(outputsDir, 0755)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
-
-	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
-	w := httptest.NewRecorder()
-	h.StreamLogs(w, req, task.ID)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200 for test phase with turn files, got %d", w.Code)
-	}
-	body := w.Body.String()
-	if !strings.Contains(body, `"turn":1`) {
-		t.Error("expected turn 1 in test phase output (fromTurn=0 means no lower bound)")
-	}
-	if !strings.Contains(body, `"turn":2`) {
-		t.Error("expected turn 2 in test phase output")
-	}
-}
-
 // TestStreamLogs_InProgressNoContainerExitsOnContextCancel verifies that
 // StreamLogs for an in-progress task with no live container (runner returns "")
 // falls back gracefully (serveStoredLogs) rather than panicking.
@@ -870,26 +747,6 @@ func TestStreamLogs_InProgress_NoLiveReader_ServesStoredLogs(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "stored ok") {
 		t.Errorf("expected stored turn output in response, got: %s", w.Body.String())
-	}
-}
-
-// TestStreamLogs_PhaseTest_InProgress verifies that ?phase=test for an
-// in-progress task does NOT go to serveStoredLogsFrom but instead falls
-// through to the live container path (or stored logs if no container).
-func TestStreamLogs_PhaseTest_InProgress(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "phase-test in-progress", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
-
-	// No container (real runner returns ""), so falls back to serveStoredLogs.
-	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
-	w := httptest.NewRecorder()
-	h.StreamLogs(w, req, task.ID)
-
-	// No turn files saved → serveStoredLogs → 200 with "no output" message.
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200 (no logs), got %d", w.Code)
 	}
 }
 

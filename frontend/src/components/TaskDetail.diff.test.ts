@@ -33,8 +33,6 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     tags: [],
     failure_category: '',
     fresh_start: false,
-    is_test_run: false,
-    last_test_result: '',
     session_id: null,
     worktree_paths: {},
     usage_breakdown: {},

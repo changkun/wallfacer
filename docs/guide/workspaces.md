@@ -8,7 +8,7 @@ Each workspace has a stable identity (a UUID assigned once) and a mutable folder
 
 Per-workspace settings:
 
-- **Parallel caps**: a maximum number of concurrently running tasks and test runs for the workspace. Leave a cap empty to inherit the global default (`WALLFACER_MAX_PARALLEL`); see [Configuration](configuration.md).
+- **Parallel cap**: a maximum number of concurrently running tasks for the workspace. Leave the cap empty to inherit the global default (`WALLFACER_MAX_PARALLEL`); see [Configuration](configuration.md).
 - **Name**: an optional display name; unnamed workspaces show their folder basenames.
 
 Folders can be git repositories or plain directories; both work (see non-git folders below).

@@ -316,7 +316,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
 	h.StartWaitingSyncWatcher(ctx)
-	h.StartAutoTester(ctx)
 	h.StartAutoSubmitter(ctx)
 	h.StartAutoReview(ctx)
 
@@ -1037,7 +1036,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CompleteTask":     withID(h.CompleteTask),
 		"ResumeTask":       withID(h.ResumeTask),
 		"SyncTask":         withID(h.SyncTask),
-		"TestTask":         withID(h.TestTask),
 		"ReviewTask":       withID(h.ReviewTask),
 		"ReviewTranscript": withID(h.ReviewTranscript),
 
@@ -1118,7 +1116,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SubmitFeedback": handler.BodyLimitFeedback,
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
-		"TestTask":       handler.BodyLimitDefault,
 		"ReviewTask":     handler.BodyLimitDefault,
 	}
 

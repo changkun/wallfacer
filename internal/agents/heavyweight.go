@@ -9,13 +9,3 @@ var Implementation = Role{
 	Capabilities: []string{CapWorkspaceWrite, CapBoardContext},
 	Multiturn:    true,
 }
-
-// Testing runs the task's test suite after Implementation and
-// classifies the verdict.
-var Testing = Role{
-	Slug:         "test",
-	Title:        "Testing",
-	Description:  "Runs the task's test suite and classifies the verdict.",
-	Capabilities: []string{CapWorkspaceWrite, CapBoardContext},
-	Multiturn:    true,
-}

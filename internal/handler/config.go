@@ -152,12 +152,11 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	// them against activeGroupInfos entries. Per-group concurrency overrides
 	// ride along so the In-Progress column editor can show the current value.
 	type keyedGroup struct {
-		ID              string   `json:"id,omitempty"`
-		Name            string   `json:"name,omitempty"`
-		Workspaces      []string `json:"workspaces"`
-		Key             string   `json:"key"`
-		MaxParallel     *int     `json:"max_parallel,omitempty"`
-		MaxTestParallel *int     `json:"max_test_parallel,omitempty"`
+		ID          string   `json:"id,omitempty"`
+		Name        string   `json:"name,omitempty"`
+		Workspaces  []string `json:"workspaces"`
+		Key         string   `json:"key"`
+		MaxParallel *int     `json:"max_parallel,omitempty"`
 	}
 	keyedGroups := make([]keyedGroup, 0, len(groups))
 	for _, g := range groups {
@@ -180,16 +179,15 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 			folders = []string{} // never marshal null; the frontend joins this
 		}
 		keyedGroups = append(keyedGroups, keyedGroup{
-			ID:              g.ID,
-			Name:            g.Name,
-			Workspaces:      folders,
-			Key:             key,
-			MaxParallel:     g.MaxParallel,
-			MaxTestParallel: g.MaxTestParallel,
+			ID:          g.ID,
+			Name:        g.Name,
+			Workspaces:  folders,
+			Key:         key,
+			MaxParallel: g.MaxParallel,
 		})
 	}
 
-	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-review"}
+	watcherNames := []string{"auto-promote", "auto-retry", "auto-submit", "auto-sync", "auto-review"}
 	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
 	for _, name := range watcherNames {
 		if wb, ok := h.breakers[name]; ok {
@@ -210,7 +208,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"sandbox_reasons":           map[string]string{},
 		"activity_sandboxes":        map[string]string{},
 		"autoimplement":             h.AutoimplementEnabled(),
-		"autotest":                  h.AutotestEnabled(),
 		"autosubmit":                h.AutosubmitEnabled(),
 		"autosync":                  h.AutosyncEnabled(),
 		"autopush":                  h.AutopushEnabled(),
@@ -268,7 +265,6 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Autoimplement    *bool                 `json:"autoimplement"`
-		Autotest         *bool                 `json:"autotest"`
 		Autosubmit       *bool                 `json:"autosubmit"`
 		Autosync         *bool                 `json:"autosync"`
 		Autopush         *bool                 `json:"autopush"`
@@ -291,7 +287,6 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// detached context: r.Context() is cancelled the moment UpdateConfig
 	// returns (mirrors the agent exec goroutine).
 	applyBoolToggle(context.Background(), req.Autoimplement, h.SetAutoimplement, h.AutoimplementEnabled, h.tryAutoPromote)
-	applyBoolToggle(context.Background(), req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	applyBoolToggle(context.Background(), req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
 	applyBoolToggle(context.Background(), req.Review, h.SetReview, h.ReviewEnabled, h.tryAutoReview)
@@ -299,8 +294,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// and back does not reset the user's automation choices, and a
 	// different group on this server stays manual unless the user turns
 	// automation on for it explicitly.
-	if req.Autoimplement != nil || req.Autotest != nil ||
-		req.Autosubmit != nil || req.Autosync != nil {
+	if req.Autoimplement != nil || req.Autosubmit != nil || req.Autosync != nil {
 		h.persistCurrentGroupToggles()
 	}
 	// Auto-push: update both the in-memory toggle and the .env file so the
@@ -319,7 +313,6 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]any{
 		"autoimplement": h.AutoimplementEnabled(),
-		"autotest":      h.AutotestEnabled(),
 		"autosubmit":    h.AutosubmitEnabled(),
 		"autosync":      h.AutosyncEnabled(),
 		"autopush":      h.AutopushEnabled(),

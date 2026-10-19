@@ -57,6 +57,8 @@ var removedKeys = []string{
 	"CLAUDE_TITLE_MODEL",
 	"CODEX_TITLE_MODEL",
 	"WALLFACER_SANDBOX_TITLE",
+	"WALLFACER_SANDBOX_TESTING",
+	"WALLFACER_MAX_TEST_PARALLEL",
 }
 
 // TestParse_RemovedKeysIgnored verifies that a file carrying every removed key
@@ -542,51 +544,6 @@ func TestParseArchivedTasksPerPageAbsent(t *testing.T) {
 	}
 	if cfg.ArchivedTasksPerPage != 0 {
 		t.Errorf("ArchivedTasksPerPage = %d; want 0 when absent", cfg.ArchivedTasksPerPage)
-	}
-}
-
-// TestParseMaxTestParallelTasks verifies parsing a valid max test parallel value.
-func TestParseMaxTestParallelTasks(t *testing.T) {
-	content := "WALLFACER_MAX_TEST_PARALLEL=3\n"
-	path := writeEnvFile(t, content)
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.MaxTestParallelTasks != 3 {
-		t.Errorf("MaxTestParallelTasks = %d; want 3", cfg.MaxTestParallelTasks)
-	}
-}
-
-// TestParseMaxTestParallelTasksAbsent verifies that a missing key defaults to 0.
-func TestParseMaxTestParallelTasksAbsent(t *testing.T) {
-	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
-	path := writeEnvFile(t, content)
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.MaxTestParallelTasks != 0 {
-		t.Errorf("MaxTestParallelTasks = %d; want 0 when absent", cfg.MaxTestParallelTasks)
-	}
-}
-
-// TestUpdateMaxTestParallelTasks verifies that max test parallel can be set via Update.
-func TestUpdateMaxTestParallelTasks(t *testing.T) {
-	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
-	path := writeEnvFile(t, content)
-
-	v := "4"
-	if err := envconfig.Update(path, envconfig.Updates{MaxTestParallel: &v}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse after update: %v", err)
-	}
-	if cfg.MaxTestParallelTasks != 4 {
-		t.Errorf("MaxTestParallelTasks = %d; want 4 after update", cfg.MaxTestParallelTasks)
 	}
 }
 

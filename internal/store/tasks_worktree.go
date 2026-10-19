@@ -38,53 +38,6 @@ func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes m
 	})
 }
 
-// UpdateTaskTestRun sets the IsTestRun flag and LastTestResult on a task atomically.
-// Call with isTestRun=true and empty lastTestResult to mark the start of a test run;
-// call with isTestRun=false and a verdict ("pass"/"fail"/"") when the test completes.
-func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun bool, lastTestResult string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.IsTestRun = isTestRun
-		t.LastTestResult = lastTestResult
-		if isTestRun || lastTestResult != "fail" {
-			t.PendingTestFeedback = ""
-		}
-		if isTestRun {
-			// Record the current turn count so we know which turn files belong to
-			// the implementation phase vs the test phase.
-			t.TestRunStartTurn = t.Turns
-		}
-		return nil
-	})
-}
-
-// UpdateTaskPendingTestFeedback stores or clears the pending feedback message
-// generated from the latest failed test run.
-func (s *Store) UpdateTaskPendingTestFeedback(_ context.Context, id uuid.UUID, message string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.PendingTestFeedback = message
-		return nil
-	})
-}
-
-// IncrementTestFailCount atomically increments the consecutive test failure
-// counter for a task. Called by the runner when a test verdict is "fail".
-func (s *Store) IncrementTestFailCount(_ context.Context, id uuid.UUID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.TestFailCount++
-		return nil
-	})
-}
-
-// ResetTestFailCount resets the consecutive test failure counter to zero.
-// Called when the user manually provides feedback or when a test passes,
-// so the auto-resume cycle can start fresh.
-func (s *Store) ResetTestFailCount(_ context.Context, id uuid.UUID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.TestFailCount = 0
-		return nil
-	})
-}
-
 // SetTaskFailureCategory sets the failure_category field on a task.
 // It is called immediately after a TaskStatusFailed transition to record
 // the machine-readable root cause. The field is persisted atomically so

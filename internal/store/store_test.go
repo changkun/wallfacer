@@ -197,8 +197,7 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary test", Title: "Summary Test", Timeout: 10})
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
-	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
-	_ = s.UpdateTaskTurns(bg(), task.ID, 3)
+	_ = s.UpdateTaskResult(bg(), task.ID, "", "", "end_turn", 3)
 
 	transitionToDone(t, s, task.ID)
 
@@ -225,9 +224,6 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	if math.Abs(summary.TotalCostUSD-0.42) > 1e-9 {
 		t.Errorf("TotalCostUSD = %v, want 0.42", summary.TotalCostUSD)
 	}
-	if summary.TestResult != "pass" {
-		t.Errorf("TestResult = %q, want 'pass'", summary.TestResult)
-	}
 	implUsage, ok := summary.ByActivity[SandboxActivityImplementation]
 	if !ok {
 		t.Error("ByActivity missing 'implementation'")
@@ -249,8 +245,7 @@ func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force done task", Title: "Force Done Task", Timeout: 10})
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 50, OutputTokens: 25, CostUSD: 0.21})
-	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
-	_ = s.UpdateTaskTurns(bg(), task.ID, 2)
+	_ = s.UpdateTaskResult(bg(), task.ID, "", "", "end_turn", 2)
 
 	// Skip straight to done via ForceUpdateTaskStatus (no state machine check).
 	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone); err != nil {
@@ -272,9 +267,6 @@ func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 	}
 	if summary.TotalTurns != 2 {
 		t.Errorf("TotalTurns = %d, want 2", summary.TotalTurns)
-	}
-	if summary.TestResult != "pass" {
-		t.Errorf("TestResult = %q, want 'pass'", summary.TestResult)
 	}
 }
 
@@ -785,14 +777,10 @@ func TestStatusIndex_SortedByPositionThenCreatedAt(t *testing.T) {
 func TestCountRegularInProgress(t *testing.T) {
 	s := newTestStore(t)
 
-	// One regular in-progress task.
-	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "regular", Timeout: 10})
+	// One in-progress task and one backlog task.
+	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "running", Timeout: 10})
 	_ = s.UpdateTaskStatus(bg(), t1.ID, TaskStatusInProgress)
-
-	// One test-run in-progress task.
-	t2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test run", Timeout: 10})
-	_ = s.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
-	_ = s.UpdateTaskTestRun(bg(), t2.ID, true, "")
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "queued", Timeout: 10})
 
 	if got := s.CountRegularInProgress(); got != 1 {
 		t.Errorf("CountRegularInProgress() = %d, want 1", got)

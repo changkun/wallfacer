@@ -71,7 +71,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/config", Name: "UpdateConfig",
-		Description: "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
+		Description: "Update server configuration (autoimplement, autosubmit, sandbox assignments).",
 		Tags:        []string{"config"},
 	},
 
@@ -435,11 +435,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/test", Name: "TestTask",
-		Description: "Trigger the test agent for a task.",
-		Tags:        []string{"tasks"},
-	},
-	{
 		Method: http.MethodPost, Pattern: "/api/tasks/{id}/review", Name: "ReviewTask",
 		Description: "Run one review round for a waiting task on the reviewer model.",
 		Tags:        []string{"tasks"},
@@ -482,7 +477,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/oversight", Name: "GetOversight",
-		Description: "Oversight summary for a task. ?phase=impl (default) or ?phase=test selects the implementation- or test-agent summary.",
+		Description: "Oversight summary for a task.",
 		Tags:        []string{"tasks"},
 	},
 

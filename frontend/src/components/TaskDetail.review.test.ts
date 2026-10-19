@@ -17,7 +17,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, cost_usd: 0 },
     sandbox: '', position: 0, created_at: '', updated_at: '', branch_name: '', commit_message: '',
     model: '', kind: '', tags: [], failure_category: '', fresh_start: false,
-    is_test_run: false, last_test_result: '', session_id: null, worktree_paths: {}, usage_breakdown: {},
+    session_id: null, worktree_paths: {}, usage_breakdown: {},
     ...overrides,
   } as Task;
 }

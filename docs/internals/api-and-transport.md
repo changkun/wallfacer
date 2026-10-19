@@ -22,7 +22,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
 | `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits). |
-| `PUT /api/config` | Update server configuration (autoimplement, autotest, autosubmit, harness assignments) |
+| `PUT /api/config` | Update server configuration (autoimplement, autosubmit, harness assignments) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
 | `POST /api/workspaces/pick-folder` | Open the native OS folder picker and return the chosen path |
@@ -72,13 +72,12 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |
 | `POST /api/tasks/{id}/resume` | Resume a failed or waiting task using its existing session |
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto the latest default branch |
-| `POST /api/tasks/{id}/test` | Trigger the test agent for a task |
 | `GET /api/tasks/{id}/diff` | Git diff of task worktrees versus the default branch |
 | `GET /api/tasks/{id}/logs` | Live log stream for a running task (`text/plain`, not SSE; see [Live Task Logs](#live-task-logs-get-apitasksidlogs)) |
 | `GET /api/tasks/{id}/outputs/{filename}` | Raw Claude Code output file for a single agent turn |
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
-| `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
+| `GET /api/tasks/{id}/oversight` | Oversight summary for a task |
 | `POST /api/tasks/{id}/review` | Run one review round for a waiting task, whatever the review toggle says; 400 with code `review_no_worktree` for a task without a worktree, 409 while a round is in flight |
 | `GET /api/tasks/{id}/review/transcript` | The task's newest review session: `rounds` (each with the reviewer's answer, failed attempts, the feedback sent and the task's reply), `outcome` once the session ended (termination, open findings, headline, tokens, skip reason), the current `config`, and `running` from the in-flight set. `legacy: true` with empty `rounds` for a session the earlier debate engine recorded. `truncated: true` when the transcript could not be read to its end (an I/O error, or a record over the line cap in `internal/review/record.go`); `rounds` then holds the rounds before that point, and the server logs the error |
 | **File Explorer** | |
@@ -394,7 +393,7 @@ Usage is displayed on task cards and aggregated in the Done column header. It pe
 
 In addition to the aggregate `TaskUsage`, each task records:
 
-- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `title`, `oversight`, `commit_message`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `oversight`, `commit_message`, `review`. Tasks stored by earlier releases may also carry `test`, `oversight-test` and `title` keys. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
 - Per-turn `TurnUsageRecord` entries accessible via `GET /api/tasks/{id}/turn-usage`, providing detailed per-turn token consumption, stop reasons, and sub-agent labels.
 
 ## Task Search

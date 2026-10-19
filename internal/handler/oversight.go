@@ -16,11 +16,8 @@ type oversightResponse struct {
 	PhaseCount int `json:"phase_count"`
 }
 
-// GetOversight returns the oversight summary for a task. The `?phase=` query
-// parameter selects between the implementation-phase summary (default `impl`,
-// generated asynchronously when the task transitions to waiting or done) and
-// the test-phase summary (`test`, generated when a test run transitions back
-// to waiting). Both phases share the same JSON envelope.
+// GetOversight returns the oversight summary for a task, generated
+// asynchronously when the task transitions to waiting or done.
 func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	s, ok := h.requireStore(w)
 	if !ok {
@@ -31,16 +28,9 @@ func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.U
 		return
 	}
 
-	read := s.GetOversight
-	errMsg := "failed to read oversight"
-	if r.URL.Query().Get("phase") == "test" {
-		read = s.GetTestOversight
-		errMsg = "failed to read test oversight"
-	}
-
-	oversight, err := read(id)
+	oversight, err := s.GetOversight(id)
 	if err != nil {
-		http.Error(w, errMsg, http.StatusInternalServerError)
+		http.Error(w, "failed to read oversight", http.StatusInternalServerError)
 		return
 	}
 

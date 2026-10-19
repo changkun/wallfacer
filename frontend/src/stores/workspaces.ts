@@ -75,7 +75,6 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
       name?: string;
       folders?: string[];
       max_parallel?: number | null;
-      max_test_parallel?: number | null;
     },
   ): Promise<Workspace> {
     error.value = null;

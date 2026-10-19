@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -260,11 +261,11 @@ func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
 	wsB := t.TempDir()
 	wsC := t.TempDir()
 
-	mp, mtp := 3, 2
+	mp := 3
 	zero := 0
 	neg := -1
 	input := []Workspace{
-		{Name: "Limited", Folders: []string{wsA}, MaxParallel: &mp, MaxTestParallel: &mtp},
+		{Name: "Limited", Folders: []string{wsA}, MaxParallel: &mp},
 		{Name: "Unlimited", Folders: []string{wsB}, MaxParallel: &zero},
 		{Name: "NegativeSanitized", Folders: []string{wsC}, MaxParallel: &neg},
 	}
@@ -287,9 +288,6 @@ func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
 	if limited.MaxParallel == nil || *limited.MaxParallel != 3 {
 		t.Errorf("Limited.MaxParallel: want 3, got %v", limited.MaxParallel)
 	}
-	if limited.MaxTestParallel == nil || *limited.MaxTestParallel != 2 {
-		t.Errorf("Limited.MaxTestParallel: want 2, got %v", limited.MaxTestParallel)
-	}
 
 	unlimited := byName["Unlimited"]
 	if unlimited.MaxParallel == nil || *unlimited.MaxParallel != 0 {
@@ -299,6 +297,41 @@ func TestSaveGroups_RoundTrip_WithLimits(t *testing.T) {
 	sanitized := byName["NegativeSanitized"]
 	if sanitized.MaxParallel != nil {
 		t.Errorf("NegativeSanitized.MaxParallel: want nil after sanitize, got %v", *sanitized.MaxParallel)
+	}
+}
+
+// TestLoadGroups_DropsRemovedKeys verifies that a workspaces file carrying the
+// test-run concurrency cap and the auto-test toggle of earlier releases loads,
+// and that the keys are gone after the next save.
+func TestLoadGroups_DropsRemovedKeys(t *testing.T) {
+	configDir := t.TempDir()
+	ws := t.TempDir()
+	folders, err := json.Marshal([]string{ws})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := `[{"name":"Stored","folders":` + string(folders) + `,"max_parallel":2,"max_test_parallel":3,"autotest":true}]`
+	if err := os.WriteFile(workspacesFilePath(configDir), []byte(raw), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, err := LoadGroups(configDir)
+	if err != nil {
+		t.Fatalf("LoadGroups: %v", err)
+	}
+	if len(got) != 1 || got[0].MaxParallel == nil || *got[0].MaxParallel != 2 {
+		t.Fatalf("loaded groups = %+v, want one group with max_parallel 2", got)
+	}
+	if err := SaveGroups(configDir, got); err != nil {
+		t.Fatalf("SaveGroups: %v", err)
+	}
+	saved, err := os.ReadFile(workspacesFilePath(configDir))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	for _, key := range []string{"max_test_parallel", "autotest"} {
+		if strings.Contains(string(saved), `"`+key+`"`) {
+			t.Errorf("saved workspaces file still carries %q: %s", key, saved)
+		}
 	}
 }
 

@@ -325,23 +325,23 @@ func TestRunReview_EmitsTimelineEvents(t *testing.T) {
 	}
 }
 
-func TestReviewSupersedesTest_Gate(t *testing.T) {
+func TestReviewGatesSubmit(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	withWorktree := &store.Task{WorktreePaths: map[string]string{"/repo": "/wt/repo"}}
 	noWorktree := &store.Task{}
 
-	// Review off: never supersedes.
-	if h.reviewSupersedesTest(withWorktree) {
-		t.Error("review off should not supersede the test agent")
+	// Review off: auto-submit does not wait on a review verdict.
+	if h.reviewGatesSubmit(withWorktree) {
+		t.Error("review off should not gate auto-submit")
 	}
-	// Review on + worktree: supersedes, with or without a session.
+	// Review on + worktree: gated, with or without a session.
 	h.SetReview(true)
-	if !h.reviewSupersedesTest(withWorktree) {
-		t.Error("review on + worktree should supersede the test agent")
+	if !h.reviewGatesSubmit(withWorktree) {
+		t.Error("review on + worktree should gate auto-submit")
 	}
-	// Review on, no worktree: nothing to review; falls back to the test agent.
-	if h.reviewSupersedesTest(noWorktree) {
-		t.Error("a task without a worktree should fall back to the test agent")
+	// Review on, no worktree: nothing to review, so no gate.
+	if h.reviewGatesSubmit(noWorktree) {
+		t.Error("a task without a worktree should not wait on a review")
 	}
 }
 

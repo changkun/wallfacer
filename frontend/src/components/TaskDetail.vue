@@ -20,7 +20,6 @@ import SpanFlamegraph from './SpanFlamegraph.vue';
 import ReviewVerification from './ReviewVerification.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
-import { detectResultType } from '../lib/resultType';
 import { harnessLabel, supportedHarnesses } from '../lib/harness';
 // Re-imported as a local binding so the template can call renderMarkdown()
 // directly inside the Results tab.
@@ -115,26 +114,12 @@ async function fetchDiff() {
   }
 }
 
-// --- Results (multi-turn) tab ---
-//
-// One entry per "output" event with a non-empty result text. Implementation
-// turns vs test turns are separated using task.test_run_start_turn: turns
-// before that index are implementation, turns >= are test. Newest-first
-// to match ui/js/modal-results.js (line 603).
+// --- Verification tab ---
 
-interface ResultEntry {
-  turn: number;      // 1-based chronological turn number
-  text: string;
-  type: 'plan' | 'result';
-  showRaw: boolean;
-}
-const testResults = ref<ResultEntry[]>([]);
-const resultsLoading = ref(false);
-const resultsError = ref('');
 const resultsFetched = ref(false);
 
 // Review verification trajectory — the live proposer/critic debate, polled while
-// a run is in flight and rendered alongside the test-agent results.
+// a run is in flight.
 const reviewTranscript = ref<ReviewTranscript | null>(null);
 // Review transcript view: the rendered fork/round debate (default) ↔ the raw
 // transcript payload (the fork/round records + bodies the server assembled).
@@ -175,43 +160,8 @@ async function fetchReviewTranscript() {
 
 async function fetchResults() {
   if (!props.task) return;
-  // Kick off the review trajectory fetch alongside the test-agent results.
-  void fetchReviewTranscript();
-  resultsLoading.value = true;
-  resultsError.value = '';
-  try {
-    const data = await api<{ events?: { event_type: string; data?: { result?: string } }[] } | { event_type: string; data?: { result?: string } }[]>(
-      'GET',
-      `/api/tasks/${props.task.id}/events?type=output`,
-    );
-    const events = Array.isArray(data) ? data : (data?.events ?? []);
-    const outputs = events
-      .filter((e) => e.event_type === 'output' && typeof e.data?.result === 'string' && e.data.result.length > 0)
-      .map((e) => e.data!.result as string);
-    // The Verification tab shows only the test/verify-phase transcript: turns at
-    // or after task.test_run_start_turn (1-based) belong to the test agent.
-    // Earlier (implementation) turns live in Activity and Spec, so they're not
-    // repeated here.
-    const startTurn = props.task.test_run_start_turn ?? 0;
-    const splitIdx = startTurn > 0 ? Math.min(startTurn - 1, outputs.length) : outputs.length;
-    const tests = outputs.slice(splitIdx);
-    testResults.value = tests.map((text, i) => ({
-      turn: splitIdx + i + 1,
-      text,
-      type: detectResultType(text),
-      showRaw: false,
-    })).reverse();
-    resultsFetched.value = true;
-  } catch (e) {
-    resultsError.value = e instanceof Error ? e.message : String(e);
-  } finally {
-    resultsLoading.value = false;
-  }
-}
-
-function copyResult(entry: ResultEntry) {
-  void navigator.clipboard.writeText(entry.text);
-  toast.push('Copied to clipboard', { kind: 'success', timeout: 2000 });
+  await fetchReviewTranscript();
+  resultsFetched.value = true;
 }
 
 // Spec/Result markdown helper actions (toggle rendered/raw + copy), mirroring
@@ -393,7 +343,7 @@ watch(
   () => props.task?.id,
   () => {
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
-    resultsFetched.value = false; testResults.value = [];
+    resultsFetched.value = false;
     stopReviewPoll(); reviewTranscript.value = null;
     eventsFetched.value = false; events.value = [];
     diffFetched.value = false; diffFiles.value = []; behindCounts.value = {};
@@ -468,9 +418,6 @@ interface OversightPhase {
 const oversightStatus = ref('');
 const oversightPhases = ref<OversightPhase[]>([]);
 const oversightError = ref('');
-// Test-phase oversight (the test agent's run), shown as a parallel "Testing"
-// section. Sourced from /oversight?phase=test.
-const testOversightPhases = ref<OversightPhase[]>([]);
 let oversightTimer: ReturnType<typeof setTimeout> | null = null;
 let oversightTaskId = '';
 
@@ -488,13 +435,7 @@ async function fetchOversight() {
     oversightStatus.value = '';
     oversightPhases.value = [];
     oversightError.value = '';
-    testOversightPhases.value = [];
   }
-  // Test-phase oversight (best-effort; only present once a test agent has run).
-  try {
-    const t = await api<{ phases?: OversightPhase[] }>('GET', `/api/tasks/${props.task.id}/oversight?phase=test`);
-    testOversightPhases.value = t?.phases ?? [];
-  } catch { testOversightPhases.value = []; }
   try {
     const data = await api<{ status?: string; phases?: OversightPhase[]; error?: string }>(
       'GET',
@@ -657,18 +598,6 @@ async function completeTask() {
 }
 async function resumeTask() {
   await api('POST', `/api/tasks/${props.task.id}/resume`);
-}
-async function testTask() {
-  // Optional acceptance criteria — when set, the test agent focuses on
-  // the exact checks the user described. Empty / cancelled = generic run.
-  const criteria = await dialog.prompt({
-    title: 'Test verification',
-    message: 'Acceptance criteria (optional). Leave blank for a generic verification run.',
-    placeholder: 'e.g. all unit tests pass; CHANGELOG updated',
-  });
-  if (criteria === null) return;
-  const body = criteria.trim() ? { criteria: criteria.trim() } : undefined;
-  await api('POST', `/api/tasks/${props.task.id}/test`, body);
 }
 async function reviewTask() {
   // The run is asynchronous and takes minutes; acknowledge the trigger so the
@@ -1141,16 +1070,6 @@ async function submitReview() {
                           </div>
                         </div>
                       </div>
-                      <div v-if="testOversightPhases.length" class="ta-oversight" style="margin-top: 10px;">
-                        <div class="ta-oversight__label">Testing oversight</div>
-                        <div v-for="(ph, pi) in testOversightPhases" :key="'test' + pi" class="ta-oversight__phase">
-                          <div class="ta-oversight__title">{{ ph.title }}</div>
-                          <div class="ta-oversight__summary">{{ ph.summary }}</div>
-                          <div v-if="ph.tools_used?.length" class="ta-oversight__tools">
-                            <span v-for="t in ph.tools_used" :key="t" class="ta-oversight__tool">{{ t }}</span>
-                          </div>
-                        </div>
-                      </div>
                       <div v-else-if="oversightStatus === 'pending'" class="text-xs text-v-muted">Oversight summary not yet generated.</div>
                       <div v-else-if="oversightStatus === 'generating'" class="text-xs text-v-muted ta-oversight__generating">
                         <span class="spinner" aria-hidden="true"></span>
@@ -1427,44 +1346,9 @@ async function submitReview() {
                   </section>
                 </div>
 
-                <!-- RESULTS tab (multi-turn) -->
-                <!-- Verification: the test/verify-phase transcript only. The
-                     implementation turns live in Activity (full transcript) and
-                     the latest result shows in Spec, so they're not repeated
-                     here. -->
+                <!-- Verification: the review's config, outcome and live trajectory. -->
                 <div data-main-tab-section="verification">
-                  <!-- Adversarial verification (review): config, outcome, live trajectory -->
                   <ReviewVerification :task="task" :transcript="reviewTranscript" />
-
-                  <!-- Test-agent verification (separate phase, its own empty state) -->
-                  <section class="ta-verify-sec">
-                    <h3 class="ta-events__h">Test agent</h3>
-                    <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading…</div>
-                    <div v-else-if="resultsError" class="text-xs text-err">{{ resultsError }}</div>
-                    <div v-else-if="!testResults.length" class="text-xs text-v-muted">No test-agent run for this task yet.</div>
-                    <template v-else>
-                      <details
-                        v-for="(entry, idx) in testResults"
-                        :key="`test-${entry.turn}`"
-                        class="result-entry"
-                        :open="idx === 0"
-                      >
-                        <summary class="result-entry-summary">
-                          <div class="result-entry-labels">
-                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
-                            <span class="result-turn-label">Turn {{ entry.turn }}</span>
-                          </div>
-                        </summary>
-                        <div class="result-entry-actions flex items-center gap-1.5">
-                          <button type="button" class="btn sm ghost" @click="copyResult(entry)">Copy</button>
-                          <button type="button" class="btn sm ghost" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                        </div>
-                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
-                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                      </details>
-                    </template>
-                  </section>
                 </div>
 
                 <!-- TIMELINE tab (span flamegraph) -->
@@ -1509,13 +1393,6 @@ async function submitReview() {
               <span class="aside-action__body">
                 <span class="aside-action__label">Resume</span>
                 <span class="aside-action__hint">continue existing session</span>
-              </span>
-            </button>
-            <button v-if="isWaiting || isDone || isFailed" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'test' }" :disabled="busy" data-action="test" @click="runAction('test', testTask)">
-              <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
-              <span class="aside-action__body">
-                <span class="aside-action__label">Test</span>
-                <span class="aside-action__hint">run test verification</span>
               </span>
             </button>
             <button v-if="isWaiting && isReviewable" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" data-action="review" @click="runAction('review', reviewTask)">
@@ -1589,8 +1466,8 @@ async function submitReview() {
                   <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
                 </div>
                 <label class="backlog-edit__field">
-                  <span>Test criteria</span>
-                  <textarea v-model="editCriteria" class="field backlog-edit__prompt" rows="3" placeholder="What the test agent and review critics should verify (optional)"></textarea>
+                  <span>Acceptance criteria</span>
+                  <textarea v-model="editCriteria" class="field backlog-edit__prompt" rows="3" placeholder="What the reviewer should verify (optional)"></textarea>
                 </label>
                 <label class="backlog-edit__field">
                   <span>Timeout (min)</span>
@@ -1892,7 +1769,6 @@ async function submitReview() {
 /* Events tab sections. */
 .ta-events__sec { padding: 14px 0; border-top: 1px solid var(--rule); }
 .ta-events__sec:first-child { padding-top: 0; border-top: none; }
-.ta-verify-sec { margin-top: 4px; }
 .ta-events__h {
   font: 600 var(--fs-9) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);

@@ -110,7 +110,6 @@ type envConfigResponse struct {
 	DefaultSandbox       harness.ID                           `json:"default_sandbox"`
 	SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
-	MaxTestParallelTasks int                                  `json:"max_test_parallel_tasks"`
 	MaxAgents            int                                  `json:"max_agents"`
 	AgentNice            int                                  `json:"agent_nice"`
 	ReviewRounds         int                                  `json:"review_rounds"`
@@ -123,12 +122,13 @@ type envConfigResponse struct {
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
-// smoke-check via POST /api/env/test.
+// smoke-check via POST /api/env/test. Passed is true when the probe run
+// ended with the harness's answer rather than an error.
 type sandboxTestResponse struct {
 	TaskID          string     `json:"task_id"`
 	Sandbox         harness.ID `json:"sandbox"`
 	Status          string     `json:"status"`
-	LastTestResult  string     `json:"last_test_result,omitempty"`
+	Passed          bool       `json:"passed"`
 	Result          string     `json:"result,omitempty"`
 	StopReason      string     `json:"stop_reason,omitempty"`
 	ReauthAvailable bool       `json:"reauth_available,omitempty"`
@@ -162,10 +162,6 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	maxParallel := cfg.MaxParallelTasks
 	if maxParallel <= 0 {
 		maxParallel = constants.DefaultMaxConcurrentTasks
-	}
-	maxTestParallel := cfg.MaxTestParallelTasks
-	if maxTestParallel <= 0 {
-		maxTestParallel = constants.DefaultMaxTestConcurrentTasks
 	}
 	autoPushThreshold := cfg.AutoPushThreshold
 	if autoPushThreshold <= 0 {
@@ -202,7 +198,6 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		DefaultSandbox:       cfg.DefaultSandbox,
 		SandboxByActivity:    cfg.SandboxByActivity(),
 		MaxParallelTasks:     maxParallel,
-		MaxTestParallelTasks: maxTestParallel,
 		MaxAgents:            cfg.MaxAgents,
 		AgentNice:            agentNice,
 		ReviewRounds:         reviewRounds,
@@ -298,10 +293,6 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := s.UpdateTaskTestRun(r.Context(), task.ID, true, ""); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
 	probeRunner := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:       tempEnvFile,
@@ -311,6 +302,10 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		CodexAuthPath: h.runner.CodexAuthPath(),
 	})
 	probeRunner.Run(task.ID, prompt, "", false)
+	// Run starts the oversight summary in the background when the probe ends
+	// its turn; wait for it so it runs on the probed credentials before the
+	// deferred cleanup removes the temporary env file.
+	probeRunner.WaitBackground()
 
 	updated, err := s.GetTask(r.Context(), task.ID)
 	if err != nil {
@@ -318,11 +313,12 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Keep test tasks visible for auditability and quick re-test.
-	// In the happy path a sandbox connectivity test that returns a PASS
-	// is represented as a terminal done task; failures keep their natural
+	// The probe passes when the run ends waiting for review with no failure
+	// category: the harness started, authenticated and answered. A probe
+	// that passes is recorded as a done task; failures keep their natural
 	// terminal state from the runner.
-	if updated.Status == store.TaskStatusWaiting && updated.LastTestResult == "pass" {
+	passed := updated.Status == store.TaskStatusWaiting && updated.FailureCategory == ""
+	if passed {
 		if err := s.ForceUpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -342,10 +338,10 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := sandboxTestResponse{
-		TaskID:         updated.ID.String(),
-		Sandbox:        sb,
-		Status:         string(updated.Status),
-		LastTestResult: updated.LastTestResult,
+		TaskID:  updated.ID.String(),
+		Sandbox: sb,
+		Status:  string(updated.Status),
+		Passed:  passed,
 	}
 	if updated.Result != nil {
 		resp.Result = *updated.Result
@@ -354,13 +350,11 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		resp.StopReason = *updated.StopReason
 	}
 
-	passed := strings.EqualFold(updated.LastTestResult, "pass") &&
-		(updated.Status == store.TaskStatusDone || updated.Status == store.TaskStatusWaiting)
 	h.setSandboxTestPassed(sb, passed)
 
 	// Detect auth errors and offer re-auth when OAuth is available.
 	if !passed {
-		resp.ReauthAvailable = isAuthError(resp.Result, resp.LastTestResult) &&
+		resp.ReauthAvailable = isAuthError(resp.Result, resp.StopReason) &&
 			isOAuthAvailable(sb, h.envFile)
 	}
 
@@ -435,7 +429,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		DefaultSandbox       *harness.ID                          `json:"default_sandbox"`
 		SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
-		MaxTestParallelTasks *int                                 `json:"max_test_parallel_tasks"`
 		MaxAgents            *int                                 `json:"max_agents"`
 		AgentNice            *int                                 `json:"agent_nice"`
 		ReviewRounds         *int                                 `json:"review_rounds"`
@@ -470,14 +463,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		v := max(*req.MaxParallelTasks, 1)
 		s := fmt.Sprintf("%d", v)
 		maxParallel = &s
-	}
-
-	// Convert max_test_parallel_tasks int to string for the env file.
-	var maxTestParallel *string
-	if req.MaxTestParallelTasks != nil {
-		v := max(*req.MaxTestParallelTasks, 1)
-		s := fmt.Sprintf("%d", v)
-		maxTestParallel = &s
 	}
 
 	// Convert max_agents int to string. Clamp to [0, ∞): 0 = unlimited.
@@ -584,7 +569,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		DefaultModel:         req.DefaultModel,
 		CodexDefaultModel:    req.CodexDefaultModel,
 		MaxParallel:          maxParallel,
-		MaxTestParallel:      maxTestParallel,
 		MaxAgents:            maxAgents,
 		AgentNice:            agentNice,
 		ReviewRounds:         reviewRounds,
@@ -614,26 +598,23 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Invalidate the cached parallel-limit values so the next call to
-	// maxConcurrentTasks / maxTestConcurrentTasks re-reads from the env file.
+	// Invalidate the cached parallel-limit value so the next call to
+	// maxConcurrentTasks re-reads from the env file.
 	h.cachedMaxParallel.Invalidate()
-	h.cachedMaxTestParallel.Invalidate()
 
 	// When the parallel task limit changes, re-evaluate immediately so new
 	// capacity is filled without waiting for the next store event.
 	if req.MaxParallelTasks != nil {
 		go h.tryAutoPromote(h.runner.ShutdownCtx())
 	}
-	if req.MaxTestParallelTasks != nil {
-		go h.tryAutoTest(h.runner.ShutdownCtx())
-	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// isAuthError checks if the test output contains authentication error indicators.
-func isAuthError(result, lastTestResult string) bool {
-	combined := strings.ToLower(result + " " + lastTestResult)
+// isAuthError checks if the probe's result or stop reason contains
+// authentication error indicators.
+func isAuthError(result, stopReason string) bool {
+	combined := strings.ToLower(result + " " + stopReason)
 	for _, pattern := range []string{
 		"unauthorized", "401", "403",
 		"invalid token", "invalid_token", "invalid api key", "invalid_api_key",

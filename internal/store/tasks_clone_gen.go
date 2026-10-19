@@ -18,8 +18,6 @@ func deepCloneTask(t *Task) Task {
 	cp.PromptHistory = slices.Clone(t.PromptHistory)
 	cp.RetryHistory = slices.Clone(t.RetryHistory)
 	cp.RefineSessions = cloneRefinementSessionSlice(t.RefineSessions)
-	cp.CustomPassPatterns = slices.Clone(t.CustomPassPatterns)
-	cp.CustomFailPatterns = slices.Clone(t.CustomFailPatterns)
 	cp.Tags = slices.Clone(t.Tags)
 	cp.TruncatedTurns = slices.Clone(t.TruncatedTurns)
 	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)

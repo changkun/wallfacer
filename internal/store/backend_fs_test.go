@@ -194,13 +194,20 @@ func TestFilesystemBackend_LoadAll_LeavesRoutineCardsUnread(t *testing.T) {
 // removedTaskFields are task.json keys that records written by earlier
 // releases may carry but Task no longer declares.
 var removedTaskFields = map[string]string{
-	"depends_on":       `["11111111-1111-1111-1111-111111111111"]`,
-	"title_generating": `true`,
+	"depends_on":            `["11111111-1111-1111-1111-111111111111"]`,
+	"title_generating":      `true`,
+	"is_test_run":           `true`,
+	"last_test_result":      `"fail"`,
+	"test_run_start_turn":   `3`,
+	"pending_test_feedback": `"tests fail"`,
+	"test_fail_count":       `2`,
+	"custom_pass_patterns":  `["ok"]`,
+	"custom_fail_patterns":  `["FAIL"]`,
 }
 
 // removedActivities are sandbox_by_activity keys that records written by
 // earlier releases may carry but no activity routes by any more.
-var removedActivities = []string{"title"}
+var removedActivities = []string{"title", "testing"}
 
 // TestFilesystemBackend_LoadAll_DropsRemovedTaskFields writes two records
 // carrying every removed field and every removed activity: one in an older

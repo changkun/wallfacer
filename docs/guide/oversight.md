@@ -6,7 +6,7 @@ Wallfacer records what agents do while they work: structured summaries of each t
 
 An oversight summary is a phase-by-phase account of what an agent did during a task, produced by a lightweight oversight agent that reads the task's transcript. Each phase carries a title, a short summary, and a timestamp, plus the tools used, commands run, and key actions taken where available.
 
-Summaries are generated automatically when a task reaches the waiting, done, or failed state. Test runs produce a separate testing oversight summary covering only the test agent's activity.
+Summaries are generated automatically when a task reaches the waiting, done, or failed state.
 
 A summary has one of four statuses:
 
@@ -19,7 +19,7 @@ A summary has one of four statuses:
 
 ### Viewing a summary
 
-Open a task card and select the **Activity** tab in the detail modal. The summary appears above the transcript once ready. Tasks with a test run show an additional testing oversight block. The **Timeline** tab reuses the phases as a colored band across the flamegraph.
+Open a task card and select the **Activity** tab in the detail modal. The summary appears above the transcript once ready. The **Timeline** tab reuses the phases as a colored band across the flamegraph.
 
 ![Task detail modal with the oversight summary above the transcript](images/task-detail.png)
 
@@ -94,7 +94,7 @@ Open **Analytics** from the sidebar (or navigate to `/analytics`). The page has 
 
 ### Usage
 
-Token and cost accounting over a selectable period (last 7, 30, or 90 days, or all time): total cost and task count, plus **By Status** and **By Sub-Agent** tables. Sub-agents cover implementation, test, refinement, oversight, testing oversight, and agent sessions.
+Token and cost accounting over a selectable period (last 7, 30, or 90 days, or all time): total cost and task count, plus **By Status** and **By Sub-Agent** tables. Sub-agents cover implementation, refinement, oversight, commit messages, review, and agent sessions.
 
 ### Tokens & cost
 

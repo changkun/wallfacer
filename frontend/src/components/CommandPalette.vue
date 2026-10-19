@@ -384,7 +384,6 @@ async function runTaskAction(action: CardAction, task: Task) {
     case 'retry': await api('PATCH', `/api/tasks/${id}`, { status: 'backlog' }); break;
     case 'done': await api('POST', `/api/tasks/${id}/done`); break;
     case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
-    case 'test': await api('POST', `/api/tasks/${id}/test`); break;
     case 'sync': await api('POST', '/api/git/sync', { task_id: id }); break;
   }
   close();

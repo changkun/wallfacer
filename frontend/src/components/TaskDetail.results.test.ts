@@ -1,6 +1,5 @@
-// The Verification tab shows only the test/verify-phase transcript — turns at
-// or after task.test_run_start_turn. Implementation turns live in Activity and
-// the latest result in Spec, so they are not repeated here.
+// The Verification tab shows the review only. Implementation turns live in
+// Activity and the latest result in Spec, so they are not repeated here.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, type App } from 'vue';
@@ -32,8 +31,6 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     tags: [],
     failure_category: '',
     fresh_start: false,
-    is_test_run: false,
-    last_test_result: '',
     session_id: null,
     worktree_paths: {},
     usage_breakdown: {},
@@ -97,31 +94,14 @@ async function mountVerification(results: string[], overrides: Partial<Task> = {
 }
 
 describe('TaskDetail Verification tab', () => {
-  it('shows the test-phase transcript with turn labels', async () => {
-    // test_run_start_turn=1 → every output belongs to the verification phase.
-    const { app, host } = await mountVerification(
-      ['VERIFY_TURN_ONE first.', 'VERIFY_TURN_TWO second.'],
-      { test_run_start_turn: 1 } as Partial<Task>,
-    );
-
-    const section = host.querySelector('[data-main-tab-section="verification"]')!;
-    expect(section.textContent).toContain('VERIFY_TURN_ONE');
-    expect(section.textContent).toContain('VERIFY_TURN_TWO');
-    expect(section.textContent).toContain('Turn 1');
-    expect(section.textContent).toContain('Turn 2');
-    expect(section.querySelectorAll('.result-entry').length).toBe(2);
-
-    app.unmount();
-  });
-
-  it('shows an empty state when there is no verification run (impl-only turns are not repeated)', async () => {
-    // No test_run_start_turn → the outputs are implementation turns, shown in
-    // Activity/Spec instead, so Verification is empty.
+  it('shows an empty state when there is no review (implementation turns are not repeated)', async () => {
+    // The outputs are implementation turns, shown in Activity/Spec instead,
+    // so Verification shows only the review's empty state.
     const { app, host } = await mountVerification(['implementation answer only.']);
 
     const section = host.querySelector('[data-main-tab-section="verification"]')!;
     expect(section.textContent).toContain('No review has run');
-    expect(section.querySelector('.result-entry')).toBeNull();
+    expect(section.textContent).not.toContain('implementation answer only.');
 
     app.unmount();
   });

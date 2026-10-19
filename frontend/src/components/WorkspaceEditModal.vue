@@ -72,9 +72,9 @@ async function saveName() {
   }
 }
 
-// Parallel caps: a number sets the cap, an empty input clears it (null) so the
-// global default applies again. Both write through PUT /api/workspaces/{id}.
-async function saveCap(field: 'max_parallel' | 'max_test_parallel', e: Event) {
+// Parallel cap: a number sets the cap, an empty input clears it (null) so the
+// global default applies again. Writes through PUT /api/workspaces/{id}.
+async function saveCap(field: 'max_parallel', e: Event) {
   const w = ws.value;
   if (!w || busy.value) return;
   const raw = (e.target as HTMLInputElement).value.trim();
@@ -232,24 +232,6 @@ function onBackdrop(e: MouseEvent) {
                   :disabled="busy"
                   aria-label="Max parallel"
                   @change="saveCap('max_parallel', $event)"
-                />
-              </div>
-            </div>
-            <div class="row ws-edit__caps">
-              <div class="row-main">
-                <span class="row-title">Max test parallel</span>
-                <span class="row-help">Test runs at once. Empty uses the global limit.</span>
-              </div>
-              <div class="row-end ws-edit__end ws-edit__end--num">
-                <input
-                  class="field"
-                  type="number"
-                  min="0"
-                  :value="ws.max_test_parallel ?? ''"
-                  placeholder="default"
-                  :disabled="busy"
-                  aria-label="Max test parallel"
-                  @change="saveCap('max_test_parallel', $event)"
                 />
               </div>
             </div>

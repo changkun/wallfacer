@@ -23,7 +23,6 @@ type Config struct {
 	ServerAPIKey           string // WALLFACER_SERVER_API_KEY
 	DefaultModel           string // CLAUDE_DEFAULT_MODEL
 	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
-	MaxTestParallelTasks   int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
 	MaxAgents              int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
 	AgentNice              int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
 	OversightInterval      int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
@@ -50,7 +49,6 @@ type Config struct {
 
 	DefaultSandbox        harness.ID // WALLFACER_DEFAULT_SANDBOX
 	ImplementationSandbox harness.ID // WALLFACER_SANDBOX_IMPLEMENTATION
-	TestingSandbox        harness.ID // WALLFACER_SANDBOX_TESTING
 	OversightSandbox      harness.ID // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  harness.ID // WALLFACER_SANDBOX_COMMIT_MESSAGE
 
@@ -80,7 +78,6 @@ var knownKeys = []string{
 	"CURSOR_API_KEY",
 	"OPENCODE_SERVER_PASSWORD",
 	"WALLFACER_MAX_PARALLEL",
-	"WALLFACER_MAX_TEST_PARALLEL",
 	"WALLFACER_MAX_AGENTS",
 	"WALLFACER_AGENT_NICE",
 	"WALLFACER_OVERSIGHT_INTERVAL",
@@ -94,7 +91,6 @@ var knownKeys = []string{
 	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
 	"WALLFACER_SANDBOX_IMPLEMENTATION",
-	"WALLFACER_SANDBOX_TESTING",
 	"WALLFACER_SANDBOX_OVERSIGHT",
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_HOST_CLAUDE_BINARY",
@@ -148,10 +144,6 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_MAX_PARALLEL":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
-			}
-		case "WALLFACER_MAX_TEST_PARALLEL":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.MaxTestParallelTasks = n
 			}
 		case "WALLFACER_MAX_AGENTS":
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -208,8 +200,6 @@ func Parse(path string) (Config, error) {
 			cfg.DefaultSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_IMPLEMENTATION":
 			cfg.ImplementationSandbox = harness.NormalizeID(v)
-		case "WALLFACER_SANDBOX_TESTING":
-			cfg.TestingSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_OVERSIGHT":
 			cfg.OversightSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_COMMIT_MESSAGE":
@@ -284,9 +274,6 @@ func (c Config) SandboxByActivity() map[store.SandboxActivity]harness.ID {
 	out := map[store.SandboxActivity]harness.ID{}
 	if c.ImplementationSandbox != "" {
 		out[store.SandboxActivityImplementation] = c.ImplementationSandbox
-	}
-	if c.TestingSandbox != "" {
-		out[store.SandboxActivityTesting] = c.TestingSandbox
 	}
 	if c.OversightSandbox != "" {
 		out[store.SandboxActivityOversight] = c.OversightSandbox
@@ -387,7 +374,6 @@ type Updates struct {
 	DefaultModel         *string
 	CodexDefaultModel    *string
 	MaxParallel          *string
-	MaxTestParallel      *string
 	MaxAgents            *string
 	AgentNice            *string
 	ReviewRounds         *string
@@ -417,7 +403,6 @@ func Update(path string, u Updates) error {
 		"CLAUDE_DEFAULT_MODEL":              u.DefaultModel,
 		"CODEX_DEFAULT_MODEL":               u.CodexDefaultModel,
 		"WALLFACER_MAX_PARALLEL":            u.MaxParallel,
-		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
 		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
 		"WALLFACER_AGENT_NICE":              u.AgentNice,
 		"WALLFACER_REVIEW_ROUNDS":           u.ReviewRounds,
@@ -435,10 +420,10 @@ func Update(path string, u Updates) error {
 
 // UpdateSandboxSettings merges global sandbox-routing settings into the env file.
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
-// sandboxByActivity supports keys: implementation, testing, oversight,
+// sandboxByActivity supports keys: implementation, oversight,
 // commit_message.
 func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByActivity map[store.SandboxActivity]harness.ID) error {
-	var impl, test, oversight, commit *string
+	var impl, oversight, commit *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
 		// Two-phase approach: start with all activity pointers set to empty strings,
@@ -446,18 +431,12 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		// activities present in the caller's map with their actual values.
 		// This ensures that omitted activities are actively removed rather than
 		// silently left stale.
-		emptyImpl, emptyTest := "", ""
-		emptyOversight, emptyCommit := "", ""
-		impl, test = &emptyImpl, &emptyTest
-		oversight, commit = &emptyOversight, &emptyCommit
+		emptyImpl, emptyOversight, emptyCommit := "", "", ""
+		impl, oversight, commit = &emptyImpl, &emptyOversight, &emptyCommit
 
 		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
 			s := string(harness.NormalizeID(string(v)))
 			impl = &s
-		}
-		if v, ok := sandboxByActivity[store.SandboxActivityTesting]; ok {
-			s := string(harness.NormalizeID(string(v)))
-			test = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityOversight]; ok {
 			s := string(harness.NormalizeID(string(v)))
@@ -477,7 +456,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 	updates := map[string]*string{
 		"WALLFACER_DEFAULT_SANDBOX":        defaultSandboxValue,
 		"WALLFACER_SANDBOX_IMPLEMENTATION": impl,
-		"WALLFACER_SANDBOX_TESTING":        test,
 		"WALLFACER_SANDBOX_OVERSIGHT":      oversight,
 		"WALLFACER_SANDBOX_COMMIT_MESSAGE": commit,
 	}

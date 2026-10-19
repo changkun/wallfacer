@@ -29,19 +29,10 @@ import (
 // overrides (Group.MaxParallel in workspace-groups.json) take precedence
 // over the env-file default; a 0 override means "unlimited" for that group.
 func (h *Handler) maxConcurrentTasks() int {
-	if override, ok := h.currentGroupParallelLimit(false); ok {
+	if override, ok := h.currentGroupParallelLimit(); ok {
 		return override
 	}
 	return h.cachedMaxParallel.Get()
-}
-
-// maxTestConcurrentTasks returns the configured parallel test-run limit.
-// Same per-group override semantics as maxConcurrentTasks.
-func (h *Handler) maxTestConcurrentTasks() int {
-	if override, ok := h.currentGroupParallelLimit(true); ok {
-		return override
-	}
-	return h.cachedMaxTestParallel.Get()
 }
 
 // checkConcurrencyAndUpdateStatus acquires promoteMu, enforces the regular
@@ -74,7 +65,7 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 
 // promoteMu serializes auto-promotion so two simultaneous state changes
 // cannot both promote a task, exceeding the concurrency limit. It is shared
-// across tryAutoPromote, tryAutoTest, tryAutoSubmit, SubmitFeedback,
+// across tryAutoPromote, tryAutoSubmit, SubmitFeedback,
 // ResumeTask, SyncTask, and checkAndSyncWaitingTasks — any code path that
 // transitions a task to in_progress or committing.
 var promoteMu sync.Mutex
@@ -154,14 +145,11 @@ func (h *Handler) StartAutoRetrier(ctx context.Context) {
 	})
 }
 
-// autoPromoteCandidate holds a task eligible for auto-promotion and whether it
-// is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
+// autoPromoteCandidate holds a backlog task eligible for auto-promotion.
 // Populated by Phase 1 and consumed by Phase 2 of the two-phase protocol.
 type autoPromoteCandidate struct {
-	task     store.Task
-	store    *store.Store // the store that owns this task
-	isResume bool
-	feedback string
+	task  store.Task
+	store *store.Store // the store that owns this task
 }
 
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
@@ -172,8 +160,7 @@ type autoPromoteCandidate struct {
 //
 // Phase 1 (no lock): call store.ListTasksByStatus, compute the regular in-progress
 // count, and collect all eligible candidates without holding promoteMu, so
-// that a concurrent tryAutoPromote call (or tryAutoTest) can proceed in
-// parallel.
+// that a concurrent tryAutoPromote call can proceed in parallel.
 //
 // Phase 2 (under promoteMu): re-count to pick up any state changes that
 // happened during Phase 1, re-check capacity, then promote all candidates
@@ -196,41 +183,12 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build candidate list without holding promoteMu.
-			// Scan ALL active stores for eligible tasks.
-
-			// Check for auto-resume candidates first (waiting tasks with failed test feedback).
 			// Automation is scoped to the currently viewed workspace group.
-			h.forCurrentStore(func(s *store.Store, _ []string) {
-				waitingTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-				if err != nil {
-					return
-				}
-				for i := range waitingTasks {
-					t := &waitingTasks[i]
-					if t.IsTestRun || t.PendingTestFeedback == "" || t.LastTestResult != "fail" {
-						continue
-					}
-					if t.SessionID == nil || *t.SessionID == "" {
-						continue
-					}
-					if t.TestFailCount >= constants.MaxTestFailRetries {
-						logger.Handler.Info("auto-promote: skipping task — test fail cap reached",
-							"task", t.ID, "test_fail_count", t.TestFailCount, "max", constants.MaxTestFailRetries)
-						continue
-					}
-					candidates = append(candidates, autoPromoteCandidate{
-						task:     *t,
-						store:    s,
-						isResume: true,
-						feedback: t.PendingTestFeedback,
-					})
-				}
-			})
 
 			// Check available capacity for backlog promotion (global count).
 			regularInProgress := h.countGlobalInProgress()
 			availableSlots := h.maxConcurrentTasks() - regularInProgress
-			if availableSlots <= 0 && len(candidates) == 0 {
+			if availableSlots <= 0 {
 				h.incAutoimplementAction("auto_promoter", "skipped_capacity")
 				return nil, nil
 			}
@@ -303,40 +261,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			promoted := false
 
 			for _, c := range candidates {
-				if c.isResume {
-					// Auto-resume: re-verify eligibility with fresh state.
-					freshTask, err := c.store.GetTask(ctx, c.task.ID)
-					if err != nil || freshTask == nil {
-						continue
-					}
-					if freshTask.Status != store.TaskStatusWaiting || freshTask.IsTestRun || freshTask.LastTestResult != "fail" || freshTask.PendingTestFeedback == "" {
-						continue
-					}
-					if freshTask.SessionID == nil || *freshTask.SessionID == "" {
-						continue
-					}
-					if freshTask.TestFailCount >= constants.MaxTestFailRetries {
-						logger.Handler.Info("auto-promote: test fail cap reached, stopping auto-resume",
-							"task", freshTask.ID, "test_fail_count", freshTask.TestFailCount)
-						h.insertEventOrLog(ctx, freshTask.ID, store.EventTypeSystem, map[string]string{
-							"result": fmt.Sprintf("Auto-resume halted: %d consecutive test failures (cap: %d). Manual feedback required to continue.", freshTask.TestFailCount, constants.MaxTestFailRetries),
-						})
-						continue
-					}
-
-					logger.Handler.Info("auto-promote: resuming waiting task from failed test feedback",
-						"task", freshTask.ID)
-					if err := h.resumeWaitingTaskWithFeedbackLocked(ctx, freshTask, freshTask.PendingTestFeedback, store.TriggerFeedback, "Autoimplement: resuming task with failed test feedback."); err != nil {
-						logger.Handler.Error("auto-promote resume failed test feedback", "task", freshTask.ID, "error", err)
-						h.breakers["auto-promote"].recordFailure(&freshTask.ID, err.Error())
-						continue
-					}
-					h.incAutoimplementAction("auto_promoter", "resumed_failed_test")
-					h.breakers["auto-promote"].recordSuccess()
-					promoted = true
-					continue
-				}
-
 				// Backlog promotion: re-verify capacity with a fresh count (global).
 				// Re-read in-progress count each iteration; prior iterations may
 				// have promoted tasks, increasing the count.
@@ -466,9 +390,9 @@ func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
 // containers and therefore bypass the regular task capacity check. This ensures
 // waiting tasks stay up to date even when the board is running at full capacity.
 //
-// Shared cache design: this watcher, tryAutoTest, and tryAutoSubmit all call
+// Shared cache design: this watcher and tryAutoSubmit both call
 // CommitsBehind for every waiting task on 30-second tickers. h.commitsBehindCache
-// deduplicates those calls (TTL=20s) so all three watchers share a single
+// deduplicates those calls (TTL=20s) so both watchers share a single
 // post-fetch result per (repoPath, worktreePath) within each polling window.
 // checkAndSyncWaitingTasks always invalidates the cache entry before calling
 // CommitsBehind so the result reflects the just-fetched remote refs.
@@ -590,193 +514,9 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	}
 }
 
-// StartAutoTester subscribes to store change notifications and automatically
-// triggers the test agent for waiting tasks that are untested and not behind
-// the default branch tip.
-func (h *Handler) StartAutoTester(ctx context.Context) {
-	watcher.Start(ctx, watcher.Config{
-		Wake:        h.newResubscribingWakeSource(),
-		Interval:    constants.AutoTestInterval,
-		SettleDelay: constants.WatcherSettleDelay,
-		Action:      h.tryAutoTest,
-	})
-}
-
-// autoTestCandidate holds an eligible waiting task and its pre-built test prompt.
-type autoTestCandidate struct {
-	task       store.Task
-	store      *store.Store
-	testPrompt string
-}
-
-// tryAutoTest scans all waiting tasks and triggers the test agent for any
-// that are untested (LastTestResult == "") and whose worktrees are not behind
-// the default branch. Does nothing when auto-test is disabled.
-//
-// Concurrency limit: test runs have their own independent limit controlled by
-// maxTestConcurrentTasks (WALLFACER_MAX_TEST_PARALLEL). Only IsTestRun
-// in-progress tasks count against this limit; regular tasks are unaffected.
-// The promoteMu mutex is still shared with tryAutoPromote to prevent races on
-// the same task.
-//
-// Uses the two-phase protocol via runTwoPhase:
-//
-// Phase 1 (no lock): scan waiting tasks and build the full candidates list,
-// performing git I/O (CommitsBehind) without holding promoteMu.
-//
-// Phase 2 (under promoteMu): re-read a fresh task snapshot, enforce the test
-// concurrency limit, then trigger each still-eligible candidate.
-func (h *Handler) tryAutoTest(ctx context.Context) {
-	if !h.AutotestEnabled() {
-		return
-	}
-	if h.breakers["auto-test"].isOpen() {
-		return
-	}
-
-	// candidates is populated by Phase1 and consumed by Phase2 via closure.
-	var candidates []autoTestCandidate
-
-	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
-		Name: "auto-test",
-		OnPhase1Error: func(err error) {
-			h.breakers["auto-test"].recordFailure(nil, err.Error())
-		},
-		OnPhase2Miss: func(_ *store.Task) {
-			h.incAutoimplementPhase2Miss("auto_tester")
-		},
-		Phase1: func(ctx context.Context) (*store.Task, error) {
-			// Phase 1 (no lock): build the list of eligible candidates scoped
-			// to the currently viewed workspace group. Git I/O (CommitsBehind)
-			// happens here so we don't hold promoteMu during potentially slow
-			// filesystem operations.
-			h.forCurrentStore(func(s *store.Store, _ []string) {
-				waitingTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-				if err != nil {
-					return
-				}
-
-				for i := range waitingTasks {
-					t := &waitingTasks[i]
-					if t.LastTestResult != "" || t.IsTestRun {
-						continue
-					}
-					// When review supersedes the test agent for this task, skip it
-					// here so the two don't both verify.
-					if h.reviewSupersedesTest(t) {
-						continue
-					}
-					if len(t.WorktreePaths) == 0 {
-						continue
-					}
-					if len(missingTaskWorktrees(t)) > 0 {
-						continue
-					}
-
-					behind := false
-					for repoPath, worktreePath := range t.WorktreePaths {
-						if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
-							continue
-						}
-						n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
-						if err != nil {
-							logger.Handler.Warn("auto-test: check commits behind",
-								"task", t.ID, "repo", repoPath, "error", err)
-							behind = true
-							break
-						}
-						if n > 0 {
-							behind = true
-							break
-						}
-					}
-					if behind {
-						continue
-					}
-
-					implResult := ""
-					if t.Result != nil {
-						implResult = *t.Result
-					}
-					diff := generateWorktreeDiff(t.WorktreePaths)
-					testPrompt := buildTestPrompt(t.Prompt, t.Criteria, implResult, diff)
-					candidates = append(candidates, autoTestCandidate{task: *t, store: s, testPrompt: testPrompt})
-				}
-			})
-
-			if len(candidates) == 0 {
-				return nil, nil
-			}
-			first := &candidates[0].task
-			return first, nil
-		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
-			// Phase 2 (under promoteMu): enforce the concurrency limit and trigger.
-			// Sharing promoteMu with tryAutoPromote prevents the two from racing to
-			// exceed maxConcurrentTasks simultaneously.
-
-			// Count test runners across ALL active stores.
-			testInProgress := h.countGlobalTestsInProgress(ctx)
-
-			maxTestTasks := h.maxTestConcurrentTasks()
-			triggered := false
-
-			for _, c := range candidates {
-				if testInProgress >= maxTestTasks {
-					logger.Handler.Info("auto-test: test concurrency limit reached, deferring remaining tests",
-						"limit", maxTestTasks)
-					h.incAutoimplementAction("auto_tester", "skipped_capacity")
-					break
-				}
-
-				// Re-verify eligibility using fresh state from the task's store.
-				ft, err := c.store.GetTask(ctx, c.task.ID)
-				if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
-					continue
-				}
-				if len(ft.WorktreePaths) == 0 || len(missingTaskWorktrees(ft)) > 0 {
-					continue
-				}
-
-				logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", c.task.ID)
-
-				if err := c.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
-					logger.Handler.Error("auto-test: update test run flag", "task", c.task.ID, "error", err)
-					h.breakers["auto-test"].recordFailure(&c.task.ID, err.Error())
-					continue
-				}
-				if err := c.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
-					logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
-					h.breakers["auto-test"].recordFailure(&c.task.ID, err.Error())
-					if rbErr := c.store.UpdateTaskTestRun(ctx, c.task.ID, false, ""); rbErr != nil {
-						logger.Handler.Error("auto-test: rollback IsTestRun flag", "task", c.task.ID, "error", rbErr)
-					}
-					continue
-				}
-				h.closeFeedbackWaitingSpan(ctx, c.task.ID)
-				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
-					store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerAutoTest, nil))
-				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
-					"result": "Auto-test: triggering test verification agent.",
-				})
-
-				h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
-				testInProgress++
-				triggered = true
-				h.incAutoimplementAction("auto_tester", "tested")
-			}
-
-			if !h.breakers["auto-test"].isOpen() {
-				h.breakers["auto-test"].recordSuccess()
-			}
-			return triggered, nil
-		},
-	})
-}
-
 // StartAutoSubmitter subscribes to store change notifications and automatically
-// moves waiting tasks to done when they are verified (LastTestResult == "pass"),
-// not behind the default branch tip, and have no unresolved worktree conflicts.
+// moves waiting tasks to done when they are complete (see tryAutoSubmit), not
+// behind the default branch tip, and have no unresolved worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:        h.newResubscribingWakeSource(),
@@ -789,15 +529,16 @@ func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 // autoSubmitCandidate holds a waiting task that has passed all eligibility checks
 // and is ready for auto-submission.
 type autoSubmitCandidate struct {
-	task              store.Task
-	store             *store.Store
-	naturallyComplete bool
+	task  store.Task
+	store *store.Store
 }
 
-// tryAutoSubmit scans all waiting tasks and moves any that are verified
-// (LastTestResult == "pass"), not behind the default branch, and free of
-// worktree conflicts directly to done (via the commit pipeline if a session
-// exists). Does nothing when auto-submit is disabled.
+// tryAutoSubmit scans all waiting tasks and moves any that are complete, not
+// behind the default branch, and free of worktree conflicts directly to done
+// (via the commit pipeline if a session exists). A task is complete when the
+// review approved it (review enabled and the task reviewable) or, otherwise,
+// when its agent ended its turn on its own (stop_reason "end_turn"). Does
+// nothing when auto-submit is disabled.
 //
 // Uses the two-phase protocol via runTwoPhase with promoteMu to coordinate
 // with SubmitFeedback and other operations that transition waiting tasks.
@@ -854,27 +595,16 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				if t.Status != store.TaskStatusWaiting {
 					continue
 				}
-				// Determine eligibility. When review supersedes the test agent
-				// (review enabled + the task has a session), the gate is a clean
-				// review verdict; the test-pass and natural-complete shortcuts do
-				// not apply — review must clear the task first.
-				reviewGate := h.reviewSupersedesTest(t)
-				var tested, naturallyComplete bool
-				if reviewGate {
-					tested = t.ReviewUnresolved != nil && *t.ReviewUnresolved == 0
+				// Determine eligibility. When review gates the task (review
+				// enabled + the task is reviewable), the gate is a clean review
+				// verdict; otherwise the agent must have ended its turn on its own.
+				var complete bool
+				if h.reviewGatesSubmit(t) {
+					complete = t.ReviewUnresolved != nil && *t.ReviewUnresolved == 0
 				} else {
-					// (a) Passed verification ("pass").
-					// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
-					//     but only when auto-test is off — otherwise let auto-test run first.
-					// Tasks that failed testing are never auto-submitted.
-					tested = t.LastTestResult == "pass"
-					naturallyComplete = t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
+					complete = t.StopReason != nil && *t.StopReason == "end_turn"
 				}
-				if !tested && !naturallyComplete {
-					continue
-				}
-				// Skip while the test agent is still running.
-				if t.IsTestRun {
+				if !complete {
 					continue
 				}
 				if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(t)) > 0 {
@@ -930,7 +660,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					continue
 				}
 
-				candidates = append(candidates, autoSubmitCandidate{task: *t, store: allTasks[i].store, naturallyComplete: naturallyComplete})
+				candidates = append(candidates, autoSubmitCandidate{task: *t, store: allTasks[i].store})
 			}
 
 			if len(candidates) == 0 {
@@ -961,26 +691,22 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 //
 // The re-fetch is essential: Phase 1 runs without promoteMu while doing slow
 // git I/O, so a candidate may have left waiting in the meantime (user resume,
-// auto-test promotion). Acting on the stale Phase-1 snapshot could force a
+// feedback). Acting on the stale Phase-1 snapshot could force a
 // no-longer-waiting task to done via ForceUpdateTaskStatus, which bypasses the
-// state machine. This mirrors the auto-promote / auto-test watchers, which also
-// re-read fresh state before acting.
+// state machine. This mirrors the auto-promote watcher, which also re-reads
+// fresh state before acting.
 func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCandidate) bool {
 	ft, err := c.store.GetTask(ctx, c.task.ID)
-	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting || ft.IsTestRun {
+	if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting {
 		return false
 	}
 	t := *ft
 	if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(&t)) > 0 {
 		return false
 	}
-	logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
-	autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
-	if c.naturallyComplete {
-		autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
-	}
+	logger.Handler.Info("auto-submit: completing waiting task", "task", t.ID)
 	h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-		"result": autoSubmitMsg,
+		"result": "Auto-submit: task complete, up to date, and no conflicts.",
 	})
 	h.closeFeedbackWaitingSpan(ctx, t.ID)
 
@@ -1013,7 +739,7 @@ func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCan
 func (h *Handler) StartAutoReview(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:        h.newResubscribingWakeSource(),
-		Interval:    constants.AutoTestInterval, // same cadence as the auto-tester
+		Interval:    constants.AutoReviewInterval,
 		SettleDelay: constants.WatcherSettleDelay,
 		Action:      h.tryAutoReview,
 	})
@@ -1057,11 +783,9 @@ func reviewable(t *store.Task) bool {
 	return len(t.WorktreePaths) > 0
 }
 
-// reviewSupersedesTest reports whether review replaces the test agent for this
-// task: review is enabled and the task is reviewable. Used to skip auto-test
-// for the task and to gate auto-submit on the review verdict instead of the
-// test verdict.
-func (h *Handler) reviewSupersedesTest(t *store.Task) bool {
+// reviewGatesSubmit reports whether auto-submit waits on the review verdict
+// for this task: review is enabled and the task is reviewable.
+func (h *Handler) reviewGatesSubmit(t *store.Task) bool {
 	return h.ReviewEnabled() && reviewable(t)
 }
 
@@ -1188,8 +912,7 @@ func reviewStateDir(worktreePath string) string {
 func (h *Handler) runReview(ctx context.Context, s *store.Store, t store.Task) error {
 	// A worktree that is gone or is not a git repository contributes nothing
 	// to the diff, and an approval of the remaining (possibly empty) diff
-	// would open the auto-submit gate unreviewed. Skip the round, as the
-	// auto-tester skips such a task.
+	// would open the auto-submit gate unreviewed. Skip the round.
 	if !reviewable(&t) || len(missingTaskWorktrees(&t)) > 0 {
 		return nil
 	}

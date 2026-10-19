@@ -26,7 +26,7 @@ Start here for the full reading order.
 
 ### Operate
 
-- [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
+- [Automation](automation.md). Autoimplement, auto-submit, auto-retry, circuit breakers.
 - [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, cost and usage analytics.
 - [Mission Control](mission-control.md). The unified spec and task graph, acting on the pipeline.
 - [Workspaces](workspaces.md). Workspace management, git integration, branches.
@@ -62,7 +62,7 @@ Create multiple Backlog tasks, enable [Autoimplement](automation.md), and let Wa
 
 ### Fully automated pipeline
 
-1. Enable Autoimplement, Auto-Test, and Auto-Submit (see [Automation](automation.md)).
+1. Enable Autoimplement and Auto-Submit (see [Automation](automation.md)).
 2. Create backlog tasks (see [Board](board.md)).
 3. Tasks are automatically promoted, tested, and submitted as they complete.
 

@@ -700,39 +700,6 @@ func TestUpdateEnvConfig_OpenAIBaseURLSSRFRejected(t *testing.T) {
 	}
 }
 
-// TestUpdateEnvConfig_MaxTestParallelTasks verifies that max_test_parallel_tasks
-// is accepted and clamped to a minimum of 1.
-func TestUpdateEnvConfig_MaxTestParallelTasks(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	body := `{"max_test_parallel_tasks":2}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateEnvConfig_MaxTestParallelTasksClampedToOne verifies that
-// max_test_parallel_tasks below 1 is clamped to 1.
-func TestUpdateEnvConfig_MaxTestParallelTasksClampedToOne(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	body := `{"max_test_parallel_tasks":0}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-	cfg, err := envconfig.Parse(envPath)
-	if err != nil {
-		t.Fatalf("parse env: %v", err)
-	}
-	if cfg.MaxTestParallelTasks < 1 {
-		t.Errorf("MaxTestParallelTasks = %d; want >= 1", cfg.MaxTestParallelTasks)
-	}
-}
-
 // TestUpdateEnvConfig_AutoPushThreshold verifies that auto_push_threshold is
 // accepted and clamped to a minimum of 1.
 func TestUpdateEnvConfig_AutoPushThreshold(t *testing.T) {

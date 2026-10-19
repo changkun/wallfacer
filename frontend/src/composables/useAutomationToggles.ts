@@ -2,21 +2,19 @@ import { ref } from 'vue';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
 
-// The five board automation switches, sourced from /api/config so the server
+// The four board automation switches, sourced from /api/config so the server
 // is the single source of truth (not the shell env). Mirrors the legacy
 // automation menu (ui/partials/automation-menu). Shared by the board
 // AutomationMenu popover and the Execution settings tab so both read and
 // write the same state.
 export type AutomationKey =
   | 'autoimplement'
-  | 'autotest'
   | 'autosubmit'
   | 'autosync'
   | 'autopush';
 
 export const AUTOMATION_KEYS: AutomationKey[] = [
   'autoimplement',
-  'autotest',
   'autosubmit',
   'autosync',
   'autopush',
@@ -24,7 +22,6 @@ export const AUTOMATION_KEYS: AutomationKey[] = [
 
 export const automationLabels: Record<AutomationKey, string> = {
   autoimplement: 'Implement',
-  autotest: 'Test',
   autosubmit: 'Submit',
   autosync: 'Catch up',
   autopush: 'Push',
@@ -32,15 +29,13 @@ export const automationLabels: Record<AutomationKey, string> = {
 
 export const automationHints: Record<AutomationKey, string> = {
   autoimplement: 'Auto-promote backlog tasks into In Progress',
-  autotest: 'Run verification automatically',
-  autosubmit: 'Mark waiting → done once verified',
+  autosubmit: 'Mark waiting → done once complete',
   autosync: 'Rebase waiting tasks onto the default branch',
   autopush: 'Auto-push completed commits',
 };
 
 const busy = ref<Record<AutomationKey, boolean>>({
   autoimplement: false,
-  autotest: false,
   autosubmit: false,
   autosync: false,
   autopush: false,

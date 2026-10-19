@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer runs six background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **WaitingSyncWatcher**, **AutoTester**, **AutoSubmitter**, and **AutoReview** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests or review verification, submitting results, retrying failures, syncing worktrees, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
+Wallfacer runs five background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **WaitingSyncWatcher**, **AutoSubmitter**, and **AutoReview** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running review, submitting results, retrying failures, syncing worktrees, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
 
 ## Background Goroutine Model
 
@@ -46,13 +46,12 @@ flowchart TD
         C1["h.StartAutoPromoter(ctx)"]
         C2["h.StartAutoRetrier(ctx)"]
         C3["h.StartWaitingSyncWatcher(ctx)"]
-        C4["h.StartAutoTester(ctx)"]
         C5["h.StartAutoSubmitter(ctx)"]
         C6["h.StartAutoReview(ctx)"]
     end
 
     A1 --> A2 --> B1 --> B2 --> B3 --> B4
-    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6
+    B4 --> C1 --> C2 --> C3 --> C5 --> C6
 ```
 
 ### Recovery Scans
@@ -66,7 +65,7 @@ Before watchers begin, two recovery operations run synchronously:
 
 All handler-level watchers follow one of two patterns:
 
-**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, auto-submitter, and auto-review call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
+**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-submitter, and auto-review call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
 
 ```go
 // Auto-promoter pattern
@@ -128,49 +127,24 @@ flowchart TD
 
 `WALLFACER_MAX_PARALLEL` defaults to 5; a workspace's `MaxParallel` field (workspaces.json) overrides it for that workspace only. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit.
 
-Autoimplement is off by default and is toggled via `PUT /api/config {"autoimplement": true/false}`. The autoimplement/autotest/autosubmit/autosync toggles are persisted per workspace (`persistCurrentGroupToggles` writes them to the viewed workspace's record), so switching away and back does not reset them, and a different workspace on the same server stays manual unless automation is turned on for it explicitly. The autopush toggle persists to the `.env` file instead, since push credentials are global.
+Autoimplement is off by default and is toggled via `PUT /api/config {"autoimplement": true/false}`. The autoimplement/autosubmit/autosync toggles are persisted per workspace (`persistCurrentGroupToggles` writes them to the viewed workspace's record), so switching away and back does not reset them, and a different workspace on the same server stays manual unless automation is turned on for it explicitly. The autopush toggle persists to the `.env` file instead, since push credentials are global.
 
 Tasks whose `ScheduledAt` is in the future are skipped by the auto-promoter even when the in-progress count is below `WALLFACER_MAX_PARALLEL`.
-
-## Test Verification
-
-`POST /api/tasks/{id}/test` runs a separate verification agent on a `waiting` task without committing:
-
-```mermaid
-flowchart TD
-    Click["User clicks Test<br/>on waiting task"] --> Setup["Set IsTestRun=true<br/>clear LastTestResult"]
-    Setup --> Transition["waiting to in_progress"]
-    Transition --> Launch["Run a fresh test agent<br/>(no --resume, new session)<br/>with test prompt"]
-    Launch --> Loop["Runner loop<br/>(isTestRun=true)"]
-    Loop --> StopReason{"stop_reason?"}
-    StopReason -->|"max_tokens / pause_turn"| Loop
-    StopReason -->|end_turn| Parse["parseTestVerdict()<br/>extract PASS / FAIL"]
-    Parse --> Record["IsTestRun = false<br/>LastTestResult = verdict<br/>in_progress to waiting<br/>(no commit pipeline)"]
-
-    Note1["TestRunStartTurn marks boundary<br/>between implementation and test output"]
-    style Note1 fill:none,stroke-dasharray: 5 5
-```
-
-The UI splits the live output panel into "Implementation" and "Test" sections using `TestRunStartTurn` as the boundary.
-
-See [Task Lifecycle](task-lifecycle.md#test-verification) for the request
-contract, the verdict fields, and how the `review` toggle supersedes the test
-agent.
 
 ## Auto-Submit
 
 Auto-submit is part of the autoimplement pipeline. When enabled via `PUT /api/config {"autosubmit": true}`, the `StartAutoSubmitter` watcher monitors tasks that reach `waiting` state and marks eligible ones as done, triggering the commit-and-push pipeline without manual intervention.
 
-The submit gate depends on which verifier owns the task (`internal/handler/tasks_autoimplement.go`):
+The submit gate depends on whether review owns the task (`internal/handler/tasks_autoimplement.go`):
 
-- **Test gate (default)**: the task's `LastTestResult` is `"pass"`, or the task completed naturally (`stop_reason = "end_turn"`, never tested) while auto-test is off. Tasks that failed testing are never auto-submitted.
-- **Review gate**: when review supersedes the test agent for the task (`reviewSupersedesTest`: the review toggle is on and the task has at least one worktree), the gate is a review approval (`ReviewUnresolved == 0`). The test-pass and natural-complete shortcuts do not apply; review must clear the task first.
+- **Completion gate (default)**: the task completed naturally (`stop_reason = "end_turn"`).
+- **Review gate**: when review gates the task (`reviewGatesSubmit`: the review toggle is on and the task has at least one worktree), the gate is a review approval (`ReviewUnresolved == 0`); natural completion alone does not qualify.
 
-This completes the autonomous loop: autoimplement promotes → agent executes → auto-tester (or auto-review) verifies → auto-submit commits.
+This completes the autonomous loop: autoimplement promotes → agent executes → auto-review (when on) checks → auto-submit commits.
 
 ## Auto-Review
 
-`StartAutoReview` is the sixth watcher. When the `review` runtime toggle is on (`PUT /api/config {"review": true}`; off by default), each tick lists the waiting tasks that have a worktree and no verdict (`ListWaitingTasksForReview`: `ReviewUnresolved == nil`) and runs one review round for each through `runReview`, which skips a task whose worktree is missing or is not a git repository (`missingTaskWorktrees`), as the auto-tester does: the diff would leave that repository out, and an approval of the rest would open the auto-submit gate unreviewed. `beginReview`/`endReview` keep one round in flight per task and at most `maxConcurrentReview` (2) across tasks; the manual `POST /api/tasks/{id}/review` takes the same slot and answers 409 while a round is in flight. A round that fails records a failure on the `auto-review` breaker, so the retry waits out its backoff (30 seconds doubling to 5 minutes), and the verdict stays unset.
+`StartAutoReview` is the fifth watcher. When the `review` runtime toggle is on (`PUT /api/config {"review": true}`; off by default), each tick lists the waiting tasks that have a worktree and no verdict (`ListWaitingTasksForReview`: `ReviewUnresolved == nil`) and runs one review round for each through `runReview`, which skips a task whose worktree is missing or is not a git repository (`missingTaskWorktrees`): the diff would leave that repository out, and an approval of the rest would open the auto-submit gate unreviewed. `beginReview`/`endReview` keep one round in flight per task and at most `maxConcurrentReview` (2) across tasks; the manual `POST /api/tasks/{id}/review` takes the same slot and answers 409 while a round is in flight. A round that fails records a failure on the `auto-review` breaker, so the retry waits out its backoff (30 seconds doubling to 5 minutes), and the verdict stays unset.
 
 A round is `review.Reviewer.Verify` (`internal/review`) on the runner's `review` role (`internal/agents`, binding in `internal/runner/agent_bindings.go`). The role mounts nothing: the reviewer reads the task prompt, the acceptance criteria and the worktree diff (capped at `constants.MaxDiffBytes`) from the `review` prompt template. Its harness resolves through `SandboxActivityReview` like any role's, which by default is the task's harness; its model is `WALLFACER_REVIEW_MODEL`. `Runner.RunReviewer` refuses with a `*runner.ReviewRefusal` before launching when the reviewer model is unset or equals a model the task runs on (its pin or the env default for its harness, and the model the harness reported); the refusal is recorded as a skip, once per reason, and leaves the verdict unset, so a task gated on review stays in waiting. The reviewer answers with JSON findings (severity `high`, `medium` or `low`, a one-sentence claim, an optional location) and a verdict, `approve` or `changes_requested`; an answer that does not parse is a `*runner.ReviewOutputError` and a failed attempt.
 
@@ -180,9 +154,9 @@ The rounds of one review form a session, recorded under the task's review state 
 - `approve`: the session ends `approved` and `UpdateTaskReview` sets `ReviewUnresolved = 0`.
 - the last round (`WALLFACER_REVIEW_ROUNDS`, default 3) still requesting changes, or the reviewer token budget (`WALLFACER_REVIEW_COST_CAP`, default 50000 input plus output tokens, checked between rounds) spent: the session ends `max_rounds` or `cost_cap`, `ReviewUnresolved` is the number of findings of the last answered round and `ReviewHeadline` the most severe one's claim.
 
-A failed attempt is recorded in the session but consumes no round and does not end it, so failures cannot widen the round limit. A session whose transcript cannot be read to its end is closed as `unreadable` and the next round starts a new one. A verdict is persisted only while the task is still waiting. Resuming the task after a session ended, by a person or by a test-failure auto-resume, clears the verdict, and the next review starts a new session. Reviewer usage is attributed to the task under `review` by `runAgent`.
+A failed attempt is recorded in the session but consumes no round and does not end it, so failures cannot widen the round limit. A session whose transcript cannot be read to its end is closed as `unreadable` and the next round starts a new one. A verdict is persisted only while the task is still waiting. Resuming the task after a session ended clears the verdict, and the next review starts a new session. Reviewer usage is attributed to the task under `review` by `runAgent`.
 
-When review owns a task, the auto-tester skips it (so the two verifiers never both run) and the auto-submitter gates on the review verdict as described above.
+When review owns a task, the auto-submitter gates on the review verdict as described above.
 
 ## Auto-Push
 
@@ -225,12 +199,11 @@ flowchart TD
 ```
 
 Served by:
-- `GET /api/tasks/{id}/oversight`, implementation run summary (default `?phase=impl`)
-- `GET /api/tasks/{id}/oversight?phase=test`, test-run summary (if a test was run)
+- `GET /api/tasks/{id}/oversight`, the task's run summary
 
 The UI renders phases in the Oversight tab and as an interactive flamegraph Timeline.
 
-The generator reads the task's trace events, passes them to the Claude API with a summarization prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob`: the implementation summary lands in `oversight.json` and the test-agent summary in `oversight-test.json`, both directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
+The generator reads the task's trace events, passes them to the Claude API with a summarization prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob` in `oversight.json` directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
 
 `POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
 

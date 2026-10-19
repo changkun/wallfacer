@@ -42,7 +42,7 @@ Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics
 
 [Automation](automation.md)
 
-Background watchers, the autoimplement promotion loop, auto-test, auto-review, auto-submit, auto-retry, circuit breakers, and startup sequence.
+Background watchers, the autoimplement promotion loop, auto-review, auto-submit, auto-retry, circuit breakers, and startup sequence.
 
 ### 7. Plan Mode
 

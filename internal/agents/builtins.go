@@ -8,6 +8,5 @@ var BuiltinAgents = []Role{
 	Oversight,
 	CommitMessage,
 	Implementation,
-	Testing,
 	Review,
 }

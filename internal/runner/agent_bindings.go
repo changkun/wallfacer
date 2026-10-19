@@ -77,18 +77,6 @@ var agentBindings = map[string]agentBinding{
 		SingleTurn:  false,
 		ParseResult: passthroughParse,
 	},
-	agents.Testing.Slug: {
-		Activity: store.SandboxActivityTesting,
-		Timeout: func(t *store.Task) time.Duration {
-			if t == nil {
-				return 0
-			}
-			return time.Duration(t.Timeout) * time.Minute
-		},
-		MountMode:   mountReadWrite,
-		SingleTurn:  false,
-		ParseResult: passthroughParse,
-	},
 }
 
 // bindingFor looks up the runner-side dispatch plumbing for an agent

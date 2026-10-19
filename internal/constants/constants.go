@@ -35,8 +35,8 @@ const AutoPromoteInterval = 60 * time.Second
 // WaitingSyncInterval is the polling interval for syncing waiting tasks.
 const WaitingSyncInterval = 30 * time.Second
 
-// AutoTestInterval is the polling interval for the auto-test watcher.
-const AutoTestInterval = 30 * time.Second
+// AutoReviewInterval is the polling interval for the auto-review watcher.
+const AutoReviewInterval = 30 * time.Second
 
 // AutoSubmitInterval is the polling interval for the auto-submit watcher.
 const AutoSubmitInterval = 30 * time.Second
@@ -87,15 +87,8 @@ const MaxAutoRetries = 3
 // MaxRebaseRetries is the maximum number of rebase attempts before giving up.
 const MaxRebaseRetries = 3
 
-// MaxTestFailRetries is the maximum number of consecutive test failures before
-// the auto-resume cycle is halted.
-const MaxTestFailRetries = 3
-
 // DefaultMaxConcurrentTasks is the default parallel task limit.
 const DefaultMaxConcurrentTasks = 5
-
-// DefaultMaxTestConcurrentTasks is the default parallel test-run limit.
-const DefaultMaxTestConcurrentTasks = 2
 
 // DefaultCBThreshold is the number of consecutive container launch failures
 // required to open the circuit breaker.
@@ -125,7 +118,7 @@ const ExplorerMaxFileSize int64 = 2 * 1024 * 1024
 const DefaultMaxTurnOutputBytes = 8 * 1024 * 1024 // 8 MB
 
 // MaxDiffBytes is the maximum number of bytes to include from the git diff in
-// the test prompt.
+// the review prompt.
 const MaxDiffBytes = 16000
 
 // MaxOversightLogBytes caps the total log size to avoid exceeding prompt limits.
@@ -146,9 +139,6 @@ const MaxSearchResults = 50
 // SnippetPadding is the number of context characters shown on each side of a
 // search match in task search results.
 const SnippetPadding = 60
-
-// MaxTailLines is the number of tail lines checked for test verdict detection.
-const MaxTailLines = 15
 
 // LogValueMaxLen is the maximum length for value truncation in pretty logging.
 const LogValueMaxLen = 200

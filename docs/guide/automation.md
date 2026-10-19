@@ -1,20 +1,19 @@
 # Automation
 
-Wallfacer operates anywhere on the spectrum from fully manual to fully hands-off. At one end, every card is dragged by hand and every result reviewed before commit. At the other, the backlog is loaded, every toggle is on, and tasks execute, verify, submit, and push without intervention. This page covers the toggles, the background watchers behind them, review on a second model, and the safety systems that keep hands-off operation from running away.
+Wallfacer operates anywhere on the spectrum from fully manual to fully hands-off. At one end, every card is dragged by hand and every result reviewed before commit. At the other, the backlog is loaded, every toggle is on, and tasks execute, submit, and push without intervention. This page covers the toggles, the background watchers behind them, review on a second model, and the safety systems that keep hands-off operation from running away.
 
 ## The automation toggles
 
-Five switches drive the pipeline. They live in the board's **Automation** popover (the lightning bolt in the header; a dot marks that at least one switch is on) and, together with the numeric execution knobs, on the Execution settings tab (`/settings?tab=execution`). Both surfaces read and write the same server-side state.
+Four switches drive the pipeline. They live in the board's **Automation** popover (the lightning bolt in the header; a dot marks that at least one switch is on) and, together with the numeric execution knobs, on the Execution settings tab (`/settings?tab=execution`). Both surfaces read and write the same server-side state.
 
 | Label | Config key | What it controls |
 |---|---|---|
 | Implement | `autoimplement` | Auto-promote backlog tasks into In Progress |
-| Test | `autotest` | Run verification on waiting tasks automatically |
-| Submit | `autosubmit` | Mark waiting tasks done once verified |
+| Submit | `autosubmit` | Mark waiting tasks done once complete |
 | Catch up | `autosync` | Rebase waiting tasks onto the default branch |
 | Push | `autopush` | Push completed commits upstream |
 
-A sixth switch, `review`, enables Review on a second model (below). It is stored in the same runtime configuration but is not part of the board popover; toggle it through the configuration API (`PUT /api/config` with `{"review": true}`). A manual per-task **Review** action is also available on the task detail actions rail.
+A fifth switch, `review`, enables Review on a second model (below). It is stored in the same runtime configuration but is not part of the board popover; toggle it through the configuration API (`PUT /api/config` with `{"review": true}`). A manual per-task **Review** action is also available on the task detail actions rail.
 
 Each toggle arms one server-side watcher. The watchers wake on store changes and on periodic tickers (30 to 60 seconds), scoped to the currently viewed workspace.
 
@@ -29,8 +28,6 @@ When capacity allows, the auto-promoter moves backlog tasks to In Progress and l
 - **Ordering**: candidates are ranked by board position, then creation time.
 - **Skips**: tasks currently locked by a planning agent are never promoted.
 
-The same watcher also auto-resumes waiting tasks that carry failed-test feedback, feeding the feedback back into the session, up to a cap of 3 consecutive test failures. After the cap, the task parks until manual feedback arrives.
-
 ### Auto-retry (always on)
 
 Failed tasks with a transient infrastructure failure category are reset to Backlog for another attempt. This watcher has no toggle; it is bounded by budgets instead:
@@ -41,18 +38,14 @@ Failed tasks with a transient infrastructure failure category are reset to Backl
 
 Agent errors, timeouts, budget overruns, and unknown failures are never auto-retried; they wait for human review. A manual retry restores the full budget.
 
-### Test: the auto-tester
-
-Waiting tasks that have not been verified (`LastTestResult` empty), have all worktrees present, and are not behind the default branch get a test agent run. Test runs have their own concurrency limit (`WALLFACER_MAX_TEST_PARALLEL`), independent of the regular cap. When Review supersedes testing for a task (below), the auto-tester skips it so the two verifiers never double up.
-
 ### Submit: the auto-submitter
 
-Verified waiting tasks move to done automatically. The gate depends on the verifier in play:
+Complete waiting tasks move to done automatically. The gate depends on whether Review is on:
 
-- **Test gate** (default): the task's last test result is `pass`. As a shortcut, a task that ended naturally (`end_turn` stop reason) and was never tested qualifies, but only while auto-test is off; with auto-test on, testing runs first.
-- **Review gate**: when Review supersedes the test agent for a task, the gate is a Review approval (no open findings). The test-pass and natural-completion shortcuts do not apply.
+- **Completion gate** (default): the agent ended its turn on its own (`end_turn` stop reason).
+- **Review gate**: when Review is on and the task has a worktree, the gate is a Review approval (no open findings); natural completion alone does not qualify.
 
-In addition, every worktree must be up to date with the default branch and free of merge conflicts. Tasks with a session go through the commit pipeline (committing state, commit message generation); sessionless tasks move straight to done. Tasks that failed testing are never auto-submitted.
+In addition, every worktree must be up to date with the default branch and free of merge conflicts. Tasks with a session go through the commit pipeline (committing state, commit message generation); sessionless tasks move straight to done.
 
 ### Catch up: the waiting-sync watcher
 
@@ -76,7 +69,7 @@ Open findings at the end of a session are a hard barrier: the task stays parked 
 Scope and behavior:
 
 - A review needs a second model. When `WALLFACER_REVIEW_MODEL` is unset, or names the model the task runs on, the review does not run: the task timeline says why, once, and the task carries no verdict, so with Review on it is not auto-submitted.
-- Review supersedes the test agent for every waiting task that has a worktree, on any harness. A task without a worktree has no diff to review and falls back to the regular test agent; a task whose worktree has gone missing is not reviewed until it is restored.
+- Review gates every waiting task that has a worktree, on any harness. A task without a worktree has no diff to review and falls back to the completion gate; a task whose worktree has gone missing is not reviewed until it is restored.
 - Eligible waiting tasks are reviewed automatically when the `review` toggle is on. One round runs at a time per task, and at most 2 rounds run at once across tasks, outside the regular task caps.
 - A reviewer run that fails, or answers in a form that cannot be read, does not use up a round: the task timeline says so, and the round is retried once the auto-review breaker's backoff has passed.
 - The reviewer reads the diff from its prompt, capped at 16,000 bytes, and runs without access to the workspace, so it cannot change the task's worktree.
@@ -96,7 +89,7 @@ Two independent breaker systems pause automation when something goes wrong, and 
 
 ### Watcher breakers
 
-Each watcher (auto-promote, auto-retry, auto-test, auto-submit, auto-sync, auto-review) has its own breaker. Repeated errors in one watcher's scan-and-act cycle open its breaker and suppress that watcher alone; all others keep running. Recovery uses exponential backoff: 30 seconds, doubling per failure, capped at 5 minutes. A single success resets the breaker. Per-watcher health (failure count, retry time, last reason) is reported in the config API response (`watcher_health`). Breakers only suppress automated actions; manual board operations keep working, and the toggles themselves are unaffected.
+Each watcher (auto-promote, auto-retry, auto-submit, auto-sync, auto-review) has its own breaker. Repeated errors in one watcher's scan-and-act cycle open its breaker and suppress that watcher alone; all others keep running. Recovery uses exponential backoff: 30 seconds, doubling per failure, capped at 5 minutes. A single success resets the breaker. Per-watcher health (failure count, retry time, last reason) is reported in the config API response (`watcher_health`). Breakers only suppress automated actions; manual board operations keep working, and the toggles themselves are unaffected.
 
 ### Agent-launch breaker
 

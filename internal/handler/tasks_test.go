@@ -1122,36 +1122,6 @@ func TestServeOutput_JSONFile(t *testing.T) {
 	}
 }
 
-// TestTryAutoPromote_DoesNotCountTestRuns verifies that test-run in_progress
-// tasks (IsTestRun=true) do not count against the regular task concurrency limit,
-// so testing tasks cannot starve regular backlog promotions.
-func TestTryAutoPromote_DoesNotCountTestRuns(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	h.autoimplement.Store(true)
-	ctx := context.Background()
-
-	// Set regular max to 1.
-	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// One test-run in_progress task (should not occupy the regular slot).
-	testTask, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test run", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, testTask.ID, store.TaskStatusInProgress)
-
-	_ = h.store.UpdateTaskTestRun(ctx, testTask.ID, true, "")
-
-	// One backlog task that should be promoted.
-	backlog, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
-
-	h.tryAutoPromote(ctx)
-
-	got, _ := h.store.GetTask(ctx, backlog.ID)
-	if got.Status != store.TaskStatusInProgress {
-		t.Errorf("expected backlog task to be promoted (test-run should not block regular slots), got %s", got.Status)
-	}
-}
-
 func TestTryAutoRetry_ContainerCrash(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
@@ -1543,428 +1513,6 @@ func TestCheckAndSyncWaitingTasks_DisabledNoOp(t *testing.T) {
 
 // --- tryAutoTest tests ---
 
-// TestTryAutoTest_DisabledNoOp verifies that auto-test does nothing when disabled.
-func TestTryAutoTest_DisabledNoOp(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// autotest is disabled by default.
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected task to remain waiting when autotest disabled, got %s", got.Status)
-	}
-}
-
-// TestTryAutoTest_SkipsNonWaiting verifies that non-waiting tasks are not tested.
-func TestTryAutoTest_SkipsNonWaiting(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	// Leave the task in backlog (not waiting).
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusBacklog {
-		t.Errorf("expected task to remain in backlog, got %s", got.Status)
-	}
-}
-
-// TestTryAutoTest_SkipsAlreadyTested verifies that tasks with a test result are skipped.
-func TestTryAutoTest_SkipsAlreadyTested(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// Simulate a previous test run that passed.
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected already-tested task to remain waiting, got %s", got.Status)
-	}
-}
-
-// TestTryAutoTest_SkipsCurrentlyTesting verifies that tasks being tested (IsTestRun) are skipped.
-func TestTryAutoTest_SkipsCurrentlyTesting(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// Mark the task as currently running a test.
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, true, "")
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected currently-testing task to remain waiting, got %s", got.Status)
-	}
-}
-
-// TestTryAutoTest_SkipsNoWorktrees verifies that waiting tasks with no worktrees are skipped.
-func TestTryAutoTest_SkipsNoWorktrees(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	// No worktrees set.
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected task without worktrees to remain waiting, got %s", got.Status)
-	}
-}
-
-func TestTryAutoTest_SkipsMissingWorktreeDir(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected task with missing worktree dir to remain waiting, got %s", got.Status)
-	}
-	if got.IsTestRun {
-		t.Error("expected task with missing worktree dir not to enter test run")
-	}
-}
-
-// TestTryAutoTest_SkipsBehindTip verifies that tasks whose worktrees are behind the
-// default branch are not auto-tested.
-func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	// Add a bare remote so the behind-tip check is not skipped for local-only repos.
-	origin := t.TempDir()
-	gitRun(t, origin, "init", "--bare")
-	gitRun(t, repo, "remote", "add", "origin", origin)
-	gitRun(t, repo, "push", "-u", "origin", "main")
-
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// Add a commit to main so the worktree is behind by 1.
-	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
-
-	gitRun(t, repo, "add", ".")
-	gitRun(t, repo, "commit", "-m", "upstream commit")
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected behind-tip task to remain waiting, got %s", got.Status)
-	}
-}
-
-// TestTryAutoTest_TriggersForEligibleTask verifies that a qualifying waiting task
-// (untested, up-to-date worktree) is transitioned to in_progress to run the test agent.
-func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
-	// The worktree parent is claimed before the handler exists, because
-	// cleanups run last-registered-first: registering it here puts its
-	// removal after the handler's Shutdown and WaitBackground, so the test
-	// agent this case starts has finished writing into the worktree by the
-	// time the directory goes. Claimed after the handler, the removal runs
-	// first and races the agent, which surfaces as "directory not empty".
-	wtParent := t.TempDir()
-
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	// Use os.MkdirTemp instead of t.TempDir so that the directories survive
-	// until r.Shutdown drains the background goroutine started by RunBackground.
-	// t.TempDir cleanups run in LIFO order before the handler's Shutdown/WaitBackground
-	// cleanups, causing races where the background goroutine accesses removed dirs.
-	repo, err := os.MkdirTemp("", "wallfacer-test-repo-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(repo) })
-	gitRun(t, repo, "init", "-b", "main")
-	gitRun(t, repo, "config", "user.email", "test@example.com")
-	gitRun(t, repo, "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(repo, "file.txt"), []byte("initial\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	gitRun(t, repo, "add", ".")
-	gitRun(t, repo, "commit", "-m", "initial commit")
-
-	// t.TempDir rather than os.MkdirTemp: the framework removes it and fails
-	// the test if it cannot, where a cleanup that swallows the error leaves
-	// the directory under TMPDIR for the life of the machine.
-	wt := filepath.Join(wtParent, "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// No new commits — worktree is up to date.
-
-	h.tryAutoTest(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusInProgress {
-		t.Errorf("expected eligible task to be moved to in_progress, got %s", got.Status)
-	}
-	if !got.IsTestRun {
-		t.Error("expected IsTestRun to be set on auto-tested task")
-	}
-}
-
-// TestTryAutoTest_RespectsMaxTestConcurrencyLimit verifies that tryAutoTest does
-// not trigger more test runs than the configured WALLFACER_MAX_TEST_PARALLEL limit.
-func TestTryAutoTest_RespectsMaxTestConcurrencyLimit(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	// Set test-run max parallel to 1 via the dedicated variable.
-	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_TEST_PARALLEL=1\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a repo with two worktrees (one per task).
-	repo := setupRepo(t)
-	wt1 := filepath.Join(t.TempDir(), "wt1")
-	wt2 := filepath.Join(t.TempDir(), "wt2")
-	gitRun(t, repo, "worktree", "add", "-b", "branch-1", wt1, "HEAD")
-	gitRun(t, repo, "worktree", "add", "-b", "branch-2", wt2, "HEAD")
-
-	// Two waiting tasks, both eligible for auto-test.
-	task1, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task 1", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task1.ID, map[string]string{repo: wt1}, "branch-1")
-
-	task2, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task 2", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task2.ID, map[string]string{repo: wt2}, "branch-2")
-
-	h.tryAutoTest(ctx)
-
-	// With test max=1 and no prior test-run in-progress tasks, exactly one test run should start.
-	tasks, _ := h.store.ListTasks(ctx, false)
-	testInProgress := 0
-	for _, task := range tasks {
-		if task.Status == store.TaskStatusInProgress && task.IsTestRun {
-			testInProgress++
-		}
-	}
-	if testInProgress != 1 {
-		t.Errorf("expected exactly 1 test run to start (max=1), got %d test in_progress", testInProgress)
-	}
-}
-
-// TestTryAutoTest_RegularTasksDoNotConsumeTestSlots verifies that regular
-// in_progress tasks (IsTestRun=false) do not count against the test concurrency
-// limit, so a full backlog of regular work cannot starve auto-test.
-func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	h.SetAutotest(true)
-	ctx := context.Background()
-
-	// Set test-run max parallel to 1 and regular max to 2.
-	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=2\nWALLFACER_MAX_TEST_PARALLEL=1\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Two regular tasks already in_progress (fills the regular slots).
-	for i := range 2 {
-		reg, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: fmt.Sprintf("regular %d", i), Timeout: 15})
-		_ = h.store.ForceUpdateTaskStatus(ctx, reg.ID, store.TaskStatusInProgress)
-
-	}
-
-	// One waiting task eligible for auto-test.
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	h.tryAutoTest(ctx)
-
-	// The test run must have started despite both regular slots being full.
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusInProgress {
-		t.Errorf("expected test task to be promoted to in_progress (regular slots full should not block tests), got %s", got.Status)
-	}
-	if !got.IsTestRun {
-		t.Error("expected IsTestRun to be set on auto-tested task")
-	}
-}
-
-func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutoimplementEnabled(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("requires Unix shell")
-	}
-	s, err := storetest.NewFileStore(t, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cmdPath := filepath.Join(t.TempDir(), "fake-runner.sh")
-	script := "#!/bin/sh\nsleep 0.2\nprintf '%s\\n' '{\"result\":\"need more work\",\"session_id\":\"impl-sess\",\"stop_reason\":\"\",\"is_error\":false,\"total_cost_usd\":0.001}'\n"
-	if err := os.WriteFile(cmdPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		Workspaces:       []string{repo},
-		HostClaudeBinary: cmdPath,
-		HostCodexBinary:  cmdPath,
-	})
-	t.Cleanup(r.WaitBackground)
-	t.Cleanup(r.Shutdown)
-
-	h := NewHandler(s, r, t.TempDir(), []string{repo}, nil)
-	// Only one task is promoted here and nothing else occupies a slot, so the
-	// default cap of 1 is enough — no parallelism override needed.
-	h.SetAutoimplement(true)
-	ctx := context.Background()
-
-	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed test follow-up", Timeout: 15})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	_ = h.store.UpdateTaskResult(ctx, task.ID, "implementation result", "impl-sess", "", 2)
-
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
-
-	_ = h.store.UpdateTaskPendingTestFeedback(ctx, task.ID, "Automated test verification failed.\n\n- fix the broken assertion")
-
-	h.tryAutoPromote(ctx)
-
-	got, err := h.store.GetTask(ctx, task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Status != store.TaskStatusInProgress {
-		t.Fatalf("expected task to resume to in_progress, got %s", got.Status)
-	}
-	if got.LastTestResult != "" {
-		t.Fatalf("expected last_test_result to be cleared on resume, got %q", got.LastTestResult)
-	}
-	if got.PendingTestFeedback != "" {
-		t.Fatalf("expected pending test feedback to be cleared on resume, got %q", got.PendingTestFeedback)
-	}
-
-	events, err := h.store.GetEvents(ctx, task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	foundFeedback := false
-	for _, event := range events {
-		if event.EventType != store.EventTypeFeedback {
-			continue
-		}
-		var data map[string]string
-		if err := json.Unmarshal(event.Data, &data); err != nil {
-			t.Fatalf("json.Unmarshal(feedback): %v", err)
-		}
-		if strings.Contains(data["message"], "fix the broken assertion") {
-			foundFeedback = true
-			break
-		}
-	}
-	if !foundFeedback {
-		t.Fatal("expected failed test outcome to be recorded as feedback")
-	}
-
-	r.WaitBackground()
-}
-
-// TestAutotest_SetAndGet verifies the SetAutotest / AutotestEnabled accessors.
-func TestAutotest_SetAndGet(t *testing.T) {
-	h := newTestHandler(t)
-	if h.AutotestEnabled() {
-		t.Fatal("expected autotest to be disabled by default")
-	}
-	h.SetAutotest(true)
-	if !h.AutotestEnabled() {
-		t.Error("expected autotest to be enabled after SetAutotest(true)")
-	}
-	h.SetAutotest(false)
-	if h.AutotestEnabled() {
-		t.Error("expected autotest to be disabled after SetAutotest(false)")
-	}
-}
-
 // --- tryAutoSubmit tests ---
 
 // TestAutosubmit_SetAndGet verifies the SetAutosubmit / AutosubmitEnabled accessors.
@@ -1997,7 +1545,7 @@ func TestTryAutoSubmit_DisabledNoOp(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	// autosubmit is disabled by default.
 	h.tryAutoSubmit(ctx)
@@ -2022,7 +1570,7 @@ func TestTryAutoSubmit_SkipsNonWaiting(t *testing.T) {
 	// Leave in backlog — not waiting.
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	h.tryAutoSubmit(ctx)
 
@@ -2049,14 +1597,14 @@ func TestTryAutoSubmit_ProcessesOnlyWaitingTasks(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, waitingTask.ID, map[string]string{repo: waitingWT}, "waiting-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, waitingTask.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, waitingTask.ID, "done", "", "end_turn", 1)
 
 	doneTask, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "verified done task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, doneTask.ID, store.TaskStatusDone)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, doneTask.ID, map[string]string{repo: doneWT}, "done-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, doneTask.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, doneTask.ID, "done", "", "end_turn", 1)
 
 	h.tryAutoSubmit(ctx)
 
@@ -2103,91 +1651,13 @@ func TestTryAutoSubmit_SkipsNotVerified(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-	// LastTestResult is "" (not tested).
+	// StopReason is unset: the agent did not end its turn on its own.
 
 	h.tryAutoSubmit(ctx)
 
 	got, _ := h.store.GetTask(ctx, task.ID)
 	if got.Status != store.TaskStatusWaiting {
 		t.Errorf("expected unverified task to remain waiting, got %s", got.Status)
-	}
-}
-
-// TestTryAutoSubmit_SkipsAmbiguousVerdict verifies that a waiting task with
-// LastTestResult=="fail" (which includes the case where the test ran but
-// produced no recognizable PASS/FAIL marker) is NOT auto-submitted.
-func TestTryAutoSubmit_SkipsAmbiguousVerdict(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutosubmit(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "ambiguous verdict task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
-
-	h.tryAutoSubmit(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected ambiguous-verdict (fail) task to remain waiting, got %s", got.Status)
-	}
-}
-
-// TestTryAutoSubmit_SkipsFailedVerification verifies tasks with LastTestResult=="fail" are not submitted.
-func TestTryAutoSubmit_SkipsFailedVerification(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutosubmit(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
-
-	h.tryAutoSubmit(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected failed-test task to remain waiting, got %s", got.Status)
-	}
-}
-
-// TestTryAutoSubmit_SkipsCurrentlyTesting verifies that tasks with IsTestRun=true are not submitted.
-func TestTryAutoSubmit_SkipsCurrentlyTesting(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutosubmit(true)
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "verified task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// IsTestRun=true means the test agent is currently running.
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, true, "pass")
-
-	h.tryAutoSubmit(ctx)
-
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Errorf("expected currently-testing task to remain waiting, got %s", got.Status)
 	}
 }
 
@@ -2202,7 +1672,7 @@ func TestTryAutoSubmit_SkipsMissingWorktreeDir(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	h.tryAutoSubmit(ctx)
 
@@ -2234,7 +1704,7 @@ func TestTryAutoSubmit_SkipsBehindTip(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	// Add a commit to main so the worktree is behind by 1.
 	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
@@ -2267,7 +1737,7 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	// No session ID — task goes directly to done.
 
@@ -2300,7 +1770,6 @@ func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
 	}
 	h.SetAutoimplement(true)
-	h.SetAutotest(true)
 	h.SetAutosubmit(true)
 	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
@@ -2317,7 +1786,7 @@ func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-autosubmit-fail")
 
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	setTaskSessionID(t, h, task.ID, "sess-autosubmit-fail")
 
@@ -2349,7 +1818,7 @@ func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "1" {
 		t.Fatalf("expected no placeholder commit to land, got %s commits", got)
 	}
-	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
+	if !h.AutoimplementEnabled() || !h.AutosubmitEnabled() {
 		t.Fatal("expected board toggles to remain enabled (only the circuit breaker opens)")
 	}
 }
@@ -3212,7 +2681,7 @@ func TestGetConfig_IncludesWatcherHealth(t *testing.T) {
 		t.Fatalf("expected watcher_health to be an array, got %T", healthRaw)
 	}
 
-	wantNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-review"}
+	wantNames := []string{"auto-promote", "auto-retry", "auto-submit", "auto-sync", "auto-review"}
 	if len(health) != len(wantNames) {
 		t.Fatalf("expected %d watcher health entries, got %d", len(wantNames), len(health))
 	}
@@ -3474,65 +2943,6 @@ func TestUpdateTask_InvalidStatusTransition(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for invalid transition backlog->done, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateTask_CustomPassPattern verifies that valid custom pass patterns
-// can be set on a backlog task.
-func TestUpdateTask_CustomPassPattern(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "pattern task", Timeout: 15})
-
-	body := `{"custom_pass_patterns": ["PASS", "ok$"]}`
-	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateTask(w, req, task.ID)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	var updated store.Task
-	_ = json.NewDecoder(w.Body).Decode(&updated)
-
-	if len(updated.CustomPassPatterns) != 2 {
-		t.Errorf("expected 2 custom pass patterns, got %d", len(updated.CustomPassPatterns))
-	}
-}
-
-// TestUpdateTask_InvalidCustomPassPattern verifies that an invalid regex in
-// custom_pass_patterns returns 400.
-func TestUpdateTask_InvalidCustomPassPattern(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "pattern task", Timeout: 15})
-
-	// An invalid regex (unmatched parenthesis).
-	body := `{"custom_pass_patterns": ["(invalid"]}`
-	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateTask(w, req, task.ID)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for invalid regex, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateTask_InvalidCustomFailPattern verifies that an invalid regex in
-// custom_fail_patterns returns 400.
-func TestUpdateTask_InvalidCustomFailPattern(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "pattern task", Timeout: 15})
-
-	// An invalid regex (unmatched bracket).
-	body := `{"custom_fail_patterns": ["[bad"]}`
-	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateTask(w, req, task.ID)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for invalid fail regex, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"net/http"
@@ -128,7 +127,6 @@ type Handler struct {
 	reg           *metrics.Registry
 
 	autoimplement atomic.Bool
-	autotest      atomic.Bool
 	autosubmit    atomic.Bool
 	autosync      atomic.Bool
 	autopush      atomic.Bool
@@ -163,11 +161,10 @@ type Handler struct {
 	// path; values are *sync.Mutex.
 	explorerCommitMu sync.Map
 
-	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
-	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
-	// re-parse the env file on every call. Invalidate on env config update.
-	cachedMaxParallel     *lazy[int]
-	cachedMaxTestParallel *lazy[int]
+	// cachedMaxParallel caches the configured parallel task limit so that
+	// maxConcurrentTasks does not re-parse the env file on every call.
+	// Invalidate on env config update.
+	cachedMaxParallel *lazy[int]
 
 	// groupLimitsMu guards groupLimits, the in-memory cache of per-workspace-
 	// group concurrency overrides loaded from workspace-groups.json. Refreshed
@@ -219,7 +216,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		breakers: map[string]*watcherBreaker{
 			"auto-promote": newWatcherBreaker(),
 			"auto-retry":   newWatcherBreaker(),
-			"auto-test":    newWatcherBreaker(),
 			"auto-submit":  newWatcherBreaker(),
 			"auto-sync":    newWatcherBreaker(),
 			"auto-review":  newWatcherBreaker(),
@@ -246,13 +242,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			return 1
 		}
 		return limit
-	})
-	h.cachedMaxTestParallel = newLazy(func() int {
-		cfg, err := envconfig.Parse(h.envFile)
-		if err != nil || cfg.MaxTestParallelTasks <= 0 {
-			return constants.DefaultMaxTestConcurrentTasks
-		}
-		return cfg.MaxTestParallelTasks
 	})
 	// Initialize the review verifier once; ReviewEnabled() is the runtime gate.
 	h.verifier = review.New(r)
@@ -399,13 +388,11 @@ func (h *Handler) applyGroupToggles(ws []string) {
 	}
 	if g == nil {
 		h.autoimplement.Store(false)
-		h.autotest.Store(false)
 		h.autosubmit.Store(false)
 		h.autosync.Store(false)
 		return
 	}
 	h.autoimplement.Store(pick(g.Autoimplement))
-	h.autotest.Store(pick(g.Autotest))
 	h.autosubmit.Store(pick(g.Autosubmit))
 	h.autosync.Store(pick(g.Autosync))
 }
@@ -428,14 +415,12 @@ func (h *Handler) persistCurrentGroupToggles() {
 	key := workspace.GroupKey(ws)
 	b := func(v bool) *bool { x := v; return &x }
 	autoimplement := b(h.autoimplement.Load())
-	autotest := b(h.autotest.Load())
 	autosubmit := b(h.autosubmit.Load())
 	autosync := b(h.autosync.Load())
 	found := false
 	for i := range groups {
 		if workspace.GroupKey(groups[i].Folders) == key {
 			groups[i].Autoimplement = autoimplement
-			groups[i].Autotest = autotest
 			groups[i].Autosubmit = autosubmit
 			groups[i].Autosync = autosync
 			found = true
@@ -446,7 +431,6 @@ func (h *Handler) persistCurrentGroupToggles() {
 		groups = append([]workspace.Workspace{{
 			Folders:       ws,
 			Autoimplement: autoimplement,
-			Autotest:      autotest,
 			Autosubmit:    autosubmit,
 			Autosync:      autosync,
 		}}, groups...)
@@ -460,8 +444,7 @@ func (h *Handler) persistCurrentGroupToggles() {
 // workspace group. nil means "inherit the env-file default"; 0 means
 // "unlimited for this group"; positive means "hard cap".
 type groupLimitEntry struct {
-	maxParallel     *int
-	maxTestParallel *int
+	maxParallel *int
 }
 
 // reloadGroupLimits re-reads workspace-groups.json and rebuilds the in-memory
@@ -473,12 +456,11 @@ func (h *Handler) reloadGroupLimits() {
 	limits := make(map[string]groupLimitEntry, len(groups))
 	if err == nil {
 		for _, g := range groups {
-			if g.MaxParallel == nil && g.MaxTestParallel == nil {
+			if g.MaxParallel == nil {
 				continue
 			}
 			limits[workspace.GroupKey(g.Folders)] = groupLimitEntry{
-				maxParallel:     g.MaxParallel,
-				maxTestParallel: g.MaxTestParallel,
+				maxParallel: g.MaxParallel,
 			}
 		}
 	}
@@ -490,9 +472,8 @@ func (h *Handler) reloadGroupLimits() {
 // currentGroupParallelLimit returns the per-group concurrency override for
 // the currently viewed workspace group, if one is set. The second return
 // value reports whether an override applies; when false, callers should fall
-// back to the env-file default. testRun selects between the regular
-// (MaxParallel) and test-run (MaxTestParallel) overrides.
-func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
+// back to the env-file default.
+func (h *Handler) currentGroupParallelLimit() (int, bool) {
 	ws := h.currentWorkspaces()
 	if len(ws) == 0 {
 		return 0, false
@@ -504,12 +485,7 @@ func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	var v *int
-	if testRun {
-		v = entry.maxTestParallel
-	} else {
-		v = entry.maxParallel
-	}
+	v := entry.maxParallel
 	if v == nil {
 		return 0, false
 	}
@@ -523,7 +499,7 @@ func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
 }
 
 // forCurrentStore calls fn only for the currently viewed workspace group's
-// store. This scopes automation actions (auto-promote, auto-retry, auto-test,
+// store. This scopes automation actions (auto-promote, auto-retry,
 // auto-submit, auto-sync) to the viewed group: tasks already
 // running in other groups finish as normal, but no new automation fires on
 // their backlogs.
@@ -545,22 +521,6 @@ func (h *Handler) countGlobalInProgress() int {
 	total := 0
 	h.forCurrentStore(func(s *store.Store, _ []string) {
 		total += s.CountRegularInProgress()
-	})
-	return total
-}
-
-// countGlobalTestsInProgress returns the number of test-run in-progress tasks
-// in the currently viewed workspace group. Scoped per-group for the same
-// reason as countGlobalInProgress.
-func (h *Handler) countGlobalTestsInProgress(ctx context.Context) int {
-	total := 0
-	h.forCurrentStore(func(s *store.Store, _ []string) {
-		inProgress, _ := s.ListTasksByStatus(ctx, store.TaskStatusInProgress)
-		for i := range inProgress {
-			if inProgress[i].IsTestRun {
-				total++
-			}
-		}
 	})
 	return total
 }
@@ -639,12 +599,6 @@ func (h *Handler) AutoimplementEnabled() bool { return h.autoimplement.Load() }
 
 // SetAutoimplement enables or disables autoimplement mode.
 func (h *Handler) SetAutoimplement(enabled bool) { h.autoimplement.Store(enabled) }
-
-// AutotestEnabled returns whether auto-test mode is active.
-func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }
-
-// SetAutotest enables or disables auto-test mode.
-func (h *Handler) SetAutotest(enabled bool) { h.autotest.Store(enabled) }
 
 // ReviewEnabled returns whether the automatic review of waiting tasks is active.
 func (h *Handler) ReviewEnabled() bool { return h.reviewEnabled.Load() }

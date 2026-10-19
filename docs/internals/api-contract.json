@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 93,
+  "route_count": 92,
   "routes": [
     {
       "method": "GET",
@@ -70,7 +70,7 @@
       "method": "PUT",
       "pattern": "/api/config",
       "name": "UpdateConfig",
-      "description": "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
+      "description": "Update server configuration (autoimplement, autosubmit, sandbox assignments).",
       "tags": [
         "config"
       ]
@@ -667,15 +667,6 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/tasks/{id}/test",
-      "name": "TestTask",
-      "description": "Trigger the test agent for a task.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
       "pattern": "/api/tasks/{id}/review",
       "name": "ReviewTask",
       "description": "Run one review round for a waiting task on the reviewer model.",
@@ -751,7 +742,7 @@
       "method": "GET",
       "pattern": "/api/tasks/{id}/oversight",
       "name": "GetOversight",
-      "description": "Oversight summary for a task. ?phase=impl (default) or ?phase=test selects the implementation- or test-agent summary.",
+      "description": "Oversight summary for a task.",
       "tags": [
         "tasks"
       ]

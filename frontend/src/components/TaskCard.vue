@@ -115,23 +115,6 @@ async function syncFromCard(e: Event) {
   } catch { /* handled by SSE state refresh */ }
 }
 
-// Test-verification badge for the card's Row 1. Mirrors ui/js/render.js:
-// pass → ✓ verified; fail → ✗ verify failed; unknown → no verdict; an
-// untested waiting task → unverified. Other statuses get nothing.
-const testBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
-  const t = props.task;
-  switch (t.last_test_result) {
-    case 'pass': return { label: 'verified', cls: 'pill-ok', title: 'Verification passed' };
-    case 'fail': return { label: 'verify failed', cls: 'pill-err', title: 'Verification failed' };
-    case 'unknown': return { label: 'no verdict', cls: 'pill-neutral', title: 'Tested — no clear verdict detected' };
-    default:
-      if (t.status === 'waiting') {
-        return { label: 'unverified', cls: 'pill-neutral', title: 'Not yet verified' };
-      }
-      return null;
-  }
-});
-
 // Tags as one meta line: priority, impact, labels.
 const tags = computed(() => orderTags(props.task.tags ?? []));
 
@@ -198,7 +181,6 @@ const failureBadge = computed(() => failureLabel(props.task.failure_category));
 interface Signal { label: string; cls: string; title: string }
 const signals = computed<Signal[]>(() => {
   const out: Signal[] = [];
-  if (testBadge.value) out.push(testBadge.value);
   if (failureBadge.value) out.push({ label: failureBadge.value, cls: 'pill-err', title: 'Failure reason: ' + props.task.failure_category });
   if (scheduledLabel.value) out.push({ label: scheduledLabel.value, cls: 'pill-neutral', title: 'Scheduled start' });
   return out;
@@ -249,7 +231,6 @@ async function runCardAction(action: CardAction, e: Event) {
     case 'retry': await api('PATCH', `/api/tasks/${id}`, { status: 'backlog' }); break;
     case 'done': await api('POST', `/api/tasks/${id}/done`); break;
     case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
-    case 'test': await api('POST', `/api/tasks/${id}/test`); break;
   }
 }
 
@@ -315,12 +296,11 @@ function onCardKeydown(e: KeyboardEvent) {
 
   // Per-status quick actions. Only fire when the action is in the matrix
   // for this card's current status (e.g. "s" → start on backlog only).
-  if (e.key === 's' || e.key === 'd' || e.key === 'r' || e.key === 't' || e.key === 'p') {
+  if (e.key === 's' || e.key === 'd' || e.key === 'r' || e.key === 'p') {
     const wanted: CardAction | null =
       e.key === 's' ? 'start'
         : e.key === 'd' ? 'done'
         : e.key === 'r' ? (props.task.session_id && props.task.status === 'waiting' ? 'resume' : 'retry')
-        : e.key === 't' ? 'test'
         : 'plan';
     if (wanted && cardActionsFor(props.task).includes(wanted)) {
       e.preventDefault();

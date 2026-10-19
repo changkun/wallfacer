@@ -133,7 +133,7 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 
 - **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
 - **Spec.** Seven-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
-- **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
+- **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
 ## Roadmap
@@ -170,7 +170,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 
 | Guide | Topics |
 |-------|--------|
-| [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers |
+| [Automation](docs/guide/automation.md) | Autoimplement, auto-submit, auto-retry, circuit breakers |
 | [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, analytics |
 | [Mission Control](docs/guide/mission-control.md) | Unified spec and task graph, acting on the pipeline |
 | [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |

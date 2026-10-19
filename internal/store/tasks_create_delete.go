@@ -40,17 +40,15 @@ type TaskCreateOptions struct {
 	// FlowID sets Task.FlowID, a record field the runner does not read for
 	// dispatch (see Task.FlowID). No handler sets it; it lets a caller build
 	// a record that carries the field, as a stored task may.
-	FlowID             string
-	Tags               []string
-	Sandbox            harness.ID
-	SandboxByActivity  map[SandboxActivity]harness.ID
-	MaxCostUSD         float64
-	MaxInputTokens     int
-	ScheduledAt        *time.Time
-	SpecSourcePath     string
-	ModelOverride      string
-	CustomPassPatterns []string
-	CustomFailPatterns []string
+	FlowID            string
+	Tags              []string
+	Sandbox           harness.ID
+	SandboxByActivity map[SandboxActivity]harness.ID
+	MaxCostUSD        float64
+	MaxInputTokens    int
+	ScheduledAt       *time.Time
+	SpecSourcePath    string
+	ModelOverride     string
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
@@ -128,14 +126,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	// ModelOverride: nil when empty so omitempty keeps JSON clean.
 	if model := strings.TrimSpace(opts.ModelOverride); model != "" {
 		task.ModelOverride = &model
-	}
-
-	// CustomPassPatterns / CustomFailPatterns: deep-copy.
-	if len(opts.CustomPassPatterns) > 0 {
-		task.CustomPassPatterns = append([]string(nil), opts.CustomPassPatterns...)
-	}
-	if len(opts.CustomFailPatterns) > 0 {
-		task.CustomFailPatterns = append([]string(nil), opts.CustomFailPatterns...)
 	}
 
 	// Build the search index entry before acquiring the lock.  Position is not

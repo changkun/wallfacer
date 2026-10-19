@@ -1437,7 +1437,7 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 	ctx := context.Background()
 
 	sA, _ := h.currentStore()
-	// Create one regular in-progress task and one test in-progress task in A.
+	// Create one in-progress task in A.
 	tA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular A", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask regular A: %v", err)
@@ -1445,23 +1445,10 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 	if err := sA.UpdateTaskStatus(ctx, tA.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus regular A: %v", err)
 	}
-	tAT, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test A", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask test A: %v", err)
-	}
-	if err := sA.UpdateTaskTestRun(ctx, tAT.ID, true, ""); err != nil {
-		t.Fatalf("UpdateTaskTestRun A: %v", err)
-	}
-	if err := sA.UpdateTaskStatus(ctx, tAT.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus test A: %v", err)
-	}
 
 	// Sanity: viewed group is A; counts reflect A.
 	if got := h.countGlobalInProgress(); got != 1 {
 		t.Fatalf("viewing A: countGlobalInProgress = %d, want 1", got)
-	}
-	if got := h.countGlobalTestsInProgress(ctx); got != 1 {
-		t.Fatalf("viewing A: countGlobalTestsInProgress = %d, want 1", got)
 	}
 
 	// Switch to group B (A stays active via its in-progress tasks).
@@ -1481,12 +1468,9 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 	}
 
 	// Workspace B is empty; its concurrency budget must be fresh (0), even
-	// though group A still has a regular + test task running.
+	// though group A still has a task running.
 	if got := h.countGlobalInProgress(); got != 0 {
 		t.Errorf("viewing empty B: countGlobalInProgress = %d, want 0 (A's in-flight must not consume B's budget)", got)
-	}
-	if got := h.countGlobalTestsInProgress(ctx); got != 0 {
-		t.Errorf("viewing empty B: countGlobalTestsInProgress = %d, want 0", got)
 	}
 }
 
@@ -1558,13 +1542,13 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	h, wsMgr, wsA := newTestHandlerWithRealWorkspaceManager(t)
 
-	// Enable autoimplement and autotest in group A via the HTTP handler so
+	// Enable autoimplement and autosubmit in group A via the HTTP handler so
 	// the persistence side-effect matches production.
 	pilot := true
 	tst := true
 	b, _ := json.Marshal(struct {
 		Autoimplement *bool `json:"autoimplement"`
-		Autotest      *bool `json:"autotest"`
+		Autosubmit    *bool `json:"autosubmit"`
 	}{&pilot, &tst})
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
 	w := httptest.NewRecorder()
@@ -1572,7 +1556,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("enable in A: %d: %s", w.Code, w.Body.String())
 	}
-	if !h.AutoimplementEnabled() || !h.AutotestEnabled() {
+	if !h.AutoimplementEnabled() || !h.AutosubmitEnabled() {
 		t.Fatalf("toggles should be on in A")
 	}
 
@@ -1589,7 +1573,7 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	// applySnapshot runs on the manager's subscription goroutine.
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		if !h.AutoimplementEnabled() && !h.AutotestEnabled() {
+		if !h.AutoimplementEnabled() && !h.AutosubmitEnabled() {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -1600,8 +1584,8 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	if h.AutoimplementEnabled() {
 		t.Errorf("autoimplement leaked into fresh group B")
 	}
-	if h.AutotestEnabled() {
-		t.Errorf("autotest leaked into fresh group B")
+	if h.AutosubmitEnabled() {
+		t.Errorf("autosubmit leaked into fresh group B")
 	}
 
 	// Switch back to A and the toggles must return to their saved state.
@@ -1616,14 +1600,14 @@ func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
 	// before applySnapshot runs on the subscription goroutine.
 	deadline = time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		if h.AutoimplementEnabled() && h.AutotestEnabled() {
+		if h.AutoimplementEnabled() && h.AutosubmitEnabled() {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if !h.AutoimplementEnabled() || !h.AutotestEnabled() {
-		t.Errorf("toggles should be restored in A after round-trip (autoimplement=%v autotest=%v)",
-			h.AutoimplementEnabled(), h.AutotestEnabled())
+	if !h.AutoimplementEnabled() || !h.AutosubmitEnabled() {
+		t.Errorf("toggles should be restored in A after round-trip (autoimplement=%v autosubmit=%v)",
+			h.AutoimplementEnabled(), h.AutosubmitEnabled())
 	}
 	_ = wsMgr
 }

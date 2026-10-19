@@ -276,8 +276,8 @@ function onInput(e: Event) {
     </div>
     <div v-if="showMore" class="composer__opts">
       <label class="composer__opt composer__opt--grow">
-        <span class="composer__opt-label">Test criteria</span>
-        <input v-model="criteria" class="field composer__input" type="text" placeholder="what the test agent should verify (optional)" aria-label="Test criteria" />
+        <span class="composer__opt-label">Acceptance criteria</span>
+        <input v-model="criteria" class="field composer__input" type="text" placeholder="what the reviewer should verify (optional)" aria-label="Acceptance criteria" />
       </label>
       <label class="composer__opt composer__opt--grow">
         <span class="composer__opt-label">Model</span>

@@ -251,16 +251,11 @@ function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'openc
 
 function summarizeTestResult(resp: SandboxTestResponse | null | undefined): string {
   if (!resp) return 'No response';
-  const normalized = (resp.last_test_result || '').toUpperCase();
-  if (normalized === 'PASS') return 'PASS';
-  if (normalized === 'FAIL') return 'FAIL';
+  if (resp.passed) return 'PASS';
   if (resp.status === 'failed' && (resp.result || resp.stop_reason)) {
     return (resp.result || resp.stop_reason || '').slice(0, 120);
   }
-  if (resp.status === 'done' || resp.status === 'waiting') {
-    return 'Test completed';
-  }
-  return `status ${resp.status}`;
+  return 'FAIL';
 }
 
 function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode', text: string, reauth: boolean): void {
@@ -620,7 +615,7 @@ const defaultSandboxOptions = computed(() => [
       <div class="set-row">
         <div class="set-row__main">
           <span class="set-row__label">Default harness <code>WALLFACER_DEFAULT_SANDBOX</code></span>
-          <span class="set-row__help">Activity-specific routing (Implementation, Testing, …) lives on the agent definition: clone a built-in from the Agents tab and set its Harness field. This is the workspace-wide fallback.</span>
+          <span class="set-row__help">Activity-specific routing (Implementation, Oversight, …) lives on the agent definition: clone a built-in from the Agents tab and set its Harness field. This is the workspace-wide fallback.</span>
         </div>
         <div class="set-row__end">
           <AppSelect v-model="defaultSandbox" :options="defaultSandboxOptions" aria-label="Default Harness" />

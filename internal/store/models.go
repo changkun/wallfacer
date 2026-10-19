@@ -132,16 +132,15 @@ const (
 
 // SandboxActivity identifies which phase of a task a container run belongs to.
 // The routing constants (Implementation through AgentSession) are used for
-// sandbox-per-activity configuration. Test and OversightTest are
-// usage-attribution-only values that appear in UsageBreakdown and turn logs.
+// sandbox-per-activity configuration. A stored task's UsageBreakdown and turn
+// logs may also carry keys of phases that no longer run, such as "test" or
+// "title"; they load as plain map keys.
 type SandboxActivity string
 
 // SandboxActivity constants for routing and usage attribution.
 const (
 	// SandboxActivityImplementation is the main implementation phase.
 	SandboxActivityImplementation SandboxActivity = "implementation"
-	// SandboxActivityTesting is the automated test-execution phase.
-	SandboxActivityTesting SandboxActivity = "testing"
 	// SandboxActivityRefinement is the prompt-refinement phase.
 	SandboxActivityRefinement SandboxActivity = "refinement"
 	// SandboxActivityOversight is the oversight summary generation phase.
@@ -151,10 +150,6 @@ const (
 	// SandboxActivityAgentSession is the interactive agent-session (chat) phase.
 	SandboxActivityAgentSession SandboxActivity = "agent-session"
 
-	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
-	SandboxActivityTest SandboxActivity = "test"
-	// SandboxActivityOversightTest is a usage-attribution-only activity for test oversight generation.
-	SandboxActivityOversightTest SandboxActivity = "oversight-test"
 	// SandboxActivityReview is the review role's activity: the reviewer's usage
 	// is attributed to it in the task's usage breakdown, and the reviewer's
 	// harness resolves through it like any other role's. It is not offered for
@@ -166,7 +161,6 @@ const (
 // SandboxActivities lists activities that support per-activity sandbox routing.
 var SandboxActivities = []SandboxActivity{
 	SandboxActivityImplementation,
-	SandboxActivityTesting,
 	SandboxActivityRefinement,
 	SandboxActivityOversight,
 	SandboxActivityCommitMessage,
@@ -247,10 +241,10 @@ type Task struct {
 	ID            uuid.UUID `json:"id"`
 	Title         string    `json:"title,omitempty"`
 	Prompt        string    `json:"prompt"`
-	// Criteria is user-defined free-form acceptance criteria for the test
-	// verification agent (and review critics). When non-empty it renders into the
-	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
-	// a hard gate. omitempty keeps existing task.json files deserializing clean.
+	// Criteria is user-defined free-form acceptance criteria for the reviewer.
+	// When non-empty it renders into the review prompt. Interpreted by the
+	// agent, not a hard gate. omitempty keeps existing task.json files
+	// deserializing clean.
 	Criteria      string        `json:"criteria,omitempty"`
 	PromptHistory []string      `json:"prompt_history,omitempty"`
 	RetryHistory  []RetryRecord `json:"retry_history,omitempty"`
@@ -290,18 +284,6 @@ type Task struct {
 	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
 	Model            string            `json:"model,omitempty"`          // deprecated: retained for migration compatibility
 	ModelOverride    *string           `json:"model_override,omitempty"` // per-task model override; nil means use global default
-
-	// Test verification fields.
-	IsTestRun           bool   `json:"is_test_run,omitempty"`           // true while the task is running as a test verifier
-	LastTestResult      string `json:"last_test_result,omitempty"`      // "pass", "fail", or "" (not yet tested)
-	TestRunStartTurn    int    `json:"test_run_start_turn,omitempty"`   // turn count when the test run started (implementation turn boundary)
-	PendingTestFeedback string `json:"pending_test_feedback,omitempty"` // failing test outcome awaiting auto-resume as feedback
-
-	// CustomPassPatterns are user-supplied regex patterns applied to test output
-	// before the built-in heuristics. A match on any pattern returns "pass".
-	CustomPassPatterns []string `json:"custom_pass_patterns,omitempty"`
-	// CustomFailPatterns are checked first; a match returns "fail" immediately.
-	CustomFailPatterns []string `json:"custom_fail_patterns,omitempty"`
 
 	// Kind identifies the execution mode (e.g. TaskKindTask, TaskKindPlanning).
 	// Empty string and "task" are equivalent: a standard implementation task.
@@ -347,11 +329,6 @@ type Task struct {
 	// AutoRetryCount is the total number of auto-retries consumed across all
 	// categories. Capped at MaxAutoRetries.
 	AutoRetryCount int `json:"auto_retry_count,omitempty"`
-
-	// TestFailCount tracks the number of consecutive test failures for this task.
-	// Used to cap the auto-resume cycle and prevent infinite test-fail loops.
-	// Reset when the user manually provides feedback or when a test passes.
-	TestFailCount int `json:"test_fail_count,omitempty"`
 
 	// LastFetchError is the most recent git fetch error message, cleared on success.
 	LastFetchError string `json:"last_fetch_error,omitempty"`
@@ -429,7 +406,6 @@ type TaskSummary struct {
 	TotalTurns               int                           `json:"total_turns"`
 	TotalCostUSD             float64                       `json:"total_cost_usd"`
 	ByActivity               map[SandboxActivity]TaskUsage `json:"by_activity"`
-	TestResult               string                        `json:"test_result"`
 	PhaseCount               int                           `json:"phase_count"`
 	FailureCategory          FailureCategory               `json:"failure_category,omitempty"`
 }
@@ -496,7 +472,6 @@ const (
 	TriggerUser        Trigger = "user"         // explicit user action (UI button, API call)
 	TriggerAutoPromote Trigger = "auto_promote" // auto-promoter moved task from backlog
 	TriggerAutoRetry   Trigger = "auto_retry"   // auto-retrier re-queued a failed task
-	TriggerAutoTest    Trigger = "auto_test"    // auto-tester initiated a test run
 	TriggerAutoSubmit  Trigger = "auto_submit"  // auto-submitter marked a waiting task as done
 	TriggerFeedback    Trigger = "feedback"     // user feedback resumed a waiting task
 	TriggerAutoReview  Trigger = "auto_review"  // the review sent its findings to a waiting task as feedback

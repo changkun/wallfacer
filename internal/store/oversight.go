@@ -65,15 +65,6 @@ func (s *Store) GetOversight(taskID uuid.UUID) (*TaskOversight, error) {
 	return &o, nil
 }
 
-// SaveTestOversight writes the test-agent oversight summary for a task via the backend.
-func (s *Store) SaveTestOversight(taskID uuid.UUID, oversight TaskOversight) error {
-	data, err := json.Marshal(oversight)
-	if err != nil {
-		return err
-	}
-	return s.backend.SaveBlob(taskID, "oversight-test.json", data)
-}
-
 // LoadOversightText reads oversight.json for taskID and concatenates all
 // phase Title and Summary fields into a single searchable string.
 // Returns ("", nil) when the file does not exist.
@@ -90,22 +81,4 @@ func (s *Store) LoadOversightText(taskID uuid.UUID) (string, error) {
 		return "", err
 	}
 	return oversightText(o), nil
-}
-
-// GetTestOversight reads the test-agent oversight summary for a task.
-// Returns a pending TaskOversight when no oversight-test.json exists yet.
-func (s *Store) GetTestOversight(taskID uuid.UUID) (*TaskOversight, error) {
-	data, err := s.backend.ReadBlob(taskID, "oversight-test.json")
-	if errors.Is(err, os.ErrNotExist) {
-		pending := TaskOversight{Status: OversightStatusPending}
-		return &pending, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var o TaskOversight
-	if err := json.Unmarshal(data, &o); err != nil {
-		return nil, err
-	}
-	return &o, nil
 }

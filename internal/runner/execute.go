@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -18,56 +16,6 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
-)
-
-// Compiled regex patterns for test verdict extraction. These are evaluated in
-// priority order by parseTestVerdict: markdown bold markers first, then
-// explicit labeled patterns, then content-level heuristics, then LLM-style
-// inference. Adding a new pattern here requires updating the corresponding
-// section in inferPassFromContent or parseTestVerdictFromLine.
-var (
-	// verdictLabelPattern detects explicit labeled verdict lines such as:
-	// "Result: PASS", "Verdict: FAILED", "Status - Pass", etc.
-	verdictLabelPattern = regexp.MustCompile(`(?i)\b(?:RESULT|VERDICT|STATUS|OUTCOME|CONCLUSION|SUMMARY)\s*[:\-]?\s*(PASS|PASSED|PASSING|FAIL|FAILED|FAILURE|FAILS)\b`)
-	// negatedPassPattern catches explicit negative-pass language near a verdict token.
-	// This is treated as a failure to avoid false positives like "NO PASS".
-	negatedPassPattern = regexp.MustCompile(`(?i)\b(?:NO|NOT)\s+PASS(?:ED|ING)?\b`)
-
-	// Content-level pass inference patterns for common test runner output formats
-	// that don't use the explicit PASS/FAIL vocabulary.
-
-	// xPassingPattern matches Mocha/Jest style: "5 passing", "5 passing (23ms)".
-	xPassingPattern = regexp.MustCompile(`(?i)\b\d+\s+passing\b`)
-	// allPassedPattern matches "all tests passed", "all 5 checks passed", etc.
-	allPassedPattern = regexp.MustCompile(`(?i)\ball\s+(?:\d+\s+)?(?:tests?|checks?|specs?|examples?)\s+pass(?:ed)?\b`)
-	// goTestOKPattern matches Go's "ok  github.com/foo/bar  0.003s" at line start.
-	goTestOKPattern = regexp.MustCompile(`(?im)^ok\s+\S`)
-	// buildSuccessPattern matches Maven/Gradle "BUILD SUCCESS".
-	buildSuccessPattern = regexp.MustCompile(`(?i)\bBUILD\s+SUCCESS\b`)
-	// nPassedPattern matches "5 passed", "5 tests passed", "5 examples passed" (pytest, rspec, etc.).
-	nPassedPattern = regexp.MustCompile(`(?i)\b\d+\s+(?:tests?\s+|specs?\s+|examples?\s+)?passed\b`)
-	// allGreenPattern matches "all green", "all 4 cases ... green", "(all green)", etc.
-	allGreenPattern = regexp.MustCompile(`(?i)\ball\s+green\b`)
-	// succeedPattern matches "passes succeed", "tests succeed", "both succeed", etc.
-	succeedPattern = regexp.MustCompile(`(?i)\b(?:pass(?:es)?|tests?|both|all)\s+succeed(?:ed|s)?\b`)
-	// failureInContentPattern detects non-zero failure counts used to guard
-	// against false-positive pass inference in mixed output like "5 passed, 1 failed".
-	failureInContentPattern = regexp.MustCompile(`(?i)\b[1-9]\d*\s+(?:tests?\s+)?(?:failed|failures?|failing)\b`)
-
-	// LLM-style verdict inference patterns for test agents that conclude
-	// everything passes but forget to emit the explicit **PASS** marker.
-
-	// satisfiesRequirementsPattern matches "satisfies every requirement", "satisfies all requirements", etc.
-	satisfiesRequirementsPattern = regexp.MustCompile(`(?i)\bsatisfies\s+(?:every|all)\s+requirement`)
-	// allRequirementsMetPattern matches "all requirements are met", "all requirements met", "meets all requirements", etc.
-	allRequirementsMetPattern = regexp.MustCompile(`(?i)\b(?:all\s+requirements?\s+(?:are\s+)?met|meets?\s+(?:all|every)\s+requirements?)\b`)
-	// noChangesNeededPattern matches "no changes are needed", "no changes needed", "no changes required", etc.
-	noChangesNeededPattern = regexp.MustCompile(`(?i)\bno\s+changes\s+(?:are\s+)?(?:needed|required|necessary)\b`)
-	// correctAsWrittenPattern matches "correct as written", "correct as-is", etc.
-	correctAsWrittenPattern = regexp.MustCompile(`(?i)\bcorrect\s+as[\s\-](?:written|is)\b`)
-	// llmFailureGuardPattern detects explicit failure language from an LLM test
-	// agent to prevent false-positive pass inference from the patterns above.
-	llmFailureGuardPattern = regexp.MustCompile(`(?i)\b(?:requirement.*(?:not|un)\s*met|does\s+not\s+(?:meet|satisfy)|fail(?:s|ed)?\s+to\s+(?:meet|satisfy)|missing\s+requirement|unmet\s+requirement)\b`)
 )
 
 // classifyFailure returns the machine-readable FailureCategory for a task
@@ -198,8 +146,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// dispatch, and the task's timeline says once that the fleet is gone.
 	r.noteRemovedFleet(bgCtx, task)
 
-	isTestRun := task.IsTestRun
-
 	// Extract per-task model override (empty string means use global default).
 	modelOverride := task.EffectiveModel()
 
@@ -213,13 +159,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	// Launch periodic oversight generation while the turn-loop executes.
 	// The goroutine exits when Run returns (oversightCancel is deferred).
-	// Skip for test runs — those are short verification passes where the
-	// implementation oversight is already finalized.
-	if !isTestRun {
-		oversightCtx, oversightCancel := context.WithCancel(ctx)
-		defer oversightCancel()
-		go r.periodicOversightWorker(oversightCtx, taskID)
-	}
+	oversightCtx, oversightCancel := context.WithCancel(ctx)
+	defer oversightCancel()
+	go r.periodicOversightWorker(oversightCtx, taskID)
 
 	// Set up worktrees only if not already present.
 	worktreePaths := task.WorktreePaths
@@ -282,12 +224,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	turns := task.Turns
 
-	// testSessionID tracks the test agent's session across turns so that
-	// multi-turn test runs (max_tokens/pause_turn) can resume their own
-	// session rather than starting a fresh empty-prompt session.
-	// It is kept separate from sessionID which holds the implementation session.
-	var testSessionID string
-
 	// NOTE: The agent's -p --resume mode reports per-invocation totals for both
 	// cost (total_cost_usd) and usage tokens — they are NOT session-cumulative.
 	// Each container invocation's values represent only that invocation's
@@ -335,17 +271,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		}
 
-		runActivity := activityImplementation
-		if isTestRun {
-			runActivity = activityTesting
-		}
 		turnLabel := fmt.Sprintf("implementation_%d", turns)
-		if isTestRun {
-			turnLabel = fmt.Sprintf("test_%d", turns)
-		}
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
-		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, modelOverride, runActivity)
+		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, modelOverride, activityImplementation)
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
 		if saveErr := r.taskStore(taskID).SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
@@ -431,29 +360,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 		}
 
-		if isTestRun {
-			// During a test run, preserve the implementation agent's result and
-			// session ID — only track the turn count so progress is visible.
-			// Also capture the test agent's session ID for multi-turn continuation.
-			if output.SessionID != "" {
-				testSessionID = output.SessionID
-			}
-			_ = r.taskStore(taskID).UpdateTaskTurns(bgCtx, taskID, turns)
-
-		} else {
-			if output.SessionID != "" {
-				sessionID = output.SessionID
-			}
-			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
-
+		if output.SessionID != "" {
+			sessionID = output.SessionID
 		}
+		_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
 
 		// Accumulate per-invocation cost and token values directly.
-		// Attribute to Test sub-agent when in test mode, Implementation otherwise.
 		subAgent := store.SandboxActivityImplementation
-		if isTestRun {
-			subAgent = store.SandboxActivityTest
-		}
 		_ = r.taskStore(taskID).AccumulateSubAgentUsage(bgCtx, taskID, subAgent, store.TaskUsage{
 
 			InputTokens:          output.Usage.InputTokens,
@@ -548,11 +461,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		switch output.StopReason {
 		case "end_turn":
 			statusSet = true
-			if isTestRun {
-				// Test verification complete: don't commit, return to waiting with verdict.
-				r.finalizeTestRun(bgCtx, taskID, *task, output.Result)
-				return
-			}
 			// Move to waiting for human review. Auto-submit (if enabled)
 			// will pick up the task and run the commit pipeline.
 			r.GenerateOversightBackground(taskID)
@@ -575,11 +483,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 			logger.Runner.Info("auto-continuing", "task", taskID, "stop_reason", output.StopReason)
 			prompt = ""
-			// For test runs, resume the test agent's own session rather than
-			// the implementation session (which must be preserved untouched).
-			if isTestRun && testSessionID != "" {
-				sessionID = testSessionID
-			}
 			continue
 
 		default:
@@ -589,12 +492,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				return
 			}
 			statusSet = true
-			if isTestRun {
-				// Test run ended without an explicit stop_reason. Record
-				// "fail" when no verdict is detected so the task is not auto-submitted.
-				r.finalizeTestRun(bgCtx, taskID, *task, output.Result)
-				return
-			}
 			r.GenerateOversight(taskID)
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
@@ -615,7 +512,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 // interactively; the task returns to prevStatus only after the agent finishes.
 func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
 	bgCtx := r.shutdownCtx
-	testStateInvalidated := false
 
 	statusSet := false
 	defer func() {
@@ -784,10 +680,6 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				"max_attempts": constants.MaxRebaseRetries,
 				"result":       fmt.Sprintf("Automatic conflict resolver exhausted retries for %s. Handing off to the main agent for interactive resolution.", filepath.Base(repoPath)),
 			})
-			if !testStateInvalidated {
-				_ = r.taskStore(taskID).UpdateTaskTestRun(bgCtx, taskID, false, "")
-
-			}
 			conflictPrompt := fmt.Sprintf(
 				"Syncing your worktree with the latest %s branch failed due to conflicting "+
 					"changes in %s. The rebase was aborted and the worktree is back to its "+
@@ -828,10 +720,6 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 						"`git stash list`. Handing off to agent to re-apply them.",
 					filepath.Base(repoPath)),
 			})
-			if !testStateInvalidated {
-				_ = r.taskStore(taskID).UpdateTaskTestRun(bgCtx, taskID, false, "")
-
-			}
 			stashPrompt := fmt.Sprintf(
 				"The worktree %s was successfully rebased onto %s, but your "+
 					"uncommitted changes could not be automatically restored because "+
@@ -852,11 +740,6 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 
 			"result": fmt.Sprintf("Successfully synced %s with %s.", filepath.Base(repoPath), defBranch),
 		})
-		if !testStateInvalidated && conflictDetected {
-			_ = r.taskStore(taskID).UpdateTaskTestRun(bgCtx, taskID, false, "")
-
-			testStateInvalidated = true
-		}
 	}
 
 	statusSet = true
@@ -895,176 +778,4 @@ func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID strin
 		store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 	_ = r.taskStore(taskID).UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
 
-}
-
-// parseTestVerdict extracts "pass" or "fail" from a test agent's result text.
-// Returns "" if no clear verdict is found.
-//
-// Detection strategy (in priority order):
-//  1. User-defined customFail patterns (immediate fail on match).
-//  2. User-defined customPass patterns (immediate pass on match).
-//  3. Explicit markdown bold markers (**PASS** or **FAIL**) anywhere in the text.
-//  4. The last non-empty line ends with the verdict word, after stripping common
-//     trailing punctuation (handles "PASS.", "Result: PASS", etc.).
-func parseTestVerdict(result string, customPass, customFail []string) string {
-	upper := strings.ToUpper(result)
-
-	// Highest confidence: explicit markdown bold markers.
-	if strings.Contains(upper, "**PASS**") {
-		return "pass"
-	}
-	if strings.Contains(upper, "**FAIL**") {
-		return "fail"
-	}
-
-	// Scan lines from the end, stripping trailing punctuation, and check
-	// whether the line contains an explicit labeled verdict or ends with a
-	// verdict word. Check a small tail window so trailing status text does not
-	// hide a valid verdict.
-	lines := strings.Split(upper, "\n")
-	maxTailLines := constants.MaxTailLines
-	seen := 0
-	for _, line := range slices.Backward(lines) {
-		line := strings.TrimRight(strings.TrimSpace(line), ".*!?:;,-")
-		if line == "" {
-			continue
-		}
-
-		seen++
-		if seen > maxTailLines {
-			break
-		}
-
-		if verdict := parseTestVerdictFromLine(line); verdict != "" {
-			return verdict
-		}
-
-		// Legacy compatibility with the older "ends-with PASS/FAIL" logic.
-		if strings.HasSuffix(line, "PASS") {
-			return "pass"
-		}
-		if strings.HasSuffix(line, "FAIL") {
-			return "fail"
-		}
-	}
-
-	// Broader content scan for common test runner passing summaries when
-	// neither explicit markers nor tail-line heuristics found a verdict.
-	if v := inferPassFromContent(result, customPass, customFail); v != "" {
-		return v
-	}
-
-	return ""
-}
-
-// buildTestFailureFeedback wraps the test agent's result text into a
-// structured feedback message for the implementation agent to address.
-func buildTestFailureFeedback(result string) string {
-	result = strings.TrimSpace(result)
-	if result == "" {
-		result = "The test agent did not provide detailed failure output."
-	}
-	return "Automated test verification failed. Address the following issues before continuing:\n\n" + result
-}
-
-// inferPassFromContent scans the full test output for common test runner
-// success patterns that don't use the explicit PASS/FAIL vocabulary.
-// customFail patterns are checked first (immediate fail); customPass patterns
-// are checked next (immediate pass); then built-in heuristics follow.
-// Returns "pass" if a passing pattern is found and no non-zero failure count
-// is detected, otherwise "".
-func inferPassFromContent(result string, customPass, customFail []string) string {
-	// User-defined patterns take priority.
-	for _, p := range customFail {
-		if re, err := regexp.Compile(p); err == nil && re.MatchString(result) {
-			return "fail"
-		}
-	}
-	for _, p := range customPass {
-		if re, err := regexp.Compile(p); err == nil && re.MatchString(result) {
-			return "pass"
-		}
-	}
-
-	// If a non-zero number of failures is mentioned, don't infer pass.
-	if failureInContentPattern.MatchString(result) {
-		return ""
-	}
-	// "N passing" — Mocha/Jest style.
-	if xPassingPattern.MatchString(result) {
-		return "pass"
-	}
-	// "all tests passed", "all 5 checks passed", etc.
-	if allPassedPattern.MatchString(result) {
-		return "pass"
-	}
-	// Go test: "ok  github.com/..." at start of line.
-	if goTestOKPattern.MatchString(result) {
-		return "pass"
-	}
-	// Maven/Gradle: "BUILD SUCCESS".
-	if buildSuccessPattern.MatchString(result) {
-		return "pass"
-	}
-	// Pytest/RSpec: "N passed", "N tests passed", "N examples passed".
-	if nPassedPattern.MatchString(result) {
-		return "pass"
-	}
-	// Informal pass indicators: "all green", "passes succeed", etc.
-	if allGreenPattern.MatchString(result) {
-		return "pass"
-	}
-	if succeedPattern.MatchString(result) {
-		return "pass"
-	}
-
-	// LLM-style verdict inference: the test agent concluded everything is
-	// fine but forgot to emit the **PASS** marker.
-	if !llmFailureGuardPattern.MatchString(result) {
-		if satisfiesRequirementsPattern.MatchString(result) ||
-			allRequirementsMetPattern.MatchString(result) ||
-			noChangesNeededPattern.MatchString(result) ||
-			correctAsWrittenPattern.MatchString(result) {
-			return "pass"
-		}
-	}
-
-	return ""
-}
-
-// parseTestVerdictFromLine checks a single uppercase line for a labeled verdict
-// pattern (e.g. "Result: PASS") or a trailing verdict word (e.g. "...PASS").
-// Returns "pass", "fail", or "" if no verdict is detected.
-func parseTestVerdictFromLine(line string) string {
-	if m := verdictLabelPattern.FindStringSubmatch(line); m != nil {
-		return verdictTokenToValue(m[1])
-	}
-
-	words := strings.FieldsFunc(line, func(r rune) bool {
-		return (r < 'A' || r > 'Z') && (r < '0' || r > '9')
-	})
-	if len(words) == 0 {
-		return ""
-	}
-
-	// Check negation before default token matching.
-	if negatedPassPattern.MatchString(line) {
-		return "fail"
-	}
-
-	last := words[len(words)-1]
-	return verdictTokenToValue(last)
-}
-
-// verdictTokenToValue maps uppercase verdict tokens (PASS, PASSED, FAIL, etc.)
-// to their normalized values ("pass" or "fail"). Returns "" for unrecognized tokens.
-func verdictTokenToValue(token string) string {
-	switch strings.ToUpper(token) {
-	case "PASS", "PASSED", "PASSING":
-		return "pass"
-	case "FAIL", "FAILS", "FAILED", "FAILING", "FAILURE", "FAILURES":
-		return "fail"
-	default:
-		return ""
-	}
 }

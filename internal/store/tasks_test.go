@@ -531,49 +531,6 @@ func TestUpdateTaskResult_NotFound(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UpdateTaskTurns
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestUpdateTaskTurns_OnlyUpdatesTurns(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	// Store an implementation result first.
-	if err := s.UpdateTaskResult(bg(), task.ID, "impl output", "impl-sess", "end_turn", 3); err != nil {
-		t.Fatalf("UpdateTaskResult: %v", err)
-	}
-
-	// UpdateTaskTurns should only change Turns.
-	if err := s.UpdateTaskTurns(bg(), task.ID, 7); err != nil {
-		t.Fatalf("UpdateTaskTurns: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.Turns != 7 {
-		t.Errorf("Turns = %d, want 7", got.Turns)
-	}
-	// Result must not be overwritten.
-	if got.Result == nil || *got.Result != "impl output" {
-		t.Errorf("Result = %v, want 'impl output'", got.Result)
-	}
-	// SessionID must not be overwritten.
-	if got.SessionID == nil || *got.SessionID != "impl-sess" {
-		t.Errorf("SessionID = %v, want 'impl-sess'", got.SessionID)
-	}
-	// StopReason must not be overwritten.
-	if got.StopReason == nil || *got.StopReason != "end_turn" {
-		t.Errorf("StopReason = %v, want 'end_turn'", got.StopReason)
-	}
-}
-
-func TestUpdateTaskTurns_NotFound(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.UpdateTaskTurns(bg(), uuid.New(), 0); err == nil {
-		t.Error("expected error for unknown task")
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // AccumulateTaskUsage
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -627,36 +584,6 @@ func TestUpdateTaskSandbox_TrimsWhitespace(t *testing.T) {
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Sandbox != "codex" {
 		t.Fatalf("expected sandbox to trim whitespace, got %q", got.Sandbox)
-	}
-}
-
-func TestUpdateTaskTestRun(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-	if err := s.UpdateTaskTurns(bg(), task.ID, 4); err != nil {
-		t.Fatalf("seed turns: %v", err)
-	}
-
-	if err := s.UpdateTaskTestRun(bg(), task.ID, true, ""); err != nil {
-		t.Fatalf("start test run: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.IsTestRun {
-		t.Fatal("expected IsTestRun=true while running test")
-	}
-	if got.TestRunStartTurn != 4 {
-		t.Fatalf("expected TestRunStartTurn 4, got %d", got.TestRunStartTurn)
-	}
-
-	if err := s.UpdateTaskTestRun(bg(), task.ID, false, "pass"); err != nil {
-		t.Fatalf("finish test run: %v", err)
-	}
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.IsTestRun {
-		t.Fatal("expected IsTestRun=false after test completion")
-	}
-	if got.LastTestResult != "pass" {
-		t.Fatalf("expected LastTestResult 'pass', got %q", got.LastTestResult)
 	}
 }
 

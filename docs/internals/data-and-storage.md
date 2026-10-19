@@ -26,7 +26,6 @@ data/<data-key>/
 │   │   └── ...
 │   ├── turn-usage.jsonl       # Per-turn token usage log (append-only)
 │   ├── oversight.json         # Oversight summary (generated async)
-│   ├── oversight-test.json    # Test-agent oversight summary
 │   ├── summary.json           # Immutable completion snapshot (cost dashboard)
 │   └── tombstone.json         # Soft-delete marker (only if deleted)
 ├── <uuid-2>/
@@ -117,18 +116,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SnapshotDiffs` | `map[string]string` | `snapshot_diffs` | Pre-computed diffs for non-git workspaces (repoPath → diff text) |
 | `CommitMessage` | `string` | `commit_message` | Generated commit message from commit pipeline |
 | `MountWorktrees` | `bool` | `mount_worktrees` | Legacy flag retained for back-compat; execution is host-process with the worktree as CWD |
-
-### Test Verification
-
-| Field | Type | JSON Key | Description |
-|---|---|---|---|
-| `IsTestRun` | `bool` | `is_test_run` | True while task is running as a test verifier |
-| `LastTestResult` | `string` | `last_test_result` | `"pass"`, `"fail"`, or `""` |
-| `TestRunStartTurn` | `int` | `test_run_start_turn` | Turn boundary between implementation and test phases |
-| `PendingTestFeedback` | `string` | `pending_test_feedback` | Failing test outcome awaiting auto-resume |
-| `TestFailCount` | `int` | `test_fail_count` | Consecutive test failures (caps auto-resume) |
-| `CustomPassPatterns` | `[]string` | `custom_pass_patterns` | User regex patterns that force "pass" verdict |
-| `CustomFailPatterns` | `[]string` | `custom_fail_patterns` | User regex patterns that force "fail" verdict |
 
 ## Supporting Data Models
 
@@ -221,7 +208,7 @@ type OversightPhase struct {
 
 `OversightStatus` values: `pending`, `generating`, `ready`, `failed`.
 
-Stored in `oversight.json` (implementation) and `oversight-test.json` (test agent) alongside `task.json`.
+Stored in `oversight.json` alongside `task.json`. An `oversight-test.json` left by an earlier release stays on disk unread.
 
 ### TaskSummary
 
@@ -239,7 +226,6 @@ type TaskSummary struct {
     TotalTurns              int                          `json:"total_turns"`
     TotalCostUSD            float64                      `json:"total_cost_usd"`
     ByActivity              map[SandboxActivity]TaskUsage `json:"by_activity"`
-    TestResult              string                       `json:"test_result"`
     PhaseCount              int                          `json:"phase_count"`
     FailureCategory         FailureCategory              `json:"failure_category,omitempty"`
 }
@@ -325,12 +311,10 @@ Identifies which phase of a task a host-process run belongs to. It drives **usag
 | Constant | Value | Usage |
 |---|---|---|
 | `SandboxActivityImplementation` | `"implementation"` | Main implementation phase (routing + attribution) |
-| `SandboxActivityTesting` | `"testing"` | Test execution phase (routing + attribution) |
 | `SandboxActivityRefinement` | `"refinement"` | Prompt refinement (routing + attribution) |
 | `SandboxActivityOversight` | `"oversight"` | Oversight generation (routing + attribution) |
 | `SandboxActivityCommitMessage` | `"commit_message"` | Commit message generation (routing + attribution) |
-| `SandboxActivityTest` | `"test"` | Attribution-only (not used for harness routing) |
-| `SandboxActivityOversightTest` | `"oversight-test"` | Attribution-only (not used for harness routing) |
+
 
 ### FailureCategory
 
@@ -578,7 +562,7 @@ The store uses a forward-only migration system in `internal/store/migrate.go`. E
 3. Backfill `AutoRetryBudget` for tasks created before schema version 2.
 4. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
 
-Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on` list, are dropped on load and disappear on the record's next save.
+Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on`, `title_generating`, `is_test_run`, `last_test_result` or `custom_pass_patterns`, are dropped on load and disappear on the record's next save. A `sandbox_by_activity` entry for an activity that no longer routes (`testing`, `title`) is dropped by the same normalization.
 
 If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `2`) and is incremented whenever a new migration step is added.
 

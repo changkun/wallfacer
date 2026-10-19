@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -246,165 +245,6 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 	}
 }
 
-// TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun verifies that when
-// UpdateTaskTestRun succeeds but UpdateTaskStatus fails in tryAutoTest's Phase2,
-// the IsTestRun flag is rolled back to false so the task remains eligible for
-// future auto-test cycles.
-//
-// The test proceeds in three stages:
-//  1. Manually place the task in the stuck state (IsTestRun=true, Status=waiting)
-//     and confirm that tryAutoTest Phase1 skips it (circuit breaker stays closed,
-//     task state unchanged).
-//  2. Apply the rollback (UpdateTaskTestRun(false, "")) and confirm IsTestRun=false.
-//  3. Call tryAutoTest again with a read-only task directory so Phase2's store write
-//     fails. The circuit breaker opens — its open state is observable proof that
-//     Phase1 found the task and Phase2 attempted to process it (i.e., Phase1 did
-//     NOT skip it after the rollback).
-func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("os.Chmod cannot enforce read-only directories on Windows")
-	}
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-	h.SetAutotest(true)
-
-	ctx := context.Background()
-
-	// Create a real git repo so Phase1's CommitsBehind check returns 0 (not behind).
-	repo := setupRepo(t)
-
-	// Create and advance the task to waiting status with a valid worktree.
-	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "rollback test", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
-	}
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
-		t.Fatalf("UpdateTaskStatus waiting: %v", err)
-	}
-	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
-		t.Fatalf("UpdateTaskWorktrees: %v", err)
-	}
-
-	// --- Stage 1: simulate the stuck state ---
-	// Replicate the failure mode: UpdateTaskTestRun succeeded (IsTestRun=true) but
-	// UpdateTaskStatus failed, leaving the task stranded at Status=waiting with
-	// IsTestRun=true. Without the fix, every subsequent Phase1 scan skips this task.
-	if err := h.store.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
-		t.Fatalf("UpdateTaskTestRun (simulate stuck): %v", err)
-	}
-
-	h.tryAutoTest(ctx) // Phase1 sees IsTestRun=true → skips task → Phase2 never runs for it
-
-	stuck, err := h.store.GetTask(ctx, task.ID)
-	if err != nil || stuck == nil {
-		t.Fatalf("GetTask after first tryAutoTest: %v", err)
-	}
-	if !stuck.IsTestRun || stuck.Status != store.TaskStatusWaiting {
-		t.Errorf("expected stuck state (IsTestRun=true, Status=waiting), got IsTestRun=%v Status=%s",
-			stuck.IsTestRun, stuck.Status)
-	}
-	if h.breakers["auto-test"].isOpen() {
-		t.Error("auto-test breaker must stay closed when Phase1 skips all candidates")
-	}
-
-	// --- Stage 2: apply the rollback ---
-	// The fix adds this call inside tryAutoTest after UpdateTaskStatus fails. Here we
-	// apply it directly to set up Stage 3, which verifies Phase1 eligibility.
-	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
-		t.Fatalf("rollback UpdateTaskTestRun: %v", err)
-	}
-
-	afterRollback, err := h.store.GetTask(ctx, task.ID)
-	if err != nil || afterRollback == nil {
-		t.Fatalf("GetTask after rollback: %v", err)
-	}
-	if afterRollback.IsTestRun {
-		t.Error("expected IsTestRun=false after rollback, got true")
-	}
-
-	// --- Stage 3: verify Phase1 eligibility after rollback ---
-	// Make the task directory read-only so that Phase2's UpdateTaskTestRun write
-	// fails. This causes the auto-test circuit breaker to open, which is the
-	// observable evidence that Phase1 found and attempted the task — i.e., it did
-	// NOT skip it (IsTestRun=false → eligible).
-	taskDir := filepath.Join(h.store.DataDir(), task.ID.String())
-	if err := os.Chmod(taskDir, 0555); err != nil {
-		t.Fatalf("chmod read-only: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(taskDir, 0755) })
-
-	h.tryAutoTest(ctx)
-
-	if !h.breakers["auto-test"].isOpen() {
-		t.Error("expected auto-test breaker to be open after Phase2 store write failure, " +
-			"proving Phase1 found and attempted the task after rollback")
-	}
-}
-
-// TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker verifies that a
-// store write failure inside tryAutoTest's Phase2 loop (e.g. UpdateTaskTestRun
-// or UpdateTaskStatus) uses recordFailure on the "auto-test" breaker rather
-// than pauseAllAutomation, so global autoimplement remains enabled and no other
-// watcher breakers are affected.
-func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("os.Chmod cannot enforce read-only directories on Windows")
-	}
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-	h.SetAutotest(true)
-
-	ctx := context.Background()
-
-	// Create a real git repo so Phase1's CommitsBehind check returns 0 (not behind).
-	repo := setupRepo(t)
-
-	// Create and advance the task to waiting status.
-	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "auto-test candidate", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
-	}
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
-		t.Fatalf("UpdateTaskStatus waiting: %v", err)
-	}
-	// Set worktree paths so Phase1 finds the task as an eligible candidate.
-	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
-		t.Fatalf("UpdateTaskWorktrees: %v", err)
-	}
-
-	// Make the task directory read-only so Phase2 store writes fail.
-	taskDir := filepath.Join(h.store.DataDir(), task.ID.String())
-	if err := os.Chmod(taskDir, 0555); err != nil {
-		t.Fatalf("chmod read-only: %v", err)
-	}
-	// Restore write permission before cleanup (os.RemoveAll) runs; t.Cleanup
-	// callbacks execute in LIFO order, so this runs before newTestHandler's cleanup.
-	t.Cleanup(func() { _ = os.Chmod(taskDir, 0755) })
-
-	h.tryAutoTest(ctx)
-
-	// Global automation must NOT be paused — a transient store error must only
-	// open the per-watcher breaker, not the global autoimplement toggle.
-	if !h.AutoimplementEnabled() {
-		t.Error("AutoimplementEnabled() = false after store error in tryAutoTest; expected true")
-	}
-	if !h.breakers["auto-test"].isOpen() {
-		t.Error("expected auto-test breaker to be open after store write failure in Phase2")
-	}
-	if h.breakers["auto-promote"].isOpen() {
-		t.Error("auto-promote breaker must remain closed after auto-test store error")
-	}
-	if h.breakers["auto-submit"].isOpen() {
-		t.Error("auto-submit breaker must remain closed after auto-test store error")
-	}
-}
-
 // Tests for Start* autoimplement goroutine launchers.
 // Each function spawns a goroutine that exits when ctx is cancelled.
 // Pre-cancelling the context causes the goroutine to exit almost immediately,
@@ -432,80 +272,6 @@ func TestStartWaitingSyncWatcher_ExitsOnCancel(t *testing.T) {
 	cancel()
 	h.StartWaitingSyncWatcher(ctx)
 	time.Sleep(10 * time.Millisecond)
-}
-
-// TestAutoTester_SettleDelayDefersTrigger verifies that the auto-tester pauses
-// for constants.WatcherSettleDelay after receiving a wake signal before acting. This
-// ensures the SSE event for the intermediate "waiting" state reaches the
-// browser and is rendered before the watcher transitions the task back.
-func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
-	// Lower the settle delay for the test so it runs quickly.
-	orig := constants.WatcherSettleDelay
-	constants.WatcherSettleDelay = 300 * time.Millisecond
-	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
-
-	h := newTestHandler(t)
-	h.SetAutotest(true)
-	ctx := t.Context()
-
-	// Create a waiting task with a worktree so it would be eligible for
-	// auto-test once the watcher runs.
-	repo, err := os.MkdirTemp("", "wallfacer-test-repo-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(repo) })
-	gitRun(t, repo, "init", "-b", "main")
-	gitRun(t, repo, "config", "user.email", "test@example.com")
-	gitRun(t, repo, "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(repo, "file.txt"), []byte("initial\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	gitRun(t, repo, "add", ".")
-	gitRun(t, repo, "commit", "-m", "initial commit")
-
-	// t.TempDir rather than os.MkdirTemp: the framework removes it and fails
-	// the test if it cannot, where a cleanup that swallows the error leaves
-	// the directory under TMPDIR for the life of the machine.
-	wtParent := t.TempDir()
-	wt := filepath.Join(wtParent, "wt")
-	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
-	// Start the watcher. The goroutine subscribes to the store wake channel
-	// asynchronously, so we must ensure it is subscribed before we trigger.
-	h.StartAutoTester(ctx)
-
-	// Send wake signals repeatedly so at least one arrives after the
-	// goroutine has subscribed. On fast machines the first signal lands;
-	// on slow CI the retry ensures delivery without a fragile sleep.
-	wakeCount := 0
-	go func() {
-		for i := range 20 {
-			time.Sleep(25 * time.Millisecond)
-			_ = h.store.UpdateTaskTags(ctx, task.ID, []string{fmt.Sprintf("trigger-wake-%d", i)})
-			wakeCount++
-		}
-	}()
-
-	// During the settle delay (300ms) the task should remain in waiting
-	// even after the first wake signal.
-	time.Sleep(50 * time.Millisecond)
-	got, _ := h.store.GetTask(ctx, task.ID)
-	if got.Status != store.TaskStatusWaiting {
-		t.Fatalf("task should still be waiting during settle delay, got %s", got.Status)
-	}
-
-	// Poll until the watcher transitions the task out of waiting.
-	// In the test environment the container runner is not available, so the
-	// task may end up in "failed" — the important thing is it left "waiting".
-	waittest.For(t, 10*time.Second, func() bool {
-		got, _ := h.store.GetTask(ctx, task.ID)
-		return got.Status != store.TaskStatusWaiting
-	})
 }
 
 // TestAutoSubmitter_SettleDelayDefersTrigger verifies that the auto-submitter
@@ -546,7 +312,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1)
 
 	h.StartAutoSubmitter(ctx)
 
@@ -677,40 +443,6 @@ func TestMaxConcurrentTasks_Caching(t *testing.T) {
 	}
 }
 
-// TestMaxTestConcurrentTasks_Caching mirrors TestMaxConcurrentTasks_Caching
-// for the test-parallel limit.
-func TestMaxTestConcurrentTasks_Caching(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-
-	initialLimit := "3"
-	if err := envconfig.Update(envPath, envconfig.Updates{MaxTestParallel: &initialLimit}); err != nil {
-		t.Fatalf("envconfig.Update initial: %v", err)
-	}
-
-	got := h.maxTestConcurrentTasks()
-	if got != 3 {
-		t.Fatalf("first call: want 3, got %d", got)
-	}
-
-	updatedLimit := "8"
-	if err := envconfig.Update(envPath, envconfig.Updates{MaxTestParallel: &updatedLimit}); err != nil {
-		t.Fatalf("envconfig.Update updated: %v", err)
-	}
-
-	// Cache still holds 3.
-	got = h.maxTestConcurrentTasks()
-	if got != 3 {
-		t.Fatalf("second call (cached): want 3, got %d", got)
-	}
-
-	h.cachedMaxTestParallel.Invalidate()
-
-	got = h.maxTestConcurrentTasks()
-	if got != 8 {
-		t.Fatalf("third call (after invalidation): want 8, got %d", got)
-	}
-}
-
 // TestUpdateEnvConfig_InvalidatesParallelLimitCache verifies that calling
 // UpdateEnvConfig with a new MaxParallelTasks value invalidates the in-process
 // cache so that the next call to maxConcurrentTasks reflects the new limit.
@@ -738,32 +470,6 @@ func TestUpdateEnvConfig_InvalidatesParallelLimitCache(t *testing.T) {
 
 	// The cache should have been invalidated; the next call must return 9.
 	got := h.maxConcurrentTasks()
-	if got != newLimit {
-		t.Fatalf("after UpdateEnvConfig: want %d, got %d", newLimit, got)
-	}
-}
-
-// TestUpdateEnvConfig_InvalidatesTestParallelLimitCache mirrors the above for
-// the test-parallel limit.
-func TestUpdateEnvConfig_InvalidatesTestParallelLimitCache(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-
-	initial := h.maxTestConcurrentTasks()
-	if initial != constants.DefaultMaxTestConcurrentTasks {
-		t.Fatalf("initial: want %d, got %d", constants.DefaultMaxTestConcurrentTasks, initial)
-	}
-
-	newLimit := 6
-	body, _ := json.Marshal(map[string]any{"max_test_parallel_tasks": newLimit})
-	req := httptest.NewRequest(http.MethodPut, "/api/env", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("UpdateEnvConfig: want 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	got := h.maxTestConcurrentTasks()
 	if got != newLimit {
 		t.Fatalf("after UpdateEnvConfig: want %d, got %d", newLimit, got)
 	}
@@ -1143,8 +849,8 @@ func TestTryAutoSubmit_SkipsTaskWithRecentFetchError(t *testing.T) {
 		t.Fatalf("ForceUpdateTaskStatus waiting: %v", err)
 	}
 	// Mark as passing verification.
-	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
-		t.Fatalf("UpdateTaskTestRun pass: %v", err)
+	if err := h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult end_turn: %v", err)
 	}
 	// Set worktree paths so the task passes the worktree eligibility checks.
 	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
@@ -1190,8 +896,8 @@ func TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError(t *testing.T) {
 	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatalf("ForceUpdateTaskStatus waiting: %v", err)
 	}
-	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
-		t.Fatalf("UpdateTaskTestRun pass: %v", err)
+	if err := h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult end_turn: %v", err)
 	}
 	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
@@ -1382,8 +1088,8 @@ func TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared(t *testing.T) {
 	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatalf("ForceUpdateTaskStatus waiting: %v", err)
 	}
-	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
-		t.Fatalf("UpdateTaskTestRun pass: %v", err)
+	if err := h.store.UpdateTaskResult(ctx, task.ID, "done", "", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult end_turn: %v", err)
 	}
 	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)

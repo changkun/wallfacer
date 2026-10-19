@@ -152,7 +152,7 @@ func TestRunTwoPhase(t *testing.T) {
 						}
 						inProgress := 0
 						for i := range tasks {
-							if tasks[i].Status == store.TaskStatusInProgress && !tasks[i].IsTestRun {
+							if tasks[i].Status == store.TaskStatusInProgress {
 								inProgress++
 							}
 						}

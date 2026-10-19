@@ -51,7 +51,7 @@ Transition labels are shortened for legibility. In full:
 | `in_progress` to `in_progress` | `stop_reason` of `max_tokens` or `pause_turn`, auto-continued in the same session |
 | `in_progress` to `waiting` | `stop_reason` of `end_turn`, or an empty/unknown `stop_reason` |
 | `in_progress` to `failed` | Process error, agent error, timeout, or a budget limit exceeded |
-| `waiting` to `in_progress` | User feedback, or a test run (`IsTestRun`) |
+| `waiting` to `in_progress` | User feedback, or review feedback |
 | `committing` to `done` / `failed` | Commit pipeline success or failure |
 | `failed` to `backlog` | Manual retry or auto-retry |
 
@@ -172,41 +172,13 @@ A task's title is set when the task is created and never changes afterwards. A `
 
 Prompt refinement is the Plan task-mode chat. There are no dedicated refine routes or background refinement jobs. The agent session converses with the user about the task, and when both agree on an improved prompt the agent calls the `update_task_prompt` tool, which the console forwards as `POST /api/agent/tool/update_task_prompt` (`internal/handler/agentsession_tool.go`). The handler moves the prior prompt into history and sets the task's prompt to the new text. See [Plan Mode](plan-mode.md) for the task-mode chat flow.
 
-## Test Verification
+## Review
 
-Once a task has reached `waiting` (Claude finished but the user hasn't committed yet), a test verification agent can be triggered to check whether the implementation meets acceptance criteria.
-
-```
-POST /api/tasks/{id}/test
-  body: { criteria?: string }   // optional additional acceptance criteria
-  ↓
-  Sets IsTestRun = true, clears LastTestResult.
-  Transitions waiting → in_progress.
-  Launches a fresh host process (separate session, no --resume) with a test prompt.
-
-Test agent runs (IsTestRun = true):
-  Process executes: inspect code, run tests, verify requirements.
-  Agent must end its response with **PASS** or **FAIL**.
-
-On end_turn:
-  parseTestVerdict() extracts "pass", "fail", or "unknown" from the result.
-  Records verdict in LastTestResult.
-  Transitions in_progress → waiting (no commit).
-  Test output is shown separately from implementation output in the task detail panel.
-```
-
-The test verdict is displayed as a badge on the task card and in the task detail panel. Multiple test runs are allowed; each overwrites the previous verdict. The `TestRunStartTurn` field records which turn the test started so the UI can split implementation vs. test output.
-
-After reviewing the verdict, the user can:
-- Mark the task done (commit pipeline runs) if the verdict is PASS
-- Provide feedback to fix issues, then re-test
-- Cancel the task
-
-**Review supersedes the test agent** when the `review` runtime toggle is on and the task has at least one worktree (`reviewSupersedesTest`, `internal/handler/tasks_autoimplement.go`), whatever its harness. For such tasks the auto-tester skips the task and the auto-submitter gates on a review approval (`ReviewUnresolved == 0`) instead of `LastTestResult`. Tasks without a worktree fall back to the test agent. See [Automation](automation.md#auto-review).
+When the `review` runtime toggle is on and the task has at least one worktree (`reviewGatesSubmit`, `internal/handler/tasks_autoimplement.go`), whatever its harness, the auto-submitter gates on a review approval (`ReviewUnresolved == 0`) instead of natural completion. Tasks without a worktree fall back to the completion gate. See [Automation](automation.md#auto-review).
 
 ## Autoimplement
 
-Six background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, waiting-sync, auto-tester, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
+Five background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, waiting-sync, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
 
 ## Board Context
 

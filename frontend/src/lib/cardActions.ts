@@ -4,7 +4,7 @@
 
 import type { Task } from '../api/types';
 
-export type CardAction = 'plan' | 'start' | 'resume' | 'test' | 'done' | 'retry' | 'sync';
+export type CardAction = 'plan' | 'start' | 'resume' | 'done' | 'retry' | 'sync';
 
 export interface CardActionDef {
   id: CardAction;
@@ -17,7 +17,6 @@ export const CARD_ACTION_DEFS: Record<CardAction, CardActionDef> = {
   plan: { id: 'plan', label: 'Plan', icon: '✎', title: 'Send to Plan' },
   start: { id: 'start', label: 'Start', icon: '▶', title: 'Move to In Progress' },
   resume: { id: 'resume', label: 'Resume', icon: '↻', title: 'Resume in existing session' },
-  test: { id: 'test', label: 'Test', icon: '▶', title: 'Run test agent' },
   done: { id: 'done', label: 'Done', icon: '✓', title: 'Mark done and commit' },
   retry: { id: 'retry', label: 'Retry', icon: '↩', title: 'Move back to Backlog' },
   sync: { id: 'sync', label: 'Sync with default', icon: '⟳', title: 'Rebase worktrees onto the default branch' },
@@ -31,7 +30,7 @@ export function cardActionsFor(task: Pick<Task, 'status' | 'archived' | 'session
     case 'backlog':
       return ['plan', 'start'];
     case 'waiting':
-      return task.session_id ? ['resume', 'test', 'done'] : ['test', 'done'];
+      return task.session_id ? ['resume', 'done'] : ['done'];
     case 'failed':
       return task.session_id ? ['resume', 'retry'] : ['retry'];
     case 'cancelled':

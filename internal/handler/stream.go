@@ -174,8 +174,6 @@ func marshalDeltaPayload(d store.TaskDelta) ([]byte, error) {
 
 // StreamLogs streams live container logs for an in-progress task, or serves
 // saved turn outputs for tasks that are no longer running.
-// When phase=impl is specified, serves only the implementation-phase turn files
-// (up to task.TestRunStartTurn) so the UI can display impl and test outputs separately.
 func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	s, ok := h.requireStore(w)
 	if !ok {
@@ -190,7 +188,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// ?format=normalized rewrites the raw harness-native stream into
 	// normalized-event NDJSON via the task's harness ParseEvent, so the client
 	// renders one trajectory shape across every harness. Installed before the
-	// phase/live/stored branching so all serve paths inherit it. If the task's
+	// live/stored branching so both serve paths inherit it. If the task's
 	// harness is unregistered, fall through serving the raw stream unchanged.
 	if r.URL.Query().Get("format") == "normalized" {
 		if hImpl, ok := harness.Lookup(task.Sandbox); ok {
@@ -198,21 +196,6 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			defer nw.finish()
 			w = nw
 		}
-	}
-
-	// Implementation-phase logs: serve only the turns that belong to the
-	// implementation agent (before the test run started).
-	if r.URL.Query().Get("phase") == "impl" {
-		h.serveStoredLogsUpTo(w, r, id, task.TestRunStartTurn)
-		return
-	}
-
-	// Test-phase logs: serve only the turns that belong to the test agent
-	// (after the implementation turns). Only meaningful for completed tasks
-	// where the test agent has already run.
-	if r.URL.Query().Get("phase") == "test" && task.Status != store.TaskStatusInProgress && task.Status != store.TaskStatusCommitting {
-		h.serveStoredLogsFrom(w, r, id, task.TestRunStartTurn)
-		return
 	}
 
 	if task.Status != store.TaskStatusInProgress && task.Status != store.TaskStatusCommitting {
@@ -344,18 +327,6 @@ func (h *Handler) writeStoredTurns(w http.ResponseWriter, id uuid.UUID) {
 // serveStoredLogs serves saved turn output for tasks no longer running.
 func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	h.serveStoredLogsRange(w, r, id, 0, 0)
-}
-
-// serveStoredLogsUpTo serves saved turn files up to maxTurn (inclusive).
-// If maxTurn is 0, all turn files are served.
-func (h *Handler) serveStoredLogsUpTo(w http.ResponseWriter, r *http.Request, id uuid.UUID, maxTurn int) {
-	h.serveStoredLogsRange(w, r, id, 0, maxTurn)
-}
-
-// serveStoredLogsFrom serves saved turn files after fromTurn (exclusive).
-// If fromTurn is 0, all turn files are served.
-func (h *Handler) serveStoredLogsFrom(w http.ResponseWriter, r *http.Request, id uuid.UUID, fromTurn int) {
-	h.serveStoredLogsRange(w, r, id, fromTurn, 0)
 }
 
 // serveStoredLogsRange serves saved turn files in the range (fromTurn, maxTurn].

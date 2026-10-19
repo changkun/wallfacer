@@ -9,12 +9,12 @@ describe('cardActionsFor', () => {
     expect(cardActionsFor(task({ status: 'backlog' }))).toEqual(['plan', 'start']);
   });
 
-  it('waiting with a session → Resume, Test, Done', () => {
-    expect(cardActionsFor(task({ status: 'waiting', session_id: 's1' }))).toEqual(['resume', 'test', 'done']);
+  it('waiting with a session → Resume, Done', () => {
+    expect(cardActionsFor(task({ status: 'waiting', session_id: 's1' }))).toEqual(['resume', 'done']);
   });
 
-  it('waiting without a session → Test, Done (no Resume)', () => {
-    expect(cardActionsFor(task({ status: 'waiting', session_id: null }))).toEqual(['test', 'done']);
+  it('waiting without a session → Done (no Resume)', () => {
+    expect(cardActionsFor(task({ status: 'waiting', session_id: null }))).toEqual(['done']);
   });
 
   it('failed with a session → Resume, Retry', () => {
@@ -42,7 +42,7 @@ describe('cardActionsFor', () => {
 
 describe('commandPaletteActionsFor', () => {
   it('appends a Sync action for waiting/failed', () => {
-    expect(commandPaletteActionsFor(task({ status: 'waiting', session_id: 's1' }))).toEqual(['resume', 'test', 'done', 'sync']);
+    expect(commandPaletteActionsFor(task({ status: 'waiting', session_id: 's1' }))).toEqual(['resume', 'done', 'sync']);
     expect(commandPaletteActionsFor(task({ status: 'failed', session_id: null }))).toEqual(['retry', 'sync']);
   });
   it('does not add Sync for other statuses', () => {

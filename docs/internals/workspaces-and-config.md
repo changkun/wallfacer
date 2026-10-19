@@ -18,9 +18,7 @@ type Workspace struct {
     DataKey string   // stable storage handle under data/<DataKey>
 
     MaxParallel     *int  // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit)
-    MaxTestParallel *int  // same for WALLFACER_MAX_TEST_PARALLEL
     Autoimplement   *bool // per-workspace automation toggles (autopush stays global)
-    Autotest        *bool
     Autosubmit      *bool
     Autosync        *bool
 
@@ -115,7 +113,7 @@ Execution is host-process. The runner execs the selected CLI as a host process w
 1. **Role harness pin** (`role.Harness` if set and valid). The built-in role descriptors leave it empty; a caller that must reach a particular harness sets it on a copy of a built-in role for one call. This top tier wins over every per-task and env tier, so a role pinned to `codex` always reaches Codex regardless of task or env settings.
 2. **Per-task per-activity override, deprecated** (`task.SandboxByActivity[activity]` if set and valid). Back-compat only: new tasks do not populate this map (matching `data-and-storage.md`), but the runner still reads it when present.
 3. **Per-task default** (`task.Sandbox` if set and valid).
-4. **Env-file per-activity setting** (`WALLFACER_SANDBOX_<ACTIVITY>`, e.g. `WALLFACER_SANDBOX_TESTING=codex`).
+4. **Env-file per-activity setting** (`WALLFACER_SANDBOX_<ACTIVITY>`, e.g. `WALLFACER_SANDBOX_OVERSIGHT=codex`).
 5. **Env-file default** (`WALLFACER_DEFAULT_SANDBOX`).
 6. **Hardcoded fallback** (`Claude`).
 
@@ -126,11 +124,10 @@ Activities consulted by the env-file tier (`Runner.sandboxFromEnvForActivity()`,
 | Activity | Env variable | Purpose |
 |---|---|---|
 | `implementation` | `WALLFACER_SANDBOX_IMPLEMENTATION` | Main task execution |
-| `testing` | `WALLFACER_SANDBOX_TESTING` | Test verification agent |
 | `oversight` | `WALLFACER_SANDBOX_OVERSIGHT` | Oversight summary generation |
 | `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
 
-The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `agent-session`, `test`, and `oversight-test`. These are not switched on by the env-file tier (the resolution switch covers only the six rows above). `test` and `oversight-test` exist for usage attribution, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent.
+The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `agent-session`, and `review`. These are not switched on by the env-file tier (the resolution switch covers only the rows above). `review` exists for usage attribution and resolves through the task's harness, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent. An env file or stored task that still names the `testing` or `title` activity loads; the entry routes nothing.
 
 ### Host CLI resolution
 
@@ -170,7 +167,7 @@ The `Config` struct covers all known keys. Key categories:
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel` |
 | **Cursor/OpenCode** | `CursorAPIKey` (`CURSOR_API_KEY`), `OpenCodeServerPassword` (`OPENCODE_SERVER_PASSWORD`) |
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
-| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
+| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
 | **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
@@ -206,7 +203,6 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 | Embedded file | API name | Used for |
 |---|---|---|
 | `commit.tmpl` | `commit_message` | Generating commit messages during the commit pipeline |
-| `test.tmpl` | `test_verification` | Test verification agent prompt |
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
 | `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
 | `task_prompt_refine.tmpl` | `task_prompt_refine` | Task prompt refinement in Plan mode |

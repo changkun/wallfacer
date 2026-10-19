@@ -24,7 +24,7 @@ func TestSubmitAutoSubmitCandidate_SkipsStaleNonWaiting(t *testing.T) {
 
 	// Snapshot the task while waiting (what Phase 1 would capture), no session.
 	waiting, _ := s.GetTask(ctx, task.ID)
-	cand := autoSubmitCandidate{task: *waiting, store: s, naturallyComplete: true}
+	cand := autoSubmitCandidate{task: *waiting, store: s}
 
 	// The task leaves waiting before Phase 2 acts (e.g. user resume).
 	_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
@@ -50,7 +50,7 @@ func TestSubmitAutoSubmitCandidate_NoSessionGoesToDone(t *testing.T) {
 	_ = s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task")
 
 	waiting, _ := s.GetTask(ctx, task.ID)
-	cand := autoSubmitCandidate{task: *waiting, store: s, naturallyComplete: true}
+	cand := autoSubmitCandidate{task: *waiting, store: s}
 
 	if !h.submitAutoSubmitCandidate(ctx, cand) {
 		t.Fatal("eligible waiting candidate should be submitted")

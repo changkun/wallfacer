@@ -58,7 +58,6 @@ var embeddedToAPI = map[string]string{
 	"oversight.tmpl":            "oversight",
 	"commit.tmpl":               "commit_message",
 	"conflict.tmpl":             "conflict_resolution",
-	"test.tmpl":                 "test_verification",
 	"review.tmpl":               "review",
 	"spec.tmpl":                 "spec",
 	"spec_system_empty.tmpl":    "spec_system_empty",
@@ -71,7 +70,6 @@ var apiToEmbedded = map[string]string{
 	"oversight":            "oversight.tmpl",
 	"commit_message":       "commit.tmpl",
 	"conflict_resolution":  "conflict.tmpl",
-	"test_verification":    "test.tmpl",
 	"review":               "review.tmpl",
 	"spec":                 "spec.tmpl",
 	"spec_system_empty":    "spec_system_empty.tmpl",
@@ -85,7 +83,6 @@ var knownNames = []string{
 	"oversight",
 	"commit_message",
 	"conflict_resolution",
-	"test_verification",
 	"review",
 	"spec",
 	"spec_system_empty",
@@ -251,8 +248,6 @@ func mockContextFor(apiName string) (any, bool) {
 			WorktreePath:  "/home/example/worktree",
 			DefaultBranch: "main",
 		}, true
-	case "test_verification":
-		return TestData{OriginalPrompt: "example prompt"}, true
 	case "review":
 		return ReviewData{Prompt: "example prompt", Round: 1, MaxRounds: 3}, true
 	case "oversight":
@@ -325,14 +320,6 @@ type DriftData struct {
 	Diff         string
 }
 
-// TestData holds template variables for the test verification prompt.
-type TestData struct {
-	OriginalPrompt string
-	Criteria       string // optional
-	ImplResult     string // optional
-	Diff           string // optional
-}
-
 // ReviewData holds template variables for the review prompt: what the
 // reviewer reads in one round. PriorFindings and ImplementerReply are set from
 // the second round on, so the reviewer checks whether its earlier findings were
@@ -370,9 +357,6 @@ func (m *Manager) DriftAssessment(d DriftData) string { return m.render("drift.t
 // ConflictResolution renders the rebase conflict resolution prompt.
 func (m *Manager) ConflictResolution(d ConflictData) string { return m.render("conflict.tmpl", d) }
 
-// TestVerification renders the test verification agent prompt.
-func (m *Manager) TestVerification(d TestData) string { return m.render("test.tmpl", d) }
-
 // Review renders the review agent prompt for one review round.
 func (m *Manager) Review(d ReviewData) string { return m.render("review.tmpl", d) }
 
@@ -398,9 +382,6 @@ func (m *Manager) SpecSystemNonempty() string {
 
 // TaskPromptRefine renders the task-mode spec-mode agent system prompt.
 func TaskPromptRefine(d RefinementData) string { return Default.TaskPromptRefine(d) }
-
-// TestVerification renders the test verification agent prompt.
-func TestVerification(d TestData) string { return Default.TestVerification(d) }
 
 // SpecSystemEmpty renders the spec-mode prompt prefix used
 // when the workspace spec tree is empty.

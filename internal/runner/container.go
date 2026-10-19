@@ -51,7 +51,6 @@ type agentOutput struct {
 // in sandbox routing call sites throughout the runner package.
 const (
 	activityImplementation = store.SandboxActivityImplementation
-	activityTesting        = store.SandboxActivityTesting
 	activityOversight      = store.SandboxActivityOversight
 	activityCommitMessage  = store.SandboxActivityCommitMessage
 )
@@ -261,10 +260,6 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) harne
 		if cfg.ImplementationSandbox != "" {
 			return cfg.ImplementationSandbox
 		}
-	case activityTesting:
-		if cfg.TestingSandbox != "" {
-			return cfg.TestingSandbox
-		}
 	case activityOversight:
 		if cfg.OversightSandbox != "" {
 			return cfg.OversightSandbox
@@ -295,20 +290,15 @@ func (r *Runner) modelFromEnvForSandbox(sb harness.ID) string {
 	}
 }
 
-// roleImplementation and roleTesting are the heavyweight descriptors the
-// multi-turn agent turn loop in execute.go calls runAgent through. They
-// carry no timeout (the turn loop owns the deadline via ctx), no
-// ParseResult (the caller operates directly on the raw agentOutput),
-// and a noop ParseResult stub so runAgent's required-field check
-// passes. Turn sequencing, session recovery, and verdict inference
-// stay in execute.go — runAgent handles only the per-turn launch.
-// roleImplementation and roleTesting bind to the descriptors in the
-// internal/agents package; the runner's dispatch plumbing lives in
-// agent_bindings.go.
-var (
-	roleImplementation = agents.Implementation
-	roleTesting        = agents.Testing
-)
+// roleImplementation is the heavyweight descriptor the multi-turn agent
+// turn loop in execute.go calls runAgent through. It carries no timeout
+// (the turn loop owns the deadline via ctx), no ParseResult (the caller
+// operates directly on the raw agentOutput), and a noop ParseResult stub
+// so runAgent's required-field check passes. Turn sequencing and session
+// recovery stay in execute.go; runAgent handles only the per-turn launch.
+// roleImplementation binds to the descriptor in the internal/agents
+// package; the runner's dispatch plumbing lives in agent_bindings.go.
+var roleImplementation = agents.Implementation
 
 // runContainer executes an agent container and parses its NDJSON output.
 // Returns (output, rawStdout, rawStderr, error). Wraps runAgent with the
@@ -335,9 +325,6 @@ func (r *Runner) runContainer(
 	}
 
 	role := roleImplementation
-	if activity == store.SandboxActivityTesting {
-		role = roleTesting
-	}
 
 	// Set up the live-log buffer that StreamLogs attaches to while the
 	// container is running. The tee is wired via LiveLogWriter so

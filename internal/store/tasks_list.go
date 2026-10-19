@@ -45,19 +45,10 @@ func (s *Store) CountByStatus(status TaskStatus) int {
 	return len(s.tasksByStatus[status])
 }
 
-// CountRegularInProgress returns the count of in-progress tasks that are not
-// test runs. This is O(k) where k is the number of in-progress tasks, not O(n)
-// over all tasks. Must not be called while s.mu is held.
+// CountRegularInProgress returns the count of in-progress tasks in O(1).
+// Must not be called while s.mu is held.
 func (s *Store) CountRegularInProgress() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	count := 0
-	for id := range s.tasksByStatus[TaskStatusInProgress] {
-		if t := s.tasks[id]; t != nil && !t.IsTestRun {
-			count++
-		}
-	}
-	return count
+	return s.CountByStatus(TaskStatusInProgress)
 }
 
 // ListSummaries returns all task summaries by finding tasks that have a

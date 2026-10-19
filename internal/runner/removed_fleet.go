@@ -24,7 +24,7 @@ const removedFleetEventKind = "fleet:removed"
 // writer sets it and dispatch never reads it, so the event is the only place
 // the value still surfaces.
 //
-// The event is written once per task. A resumed, retried or test run of the
+// The event is written once per task. A resumed or retried run of the
 // same task finds the earlier event and writes nothing, so the timeline does
 // not repeat the notice on every run. When the timeline cannot be read the
 // notice is skipped and logged rather than risk writing a duplicate.

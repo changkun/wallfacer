@@ -109,7 +109,6 @@ func (s *Store) buildAndSaveSummary(task Task) {
 		TotalTurns:               task.Turns,
 		TotalCostUSD:             task.Usage.CostUSD,
 		ByActivity:               task.UsageBreakdown,
-		TestResult:               task.LastTestResult,
 		PhaseCount:               phaseCount,
 		FailureCategory:          task.FailureCategory,
 	}
@@ -159,16 +158,6 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 		s.scheduleTerminalCompaction(id)
 	}
 	return nil
-}
-
-// UpdateTaskTurns updates only the turn counter for a task, leaving all other
-// fields (Result, SessionID, StopReason) unchanged. Used during test runs so
-// that the implementation agent's output is not overwritten.
-func (s *Store) UpdateTaskTurns(_ context.Context, id uuid.UUID, turns int) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.Turns = turns
-		return nil
-	})
 }
 
 // UpdateTaskResult stores the final output, session ID, stop reason, and turn count.
@@ -358,24 +347,6 @@ func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model s
 	})
 }
 
-// UpdateTaskCustomPatterns replaces the custom pass/fail regex pattern slices on a task.
-// Passing a nil slice clears the corresponding field; passing a non-nil empty slice also clears it.
-func (s *Store) UpdateTaskCustomPatterns(_ context.Context, id uuid.UUID, passPatterns, failPatterns []string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		if len(passPatterns) == 0 {
-			t.CustomPassPatterns = nil
-		} else {
-			t.CustomPassPatterns = append([]string(nil), passPatterns...)
-		}
-		if len(failPatterns) == 0 {
-			t.CustomFailPatterns = nil
-		} else {
-			t.CustomFailPatterns = append([]string(nil), failPatterns...)
-		}
-		return nil
-	})
-}
-
 // UpdateTaskEnvironment records the execution environment captured at the start of Run().
 // The environment is written atomically alongside the task and broadcast to SSE subscribers.
 func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env ExecutionEnvironment) error {
@@ -445,10 +416,6 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	}
 	t.CommitHashes = nil
 	t.BaseCommitHashes = nil
-	t.IsTestRun = false
-	t.LastTestResult = ""
-	t.PendingTestFeedback = ""
-	t.TestFailCount = 0
 	// Reset auto-retry counters so that a manual retry after budget exhaustion
 	// grants a fresh allowance and the auto-retrier can act on the next failure.
 	t.AutoRetryCount = 0

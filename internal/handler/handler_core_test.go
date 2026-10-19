@@ -55,7 +55,6 @@ func TestSetAutoimplement_Toggle(t *testing.T) {
 func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAutoimplement(true)
-	h.SetAutotest(true)
 	h.SetAutosubmit(true)
 
 	taskID := uuid.New()
@@ -72,16 +71,13 @@ func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
 	if h.breakers["auto-promote"].isOpen() {
 		t.Error("expected auto-promote circuit breaker to remain closed")
 	}
-	if h.breakers["auto-test"].isOpen() {
-		t.Error("expected auto-test circuit breaker to remain closed")
+	if h.breakers["auto-sync"].isOpen() {
+		t.Error("expected auto-sync circuit breaker to remain closed")
 	}
 
 	// User-controlled toggles must NOT be disabled by a circuit breaker event.
 	if !h.AutoimplementEnabled() {
 		t.Error("expected autoimplement toggle to remain enabled")
-	}
-	if !h.AutotestEnabled() {
-		t.Error("expected autotest toggle to remain enabled")
 	}
 	if !h.AutosubmitEnabled() {
 		t.Error("expected autosubmit toggle to remain enabled")

@@ -60,7 +60,7 @@ Click **+ New Task** in the Backlog header, or press **n** anywhere on the board
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
-- **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), and a harness override.
+- **More** expands: acceptance criteria for the reviewer, a model override, budget limits (max cost in USD and max input tokens), and a harness override.
 
 Every task carries a short **Title** and the full **Prompt**. The title is the first non-blank line of the prompt, with a leading Markdown heading marker removed and shortened at a word boundary when it runs long.
 
@@ -74,7 +74,6 @@ When the agent pauses or finishes, the task lands in **Waiting**. From there:
 |---|---|
 | **Submit feedback** | Send a message (with `@` file mentions); the agent resumes in the same session. |
 | **Mark as Done** | Trigger the commit pipeline and merge the changes. |
-| **Test** | Launch a verification agent, optionally with acceptance criteria. |
 | **Review** | Run one review round on a second model (see below). |
 | **Sync** | Rebase the task's worktree onto the latest default branch without merging. |
 | **Raise budget** | Shown when a cost or token limit was hit; adjust the limit and continue. |
@@ -107,7 +106,7 @@ The header search bar filters visible cards live by title, prompt, and tags. Use
 Press **Cmd+K** (Ctrl+K) to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
 
 - Backlog: **Plan** (open task-mode chat in Plan), **Start**
-- Waiting: **Resume** (with session), **Test**, **Done**, **Sync**
+- Waiting: **Resume** (with session), **Done**, **Sync**
 - Failed: **Resume** (with session), **Retry**, **Sync**
 - Done / Cancelled: **Retry**
 - Any non-backlog task: **Open changes**; once at least one turn has run, **Open verification** and **Open timeline**
@@ -123,7 +122,7 @@ Click any card to open the detail view. A left rail carries the header (status, 
 | **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy) and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
 | **Changes** | Task commits with expandable patches, followed by the aggregate diff and a commits-behind warning. |
-| **Verification** | The Review panel and the test agent's per-turn results. |
+| **Verification** | The Review panel. |
 | **Events** | The event audit trail grouped by type, usage statistics, per-agent usage, retry history, and prompt history. |
 | **Timeline** | Execution spans rendered as a flamegraph with a time axis, an optional cumulative-cost overlay, and a span table sorted by duration. |
 
@@ -145,11 +144,9 @@ and marks the task failed so it can be retried after storage is repaired.
 
 While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box (Cmd+Enter saves). Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
 
-### Verification and Review
+### Review
 
-The **Test** action launches a separate verification agent against the task's worktree; it runs the relevant checks and reports a pass or fail verdict shown as a badge on the card. Acceptance criteria can be supplied when starting the run, and repeated runs overwrite the previous verdict.
-
-**Review** checks the change with a second model, off by default and enabled as a runtime toggle. A reviewer on the model set as `WALLFACER_REVIEW_MODEL` reads the task, its acceptance criteria and its diff, and answers with findings and a verdict; requested changes go back to the task as feedback, and the next turn's diff is reviewed again, up to `WALLFACER_REVIEW_ROUNDS` rounds and within `WALLFACER_REVIEW_COST_CAP` reviewer tokens. The Verification tab shows the review's status, its configuration, and each round's findings, the feedback sent and the task's reply. When Review is enabled and the task has a worktree, its verdict supersedes the plain test verdict as the auto-submit gate; see [Automation](automation.md).
+**Review** checks the change with a second model, off by default and enabled as a runtime toggle. A reviewer on the model set as `WALLFACER_REVIEW_MODEL` reads the task, its acceptance criteria and its diff, and answers with findings and a verdict; requested changes go back to the task as feedback, and the next turn's diff is reviewed again, up to `WALLFACER_REVIEW_ROUNDS` rounds and within `WALLFACER_REVIEW_COST_CAP` reviewer tokens. The Verification tab shows the review's status, its configuration, and each round's findings, the feedback sent and the task's reply. When Review is enabled and the task has a worktree, its verdict is the auto-submit gate; see [Automation](automation.md).
 
 ### Timeline
 
@@ -157,13 +154,12 @@ The **Timeline** tab renders every recorded span (worktree setup, agent turns, c
 
 ## Automation menu
 
-The lightning-bolt menu in the board header exposes five runtime toggles:
+The lightning-bolt menu in the board header exposes four runtime toggles:
 
 | Toggle | Effect |
 |---|---|
 | **Implement** | Auto-promote eligible backlog tasks into In Progress. |
-| **Test** | Run the verification agent automatically when a task reaches Waiting. |
-| **Submit** | Move verified waiting tasks to Done automatically. |
+| **Submit** | Move complete waiting tasks to Done automatically. |
 | **Catch up** | Rebase waiting tasks onto the default branch as it advances. |
 | **Push** | Push completed commits to the remote automatically. |
 

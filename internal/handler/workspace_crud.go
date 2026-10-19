@@ -28,13 +28,12 @@ func parseLimit(raw json.RawMessage) *int {
 
 // workspaceDTO is the JSON shape of a workspace returned by the CRUD endpoints.
 type workspaceDTO struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Folders         []string `json:"folders"`
-	Dormant         bool     `json:"dormant"`
-	Active          bool     `json:"active"`
-	MaxParallel     *int     `json:"max_parallel,omitempty"`
-	MaxTestParallel *int     `json:"max_test_parallel,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Folders     []string `json:"folders"`
+	Dormant     bool     `json:"dormant"`
+	Active      bool     `json:"active"`
+	MaxParallel *int     `json:"max_parallel,omitempty"`
 }
 
 func (h *Handler) workspaceDTO(ws workspace.Workspace) workspaceDTO {
@@ -45,13 +44,12 @@ func (h *Handler) workspaceDTO(ws workspace.Workspace) workspaceDTO {
 		folders = []string{}
 	}
 	return workspaceDTO{
-		ID:              ws.ID,
-		Name:            ws.Name,
-		Folders:         folders,
-		Dormant:         ws.Dormant,
-		Active:          ws.ID != "" && ws.ID == h.activeWorkspaceID(),
-		MaxParallel:     ws.MaxParallel,
-		MaxTestParallel: ws.MaxTestParallel,
+		ID:          ws.ID,
+		Name:        ws.Name,
+		Folders:     folders,
+		Dormant:     ws.Dormant,
+		Active:      ws.ID != "" && ws.ID == h.activeWorkspaceID(),
+		MaxParallel: ws.MaxParallel,
 	}
 }
 
@@ -120,8 +118,7 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		Folders []string `json:"folders"`
 		// RawMessage so a present-but-null value (clear the override) is
 		// distinguishable from an absent key (leave the override unchanged).
-		MaxParallel     json.RawMessage `json:"max_parallel"`
-		MaxTestParallel json.RawMessage `json:"max_test_parallel"`
+		MaxParallel json.RawMessage `json:"max_parallel"`
 	}](w, r)
 	if !ok {
 		return
@@ -145,22 +142,8 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		}
 		updated = true
 	}
-	if req.MaxParallel != nil || req.MaxTestParallel != nil {
-		// Merge against the current record so an absent field is left unchanged
-		// while a present (incl. null) field is applied.
-		cur, found, cerr := h.workspace.WorkspaceByID(id)
-		if cerr != nil || !found {
-			http.Error(w, "workspace not found", http.StatusNotFound)
-			return
-		}
-		mp, mtp := cur.MaxParallel, cur.MaxTestParallel
-		if req.MaxParallel != nil {
-			mp = parseLimit(req.MaxParallel)
-		}
-		if req.MaxTestParallel != nil {
-			mtp = parseLimit(req.MaxTestParallel)
-		}
-		if ws, err = h.workspace.SetLimits(id, mp, mtp); err != nil {
+	if req.MaxParallel != nil {
+		if ws, err = h.workspace.SetLimits(id, parseLimit(req.MaxParallel)); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
