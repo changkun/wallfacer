@@ -16,7 +16,6 @@ import (
 
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
@@ -158,95 +157,7 @@ func (r *Runner) commit(
 		"result": "Commit pipeline completed.",
 	})
 	logger.Runner.Info("commit completed", "task", taskID)
-
-	// Auto-push: if enabled, push each workspace whose local branch is at
-	// least AutoPushThreshold commits ahead of its upstream.
-	r.maybeAutoPush(bgCtx, taskID, worktreePaths)
-
 	return nil
-}
-
-// maybeAutoPush checks the auto-push configuration and, for each repo that
-// qualifies (ahead_count >= threshold), runs `git push`.
-func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePaths map[string]string) {
-	if r.envFile == "" {
-		return
-	}
-	cfg, err := envconfig.Parse(r.envFile)
-	if err != nil || !cfg.AutoPushEnabled {
-		return
-	}
-	threshold := cfg.AutoPushThreshold
-	if threshold <= 0 {
-		threshold = 1
-	}
-
-	for repoPath := range worktreePaths {
-		if !gitutil.IsGitRepo(repoPath) {
-			continue
-		}
-		s := gitutil.WorkspaceStatus(repoPath)
-		if !s.HasRemote || s.AheadCount < threshold {
-			continue
-		}
-		logger.Runner.Info("auto-push", "task", taskID, "repo", repoPath, "ahead", s.AheadCount)
-		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
-
-			"result": fmt.Sprintf("Auto-pushing %s (%d commit(s) ahead)...", repoPath, s.AheadCount),
-		})
-		pushLabel := "push_" + filepath.Base(repoPath)
-		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: pushLabel})
-
-		out, pushErr := cmdexec.Git(repoPath, "push").WithContext(ctx).Combined()
-		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: pushLabel})
-
-		if pushErr != nil {
-			logger.Runner.Error("auto-push failed", "task", taskID, "repo", repoPath, "error", pushErr)
-			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{
-
-				"error": fmt.Sprintf("auto-push failed for %s: %v\n%s", repoPath, pushErr, out),
-			})
-		} else {
-			logger.Runner.Info("auto-push succeeded", "task", taskID, "repo", repoPath)
-			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
-
-				"result": fmt.Sprintf("Auto-push succeeded for %s.", repoPath),
-			})
-		}
-	}
-}
-
-// MaybeAutoPushWorkspace performs auto-push for a single workspace if
-// auto-push is enabled and the repo is at least AutoPushThreshold commits
-// ahead of its upstream. Unlike maybeAutoPush it does not require a task ID
-// — log events are written via slog. Used by callers that have no task in
-// scope, e.g. the planning commit pipeline.
-func (r *Runner) MaybeAutoPushWorkspace(ctx context.Context, ws string) {
-	if r.envFile == "" {
-		return
-	}
-	cfg, err := envconfig.Parse(r.envFile)
-	if err != nil || !cfg.AutoPushEnabled {
-		return
-	}
-	threshold := cfg.AutoPushThreshold
-	if threshold <= 0 {
-		threshold = 1
-	}
-	if !gitutil.IsGitRepo(ws) {
-		return
-	}
-	s := gitutil.WorkspaceStatus(ws)
-	if !s.HasRemote || s.AheadCount < threshold {
-		return
-	}
-	logger.Runner.Info("planning auto-push", "workspace", ws, "ahead", s.AheadCount)
-	out, pushErr := cmdexec.Git(ws, "push").WithContext(ctx).Combined()
-	if pushErr != nil {
-		logger.Runner.Error("planning auto-push failed", "workspace", ws, "error", pushErr, "output", out)
-	} else {
-		logger.Runner.Info("planning auto-push succeeded", "workspace", ws)
-	}
 }
 
 // hostStageAndCommit stages and commits all uncommitted changes in each
@@ -331,7 +242,7 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 		// Do not fabricate a commit message. Surface the failure (already wrapped
 		// with ErrCommitMessageGeneration) so the caller returns the task to
 		// waiting for human review rather than merging a placeholder commit into
-		// the default branch and possibly auto-pushing it.
+		// the default branch.
 		logger.Runner.Warn("commit message generation failed, returning task to waiting", "task", taskID, "error", err)
 		return false, err
 	}

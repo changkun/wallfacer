@@ -7,11 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"latere.ai/x/pkg/metrics"
-
-	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
 // --- currentWorkspaces fallback path ---
@@ -43,42 +38,6 @@ func TestCurrentWorkspaces_WorkspaceManagerNil_WithWorkspaces(t *testing.T) {
 	if ws[0] != "/tmp/ws1" || ws[1] != "/tmp/ws2" {
 		t.Errorf("unexpected workspace values: %v", ws)
 	}
-}
-
-// --- incAutoimplementPhase2Miss ---
-
-// TestIncAutoimplementPhase2Miss_NilRegistry verifies that incAutoimplementPhase2Miss
-// is a no-op (does not panic) when no metrics registry is configured.
-func TestIncAutoimplementPhase2Miss_NilRegistry(t *testing.T) {
-	h := newTestHandler(t) // h.reg is nil
-	// Should not panic.
-	h.incAutoimplementPhase2Miss("auto-promote")
-}
-
-// TestIncAutoimplementPhase2Miss_WithRegistry verifies that incAutoimplementPhase2Miss
-// increments the counter when a metrics registry is configured.
-func TestIncAutoimplementPhase2Miss_WithRegistry(t *testing.T) {
-	storeDir, err := os.MkdirTemp("", "wallfacer-handler-util-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, err := storetest.NewFileStore(t, storeDir)
-	if err != nil {
-		_ = os.RemoveAll(storeDir)
-		t.Fatal(err)
-	}
-
-	reg := metrics.NewRegistry()
-	r := runner.NewRunner(s, runner.RunnerConfig{})
-	// Cleanups run LIFO: remove store dir last, after compaction and background work finish.
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
-	t.Cleanup(s.WaitCompaction)
-	t.Cleanup(r.WaitBackground)
-	t.Cleanup(r.Shutdown)
-
-	h := NewHandler(s, r, t.TempDir(), nil, reg)
-	// Should not panic and should increment the counter.
-	h.incAutoimplementPhase2Miss("auto-promote")
 }
 
 // --- BrowseWorkspaces ---

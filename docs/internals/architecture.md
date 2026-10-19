@@ -8,7 +8,7 @@ Each agent turn runs as a host `os/exec` of the selected CLI (`claude`, `codex`,
 
 The runner unconditionally selects `executor.HostBackend` (the only `executor.Backend` implementation) and sets `hostMode = true` (`internal/runner/runner.go:491-498`). The backend execs the CLI directly (`internal/executor/host.go`). Cancellation is `SIGTERM` then `SIGKILL` on the host process (`internal/executor/host.go`), not a runtime kill command.
 
-Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `ContainerSpec`, `ContainerInfo`, `ContainerLister`, `buildContainerSpecForSandbox`, and the launch circuit breaker's `WALLFACER_CONTAINER_CB_*` env vars. These name code, not behavior. The behavior is a host process.
+Several Go symbols keep the word "Container" as deliberate legacy vocabulary: `ContainerSpec`, `ContainerInfo`, and `buildContainerSpecForSandbox`. These name code, not behavior. The behavior is a host process.
 
 ## System Overview
 
@@ -22,15 +22,12 @@ graph TB
         Handler["Handler<br/>REST API + SSE"]
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
-        Automation["Automation Loops<br/>promote / test / review / submit<br/>sync / retry"]
         Plan["Plan Mode<br/>spec tree + agent session<br/>dispatch + undo"]
 
         Handler --> Runner
         Handler --> Plan
         Runner --> Store
-        Automation --> Store
         Plan --> Store
-        Store -.->|pub/sub| Automation
     end
 
     subgraph Infra["Host"]
@@ -54,7 +51,7 @@ graph TB
 
 **Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
 
-**Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds).
+**Runs start on request.** No background loop starts, tests, submits, syncs, or retries a task. Each run begins with a request (start, feedback, test, sync, Mark as Done), and the parallel limit is checked when a task starts.
 
 ### Recent migrations
 
@@ -92,29 +89,15 @@ flowchart TD
     Waiting -->|feedback received| Start
 ```
 
-## Background Automation
+## Background Work
 
-Six long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go`).
+No background loop starts, tests, submits, syncs, or retries a task; each run begins with a request. Besides the goroutines those requests start, the server runs the startup recovery pass and two worktree maintenance goroutines (`StartWorktreeGC`, `StartWorktreeHealthWatcher`). See [Background Work and Recovery](background-work.md).
 
-```mermaid
-flowchart LR
-    PubSub["Store<br/>pub/sub on<br/>state changes"]
-
-    PubSub --> Promoter["Auto-promoter<br/>backlog to in_progress<br/>when capacity available<br/>+ deps met + scheduled"]
-    PubSub --> Tester["Auto-tester<br/>launch test verification<br/>on untested waiting tasks"]
-    PubSub --> Submitter["Auto-submitter<br/>waiting to done<br/>when test passed<br/>+ conflict-free"]
-    PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
-    PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
-    PubSub --> Review["Auto-review<br/>a second model reviews<br/>waiting tasks with a worktree<br/>(supersedes auto-test when on)"]
-```
-
-The six entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`. There is no auto-refiner.
-
-### Agent roles and the dispatch layer
+## Agent Roles and the Dispatch Layer
 
 Every task runs one built-in pipeline. `internal/agents/` holds its **Role** descriptors: exactly five built-ins (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`). A role names what an agent is and which prompt template it renders; the runner's binding table (`internal/runner/agent_bindings.go`) holds the dispatch plumbing per slug (activity, mount mode, timeout, result parser). Each role's harness follows the task's harness, its per-activity override, or the `WALLFACER_SANDBOX_*` settings.
 
-Task execution runs the turn loop in `internal/runner/execute.go`: impl -> test -> commit pipeline, with full session-recovery semantics. A task or setting that names a harness no longer registered resolves to the next routing tier and, last, to `harness.Default()`.
+Task execution runs the turn loop in `internal/runner/execute.go`: impl, then test when requested, then the commit pipeline, with full session-recovery semantics. A task or setting that names a harness no longer registered resolves to the next routing tier and, last, to `harness.Default()`.
 
 `Task.FlowID` is a record field kept for stored tasks and is not read for dispatch; a stored task that names a fleet gets one notice on its timeline and runs the same pipeline.
 
@@ -124,7 +107,7 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl -> test 
 
 **Runner** (`internal/runner/`), Orchestration engine. Creates worktrees, builds launch specs, execs the agent CLI as a host process, runs the turn loop, accumulates usage, enforces budgets, runs the commit pipeline, and generates titles/oversight in the background.
 
-**Handler** (`internal/handler/`), REST API and SSE endpoints organized by concern. Hosts automation toggle controls and the background watchers.
+**Handler** (`internal/handler/`), REST API and SSE endpoints organized by concern.
 
 **Executor** (`internal/executor/`), The `Backend` seam (`Launch`/cancellation) plus `HostBackend`, the single shipping implementation that execs the CLI as a host process and relays its stream-json stdout.
 
@@ -220,19 +203,19 @@ The browser sends `PATCH /api/tasks/{id}` with `{status: "in_progress"}`. `Handl
 
 ### 3. Turn loop
 
-The turn loop in `Run` increments the turn counter, refreshes the board context via `generateBoardContextAndMounts` (`internal/runner/board.go`), and calls `runContainer` (`internal/runner/container.go`). That function builds the launch spec via `buildContainerSpecForSandbox`, resolves the harness and model per activity, checks the circuit breaker, and invokes `backend.Launch`, which execs the agent CLI directly via `os/exec` with the worktree as CWD. The stream-json stdout is parsed into an `agentOutput` struct. The runner saves raw output via `Store.SaveTurnOutput`, accumulates token usage via `Store.AccumulateSubAgentUsage` and `Store.AppendTurnUsage`, then inspects `output.StopReason` to decide the next step.
+The turn loop in `Run` increments the turn counter, refreshes the board context via `generateBoardContextAndMounts` (`internal/runner/board.go`), and calls `runContainer` (`internal/runner/container.go`). That function builds the launch spec via `buildContainerSpecForSandbox`, resolves the harness and model per activity, and invokes `backend.Launch`, which execs the agent CLI directly via `os/exec` with the worktree as CWD. The stream-json stdout is parsed into an `agentOutput` struct. The runner saves raw output via `Store.SaveTurnOutput`, accumulates token usage via `Store.AccumulateSubAgentUsage` and `Store.AppendTurnUsage`, then inspects `output.StopReason` to decide the next step.
 
 ### 4. Waiting state
 
-When `stop_reason` is `"end_turn"`, the runner transitions the task to `waiting` via `Store.UpdateTaskStatus`, inserts a `state_change` event, and opens a `feedback_waiting` span. `GenerateOversightBackground` fires an asynchronous oversight summary generation (a host-process agent run). The `notify()` call inside the status update fans a delta to SSE subscribers and wakes automation watchers (auto-tester, auto-submitter) via the `SubscribeWake` channels. If `stop_reason` is `"max_tokens"` or `"pause_turn"`, the loop auto-continues by setting `prompt = ""` and resuming the same session.
+When `stop_reason` is `"end_turn"`, the runner transitions the task to `waiting` via `Store.UpdateTaskStatus`, inserts a `state_change` event, and opens a `feedback_waiting` span. `GenerateOversightBackground` fires an asynchronous oversight summary generation (a host-process agent run). The `notify()` call inside the status update fans a delta to SSE subscribers. If `stop_reason` is `"max_tokens"` or `"pause_turn"`, the loop auto-continues by setting `prompt = ""` and resuming the same session.
 
 ### 5. Mark done and commit pipeline
 
-The user clicks "Mark as Done", sending `POST /api/tasks/{id}/done`. `Handler.CompleteTask` (`internal/handler/execute.go`) verifies the task is in `waiting`, restores any missing worktrees, transitions to `committing` via `Store.ForceUpdateTaskStatus`, and calls `runCommitTransition` which launches `Runner.Commit` (`internal/runner/commit.go`) in a background goroutine. The commit pipeline has three phases. **Phase 1** (`hostStageAndCommit`) stages and commits host-side: it runs `git add` and `git commit` in each worktree on the host, using a commit message produced by `generateCommitMessage`, which is itself a host-process agent run (the `commit-msg` role). **Phase 2** (`rebaseAndMerge`) acquires the per-repo mutex via `repoLock()`, calls `gitutil.RebaseOntoDefault` with up to 3 conflict-resolution retries (each retry runs a host-process conflict-resolver agent), then `gitutil.FFMerge` to fast-forward the default branch. **Phase 3** persists commit hashes, cleans up worktrees via `cleanupWorktrees` (under `worktreeMu`), and optionally auto-pushes.
+The user clicks "Mark as Done", sending `POST /api/tasks/{id}/done`. `Handler.CompleteTask` (`internal/handler/execute.go`) verifies the task is in `waiting`, restores any missing worktrees, transitions to `committing` via `Store.ForceUpdateTaskStatus`, and calls `runCommitTransition` which launches `Runner.Commit` (`internal/runner/commit.go`) in a background goroutine. The commit pipeline has three phases. **Phase 1** (`hostStageAndCommit`) stages and commits host-side: it runs `git add` and `git commit` in each worktree on the host, using a commit message produced by `generateCommitMessage`, which is itself a host-process agent run (the `commit-msg` role). **Phase 2** (`rebaseAndMerge`) acquires the per-repo mutex via `repoLock()`, calls `gitutil.RebaseOntoDefault` with up to 3 conflict-resolution retries (each retry runs a host-process conflict-resolver agent), then `gitutil.FFMerge` to fast-forward the default branch. **Phase 3** persists commit hashes, and cleans up worktrees via `cleanupWorktrees` (under `worktreeMu`).
 
 ### 6. Done
 
-After the commit pipeline succeeds, `runCommitTransition` transitions the task to `done` via `Store.ForceUpdateTaskStatus`. The store persists the status, notifies SSE subscribers, and wakes watchers. The worktree directories and task branch have already been removed in Phase 3. A `TaskSummary` is written for the cost dashboard.
+After the commit pipeline succeeds, `runCommitTransition` transitions the task to `done` via `Store.ForceUpdateTaskStatus`. The store persists the status and notifies SSE subscribers. The worktree directories and task branch have already been removed in Phase 3. A `TaskSummary` is written for the cost dashboard.
 
 ## Concurrency Model
 
@@ -245,7 +228,6 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 | `Runner.repoMu` (per-repo) | `internal/runner/runner.go` | Rebase + merge serialization per repository | Exclusive lock via `repoLock(repoPath)` in `rebaseAndMerge`; tasks on different repos run concurrently | Seconds (rebase + merge + optional conflict resolution) |
 | `Runner.oversightMu` (per-task) | `internal/runner/runner.go` | Serializes oversight generation per task | Exclusive lock via `oversightLock(taskID)` in `GenerateOversight` | Seconds (host-process agent run) |
 | `Store.subMu` | `internal/store/subscribe.go` | SSE subscriber map | Exclusive lock during `Subscribe`, `Unsubscribe`, and the fan-out in `notify()` | Microseconds |
-| `Store.wakeSubMu` | `internal/store/subscribe.go` | Wake-only subscriber map | Exclusive lock during `SubscribeWake`, `UnsubscribeWake`, and the fan-out in `notify()` | Microseconds |
 | `Store.replayMu` | `internal/store/subscribe.go` | Replay buffer (ring of recent deltas) | Write lock in `notify()`; read lock in `DeltasSince()` | Microseconds |
 | `Runner.boardCache.mu` | `internal/runner/runner.go` | Board context JSON cache and mount cache | Exclusive lock for cache read/write in `generateBoardContextAndMounts` | Microseconds |
 | `Runner.storeMu` | `internal/runner/runner.go` | Runner's pointer to the active `*store.Store` (swapped on workspace switch) | Write lock in `applyWorkspaceSnapshot`; read lock in `currentStore` | Microseconds |
@@ -254,17 +236,13 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedwg.WaitGroup`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
-The six automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
-
 ### Pub/sub channels
 
-The store provides two subscriber tiers:
+The store fans every change out to full-delta subscribers:
 
 - **Full-delta channels** (`Subscribe`): returns `(int, <-chan SequencedDelta)`. Channels are buffered at 256 (`pubsub.DefaultChannelSize`). Each mutation calls `notify()` which stamps a monotonic `deltaSeq`, appends to a bounded replay buffer (512 entries), and fans out a deep-copied `SequencedDelta` to every subscriber. If a subscriber's buffer is full, the delta is silently dropped. SSE reconnection uses `DeltasSince(seq)` to replay missed deltas from the buffer before falling back to a full snapshot.
 
-- **Wake-only channels** (`SubscribeWake`): returns `(int, <-chan struct{})`. Channels are buffered at 1. The capacity-1 design coalesces rapid bursts: once a signal is pending, further sends are no-ops. Automation watchers use this tier to avoid allocating full `SequencedDelta` copies when they only need a "something changed" signal.
-
-Both fan-outs happen inside `notify()` (`internal/store/subscribe.go`), which is always called while `Store.mu` is held, ensuring the delta sequence is consistent with the in-memory state.
+The fan-out happens inside `notify()` (`internal/store/subscribe.go`), which is always called while `Store.mu` is held, ensuring the delta sequence is consistent with the in-memory state.
 
 ### Shutdown coordination
 
@@ -287,7 +265,7 @@ sequenceDiagram
     R-->>Srv: Shutdown() returns
 ```
 
-The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `RunServer` (`internal/cli/server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any agent launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. In-progress agent processes are intentionally left running; they continue independently and are recovered by `RecoverOrphanedTasks` (`internal/runner/recovery.go`) on the next startup.
+The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `RunServer` (`internal/cli/server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any agent launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. Running agent processes are not waited for; on the next startup `RecoverOrphanedTasks` (`internal/runner/recovery.go`) moves their tasks to `waiting`.
 
 ## Where to Look
 
@@ -299,7 +277,6 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Add a field to Task | `internal/store/models.go` -> `internal/store/migrate.go` |
 | Change the turn loop | `internal/runner/execute.go` (`Run()`) |
 | Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `latere.ai/x/pkg/gitutil/ops.go` |
-| Add a new automation watcher | `internal/handler/tasks_autoimplement.go` (follow `SubscribeWake` pattern) |
 | Change the agent launch spec | `internal/runner/container.go` (`buildContainerSpecForSandbox()`) + `internal/executor/host.go` |
 | Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `opencode.go`, `pi.go`, `registry.go`) |
 | Add a new env config variable | `internal/envconfig/envconfig.go` |
@@ -309,7 +286,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
 | Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
-| Change pub/sub behavior | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
+| Change pub/sub behavior | `internal/store/subscribe.go` (`notify()`, `Subscribe()`) |
 
 ## Package Map
 
@@ -322,16 +299,15 @@ Every `internal/` package and its role in the system:
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
-| `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
+| `handler` | HTTP API handlers organized by concern | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `oteltest` | Test-only: installs a recording OpenTelemetry SDK and a trace-header-recording HTTP server, so instrumentation is checked by the spans it ends and the `traceparent` that reaches the server | `Install()`, `SpanNames()`, `NewServer()`, `Server` |
-| `review` | Review of a waiting task's change by a reviewer on a second model: one round per call, findings sent back as feedback until approval, the round limit or the token budget; the session record lives beside the worktree | `Verifier`, `New()`, `Newest()` |
-| `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
+| `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
 | `testenv` | Test-only: runs a package's tests with the per-user directories pointed at a temporary directory and the coding-agent CLIs removed from `PATH`, so tests never touch the real configuration and never launch a real agent | `RunIsolated()`, `AgentCLIs`, `AgentCLIsOnPath()`, `Within()` |
 | `webserver` | The catch-all routes beside the API: the SPA shell for client routes, the JSON error envelope for unmatched `/api` paths | `MountCatchAll()` |
-| `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
+| `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
@@ -342,7 +318,6 @@ Shared utility packages under `internal/pkg/`:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `pkg/dagscorer` | Critical-path score of a node in a dependency DAG, used to rank backlog tasks for promotion | `Score()` |
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader.ReadChunk()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
@@ -354,13 +329,13 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 
 | File | Concern | Key endpoints |
 |---|---|---|
-| `handler.go` | Core `Handler` struct, constructor, autoimplement toggle state, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
+| `handler.go` | Core `Handler` struct, constructor, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
-| `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-review, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoReview()`, etc. |
+| `tasks_concurrency.go` | The transition lock, the parallel-task limit, and dependency cycle checks | `checkConcurrencyAndUpdateStatus()`, `taskReachable()` (internal helpers) |
 | `stream.go` | SSE streaming for live task updates and agent logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |
-| `config.go` | Server configuration (autoimplement flags, harness list, watcher health) | `GET /api/config`, `PUT /api/config` |
+| `config.go` | Server configuration (workspaces, workspace groups and their parallel limits, harness list) | `GET /api/config`, `PUT /api/config` |
 | `env.go` | Environment configuration (API tokens, model settings, harness routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |
 | `git.go` | Git workspace operations (status, push, sync, rebase, branches, checkout) | `GET /api/git/status`, `POST /api/git/push`, `POST /api/git/sync`, etc. |
 | `execute.go` | Task execution trigger (delegates to runner) |, (internal, called by task status transitions) |
@@ -368,7 +343,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `spans.go` | Per-task span timing | `GET /api/tasks/{id}/spans` |
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |
 | `sandbox_gate.go` | Harness usability checks (auth validation before task launch) |, (internal helpers) |
-| `watcher.go` | Shared two-phase watcher helper used by the autoimplement loops in `tasks_autoimplement.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |
 | `agentsession.go` | Agent session chat: messages, streaming, interrupt, commands | `GET/POST/DELETE /api/agent/messages`, `GET /api/agent/messages/stream`, `POST /api/agent/messages/interrupt`, `GET /api/agent/commands` |
 | `agentsession_tool.go` | Plan task-mode tools, including prompt refinement | `POST /api/agent/tool/update_task_prompt` |
 | `agentsession_threads.go` | Agent session CRUD (list, create, rename, archive, unarchive, activate) | `GET/POST /api/agent/sessions`, `PATCH /api/agent/sessions/{id}` |
@@ -388,7 +362,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 | `logger.Runner` | `runner` | Orchestration, turn loop, commit pipeline |
 | `logger.Store` | `store` | Task persistence, state transitions |
 | `logger.Git` | `git` | Worktree and git operations |
-| `logger.Handler` | `handler` | HTTP request handling, automation watchers |
+| `logger.Handler` | `handler` | HTTP request handling |
 | `logger.Recovery` | `recovery` | Orphaned task recovery on startup |
 | `logger.Prompts` | `prompts` | System prompt template management |
 
@@ -402,11 +376,9 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Concurrency**, `Store.mu` for task map integrity; `Runner.worktreeMu` for filesystem ops; per-repo mutex for rebase serialization; per-task mutex for oversight generation. See [Data & Storage](data-and-storage.md) for the concurrency model.
 
-**Recovery**, On startup, `RecoverOrphanedTasks` inspects `in_progress` and `committing` tasks against actual process and worktree state, recovering or failing them as appropriate.
+**Recovery**, On startup, `RecoverOrphanedTasks` moves `in_progress` tasks to `waiting` (or `failed` when a worktree is missing) and settles `committing` tasks by their branch tips. See [Background Work and Recovery](background-work.md).
 
 **Security**, a per-machine server key, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits.
-
-**Circuit breakers**, Per-watcher exponential backoff suppresses individual automation loops on failure; an agent-launch circuit breaker blocks launches when a CLI is unavailable. See [Automation](../guide/automation.md).
 
 **Observability**, SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics. See [API & Transport](api-and-transport.md) for the metrics reference.
 
@@ -424,4 +396,4 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 - [Git Operations](git-worktrees.md), worktrees, commit pipeline, branch management
 - [Workspaces & Configuration](workspaces-and-config.md), workspace manager, AGENTS.md, harnesses, templates
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware
-- [Automation](automation.md), watchers, auto-retry, circuit breakers
+- [Background Work and Recovery](background-work.md), goroutine model, startup recovery, oversight generation

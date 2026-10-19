@@ -888,7 +888,7 @@ func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
 }
 
 // TestSwitchKeepsStoreForWaitingTasks verifies that switching away from a group
-// with waiting tasks keeps its store open so watchers can still process them.
+// with waiting tasks keeps its store open while those tasks are live.
 func TestSwitchKeepsStoreForWaitingTasks(t *testing.T) {
 	m, _ := newTestManager(t)
 	wsA := t.TempDir()

@@ -8,7 +8,7 @@ Each workspace has a stable identity (a UUID assigned once) and a mutable folder
 
 Per-workspace settings:
 
-- **Parallel caps**: a maximum number of concurrently running tasks and test runs for the workspace. Leave a cap empty to inherit the global default (`WALLFACER_MAX_PARALLEL`); see [Configuration](configuration.md).
+- **Parallel cap**: a maximum number of concurrently running tasks for the workspace. Leave it empty to inherit the global default (`WALLFACER_MAX_PARALLEL`); see [Configuration](configuration.md).
 - **Name**: an optional display name; unnamed workspaces show their folder basenames.
 
 Folders can be git repositories or plain directories; both work (see non-git folders below).
@@ -32,7 +32,7 @@ Click **Add workspace** in the switcher to open the picker, a two-step wizard:
 
 ### Editing
 
-Open the edit control on a workspace row (in the switcher or the picker list) to open the workspace settings popup. It edits the name, the folder set (via the same folder browser), and the parallel caps, and offers deletion. Name changes save on confirm; folder and cap changes persist immediately.
+Open the edit control on a workspace row (in the switcher or the picker list) to open the workspace settings popup. It edits the name, the folder set (via the same folder browser), and the parallel cap, and offers deletion. Name changes save on confirm; folder and cap changes persist immediately.
 
 ### Deleting
 
@@ -85,4 +85,4 @@ Folders that are not git repositories still get change tracking: the task works 
 
 ## See also
 
-[Getting Started](getting-started.md) for first-run setup, [Concepts](concepts.md) for how workspaces relate to tasks and specs, [Board](board.md) for the task lifecycle, [Configuration](configuration.md) for parallelism and push settings, and [Workspaces & Config internals](../internals/workspaces-and-config.md) for the storage layout.
+[Getting Started](getting-started.md) for first-run setup, [Concepts](concepts.md) for how workspaces relate to tasks and specs, [Board](board.md) for the task lifecycle, [Configuration](configuration.md) for parallelism settings, and [Workspaces & Config internals](../internals/workspaces-and-config.md) for the storage layout.

@@ -104,39 +104,6 @@ func classifyFailure(err error, isError bool, result string) store.FailureCatego
 	return store.FailureCategoryUnknown
 }
 
-// tryAutoRetry checks whether the task should be automatically retried given
-// the failure category. It returns true and resets the task to backlog when:
-//   - the per-category budget is > 0, AND
-//   - the total auto-retry count is < constants.MaxAutoRetries.
-//
-// The caller must set statusSet=true before calling and return immediately
-// when tryAutoRetry returns true, so the deferred guard does not overwrite
-// the backlog status.
-func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category store.FailureCategory) bool {
-	t, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
-	if err != nil {
-		return false
-	}
-	if !store.IsAutoRetryEligible(*t, category) {
-		return false
-	}
-	if err := r.taskStore(taskID).IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
-		logger.Runner.Warn("tryAutoRetry: IncrementAutoRetryCount failed", "task", taskID, "category", category, "error", err)
-		return false
-	}
-	// Re-read to get the updated count for the event message.
-	if updated, err := r.taskStore(taskID).GetTask(bgCtx, taskID); err == nil {
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"message": fmt.Sprintf("auto-retry %d/%d after %s",
-				updated.AutoRetryCount, constants.MaxAutoRetries, category),
-		})
-	}
-	_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
-
-	return true
-}
-
 // Run is the main task execution loop. It sets up worktrees, runs the agent
 // in a container, handles auto-continue turns, and transitions the task to the
 // appropriate terminal state (done/waiting/failed).
@@ -163,9 +130,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			category := store.FailureCategoryUnknown
 			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -401,9 +365,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 
 			statusSet = true
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -530,9 +491,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
 			statusSet = true
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -553,8 +511,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				r.finalizeTestRun(bgCtx, taskID, *task, output.Result)
 				return
 			}
-			// Move to waiting for human review. Auto-submit (if enabled)
-			// will pick up the task and run the commit pipeline.
+			// Move to waiting for human review; Done runs the commit pipeline.
 			r.GenerateOversightBackground(taskID)
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
@@ -570,9 +527,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			return
 
 		case "max_tokens", "pause_turn":
-			if output.StopReason == "max_tokens" {
-				r.notifyStopReason(taskID, output.StopReason)
-			}
 			logger.Runner.Info("auto-continuing", "task", taskID, "stop_reason", output.StopReason)
 			prompt = ""
 			// For test runs, resume the test agent's own session rather than
@@ -591,7 +545,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			statusSet = true
 			if isTestRun {
 				// Test run ended without an explicit stop_reason. Record
-				// "fail" when no verdict is detected so the task is not auto-submitted.
+				// "fail" when no verdict is detected so the task is not shown as passing.
 				r.finalizeTestRun(bgCtx, taskID, *task, output.Result)
 				return
 			}
@@ -955,16 +909,6 @@ func parseTestVerdict(result string, customPass, customFail []string) string {
 	}
 
 	return ""
-}
-
-// buildTestFailureFeedback wraps the test agent's result text into a
-// structured feedback message for the implementation agent to address.
-func buildTestFailureFeedback(result string) string {
-	result = strings.TrimSpace(result)
-	if result == "" {
-		result = "The test agent did not provide detailed failure output."
-	}
-	return "Automated test verification failed. Address the following issues before continuing:\n\n" + result
 }
 
 // inferPassFromContent scans the full test output for common test runner

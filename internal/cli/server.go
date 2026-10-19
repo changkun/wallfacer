@@ -243,9 +243,8 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 
-	// Recover tasks that were in_progress when the server last crashed or
-	// was killed. They are moved back to backlog so the auto-promoter can
-	// re-schedule them.
+	// Recover tasks that were in_progress or committing when the server last
+	// crashed or was killed (see runner.RecoverOrphanedTasks).
 	if s != nil {
 		runner.RecoverOrphanedTasks(ctx, s, r)
 	}
@@ -292,15 +291,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		// completed task runs the drift tester before the spec lands.
 		s.OnDone = handler.SpecCompletionHook(h.CurrentWorkspaces, handler.NewRunnerDriftTester(r), nil)
 	}
-	// Safety valve: disable autoimplement if any task hits the max_tokens limit,
-	// which indicates context window exhaustion — continuing blindly would
-	// waste budget without progress.
-	r.SetStopReasonHandler(func(_ uuid.UUID, stopReason string) {
-		if stopReason == "max_tokens" {
-			h.SetAutoimplement(false)
-		}
-	})
-
 	// Create and wire the agent-session runtime.
 	p := agentsession.New(agentsession.Config{
 		Backend:     r.SandboxBackend(),
@@ -311,13 +301,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	})
 	h.SetAgentSession(p)
 	r.SetAgentSession(p)
-
-	h.StartAutoPromoter(ctx)
-	h.StartAutoRetrier(ctx)
-	h.StartWaitingSyncWatcher(ctx)
-	h.StartAutoTester(ctx)
-	h.StartAutoSubmitter(ctx)
-	h.StartAutoReview(ctx)
 
 	reg.Gauge(
 		"wallfacer_tasks_total",
@@ -406,21 +389,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 			}
 			return vals
 		},
-	)
-	reg.Gauge(
-		"wallfacer_circuit_breaker_open",
-		"1 when the container launch circuit breaker is open (runtime unavailable), 0 when closed.",
-		func() []metrics.LabeledValue {
-			v := 0.0
-			if r.ContainerCircuitOpen() {
-				v = 1.0
-			}
-			return []metrics.LabeledValue{{Value: v}}
-		},
-	)
-	reg.Counter(
-		"wallfacer_autoimplement_actions_total",
-		"Total number of autonomous actions taken by autoimplement watchers, by watcher and outcome.",
 	)
 
 	// Bind the listening socket. If the requested port is taken (e.g. another
@@ -1023,16 +991,14 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ListDeletedTasks":         h.ListDeletedTasks,
 
 		// Task instance operations (UUID extracted via withID).
-		"UpdateTask":       withID(h.UpdateTask),
-		"DeleteTask":       withID(h.DeleteTask),
-		"GetEvents":        withID(h.GetEvents),
-		"SubmitFeedback":   withID(h.SubmitFeedback),
-		"CompleteTask":     withID(h.CompleteTask),
-		"ResumeTask":       withID(h.ResumeTask),
-		"SyncTask":         withID(h.SyncTask),
-		"TestTask":         withID(h.TestTask),
-		"ReviewTask":       withID(h.ReviewTask),
-		"ReviewTranscript": withID(h.ReviewTranscript),
+		"UpdateTask":     withID(h.UpdateTask),
+		"DeleteTask":     withID(h.DeleteTask),
+		"GetEvents":      withID(h.GetEvents),
+		"SubmitFeedback": withID(h.SubmitFeedback),
+		"CompleteTask":   withID(h.CompleteTask),
+		"ResumeTask":     withID(h.ResumeTask),
+		"SyncTask":       withID(h.SyncTask),
+		"TestTask":       withID(h.TestTask),
 
 		"TaskCommits":  withID(h.TaskCommits),
 		"TaskDiff":     withID(h.TaskDiff),
@@ -1111,7 +1077,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
 		"TestTask":       handler.BodyLimitDefault,
-		"ReviewTask":     handler.BodyLimitDefault,
 	}
 
 	// Register all routes from the contract. A missing handler entry panics at

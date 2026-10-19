@@ -15,7 +15,7 @@ Start here for the full reading order.
 ### Get Started
 
 - [Getting Started](getting-started.md). Installation, credentials, first task end to end.
-- [Concepts](concepts.md). The mental model: workspaces, tasks, specs, agents, and the autonomy spectrum.
+- [Concepts](concepts.md). The mental model: workspaces, tasks, specs, agents, and the working levels.
 
 ### Use Wallfacer
 
@@ -24,7 +24,6 @@ Start here for the full reading order.
 
 ### Operate
 
-- [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
 - [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, per-task cost and usage.
 - [Workspaces](workspaces.md). Workspace management, git integration, branches.
 - [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference.
@@ -42,7 +41,7 @@ Start here for the full reading order.
 
 ### Parallel feature development
 
-Create multiple Backlog tasks, enable [Autoimplement](automation.md), and let Wallfacer run them concurrently. Each task works in its own git worktree, so there are no conflicts during execution. Conflicts (if any) are resolved at merge time.
+Create multiple Backlog tasks and start each one; Wallfacer runs them concurrently up to the parallel limit (see [Workspaces](workspaces.md)). Each task works in its own git worktree, so there are no conflicts during execution. Conflicts (if any) are resolved at merge time.
 
 ### Iterative refinement
 
@@ -56,12 +55,6 @@ Create multiple Backlog tasks, enable [Autoimplement](automation.md), and let Wa
 2. Run the task; when it reaches Waiting, click Test (see [Oversight](oversight.md)).
 3. If it fails, send feedback with the test output; re-run until passing.
 4. Mark Done to commit.
-
-### Fully automated pipeline
-
-1. Enable Autoimplement, Auto-Test, and Auto-Submit (see [Automation](automation.md)).
-2. Create backlog tasks with dependencies (see [Board](board.md)).
-3. Tasks are automatically promoted, tested, and submitted as they complete.
 
 ## For Developers
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
 
@@ -1018,86 +1017,30 @@ func TestRunnerPendingGoroutines(t *testing.T) {
 	}
 }
 
-// TestContainerCircuitBreaker verifies that the container circuit breaker
-// accessors work correctly: Allow/Open/State/Failures/RecordContainerFailure.
-func TestContainerCircuitBreaker(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-
-	// Initially circuit should be closed (Allow=true, Open=false).
-	if !r.ContainerCircuitAllow() {
-		t.Error("expected ContainerCircuitAllow=true initially")
-	}
-	if r.ContainerCircuitOpen() {
-		t.Error("expected ContainerCircuitOpen=false initially")
-	}
-	if r.ContainerCircuitFailures() != 0 {
-		t.Errorf("expected 0 failures initially, got %d", r.ContainerCircuitFailures())
-	}
-	if r.ContainerCircuitState() == "" {
-		t.Error("expected non-empty circuit state")
-	}
-
-	// Record a failure.
-	r.RecordContainerFailure()
-	if r.ContainerCircuitFailures() != 1 {
-		t.Errorf("expected 1 failure after RecordContainerFailure, got %d", r.ContainerCircuitFailures())
-	}
-}
-
-// TestContainerCircuitOpen_DoesNotConsumeProbe verifies that the read-only
-// ContainerCircuitOpen accessor (used by the Prometheus gauge on every scrape)
-// does not steal the half-open recovery probe. Before the fix it delegated to
-// the mutating Allow(), so a scrape on an elapsed-open breaker performed the
-// open->half-open transition itself, consuming the probe meant for a real
-// launch and making the gauge flap.
-func TestContainerCircuitOpen_DoesNotConsumeProbe(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// Trip the breaker after one failure with a short open window so a probe
-	// becomes available quickly.
-	r.containerCB = circuitbreaker.New(1, 10*time.Millisecond)
-	r.RecordContainerFailure()
-
-	// Wait past the open window so the half-open probe is available.
-	time.Sleep(25 * time.Millisecond)
-
-	// Repeated metrics scrapes must keep reading "open" and must NOT consume
-	// the probe.
-	for i := range 5 {
-		if !r.ContainerCircuitOpen() {
-			t.Fatalf("scrape %d: expected circuit to read open", i)
-		}
-	}
-
-	// The real launch decision must still get the half-open probe.
-	if !r.ContainerCircuitAllow() {
-		t.Fatal("recovery probe was stolen by read-only scrapes; real launch blocked")
-	}
-}
-
 // ---------------------------------------------------------------------------
-// sandboxForTask / modelFromEnvForSandbox / titleModelFromEnvForSandbox
+// sandboxForTaskActivity / modelFromEnvForSandbox / titleModelFromEnvForSandbox
 // ---------------------------------------------------------------------------
 
 // TestSandboxForTask_NilTask_DefaultsToDefaultHarness verifies that
-// sandboxForTask with a nil task falls back to the configured default harness.
+// sandboxForTaskActivity with a nil task falls back to the configured default harness.
 // Pinning the assertion to harness.Default() (not a literal "claude") keeps the
 // decoupling contract: when the native default changes, the resolver follows.
 func TestSandboxForTask_NilTask_DefaultsToDefaultHarness(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
-	result := r.sandboxForTask(nil)
+	result := r.sandboxForTaskActivity(nil, activityImplementation)
 	if result != harness.Default() {
-		t.Errorf("sandboxForTask(nil) = %q, want %q", result, harness.Default())
+		t.Errorf("sandboxForTaskActivity(nil) = %q, want %q", result, harness.Default())
 	}
 }
 
-// TestSandboxForTask_TaskWithSandbox verifies that sandboxForTask returns the
+// TestSandboxForTask_TaskWithSandbox verifies that sandboxForTaskActivity returns the
 // sandbox set on the task.
 func TestSandboxForTask_TaskWithSandbox(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	task := &store.Task{Sandbox: "codex"}
-	result := r.sandboxForTask(task)
+	result := r.sandboxForTaskActivity(task, activityImplementation)
 	if result != "codex" {
-		t.Errorf("sandboxForTask(task{Sandbox:codex}) = %q, want %q", result, "codex")
+		t.Errorf("sandboxForTaskActivity(task{Sandbox:codex}) = %q, want %q", result, "codex")
 	}
 }
 
@@ -1108,9 +1051,9 @@ func TestSandboxForTask_TaskWithSandbox(t *testing.T) {
 func TestSandboxForTask_EmptyTask_DefaultsToDefaultHarness(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	task := &store.Task{}
-	result := r.sandboxForTask(task)
+	result := r.sandboxForTaskActivity(task, activityImplementation)
 	if result != harness.Default() {
-		t.Errorf("sandboxForTask(empty task) = %q, want %q", result, harness.Default())
+		t.Errorf("sandboxForTaskActivity(empty task) = %q, want %q", result, harness.Default())
 	}
 }
 

@@ -128,17 +128,17 @@ func TestWorkspaceUpdate_Limits(t *testing.T) {
 
 	// Set max_parallel=2.
 	d := put(`{"max_parallel":2}`)
-	if d.MaxParallel == nil || *d.MaxParallel != 2 || d.MaxTestParallel != nil {
+	if d.MaxParallel == nil || *d.MaxParallel != 2 {
 		t.Fatalf("after set max_parallel: %+v", d)
 	}
-	// Set max_test_parallel=1, max_parallel absent -> unchanged (still 2).
-	d = put(`{"max_test_parallel":1}`)
-	if d.MaxParallel == nil || *d.MaxParallel != 2 || d.MaxTestParallel == nil || *d.MaxTestParallel != 1 {
+	// A rename leaves max_parallel absent -> unchanged (still 2).
+	d = put(`{"name":"B"}`)
+	if d.MaxParallel == nil || *d.MaxParallel != 2 {
 		t.Fatalf("absent field should be preserved: %+v", d)
 	}
-	// Clear max_parallel via null; max_test_parallel untouched.
+	// Clear max_parallel via null.
 	d = put(`{"max_parallel":null}`)
-	if d.MaxParallel != nil || d.MaxTestParallel == nil || *d.MaxTestParallel != 1 {
-		t.Fatalf("null should clear only max_parallel: %+v", d)
+	if d.MaxParallel != nil {
+		t.Fatalf("null should clear max_parallel: %+v", d)
 	}
 }

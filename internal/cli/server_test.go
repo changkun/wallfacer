@@ -16,7 +16,6 @@ import (
 
 	"latere.ai/x/pkg/metrics"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -617,7 +616,6 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 
 	// Verify gauge metrics appear.
 	for _, want := range []string{
-		"wallfacer_circuit_breaker_open",
 		"wallfacer_background_goroutines",
 	} {
 		if !strings.Contains(metricsText, want) {
@@ -753,51 +751,5 @@ func TestGauge_StoreSubscribers(t *testing.T) {
 	}
 	if vals[0].Value != 0 {
 		t.Errorf("expected 0 subscribers initially, got %v", vals[0].Value)
-	}
-}
-
-// TestGauge_CircuitBreakerOpen validates the circuit-breaker gauge: starts at
-// 0 (closed), then flips to 1 (open) after exceeding the failure threshold.
-func TestGauge_CircuitBreakerOpen(t *testing.T) {
-	workdir := t.TempDir()
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-
-	// Circuit should be closed initially.
-	collector := func() []metrics.LabeledValue {
-		v := 0.0
-		if r.ContainerCircuitOpen() {
-			v = 1.0
-		}
-		return []metrics.LabeledValue{{Value: v}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Value != 0.0 {
-		t.Errorf("circuit breaker open = %v, want 0 (closed)", vals[0].Value)
-	}
-
-	// Trip the circuit breaker by recording failures above the threshold.
-	for range constants.DefaultCBThreshold + 1 {
-		r.RecordContainerFailure()
-	}
-
-	vals = collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Value != 1.0 {
-		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
 	}
 }

@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { api } from '../../api/client';
 import { useEnvConfig } from '../../composables/useEnvConfig';
 import { useTaskStore } from '../../stores/tasks';
-import { useAutomationToggles } from '../../composables/useAutomationToggles';
 import AppSelect from '../AppSelect.vue';
-import SettingToggle from './SettingToggle.vue';
 
 const LIMIT_OPTIONS = [
   { value: '5', label: '5 tasks' },
@@ -17,29 +15,15 @@ const LIMIT_OPTIONS = [
 
 const taskStore = useTaskStore();
 
-// Automation toggles share one source of truth with the board AutomationMenu
-// popover via useAutomationToggles (server config, not the shell env).
-const {
-  AUTOMATION_KEYS,
-  automationLabels,
-  automationHints,
-  isOn: automationOn,
-  isBusy: automationBusy,
-  toggle: toggleAutomation,
-} = useAutomationToggles();
-
 const { env, fetchEnv, updateEnv } = useEnvConfig();
 
 const maxParallel = ref(5);
 const archivedPerPage = ref(20);
 const oversightInterval = ref(0);
-const autoPushEnabled = ref(false);
-const autoPushThreshold = ref(1);
 
 const maxParallelStatus = ref('');
 const archivedStatus = ref('');
 const oversightStatus = ref('');
-const autoPushStatus = ref('');
 
 const titlesLimit = ref('10');
 const titlesStatus = ref('');
@@ -48,8 +32,6 @@ const titlesBusy = ref(false);
 const oversightLimit = ref('10');
 const oversightGenStatus = ref('');
 const oversightGenBusy = ref(false);
-
-const showThresholdRow = computed(() => autoPushEnabled.value);
 
 function clamp(value: number, min: number, max: number): number {
   if (Number.isNaN(value)) return min;
@@ -75,10 +57,6 @@ function syncFromEnv() {
   }
   if (typeof env.value.oversight_interval === 'number') {
     oversightInterval.value = env.value.oversight_interval;
-  }
-  autoPushEnabled.value = !!env.value.auto_push_enabled;
-  if (typeof env.value.auto_push_threshold === 'number' && env.value.auto_push_threshold > 0) {
-    autoPushThreshold.value = env.value.auto_push_threshold;
   }
 }
 
@@ -123,22 +101,6 @@ async function saveOversightInterval() {
     flashSaved(oversightStatus);
   } catch (e) {
     oversightStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
-  }
-}
-
-async function saveAutoPush() {
-  let threshold = parseInt(String(autoPushThreshold.value), 10);
-  if (Number.isNaN(threshold) || threshold < 1) threshold = 1;
-  autoPushThreshold.value = threshold;
-  autoPushStatus.value = 'Saving…';
-  try {
-    await updateEnv({
-      auto_push_enabled: autoPushEnabled.value,
-      auto_push_threshold: threshold,
-    });
-    flashSaved(autoPushStatus);
-  } catch (e) {
-    autoPushStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -189,22 +151,6 @@ async function generateMissingOversight() {
 
 <template>
   <div class="card compact" data-settings-tab="execution">
-    <div class="card-head"><span class="eyebrow">Automation</span></div>
-    <div class="rows">
-      <div v-for="k in AUTOMATION_KEYS" :key="k" class="set-row">
-        <div class="set-row__main">
-          <span class="set-row__label">{{ automationLabels[k] }}</span>
-          <span class="set-row__help">{{ automationHints[k] }}<template v-if="automationBusy(k)"> · saving…</template></span>
-        </div>
-        <div class="set-row__end">
-          <SettingToggle :model-value="automationOn(k)" :disabled="automationBusy(k)" :label="automationLabels[k]" @update:model-value="toggleAutomation(k)" />
-        </div>
-      </div>
-    </div>
-    <div class="card-foot"><span class="set-row__help">Each toggle drives one server-side watcher; see the automation guide for the full lifecycle and budgets.</span></div>
-  </div>
-
-  <div class="card compact">
     <div class="card-head"><span class="eyebrow">Limits</span></div>
     <div class="rows">
       <div class="set-row">
@@ -236,31 +182,6 @@ async function generateMissingOversight() {
           <span id="oversight-interval-status" class="set-status">{{ oversightStatus }}</span>
           <input id="oversight-interval-input" v-model.number="oversightInterval" type="number" min="0" max="120" class="field set-num" autocomplete="off" @change="saveOversightInterval" />
           <span class="set-unit">min</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card compact">
-    <div class="card-head"><span class="eyebrow">Auto push</span></div>
-    <div class="rows">
-      <div class="set-row">
-        <div class="set-row__main">
-          <span class="set-row__label">Push after the commit pipeline</span>
-          <span class="set-row__help">Automatically push when the workspace is at least N commits ahead of upstream.</span>
-        </div>
-        <div class="set-row__end">
-          <span id="auto-push-status" class="set-status">{{ autoPushStatus }}</span>
-          <SettingToggle id="auto-push-enabled" v-model="autoPushEnabled" label="Auto push" @update:model-value="saveAutoPush" />
-        </div>
-      </div>
-      <div v-show="showThresholdRow" id="auto-push-threshold-row" class="set-row">
-        <div class="set-row__main">
-          <span class="set-row__label">Push when ahead by</span>
-        </div>
-        <div class="set-row__end">
-          <input id="auto-push-threshold" v-model.number="autoPushThreshold" type="number" min="1" class="field set-num" autocomplete="off" @change="saveAutoPush" />
-          <span class="set-unit">commit(s)</span>
         </div>
       </div>
     </div>

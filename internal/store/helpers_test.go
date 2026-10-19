@@ -51,6 +51,15 @@ func newTestStoreBackend(tb testing.TB, backend StorageBackend) (*Store, error) 
 	return s, err
 }
 
+// assertTaskMatchesSnapshot fails the test if got does not deeply equal want.
+// Used to verify that store-returned clones are not aliased with internal state.
+func assertTaskMatchesSnapshot(t *testing.T, got *Task, want Task) {
+	t.Helper()
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("task mismatch after clone mutation\n got: %#v\nwant: %#v", *got, want)
+	}
+}
+
 // setTaskCloneFixture populates all nested, pointer, slice, and map fields on
 // task with deterministic values, then returns a deep clone. The clone serves
 // as the "golden snapshot" that later assertions compare against to verify
@@ -61,7 +70,6 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	sessionID := "session-1"
 	result := "result-1"
 	stopReason := "stop-1"
-	scheduledAt := time.Unix(1_700_000_000, 0).UTC()
 
 	messageTime := time.Unix(1_700_000_010, 0).UTC()
 
@@ -120,9 +128,6 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.BaseCommitHashes = map[string]string{"/repo": "base-1"}
 	task.Tags = []string{"tag-1"}
 	task.DependsOn = []string{"dep-1"}
-	task.ScheduledAt = &scheduledAt
-	reviewUnresolved := 2
-	task.ReviewUnresolved = &reviewUnresolved
 
 	return deepCloneTask(task)
 }
@@ -147,15 +152,4 @@ func mutateTaskCloneForIsolation(task *Task) {
 	*task.SessionID = "mutated-session"
 	*task.Result = "mutated-result"
 	*task.StopReason = "mutated-stop"
-	*task.ScheduledAt = time.Unix(1_800_000_000, 0).UTC()
-	*task.ReviewUnresolved = 99
-}
-
-// assertTaskMatchesSnapshot fails the test if got does not deeply equal want.
-// Used to verify that store-returned clones are not aliased with internal state.
-func assertTaskMatchesSnapshot(t *testing.T, got *Task, want Task) {
-	t.Helper()
-	if !reflect.DeepEqual(*got, want) {
-		t.Fatalf("task mismatch after clone mutation\n got: %#v\nwant: %#v", *got, want)
-	}
 }

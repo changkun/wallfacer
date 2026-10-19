@@ -17,5 +17,5 @@
 // # Usage
 //
 //	timeout := constants.DefaultTaskTimeout
-//	ticker := time.NewTicker(constants.AutoPromoteInterval)
+//	ticker := time.NewTicker(constants.DefaultWorktreeGCInterval)
 package constants

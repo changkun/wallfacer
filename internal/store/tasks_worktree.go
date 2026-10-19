@@ -45,42 +45,11 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 	return s.mutateTask(id, func(t *Task) error {
 		t.IsTestRun = isTestRun
 		t.LastTestResult = lastTestResult
-		if isTestRun || lastTestResult != "fail" {
-			t.PendingTestFeedback = ""
-		}
 		if isTestRun {
 			// Record the current turn count so we know which turn files belong to
 			// the implementation phase vs the test phase.
 			t.TestRunStartTurn = t.Turns
 		}
-		return nil
-	})
-}
-
-// UpdateTaskPendingTestFeedback stores or clears the pending feedback message
-// generated from the latest failed test run.
-func (s *Store) UpdateTaskPendingTestFeedback(_ context.Context, id uuid.UUID, message string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.PendingTestFeedback = message
-		return nil
-	})
-}
-
-// IncrementTestFailCount atomically increments the consecutive test failure
-// counter for a task. Called by the runner when a test verdict is "fail".
-func (s *Store) IncrementTestFailCount(_ context.Context, id uuid.UUID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.TestFailCount++
-		return nil
-	})
-}
-
-// ResetTestFailCount resets the consecutive test failure counter to zero.
-// Called when the user manually provides feedback or when a test passes,
-// so the auto-resume cycle can start fresh.
-func (s *Store) ResetTestFailCount(_ context.Context, id uuid.UUID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.TestFailCount = 0
 		return nil
 	})
 }
@@ -299,56 +268,6 @@ func buildSnippet(src string, idx, matchLen int) string {
 func (s *Store) MarkTurnTruncated(_ context.Context, taskID uuid.UUID, turn int) error {
 	return s.mutateTask(taskID, func(t *Task) error {
 		t.TruncatedTurns = append(t.TruncatedTurns, turn)
-		return nil
-	})
-}
-
-// IncrementAutoRetryCount records one auto-retry attempt for the given
-// FailureCategory: it increments AutoRetryCount and decrements the per-category
-// budget in AutoRetryBudget (flooring at zero).
-func (s *Store) IncrementAutoRetryCount(_ context.Context, id uuid.UUID, category FailureCategory) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.AutoRetryCount++
-		if t.AutoRetryBudget == nil {
-			t.AutoRetryBudget = make(map[FailureCategory]int)
-		}
-		if t.AutoRetryBudget[category] > 0 {
-			t.AutoRetryBudget[category]--
-		}
-		return nil
-	})
-}
-
-// RecordFetchFailure sets LastFetchError and LastFetchErrorAt on a task to
-// record the most recent git fetch failure. While a recent fetch failure is
-// recorded the task is excluded from CommitsBehind checks and auto-submission
-// until ClearFetchFailure is called or the failure timestamp becomes stale.
-func (s *Store) RecordFetchFailure(_ context.Context, id uuid.UUID, msg string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		now := time.Now()
-		t.LastFetchError = msg
-		t.LastFetchErrorAt = &now
-		return nil
-	})
-}
-
-// ClearFetchFailure clears a previously recorded fetch failure. Called after
-// a successful git fetch so that CommitsBehind checks and auto-submission can
-// proceed normally. It is a no-op (does not write to disk) when no failure
-// is currently recorded.
-func (s *Store) ClearFetchFailure(_ context.Context, id uuid.UUID) error {
-	// Fast-path read lock: skip the write if no failure is recorded.
-	// This avoids unnecessary disk writes on every successful fetch.
-	s.mu.RLock()
-	t, ok := s.tasks[id]
-	if !ok || (t.LastFetchError == "" && t.LastFetchErrorAt == nil) {
-		s.mu.RUnlock()
-		return nil
-	}
-	s.mu.RUnlock()
-	return s.mutateTask(id, func(t *Task) error {
-		t.LastFetchError = ""
-		t.LastFetchErrorAt = nil
 		return nil
 	})
 }

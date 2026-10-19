@@ -81,6 +81,6 @@ Everything is stored under `~/.wallfacer/`:
 
 ## Next steps
 
-- [Concepts](concepts.md): the mental model, from chat to full automation
+- [Concepts](concepts.md): the mental model, from chat to the board
 - [Board](board.md): task lifecycle, review, and feedback in detail
 - [Configuration](configuration.md): settings, CLI reference, and environment variables

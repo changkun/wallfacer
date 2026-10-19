@@ -104,7 +104,7 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Println()
 	if gitPath, err := exec.LookPath("git"); err != nil {
 		fmt.Printf("[!] Git not found\n")
-		fmt.Printf("    Git is needed for worktrees, diffs, and auto-push.\n")
+		fmt.Printf("    Git is needed for worktrees, diffs, and commits.\n")
 		issues++
 	} else {
 		out, _ := cmdexec.New(gitPath, "--version").Output()

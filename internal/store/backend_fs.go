@@ -111,8 +111,7 @@ func (b *FilesystemBackend) LoadAll() ([]*Task, error) {
 
 // routineKind is the kind a stored routine card carries. Wallfacer has no
 // routines: LoadAll leaves these records on disk unread and unrewritten, so a
-// schedule template never loads as an ordinary backlog task that the
-// auto-promoter would run.
+// schedule template never loads as an ordinary backlog task.
 const routineKind TaskKind = "routine"
 
 // SaveTask atomically writes a task's metadata to its task.json file.

@@ -176,9 +176,8 @@ func buildAgentCmd(prompt, model string) []string {
 //
 // The configured envFile may be overridden (via ENV_FILE / --env-file) to a
 // transient location — most notably a mktemp path under /var/folders that
-// macOS's periodic tmp-reaper purges after ~3 idle days. A long-idle scheduled
-// task that fires after that window would otherwise fail to read its
-// credentials. When the configured path is missing but the canonical default
+// macOS's periodic tmp-reaper purges after ~3 idle days. A task started
+// after that window would otherwise fail to read its credentials. When the configured path is missing but the canonical default
 // (<configDir>/.env) exists, fall back to it.
 //
 // The fallback only *redirects* to a known-good default; it never silently
@@ -211,12 +210,6 @@ func (r *Runner) buildBaseContainerSpec(containerName string, sb harness.ID) exe
 	}
 	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
 	return spec
-}
-
-// sandboxForTask returns the resolved sandbox type for the task's implementation activity.
-// Shorthand for sandboxForTaskActivity(task, activityImplementation).
-func (r *Runner) sandboxForTask(task *store.Task) harness.ID {
-	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
@@ -342,8 +335,7 @@ var (
 // runContainer executes an agent container and parses its NDJSON output.
 // Returns (output, rawStdout, rawStderr, error). Wraps runAgent with the
 // heavyweight-specific concerns: slugged container name, live-log tee,
-// container-runtime circuit breaker, and the per-activity descriptor
-// dispatch. The outer turn loop in execute.go owns session handling
+// and the per-activity descriptor dispatch. The outer turn loop in execute.go owns session handling
 // and retry policy beyond the Claude→Codex token-limit fallback.
 func (r *Runner) runContainer(
 	ctx context.Context,
@@ -388,7 +380,6 @@ func (r *Runner) runContainer(
 		BoardDir:          boardDir,
 		SiblingMounts:     siblingMounts,
 		LiveLogWriter:     ll,
-		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
 		// Register the process so KillContainer can signal the running
 		// agent when the user cancels the task mid-run.
@@ -474,7 +465,6 @@ func (r *Runner) runContainerOnSandbox(
 		BoardDir:          boardDir,
 		SiblingMounts:     siblingMounts,
 		LiveLogWriter:     ll,
-		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
 		// Register the fallback launch's handle too, so a cancel during
 		// the codex-fallback turn can still kill the running agent.

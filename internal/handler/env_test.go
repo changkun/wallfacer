@@ -11,13 +11,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
@@ -71,93 +69,6 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 	t.Cleanup(r.Shutdown)
 	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath, codexAuthDir
-}
-
-// TestUpdateEnvConfig_TriggersAutoPromote verifies that updating
-// max_parallel_tasks immediately triggers auto-promotion when autoimplement is
-// enabled and there are backlog tasks waiting.
-func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-
-	// Enable autoimplement so tryAutoPromote will act.
-	h.autoimplement.Store(true)
-
-	// Create a backlog task.
-	ctx := context.Background()
-	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Update max_parallel_tasks to 1 via the HTTP handler.
-	body := `{"max_parallel_tasks": 1}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Poll briefly for the backlog task to leave backlog status.
-	// The promotion happens in a background goroutine; the task moves to
-	// in_progress (and may then move to failed if the runner has no command),
-	// but either outcome proves tryAutoPromote was triggered.
-	promoted := false
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		tasks, err := h.store.ListTasks(ctx, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(tasks) > 0 && tasks[0].Status != "backlog" {
-			promoted = true
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	if !promoted {
-		tasks, _ := h.store.ListTasks(ctx, false)
-		status := store.TaskStatus("unknown")
-		if len(tasks) > 0 {
-			status = tasks[0].Status
-		}
-		t.Errorf("expected backlog task to be promoted (leave backlog status), got %s", status)
-	}
-}
-
-// TestUpdateEnvConfig_NoAutoPromoteWhenAutoimplementOff verifies that no
-// auto-promotion happens when autoimplement is disabled.
-func TestUpdateEnvConfig_NoAutoPromoteWhenAutoimplementOff(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	// autoimplement is false by default.
-
-	ctx := context.Background()
-	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	body := `{"max_parallel_tasks": 1}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Wait long enough that a goroutine would have run.
-	time.Sleep(100 * time.Millisecond)
-
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tasks) > 0 && tasks[0].Status == "in_progress" {
-		t.Errorf("expected task to remain in backlog when autoimplement is off, got in_progress")
-	}
 }
 
 // TestValidateBaseURL_SchemeAndIPChecks verifies the scheme, bare-IP, and
@@ -725,72 +636,6 @@ func TestUpdateEnvConfig_SetTitleModel(t *testing.T) {
 	}
 	if cfg.TitleModel != model {
 		t.Errorf("TitleModel = %q; want %q", cfg.TitleModel, model)
-	}
-}
-
-// TestUpdateEnvConfig_MaxTestParallelTasks verifies that max_test_parallel_tasks
-// is accepted and clamped to a minimum of 1.
-func TestUpdateEnvConfig_MaxTestParallelTasks(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	body := `{"max_test_parallel_tasks":2}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateEnvConfig_MaxTestParallelTasksClampedToOne verifies that
-// max_test_parallel_tasks below 1 is clamped to 1.
-func TestUpdateEnvConfig_MaxTestParallelTasksClampedToOne(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	body := `{"max_test_parallel_tasks":0}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-	cfg, err := envconfig.Parse(envPath)
-	if err != nil {
-		t.Fatalf("parse env: %v", err)
-	}
-	if cfg.MaxTestParallelTasks < 1 {
-		t.Errorf("MaxTestParallelTasks = %d; want >= 1", cfg.MaxTestParallelTasks)
-	}
-}
-
-// TestUpdateEnvConfig_AutoPushThreshold verifies that auto_push_threshold is
-// accepted and clamped to a minimum of 1.
-func TestUpdateEnvConfig_AutoPushThreshold(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	body := `{"auto_push_threshold":5}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateEnvConfig_AutoPushThresholdClampedToOne verifies that an
-// auto_push_threshold of 0 is clamped to 1.
-func TestUpdateEnvConfig_AutoPushThresholdClampedToOne(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	body := `{"auto_push_threshold":0}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-	cfg, err := envconfig.Parse(envPath)
-	if err != nil {
-		t.Fatalf("parse env: %v", err)
-	}
-	if cfg.AutoPushThreshold < 1 {
-		t.Errorf("AutoPushThreshold = %d; want >= 1", cfg.AutoPushThreshold)
 	}
 }
 

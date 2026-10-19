@@ -17,16 +17,6 @@ import (
 	"latere.ai/x/wallfacer/internal/logger"
 )
 
-// defaultAutoRetryBudget defines the per-category retry allowances granted to
-// every newly created task. ResetTaskForRetry uses this same map so that a
-// manual retry after a budget-exhausted auto-retry cycle restores the full
-// budget, allowing the auto-retrier to act again on the next failure.
-var defaultAutoRetryBudget = map[FailureCategory]int{
-	FailureCategoryContainerCrash: 2,
-	FailureCategorySyncError:      2,
-	FailureCategoryWorktree:       1,
-}
-
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
@@ -45,7 +35,6 @@ type TaskCreateOptions struct {
 	SandboxByActivity  map[SandboxActivity]harness.ID
 	MaxCostUSD         float64
 	MaxInputTokens     int
-	ScheduledAt        *time.Time
 	DependsOn          []string
 	SpecSourcePath     string
 	ModelOverride      string
@@ -55,7 +44,7 @@ type TaskCreateOptions struct {
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
 // All fields in opts are normalized (sandbox maps, budget clamps) and persisted
-// together, so no watcher or SSE subscriber can observe a partially-initialized
+// together, so no SSE subscriber can observe a partially-initialized
 // task.  notify is called exactly once.
 func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions) (*Task, error) {
 	// Build the task struct from opts outside the lock.  Position is the only
@@ -83,13 +72,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		// Position is set under the lock after scanning existing backlog tasks.
 		CreatedAt: now,
 		UpdatedAt: now,
-		// AutoRetryBudget provides per-category retry allowances for transient
-		// failures. Budget is only granted for categories where retrying is safe.
-		AutoRetryBudget: map[FailureCategory]int{
-			FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
-			FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
-			FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
-		},
 	}
 
 	// Tags: deep-copy to protect store state from caller mutation.
@@ -121,12 +103,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		task.MaxCostUSD = opts.MaxCostUSD
 	}
 	task.MaxInputTokens = max(opts.MaxInputTokens, 0)
-
-	// ScheduledAt: copy to avoid aliasing the caller's pointer.
-	if opts.ScheduledAt != nil {
-		ts := *opts.ScheduledAt
-		task.ScheduledAt = &ts
-	}
 
 	// ModelOverride: nil when empty so omitempty keeps JSON clean.
 	if model := strings.TrimSpace(opts.ModelOverride); model != "" {
@@ -291,9 +267,8 @@ func (s *Store) removeOrphanedDependents(ctx context.Context, cancelledID uuid.U
 
 // CancelTask moves a task to TaskStatusCancelled using ForceUpdateTaskStatus
 // (which bypasses the normal state-machine transitions) and then removes the
-// task's ID from the DependsOn list of any non-terminal tasks that reference it.
-// Cancelled tasks can never reach done, so their dependents would otherwise be
-// permanently blocked by the auto-promoter's dependency check.
+// task's ID from the DependsOn list of any non-terminal tasks that reference it,
+// since a cancelled task can never reach done.
 func (s *Store) CancelTask(ctx context.Context, id uuid.UUID) error {
 	if err := s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled); err != nil {
 		return err

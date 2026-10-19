@@ -113,20 +113,6 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	}
 }
 
-// newTestRunner creates a Runner backed by a fresh temporary file store.
-func newTestRunner(t *testing.T) *Runner {
-	t.Helper()
-	dataDir := t.TempDir()
-	s, err := storetest.NewFileStore(t, dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	r := NewRunner(s, RunnerConfig{})
-	t.Cleanup(func() { r.Shutdown() })
-	return r
-}
-
 // containsConsecutive returns true if slice contains needle1 immediately
 // followed by needle2.
 func containsConsecutive(slice []string, needle1, needle2 string) bool {

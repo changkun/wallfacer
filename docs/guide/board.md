@@ -13,7 +13,7 @@ The Board is the execution surface of wallfacer: a four-column kanban where task
 | **Waiting** | `waiting`, `failed` | The agent paused for input, a verdict, or a budget raise; failed tasks land here for retry. |
 | **Done** | `done`, `cancelled` | Terminal states. Done tasks have their changes merged; cancelled tasks keep their history. |
 
-The In Progress column header shows a `max N` tag: the effective parallel-execution cap for the active workspace. The value resolves from the workspace's `max_parallel` override, then `WALLFACER_MAX_PARALLEL`, with a default of 5 (`0` renders as unlimited). The cap gates how many tasks automation promotes concurrently; see [Automation](automation.md) and [Workspaces](workspaces.md).
+The In Progress column header shows a `max N` tag: the effective parallel-execution cap for the active workspace. The value resolves from the workspace's `max_parallel` override, then `WALLFACER_MAX_PARALLEL`, with a default of 5 (`0` renders as unlimited). Starting a task while the cap is reached is refused until a running task finishes; see [Workspaces](workspaces.md).
 
 The Done column header carries two controls: **Archive all** archives every done task at once, and **Show archived** reveals archived tasks, which are hidden by default.
 
@@ -49,9 +49,23 @@ stateDiagram-v2
     cancelled --> backlog : retry
 ```
 
-Note that `in_progress` never jumps straight to `committing` or `done`: completion always passes through `waiting`, where a review, a test verdict, or auto-submit decides whether to commit. **Mark as Done** (or the auto-submit watcher) moves a waiting task into `committing`, which rebases the task branch onto the default branch, fast-forward merges it, and cleans up the worktree. Details in [Task Lifecycle internals](../internals/task-lifecycle.md) and [Git Worktrees](../internals/git-worktrees.md).
+Note that `in_progress` never jumps straight to `committing` or `done`: completion always passes through `waiting`, where the result is reviewed, optionally tested, and either accepted or sent back with feedback. **Mark as Done** moves a waiting task into `committing`, which rebases the task branch onto the default branch, fast-forward merges it, and cleans up the worktree. Details in [Task Lifecycle internals](../internals/task-lifecycle.md) and [Git Worktrees](../internals/git-worktrees.md).
 
-When a task fails, the failure is categorized: `timeout`, `budget_exceeded`, `worktree_setup`, `container_crash` (unexpected agent-process exit), `agent_error`, `sync_error`, or `unknown`. Categories drive the auto-retry budgets described in [Automation](automation.md).
+### Failure categories
+
+Every failed task carries a failure category, shown on the card:
+
+| Category | Meaning |
+|---|---|
+| `container_crash` | The agent process exited unexpectedly (the name predates host-process execution) |
+| `sync_error` | A rebase or merge failed during sync |
+| `worktree_setup` | Worktree creation failed |
+| `timeout` | The task exceeded its time limit |
+| `budget_exceeded` | The token or cost budget ran out |
+| `agent_error` | The agent itself reported failure |
+| `unknown` | Unclassified |
+
+Recurring `container_crash` failures point to a CLI or credential problem, which `wallfacer doctor` checks. `agent_error` and `timeout` call for a clearer prompt, a smaller scope, or feedback on the task. `sync_error` and `worktree_setup` failures often clear on **Retry** once the repository is back in a clean state. Failed-task counts per category are exported on `/metrics` as `wallfacer_failed_tasks_by_category`.
 
 ## Creating tasks
 
@@ -68,7 +82,7 @@ Every task carries a short **Title** (auto-generated after creation, or set manu
 
 ## Starting, resuming, and completing
 
-A task starts when it moves from Backlog to In Progress: drag the card, click **Start task** in the detail view, or let the auto-implement watcher promote it. The server creates a branch `task/<uuid-prefix>` and a worktree per workspace folder, launches the selected harness as a host process, and streams live output into the detail view. Each prompt/response round-trip is a turn; token usage and cost accumulate per turn.
+A task starts when it moves from Backlog to In Progress: drag the card or click **Start task** in the detail view. The server creates a branch `task/<uuid-prefix>` and a worktree per workspace folder, launches the selected harness as a host process, and streams live output into the detail view. Each prompt/response round-trip is a turn; token usage and cost accumulate per turn.
 
 When the agent pauses or finishes, the task lands in **Waiting**. From there:
 
@@ -77,7 +91,6 @@ When the agent pauses or finishes, the task lands in **Waiting**. From there:
 | **Submit feedback** | Send a message (with `@` file mentions); the agent resumes in the same session. |
 | **Mark as Done** | Trigger the commit pipeline and merge the changes. |
 | **Test** | Launch a verification agent, optionally with acceptance criteria. |
-| **Review** | Run one review round on a second model (see below). |
 | **Sync** | Rebase the task's worktree onto the latest default branch without merging. |
 | **Raise budget** | Shown when a cost or token limit was hit; adjust the limit and continue. |
 | **Cancel** | Discard the worktree and move to Cancelled; history and logs are preserved. |
@@ -90,7 +103,7 @@ Full per-state action availability in the detail view:
 |---|---|
 | `backlog` | Start task, Edit task, Delete |
 | `in_progress` / `committing` | Cancel, Delete |
-| `waiting` | Mark as Done, Test, Review (with session), Raise budget (when budget-hit), Sync, Cancel, Delete |
+| `waiting` | Mark as Done, Test, Raise budget (when budget-hit), Sync, Cancel, Delete |
 | `failed` | Resume (with session), Test, Raise budget, Sync, Retry, Delete |
 | `done` | Test, Archive, Delete |
 | `cancelled` | Retry, Archive, Delete |
@@ -98,13 +111,9 @@ Full per-state action availability in the detail view:
 
 ## Dependencies
 
-The **Depends on** picker (in the composer's More section and the backlog Edit panel) declares prerequisite tasks. A task with unmet dependencies is not promoted by automation even when capacity is free: promotion requires every dependency to be `done`, the scheduled time (if any) to have passed, and a free parallel slot.
+The **Depends on** picker (in the composer's More section and the backlog Edit panel) declares prerequisite tasks. Dependencies record the intended order; nothing enforces it, so a task with unmet dependencies can still be started by hand.
 
 Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status.
-
-## Scheduled tasks
-
-Set **Schedule start** in the backlog Edit panel to defer a task to a future date and time. The auto-promoter skips it until the time arrives (a precise one-shot timer fires within milliseconds of the due time), then treats it like any other backlog task. The card shows a relative indicator such as `in 3h` until then.
 
 ## Search and filtering
 
@@ -131,7 +140,7 @@ Click any card to open the detail view. A left rail carries the header (status, 
 | **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy) and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
 | **Changes** | Task commits with expandable patches, followed by the aggregate diff and a commits-behind warning. |
-| **Verification** | The Review panel and the test agent's per-turn results. |
+| **Verification** | The test agent's per-turn results. |
 | **Events** | The event audit trail grouped by type, usage statistics, per-agent usage, retry history, and prompt history. |
 | **Timeline** | Execution spans rendered as a flamegraph with a time axis, an optional cumulative-cost overlay, and a span table sorted by duration. |
 
@@ -151,31 +160,15 @@ and marks the task failed so it can be retried after storage is repaired.
 
 ### Inline diff comments
 
-While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box. Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
+While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box. Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input.
 
-### Verification and Review
+### Verification
 
 The **Test** action launches a separate verification agent against the task's worktree; it runs the relevant checks and reports a pass or fail verdict shown as a badge on the card. Acceptance criteria can be supplied when starting the run, and repeated runs overwrite the previous verdict.
-
-**Review** checks the change with a second model, off by default and enabled as a runtime toggle. A reviewer on the model set as `WALLFACER_REVIEW_MODEL` reads the task, its acceptance criteria and its diff, and answers with findings and a verdict; requested changes go back to the task as feedback, and the next turn's diff is reviewed again, up to `WALLFACER_REVIEW_ROUNDS` rounds and within `WALLFACER_REVIEW_COST_CAP` reviewer tokens. The Verification tab shows the review's status, its configuration, and each round's findings, the feedback sent and the task's reply. When Review is enabled and the task has a worktree, its verdict supersedes the plain test verdict as the auto-submit gate; see [Automation](automation.md).
 
 ### Timeline
 
 The **Timeline** tab renders every recorded span (worktree setup, agent turns, commits) as a Gantt-style flamegraph with idle time compressed, plus a detail table.
-
-## Automation menu
-
-The lightning-bolt menu in the board header exposes five runtime toggles:
-
-| Toggle | Effect |
-|---|---|
-| **Implement** | Auto-promote eligible backlog tasks into In Progress. |
-| **Test** | Run the verification agent automatically when a task reaches Waiting. |
-| **Submit** | Move verified waiting tasks to Done automatically. |
-| **Catch up** | Rebase waiting tasks onto the default branch as it advances. |
-| **Push** | Push completed commits to the remote automatically. |
-
-Numeric knobs (parallelism, thresholds, intervals) live on the Execution settings tab. Auto-retry budgets, circuit breakers, and the Review toggle are covered in [Automation](automation.md).
 
 ## Backlog sort
 
@@ -190,7 +183,6 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 ## See also
 
 - [Plan](plan.md): author and dispatch specs that become board tasks
-- [Automation](automation.md): watchers, retry budgets, and circuit breakers
 - [Oversight](oversight.md): summaries, usage, cost, and timing
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings
 - [Configuration](configuration.md): environment variables and settings tabs

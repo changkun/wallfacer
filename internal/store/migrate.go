@@ -27,10 +27,7 @@ import (
 //     stable-sort.
 //  4. Normalize Sandbox (trim) and SandboxByActivity via
 //     normalizeSandboxByActivity.
-//  5. Backfill AutoRetryBudget for tasks created before schema version 2.
-//  6. Fold the deprecated Lineage field into Trace, renamed in schema
-//     version 3.
-//  7. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
+//  5. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
 func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	var task Task
 	if err := json.Unmarshal(raw, &task); err != nil {
@@ -83,19 +80,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (4) Backfill AutoRetryBudget for tasks created before schema version 2.
-	// Only transient/infrastructure failures get a budget; agent_error and
-	// timeout are not retried automatically because they are likely to recur.
-	if task.AutoRetryBudget == nil {
-		task.AutoRetryBudget = map[FailureCategory]int{
-			FailureCategoryContainerCrash: 2,
-			FailureCategorySyncError:      2,
-			FailureCategoryWorktree:       1,
-		}
-		changed = true
-	}
-
-	// (5) Guarantee SchemaVersion is current.
+	// (4) Guarantee SchemaVersion is current.
 	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
 		task.SchemaVersion = constants.CurrentTaskSchemaVersion
 		changed = true

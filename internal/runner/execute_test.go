@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
@@ -195,34 +194,6 @@ func TestRunMaxTokensAutoContinues(t *testing.T) {
 	}
 	if updated.Turns < 2 {
 		t.Fatalf("expected at least 2 turns after auto-continue, got %d", updated.Turns)
-	}
-}
-
-func TestRunMaxTokensTriggersStopReasonHandler(t *testing.T) {
-	repo := setupTestRepo(t)
-	cmd := fakeStatefulCmd(t, []string{maxTokensOutput, endTurnOutput})
-	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Stop reason handler test", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-
-	seen := false
-	r.SetStopReasonHandler(func(_ uuid.UUID, reason string) {
-		if reason == "max_tokens" {
-			seen = true
-		}
-	})
-	r.Run(task.ID, "prompt", "", false)
-
-	if !seen {
-		t.Fatal("expected max_tokens stop-reason handler to be called")
 	}
 }
 
@@ -813,127 +784,10 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 	}
 }
 
-// TestRunTestRunPreservesImplementationResult verifies that a test run (IsTestRun=true)
-// does not overwrite the implementation agent's Result or SessionID. The test
-// verdict is recorded in LastTestResult but the implementation output is left intact
-// so the user can still see what was implemented and resume the same session.
-func TestRunTestRunPreservesImplementationResult(t *testing.T) {
-	repo := setupTestRepo(t)
-
-	// Implementation agent: pauses at "waiting" (empty stop_reason).
-	implOutput := `{"result":"implementation complete","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
-	// Test agent: concludes with PASS verdict.
-	testOutput := `{"result":"All checks passed. **PASS**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
-
-	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
-	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Preserve impl result test", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Phase 1: implementation run → task goes to "waiting".
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-	r.Run(task.ID, "implement the feature", "", false)
-
-	afterImpl, _ := s.GetTask(ctx, task.ID)
-	if afterImpl.Status != "waiting" {
-		t.Fatalf("expected status=waiting after implementation run, got %q", afterImpl.Status)
-	}
-	if afterImpl.Result == nil || *afterImpl.Result != "implementation complete" {
-		t.Fatalf("expected implementation result, got %v", afterImpl.Result)
-	}
-	if afterImpl.SessionID == nil || *afterImpl.SessionID != "impl-sess" {
-		t.Fatalf("expected impl-sess session ID, got %v", afterImpl.SessionID)
-	}
-
-	// Phase 2: mark as test run and run the test agent (fresh session "").
-	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
-		t.Fatal(err)
-	}
-
-	r.Run(task.ID, "verify the implementation", "", false)
-
-	afterTest, _ := s.GetTask(ctx, task.ID)
-	if afterTest.Status != "waiting" {
-		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
-	}
-
-	// Implementation result must NOT be overwritten by the test agent.
-	if afterTest.Result == nil || *afterTest.Result != "implementation complete" {
-		t.Fatalf("test run overwrote implementation result; got %v, want 'implementation complete'", afterTest.Result)
-	}
-	// Implementation session ID must NOT be overwritten by the test agent's session.
-	if afterTest.SessionID == nil || *afterTest.SessionID != "impl-sess" {
-		t.Fatalf("test run overwrote implementation session ID; got %v, want 'impl-sess'", afterTest.SessionID)
-	}
-	// Test verdict must be recorded.
-	if afterTest.LastTestResult != "pass" {
-		t.Fatalf("expected last_test_result=pass, got %q", afterTest.LastTestResult)
-	}
-	if afterTest.PendingTestFeedback != "" {
-		t.Fatalf("expected no pending test feedback on pass, got %q", afterTest.PendingTestFeedback)
-	}
-	// IsTestRun must be cleared after the test completes.
-	if afterTest.IsTestRun {
-		t.Fatal("IsTestRun should be false after test completion")
-	}
-}
-
-func TestRunTestRunFailStoresPendingFeedback(t *testing.T) {
-	repo := setupTestRepo(t)
-
-	implOutput := `{"result":"implementation done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
-	testOutput := `{"result":"pytest failed\n\n- TestFoo: expected 200, got 500\n\n**FAIL**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
-
-	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
-	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Store test failure feedback", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-	r.Run(task.ID, "implement the feature", "", false)
-
-	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-
-	r.Run(task.ID, "verify the implementation", "", false)
-
-	afterTest, _ := s.GetTask(ctx, task.ID)
-	if afterTest.Status != "waiting" {
-		t.Fatalf("expected status=waiting after failed test run, got %q", afterTest.Status)
-	}
-	if afterTest.LastTestResult != "fail" {
-		t.Fatalf("expected last_test_result=fail, got %q", afterTest.LastTestResult)
-	}
-	if !strings.Contains(afterTest.PendingTestFeedback, "Automated test verification failed.") {
-		t.Fatalf("expected pending feedback header, got %q", afterTest.PendingTestFeedback)
-	}
-	if !strings.Contains(afterTest.PendingTestFeedback, "expected 200, got 500") {
-		t.Fatalf("expected failing test details in pending feedback, got %q", afterTest.PendingTestFeedback)
-	}
-}
-
 // TestRunTestRunFailVerdictWhenNoMarker verifies that when the test agent's
 // output does not contain a recognizable PASS/FAIL marker, the verdict is stored
-// as "fail" (not "") so the task is not auto-submitted without explicit confirmation.
+// as "fail" (not "", which reads as never tested), so an inconclusive run is
+// not mistaken for a missing one.
 func TestRunTestRunFailVerdictWhenNoMarker(t *testing.T) {
 	repo := setupTestRepo(t)
 
@@ -1022,7 +876,7 @@ func TestRunTestRunDefaultStopReasonSetsFail(t *testing.T) {
 	if afterTest.Status != "waiting" {
 		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
 	}
-	// Must NOT be "" (unverified) — must be "fail" so the task is not auto-submitted.
+	// Must NOT be "" (never tested): an inconclusive run records "fail".
 	if afterTest.LastTestResult != "fail" {
 		t.Fatalf("expected last_test_result=fail for empty stop_reason, got %q", afterTest.LastTestResult)
 	}
@@ -1859,11 +1713,8 @@ func TestMockDeferredPanicRecovery(t *testing.T) {
 // FailureCategoryContainerCrash and the task to transition to failed.
 func TestMockFailureCategoryContainerCrash(t *testing.T) {
 	repo := setupTestRepo(t)
-	// Provide 3 crash responses: 2 consumed by auto-retries, 1 for final failure.
 	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
-			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
-			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 		},
 	}
@@ -1875,17 +1726,14 @@ func TestMockFailureCategoryContainerCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Run 3 times: 2 auto-retries then permanent failure.
-	for i := range 3 {
-		if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-			t.Fatalf("run %d: UpdateTaskStatus: %v", i+1, err)
-		}
-		r.Run(task.ID, "do the task", "", false)
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
 	}
+	r.Run(task.ID, "do the task", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
 	if updated.Status != store.TaskStatusFailed {
-		t.Fatalf("expected status=failed after budget exhausted, got %q", updated.Status)
+		t.Fatalf("expected status=failed, got %q", updated.Status)
 	}
 	if updated.FailureCategory != store.FailureCategoryContainerCrash {
 		t.Fatalf("expected failure_category=container_crash, got %q", updated.FailureCategory)
@@ -1937,110 +1785,8 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-retry tests
+// Test verdicts
 // ---------------------------------------------------------------------------
-
-func TestAutoRetry_ContainerCrash(t *testing.T) {
-	repo := setupTestRepo(t)
-	cmd := fakeCmdScript(t, "", 0)
-	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "crash retry test", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := range 3 {
-		if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-			t.Fatalf("run %d: UpdateTaskStatus in_progress: %v", i+1, err)
-		}
-		r.Run(task.ID, "do the task", "", false)
-
-		got, err := s.GetTask(ctx, task.ID)
-		if err != nil {
-			t.Fatalf("run %d: GetTask: %v", i+1, err)
-		}
-		if i < 2 {
-			if got.Status != store.TaskStatusBacklog {
-				t.Errorf("run %d: expected backlog after retry, got %s", i+1, got.Status)
-			}
-		} else {
-			if got.Status != store.TaskStatusFailed {
-				t.Errorf("run %d: expected failed after budget exhausted, got %s", i+1, got.Status)
-			}
-			if got.FailureCategory != store.FailureCategoryContainerCrash {
-				t.Errorf("run %d: expected failure_category=container_crash, got %s", i+1, got.FailureCategory)
-			}
-			if got.AutoRetryCount != 2 {
-				t.Errorf("run %d: expected AutoRetryCount=2, got %d", i+1, got.AutoRetryCount)
-			}
-		}
-	}
-}
-
-func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
-	repo := setupTestRepo(t)
-	budgetErrOutput := `{"result":"budget exceeded","session_id":"s1","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
-	cmd := fakeCmdScript(t, budgetErrOutput, 0)
-	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget exceeded test", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-	r.Run(task.ID, "do the task", "", false)
-
-	got, err := s.GetTask(ctx, task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Status != store.TaskStatusFailed {
-		t.Errorf("expected failed (no retry budget for budget_exceeded), got %s", got.Status)
-	}
-	if got.AutoRetryCount != 0 {
-		t.Errorf("expected AutoRetryCount=0 (no retry attempted), got %d", got.AutoRetryCount)
-	}
-}
-
-func TestAutoRetry_MaxTotalCap(t *testing.T) {
-	repo := setupTestRepo(t)
-	cmd := fakeCmdScript(t, "", 0)
-	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "total cap test", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for range constants.MaxAutoRetries {
-		if err := s.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
-			t.Fatalf("IncrementAutoRetryCount: %v", err)
-		}
-	}
-
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
-	}
-	r.Run(task.ID, "do the task", "", false)
-
-	got, err := s.GetTask(ctx, task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Status != store.TaskStatusFailed {
-		t.Errorf("expected failed (total cap hit), got %s", got.Status)
-	}
-	if got.AutoRetryCount != constants.MaxAutoRetries {
-		t.Errorf("expected AutoRetryCount=%d (unchanged), got %d", constants.MaxAutoRetries, got.AutoRetryCount)
-	}
-}
 
 // TestParseTestVerdictCustomPatterns verifies that user-supplied regex patterns
 // are evaluated before the built-in heuristics.
@@ -2096,5 +1842,76 @@ func TestParseTestVerdictCustomPatterns(t *testing.T) {
 					tc.input, tc.customPass, tc.customFail, got, tc.expected)
 			}
 		})
+	}
+}
+
+// TestRunTestRunPreservesImplementationResult verifies that a test run (IsTestRun=true)
+// does not overwrite the implementation agent's Result or SessionID. The test
+// verdict is recorded in LastTestResult but the implementation output is left intact
+// so the user can still see what was implemented and resume the same session.
+func TestRunTestRunPreservesImplementationResult(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Implementation agent: pauses at "waiting" (empty stop_reason).
+	implOutput := `{"result":"implementation complete","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	// Test agent: concludes with PASS verdict.
+	testOutput := `{"result":"All checks passed. **PASS**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Preserve impl result test", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Phase 1: implementation run → task goes to "waiting".
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "implement the feature", "", false)
+
+	afterImpl, _ := s.GetTask(ctx, task.ID)
+	if afterImpl.Status != "waiting" {
+		t.Fatalf("expected status=waiting after implementation run, got %q", afterImpl.Status)
+	}
+	if afterImpl.Result == nil || *afterImpl.Result != "implementation complete" {
+		t.Fatalf("expected implementation result, got %v", afterImpl.Result)
+	}
+	if afterImpl.SessionID == nil || *afterImpl.SessionID != "impl-sess" {
+		t.Fatalf("expected impl-sess session ID, got %v", afterImpl.SessionID)
+	}
+
+	// Phase 2: mark as test run and run the test agent (fresh session "").
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify the implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
+	}
+
+	// Implementation result must NOT be overwritten by the test agent.
+	if afterTest.Result == nil || *afterTest.Result != "implementation complete" {
+		t.Fatalf("test run overwrote implementation result; got %v, want 'implementation complete'", afterTest.Result)
+	}
+	// Implementation session ID must NOT be overwritten by the test agent's session.
+	if afterTest.SessionID == nil || *afterTest.SessionID != "impl-sess" {
+		t.Fatalf("test run overwrote implementation session ID; got %v, want 'impl-sess'", afterTest.SessionID)
+	}
+	// Test verdict must be recorded.
+	if afterTest.LastTestResult != "pass" {
+		t.Fatalf("expected last_test_result=pass, got %q", afterTest.LastTestResult)
+	}
+	// IsTestRun must be cleared after the test completes.
+	if afterTest.IsTestRun {
+		t.Fatal("IsTestRun should be false after test completion")
 	}
 }

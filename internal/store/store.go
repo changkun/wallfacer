@@ -226,8 +226,7 @@ func (s *Store) loadAll() error {
 		// excluded from ListTasks but can still be restored or purged. The
 		// presence of the marker is authoritative: a corrupt/unparseable
 		// tombstone still means deleted, otherwise a soft-deleted task would
-		// resurrect as live on restart (and could be picked up by the
-		// auto-promoter). Parsing only populates metadata.
+		// resurrect as live on restart. Parsing only populates metadata.
 		if tombRaw, err := s.backend.ReadBlob(id, "tombstone.json"); err == nil {
 			var tomb Tombstone
 			if perr := json.Unmarshal(tombRaw, &tomb); perr != nil {

@@ -38,12 +38,11 @@ type MockRunner struct {
 	WorkspaceMgr *workspace.Manager
 
 	// Recorded call arguments (mutex-protected for race-safety).
-	RunBackgroundCalls          []uuid.UUID
-	KillContainerCalls          []uuid.UUID
-	CleanupWorktreesCalls       []uuid.UUID
-	GenerateTitleCalls          []uuid.UUID
-	MaybeAutoPushWorkspaceCalls []string
-	CommitCalls                 []uuid.UUID
+	RunBackgroundCalls    []uuid.UUID
+	KillContainerCalls    []uuid.UUID
+	CleanupWorktreesCalls []uuid.UUID
+	GenerateTitleCalls    []uuid.UUID
+	CommitCalls           []uuid.UUID
 
 	// Optional override for ContainerName return value.
 	// When nil the method returns "" (no container active), matching the default
@@ -56,10 +55,6 @@ type MockRunner struct {
 
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
-
-	// RunReviewerFn lets tests stub the reviewer. When nil, RunReviewer
-	// returns an approve verdict with no findings.
-	RunReviewerFn func(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
 
 	// GenerateAgentSessionTitleFn lets tests stub the task-free agent-session
 	// thread title generation. When nil, the method returns ("", nil).
@@ -137,18 +132,6 @@ func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 	m.mu.Unlock()
 }
 
-// ContainerCircuitAllow always returns true in the mock.
-func (m *MockRunner) ContainerCircuitAllow() bool { return true }
-
-// ContainerCircuitState returns the circuit breaker state.
-func (m *MockRunner) ContainerCircuitState() string { return "closed" }
-
-// ContainerCircuitFailures returns the failure count.
-func (m *MockRunner) ContainerCircuitFailures() int { return 0 }
-
-// RecordContainerFailure is a no-op in the mock.
-func (m *MockRunner) RecordContainerFailure() {}
-
 // PendingGoroutines returns nil in the mock.
 func (m *MockRunner) PendingGoroutines() []string { return nil }
 
@@ -216,15 +199,6 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 	return spec.DriftVerdict{}, nil
 }
 
-// RunReviewer delegates to RunReviewerFn when set; otherwise it returns an
-// approve verdict with no findings.
-func (m *MockRunner) RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error) {
-	if m.RunReviewerFn != nil {
-		return m.RunReviewerFn(ctx, task, in)
-	}
-	return &ReviewerResult{Answer: ReviewAnswer{Verdict: ReviewApprove}}, nil
-}
-
 // GenerateAgentSessionTitle delegates to GenerateAgentSessionTitleFn when
 // set; the default returns ("", nil) so callers skip the rename.
 func (m *MockRunner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error) {
@@ -232,20 +206,6 @@ func (m *MockRunner) GenerateAgentSessionTitle(ctx context.Context, firstUserMes
 		return m.GenerateAgentSessionTitleFn(ctx, firstUserMessage)
 	}
 	return "", nil
-}
-
-// MaybeAutoPushWorkspace records the workspace path for later inspection by tests.
-func (m *MockRunner) MaybeAutoPushWorkspace(_ context.Context, ws string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.MaybeAutoPushWorkspaceCalls = append(m.MaybeAutoPushWorkspaceCalls, ws)
-}
-
-// AutoPushWorkspaceCalls returns a race-safe snapshot of the workspaces passed to MaybeAutoPushWorkspace.
-func (m *MockRunner) AutoPushWorkspaceCalls() []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Clone(m.MaybeAutoPushWorkspaceCalls)
 }
 
 // WorkspaceManager returns the injected manager (or nil, the default, which

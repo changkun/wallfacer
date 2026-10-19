@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 89,
+  "route_count": 87,
   "routes": [
     {
       "method": "GET",
@@ -52,7 +52,7 @@
       "method": "GET",
       "pattern": "/api/config",
       "name": "GetConfig",
-      "description": "Get server configuration (workspaces, autoimplement flags, sandbox list).",
+      "description": "Get server configuration (workspaces, workspace groups, sandbox list).",
       "tags": [
         "config"
       ]
@@ -61,7 +61,7 @@
       "method": "PUT",
       "pattern": "/api/config",
       "name": "UpdateConfig",
-      "description": "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
+      "description": "Update server configuration (workspace groups and their parallel limits).",
       "tags": [
         "config"
       ]
@@ -633,24 +633,6 @@
       "pattern": "/api/tasks/{id}/test",
       "name": "TestTask",
       "description": "Trigger the test agent for a task.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/review",
-      "name": "ReviewTask",
-      "description": "Run one review round for a waiting task on the reviewer model.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/tasks/{id}/review/transcript",
-      "name": "ReviewTranscript",
-      "description": "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
       "tags": [
         "tasks"
       ]

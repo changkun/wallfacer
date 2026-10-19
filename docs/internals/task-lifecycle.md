@@ -8,7 +8,7 @@ Tasks progress through a well-defined set of states. Every transition is recorde
 stateDiagram-v2
     [*] --> backlog
 
-    backlog --> in_progress : drag / autoimplement
+    backlog --> in_progress : start
 
     in_progress --> in_progress : auto-continue
     in_progress --> waiting : end_turn
@@ -23,7 +23,7 @@ stateDiagram-v2
     waiting --> committing : mark done
     waiting --> cancelled : cancel
 
-    failed --> backlog : retry / auto_retry
+    failed --> backlog : retry
     failed --> cancelled : cancel
 
     done --> cancelled : cancel
@@ -47,13 +47,13 @@ Transition labels are shortened for legibility. In full:
 
 | Transition | Trigger |
 |---|---|
-| `backlog` to `in_progress` | User drag, or autoimplement promoting a backlog card |
+| `backlog` to `in_progress` | User drag or **Start task**, refused with 409 at the parallel limit |
 | `in_progress` to `in_progress` | `stop_reason` of `max_tokens` or `pause_turn`, auto-continued in the same session |
 | `in_progress` to `waiting` | `stop_reason` of `end_turn`, or an empty/unknown `stop_reason` |
 | `in_progress` to `failed` | Process error, agent error, timeout, or a budget limit exceeded |
 | `waiting` to `in_progress` | User feedback, or a test run (`IsTestRun`) |
 | `committing` to `done` / `failed` | Commit pipeline success or failure |
-| `failed` to `backlog` | Manual retry or auto-retry |
+| `failed` to `backlog` | Retry |
 
 ## States
 
@@ -80,7 +80,7 @@ Each pass through the loop in `runner.go` `Run()`:
 
 | `stop_reason` | `is_error` | Result |
 |---|---|---|
-| `end_turn` | false | Exit loop → `waiting` (awaiting review; auto-submit or user marks done to trigger commit pipeline) |
+| `end_turn` | false | Exit loop → `waiting` (awaiting review; the user marks done to trigger the commit pipeline) |
 | `max_tokens` | false | Auto-continue (next iteration, same session) |
 | `pause_turn` | false | Auto-continue (next iteration, same session) |
 | empty / unknown | false | Set `waiting`; block until user provides feedback |
@@ -134,20 +134,9 @@ When a task transitions to `failed`, the runner classifies the failure into one 
 
 The category is stored in `Task.FailureCategory` and included in `RetryRecord` when the task is reset for retry.
 
-## Auto-Retry
-
-Tasks can have an `AutoRetryBudget map[FailureCategory]int` that specifies how many automatic retries are allowed for each failure category. When a task fails:
-
-1. The failure is classified into a `FailureCategory`
-2. If the budget for that category has remaining retries, the count is decremented
-3. The task is automatically reset to `backlog` for a fresh run
-4. `AutoRetryCount` tracks the total number of auto-retries consumed
-
-A global cap (`constants.MaxAutoRetries`, currently 3) prevents infinite retry loops regardless of per-category budgets.
-
 ## Retry History
 
-Each time a task is reset for retry (manual or automatic), a `RetryRecord` is appended to `Task.RetryHistory`:
+Each time a task is reset for retry, a `RetryRecord` is appended to `Task.RetryHistory`:
 
 ```
 RetryRecord {
@@ -202,12 +191,6 @@ After reviewing the verdict, the user can:
 - Provide feedback to fix issues, then re-test
 - Cancel the task
 
-**Review supersedes the test agent** when the `review` runtime toggle is on and the task has at least one worktree (`reviewSupersedesTest`, `internal/handler/tasks_autoimplement.go`), whatever its harness. For such tasks the auto-tester skips the task and the auto-submitter gates on a review approval (`ReviewUnresolved == 0`) instead of `LastTestResult`. Tasks without a worktree fall back to the test agent. See [Automation](automation.md#auto-review).
-
-## Autoimplement
-
-Six background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, waiting-sync, auto-tester, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
-
 ## Board Context
 
 Before each turn the runner writes a `board.json` manifest of all non-archived tasks to a host directory (the BoardDir) and passes its path to the agent via the `WALLFACER_BOARD_JSON` environment variable (`internal/runner/{container.go,execute.go}` `writeBoardDir`). The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn.
@@ -224,25 +207,21 @@ See [Data & Storage](data-and-storage.md).
 
 ## Crash Recovery
 
-On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It first calls the backend's `ListContainers` through the `ContainerLister` interface to determine which task processes are still running (for HostBackend this enumerates host processes, not `podman/docker ps`), then handles each interrupted task as follows:
+On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It does not look for agent processes from the previous server; it decides from the stored status and the worktrees on disk:
 
-| Previous status | Process state | Recovery action |
-|---|---|---|
-| `committing` | any | Inspect worktree: if commit landed after `UpdatedAt` → `done`; otherwise → `failed` |
-| `in_progress` | still running | Stay `in_progress`; a monitor goroutine watches the process and transitions to `waiting` once it stops |
-| `in_progress` | already stopped | → `waiting`, user can review partial output, provide feedback, or mark as done |
+| Previous status | Recovery action |
+|---|---|
+| `committing` | Inspect each worktree's branch tip: if a commit landed after `UpdatedAt` → `done`; otherwise → `failed` |
+| `in_progress` | → `waiting`, so the user can review partial output, provide feedback, or mark the task done |
 
-If worktrees are missing during recovery, the task is marked `failed` with `FailureCategory = worktree_setup`.
+If a worktree is missing during recovery, the task is marked `failed` with `FailureCategory = worktree_setup`.
 
-**Why `waiting` instead of `failed` for stopped processes?**
+**Why `waiting` instead of `failed` for interrupted tasks?**
 The task may have produced useful partial output. Moving to `waiting` lets the user inspect results and choose the next action (resume with feedback, mark as done, or cancel) rather than forcing a retry from scratch.
-
-**Monitor goroutine** (`monitorContainerUntilStopped`):
-When a task process is found still running after a restart, a background goroutine polls the backend's `ListContainers` (host-process enumeration under HostBackend) every 5 seconds. Once the process stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.
 
 ## Oversight Generation
 
-See [Automation](automation.md).
+See [Background Work and Recovery](background-work.md#oversight-generation).
 
 ## Output Truncation
 
@@ -270,7 +249,7 @@ See [Data & Storage](data-and-storage.md).
 
 ## Dependency Resolution
 
-Tasks can declare dependencies on other tasks via `DependsOn []string` (a list of task UUID strings). A task with unsatisfied dependencies is not eligible for auto-promotion, even when capacity is available.
+Tasks can declare dependencies on other tasks via `DependsOn []string` (a list of task UUID strings). Dependencies are recorded and validated for cycles, and the board shows whether they are met; starting a task does not check them.
 
 ### DAG Validation in Batch Create
 
@@ -325,33 +304,7 @@ Tasks are created in topological order (from the Kahn's sort output), so each ta
 
 ### Single-Task Dependency Update
 
-`PATCH /api/tasks/{id}` with a `depends_on` field calls `UpdateTaskDependsOn`, which stores the list via `mutateTask`. No cycle detection is performed on single-task updates, the caller is responsible for ensuring validity.
-
-### Dependency Satisfaction Check
-
-`AreDependenciesSatisfied` (in `internal/store/tasks_update.go`) is the authoritative dependency gate:
-
-```go
-func (s *Store) AreDependenciesSatisfied(ctx context.Context, id uuid.UUID) (bool, error) {
-    // Under RLock:
-    for each depStr in task.DependsOn:
-        parse UUID (malformed → unsatisfied)
-        lookup in s.tasks (missing → unsatisfied, conservative)
-        if dep.Status != TaskStatusDone → unsatisfied
-    return true (all deps done)
-}
-```
-
-Conservative semantics: a malformed UUID or a deleted dependency is treated as unsatisfied to avoid silent unblocking.
-
-### Dependency in Auto-Promoter
-
-The auto-promoter (`tryAutoPromote` in `internal/handler/tasks_autoimplement.go`) checks dependencies as part of candidate selection:
-
-1. Lists all backlog tasks sorted by position.
-2. For each candidate, calls `AreDependenciesSatisfied`, skips if any dependency is not `done`.
-3. Also checks `ScheduledAt`, skips if the scheduled time is in the future.
-4. Promotes the highest-priority eligible candidate.
+`PATCH /api/tasks/{id}` with a `depends_on` field rejects a malformed UUID, a self-dependency, and an unknown task, then runs `taskReachable` over every task (archived included) and answers 400 when a new edge would close a cycle. The list is stored via `UpdateTaskDependsOn`.
 
 ---
 
@@ -433,6 +386,6 @@ See [Data & Storage](data-and-storage.md).
 - [Internals Index](internals.md), Overview and reading order for all internals docs
 - [Architecture](architecture.md), System design, component overview, and design decisions
 - [Data & Storage](data-and-storage.md), Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
-- [Automation](automation.md), Autoimplement, oversight generation
+- [Background Work and Recovery](background-work.md), startup recovery, oversight generation
 - [Git Worktrees](git-worktrees.md), Worktree lifecycle, branch naming, cleanup
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

@@ -144,11 +144,11 @@ func TestSubmitFeedback_Success(t *testing.T) {
 
 // --- CompleteTask ---
 
-// TestCompleteTask_AcquiresPromoteMu verifies CompleteTask serializes its
-// waiting→ transition under promoteMu, so it cannot race tryAutoSubmit into a
-// double commit. While promoteMu is held elsewhere, CompleteTask must block
-// before touching the task rather than completing the transition.
-func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
+// TestCompleteTask_AcquiresTransitionMu verifies CompleteTask serializes its
+// waiting→ transition under transitionMu, so two Mark as Done requests cannot
+// race into a double commit. While transitionMu is held elsewhere, CompleteTask
+// must block before touching the task rather than completing the transition.
+func TestCompleteTask_AcquiresTransitionMu(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
@@ -156,7 +156,7 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 	// No session → CompleteTask takes the direct waiting→done branch (no
 	// background goroutine), keeping the post-release assertion race-free.
 
-	promoteMu.Lock()
+	transitionMu.Lock()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
 	w := httptest.NewRecorder()
@@ -168,18 +168,18 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 
 	select {
 	case <-done:
-		promoteMu.Unlock()
-		t.Fatal("CompleteTask completed while promoteMu was held; it does not serialize the waiting transition")
+		transitionMu.Unlock()
+		t.Fatal("CompleteTask completed while transitionMu was held; it does not serialize the waiting transition")
 	case <-time.After(250 * time.Millisecond):
-		// Expected: blocked on promoteMu.Lock().
+		// Expected: blocked on transitionMu.Lock().
 	}
 
 	if cur, _ := h.store.GetTask(ctx, task.ID); cur.Status != store.TaskStatusWaiting {
-		promoteMu.Unlock()
-		t.Fatalf("task should still be waiting while promoteMu held, got %s", cur.Status)
+		transitionMu.Unlock()
+		t.Fatalf("task should still be waiting while transitionMu held, got %s", cur.Status)
 	}
 
-	promoteMu.Unlock()
+	transitionMu.Unlock()
 	<-done
 
 	if w.Code != http.StatusOK {
@@ -190,16 +190,16 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 	}
 }
 
-// TestTestTask_AcquiresPromoteMu verifies TestTask serializes its waiting→
-// in_progress transition under promoteMu, so a concurrent tryAutoSubmit cannot
+// TestTestTask_AcquiresTransitionMu verifies TestTask serializes its waiting→
+// in_progress transition under transitionMu, so a concurrent Mark as Done cannot
 // move the task to committing between TestTask's status check and its
 // UpdateTaskTestRun/UpdateTaskStatus writes.
-func TestTestTask_AcquiresPromoteMu(t *testing.T) {
+func TestTestTask_AcquiresTransitionMu(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	id := createWaitingTask(t, h, "implement something")
 
-	promoteMu.Lock()
+	transitionMu.Lock()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/test", strings.NewReader(`{}`))
 	w := httptest.NewRecorder()
@@ -211,19 +211,19 @@ func TestTestTask_AcquiresPromoteMu(t *testing.T) {
 
 	select {
 	case <-done:
-		promoteMu.Unlock()
-		t.Fatal("TestTask completed while promoteMu was held; it does not serialize the waiting transition")
+		transitionMu.Unlock()
+		t.Fatal("TestTask completed while transitionMu was held; it does not serialize the waiting transition")
 	case <-time.After(250 * time.Millisecond):
-		// Expected: blocked on promoteMu.Lock() before any write.
+		// Expected: blocked on transitionMu.Lock() before any write.
 	}
 
 	// Blocked before any write: the test-run flag must not be set yet.
 	if cur, _ := h.store.GetTask(ctx, id); cur.Status != store.TaskStatusWaiting || cur.IsTestRun {
-		promoteMu.Unlock()
-		t.Fatalf("task should be untouched while promoteMu held: status=%s isTestRun=%v", cur.Status, cur.IsTestRun)
+		transitionMu.Unlock()
+		t.Fatalf("task should be untouched while transitionMu held: status=%s isTestRun=%v", cur.Status, cur.IsTestRun)
 	}
 
-	promoteMu.Unlock()
+	transitionMu.Unlock()
 	<-done
 
 	if w.Code != http.StatusOK {
@@ -449,76 +449,6 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 		// OK — commit pipeline was triggered.
 	default:
 		t.Errorf("expected committing/done/failed, got %s — commit pipeline was not triggered", updated.Status)
-	}
-}
-
-// TestCompleteTask_CommitMessageFailureReturnsToWaiting verifies that when
-// commit message generation fails, the task returns to waiting for review and no
-// placeholder commit is merged (rather than silently completing with a
-// fabricated message). A user-triggered completion leaves automation unchanged.
-func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
-	h := newTestHandler(t)
-	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*executor.HostBackend); ok {
-		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
-		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
-	}
-	h.SetAutoimplement(true)
-	h.SetAutotest(true)
-	h.SetAutosubmit(true)
-	t.Cleanup(func() { waitForBackground(2000) })
-	ctx := context.Background()
-
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt-commit-fail")
-	gitRun(t, repo, "worktree", "add", "-b", "task-commit-fail", wt, "HEAD")
-	if err := os.WriteFile(filepath.Join(wt, "feature.txt"), []byte("new work\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
-	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-commit-fail")
-
-	setTaskSessionID(t, h, task.ID, "sess-fail")
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
-	w := httptest.NewRecorder()
-	h.CompleteTask(w, req, task.ID)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Wait for the commit pipeline to run and the recovery to return the task
-	// to waiting, signaled by the "returned to waiting" system event.
-	returned := false
-	for range 100 {
-		events, _ := h.store.GetEvents(ctx, task.ID)
-		for _, e := range events {
-			var data map[string]string
-			if err := json.Unmarshal(e.Data, &data); err == nil && strings.Contains(data["result"], "returned to waiting") {
-				returned = true
-			}
-		}
-		if returned {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if !returned {
-		t.Fatal("expected a 'returned to waiting' event after commit message generation failed")
-	}
-
-	updated, _ := h.store.GetTask(ctx, task.ID)
-	if updated == nil || updated.Status != store.TaskStatusWaiting {
-		t.Fatalf("expected task to return to waiting, got %v", updated.Status)
-	}
-	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "1" {
-		t.Fatalf("expected no placeholder commit to land, got %s commits", got)
-	}
-	// User-triggered completion (TriggerUser) does not pause automation.
-	if !h.AutoimplementEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
-		t.Fatal("expected automation toggles to remain unchanged on the user-triggered path")
 	}
 }
 
@@ -1198,5 +1128,68 @@ func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
 	// MockRunner.Commit returns nil, so the task should reach done status.
 	if updated == nil || updated.Status != store.TaskStatusDone {
 		t.Errorf("expected done status, got %q", updated.Status)
+	}
+}
+
+// TestCompleteTask_CommitMessageFailureReturnsToWaiting verifies that when
+// commit message generation fails, the task returns to waiting for review and no
+// placeholder commit is merged (rather than silently completing with a
+// fabricated message).
+func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	if hb, ok := h.runner.(*runner.Runner).SandboxBackend().(*executor.HostBackend); ok {
+		hb.SetBinaryForTest(harness.Claude, "/usr/bin/false")
+		hb.SetBinaryForTest(harness.Codex, "/usr/bin/false")
+	}
+	t.Cleanup(func() { waitForBackground(2000) })
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt-commit-fail")
+	gitRun(t, repo, "worktree", "add", "-b", "task-commit-fail", wt, "HEAD")
+	if err := os.WriteFile(filepath.Join(wt, "feature.txt"), []byte("new work\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-commit-fail")
+
+	setTaskSessionID(t, h, task.ID, "sess-fail")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
+	w := httptest.NewRecorder()
+	h.CompleteTask(w, req, task.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Wait for the commit pipeline to run and the recovery to return the task
+	// to waiting, signaled by the "returned to waiting" system event.
+	returned := false
+	for range 100 {
+		events, _ := h.store.GetEvents(ctx, task.ID)
+		for _, e := range events {
+			var data map[string]string
+			if err := json.Unmarshal(e.Data, &data); err == nil && strings.Contains(data["result"], "returned to waiting") {
+				returned = true
+			}
+		}
+		if returned {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !returned {
+		t.Fatal("expected a 'returned to waiting' event after commit message generation failed")
+	}
+
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated == nil || updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected task to return to waiting, got %v", updated.Status)
+	}
+	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "1" {
+		t.Fatalf("expected no placeholder commit to land, got %s commits", got)
 	}
 }

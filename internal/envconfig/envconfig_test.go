@@ -52,68 +52,6 @@ UNKNOWN_KEY=ignored
 	}
 }
 
-// TestParseReviewTuning verifies the review bounds are read, and that a
-// non-positive value is ignored (leaving the field zero so the default applies).
-func TestParseReviewTuning(t *testing.T) {
-	content := `WALLFACER_REVIEW_ROUNDS=6
-WALLFACER_REVIEW_COST_CAP=120000
-`
-	cfg, err := envconfig.Parse(writeEnvFile(t, content))
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.ReviewMaxRounds != 6 {
-		t.Errorf("ReviewMaxRounds = %d; want 6", cfg.ReviewMaxRounds)
-	}
-	if cfg.ReviewCostCap != 120000 {
-		t.Errorf("ReviewCostCap = %d; want 120000", cfg.ReviewCostCap)
-	}
-
-	// Non-positive values are rejected, leaving zero (default applies downstream).
-	cfg2, err := envconfig.Parse(writeEnvFile(t, "WALLFACER_REVIEW_ROUNDS=-1\nWALLFACER_REVIEW_COST_CAP=0\n"))
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg2.ReviewMaxRounds != 0 || cfg2.ReviewCostCap != 0 {
-		t.Errorf("non-positive values should be ignored, got rounds=%d cap=%d", cfg2.ReviewMaxRounds, cfg2.ReviewCostCap)
-	}
-}
-
-// TestReviewModel_ParseAndUpdate verifies the reviewer model is read from the
-// env file, written by Update, and removed by an empty update.
-func TestReviewModel_ParseAndUpdate(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_REVIEW_MODEL=gpt-5-codex\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.ReviewModel != "gpt-5-codex" {
-		t.Errorf("ReviewModel = %q; want gpt-5-codex", cfg.ReviewModel)
-	}
-
-	model := "claude-opus-4-6"
-	if err := envconfig.Update(path, envconfig.Updates{ReviewModel: &model}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-	if cfg, err = envconfig.Parse(path); err != nil {
-		t.Fatalf("Parse after update: %v", err)
-	}
-	if cfg.ReviewModel != model {
-		t.Errorf("ReviewModel after update = %q; want %q", cfg.ReviewModel, model)
-	}
-
-	empty := ""
-	if err := envconfig.Update(path, envconfig.Updates{ReviewModel: &empty}); err != nil {
-		t.Fatalf("Update clear: %v", err)
-	}
-	if cfg, err = envconfig.Parse(path); err != nil {
-		t.Fatalf("Parse after clear: %v", err)
-	}
-	if cfg.ReviewModel != "" {
-		t.Errorf("ReviewModel after clear = %q; want empty", cfg.ReviewModel)
-	}
-}
-
 // TestParseExportedKeys verifies that the "export " prefix is stripped from key lines.
 func TestParseExportedKeys(t *testing.T) {
 	content := `export CLAUDE_CODE_OAUTH_TOKEN=exported-oauth
@@ -524,51 +462,6 @@ func TestParseArchivedTasksPerPageAbsent(t *testing.T) {
 	}
 }
 
-// TestParseMaxTestParallelTasks verifies parsing a valid max test parallel value.
-func TestParseMaxTestParallelTasks(t *testing.T) {
-	content := "WALLFACER_MAX_TEST_PARALLEL=3\n"
-	path := writeEnvFile(t, content)
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.MaxTestParallelTasks != 3 {
-		t.Errorf("MaxTestParallelTasks = %d; want 3", cfg.MaxTestParallelTasks)
-	}
-}
-
-// TestParseMaxTestParallelTasksAbsent verifies that a missing key defaults to 0.
-func TestParseMaxTestParallelTasksAbsent(t *testing.T) {
-	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
-	path := writeEnvFile(t, content)
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.MaxTestParallelTasks != 0 {
-		t.Errorf("MaxTestParallelTasks = %d; want 0 when absent", cfg.MaxTestParallelTasks)
-	}
-}
-
-// TestUpdateMaxTestParallelTasks verifies that max test parallel can be set via Update.
-func TestUpdateMaxTestParallelTasks(t *testing.T) {
-	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
-	path := writeEnvFile(t, content)
-
-	v := "4"
-	if err := envconfig.Update(path, envconfig.Updates{MaxTestParallel: &v}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse after update: %v", err)
-	}
-	if cfg.MaxTestParallelTasks != 4 {
-		t.Errorf("MaxTestParallelTasks = %d; want 4 after update", cfg.MaxTestParallelTasks)
-	}
-}
-
 // TestUpdateOversightInterval verifies that the oversight interval can be set via Update.
 func TestUpdateOversightInterval(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
@@ -608,66 +501,8 @@ func TestUpdateArchivedTasksPerPage(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AutoPush
+// MaskToken
 // ---------------------------------------------------------------------------
-
-// TestParseAutoPush verifies parsing of auto-push enabled flag and threshold.
-func TestParseAutoPush(t *testing.T) {
-	content := "WALLFACER_AUTO_PUSH=true\nWALLFACER_AUTO_PUSH_THRESHOLD=3\n"
-	path := writeEnvFile(t, content)
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if !cfg.AutoPushEnabled {
-		t.Errorf("AutoPushEnabled = false; want true")
-	}
-	if cfg.AutoPushThreshold != 3 {
-		t.Errorf("AutoPushThreshold = %d; want 3", cfg.AutoPushThreshold)
-	}
-}
-
-// TestParseAutoPushDefaults verifies that auto-push defaults to disabled with threshold 0.
-func TestParseAutoPushDefaults(t *testing.T) {
-	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
-	path := writeEnvFile(t, content)
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.AutoPushEnabled {
-		t.Errorf("AutoPushEnabled = true; want false when absent")
-	}
-	if cfg.AutoPushThreshold != 0 {
-		t.Errorf("AutoPushThreshold = %d; want 0 when absent", cfg.AutoPushThreshold)
-	}
-}
-
-// TestUpdateAutoPush verifies that auto-push settings can be written and read back.
-func TestUpdateAutoPush(t *testing.T) {
-	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
-	path := writeEnvFile(t, content)
-
-	enabled := "true"
-	threshold := "5"
-	if err := envconfig.Update(path, envconfig.Updates{
-		AutoPush:          &enabled,
-		AutoPushThreshold: &threshold,
-	}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse after update: %v", err)
-	}
-	if !cfg.AutoPushEnabled {
-		t.Errorf("AutoPushEnabled = false; want true after update")
-	}
-	if cfg.AutoPushThreshold != 5 {
-		t.Errorf("AutoPushThreshold = %d; want 5 after update", cfg.AutoPushThreshold)
-	}
-}
 
 // TestMaskToken verifies token redaction: empty stays empty, short tokens are fully masked,
 // and longer tokens show first 4 and last 4 characters with "..." in between.

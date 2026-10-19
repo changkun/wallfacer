@@ -334,8 +334,8 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 
 	// Decide whether the previous group's store should be closed.
 	// Keep the store alive if it has running tasks (taskCount > 0) OR
-	// non-terminal tasks (waiting, in_progress, committing) that watchers
-	// need to process.
+	// non-terminal tasks (waiting, in_progress, committing), so background
+	// work still writing to those tasks finds the store open.
 	previousKey := swap.previous.Key
 	var closePrevious bool
 	var previousStore *store.Store

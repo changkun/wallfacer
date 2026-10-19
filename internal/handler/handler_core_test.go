@@ -8,85 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
 
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
-	"latere.ai/x/wallfacer/internal/store"
 )
-
-// TestSetAutoimplement verifies that autoimplement state can be toggled.
-func TestSetAutoimplement_Enable(t *testing.T) {
-	h := newTestHandler(t)
-	if h.AutoimplementEnabled() {
-		t.Fatal("expected autoimplement to be disabled by default")
-	}
-
-	h.SetAutoimplement(true)
-	if !h.AutoimplementEnabled() {
-		t.Error("expected autoimplement to be enabled after SetAutoimplement(true)")
-	}
-}
-
-func TestSetAutoimplement_Disable(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-	h.SetAutoimplement(false)
-	if h.AutoimplementEnabled() {
-		t.Error("expected autoimplement to be disabled after SetAutoimplement(false)")
-	}
-}
-
-func TestSetAutoimplement_Toggle(t *testing.T) {
-	h := newTestHandler(t)
-	for i := range 5 {
-		enabled := i%2 == 0
-		h.SetAutoimplement(enabled)
-		if h.AutoimplementEnabled() != enabled {
-			t.Errorf("iteration %d: expected autoimplement=%v, got %v", i, enabled, h.AutoimplementEnabled())
-		}
-	}
-}
-
-// TestPauseAllAutomation_OpensWatcherBreaker verifies that pauseAllAutomation
-// now opens the circuit breaker only for the watcher that failed and does NOT
-// disable user-controlled automation toggles.
-func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-	h.SetAutotest(true)
-	h.SetAutosubmit(true)
-
-	taskID := uuid.New()
-	paused := h.pauseAllAutomation(&taskID, "auto-submit", "boom")
-	if !paused {
-		t.Fatal("expected pauseAllAutomation to return true (new failure)")
-	}
-
-	// The circuit breaker for the failing watcher should be open.
-	if !h.breakers["auto-submit"].isOpen() {
-		t.Error("expected auto-submit circuit breaker to be open")
-	}
-	// Other watchers must remain healthy.
-	if h.breakers["auto-promote"].isOpen() {
-		t.Error("expected auto-promote circuit breaker to remain closed")
-	}
-	if h.breakers["auto-test"].isOpen() {
-		t.Error("expected auto-test circuit breaker to remain closed")
-	}
-
-	// User-controlled toggles must NOT be disabled by a circuit breaker event.
-	if !h.AutoimplementEnabled() {
-		t.Error("expected autoimplement toggle to remain enabled")
-	}
-	if !h.AutotestEnabled() {
-		t.Error("expected autotest toggle to remain enabled")
-	}
-	if !h.AutosubmitEnabled() {
-		t.Error("expected autosubmit toggle to remain enabled")
-	}
-}
 
 // TestWriteJSON_SetsContentType verifies that writeJSON sets the correct content type.
 func TestWriteJSON_SetsContentType(t *testing.T) {
@@ -202,62 +128,6 @@ func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
 	}
 }
 
-// TestEnvConfig_ResourceGovernanceRoundTrip proves the resource knobs
-// (max_agents, agent_nice, review rounds, cost cap and model) report their
-// defaults on GET and persist through PUT.
-func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-
-	get := func() envConfigResponse {
-		w := httptest.NewRecorder()
-		h.GetEnvConfig(w, httptest.NewRequest(http.MethodGet, "/api/env", nil))
-		var resp envConfigResponse
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
-		return resp
-	}
-
-	// Defaults: review bounds, no reviewer model, backend default nice,
-	// unlimited budget.
-	d := get()
-	if d.ReviewRounds != 3 || d.ReviewCostCap != 50000 || d.ReviewModel != "" {
-		t.Errorf("review defaults = rounds %d cap %d model %q; want 3/50000/empty", d.ReviewRounds, d.ReviewCostCap, d.ReviewModel)
-	}
-	if d.AgentNice != executor.DefaultAgentNice {
-		t.Errorf("agent_nice default = %d, want %d", d.AgentNice, executor.DefaultAgentNice)
-	}
-	if d.MaxAgents != 0 {
-		t.Errorf("max_agents default = %d, want 0 (unlimited)", d.MaxAgents)
-	}
-
-	// Persist new values via PUT.
-	body := `{"max_agents":4,"agent_nice":15,"review_rounds":5,"review_cost_cap":80000,"review_model":"gpt-5-codex"}`
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body)))
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("PUT = %d: %s", w.Code, w.Body.String())
-	}
-
-	// GET reflects the persisted values.
-	g := get()
-	if g.MaxAgents != 4 || g.AgentNice != 15 || g.ReviewRounds != 5 || g.ReviewCostCap != 80000 || g.ReviewModel != "gpt-5-codex" {
-		t.Errorf("after PUT = max_agents %d nice %d rounds %d cap %d model %q; want 4/15/5/80000/gpt-5-codex",
-			g.MaxAgents, g.AgentNice, g.ReviewRounds, g.ReviewCostCap, g.ReviewModel)
-	}
-}
-
-// TestUpdateEnvConfig_ReviewForksIsGone pins the removal of the review fork
-// count: a single reviewer has no forks, so the setting is no longer accepted.
-func TestUpdateEnvConfig_ReviewForksIsGone(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"review_forks":2}`)))
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("PUT review_forks = %d, want 400 for an unknown field", w.Code)
-	}
-}
-
 // TestUpdateEnvConfig_InvalidJSON returns 400 for bad JSON.
 func TestUpdateEnvConfig_InvalidJSON(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
@@ -308,49 +178,6 @@ func TestUpdateEnvConfig_EmptyTokenTreatedAsNoChange(t *testing.T) {
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d", w.Code)
-	}
-}
-
-// TestTryAutoPromote_NoTasksWhenAutoimplementOff verifies no promotion when autoimplement disabled.
-func TestTryAutoPromote_NoPromotionWhenAutoimplementOff(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutoimplement(false)
-
-	ctx := h.store // use store indirectly
-	_ = ctx
-	h.tryAutoPromote(httptest.NewRequest(http.MethodGet, "/", nil).Context())
-
-	// No panic and no tasks should be promoted.
-}
-
-// TestTryAutoPromote_PromotesIdeaAgentTaggedTasks verifies that tasks tagged
-// "idea-agent" (created by the brainstorm agent) ARE auto-promoted like normal tasks.
-func TestTryAutoPromote_PromotesIdeaAgentTaggedTasks(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-	ctx := context.Background()
-
-	// Create a task tagged "idea-agent" (created by brainstorm, Kind=TaskKindTask).
-	ideaTask, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm idea", Timeout: 30, Kind: store.TaskKindTask, Tags: []string{"idea-agent"}})
-	if err != nil {
-		t.Fatalf("CreateTask (idea-agent tagged): %v", err)
-	}
-
-	h.tryAutoPromote(ctx)
-
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		t.Fatalf("ListTasks: %v", err)
-	}
-
-	taskMap := make(map[string]store.TaskStatus)
-	for _, task := range tasks {
-		taskMap[task.ID.String()] = task.Status
-	}
-
-	// The idea-agent tagged task should have been promoted out of backlog.
-	if got := taskMap[ideaTask.ID.String()]; got == store.TaskStatusBacklog {
-		t.Errorf("idea-agent tagged task: expected promotion out of backlog, still in backlog")
 	}
 }
 
@@ -464,15 +291,42 @@ func TestRequireStoreMiddleware_WithoutStore(t *testing.T) {
 	}
 }
 
-// TestSetAutopush_Toggle verifies that SetAutopush toggles the autopush state.
-func TestSetAutopush_Toggle(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutopush(true)
-	if !h.AutopushEnabled() {
-		t.Error("expected autopush=true after SetAutopush(true)")
+// TestEnvConfig_ResourceGovernanceRoundTrip proves the resource knobs
+// (max_agents, agent_nice) report their defaults on GET and persist through
+// PUT.
+func TestEnvConfig_ResourceGovernanceRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	get := func() envConfigResponse {
+		w := httptest.NewRecorder()
+		h.GetEnvConfig(w, httptest.NewRequest(http.MethodGet, "/api/env", nil))
+		var resp envConfigResponse
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return resp
 	}
-	h.SetAutopush(false)
-	if h.AutopushEnabled() {
-		t.Error("expected autopush=false after SetAutopush(false)")
+
+	// Defaults: backend default nice, unlimited agents.
+	d := get()
+	if d.AgentNice != executor.DefaultAgentNice {
+		t.Errorf("agent_nice default = %d, want %d", d.AgentNice, executor.DefaultAgentNice)
+	}
+	if d.MaxAgents != 0 {
+		t.Errorf("max_agents default = %d, want 0 (unlimited)", d.MaxAgents)
+	}
+
+	// Persist new values via PUT.
+	body := `{"max_agents":4,"agent_nice":15}`
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body)))
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT = %d: %s", w.Code, w.Body.String())
+	}
+
+	// GET reflects the persisted values.
+	g := get()
+	if g.MaxAgents != 4 || g.AgentNice != 15 {
+		t.Errorf("after PUT = max_agents %d nice %d; want 4/15", g.MaxAgents, g.AgentNice)
 	}
 }

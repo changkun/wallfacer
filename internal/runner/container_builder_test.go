@@ -42,7 +42,7 @@ func argsContainSubstring(args []string, sub string) bool {
 // ---------------------------------------------------------------------------
 
 // TestResolveEnvFileFallback covers the env-file resolution guard that keeps
-// long-idle scheduled tasks alive when the configured env file path has
+// tasks started after a long idle period alive when the configured env file path has
 // vanished by launch time (e.g. a mktemp ENV_FILE under /var/folders that
 // macOS's tmp-reaper purges after a few idle days). Without the fallback,
 // buildBaseContainerSpec hands podman a dead --env-file path and the task dies

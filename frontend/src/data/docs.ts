@@ -12,10 +12,9 @@ export interface DocEntry {
 export const docIndex: DocEntry[] = [
   { slug: 'usage', title: "Usage Guide", section: "Get Started", desc: "Reading order and common workflows." },
   { slug: 'getting-started', title: "Getting Started", section: "Get Started", desc: "Installation, credentials, first task end to end." },
-  { slug: 'concepts', title: "Concepts", section: "Get Started", desc: "The mental model: workspaces, tasks, specs, agents, and the autonomy spectrum." },
+  { slug: 'concepts', title: "Concepts", section: "Get Started", desc: "The mental model: workspaces, tasks, specs, agents, and the working levels." },
   { slug: 'board', title: "Board", section: "Use Wallfacer", desc: "The task board: lifecycle, dependencies, batch creation, search, the task detail view." },
   { slug: 'plan', title: "Plan", section: "Use Wallfacer", desc: "Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations." },
-  { slug: 'automation', title: "Automation", section: "Operate", desc: "Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers." },
   { slug: 'oversight', title: "Oversight", section: "Operate", desc: "Oversight summaries, timelines, logs, diff review, per-task cost and usage." },
   { slug: 'workspaces', title: "Workspaces", section: "Operate", desc: "Workspace management, git integration, branches." },
   { slug: 'configuration', title: "Configuration", section: "Operate", desc: "Settings, environment variables, harness selection, CLI reference." },

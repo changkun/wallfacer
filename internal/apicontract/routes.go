@@ -61,12 +61,12 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/config", Name: "GetConfig",
-		Description: "Get server configuration (workspaces, autoimplement flags, sandbox list).",
+		Description: "Get server configuration (workspaces, workspace groups, sandbox list).",
 		Tags:        []string{"config"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/config", Name: "UpdateConfig",
-		Description: "Update server configuration (autoimplement, autotest, autosubmit, sandbox assignments).",
+		Description: "Update server configuration (workspace groups and their parallel limits).",
 		Tags:        []string{"config"},
 	},
 
@@ -413,16 +413,6 @@ var Routes = []Route{
 	{
 		Method: http.MethodPost, Pattern: "/api/tasks/{id}/test", Name: "TestTask",
 		Description: "Trigger the test agent for a task.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/review", Name: "ReviewTask",
-		Description: "Run one review round for a waiting task on the reviewer model.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/review/transcript", Name: "ReviewTranscript",
-		Description: "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
 		Tags:        []string{"tasks"},
 	},
 
