@@ -3,7 +3,7 @@
 // presence. Wallfacer owns this chrome rather than composing the
 // shared package rail; the geometry is the design system's nav row and
 // the rail sits on the deep ground with no border, so the seam between it and
-// the content card is a depth, not a line. See specs/shared/console-redesign/shell.md.
+// the content card is a depth, not a line. See specs/.archive/shared/console-redesign/shell.md.
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import WorkspaceChip from './WorkspaceChip.vue';

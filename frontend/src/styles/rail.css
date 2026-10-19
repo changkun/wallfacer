@@ -2,7 +2,7 @@
    The console rail sits on the deep ground with no border; the main card
    beside it carries the depth. Rows are the nav-row primitive (34px, radius
    12): the current destination is the one sheet of paper in the rail, the
-   same material the content is. See specs/shared/console-redesign/shell.md. */
+   same material the content is. See specs/.archive/shared/console-redesign/shell.md. */
 .app-rail {
   position: relative;
   z-index: 30;

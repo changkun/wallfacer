@@ -2,7 +2,7 @@
 // The one bar every page shares: a crumb on the left (workspace › page › leaf)
 // and, on the right, the page's own actions (a component the page registers
 // on the ui store). Below the phone breakpoint a menu button opens the rail
-// drawer. See specs/shared/console-redesign/shell.md.
+// drawer. See specs/.archive/shared/console-redesign/shell.md.
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTaskStore } from '../stores/tasks';

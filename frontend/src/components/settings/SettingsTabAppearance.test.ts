@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import SettingsTabAppearance from './SettingsTabAppearance.vue';
 import { PALETTES, usePrefsStore } from '../../stores/prefs';
 
-// Appearance (specs/shared/console-redesign/settings.md): the mode is a
+// Appearance (specs/.archive/shared/console-redesign/settings.md): the mode is a
 // segmented control and the palette roster comes from the prefs store, so a
 // new preset appears without a template change.
 function mount() {

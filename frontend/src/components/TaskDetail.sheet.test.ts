@@ -5,7 +5,7 @@ import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import TaskDetail from './TaskDetail.vue';
 import type { Task } from '../api/types';
 
-// The sheet (specs/shared/console-redesign/task-detail.md): one ink action
+// The sheet (specs/.archive/shared/console-redesign/task-detail.md): one ink action
 // per status, ghosts for the rest, Delete in the card foot, and one visible
 // tab section at a time.
 function makeTask(over: Partial<Task> = {}): Task {

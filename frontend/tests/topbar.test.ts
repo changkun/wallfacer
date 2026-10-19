@@ -7,7 +7,7 @@ import Topbar from '../src/components/Topbar.vue';
 import { useUiStore } from '../src/stores/ui';
 
 // The topbar carries the crumb and the page's own actions
-// (specs/shared/console-redesign/shell.md).
+// (specs/.archive/shared/console-redesign/shell.md).
 async function mountTopbar(path: string) {
   const router = createRouter({
     history: createMemoryHistory(),

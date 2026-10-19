@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 // Regression guard for the console design system
-// (specs/shared/console-redesign.md). Four contracts:
+// (specs/.archive/shared/console-redesign.md). Four contracts:
 //   1. The material is matte: no backdrop-filter anywhere in src/styles, and
 //      (as surface specs land) in any component style block. `none` is allowed:
 //      it switches a filter off.

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // The workspace chip absorbed the status bar's connection dot and branch
-// actions (specs/shared/console-redesign/shell.md). These guard that the dot
+// actions (specs/.archive/shared/console-redesign/shell.md). These guard that the dot
 // reflects the SSE state and that Sync / Push / Rebase still hit the same
 // endpoints the status bar did.
 vi.mock('../src/api/client', () => ({

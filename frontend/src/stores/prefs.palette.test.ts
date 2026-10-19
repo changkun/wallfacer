@@ -3,7 +3,7 @@
 // light/dark: prefs.palette persists at wallfacer-palette and applies as
 // <html data-palette>, with the default palette (clay) carrying no attribute
 // so SSG output matches the default first paint. See
-// specs/shared/visual-identity/theme-system.md.
+// specs/.archive/shared/visual-identity/theme-system.md.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 

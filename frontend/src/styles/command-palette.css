@@ -2,7 +2,7 @@
    A popover pinned near the top of the viewport: a borderless search field in
    the head, grouped rows below, the selected row on the sunk surface, task
    actions as small ghost buttons under their task. The palette never blurs.
-   See specs/shared/console-redesign/panels-and-overlays.md. */
+   See specs/.archive/shared/console-redesign/panels-and-overlays.md. */
 .command-palette {
   position: fixed;
   inset: 0;

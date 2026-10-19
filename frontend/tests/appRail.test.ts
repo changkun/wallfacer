@@ -13,7 +13,7 @@ vi.mock('../src/composables/useSse', () => ({
 import AppRail from '../src/components/AppRail.vue';
 import { NAV_GROUPS } from '../src/lib/nav';
 
-// The rail is wallfacer's own chrome (specs/shared/console-redesign/shell.md).
+// The rail is wallfacer's own chrome (specs/.archive/shared/console-redesign/shell.md).
 // These guard its contract: every destination renders as a row, the fold
 // hides the words and keeps the icons, and the Board row carries the live
 // count the status bar used to show.

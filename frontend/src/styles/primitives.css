@@ -1,7 +1,7 @@
 /* =======================================================================
    Wallfacer — Primitives
    The shared classes every surface is composed from. Styled through tokens
-   only; the geometry table lives in specs/shared/console-redesign.md. Class
+   only; the geometry table lives in specs/.archive/shared/console-redesign.md. Class
    names follow replichai so a reader can move between the two codebases.
 
    The compatibility block at the end maps the class names older templates

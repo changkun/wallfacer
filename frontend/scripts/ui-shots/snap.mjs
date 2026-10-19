@@ -51,7 +51,7 @@ const SURFACES = {
   // overview-spec focuses a real spec so the three-pane Plan view is populated;
   // oversight opens the rich OAuth task on its diff (Changes) tab.
   'overview-spec': {
-    route: '/plan?spec=specs/shared/console-redesign.md',
+    route: '/plan?spec=specs/.archive/shared/console-redesign.md',
     steps: [{ waitFor: '.sf-content--spec' }, { wait: 1200 }],
   },
   oversight: {
@@ -64,7 +64,7 @@ const SURFACES = {
     ],
   },
   // The plan with a spec focused, so the three panes carry content.
-  plan: { route: '/plan?spec=specs/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
+  plan: { route: '/plan?spec=specs/.archive/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
 };
 
 const base = arg('base', 'http://localhost:8099');

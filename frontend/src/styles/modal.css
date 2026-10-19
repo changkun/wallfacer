@@ -4,7 +4,7 @@
    centered dialog (.dialog) at 440 or 720 wide, and the task sheet, the wide
    dialog variant with a header row, an underline tab strip, a scrolling main
    column and a 340px aside of cards. See
-   specs/shared/console-redesign/panels-and-overlays.md and task-detail.md. */
+   specs/.archive/shared/console-redesign/panels-and-overlays.md and task-detail.md. */
 .modal-overlay {
   background: var(--glass-dim);
   animation: om-fade-in 0.16s var(--ease-fluid) both;

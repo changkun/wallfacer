@@ -112,7 +112,7 @@ const SCENES = {
     const main = await firstBox(page, '.app-main');
     expect('board', main && main.width > 0, 'app-main not rendered');
 
-    // The board geometry (specs/shared/console-redesign/board.md): four equal
+    // The board geometry (specs/.archive/shared/console-redesign/board.md): four equal
     // columns, 14px cards, at most two pills on a card's first row, no card
     // wider than its column, and a composer that expands on click.
     const cols = await boxes(page, '.board-grid > .col');
@@ -134,7 +134,7 @@ const SCENES = {
     expect('board', focused === true, 'composer did not expand with the prompt focused');
   },
 
-  // The shell geometry (specs/shared/console-redesign/shell.md): rail 236 open
+  // The shell geometry (specs/.archive/shared/console-redesign/shell.md): rail 236 open
   // and 64 folded on the deep ground, the main card inset 8px on three sides
   // starting at the rail's edge, a 52px topbar, and no status bar anywhere.
   shell: async (page) => {
@@ -252,7 +252,7 @@ SCENES['contrast'] = async (page) => {
   }
 };
 
-// The task sheet (specs/shared/console-redesign/task-detail.md): open the
+// The task sheet (specs/.archive/shared/console-redesign/task-detail.md): open the
 // first card, the sheet fits the viewport, the aside is 340 wide, the tabs
 // row is present, the Actions card carries one ink button, and the Changes
 // and Verification tabs switch without page errors.
@@ -414,7 +414,7 @@ SCENES['chat-error'] = async (page) => {
   }
 };
 
-// The chat popup (specs/shared/console-redesign/chat.md): on a page that does
+// The chat popup (specs/.archive/shared/console-redesign/chat.md): on a page that does
 // not own the chat, the launcher sits inside the viewport and opens a window
 // that stays inside it, with the composer ready.
 SCENES['chat-popup'] = async (page) => {
@@ -431,7 +431,7 @@ SCENES['chat-popup'] = async (page) => {
   expect('chat-popup', !!(await firstBox(page, '.scp-window .pcp-composer')), 'composer did not render in the popup');
 };
 
-// The plan surface (specs/shared/console-redesign/plan.md): tree rows on the
+// The plan surface (specs/.archive/shared/console-redesign/plan.md): tree rows on the
 // nav-row geometry, a reading column no wider than 76ch, the tree folds to a
 // 28px strip, and the focused view's status is a pill.
 SCENES['plan'] = async (page) => {
@@ -459,7 +459,7 @@ SCENES['plan'] = async (page) => {
 
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
-// Settings (specs/shared/console-redesign/settings.md): a column no wider
+// Settings (specs/.archive/shared/console-redesign/settings.md): a column no wider
 // than 760, an underline tab strip, right-aligned controls, every tab without
 // page errors, and six swatches on Appearance.
 SCENES['settings'] = async (page) => {
@@ -484,7 +484,7 @@ SCENES['settings'] = async (page) => {
   }
 };
 
-// The command palette (specs/shared/console-redesign/panels-and-overlays.md):
+// The command palette (specs/.archive/shared/console-redesign/panels-and-overlays.md):
 // the rail's search button opens a 640px popover near the top of the viewport,
 // inside it, with the
 // first row selected and no blur anywhere on the page.

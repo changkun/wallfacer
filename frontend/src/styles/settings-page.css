@@ -1,6 +1,6 @@
 /* --- Settings ---
    A centered column: title, underline tabs, then one card per section with
-   label / help / control rows. See specs/shared/console-redesign/settings.md. */
+   label / help / control rows. See specs/.archive/shared/console-redesign/settings.md. */
 .settings-page {
   flex: 1;
   overflow-y: auto;

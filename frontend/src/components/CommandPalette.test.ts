@@ -1,7 +1,7 @@
 // The command palette is a popover of grouped rows: tasks first, then specs.
 // Arrow keys move the selected row and Enter opens it. Pins the row
 // vocabulary and the keyboard contract
-// (specs/shared/console-redesign/panels-and-overlays.md).
+// (specs/.archive/shared/console-redesign/panels-and-overlays.md).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, h, nextTick, type App } from 'vue';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';

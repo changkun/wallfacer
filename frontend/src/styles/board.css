@@ -1,7 +1,7 @@
 /* --- Columns ---
    Four equal columns; each header is an eyebrow with the column's state dot,
    its count, and quiet controls. The column body is a soft tray on the sunk
-   surface; cards float on it. See specs/shared/console-redesign/board.md. */
+   surface; cards float on it. See specs/.archive/shared/console-redesign/board.md. */
 .board-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

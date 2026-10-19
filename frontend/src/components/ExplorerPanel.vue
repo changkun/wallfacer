@@ -9,7 +9,7 @@ import { fileIcon, type FileIcon } from '../lib/fileIcon';
 import { statusPill } from '../lib/statusPill';
 
 // Collapsible file-explorer side panel. Lives inside BoardPage to the left of
-// the board grid (see specs/foundations/file-explorer.md) so browsing files
+// the board grid (see specs/.archive/foundations/file-explorer.md) so browsing files
 // never hides the board. Clicking a file opens it as an editor tab (see
 // stores/editorTabs); the board's top-bar tab strip swaps the center pane.
 const emit = defineEmits<{ close: [] }>();

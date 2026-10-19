@@ -4,7 +4,7 @@
    card of rows for name and limits plus a folders card. The folder browser
    (FolderBrowser.vue) is shared: a path field, a breadcrumb, a toolbar and
    entry rows on the sunk surface.
-   See specs/shared/console-redesign/panels-and-overlays.md. */
+   See specs/.archive/shared/console-redesign/panels-and-overlays.md. */
 
 /* The list body and each wizard step share one height so the dialog does not
    jump between views. */

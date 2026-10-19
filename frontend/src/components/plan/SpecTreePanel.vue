@@ -670,7 +670,7 @@ onUnmounted(() => {
 <style scoped>
 /* The spec tree: a sunk column of nav rows. A row is the rail's row (34px,
    radius 12), the focused one sits on the card surface, and a 5px ramp dot
-   carries the lifecycle status. See specs/shared/console-redesign/plan.md. */
+   carries the lifecycle status. See specs/.archive/shared/console-redesign/plan.md. */
 .spec-tree-panel {
   width: var(--stp-width, 280px);
   min-width: 200px;

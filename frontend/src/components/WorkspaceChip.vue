@@ -3,7 +3,7 @@
 // popover of groups) with the live-connection state as a dot before the name,
 // and one branch row per git workspace with ahead/behind counts and the
 // sync / push / rebase actions. This is where the status bar's contents
-// re-homed (specs/shared/console-redesign/shell.md): connection and branches
+// re-homed (specs/.archive/shared/console-redesign/shell.md): connection and branches
 // are workspace state, so they live with the workspace.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
