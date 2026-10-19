@@ -108,9 +108,6 @@ func DriftAssessment(d DriftData) string { return render("drift.tmpl", d) }
 // ConflictResolution renders the rebase conflict resolution prompt.
 func ConflictResolution(d ConflictData) string { return render("conflict.tmpl", d) }
 
-// Spec renders the spec-mode agent system prompt.
-func Spec() string { return render("spec.tmpl", nil) }
-
 // SpecSystemEmpty renders the spec-mode prompt prefix used
 // when the workspace spec tree is empty (no non-archived parseable
 // specs). Encourages the agent to emit a `/spec-new` directive for

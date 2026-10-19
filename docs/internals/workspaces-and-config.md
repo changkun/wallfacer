@@ -214,7 +214,6 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 | `oversight.tmpl` | `Oversight` | Oversight summarization of task activity |
 | `conflict.tmpl` | `ConflictResolution` | Rebase conflict resolution agent |
 | `task_prompt_refine.tmpl` | `TaskPromptRefine` | Task prompt refinement in Plan mode |
-| `spec.tmpl` | `Spec` | Spec authoring |
 | `spec_system_empty.tmpl` | `SpecSystemEmpty` | Plan session system prompt, empty spec tree |
 | `spec_system_nonempty.tmpl` | `SpecSystemNonempty` | Plan session system prompt, existing spec tree |
 

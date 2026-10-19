@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/prompts"
-	"latere.ai/x/wallfacer/internal/spec"
 )
 
 // TestOversight_ReturnsNonEmptyRendered verifies that the oversight template
@@ -73,50 +72,6 @@ func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 	if strings.Contains(got, "{{") {
 		t.Errorf("ConflictResolution returned unreplaced template syntax: %q", got)
-	}
-}
-
-// TestRenderSpec verifies that the spec template renders without error
-// and contains key phrases.
-func TestRenderSpec(t *testing.T) {
-	got := prompts.Spec()
-	if strings.TrimSpace(got) == "" {
-		t.Error("Spec returned empty string")
-	}
-	if strings.Contains(got, "{{") {
-		t.Errorf("Spec returned unreplaced template syntax: %q", got)
-	}
-	for _, phrase := range []string{"spec", "planning", "specs/"} {
-		if !strings.Contains(strings.ToLower(got), phrase) {
-			t.Errorf("Spec output missing expected phrase %q", phrase)
-		}
-	}
-}
-
-// TestRenderSpec_StatusesMatchModel pins the spec prompt to the lifecycle
-// the code enforces: every status the parser knows is listed, so the agent
-// never learns a five-state machine while the server runs a seven-state one.
-func TestRenderSpec_StatusesMatchModel(t *testing.T) {
-	got := prompts.Spec()
-	for _, st := range []spec.Status{
-		spec.StatusVague, spec.StatusDrafted, spec.StatusValidated, spec.StatusTesting,
-		spec.StatusComplete, spec.StatusStale, spec.StatusArchived,
-	} {
-		if !strings.Contains(got, "`"+string(st)+"`") {
-			t.Errorf("spec prompt does not list status %q", st)
-		}
-	}
-}
-
-// TestRenderSpec_NoHardcodedTracks: track directories come and go, so the
-// prompt points the agent at specs/README.md instead of naming a fixed set.
-func TestRenderSpec_NoHardcodedTracks(t *testing.T) {
-	got := prompts.Spec()
-	if strings.Contains(got, "specs/foundations/") {
-		t.Errorf("spec prompt still hardcodes a track directory:\n%s", got)
-	}
-	if !strings.Contains(got, "specs/README.md") {
-		t.Errorf("spec prompt should point at specs/README.md for the live tracks")
 	}
 }
 
