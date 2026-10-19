@@ -25,9 +25,8 @@ Each toggle arms one server-side watcher. The watchers wake on store changes and
 When capacity allows, the auto-promoter moves backlog tasks to In Progress and launches their agents. Eligibility and ordering:
 
 - **Parallel cap**: the global limit is `WALLFACER_MAX_PARALLEL`; a workspace can override it with its own `MaxParallel` (0 means unlimited for that workspace).
-- **Dependencies**: a task is promoted only when every task it depends on is done.
 - **Scheduled time**: a task with a future `ScheduledAt` waits; a precise one-shot timer promotes it within milliseconds of the due time.
-- **Ordering**: candidates are ranked by critical-path score (tasks that unblock the most downstream work go first), then board position, then creation time.
+- **Ordering**: candidates are ranked by board position, then creation time.
 - **Skips**: tasks currently locked by a planning agent are never promoted.
 
 The same watcher also auto-resumes waiting tasks that carry failed-test feedback, feeding the feedback back into the session, up to a cap of 3 consecutive test failures. After the cap, the task parks until manual feedback arrives.

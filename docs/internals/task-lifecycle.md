@@ -268,42 +268,6 @@ See [Data & Storage](data-and-storage.md).
 
 ---
 
-## Dependency Resolution
-
-Tasks can declare dependencies on other tasks via `DependsOn []string` (a list of task UUID strings). A task with unsatisfied dependencies is not eligible for auto-promotion, even when capacity is available.
-
-### Single-Task Dependency Update
-
-`PATCH /api/tasks/{id}` with a `depends_on` field calls `UpdateTaskDependsOn`, which stores the list via `mutateTask`. No cycle detection is performed on single-task updates, the caller is responsible for ensuring validity.
-
-### Dependency Satisfaction Check
-
-`AreDependenciesSatisfied` (in `internal/store/tasks_update.go`) is the authoritative dependency gate:
-
-```go
-func (s *Store) AreDependenciesSatisfied(ctx context.Context, id uuid.UUID) (bool, error) {
-    // Under RLock:
-    for each depStr in task.DependsOn:
-        parse UUID (malformed → unsatisfied)
-        lookup in s.tasks (missing → unsatisfied, conservative)
-        if dep.Status != TaskStatusDone → unsatisfied
-    return true (all deps done)
-}
-```
-
-Conservative semantics: a malformed UUID or a deleted dependency is treated as unsatisfied to avoid silent unblocking.
-
-### Dependency in Auto-Promoter
-
-The auto-promoter (`tryAutoPromote` in `internal/handler/tasks_autoimplement.go`) checks dependencies as part of candidate selection:
-
-1. Lists all backlog tasks sorted by position.
-2. For each candidate, calls `AreDependenciesSatisfied`, skips if any dependency is not `done`.
-3. Also checks `ScheduledAt`, skips if the scheduled time is in the future.
-4. Promotes the highest-priority eligible candidate.
-
----
-
 ## Board Context Generation
 
 Board context gives each running agent visibility into sibling tasks on the board, enabling cross-task coordination and conflict avoidance.

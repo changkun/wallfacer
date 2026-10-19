@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 	"time"
 
@@ -389,75 +388,6 @@ func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
 	}
 	if changed {
 		t.Error("expected changed=false for already-current task JSON")
-	}
-}
-
-// TestMigrateTaskJSON_CanonicalizeDependsOn verifies that DependsOn entries
-// are trimmed, UUID-validated, deduplicated, and sorted.
-func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {
-	id1 := uuid.New()
-	id2 := uuid.New()
-	// Ensure id1 < id2 in canonical string form for predictable sort assertion.
-	if id1.String() > id2.String() {
-		id1, id2 = id2, id1
-	}
-
-	// Include: whitespace padding, duplicate (id1 repeated), invalid UUID, and
-	// uppercase variant of id2 that should round-trip to lowercase.
-	raw := []byte(fmt.Sprintf(`{
-		"schema_version": %d,
-		"id": "11111111-1111-1111-1111-111111111111",
-		"prompt": "p",
-		"status": "backlog",
-		"timeout": 30,
-		"created_at": "2024-01-01T00:00:00Z",
-		"updated_at": "2024-01-01T00:00:00Z",
-		"depends_on": [" %s ", "%s", "not-a-uuid", "%s"]
-	}`,
-		constants.CurrentTaskSchemaVersion,
-		id1.String(), id2.String(),
-		id1.String(), // duplicate
-	))
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true for DependsOn requiring canonicalization")
-	}
-
-	want := []string{id1.String(), id2.String()}
-	slices.Sort(want)
-	if !slices.Equal(task.DependsOn, want) {
-		t.Errorf("DependsOn = %v, want %v", task.DependsOn, want)
-	}
-}
-
-// TestMigrateTaskJSON_InvalidDependsOnDropped verifies that a DependsOn list
-// containing only invalid UUIDs results in nil (keeping JSON clean).
-func TestMigrateTaskJSON_InvalidDependsOnDropped(t *testing.T) {
-	now := "2024-01-01T00:00:00Z"
-	raw := []byte(fmt.Sprintf(`{
-		"schema_version": %d,
-		"id": "22222222-2222-2222-2222-222222222222",
-		"prompt": "p",
-		"status": "backlog",
-		"timeout": 30,
-		"created_at": %q,
-		"updated_at": %q,
-		"depends_on": ["not-a-uuid", "also-not", ""]
-	}`, constants.CurrentTaskSchemaVersion, now, now))
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true when invalid DependsOn entries are dropped")
-	}
-	if task.DependsOn != nil {
-		t.Errorf("DependsOn = %v, want nil after dropping all invalid entries", task.DependsOn)
 	}
 }
 

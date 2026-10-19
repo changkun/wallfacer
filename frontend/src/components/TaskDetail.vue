@@ -18,7 +18,6 @@ import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import ReviewVerification from './ReviewVerification.vue';
-import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
 import { detectResultType } from '../lib/resultType';
@@ -35,24 +34,6 @@ const emit = defineEmits<{ close: [] }>();
 const taskStore = useTaskStore();
 const detailRouter = useRouter();
 
-// "Blocked by" dependency list — resolves depends_on against the live task
-// store, mirroring modal-core's dependency section. Each row is clickable
-// to open the blocking task; a "Waiting on X of Y" summary shows how many
-// are still unsatisfied (not done/cancelled).
-interface DepRow { id: string; label: string; status: string; satisfied: boolean }
-const blockedBy = computed<DepRow[]>(() => {
-  const ids = props.task.depends_on ?? [];
-  const byId = new Map(taskStore.tasks.map((t) => [t.id, t]));
-  return ids.map((id) => {
-    const dep = byId.get(id);
-    if (!dep) return { id, label: id.slice(0, 8) + '…', status: 'missing', satisfied: false };
-    const label = dep.title || (dep.prompt.length > 40 ? dep.prompt.slice(0, 40) + '…' : dep.prompt) || id.slice(0, 8);
-    const satisfied = dep.status === 'done' || dep.status === 'cancelled';
-    return { id, label, status: dep.status, satisfied };
-  });
-});
-const blockedByUnmet = computed(() => blockedBy.value.filter((d) => !d.satisfied).length);
-
 // Execution-environment provenance rows (harness, model, API endpoint,
 // recorded time).
 const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() => {
@@ -65,9 +46,6 @@ const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() 
   if (e.recorded_at) rows.push({ label: 'Recorded', value: relativeTime(e.recorded_at) });
   return rows;
 });
-function openDep(id: string) {
-  detailRouter.push({ path: '/', query: { task: id } });
-}
 
 // Source spec link (Links → spec). The basename is shown as the label; the
 // click deep-links to /plan focusing the spec (PlanPage honors ?spec=<path>).
@@ -589,11 +567,6 @@ const gitWorktrees = computed(() => {
   return n ? `${n} ${n === 1 ? 'repo' : 'repos'}` : 'none';
 });
 
-const dependsOnDisplay = computed(() => {
-  const n = (props.task.depends_on || []).length;
-  return n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : 'none';
-});
-
 // Budget usage as a percentage of the configured cost/token cap (0 when no cap).
 const budgetPct = computed(() => {
   const u = props.task.usage;
@@ -742,7 +715,6 @@ const EDIT_SANDBOX_OPTIONS = computed(() => [
   })),
 ]);
 const editTags = ref('');
-const editDeps = ref<string[]>([]);
 const editScheduledAt = ref('');
 const editMaxCost = ref<number | null>(null);
 const editMaxTokens = ref<number | null>(null);
@@ -769,7 +741,6 @@ function openBacklogEdit() {
   editModel.value = t.model ?? '';
   editSandbox.value = t.sandbox ?? '';
   editTags.value = (t.tags ?? []).join(', ');
-  editDeps.value = [...(t.depends_on ?? [])];
   editScheduledAt.value = toDatetimeLocal(t.scheduled_at);
   editMaxCost.value = t.max_cost_usd && t.max_cost_usd > 0 ? t.max_cost_usd : null;
   editMaxTokens.value = t.max_input_tokens && t.max_input_tokens > 0 ? t.max_input_tokens : null;
@@ -788,7 +759,6 @@ async function saveBacklogEdit() {
     if (editSandbox.value !== (t.sandbox ?? '')) patch.sandbox = editSandbox.value;
     const parsedTags = editTags.value.split(',').map((x) => x.trim()).filter(Boolean);
     if (JSON.stringify(parsedTags) !== JSON.stringify(t.tags ?? [])) patch.tags = parsedTags;
-    if (JSON.stringify(editDeps.value) !== JSON.stringify(t.depends_on ?? [])) patch.depends_on = [...editDeps.value];
     const nextScheduled = editScheduledAt.value ? new Date(editScheduledAt.value).toISOString() : null;
     if ((nextScheduled ?? '') !== (t.scheduled_at ?? '')) patch.scheduled_at = nextScheduled;
     if ((editMaxCost.value ?? 0) !== (t.max_cost_usd ?? 0)) patch.max_cost_usd = editMaxCost.value ?? 0;
@@ -1508,26 +1478,6 @@ async function submitReview() {
 
         <!-- Right aside -->
         <aside class="sheet-aside">
-          <!-- Blocked by: the dependency list with its readiness summary. -->
-          <section v-if="blockedBy.length" class="mdl-section">
-            <div class="mdl-h">
-              Blocked by
-              <span v-if="blockedByUnmet > 0" class="pill pill-warn deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
-              <span v-else class="pill pill-ok deps-summary">all satisfied</span>
-            </div>
-            <button
-              v-for="d in blockedBy"
-              :key="d.id"
-              type="button"
-              class="dep-row"
-              :title="`Open ${d.label}`"
-              @click="openDep(d.id)"
-            >
-              <span class="pill" :class="pillClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
-              <span class="dep-row__label">{{ d.label }}</span>
-            </button>
-          </section>
-
           <!-- Actions: a stack of explicit rows, each with a glyph, a label and
                a hint. The forward transition takes the accent, done the green,
                cancel the warn tone and delete the red. -->
@@ -1654,10 +1604,6 @@ async function submitReview() {
                   <span>Harness</span>
                   <AppSelect v-model="editSandbox" :options="EDIT_SANDBOX_OPTIONS" aria-label="Harness" block />
                 </label>
-                <div class="backlog-edit__field">
-                  <span>Depends on</span>
-                  <DependencyPicker v-model="editDeps" :exclude-id="props.task.id" />
-                </div>
                 <label class="backlog-edit__field">
                   <span>Scheduled</span>
                   <input v-model="editScheduledAt" class="field" type="datetime-local" />
@@ -1714,7 +1660,6 @@ async function submitReview() {
                 <template v-else>—</template>
               </span>
             </div>
-            <div class="row"><span class="k">depends on</span><span class="v">{{ dependsOnDisplay }}</span></div>
           </section>
 
           <section v-if="envRows.length" class="mdl-section">
@@ -1920,11 +1865,6 @@ async function submitReview() {
   font-weight: 400;
 }
 .backlog-edit__actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
-
-/* Blocked-by rows in the Git card. */
-.deps-summary { margin-left: auto; }
-.dep-row { width: 100%; border: none; border-top: 1px solid var(--rule); background: transparent; text-align: left; font: inherit; color: var(--ink); }
-.dep-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
 
 /* Usage-by-agent table. */
 .usage-breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; }

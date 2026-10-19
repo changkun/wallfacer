@@ -10,7 +10,7 @@ import { highlightMatch } from '../lib/highlight';
 import { orderTags } from '../lib/tagBadge';
 import { cardActionsFor, primaryCardAction, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import HarnessLogo from './HarnessLogo.vue';
-import { dependencyBadge, failureLabel } from '../lib/cardBadges';
+import { failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { useNow } from '../composables/useNow';
 import { toRef } from 'vue';
@@ -189,37 +189,6 @@ const taskStore = useTaskStore();
 // Highlight the active board filter inside the card title (legacy parity).
 const titleHtml = computed(() => highlightMatch(props.task.title || '', taskStore.filterQuery));
 
-// Dependency-state badge for backlog cards (blocked / ready / cancelled),
-// resolved against the live task list. Mirrors render.js renderDependencyBadge.
-const depBadge = computed(() => {
-  // Only backlog cards carry a dependency badge; skip the map lookup entirely
-  // for every other card so a tasks change does not touch them.
-  if (props.task.status !== 'backlog') return null;
-  return dependencyBadge(props.task, taskStore.tasksById);
-});
-const depBadgeClass = computed(() => {
-  switch (depBadge.value?.kind) {
-    case 'blocked': return 'pill-warn';
-    case 'ready': return 'pill-ok';
-    case 'cancelled': return 'pill-warn';
-    default: return '';
-  }
-});
-const depBadgeText = computed(() => {
-  const b = depBadge.value;
-  if (!b) return '';
-  if (b.kind === 'ready') return 'ready';
-  if (b.kind === 'cancelled') return 'dependency cancelled';
-  return `${b.count} dep${b.count !== 1 ? 's' : ''}`;
-});
-const depBadgeTitle = computed(() => {
-  const b = depBadge.value;
-  if (!b) return '';
-  if (b.kind === 'blocked') return `Blocked by: ${b.blocking}`;
-  if (b.kind === 'cancelled') return 'A dependency was cancelled or removed; this task may be unblocked after the next sync';
-  return 'All dependencies satisfied; ready for promotion';
-});
-
 // Friendly failure-category label (Timeout/Budget/…) for failed cards.
 const failureBadge = computed(() => failureLabel(props.task.failure_category));
 
@@ -231,7 +200,6 @@ const signals = computed<Signal[]>(() => {
   const out: Signal[] = [];
   if (testBadge.value) out.push(testBadge.value);
   if (failureBadge.value) out.push({ label: failureBadge.value, cls: 'pill-err', title: 'Failure reason: ' + props.task.failure_category });
-  if (depBadge.value) out.push({ label: depBadgeText.value, cls: depBadgeClass.value, title: depBadgeTitle.value });
   if (scheduledLabel.value) out.push({ label: scheduledLabel.value, cls: 'pill-neutral', title: 'Scheduled start' });
   return out;
 });

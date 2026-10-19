@@ -21,7 +21,6 @@ func deepCloneTask(t *Task) Task {
 	cp.CustomPassPatterns = slices.Clone(t.CustomPassPatterns)
 	cp.CustomFailPatterns = slices.Clone(t.CustomFailPatterns)
 	cp.Tags = slices.Clone(t.Tags)
-	cp.DependsOn = slices.Clone(t.DependsOn)
 	cp.TruncatedTurns = slices.Clone(t.TruncatedTurns)
 	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
 	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)

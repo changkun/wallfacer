@@ -24,7 +24,7 @@ Data models (Task, TaskEvent, TaskUsage, TaskSummary), per-task directory persis
 
 [Task Lifecycle](task-lifecycle.md)
 
-The task state machine, turn loop, dependency resolution, auto-retry, failure categorization, and board context manifests.
+The task state machine, turn loop, auto-retry, failure categorization, and board context manifests.
 
 ### 4. Git Operations & Worktree Lifecycle
 

@@ -329,8 +329,8 @@ const tasks = [
   {
     schema_version: 2,
     id: ID.back1,
-    title: 'Wire dependency badges on backlog cards',
-    prompt: 'Show a dep-count badge and block promotion until deps are done.',
+    title: 'Add keyboard shortcuts to the board',
+    prompt: 'Bind keys to open the composer, search, and move between columns.',
     status: 'backlog',
     result: null,
     stop_reason: null,
@@ -339,8 +339,6 @@ const tasks = [
     usage: usage(0, 0, 0, 0, 0),
     sandbox: 'claude',
     tags: ['priority:medium', 'impact:3', 'frontend'],
-    // Depends on two done tasks to render a dependency badge.
-    depends_on: [ID.done1, ID.done2],
     impact_score: 3,
     position: 0,
     created_at: iso(20),

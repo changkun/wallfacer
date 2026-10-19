@@ -66,7 +66,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/summaries` | List immutable task summaries for completed tasks (cost dashboard) |
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
-| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, harness, dependencies, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
+| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, harness, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
 | `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
@@ -98,7 +98,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **Spec tree & graph** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
-| `GET /api/graph` | Unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for Mission Control |
+| `GET /api/graph` | Unified spec+task graph (nodes, typed edges, critical path) for Mission Control |
 | `GET /api/specs/stale-candidates` | List specs flagged as potentially stale by the drift pipeline |
 | `POST /api/specs/dismiss-stale-candidates` | Dismiss all pending stale-candidate flags |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |

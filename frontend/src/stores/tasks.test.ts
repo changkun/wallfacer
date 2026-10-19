@@ -7,7 +7,6 @@ vi.mock('../api/client', () => ({
 }));
 
 import { useTaskStore } from './tasks';
-import { dependencyBadge } from '../lib/cardBadges';
 import type { Task } from '../api/types';
 
 beforeEach(() => {
@@ -47,17 +46,6 @@ describe('tasks store tasksById', () => {
     store.setTasks([{ id: 'c' } as Task]);
     expect(store.tasksById.has('a')).toBe(false);
     expect(store.tasksById.get('c')?.id).toBe('c');
-  });
-
-  it('resolves a backlog blocked badge via the shared map', () => {
-    const store = useTaskStore();
-    const dep = { id: 'dep', title: 'Build deps', status: 'in_progress' } as Task;
-    const card = { id: 'card', status: 'backlog', depends_on: ['dep'] } as Task;
-    store.setTasks([dep, card]);
-
-    const badge = dependencyBadge(card, store.tasksById);
-    expect(badge?.kind).toBe('blocked');
-    expect(badge?.blocking).toBe('Build deps');
   });
 });
 

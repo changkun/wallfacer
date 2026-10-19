@@ -61,7 +61,6 @@ describe('edgePaths (detachment fix)', () => {
     ],
     edges: [{ from: 'a', to: 'b', kind: 'dispatch' }],
     critical_path: [],
-    blocked: [],
   };
 
   it('re-aims the edge endpoint to the live node position after a move', () => {

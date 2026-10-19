@@ -29,8 +29,6 @@ var defaultAutoRetryBudget = map[FailureCategory]int{
 
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
-	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
-	ID             uuid.UUID
 	Prompt         string
 	Criteria       string
 	Timeout        int
@@ -46,7 +44,6 @@ type TaskCreateOptions struct {
 	MaxCostUSD         float64
 	MaxInputTokens     int
 	ScheduledAt        *time.Time
-	DependsOn          []string
 	SpecSourcePath     string
 	ModelOverride      string
 	CustomPassPatterns []string
@@ -62,10 +59,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	// field that requires a locked scan of s.tasks; it is set inside the lock
 	// below.  All search-indexed fields (Prompt, Tags) are available from opts
 	// so buildIndexEntry can run before we take any lock.
-	id := opts.ID
-	if id == (uuid.UUID{}) {
-		id = uuid.New()
-	}
+	id := uuid.New()
 
 	now := time.Now()
 
@@ -95,11 +89,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	// Tags: deep-copy to protect store state from caller mutation.
 	if len(opts.Tags) > 0 {
 		task.Tags = append([]string(nil), opts.Tags...)
-	}
-
-	// DependsOn: deep-copy.
-	if len(opts.DependsOn) > 0 {
-		task.DependsOn = append([]string(nil), opts.DependsOn...)
 	}
 
 	task.SpecSourcePath = opts.SpecSourcePath
@@ -223,9 +212,7 @@ func normalizeSandboxByActivity(input map[SandboxActivity]harness.ID) map[Sandbo
 // The task directory is retained on disk; the task is moved from s.tasks to
 // s.deleted so it no longer appears in ListTasks but can be restored.
 // reason is optional human-readable context for why the task was deleted.
-// After the tombstone is written, any non-terminal tasks that depend on id have
-// id removed from their DependsOn list so they are no longer permanently blocked.
-func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) error {
+func (s *Store) DeleteTask(_ context.Context, id uuid.UUID, reason string) error {
 	s.mu.Lock()
 
 	t, ok := s.tasks[id]
@@ -249,57 +236,13 @@ func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) err
 	s.deleted[id] = t
 	s.notify(t, true) // task-deleted delta — SSE clients work unchanged
 	s.mu.Unlock()
-
-	// Clean up orphaned dependencies: any backlog/in_progress/waiting/failed task
-	// that listed id in DependsOn is now permanently blocked, so remove id from
-	// each dependent's DependsOn slice.
-	s.removeOrphanedDependents(ctx, id)
 	return nil
 }
 
-// removeOrphanedDependents finds all non-terminal tasks that depend on cancelledID
-// and removes cancelledID from their DependsOn slices. This unblocks tasks whose
-// only blocker was a task that is now cancelled or deleted.
-func (s *Store) removeOrphanedDependents(ctx context.Context, cancelledID uuid.UUID) {
-	deps, err := s.TasksDependingOn(ctx, cancelledID)
-	if err != nil {
-		logger.Store.Warn("orphan cleanup: list dependents", "task", cancelledID, "error", err)
-		return
-	}
-	cancelledIDStr := cancelledID.String()
-	for _, dep := range deps {
-		if err := s.mutateTask(dep.ID, func(t *Task) error {
-			updated := t.DependsOn[:0:0] // preserve nil if empty
-			for _, idStr := range t.DependsOn {
-				if idStr != cancelledIDStr {
-					updated = append(updated, idStr)
-				}
-			}
-			if len(updated) == 0 {
-				t.DependsOn = nil
-			} else {
-				t.DependsOn = updated
-			}
-			return nil
-		}); err != nil {
-			logger.Store.Warn("orphan cleanup: remove dep", "dependent", dep.ID, "cancelled", cancelledID, "error", err)
-		} else {
-			logger.Store.Info("removed orphaned dependency", "dependent", dep.ID, "cancelled_dep", cancelledID)
-		}
-	}
-}
-
-// CancelTask moves a task to TaskStatusCancelled using ForceUpdateTaskStatus
-// (which bypasses the normal state-machine transitions) and then removes the
-// task's ID from the DependsOn list of any non-terminal tasks that reference it.
-// Cancelled tasks can never reach done, so their dependents would otherwise be
-// permanently blocked by the auto-promoter's dependency check.
+// CancelTask moves a task to TaskStatusCancelled using ForceUpdateTaskStatus,
+// which bypasses the normal state-machine transitions.
 func (s *Store) CancelTask(ctx context.Context, id uuid.UUID) error {
-	if err := s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled); err != nil {
-		return err
-	}
-	s.removeOrphanedDependents(ctx, id)
-	return nil
+	return s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled)
 }
 
 // ListDeletedTasks returns all soft-deleted (tombstoned) tasks sorted by UpdatedAt DESC.

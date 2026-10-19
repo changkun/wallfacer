@@ -3,11 +3,7 @@ package store
 import (
 	"encoding/json"
 	"maps"
-	"slices"
-	"strings"
 	"time"
-
-	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -23,14 +19,14 @@ import (
 //     and ModelOverride is unset), then clear Model.
 //  2. Default missing/zero values: Status → "backlog", Timeout via
 //     clampTimeout, missing CreatedAt/UpdatedAt from file mod time.
-//  3. Canonicalize DependsOn: trim whitespace, UUID-validate, deduplicate,
-//     stable-sort.
-//  4. Normalize Sandbox (trim) and SandboxByActivity via
+//  3. Normalize Sandbox (trim) and SandboxByActivity via
 //     normalizeSandboxByActivity.
-//  5. Backfill AutoRetryBudget for tasks created before schema version 2.
-//  6. Fold the deprecated Lineage field into Trace, renamed in schema
-//     version 3.
-//  7. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
+//  4. Backfill AutoRetryBudget for tasks created before schema version 2.
+//  5. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
+//
+// Keys a stored record carries that Task does not declare, such as an older
+// record's depends_on list, are dropped by json.Unmarshal and disappear on
+// the record's next save.
 func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	var task Task
 	if err := json.Unmarshal(raw, &task); err != nil {
@@ -64,16 +60,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (2) Canonicalize DependsOn.
-	if len(task.DependsOn) > 0 {
-		canon := canonicalizeDependsOn(task.DependsOn)
-		if !slices.Equal(canon, task.DependsOn) {
-			task.DependsOn = canon
-			changed = true
-		}
-	}
-
-	// (3) Normalize Sandbox and SandboxByActivity.
+	// (2) Normalize Sandbox and SandboxByActivity.
 	if normalSandbox := harness.NormalizeID(string(task.Sandbox)); normalSandbox != task.Sandbox {
 		task.Sandbox = normalSandbox
 		changed = true
@@ -83,7 +70,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (4) Backfill AutoRetryBudget for tasks created before schema version 2.
+	// (3) Backfill AutoRetryBudget for tasks created before schema version 2.
 	// Only transient/infrastructure failures get a budget; agent_error and
 	// timeout are not retried automatically because they are likely to recur.
 	if task.AutoRetryBudget == nil {
@@ -95,37 +82,11 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (5) Guarantee SchemaVersion is current.
+	// (4) Guarantee SchemaVersion is current.
 	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
 		task.SchemaVersion = constants.CurrentTaskSchemaVersion
 		changed = true
 	}
 
 	return task, changed, nil
-}
-
-// canonicalizeDependsOn trims whitespace from each element, validates UUID
-// format (dropping non-UUID values), deduplicates using the 16-byte UUID value
-// (so case and format variants are unified), and sorts the result in ascending
-// order. Returns nil instead of an empty slice so json:"omitempty" keeps the
-// field absent in JSON when there are no valid dependencies.
-func canonicalizeDependsOn(deps []string) []string {
-	seen := make(map[uuid.UUID]struct{}, len(deps))
-	out := make([]string, 0, len(deps))
-	for _, dep := range deps {
-		id, err := uuid.Parse(strings.TrimSpace(dep))
-		if err != nil {
-			continue // drop non-UUID values
-		}
-		if _, dup := seen[id]; dup {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id.String()) // canonical lowercase hyphenated form
-	}
-	slices.Sort(out)
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }

@@ -94,10 +94,9 @@ type dispatchError struct {
 
 // resolvedSpec holds a parsed spec along with its absolute filesystem path.
 type resolvedSpec struct {
-	spec     *spec.Spec
-	absPath  string
-	relPath  string   // original path from request (e.g. "specs/local/foo.md")
-	taskDeps []string // resolved task dependency UUIDs
+	spec    *spec.Spec
+	absPath string
+	relPath string // original path from request (e.g. "specs/local/foo.md")
 }
 
 // promoteTarget is a non-leaf spec marked validated as part of folder dispatch.
@@ -223,12 +222,6 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 	resolved := make([]resolvedSpec, 0, len(exp.leafPaths))
 	errs := exp.errs
 
-	// Track which paths are in this batch for intra-batch dependency resolution.
-	batchPaths := make(map[string]int) // relPath → index in resolved
-	for _, p := range exp.leafPaths {
-		batchPaths[p] = -1 // placeholder, updated after validation
-	}
-
 	for _, relPath := range exp.leafPaths {
 		absPath := findSpecFile(workspaces, relPath)
 		if absPath == "" {
@@ -268,7 +261,6 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		batchPaths[relPath] = len(resolved)
 		resolved = append(resolved, resolvedSpec{
 			spec:    s,
 			absPath: absPath,
@@ -300,47 +292,8 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Phase 2: Resolve dependencies.
-	// For each spec's depends_on, check if the dependency is in this batch
-	// (use pre-assigned UUID) or already dispatched (use existing task ID).
-	preAssignedIDs := make([]uuid.UUID, len(resolved))
-	for i := range resolved {
-		preAssignedIDs[i] = uuid.New()
-	}
-
-	for i, rs := range resolved {
-		var deps []string
-		for _, depPath := range rs.spec.DependsOn {
-			// Check if dependency is in the current batch.
-			if idx, ok := batchPaths[depPath]; ok && idx >= 0 {
-				deps = append(deps, preAssignedIDs[idx].String())
-				continue
-			}
-			// Check if dependency spec is already dispatched.
-			depAbsPath := findSpecFile(workspaces, depPath)
-			if depAbsPath == "" {
-				continue // dependency not found, skip
-			}
-			depSpec, err := spec.ParseFile(depAbsPath)
-			if err != nil {
-				continue
-			}
-			// Archived dependencies are considered already satisfied — they
-			// contribute no blocker edge to the resulting board task.
-			if depSpec.Status == spec.StatusArchived {
-				continue
-			}
-			if depSpec.DispatchedTaskID != nil {
-				deps = append(deps, *depSpec.DispatchedTaskID)
-			}
-			// If dependency exists but isn't dispatched, no blocker is added.
-		}
-		resolved[i].taskDeps = deps
-	}
-
-	// Phase 3: Create tasks.
-	// Simple sequential creation (topological sort is not strictly needed since
-	// dependencies are resolved by pre-assigned UUIDs, not creation order).
+	// Phase 2: Create tasks. A spec's depends_on stays in the spec tree; the
+	// created task carries no link to the tasks of the specs it depends on.
 	createdTaskIDs := make([]uuid.UUID, len(resolved))
 	for i, rs := range resolved {
 		tags := []string{"spec-dispatched"}
@@ -349,12 +302,10 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		}
 
 		task, err := s.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
-			ID:             preAssignedIDs[i],
 			Prompt:         rs.spec.Body,
 			Timeout:        60,
 			Tags:           tags,
 			SpecSourcePath: rs.relPath,
-			DependsOn:      rs.taskDeps,
 		})
 		if err != nil {
 			// Rollback: delete any tasks created so far.
@@ -372,7 +323,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 	}
 
-	// Phase 4: Write dispatched_task_id back to spec files.
+	// Phase 3: Write dispatched_task_id back to spec files.
 	for i, rs := range resolved {
 		taskIDStr := createdTaskIDs[i].String()
 		err := spec.UpdateFrontmatter(rs.absPath, map[string]any{
@@ -396,7 +347,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Phase 4b: Promote drafted non-leaf ancestors in dispatched subtrees to
+	// Phase 3b: Promote drafted non-leaf ancestors in dispatched subtrees to
 	// validated. Best-effort — the leaves are already dispatched; a failed
 	// promotion is cosmetic and logged, not fatal.
 	for _, pt := range exp.promote {
@@ -412,7 +363,7 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Phase 5: If run is true, transition tasks to in_progress.
+	// Phase 4: If run is true, transition tasks to in_progress.
 	if req.Run {
 		for i := range resolved {
 			if err := s.UpdateTaskStatus(r.Context(), createdTaskIDs[i], store.TaskStatusInProgress); err != nil {

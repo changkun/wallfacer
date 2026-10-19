@@ -19,7 +19,7 @@ Start here for the full reading order.
 
 ### Use Wallfacer
 
-- [Board](board.md). The task board: lifecycle, dependencies, search, the task detail view.
+- [Board](board.md). The task board: lifecycle, search, the task detail view.
 - [Chat](chat.md). The dedicated chat surface: sessions, slash commands, @mentions.
 - [Plan](plan.md). Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations.
 - [Whiteboard](whiteboard.md). The free-form drawing canvas.
@@ -40,7 +40,7 @@ Start here for the full reading order.
 2. Issue `/create` to scaffold a first draft.
 3. Refine with `/refine`, `/impact`, then `/validate`.
 4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.
-5. When leaves are ready, `/dispatch` to push them to the board with dependency wiring.
+5. When leaves are ready, `/dispatch` to push them to the board.
 6. After tasks finish, `/review-impl` and `/wrapup` to close out the parent.
 
 ### Parallel feature development
@@ -63,7 +63,7 @@ Create multiple Backlog tasks, enable [Autoimplement](automation.md), and let Wa
 ### Fully automated pipeline
 
 1. Enable Autoimplement, Auto-Test, and Auto-Submit (see [Automation](automation.md)).
-2. Create backlog tasks with dependencies (see [Board](board.md)).
+2. Create backlog tasks (see [Board](board.md)).
 3. Tasks are automatically promoted, tested, and submitted as they complete.
 
 ## For Developers

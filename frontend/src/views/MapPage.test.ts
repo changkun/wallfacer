@@ -26,7 +26,6 @@ const graphFixture: Graph = {
   ],
   edges: [{ from: 'spec:a', to: 'task:b', kind: 'dispatch' }],
   critical_path: ['spec:a', 'task:b'],
-  blocked: [],
 };
 
 interface Call { method: string; url: string; body: unknown }

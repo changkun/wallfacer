@@ -154,39 +154,6 @@ func (h *Handler) StartAutoRetrier(ctx context.Context) {
 	})
 }
 
-// taskReachable reports whether target is reachable from start by following
-// DependsOn edges (i.e., target is a transitive dependency of start).
-// Used to detect cycles before accepting a new dependency edge.
-func taskReachable(taskList []store.Task, start, target uuid.UUID) bool {
-	adj := make(map[uuid.UUID][]uuid.UUID, len(taskList))
-	for _, t := range taskList {
-		for _, s := range t.DependsOn {
-			if id, err := uuid.Parse(s); err == nil {
-				adj[t.ID] = append(adj[t.ID], id)
-			}
-		}
-	}
-	return taskReachableInAdj(adj, start, target)
-}
-
-// taskReachableInAdj reports whether target is reachable from start by following
-// edges in the provided adjacency map (task → its dependencies).
-func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) bool {
-	visited := make(map[uuid.UUID]bool)
-	var dfs func(uuid.UUID) bool
-	dfs = func(cur uuid.UUID) bool {
-		if cur == target {
-			return true
-		}
-		if visited[cur] {
-			return false
-		}
-		visited[cur] = true
-		return slices.ContainsFunc(adj[cur], dfs)
-	}
-	return dfs(start)
-}
-
 // autoPromoteCandidate holds a task eligible for auto-promotion and whether it
 // is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
 // Populated by Phase 1 and consumed by Phase 2 of the two-phase protocol.
@@ -204,10 +171,9 @@ type autoPromoteCandidate struct {
 // Concurrency design: two-phase protocol via runTwoPhase.
 //
 // Phase 1 (no lock): call store.ListTasksByStatus, compute the regular in-progress
-// count, and collect all eligible candidates. AreDependenciesSatisfied may do
-// disk I/O here; we must not hold promoteMu during these potentially slow
-// operations so that a concurrent tryAutoPromote call (or tryAutoTest) can
-// proceed in parallel.
+// count, and collect all eligible candidates without holding promoteMu, so
+// that a concurrent tryAutoPromote call (or tryAutoTest) can proceed in
+// parallel.
 //
 // Phase 2 (under promoteMu): re-count to pick up any state changes that
 // happened during Phase 1, re-check capacity, then promote all candidates
@@ -270,12 +236,11 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			}
 
 			if availableSlots > 0 {
-				type cpCandidate struct {
+				type backlogCandidate struct {
 					task  store.Task
 					store *store.Store
-					score int
 				}
-				var cpCandidates []cpCandidate
+				var backlog []backlogCandidate
 				var nextScheduled *time.Time
 				h.forCurrentStore(func(s *store.Store, _ []string) {
 					backlogTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusBacklog)
@@ -291,29 +256,13 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 							}
 							continue
 						}
-						satisfied, err := s.AreDependenciesSatisfied(ctx, t.ID)
-						if err != nil || !satisfied {
-							h.incAutoimplementAction("auto_promoter", "skipped_dependency")
-							continue
-						}
 						if locked, threadID := h.isTaskLockedByAgent(t.ID.String()); locked {
 							h.incAutoimplementAction("auto_promoter", "skipped_locked")
 							logger.Handler.Debug("auto-promote: skipping locked task",
 								"task", t.ID, "thread", threadID)
 							continue
 						}
-						cpCandidates = append(cpCandidates, cpCandidate{task: *t, store: s})
-					}
-					// Score all candidates in one batch: CriticalPathScores
-					// builds the reverse-dependency graph once rather than once
-					// per candidate.
-					ids := make([]uuid.UUID, len(cpCandidates))
-					for i := range cpCandidates {
-						ids[i] = cpCandidates[i].task.ID
-					}
-					scores := s.CriticalPathScores(ids)
-					for i := range cpCandidates {
-						cpCandidates[i].score = scores[cpCandidates[i].task.ID]
+						backlog = append(backlog, backlogCandidate{task: *t, store: s})
 					}
 				})
 				// Arm a precise timer for the soonest scheduled task so it is
@@ -322,21 +271,18 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				if nextScheduled != nil {
 					h.ensureScheduledPromoteTrigger(ctx, *nextScheduled)
 				}
-				if len(cpCandidates) > 0 {
-					slices.SortFunc(cpCandidates, func(a, b cpCandidate) int {
-						if c := cmp.Compare(b.score, a.score); c != 0 {
-							return c
-						}
+				if len(backlog) > 0 {
+					slices.SortFunc(backlog, func(a, b backlogCandidate) int {
 						if c := cmp.Compare(a.task.Position, b.task.Position); c != 0 {
 							return c
 						}
 						return a.task.CreatedAt.Compare(b.task.CreatedAt)
 					})
-					for _, cp := range cpCandidates {
+					for _, bc := range backlog {
 						if availableSlots <= 0 {
 							break
 						}
-						candidates = append(candidates, autoPromoteCandidate{task: cp.task, store: cp.store})
+						candidates = append(candidates, autoPromoteCandidate{task: bc.task, store: bc.store})
 						availableSlots--
 					}
 				}

@@ -27,7 +27,7 @@ const router = useRouter();
 // focused spec and open the same popup Plan uses.
 const chatPopupRef = ref<InstanceType<typeof SpecChatPopup> | null>(null);
 
-const graph = ref<Graph>({ nodes: [], edges: [], critical_path: [], blocked: [] });
+const graph = ref<Graph>({ nodes: [], edges: [], critical_path: [] });
 const loadError = ref(false);
 const showArchived = ref(false);
 const mapSearch = ref('');
@@ -72,8 +72,8 @@ onMounted(async () => {
 });
 
 // Apply label-substring search and the status filter; keep only edges whose
-// endpoints both survive. Pruning critical_path/blocked to surviving nodes
-// keeps the inspector consistent with what's drawn.
+// endpoints both survive. Pruning critical_path to surviving nodes keeps the
+// inspector consistent with what's drawn.
 const filteredGraph = computed<Graph>(() => {
   const q = mapSearch.value.trim().toLowerCase();
   const hidden = hiddenStatuses.value;
@@ -84,8 +84,7 @@ const filteredGraph = computed<Graph>(() => {
   const keep = new Set(nodes.map((n) => n.id));
   const edges = graph.value.edges.filter((e) => keep.has(e.from) && keep.has(e.to));
   const critical_path = graph.value.critical_path.filter((id) => keep.has(id));
-  const blocked = graph.value.blocked.filter((id) => keep.has(id));
-  return { nodes, edges, critical_path, blocked };
+  return { nodes, edges, critical_path };
 });
 
 const selectedNode = computed<GraphNode | null>(
@@ -182,7 +181,7 @@ const criticalNodes = computed(() =>
 // Re-sync the graph when the drawn task set changes (SSE deltas mutate tasks in
 // place), when the workspace switches, or when the archived toggle flips.
 watch(
-  () => store.tasks.map((t) => `${t.id}:${t.status}:${t.archived ? 1 : 0}:${(t.depends_on || []).join('|')}`).join(','),
+  () => store.tasks.map((t) => `${t.id}:${t.status}:${t.archived ? 1 : 0}`).join(','),
   () => void loadGraph(),
 );
 watch(() => (store.config?.workspaces ?? []).join('\n'), () => void loadGraph());
@@ -196,7 +195,7 @@ watch(showArchived, () => void loadGraph());
         <div class="mission__titles">
           <h1 class="mission__title">Mission Control</h1>
           <p class="mission__lede">
-            Specs and tasks by dependency. Click a node to inspect and act,
+            Specs and tasks, linked by spec dependencies and dispatch. Click a node to inspect and act,
             double-click a spec to open it, drag to reposition. Hold
             <kbd class="key">Space</kbd> and drag to pan;
             <kbd class="key">Ctrl</kbd> or <kbd class="key">&#8984;</kbd> + scroll to zoom.
@@ -305,7 +304,7 @@ watch(showArchived, () => void loadGraph());
               </li>
             </ol>
             <p v-else class="card-pad mission__muted">
-              No dependency chain yet. Add depends-on links between specs or tasks.
+              No dependency chain yet. Add depends-on links between specs.
             </p>
           </section>
           <section v-if="allStatuses.length" class="card compact">

@@ -2,7 +2,6 @@
 import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useMentions } from '../composables/useMentions';
-import DependencyPicker from './DependencyPicker.vue';
 import HarnessSelect from './HarnessSelect.vue';
 import AppSelect from './AppSelect.vue';
 import { getStored, setStored, removeStored } from '../lib/storage';
@@ -71,7 +70,6 @@ const model = ref('');
 const criteria = ref('');
 const maxCostUsd = ref<number | null>(null);
 const maxInputTokens = ref<number | null>(null);
-const dependsOn = ref<string[]>([]);
 const sandbox = ref<'' | 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'>('');
 // Harness options for the picker: prefer the server's registered list so a
 // newly added harness appears without editing this component; fall back to
@@ -84,13 +82,6 @@ const harnessOptions = computed<string[]>(() =>
 function onHarnessChange(v: string): void {
   sandbox.value = v as typeof sandbox.value;
 }
-
-// Candidate dependencies: existing non-archived tasks (most recent first).
-const depCandidates = computed(() =>
-  store.tasks
-    .filter((t) => !t.archived)
-    .map((t) => ({ id: t.id, label: (t.title || t.prompt || t.id).slice(0, 60) })),
-);
 
 // Inserts an "@" at the cursor (with a leading space if needed) and opens the
 // mention autocomplete, matching the legacy board-composer "@" action button.
@@ -135,7 +126,6 @@ function collapse() {
   criteria.value = '';
   maxCostUsd.value = null;
   maxInputTokens.value = null;
-  dependsOn.value = [];
   sandbox.value = '';
 }
 
@@ -160,15 +150,10 @@ async function submit() {
     } as const;
 
     const created = await store.createTask(text, sharedOpts);
-    if (created?.id) {
-      const patch: Record<string, unknown> = {};
-      if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
-      // POST /api/tasks rejects sandbox; the server-side path for per-task
-      // sandbox overrides is a follow-up PATCH (see docs/internals/api-and-transport.md).
-      if (sandbox.value) patch.sandbox = sandbox.value;
-      if (Object.keys(patch).length) {
-        await store.patchTask(created.id, patch);
-      }
+    // POST /api/tasks rejects sandbox; the server-side path for per-task
+    // sandbox overrides is a follow-up PATCH (see docs/internals/api-and-transport.md).
+    if (created?.id && sandbox.value) {
+      await store.patchTask(created.id, { sandbox: sandbox.value });
     }
 
     prompt.value = '';
@@ -178,7 +163,6 @@ async function submit() {
     model.value = '';
     maxCostUsd.value = null;
     maxInputTokens.value = null;
-    dependsOn.value = [];
     sandbox.value = '';
       expanded.value = false;
   } catch (e) {
@@ -307,10 +291,6 @@ function onInput(e: Event) {
         <span class="composer__opt-label">Max tokens</span>
         <input v-model.number="maxInputTokens" class="field composer__input composer__input--num" type="number" min="0" step="1000" placeholder="input" aria-label="Max input tokens" />
       </label>
-      <div v-if="depCandidates.length" class="composer__opt composer__opt--grow">
-        <span class="composer__opt-label">Depends on</span>
-        <DependencyPicker v-model="dependsOn" />
-      </div>
       <div class="composer__opt">
         <span class="composer__opt-label">Harness</span>
         <HarnessSelect

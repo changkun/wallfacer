@@ -2,9 +2,11 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -183,6 +185,73 @@ func TestFilesystemBackend_LoadAll_LeavesRoutineCardsUnread(t *testing.T) {
 		}
 		if string(got) != string(want) {
 			t.Errorf("routine card %s was rewritten:\n got %s\nwant %s", id, got, want)
+		}
+	}
+}
+
+// removedTaskFields are task.json keys that records written by earlier
+// releases may carry but Task no longer declares.
+var removedTaskFields = map[string]string{
+	"depends_on": `["11111111-1111-1111-1111-111111111111"]`,
+}
+
+// TestFilesystemBackend_LoadAll_DropsRemovedTaskFields writes two records
+// carrying every removed field: one in an older schema, which LoadAll
+// migrates and rewrites, and one in the current schema, which LoadAll leaves
+// on disk until the task's next save. Both load, and neither key survives a
+// save.
+func TestFilesystemBackend_LoadAll_DropsRemovedTaskFields(t *testing.T) {
+	b := newTestBackend(t)
+
+	write := func(schema int) uuid.UUID {
+		t.Helper()
+		id := uuid.New()
+		raw := `{"id":"` + id.String() + `","prompt":"stored","status":"backlog","timeout":60,` +
+			`"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z",` +
+			`"auto_retry_budget":{"container_crash":2},"schema_version":` + strconv.Itoa(schema)
+		for k, v := range removedTaskFields {
+			raw += `,"` + k + `":` + v
+		}
+		raw += "}"
+		if err := os.MkdirAll(filepath.Join(b.dir, id.String()), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(b.dir, id.String(), "task.json"), []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	older := write(1)
+	current := write(constants.CurrentTaskSchemaVersion)
+
+	tasks, err := b.LoadAll()
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected both stored tasks to load, got %d", len(tasks))
+	}
+	for _, task := range tasks {
+		if task.ID == current {
+			if err := b.SaveTask(task); err != nil {
+				t.Fatalf("SaveTask: %v", err)
+			}
+		}
+	}
+
+	for _, id := range []uuid.UUID{older, current} {
+		raw, err := os.ReadFile(filepath.Join(b.dir, id.String(), "task.json"))
+		if err != nil {
+			t.Fatalf("read %s: %v", id, err)
+		}
+		var saved map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &saved); err != nil {
+			t.Fatalf("parse saved %s: %v", id, err)
+		}
+		for k := range removedTaskFields {
+			if _, ok := saved[k]; ok {
+				t.Errorf("task %s still carries %q after a save", id, k)
+			}
 		}
 	}
 }

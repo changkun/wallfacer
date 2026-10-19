@@ -201,7 +201,10 @@ func TestDispatchSpecs_SingleSpec(t *testing.T) {
 	}
 }
 
-func TestDispatchSpecs_BatchWithDependencies(t *testing.T) {
+// TestDispatchSpecs_DependentSpecsDispatchTogether dispatches a spec with the
+// spec it depends on in one request: both become tasks, and the dependent
+// spec keeps its depends_on in the spec tree.
+func TestDispatchSpecs_DependentSpecsDispatchTogether(t *testing.T) {
 	h, ws := newDispatchTestHandler(t)
 
 	specA := `---
@@ -249,23 +252,20 @@ Depends on A.
 		t.Fatalf("dispatched count = %d, want 2", len(resp.Dispatched))
 	}
 
-	// Find task B and verify it depends on task A.
-	taskAID := resp.Dispatched[0].TaskID
-	tasks, _ := h.store.ListTasks(context.Background(), false)
-	var taskB *struct {
-		DependsOn []string
+	tasks, err := h.store.ListTasks(context.Background(), false)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
 	}
-	for _, task := range tasks {
-		if task.ID.String() == resp.Dispatched[1].TaskID {
-			taskB = &struct{ DependsOn []string }{DependsOn: task.DependsOn}
-			break
-		}
+	if len(tasks) != 2 {
+		t.Fatalf("task count = %d, want 2", len(tasks))
 	}
-	if taskB == nil {
-		t.Fatal("task B not found")
+
+	b, err := spec.ParseFile(filepath.Join(ws, "specs/local/b.md"))
+	if err != nil {
+		t.Fatalf("parse spec B: %v", err)
 	}
-	if len(taskB.DependsOn) != 1 || taskB.DependsOn[0] != taskAID {
-		t.Errorf("task B depends_on = %v, want [%s]", taskB.DependsOn, taskAID)
+	if len(b.DependsOn) != 1 || b.DependsOn[0] != "specs/local/a.md" {
+		t.Errorf("spec B depends_on = %v, want [specs/local/a.md]", b.DependsOn)
 	}
 }
 
@@ -666,7 +666,7 @@ func TestDispatch_ArchivedSpecRejectedWithMessage(t *testing.T) {
 	}
 }
 
-func TestDispatch_ArchivedDependencyTreatedAsSatisfied(t *testing.T) {
+func TestDispatch_SpecWithArchivedDependencyDispatches(t *testing.T) {
 	h, ws := newDispatchTestHandler(t)
 
 	archivedDep := strings.Replace(testSpecValidated, "status: validated", "status: archived", 1)
@@ -687,7 +687,7 @@ dispatched_task_id: null
 
 # Spec With Archived Dep
 
-Depends on an archived spec, should still dispatch without blocker edge.
+Depends on an archived spec, should still dispatch.
 `
 	writeTestSpec(t, ws, "specs/local/live.md", specWithArchivedDep)
 
@@ -700,13 +700,9 @@ Depends on an archived spec, should still dispatch without blocker edge.
 		t.Fatalf("dispatched count = %d, want 1", len(resp.Dispatched))
 	}
 
-	// Verify no blocker edge was added for the archived dep.
 	tasks, _ := h.store.ListTasks(context.Background(), false)
 	if len(tasks) != 1 {
 		t.Fatalf("task count = %d, want 1", len(tasks))
-	}
-	if len(tasks[0].DependsOn) != 0 {
-		t.Errorf("archived dep should not contribute blocker edge, got DependsOn = %v", tasks[0].DependsOn)
 	}
 }
 

@@ -161,7 +161,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 
 | Guide | Topics |
 |-------|--------|
-| [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
+| [Board](docs/guide/board.md) | Task board, lifecycle, search, task detail |
 | [Chat](docs/guide/chat.md) | Chat sessions, slash commands, @mentions |
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
 | [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
@@ -182,7 +182,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 |-----------|--------|
 | [Architecture](docs/internals/architecture.md) | System design, package map, handler organization, end-to-end walkthrough |
 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, spec document model |
-| [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
+| [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers |

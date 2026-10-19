@@ -17,7 +17,6 @@ function diamondish(): Graph {
       { from: 'b', to: 'd', kind: 'spec_dep' },
     ],
     critical_path: [],
-    blocked: [],
   };
 }
 
@@ -49,7 +48,6 @@ describe('computeLayout', () => {
       nodes: [root, ...children],
       edges: children.map((c) => ({ from: 'root', to: c.id, kind: 'spec_dep' as const })),
       critical_path: [],
-      blocked: [],
     };
     const pos = computeLayout(g, { maxRows: 16, rowHeight: 90, originY: 50 });
 
@@ -71,11 +69,10 @@ describe('computeLayout', () => {
     const g: Graph = {
       nodes: ['x', 'y'].map(node),
       edges: [
-        { from: 'x', to: 'y', kind: 'task_dep' },
-        { from: 'y', to: 'x', kind: 'task_dep' },
+        { from: 'x', to: 'y', kind: 'spec_dep' },
+        { from: 'y', to: 'x', kind: 'spec_dep' },
       ],
       critical_path: [],
-      blocked: [],
     };
     const pos = computeLayout(g);
     expect(pos.size).toBe(2);

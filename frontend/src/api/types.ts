@@ -4,7 +4,7 @@ export type TaskStatus = 'backlog' | 'in_progress' | 'waiting' | 'committing' | 
 // Mirrors internal/graph.Graph. The Map renders and drives this.
 
 export type GraphNodeKind = 'spec' | 'task';
-export type GraphEdgeKind = 'containment' | 'dispatch' | 'spec_dep' | 'task_dep';
+export type GraphEdgeKind = 'containment' | 'dispatch' | 'spec_dep';
 export type GraphAction =
   | 'dispatch'
   | 'undispatch'
@@ -34,7 +34,6 @@ export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
   critical_path: string[];
-  blocked: string[];
 }
 
 export interface TaskUsage {
@@ -68,7 +67,6 @@ export interface Task {
   kind: string;
   tags: string[];
   impact_score?: number;
-  depends_on: string[];
   failure_category: string;
   fresh_start: boolean;
   is_test_run: boolean;

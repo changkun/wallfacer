@@ -121,7 +121,7 @@ flowchart TD
     Check -->|yes| Capacity{"in_progress count<br/>< MAX_PARALLEL?"}
     Capacity -->|no| Skip
     Capacity -->|yes| Pick["Pick lowest-position<br/>backlog task"]
-    Pick --> Deps{"DependsOn met?<br/>ScheduledAt reached?"}
+    Pick --> Deps{"ScheduledAt reached?"}
     Deps -->|no| Skip
     Deps -->|yes| Promote["Promote to in_progress<br/>launch runner.Run"]
 ```
@@ -130,9 +130,7 @@ flowchart TD
 
 Autoimplement is off by default and is toggled via `PUT /api/config {"autoimplement": true/false}`. The autoimplement/autotest/autosubmit/autosync toggles are persisted per workspace (`persistCurrentGroupToggles` writes them to the viewed workspace's record), so switching away and back does not reset them, and a different workspace on the same server stays manual unless automation is turned on for it explicitly. The autopush toggle persists to the `.env` file instead, since push credentials are global.
 
-Tasks whose `DependsOn` list contains any task not yet in `done` status are skipped by the auto-promoter even when the in-progress count is below `WALLFACER_MAX_PARALLEL`.
-
-Tasks whose `ScheduledAt` is in the future are also skipped.
+Tasks whose `ScheduledAt` is in the future are skipped by the auto-promoter even when the in-progress count is below `WALLFACER_MAX_PARALLEL`.
 
 ## Test Verification
 

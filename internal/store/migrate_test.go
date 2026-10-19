@@ -14,7 +14,7 @@ import (
 
 // buildMinimalTaskJSON creates a minimal valid task JSON for migration testing.
 // Override keys are merged into the base object (id + prompt); callers can
-// selectively set fields like "status", "depends_on", "sandbox", etc.
+// selectively set fields like "status", "sandbox", etc.
 func buildMinimalTaskJSON(t *testing.T, overrides map[string]any) []byte {
 	t.Helper()
 	base := map[string]any{
@@ -75,64 +75,6 @@ func TestMigrateTaskJSON_MissingCreatedAt_UsesFileModTime(t *testing.T) {
 	}
 	if !task.UpdatedAt.Equal(modTime) {
 		t.Errorf("UpdatedAt = %v, want %v", task.UpdatedAt, modTime)
-	}
-}
-
-func TestMigrateTaskJSON_DuplicateDependsOn_Deduplicated(t *testing.T) {
-	id1 := uuid.New()
-	id2 := uuid.New()
-	// id1 appears twice, id2 once.
-	raw := buildMinimalTaskJSON(t, map[string]any{
-		"depends_on": []string{id1.String(), id2.String(), id1.String()},
-	})
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true when depends_on had duplicates")
-	}
-	if len(task.DependsOn) != 2 {
-		t.Fatalf("expected 2 unique depends_on entries, got %d: %v", len(task.DependsOn), task.DependsOn)
-	}
-}
-
-func TestMigrateTaskJSON_DependsOnInvalidUUID_Dropped(t *testing.T) {
-	id1 := uuid.New()
-	raw := buildMinimalTaskJSON(t, map[string]any{
-		"depends_on": []string{id1.String(), "not-a-uuid"},
-	})
-
-	task, _, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if len(task.DependsOn) != 1 {
-		t.Fatalf("expected 1 valid depends_on entry, got %d: %v", len(task.DependsOn), task.DependsOn)
-	}
-	if task.DependsOn[0] != id1.String() {
-		t.Errorf("DependsOn[0] = %q, want %q", task.DependsOn[0], id1.String())
-	}
-}
-
-func TestMigrateTaskJSON_DependsOnSorted(t *testing.T) {
-	// UUIDs: create two and ensure they end up sorted.
-	// Generate UUIDs where second > first alphabetically.
-	ids := []uuid.UUID{uuid.New(), uuid.New()}
-	raw := buildMinimalTaskJSON(t, map[string]any{
-		"depends_on": []string{ids[1].String(), ids[0].String()},
-	})
-
-	task, _, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if len(task.DependsOn) != 2 {
-		t.Fatalf("expected 2 depends_on entries, got %d", len(task.DependsOn))
-	}
-	if task.DependsOn[0] > task.DependsOn[1] {
-		t.Errorf("DependsOn not sorted: %v", task.DependsOn)
 	}
 }
 
@@ -202,13 +144,6 @@ func TestMigrateTaskJSON_InvalidJSON(t *testing.T) {
 
 func TestMigrateTaskJSON_NoChangesWhenAlreadyCurrent(t *testing.T) {
 	// Build a task that is already fully migrated.
-	id1 := uuid.New()
-	id2 := uuid.New()
-	// Ensure alphabetical order for depends_on.
-	dep1, dep2 := id1.String(), id2.String()
-	if dep1 > dep2 {
-		dep1, dep2 = dep2, dep1
-	}
 	now := time.Now().UTC()
 	raw := buildMinimalTaskJSON(t, map[string]any{
 		"status":         string(TaskStatusBacklog),
@@ -222,7 +157,6 @@ func TestMigrateTaskJSON_NoChangesWhenAlreadyCurrent(t *testing.T) {
 			string(FailureCategorySyncError):      2,
 			string(FailureCategoryWorktree):       1,
 		},
-		"depends_on": []string{dep1, dep2},
 	})
 
 	_, changed, err := migrateTaskJSON(raw, now)
@@ -232,63 +166,4 @@ func TestMigrateTaskJSON_NoChangesWhenAlreadyCurrent(t *testing.T) {
 	// Note: changed might still be true due to sandbox normalization details.
 	// The important thing is no error and proper parsing.
 	_ = changed
-}
-
-// --- canonicalizeDependsOn tests ---
-
-func TestCanonicalizeDependsOn_EmptySlice(t *testing.T) {
-	result := canonicalizeDependsOn(nil)
-	if result != nil {
-		t.Errorf("expected nil for empty input, got %v", result)
-	}
-	result = canonicalizeDependsOn([]string{})
-	if result != nil {
-		t.Errorf("expected nil for empty slice, got %v", result)
-	}
-}
-
-func TestCanonicalizeDependsOn_AllInvalid_ReturnsNil(t *testing.T) {
-	result := canonicalizeDependsOn([]string{"not-uuid", "also-not", ""})
-	if result != nil {
-		t.Errorf("expected nil for all-invalid UUIDs, got %v", result)
-	}
-}
-
-func TestCanonicalizeDependsOn_Deduplicates(t *testing.T) {
-	id := uuid.New()
-	result := canonicalizeDependsOn([]string{id.String(), id.String(), id.String()})
-	if len(result) != 1 {
-		t.Errorf("expected 1 after dedup, got %d: %v", len(result), result)
-	}
-}
-
-func TestCanonicalizeDependsOn_CaseInsensitive(t *testing.T) {
-	id := uuid.New()
-	lower := id.String()
-	upper := id.String() // uuid.UUID.String() is always lowercase
-	result := canonicalizeDependsOn([]string{lower, upper})
-	if len(result) != 1 {
-		t.Errorf("expected 1 after case dedup, got %d: %v", len(result), result)
-	}
-}
-
-func TestCanonicalizeDependsOn_Sorted(t *testing.T) {
-	ids := []string{uuid.New().String(), uuid.New().String(), uuid.New().String()}
-	result := canonicalizeDependsOn(ids)
-	for i := 1; i < len(result); i++ {
-		if result[i-1] > result[i] {
-			t.Errorf("result not sorted at index %d: %v", i, result)
-		}
-	}
-}
-
-func TestCanonicalizeDependsOn_TrimsWhitespace(t *testing.T) {
-	id := uuid.New()
-	result := canonicalizeDependsOn([]string{"  " + id.String() + "  "})
-	if len(result) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(result))
-	}
-	if result[0] != id.String() {
-		t.Errorf("result = %q, want %q", result[0], id.String())
-	}
 }

@@ -8,7 +8,7 @@ import (
 	"latere.ai/x/wallfacer/internal/graph"
 )
 
-// GetGraph returns the unified spec+task dependency graph the Map renders and
+// GetGraph returns the unified spec+task graph the Map renders and
 // drives. It composes the same principal-scoped sources the spec tree and task
 // list already use — collectSpecTree (workspace-visibility scoped) and
 // TasksForPrincipal (org scoped in cloud mode) — then defers all node/edge

@@ -209,29 +209,6 @@ func (s *Store) ListWaitingTasksForReview(_ context.Context) []Task {
 	return result
 }
 
-// TasksDependingOn returns all non-terminal tasks whose DependsOn contains
-// taskID. Non-terminal statuses are backlog, in_progress, waiting, and failed.
-// The returned slice contains deep copies safe for use outside the lock.
-func (s *Store) TasksDependingOn(_ context.Context, taskID uuid.UUID) ([]*Task, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	taskIDStr := taskID.String()
-	var result []*Task
-	for _, t := range s.tasks {
-		switch t.Status {
-		case TaskStatusBacklog, TaskStatusInProgress, TaskStatusWaiting, TaskStatusFailed:
-		default:
-			continue
-		}
-		if slices.Contains(t.DependsOn, taskIDStr) {
-			cp := deepCloneTask(t)
-			result = append(result, &cp)
-		}
-	}
-	return result, nil
-}
-
 // cloneTask returns a deep copy of t so that callers cannot accidentally
 // mutate store-owned state through shared slice/map/pointer fields.
 // It is the canonical outward-facing wrapper for deepCloneTask; all read

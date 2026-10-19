@@ -322,7 +322,7 @@ Every `internal/` package and its role in the system:
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
-| `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
+| `graph` | Server-side unified spec+task graph (nodes, typed edges, critical path) behind `GET /api/graph` | `Build()` |
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
@@ -343,7 +343,6 @@ Shared utility packages under `internal/pkg/`:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `pkg/dagscorer` | Critical-path score of a node in a dependency DAG, used to rank backlog tasks for promotion | `Score()` |
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader.ReadChunk()` |
 | `pkg/pty` | PTY allocation for the WebSocket terminal on macOS and Linux; every call fails on Windows | `Open()`, `StartWithSize()`, `Setsize()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
@@ -379,7 +378,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
 | `terminal.go` | WebSocket terminal relay for the host shell | `GET /api/terminal/ws` |
 | `whiteboard.go` | Per-workspace whiteboard document persistence | `GET /api/whiteboard`, `PUT /api/whiteboard` |
-| `graph.go` | Unified spec+task dependency graph for Mission Control | `GET /api/graph` |
+| `graph.go` | Unified spec+task graph for Mission Control | `GET /api/graph` |
 
 There is no `refine.go` (prompt refinement is the agent session tool above) and no `containers.go` / `GET /api/containers` endpoint.
 
@@ -425,7 +424,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 - [Development Setup](development.md), building from source, tests, make targets, releases
 - [Data & Storage](data-and-storage.md), persistence, models, migrations, search index
-- [Task Lifecycle](task-lifecycle.md), states, turn loop, dependencies, board context
+- [Task Lifecycle](task-lifecycle.md), states, turn loop, board context
 - [Git Operations](git-worktrees.md), worktrees, commit pipeline, branch management
 - [Workspaces & Configuration](workspaces-and-config.md), workspace manager, AGENTS.md, harnesses, templates
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

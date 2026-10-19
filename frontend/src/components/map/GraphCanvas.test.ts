@@ -15,7 +15,6 @@ const graph: Graph = {
   ],
   edges: [{ from: 'spec:a', to: 'task:b', kind: 'dispatch' }],
   critical_path: ['spec:a', 'task:b'],
-  blocked: [],
 };
 
 function mount(onSelect: (id: string) => void) {
@@ -64,7 +63,6 @@ describe('GraphCanvas', () => {
       ],
       edges: [],
       critical_path: ['task:run'],
-      blocked: [],
     };
     const host = document.createElement('div');
     document.body.appendChild(host);

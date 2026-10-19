@@ -17,16 +17,15 @@ var (
 	t4 = uuid.MustParse("44444444-4444-4444-4444-444444444444")
 )
 
-// fixture builds a representative spec tree + task list exercising all four
-// edge kinds, both actions, the blocked set, and the critical path.
+// fixture builds a representative spec tree + task list exercising all three
+// edge kinds, the spec and task actions, and the critical path.
 //
 //	spec:parent (validated, non-leaf)
 //	  ├─containment─ spec:childA (validated leaf, undispatched)  -> dispatch action
 //	  └─containment─ spec:childB (validated leaf, dispatched->t1)
 //	  spec_dep: childA -> childB
 //	  dispatch: childB -> task:t1 (in_progress)
-//	  task_dep: t1 -> t2 (backlog, blocked since t1 not done)
-//	  task:t3 (backlog, no deps) -> start action
+//	  task:t2, task:t3 (backlog) -> start action
 func fixture() ([]spec.NodeResponse, []store.Task) {
 	specs := []spec.NodeResponse{
 		{
@@ -56,7 +55,7 @@ func fixture() ([]spec.NodeResponse, []store.Task) {
 	}
 	tasks := []store.Task{
 		{ID: t1, Title: "Task 1", Status: store.TaskStatusInProgress, SpecSourcePath: "specs/x/parent/childB.md"},
-		{ID: t2, Title: "Task 2", Status: store.TaskStatusBacklog, DependsOn: []string{t1.String()}},
+		{ID: t2, Title: "Task 2", Status: store.TaskStatusBacklog},
 		{ID: t3, Title: "Task 3", Status: store.TaskStatusBacklog},
 	}
 	return specs, tasks
@@ -92,7 +91,6 @@ func TestBuild_NodesAndEdges(t *testing.T) {
 		{From: SpecID("specs/x/parent.md"), To: SpecID("specs/x/parent/childB.md"), Kind: EdgeContainment},
 		{From: SpecID("specs/x/parent/childA.md"), To: SpecID("specs/x/parent/childB.md"), Kind: EdgeSpecDep},
 		{From: SpecID("specs/x/parent/childB.md"), To: TaskID(t1.String()), Kind: EdgeDispatch},
-		{From: TaskID(t1.String()), To: TaskID(t2.String()), Kind: EdgeTaskDep},
 	}
 	for _, e := range want {
 		if !es[e] {
@@ -112,8 +110,8 @@ func TestBuild_AvailableActions(t *testing.T) {
 		SpecID("specs/x/parent.md"):        nil,                // validated non-leaf: nothing in the flow
 		SpecID("specs/x/parent/childA.md"): {ActionDispatch},   // validated leaf, undispatched
 		SpecID("specs/x/parent/childB.md"): {ActionUndispatch}, // validated, already dispatched
-		TaskID(t2.String()):                nil,                // backlog but blocked
-		TaskID(t3.String()):                {ActionStart},      // backlog, ready
+		TaskID(t1.String()):                nil,                // in progress
+		TaskID(t3.String()):                {ActionStart},      // backlog
 	}
 	for id, want := range cases {
 		n, ok := nodeByID(g, id)
@@ -184,60 +182,15 @@ func TestSpecActions_RespectLifecycleMachine(t *testing.T) {
 	}
 }
 
-func TestBuild_Blocked(t *testing.T) {
-	specs, tasks := fixture()
-	g := Build(specs, tasks, false)
-	if !reflect.DeepEqual(g.Blocked, []string{TaskID(t2.String())}) {
-		t.Errorf("blocked = %v, want [%s]", g.Blocked, TaskID(t2.String()))
-	}
-
-	// When the prerequisite is done, t2 is no longer blocked and gains start.
-	tasks[0].Status = store.TaskStatusDone
-	g = Build(specs, tasks, false)
-	if len(g.Blocked) != 0 {
-		t.Errorf("blocked = %v, want empty after prereq done", g.Blocked)
-	}
-	n, _ := nodeByID(g, TaskID(t2.String()))
-	if !reflect.DeepEqual(n.AvailableActions, []string{ActionStart}) {
-		t.Errorf("t2 actions = %v, want [start] after prereq done", n.AvailableActions)
-	}
-}
-
-func TestBuild_ArchivedDonePrereqDoesNotBlock(t *testing.T) {
-	// A backlog task whose only prerequisite is done-and-archived must read as
-	// ready in the default (archived-hidden) view: readiness is computed over
-	// the full task set, not the displayed subset.
-	tasks := []store.Task{
-		{ID: t1, Status: store.TaskStatusDone, Archived: true},
-		{ID: t2, Status: store.TaskStatusBacklog, DependsOn: []string{t1.String()}},
-	}
-	g := Build(nil, tasks, false)
-
-	if _, shown := nodeByID(g, TaskID(t1.String())); shown {
-		t.Error("archived prerequisite should be hidden in default view")
-	}
-	if len(g.Blocked) != 0 {
-		t.Errorf("blocked = %v, want empty (prereq is done, just archived)", g.Blocked)
-	}
-	n, ok := nodeByID(g, TaskID(t2.String()))
-	if !ok {
-		t.Fatal("t2 node missing")
-	}
-	if !reflect.DeepEqual(n.AvailableActions, []string{ActionStart}) {
-		t.Errorf("t2 actions = %v, want [start]", n.AvailableActions)
-	}
-}
-
 func TestBuild_CriticalPath(t *testing.T) {
 	specs, tasks := fixture()
 	g := Build(specs, tasks, false)
 	// Containment (parent → child) is organizational and excluded; the chain
-	// follows only dependency edges: spec_dep, dispatch, task_dep.
+	// follows only dependency edges: spec_dep, then dispatch.
 	want := []string{
 		SpecID("specs/x/parent/childA.md"),
 		SpecID("specs/x/parent/childB.md"),
 		TaskID(t1.String()),
-		TaskID(t2.String()),
 	}
 	if !reflect.DeepEqual(g.CriticalPath, want) {
 		t.Errorf("critical path = %v, want %v", g.CriticalPath, want)
@@ -296,9 +249,8 @@ func TestBuild_SkipsDocNodes(t *testing.T) {
 }
 
 func TestBuild_DanglingEdgesDropped(t *testing.T) {
-	// A spec depends_on a spec that isn't in the set; a task depends_on an
-	// absent task; a dispatch points at an absent task. None should produce an
-	// edge.
+	// A spec depends_on a spec that isn't in the set and a dispatch points at
+	// an absent task. Neither should produce an edge.
 	specs := []spec.NodeResponse{
 		{Path: "specs/a.md", IsLeaf: true, Spec: &spec.Spec{
 			Status:           spec.StatusValidated,
@@ -307,7 +259,7 @@ func TestBuild_DanglingEdgesDropped(t *testing.T) {
 		}},
 	}
 	tasks := []store.Task{
-		{ID: t2, Status: store.TaskStatusBacklog, DependsOn: []string{t4.String()}},
+		{ID: t2, Status: store.TaskStatusBacklog},
 	}
 	g := Build(specs, tasks, false)
 	if len(g.Edges) != 0 {

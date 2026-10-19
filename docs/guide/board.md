@@ -8,7 +8,7 @@ The Board is the execution surface of wallfacer: a four-column kanban where task
 
 | Column | Statuses shown | Meaning |
 |---|---|---|
-| **Backlog** | `backlog` | Queued tasks. Prompt, settings, and dependencies are editable here. |
+| **Backlog** | `backlog` | Queued tasks. Prompt and settings are editable here. |
 | **In Progress** | `in_progress`, `committing` | An agent is running in the task's worktree, or the commit pipeline is merging its result. |
 | **Waiting** | `waiting`, `failed` | The agent paused for input, a verdict, or a budget raise; failed tasks land here for retry. |
 | **Done** | `done`, `cancelled` | Terminal states. Done tasks have their changes merged; cancelled tasks keep their history. |
@@ -60,7 +60,7 @@ Click **+ New Task** in the Backlog header, or press **n** anywhere on the board
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
-- **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), a **Depends on** picker, and a harness override.
+- **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), and a harness override.
 
 Every task carries a short **Title** (auto-generated after creation, or set manually) and the full **Prompt**.
 
@@ -94,12 +94,6 @@ Full per-state action availability in the detail view:
 | `cancelled` | Retry, Archive, Delete |
 | archived | Unarchive, Delete |
 
-## Dependencies
-
-The **Depends on** picker (in the composer's More section and the backlog Edit panel) declares prerequisite tasks. A task with unmet dependencies is not promoted by automation even when capacity is free: promotion requires every dependency to be `done`, the scheduled time (if any) to have passed, and a free parallel slot.
-
-Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status. The cross-task dependency graph is visualized on [Mission Control](mission-control.md), not on the board itself.
-
 ## Scheduled tasks
 
 Set **Schedule start** in the backlog Edit panel to defer a task to a future date and time. The auto-promoter skips it until the time arrives (a precise one-shot timer fires within milliseconds of the due time), then treats it like any other backlog task. The card shows a relative indicator such as `in 3h` until then.
@@ -120,7 +114,7 @@ Press **Cmd+K** (Ctrl+K) to open the palette. It combines fuzzy local task searc
 
 ## Task detail view
 
-Click any card to open the detail view. A left rail carries the header (status, tags, elapsed time, cost, short ID), settings, the dependency panel, and the action buttons; the main pane switches between six tabs.
+Click any card to open the detail view. A left rail carries the header (status, tags, elapsed time, cost, short ID), settings, and the action buttons; the main pane switches between six tabs.
 
 ![Task detail view with the tab bar and actions rail](images/task-detail.png)
 
@@ -189,7 +183,7 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 
 - [Plan](plan.md): author and dispatch specs that become board tasks
 - [Chat](chat.md): conversational planning with the same agent engine
-- [Mission Control](mission-control.md): the combined spec and task dependency graph
+- [Mission Control](mission-control.md): the combined spec and task graph
 - [Automation](automation.md): watchers, retry budgets, and circuit breakers
 - [Oversight](oversight.md): summaries, usage, cost, and timing analytics
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings

@@ -328,11 +328,6 @@ type Task struct {
 	// directly on the board. Enables reverse navigation from task → spec.
 	SpecSourcePath string `json:"spec_source_path,omitempty"`
 
-	// DependsOn lists UUIDs of tasks that must all reach TaskStatusDone
-	// before this task is eligible for auto-promotion.
-	// Nil/empty means no dependencies (backward-compatible default).
-	DependsOn []string `json:"depends_on,omitempty"`
-
 	// ScheduledAt is an optional future time before which the task will not
 	// be auto-promoted from backlog. Nil means "run as soon as there is
 	// capacity" (the existing default behavior).

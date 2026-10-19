@@ -31,7 +31,6 @@ function makeTask(id: string): Task {
     model: '',
     kind: '',
     tags: [],
-    depends_on: [],
     failure_category: '',
     fresh_start: false,
     is_test_run: false,

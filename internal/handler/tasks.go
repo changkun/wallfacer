@@ -270,7 +270,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		MountWorktrees    *bool                                 `json:"mount_worktrees"`
 		Sandbox           *harness.ID                           `json:"sandbox"`
 		SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
-		DependsOn         *[]string                             `json:"depends_on"`
 		Tags              *[]string                             `json:"tags"`
 		// Archived flips the archived flag (replaces POST /archive,/unarchive).
 		Archived *bool `json:"archived"`
@@ -431,42 +430,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	if req.Position != nil {
 		if err := s.UpdateTaskPosition(r.Context(), id, *req.Position); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if req.DependsOn != nil {
-		parsedDeps := make([]uuid.UUID, 0, len(*req.DependsOn))
-		for _, depStr := range *req.DependsOn {
-			depID, err := uuid.Parse(depStr)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid dependency UUID %q: %v", depStr, err), http.StatusBadRequest)
-				return
-			}
-			if depID == id {
-				http.Error(w, "task cannot depend on itself", http.StatusBadRequest)
-				return
-			}
-			if _, err := s.GetTask(r.Context(), depID); err != nil {
-				http.Error(w, fmt.Sprintf("dependency task not found: %s", depStr), http.StatusBadRequest)
-				return
-			}
-			parsedDeps = append(parsedDeps, depID)
-		}
-		// Cycle detection using full graph including archived tasks.
-		allTasks, _ := s.ListTasks(r.Context(), true)
-		for _, depID := range parsedDeps {
-			if taskReachable(allTasks, depID, id) {
-				http.Error(w, fmt.Sprintf("dependency on %s would create a cycle", depID), http.StatusBadRequest)
-				return
-			}
-		}
-		strs := make([]string, len(parsedDeps))
-		for i, d := range parsedDeps {
-			strs[i] = d.String()
-		}
-		if err := s.UpdateTaskDependsOn(r.Context(), id, strs); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

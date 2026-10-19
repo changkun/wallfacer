@@ -751,25 +751,6 @@ func TestCancelTask_MovesToCancelled(t *testing.T) {
 	}
 }
 
-func TestCancelTask_RemovesOrphanedDependents(t *testing.T) {
-	s := newTestStore(t)
-	parent, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "parent", Timeout: 5})
-	child, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:    "child",
-		Timeout:   5,
-		DependsOn: []string{parent.ID.String()},
-	})
-
-	if err := s.CancelTask(bg(), parent.ID); err != nil {
-		t.Fatalf("CancelTask: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), child.ID)
-	if len(got.DependsOn) != 0 {
-		t.Errorf("child DependsOn = %v, want empty after parent cancelled", got.DependsOn)
-	}
-}
-
 func TestCancelTask_UnknownID(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.CancelTask(bg(), uuid.New()); err == nil {
@@ -979,22 +960,6 @@ func TestCreateTaskWithOptions_NegativeBudgets(t *testing.T) {
 	}
 }
 
-func TestCreateTaskWithOptions_PreAssignedID(t *testing.T) {
-	s := newTestStore(t)
-	preID := uuid.New()
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		ID:      preID,
-		Prompt:  "pre-assigned",
-		Timeout: 5,
-	})
-	if err != nil {
-		t.Fatalf("CreateTaskWithOptions: %v", err)
-	}
-	if task.ID != preID {
-		t.Errorf("ID = %s, want %s", task.ID, preID)
-	}
-}
-
 func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	s := newTestStore(t)
 	scheduled := time.Now().Add(time.Hour)
@@ -1009,7 +974,6 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 		MaxCostUSD:         10.0,
 		MaxInputTokens:     50000,
 		ScheduledAt:        &scheduled,
-		DependsOn:          []string{uuid.New().String()},
 		ModelOverride:      "  claude-opus-4-5  ",
 		CustomPassPatterns: []string{"PASS"},
 		CustomFailPatterns: []string{"FAIL"},
@@ -1491,48 +1455,6 @@ func TestParseNumberedTraceFile_Valid(t *testing.T) {
 	}
 }
 
-// --- AreDependenciesSatisfied edge cases ---
-
-func TestAreDependenciesSatisfied_MalformedUUID(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:    "deps",
-		Timeout:   5,
-		DependsOn: []string{"not-a-uuid"},
-	})
-
-	sat, err := s.AreDependenciesSatisfied(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("AreDependenciesSatisfied: %v", err)
-	}
-	if sat {
-		t.Error("expected unsatisfied for malformed UUID dependency")
-	}
-}
-
-func TestAreDependenciesSatisfied_DeletedDepCoverage(t *testing.T) {
-	s := newTestStore(t)
-	dep, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "dep", Timeout: 5})
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:    "main",
-		Timeout:   5,
-		DependsOn: []string{dep.ID.String()},
-	})
-
-	// Directly remove the dep from s.tasks (bypassing removeOrphanedDependents).
-	s.mu.Lock()
-	delete(s.tasks, dep.ID)
-	s.mu.Unlock()
-
-	sat, err := s.AreDependenciesSatisfied(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("AreDependenciesSatisfied: %v", err)
-	}
-	if sat {
-		t.Error("expected unsatisfied when dependency is deleted")
-	}
-}
-
 // --- RestoreTask: concurrent guard ---
 
 func TestRestoreTask_UnknownID(t *testing.T) {
@@ -1777,14 +1699,6 @@ func TestRebuildSearchIndex_RepairsChangedEntriesCoverage(t *testing.T) {
 	}
 }
 
-func TestCriticalPathScores_MalformedDepCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad dep", Timeout: 5, DependsOn: []string{"not-a-uuid"}})
-	if score := s.CriticalPathScores([]uuid.UUID{task.ID})[task.ID]; score != 1 {
-		t.Errorf("expected 1, got %d", score)
-	}
-}
-
 func TestSaveOversight_NotInSearchIndexCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no idx", Timeout: 5})
@@ -1793,19 +1707,6 @@ func TestSaveOversight_NotInSearchIndexCoverage(t *testing.T) {
 	s.mu.Unlock()
 	if err := s.SaveOversight(task.ID, TaskOversight{Status: OversightStatusReady}); err != nil {
 		t.Fatalf("SaveOversight: %v", err)
-	}
-}
-
-func TestDeleteTask_RemovesOrphanedDepsMultipleCoverage(t *testing.T) {
-	s := newTestStore(t)
-	parent, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "parent", Timeout: 5})
-	child1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c1", Timeout: 5, DependsOn: []string{parent.ID.String()}})
-	child2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c2", Timeout: 5, DependsOn: []string{parent.ID.String()}})
-	s.DeleteTask(bg(), parent.ID, "cleanup") //nolint:errcheck
-	got1, _ := s.GetTask(bg(), child1.ID)
-	got2, _ := s.GetTask(bg(), child2.ID)
-	if len(got1.DependsOn) != 0 || len(got2.DependsOn) != 0 {
-		t.Error("children should have empty DependsOn after parent delete")
 	}
 }
 

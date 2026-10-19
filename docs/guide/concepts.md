@@ -30,7 +30,7 @@ A workspace is a named set of project folders with a stable identity. The identi
 
 ### Task
 
-A task is a card on the board: a prompt, an optional title, a harness selection, and dependencies. Tasks move through seven lifecycle states:
+A task is a card on the board: a prompt, an optional title, and a harness selection. Tasks move through seven lifecycle states:
 
 | State | Meaning |
 |---|---|
@@ -72,7 +72,7 @@ Every task runs in its own git worktree under `~/.wallfacer/worktrees`, on a bra
 
 Automation is not a single switch but a set of composable toggles, reachable from the board header and **Settings > Execution**:
 
-- **Autoimplement** promotes backlog tasks as capacity opens, respecting dependencies and schedules.
+- **Autoimplement** promotes backlog tasks as capacity opens, respecting schedules.
 - **Autotest** runs the testing agent on finished work.
 - **Autosubmit** accepts work whose verification passed.
 - **Autosync** rebases waiting tasks onto the default branch as it moves.

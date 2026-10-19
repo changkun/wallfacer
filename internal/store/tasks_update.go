@@ -280,20 +280,6 @@ func (s *Store) UpdateTaskScheduledAt(_ context.Context, id uuid.UUID, scheduled
 	})
 }
 
-// UpdateTaskDependsOn sets the list of task UUID strings that must all reach
-// TaskStatusDone before this task is auto-promoted. An empty or nil slice clears
-// all dependencies.
-func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn []string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		if len(dependsOn) == 0 {
-			t.DependsOn = nil // normalize so omitempty keeps JSON clean
-		} else {
-			t.DependsOn = dependsOn
-		}
-		return nil
-	})
-}
-
 // UpdateTaskTags sets the tag labels for a task. An empty or nil slice clears
 // all tags.
 func (s *Store) UpdateTaskTags(_ context.Context, id uuid.UUID, tags []string) error {
@@ -309,37 +295,6 @@ func (s *Store) UpdateTaskTags(_ context.Context, id uuid.UUID, tags []string) e
 		}
 		return nil
 	})
-}
-
-// AreDependenciesSatisfied reports whether every task listed in t.DependsOn has
-// status TaskStatusDone. A missing or malformed dependency UUID is treated as
-// unsatisfied to avoid silent unblocking.
-func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return false, fmt.Errorf("task not found: %s", id)
-	}
-	for _, depStr := range t.DependsOn {
-		depID, err := uuid.Parse(depStr)
-		if err != nil {
-			return false, nil // malformed UUID → unsatisfied
-		}
-		dep, ok := s.tasks[depID]
-		if !ok {
-			// Dependency was deleted or purged. Treat as unsatisfied to
-			// prevent silent unblocking. In normal operation, DeleteTask
-			// cleans up orphaned dependency references, so this path only
-			// fires for race conditions or data corruption.
-			return false, nil
-		}
-		if dep.Status != TaskStatusDone {
-			return false, nil
-		}
-	}
-	return true, nil
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.

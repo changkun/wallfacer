@@ -1,5 +1,5 @@
-// Package graph builds the unified spec+task dependency graph that the Map
-// surface renders and drives. It is the authoritative, server-side replacement
+// Package graph builds the unified spec+task graph that the Map surface
+// renders and drives. It is the authoritative, server-side replacement
 // for the node/edge derivation that used to live in the vendored client-side
 // depgraph renderer: pure functions of a spec tree plus the task list, with no
 // store access or mutation, so the whole thing is table-testable.
@@ -19,7 +19,7 @@ const (
 	NodeTask NodeKind = "task"
 )
 
-// EdgeKind enumerates the four relationship types the graph draws.
+// EdgeKind enumerates the three relationship types the graph draws.
 type EdgeKind string
 
 // Edge kinds.
@@ -30,8 +30,6 @@ const (
 	EdgeDispatch EdgeKind = "dispatch"
 	// EdgeSpecDep is a prerequisite spec → a spec that depends_on it.
 	EdgeSpecDep EdgeKind = "spec_dep"
-	// EdgeTaskDep is a prerequisite task → a task that depends_on it.
-	EdgeTaskDep EdgeKind = "task_dep"
 )
 
 // Action names the inline operations the Map may offer on a node. Each one only
@@ -48,7 +46,7 @@ const (
 	ActionUnstale       = "unstale"        // stale spec → drafted/validated
 	ActionForceComplete = "force-complete" // testing spec → complete (skip the drift gate)
 	ActionUnarchive     = "unarchive"      // archived spec → drafted
-	ActionStart         = "start"          // ready (unblocked) backlog task → in_progress
+	ActionStart         = "start"          // backlog task → in_progress
 )
 
 // Node is one vertex of the unified graph.
@@ -75,7 +73,6 @@ type Graph struct {
 	Nodes        []Node   `json:"nodes"`
 	Edges        []Edge   `json:"edges"`
 	CriticalPath []string `json:"critical_path"` // longest dependency chain (node IDs)
-	Blocked      []string `json:"blocked"`       // node IDs whose prerequisites are unmet
 }
 
 // SpecID and TaskID are the node-ID conventions, exported so the handler and
@@ -91,23 +88,10 @@ func TaskID(id string) string { return "task:" + id }
 // (matching the Map's "Show archived" toggle). Free-form doc nodes (no
 // lifecycle, no edges) are always excluded from the graph.
 func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) Graph {
-	g := Graph{Nodes: []Node{}, Edges: []Edge{}, CriticalPath: []string{}, Blocked: []string{}}
+	g := Graph{Nodes: []Node{}, Edges: []Edge{}, CriticalPath: []string{}}
 
-	// Readiness is computed over the FULL task set, independent of which nodes
-	// are displayed: a prerequisite that is done-and-archived must still count
-	// as satisfied even when archived nodes are hidden, or a ready backlog task
-	// would wrongly read as blocked in the default view.
-	taskDone := func(id string) bool {
-		for _, t := range tasks {
-			if t.ID.String() == id {
-				return t.Status == store.TaskStatusDone
-			}
-		}
-		return false // unknown / absent prerequisite is unmet
-	}
-
-	// Display set: which tasks render (and therefore which task-incident edges
-	// are kept). Edges to a hidden task are dropped as dangling.
+	// Display set: which tasks render (and therefore which dispatch edges are
+	// kept). Edges to a hidden task are dropped as dangling.
 	shown := make(map[string]bool, len(tasks))
 	for _, t := range tasks {
 		if t.Archived && !includeArchived {
@@ -166,7 +150,7 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 		}
 	}
 
-	// --- task nodes + task_dep edges + blocked set + start action ---
+	// --- task nodes + start action ---
 	// Iterate the original slice (not the map) for deterministic ordering.
 	for _, t := range tasks {
 		if t.Archived && !includeArchived {
@@ -175,16 +159,6 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 		tid := t.ID.String()
 		id := TaskID(tid)
 
-		blocked := false
-		for _, dep := range t.DependsOn {
-			if !taskDone(dep) {
-				blocked = true
-			}
-			if shown[dep] {
-				g.Edges = append(g.Edges, Edge{From: TaskID(dep), To: id, Kind: EdgeTaskDep})
-			}
-		}
-
 		node := Node{
 			ID:     id,
 			Kind:   NodeTask,
@@ -192,11 +166,8 @@ func Build(specs []spec.NodeResponse, tasks []store.Task, includeArchived bool) 
 			Status: string(t.Status),
 			Ref:    tid,
 		}
-		if t.Status == store.TaskStatusBacklog && blocked {
-			g.Blocked = append(g.Blocked, id)
-		}
-		// Start action: a ready (unblocked) backlog task can be promoted.
-		if t.Status == store.TaskStatusBacklog && !blocked {
+		// Start action: a backlog task can be promoted.
+		if t.Status == store.TaskStatusBacklog {
 			node.AvailableActions = append(node.AvailableActions, ActionStart)
 		}
 		g.Nodes = append(g.Nodes, node)

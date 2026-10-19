@@ -40,7 +40,6 @@ const posMap = computed(() => new Map(Object.entries(pos)));
 const edges = computed(() => edgePaths(props.graph, posMap.value));
 
 const criticalSet = computed(() => new Set(props.graph.critical_path));
-const blockedSet = computed(() => new Set(props.graph.blocked));
 
 const readySet = computed(
   () => new Set(props.graph.nodes.filter((n) => hasPrimaryAction(n.available_actions)).map((n) => n.id)),
@@ -60,7 +59,6 @@ function nodeClasses(id: string, kind: string, status: string) {
     `gc-node--${kind}`,
     `gc-status--${status}`,
     { 'gc-node--critical': criticalSet.value.has(id) },
-    { 'gc-node--blocked': blockedSet.value.has(id) },
     { 'gc-node--ready': readySet.value.has(id) },
     { 'gc-node--selected': props.selectedId === id },
     { 'gc-node--running': isRunning(status) },
@@ -204,7 +202,7 @@ defineExpose({ resetView });
     <svg class="gc-svg" width="100%" height="100%">
       <defs>
         <marker
-          v-for="kind in ['containment', 'dispatch', 'spec_dep', 'task_dep']"
+          v-for="kind in ['containment', 'dispatch', 'spec_dep']"
           :id="`gc-arrow-${kind}`"
           :key="kind"
           viewBox="0 0 8 8"
@@ -298,9 +296,6 @@ defineExpose({ resetView });
   stroke-width: 3;
   filter: drop-shadow(0 0 5px var(--accent-soft));
 }
-.gc-node--blocked {
-  opacity: 0.45;
-}
 /* "Actionable now": a node the backend marked with an available action gets an
    accent ring so the operator can spot what's ready to dispatch/start. */
 .gc-node--ready .gc-dot {
@@ -367,7 +362,6 @@ defineExpose({ resetView });
 .gc-edge--containment { stroke-dasharray: 2 3; opacity: 0.55; }
 .gc-edge--dispatch { stroke: var(--run); }
 .gc-edge--spec_dep { stroke: var(--ink-4); }
-.gc-edge--task_dep { stroke: var(--ink-4); }
 .gc-edge--critical {
   stroke-width: 2.5;
   stroke: var(--accent);

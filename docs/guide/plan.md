@@ -79,7 +79,7 @@ Planning rounds that write spec files are committed per round and can be undone 
 
 Dispatching turns a validated leaf spec into a board task: press **d**, click **Dispatch** in the focused view, use `/dispatch` in chat, or multi-select specs in the explorer and dispatch the batch. Dispatching a validated non-leaf expands to its subtree's leaves.
 
-For each leaf, the server creates a task whose prompt is the spec body, tagged `spec-dispatched` plus the track name, wires `depends_on` relationships into task dependencies, and writes the task's ID back into the spec's `dispatched_task_id`. The whole batch is atomic: task creation and frontmatter writes either all succeed or all roll back. Drafted ancestors of a dispatched leaf are promoted along the way. Dispatching a spec that is not validated, or a non-leaf directly, fails without mutating anything.
+For each leaf, the server creates a task whose prompt is the spec body, tagged `spec-dispatched` plus the track name, and writes the task's ID back into the spec's `dispatched_task_id`. A spec's `depends_on` stays in the spec tree; the created tasks carry no ordering between them. The whole batch is atomic: task creation and frontmatter writes either all succeed or all roll back. Drafted ancestors of a dispatched leaf are promoted along the way. Dispatching a spec that is not validated, or a non-leaf directly, fails without mutating anything.
 
 **Undispatch** reverses the link: the linked task is cancelled if still live, `dispatched_task_id` is cleared, and the spec returns to `validated`.
 
@@ -122,7 +122,7 @@ Unarchive prefers the lossless path: it locates the archive commit and runs `git
 
 - [Board](board.md): where dispatched specs execute
 - [Chat](chat.md): the same agent engine without the spec tree
-- [Mission Control](mission-control.md): specs and tasks on one dependency graph
+- [Mission Control](mission-control.md): specs and tasks on one graph
 - [Getting Started](getting-started.md): first workspace and first spec
 - [Configuration](configuration.md): the drift tester gate and the other settings
 - [Plan Mode internals](../internals/plan-mode.md): tree building, dispatch, drift, and undo implementation

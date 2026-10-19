@@ -1,6 +1,6 @@
 # Mission Control
 
-Mission Control is the pipeline overview: one graph showing every spec and every task in the active workspace, connected by their dependencies, colored by state, and actionable in place. Open it from the sidebar or navigate to `/mission` (the legacy `/map` path redirects).
+Mission Control is the pipeline overview: one graph showing every spec and every task in the active workspace, connected by spec dependencies and dispatch links, colored by state, and actionable in place. Open it from the sidebar or navigate to `/mission` (the legacy `/map` path redirects).
 
 ![Mission Control graph with the inspector panel](images/mission.png)
 
@@ -13,7 +13,7 @@ Node types:
 - **Spec nodes** (larger discs) are colored by lifecycle state: vague, drafted, validated, testing, complete, stale, archived.
 - **Task nodes** (smaller discs) are colored by board status: backlog, in progress, waiting, committing, done, failed, cancelled.
 
-Edges distinguish containment (a spec's children, drawn dashed), dispatch links (a spec to the task it dispatched), spec dependencies, and task dependencies. The critical path, the longest dependency chain, is drawn with emphasized edges and listed in the inspector; blocked nodes render dimmed.
+Edges distinguish containment (a spec's children, drawn dashed), dispatch links (a spec to the task it dispatched), and spec dependencies. The critical path, the longest dependency chain, is drawn with emphasized edges and listed in the inspector.
 
 ## Filtering
 
@@ -42,7 +42,7 @@ The **Ready to act** section lists every node with a primary action available (v
 
 ## Live activity
 
-The graph reflects live task activity: running tasks pulse with an expanding ring, waiting tasks show a steady amber pulse, and a running node on the critical path gets a bold accent ring. Task updates stream into the client, and the graph re-fetches whenever a task changes status or dependencies, so the picture stays current without manual refresh. Animations respect the reduced-motion system preference.
+The graph reflects live task activity: running tasks pulse with an expanding ring, waiting tasks show a steady amber pulse, and a running node on the critical path gets a bold accent ring. Task updates stream into the client, and the graph re-fetches whenever a task changes status, so the picture stays current without manual refresh. Animations respect the reduced-motion system preference.
 
 ## Navigation
 

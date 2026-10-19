@@ -60,7 +60,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `StartedAt` | `*time.Time` | `started_at` | First transition to `in_progress` |
 | `UpdatedAt` | `time.Time` | `updated_at` | Last mutation timestamp |
 | `ScheduledAt` | `*time.Time` | `scheduled_at` | Optional future time before auto-promotion |
-| `DependsOn` | `[]string` | `depends_on` | UUIDs of tasks that must reach `done` first |
 
 `TaskStatus` values: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
 
@@ -576,10 +575,11 @@ Turn output files are also subject to a per-turn size budget (`WALLFACER_MAX_TUR
 The store uses a forward-only migration system in `internal/store/migrate.go`. Every `task.json` is passed through `migrateTaskJSON()` on load, which applies migration steps in order:
 
 1. Default missing values: `Status` to `"backlog"`, `Timeout` to `60`, `CreatedAt`/`UpdatedAt` from file mod time.
-2. Canonicalize `DependsOn`: trim whitespace, validate UUIDs, deduplicate, sort.
-3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
-4. Backfill `AutoRetryBudget` for tasks created before schema version 2.
-5. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
+2. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
+3. Backfill `AutoRetryBudget` for tasks created before schema version 2.
+4. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
+
+Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on` list, are dropped on load and disappear on the record's next save.
 
 If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `2`) and is incremented whenever a new migration step is added.
 
