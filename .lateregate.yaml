@@ -62,8 +62,7 @@ waive:
       git_test and tasks_autoimplement_metrics_test (t.TempDir is the
       replacement, applied already to stream_test and the worktree tests);
       t.TempDir directories recreated after the test returned by the
-      auto-tester and routine-reconcile goroutines, which outlive their
-      tests; and cursor-agent-logs, written by the cursor harness process
+      auto-tester goroutine, which outlives its tests; and cursor-agent-logs, written by the cursor harness process
       under TMPDIR rather than under the task
     until: 2026-10-31
   cover:
