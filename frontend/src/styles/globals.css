@@ -64,18 +64,6 @@ h1 em, h2 em {
     -webkit-text-fill-color: transparent;
     padding-right: 0.15em;
 }
-/* The native latere.ai agent runtime. Gradient (teal -> olive -> amber)
-   matches the .topos-brand wordmark in the agents/topos surfaces so the
-   identity is consistent across products. */
-.topos-brand {
-    font-family: var(--font-display) !important;
-    font-weight: 600 !important;
-    background: linear-gradient(135deg, #55707a 0%, #6f8a56 58%, #a07045 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    padding-right: 0.15em;
-}
 
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }

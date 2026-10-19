@@ -9,7 +9,6 @@ export const HARNESS_LABELS: Record<string, string> = {
   cursor: 'Cursor',
   opencode: 'OpenCode',
   pi: 'Pi',
-  topos: 'Topos',
 };
 
 // harnessLabel returns the brand-cased display name for a harness id,
@@ -60,15 +59,9 @@ export function supportedHarnesses(sandboxes?: string[] | null): string[] {
 }
 
 // chatHarnesses returns the harness ids a chat composer offers: the advertised
-// harnesses that are usable (a missing usable flag counts as usable) and that
-// the server lists in chat_sandboxes, the harnesses its chat runtime can
-// launch. Before /api/config loads, chat_sandboxes is absent and only the
-// usable filter applies; the composer re-filters once config arrives.
+// harnesses that are usable (a missing usable flag counts as usable).
 export function chatHarnesses(
-  config?: Pick<ServerConfig, 'sandboxes' | 'sandbox_usable' | 'chat_sandboxes'> | null,
+  config?: Pick<ServerConfig, 'sandboxes' | 'sandbox_usable'> | null,
 ): string[] {
-  const chat = config?.chat_sandboxes;
-  return supportedHarnesses(config?.sandboxes).filter(
-    (id) => config?.sandbox_usable?.[id] !== false && (!chat || chat.includes(id)),
-  );
+  return supportedHarnesses(config?.sandboxes).filter((id) => config?.sandbox_usable?.[id] !== false);
 }

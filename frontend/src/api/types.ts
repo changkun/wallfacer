@@ -90,34 +90,6 @@ export interface Task {
   // approved). Absent = no review has finished since the task's last turn.
   review_unresolved?: number;
   review_headline?: string;
-  // Present (non-empty string) only for tasks that ran on the in-process
-  // topos harness: the opaque JSON of the run's trace. The thin parsed shape
-  // is served by GET /api/tasks/{id}/trace (see AgentTrace).
-  trace?: string | null;
-}
-
-// Trace of an in-process run (GET /api/tasks/{id}/trace). status is the node
-// lifecycle; kind is the handoff type between agents. A native run records
-// one node and no edge; traces stored by earlier multi-agent runs also carry
-// handoff edges, and they still render.
-export type TraceNodeStatus = 'running' | 'done' | 'failed' | string;
-export type TraceEdgeKind = 'delegate' | 'deliver' | 'next' | string;
-export interface TraceNode {
-  id: string;
-  name: string;
-  role: string;
-  status: TraceNodeStatus;
-  grants?: string[];
-  sandbox?: string;
-}
-export interface TraceEdge {
-  from: string;
-  to: string;
-  kind: TraceEdgeKind;
-}
-export interface TaskTrace {
-  nodes: TraceNode[];
-  edges: TraceEdge[];
 }
 
 // Review transcript (GET /api/tasks/{id}/review/transcript): the task's newest
@@ -255,9 +227,6 @@ export interface ServerConfig {
   sandboxes: string[];
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
   sandbox_usable?: Record<string, boolean>;
-  // Harnesses the chat runtime can launch: the subprocess harnesses. An
-  // in-process harness (topos) can be usable for tasks and still be absent here.
-  chat_sandboxes?: string[];
   default_sandbox: string;
   terminal_enabled: boolean;
   ideation_categories?: string[];

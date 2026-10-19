@@ -48,17 +48,14 @@ describe('ChatComposer', () => {
     expect(Array.from(actions).map((b) => b.textContent?.trim())).toEqual(['/', '@']);
   });
 
-  // A harness can be usable for tasks yet have no chat runtime: topos runs
-  // in-process, and chat launches subprocess harnesses only. The picker offers
-  // what the server lists in chat_sandboxes, and does not adopt a configured
-  // default the chat runtime cannot launch.
-  it('offers only the harnesses the chat runtime can launch', async () => {
+  // The picker offers the usable harnesses only, and adopts the configured
+  // default when nothing is saved.
+  it('offers only the usable harnesses', async () => {
     localStorage.removeItem('wallfacer-chat-harness');
     const { host } = await mount({
-      sandboxes: ['claude', 'codex', 'topos'],
-      sandbox_usable: { claude: true, codex: true, topos: true },
-      chat_sandboxes: ['claude', 'codex'],
-      default_sandbox: 'topos',
+      sandboxes: ['claude', 'codex', 'pi'],
+      sandbox_usable: { claude: true, codex: true, pi: false },
+      default_sandbox: 'claude',
     });
     const trigger = host.querySelector('.harness-select__trigger .harness-badge__label');
     expect(trigger?.textContent?.trim()).toBe('Claude');

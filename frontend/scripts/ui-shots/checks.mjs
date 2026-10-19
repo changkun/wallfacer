@@ -374,8 +374,8 @@ SCENES['credential-storage'] = async (page) => {
   expect('credential-storage', await page.locator('#env-config-status').isVisible(), 'storage error is hidden');
 };
 
-// Native Topos has no host CLI launch path for chat. This exercises a real
-// asynchronous launch failure without invoking a provider or spending tokens.
+// This exercises a real asynchronous launch failure without invoking a
+// provider or spending tokens.
 SCENES['chat-error'] = async (page) => {
   const created = await fixtureRequest(page, 'POST', '/api/agent/sessions', { name: 'Failure surface regression' });
   expect('chat-error', created.status() === 201, 'could not create test chat');
@@ -383,8 +383,7 @@ SCENES['chat-error'] = async (page) => {
   try {
     await fixtureRequest(page, 'PATCH', '/api/agent/sessions/' + thread.id, { state: 'active' });
     // pi is configured to a missing binary by ui-test.sh, so the launch fails
-    // after the message is accepted. An in-process harness is refused before
-    // that, with harness_unavailable_in_chat, and would not reach the bubble.
+    // after the message is accepted.
     const sent = await fixtureRequest(page, 'POST', '/api/agent/messages', { thread: thread.id, message: 'Exercise a failed host launch', harness: 'pi' });
     expect('chat-error', sent.status() === 202, 'test message was not accepted');
     await page.goto(base + '/chat', { waitUntil: 'load' });

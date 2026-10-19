@@ -24,10 +24,8 @@ const emit = defineEmits<{ send: [text: string, harness?: string]; interrupt: []
 // Harness for this composer's turns. The choice persists across reloads so it
 // sticks per browser.
 const store = useTaskStore();
-// Only offer harnesses that are usable AND that the chat runtime can launch
-// (/api/config chat_sandboxes): an in-process harness can be usable for tasks
-// and still have no chat runtime. A missing usable flag counts as usable so
-// the picker degrades gracefully.
+// Only offer usable harnesses. A missing usable flag counts as usable so the
+// picker degrades gracefully.
 const harnessOptions = computed(() => chatHarnesses(store.config));
 const HARNESS_KEY = 'wallfacer-chat-harness';
 const harness = ref<string>(

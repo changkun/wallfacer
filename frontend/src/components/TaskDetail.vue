@@ -18,7 +18,6 @@ import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
 import ReviewVerification from './ReviewVerification.vue';
-import AgentTrace from './AgentTrace.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
@@ -734,7 +733,7 @@ const editModel = ref('');
 const editSandbox = ref('');
 // Harness options for the edit picker, driven by the server's registered
 // harness list (falling back to the known set before config loads) so every
-// harness — including Topos — is selectable, not just claude/codex.
+// harness is selectable, not just claude/codex.
 const EDIT_SANDBOX_OPTIONS = computed(() => [
   { value: '', label: 'Default (agent)' },
   ...supportedHarnesses(taskStore.config?.sandboxes).map((id) => ({
@@ -1148,11 +1147,6 @@ async function submitReview() {
                     <div v-else class="prose-content mb-4" v-html="specResultHtml"></div>
                   </template>
 
-                  <AgentTrace
-                    v-if="task.trace || task.status === 'in_progress'"
-                    :task-id="task.id"
-                    :refresh-key="task.updated_at"
-                  />
 
 
                 </div>

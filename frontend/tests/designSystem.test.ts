@@ -168,7 +168,7 @@ describe('primitives.css defines the shared classes', () => {
   const tokenOnly = [
     'src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css',
     'src/styles/modal.css', 'src/styles/task-detail.css', 'src/styles/diffs.css', 'src/styles/syntax.css', 'src/styles/mermaid.css',
-    'src/components/TaskDetail.vue', 'src/components/AgentTrace.vue',
+    'src/components/TaskDetail.vue',
     'src/components/ReviewVerification.vue', 'src/components/SpanFlamegraph.vue', 'src/components/TaskCard.vue',
     'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue',
     'src/views/ChatPage.vue', 'src/components/plan/SessionList.vue', 'src/components/plan/SpecChatPopup.vue', 'src/components/plan/ChatModelBadge.vue',

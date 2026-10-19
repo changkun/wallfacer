@@ -37,14 +37,7 @@ describe('modelLabel', () => {
 });
 
 describe('chatHarnesses', () => {
-  it('offers the usable harnesses the chat runtime can launch', () => {
-    expect(chatHarnesses({
-      sandboxes: ['claude', 'codex', 'pi', 'topos'],
-      sandbox_usable: { claude: true, codex: false, pi: true, topos: true },
-      chat_sandboxes: ['claude', 'codex', 'pi'],
-    })).toEqual(['claude', 'pi']);
-  });
-  it('applies only the usable filter while chat_sandboxes is absent', () => {
+  it('offers the usable harnesses', () => {
     expect(chatHarnesses({
       sandboxes: ['claude', 'codex'],
       sandbox_usable: { codex: false },
