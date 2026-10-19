@@ -174,11 +174,11 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		logger.Main.Info("migrated workspace groups to workspaces.json")
 	}
 
-	// Workspaces start empty; the manager restores the last active set from
-	// the persisted env file (WALLFACER_WORKSPACES). Users configure them
-	// later via the Settings UI or PUT /api/workspaces.
+	// A nil initial set makes the manager restore the most recently used
+	// workspace from workspaces.json. Workspaces are created and switched
+	// later through the workspace picker (the /api/workspaces routes).
 	var workspaces []string
-	wsMgr, err := workspace.NewManager(configDir, cfg.DataDir, cfg.EnvFile, workspaces)
+	wsMgr, err := workspace.NewManager(configDir, cfg.DataDir, workspaces)
 	if err != nil {
 		logger.Fatal("workspace manager", "error", err)
 	}

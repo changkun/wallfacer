@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -179,12 +178,6 @@ func (m *Manager) UpdateFolders(id string, folders []string) (Workspace, error) 
 	snap := cloneSnapshot(m.current)
 	m.mu.Unlock()
 
-	if m.envFile != "" {
-		encoded := envconfig.FormatWorkspaces(validated)
-		if err := envconfig.Update(m.envFile, envconfig.Updates{Workspaces: &encoded}); err != nil {
-			return Workspace{}, fmt.Errorf("persist active folders: %w", err)
-		}
-	}
 	m.publish(snap)
 	return ws, nil
 }

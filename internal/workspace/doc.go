@@ -15,9 +15,8 @@
 //
 // # Connected packages
 //
-// Depends on [envconfig] (env file path management), [prompts] (AGENTS.md key
-// and path derivation), [store] (creates scoped store per workspace), [logger],
-// and utilities [pkg/atomicfile] and [pkg/set].
+// Depends on [prompts] (data key derivation), [store] (creates scoped store
+// per workspace), [logger], and the utility [pkg/atomicfile].
 // Consumed by [handler] (workspace switching UI), [runner] (workspace paths for
 // container mounts), and [cli] (server startup initialization).
 // Changes to workspace key derivation or group persistence format affect session
@@ -25,7 +24,7 @@
 //
 // # Usage
 //
-//	mgr, err := workspace.NewManager(configDir, dataDir, envFile, paths)
+//	mgr, err := workspace.NewManager(configDir, dataDir, paths)
 //	snap := mgr.Snapshot()
 //	newSnap, err := mgr.Switch(newPaths)
 //	id, ch := mgr.Subscribe()

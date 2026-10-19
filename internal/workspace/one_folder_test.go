@@ -140,7 +140,7 @@ func TestNewManager_SeveralFolderWorkspaceWaitsForRepoint(t *testing.T) {
 		{"id": "single-id", "name": "One repo", "folders": []string{c}, "data_key": "fedcba9876543210"},
 	})
 
-	m, err := NewManager(configDir, dataDir, "", nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}

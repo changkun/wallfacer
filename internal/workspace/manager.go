@@ -10,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
@@ -53,13 +52,11 @@ func storeHasActiveTasks(s *store.Store) bool {
 		s.CountByStatus(store.TaskStatusWaiting) > 0
 }
 
-// pendingSwap carries the before/after snapshots and a cleanup callback
-// for an in-flight Switch operation. cleanup closes next.Store on failure
-// paths; it is cleared to a no-op once the swap commits successfully.
+// pendingSwap carries the before/after snapshots for an in-flight Switch
+// operation.
 type pendingSwap struct {
 	previous Snapshot
 	next     Snapshot
-	cleanup  func() // closes next.Store; set to a no-op after successful commit
 }
 
 // Manager coordinates workspace switching, store lifecycle, and change subscriptions.
@@ -68,9 +65,8 @@ type pendingSwap struct {
 // separate so that publishing to subscribers (which only needs subsMu) does not
 // block concurrent Snapshot reads (which only need mu.RLock).
 type Manager struct {
-	configDir string // ~/.wallfacer/ — workspace groups and instructions live here
+	configDir string // ~/.wallfacer/ — workspaces.json and instructions live here
 	dataDir   string // per-workspace scoped data directories
-	envFile   string // .env file path for persisting WALLFACER_WORKSPACES
 
 	mu           sync.RWMutex            // guards current, nextGen, and activeGroups
 	current      Snapshot                // the currently "viewed" workspace group
@@ -92,12 +88,13 @@ type Manager struct {
 	newStore func(dir string) (*store.Store, error)
 }
 
-// NewManager creates a Manager and switches to the initial workspace set.
-func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager, error) {
+// NewManager creates a Manager and switches to the initial workspace set. A
+// nil initial restores the most recently used workspace from workspaces.json,
+// which is the one record of the active workspace across restarts.
+func NewManager(configDir, dataDir string, initial []string) (*Manager, error) {
 	m := &Manager{
 		configDir:    configDir,
 		dataDir:      dataDir,
-		envFile:      envFile,
 		subs:         make(map[int]chan Snapshot),
 		activeGroups: make(map[string]*activeGroup),
 		newStore:     store.NewFileStore,
@@ -217,10 +214,10 @@ func (m *Manager) Unsubscribe(id int) {
 }
 
 // Switch validates and normalizes paths, then transitions the manager to the
-// new workspace set. It short-circuits when the normalized set matches the
-// current workspaces. All external side effects (store creation, instructions,
-// workspace groups, env file) are applied before the atomic swap; every
-// failure path closes the candidate store so it does not accumulate.
+// workspace on that folder (or to the empty "no workspace" state for no
+// paths). It short-circuits when the normalized folder matches the current
+// one. The workspace record and the store are resolved before the atomic
+// swap, so a failure leaves the manager unchanged.
 //
 // Multi-store lifecycle: if the previous group has running tasks
 // (taskCount > 0), its store is kept open in activeGroups. If switching to a
@@ -252,9 +249,9 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 }
 
 // activate installs `ws` as the current workspace: it opens or reuses the store
-// keyed by ws.DataKey (NOT by the folder paths), persists the active folder set
-// to the env file, performs the atomic snapshot swap, and publishes. ws.Folders
-// must already be validated/normalized and ws.DataKey must be non-empty.
+// keyed by ws.DataKey (NOT by the folder paths), performs the atomic snapshot
+// swap, and publishes. ws.Folders must already be validated/normalized and
+// ws.DataKey must be non-empty.
 //
 // Because the store is keyed by DataKey, changing a workspace's folders (via
 // UpdateFolders) keeps pointing at the same store; only Switch/SwitchByID, which
@@ -274,8 +271,8 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 	}
 	validated := ws.Folders
 
-	// Build the candidate snapshot. All external side effects happen here,
-	// before the atomic swap, so the manager is never left in a partial state.
+	// Build the candidate snapshot. The store is opened here, before the
+	// atomic swap, so the manager is never left in a partial state.
 	swap := pendingSwap{
 		next: Snapshot{
 			WorkspaceID:   ws.ID,
@@ -303,28 +300,7 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 		swap.next.Store = s
 	}
 
-	// cleanup is idempotent; called on every failure path to release the
-	// candidate store. Cleared to a no-op after the swap commits. Reused
-	// stores must NOT be closed on failure — they belong to an active group.
-	closed := false
-	swap.cleanup = func() {
-		if !closed && !reusedStore {
-			closed = true
-			swap.next.Store.Close()
-		}
-	}
-
-	if m.envFile != "" {
-		encoded := envconfig.FormatWorkspaces(validated)
-		if err := envconfig.Update(m.envFile, envconfig.Updates{
-			Workspaces: &encoded,
-		}); err != nil {
-			swap.cleanup()
-			return Snapshot{}, fmt.Errorf("persist workspaces: %w", err)
-		}
-	}
-
-	// All external effects succeeded: atomically install the new snapshot
+	// The store is open: atomically install the new snapshot
 	// and update activeGroups. The write lock ensures no concurrent reader
 	// sees a partially updated state (e.g. current.Store pointing to the
 	// previous group while current.Key already identifies the new one).
@@ -362,8 +338,6 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 	snapshot := cloneSnapshot(m.current)
 	m.mu.Unlock()
 
-	// Mark the swap as committed so the cleanup no-op is safe, then publish.
-	swap.cleanup = func() {} // no-op: next.Store is now owned by m.current
 	m.publish(snapshot)
 
 	// Close the previous store outside the lock if it was marked for cleanup.

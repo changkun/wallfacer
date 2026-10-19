@@ -32,7 +32,7 @@ func newWorkspaceTestServer(t *testing.T) (*httptest.Server, *workspace.Manager,
 		t.Fatalf("write env file: %v", err)
 	}
 
-	mgr, err := workspace.NewManager(configDir, dataDir, envPath, []string{})
+	mgr, err := workspace.NewManager(configDir, dataDir, []string{})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestWorkspaceMigrationE2E(t *testing.T) {
 		t.Fatalf("migration: migrated=%v err=%v", migrated, err)
 	}
 
-	mgr, err := workspace.NewManager(configDir, dataDir, envPath, []string{})
+	mgr, err := workspace.NewManager(configDir, dataDir, []string{})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}

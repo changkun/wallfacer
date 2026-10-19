@@ -17,11 +17,7 @@ func newCountingManager(t *testing.T) (m *Manager, configDir string, opens *int)
 	t.Helper()
 	configDir = t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-	mgr, err := NewManager(configDir, dataDir, envFile, []string{}) // empty: no restore
+	mgr, err := NewManager(configDir, dataDir, []string{}) // empty: no restore
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}

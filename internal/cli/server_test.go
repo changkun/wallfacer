@@ -22,6 +22,7 @@ import (
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestInitServer verifies that initServer returns valid components with a
@@ -677,8 +678,11 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	wsDir := t.TempDir()
-	envContent := "# test\nWALLFACER_WORKSPACES=" + wsDir + "\n"
-	if err := os.WriteFile(envFile, []byte(envContent), 0600); err != nil {
+	// Startup restores the most recently used workspace from workspaces.json.
+	if err := workspace.SaveGroups(configDir, []workspace.Workspace{{Folders: []string{wsDir}}}); err != nil {
+		t.Fatalf("save workspaces: %v", err)
+	}
+	if err := os.WriteFile(envFile, []byte("# test\n"), 0600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
 

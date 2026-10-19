@@ -1185,7 +1185,7 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	}
 
 	ws := t.TempDir()
-	wsMgr, err := workspace.NewManager(configDir, dataDir, envFile, []string{ws})
+	wsMgr, err := workspace.NewManager(configDir, dataDir, []string{ws})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}

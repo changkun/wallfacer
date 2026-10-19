@@ -5,7 +5,6 @@ package envconfig
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -63,8 +62,6 @@ type Config struct {
 	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
 	HostPiBinary       string // WALLFACER_HOST_PI_BINARY, optional override of $PATH lookup
 	TerminalEnabled    bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
-
-	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -109,7 +106,6 @@ var knownKeys = []string{
 	"WALLFACER_HOST_OPENCODE_BINARY",
 	"WALLFACER_HOST_PI_BINARY",
 	"WALLFACER_TERMINAL_ENABLED",
-	"WALLFACER_WORKSPACES",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -238,8 +234,6 @@ func Parse(path string) (Config, error) {
 			cfg.HostPiBinary = v
 		case "WALLFACER_TERMINAL_ENABLED":
 			cfg.TerminalEnabled = v != "false"
-		case "WALLFACER_WORKSPACES":
-			cfg.Workspaces = ParseWorkspaces(v)
 		}
 	}
 	cfg.OAuthToken = values["CLAUDE_CODE_OAUTH_TOKEN"]
@@ -259,36 +253,6 @@ func Parse(path string) (Config, error) {
 func ReadRaw(path string) (map[string]string, error) {
 	_, values, err := readConfigFile(path)
 	return values, err
-}
-
-// ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted
-// string (':' on Unix, ';' on Windows), trimming empty entries.
-func ParseWorkspaces(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	parts := filepath.SplitList(raw)
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		out = append(out, part)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-// FormatWorkspaces encodes workspaces for WALLFACER_WORKSPACES using the OS
-// path-list separator.
-func FormatWorkspaces(workspaces []string) string {
-	if len(workspaces) == 0 {
-		return ""
-	}
-	return strings.Join(workspaces, string(os.PathListSeparator))
 }
 
 // SandboxByActivity returns the per-activity sandbox type overrides derived from config.
@@ -415,7 +379,6 @@ type Updates struct {
 	AutoPush             *string
 	AutoPushThreshold    *string
 	TerminalEnabled      *string
-	Workspaces           *string
 }
 
 // Update merges changes into the env file at path.
@@ -447,7 +410,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
 		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
-		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)
 }
