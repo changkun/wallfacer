@@ -502,11 +502,6 @@ watch([renderedBody, renderedTaskPrompt, bodyRef], () => {
 // old onMounted addEventListener ran when bodyRef was still null (the body is
 // gated behind v-if="renderedBody", absent until the async fetch resolves), so
 // it never attached and spec-link clicks were never intercepted.
-
-// Exposed for the PlanPage keyboard shortcuts (d = dispatch, b = break down).
-function dispatchFocused() { if (showDispatch.value) void onDispatch(); }
-function breakdownFocused() { if (showBreakdown.value) onBreakdown(); }
-defineExpose({ dispatchFocused, breakdownFocused });
 </script>
 
 <template>
@@ -570,7 +565,7 @@ defineExpose({ dispatchFocused, breakdownFocused });
           class="btn sm ghost sf-action sf-chat-toggle"
           :class="{ 'sf-chat-toggle--folded': !chatVisible }"
           :aria-pressed="chatVisible"
-          :title="chatVisible ? 'Hide chat pane (C)' : 'Show chat pane (C)'"
+          :title="chatVisible ? 'Hide chat pane' : 'Show chat pane'"
           @click="emit('toggleChat')"
         >Chat</button>
         <button

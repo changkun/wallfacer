@@ -53,11 +53,4 @@ describe('Topbar', () => {
     expect(host.querySelector('#topbar-actions')).toBeNull();
     app.unmount(); host.remove();
   });
-
-  it('opens the shortcuts modal', async () => {
-    const { host, app, pinia } = await mountTopbar('/');
-    (host.querySelector('[data-action="shortcuts"]') as HTMLButtonElement).click();
-    expect(useUiStore(pinia).showShortcuts).toBe(true);
-    app.unmount(); host.remove();
-  });
 });

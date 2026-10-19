@@ -81,7 +81,7 @@ A filter box above the rows narrows the transcript to matching entries. The brow
 
 The **Changes** tab shows the task's diff against the default branch. While a task is waiting for review, the diff supports an inline comment flow:
 
-1. Click the gutter button on a line to open a comment box anchored beneath it. Press Cmd/Ctrl+Enter to save, Escape to cancel.
+1. Click the gutter button on a line to open a comment box anchored beneath it, then **Save** or **Cancel**.
 2. Add as many comments as needed, across any number of files. Lines with comments show a filled gutter marker.
 3. The **Review comments** panel collects all comments grouped by file, each editable and deletable, alongside an optional general feedback field. Click a line reference to scroll back to the anchored diff line.
 4. Click **Submit** to send everything as one batched feedback message. Comments are serialized with their file and line anchors so the agent can locate each one, and the task resumes with the feedback.

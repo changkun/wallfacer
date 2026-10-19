@@ -18,5 +18,5 @@ export const docIndex: DocEntry[] = [
   { slug: 'automation', title: "Automation", section: "Operate", desc: "Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers." },
   { slug: 'oversight', title: "Oversight", section: "Operate", desc: "Oversight summaries, timelines, logs, diff review, per-task cost and usage." },
   { slug: 'workspaces', title: "Workspaces", section: "Operate", desc: "Workspace management, git integration, branches." },
-  { slug: 'configuration', title: "Configuration", section: "Operate", desc: "Settings, environment variables, harness selection, CLI reference, keyboard shortcuts." },
+  { slug: 'configuration', title: "Configuration", section: "Operate", desc: "Settings, environment variables, harness selection, CLI reference." },
 ];

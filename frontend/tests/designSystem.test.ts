@@ -180,7 +180,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/components/SystemPromptsManager.vue', 'src/views/LocalNotFoundPage.vue',
     'src/styles/command-palette.css', 'src/styles/workspace-picker.css', 'src/styles/explorer.css',
     'src/components/CommandPalette.vue', 'src/components/WorkspacePicker.vue', 'src/components/WorkspaceEditModal.vue', 'src/components/FolderBrowser.vue',
-    'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue', 'src/components/KeyboardShortcutsModal.vue',
+    'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue',
     'src/components/TrashModal.vue',
     'src/components/ExplorerPanel.vue', 'src/components/editor/EditorTabStrip.vue', 'src/components/editor/FileEditor.vue', 'src/lib/editorTheme.ts', 'src/styles/docs.css',
     'src/views/LocalDocsPage.vue', 'src/lib/mermaidRender.ts', 'src/lib/chartPalette.ts',

@@ -27,13 +27,13 @@ Start here for the full reading order.
 - [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
 - [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, per-task cost and usage.
 - [Workspaces](workspaces.md). Workspace management, git integration, branches.
-- [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference, keyboard shortcuts.
+- [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference.
 
 ## Common Workflows
 
 ### Plan mode workflow
 
-1. Sketch the idea in the agent chat (Plan mode, press **P**).
+1. Sketch the idea in the agent chat (Plan mode).
 2. Issue `/create` to scaffold a first draft.
 3. Refine with `/refine`, `/impact`, then `/validate`.
 4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.

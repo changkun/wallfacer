@@ -250,7 +250,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       v-else-if="hasWorkspace"
       type="button"
       class="explorer-rail"
-      title="Open Explorer (e)"
+      title="Open Explorer"
       aria-label="Open Explorer"
       @click="ui.openExplorer()"
     >

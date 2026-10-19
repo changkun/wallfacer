@@ -4,7 +4,7 @@ Wallfacer is configured through the Settings page, environment variables in `~/.
 
 ## Settings page
 
-Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The page has four tabs.
+Open Settings from the bottom of the sidebar. The page has four tabs.
 
 ### Execution tab
 
@@ -210,43 +210,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `~/.wallfacer/prompts/` | System prompt template overrides |
 | `~/.wallfacer/agent-sessions/` | Chat and Plan session history |
 | `~/.wallfacer/tmp/` | Scratch space |
-
-## Keyboard shortcuts
-
-Press `?` anywhere to open this reference in the app. Shortcuts without modifiers are suppressed while focus is in a text input or a modal is open.
-
-### Global
-
-| Key | Action |
-|---|---|
-| `Cmd+K` / `Ctrl+K` | Command palette (tasks, specs, docs) |
-| `Cmd+,` / `Ctrl+,` | Open Settings |
-| `/` | Focus search |
-| `?` | Show keyboard shortcuts (also the keyboard button at the right of the top bar) |
-| `n` | New task |
-| `e` | Toggle file explorer |
-| `p` | Switch to Plan mode |
-| `Escape` | Close modal / cancel |
-
-### Card navigation (Board)
-
-| Key | Action |
-|---|---|
-| `Enter` / `Space` | Open the focused task |
-| Arrow keys | Move focus between cards |
-| `s` | Start a backlog task |
-| `d` | Mark a waiting task done |
-| `r` | Resume a waiting task with a session, otherwise retry to backlog |
-| `t` | Run test verification |
-| `p` | Open the task in Plan mode |
-| `Escape` | Blur the card |
-
-### Forms
-
-| Key | Action |
-|---|---|
-| `Ctrl+Enter` / `Cmd+Enter` | Save |
-| `Escape` | Cancel |
 
 ## See also
 

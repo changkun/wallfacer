@@ -55,7 +55,7 @@ When a task fails, the failure is categorized: `timeout`, `budget_exceeded`, `wo
 
 ## Creating tasks
 
-Click **+ New Task** in the Backlog header, or press **n** anywhere on the board. The composer offers:
+Click **+ New Task** in the Backlog header. The composer offers:
 
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
@@ -108,11 +108,11 @@ Set **Schedule start** in the backlog Edit panel to defer a task to a future dat
 
 ## Search and filtering
 
-The header search bar filters visible cards live by title, prompt, and tags. Use `#tagname` to filter by tag. Press `/` to focus the bar, Escape to clear. Prefixing a query with `@` hands it to the command palette's server-side search, which covers all tasks (including archived) by title, prompt, tags, and oversight summaries.
+The header search bar filters visible cards live by title, prompt, and tags. Use `#tagname` to filter by tag. Escape clears it. Prefixing a query with `@` hands it to the command palette's server-side search, which covers all tasks (including archived) by title, prompt, tags, and oversight summaries.
 
 ## Command palette
 
-Press **Cmd+K** (Ctrl+K) to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
+Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
 
 - Backlog: **Plan** (open task-mode chat in Plan), **Start**
 - Waiting: **Resume** (with session), **Test**, **Done**, **Sync**
@@ -151,7 +151,7 @@ and marks the task failed so it can be retried after storage is repaired.
 
 ### Inline diff comments
 
-While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box (Cmd+Enter saves). Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
+While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box. Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
 
 ### Verification and Review
 

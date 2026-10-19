@@ -144,21 +144,6 @@
   font-size: 12px;
   color: var(--ink-4);
 }
-.command-palette-foot {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--rule);
-  font-size: var(--fs-10);
-  color: var(--ink-4);
-  flex: none;
-}
-.command-palette-foot span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
 
 @media (max-width: 900px) {
   .command-palette {

@@ -6,7 +6,7 @@ Plan is the spec-first design surface, reachable from the sidebar at `/plan` or 
 
 ## Layout
 
-With specs present, Plan shows three surfaces: the **spec explorer** (file tree) on the left, the **focused view** (rendered markdown) in the center, and the **agent chat** as a floating, draggable, resizable popup toggled with **c** or the Chat button in the focused-view header. The popup's position and size persist across sessions, and it carries a compact thread switcher.
+With specs present, Plan shows three surfaces: the **spec explorer** (file tree) on the left, the **focused view** (rendered markdown) in the center, and the **agent chat** as a floating, draggable, resizable popup toggled with the Chat button in the focused-view header. The popup's position and size persist across sessions, and it carries a compact thread switcher.
 
 A workspace with no specs and no roadmap opens in a **chat-first** layout instead: a single centered chat panel invites free-form planning, with `/create <title>` as the path to the first spec. The layout flips to three-pane automatically as soon as a spec appears (the tree updates over a live stream). Plan adds the spec tree and the focused-spec context that gives the slash commands a target. Every other page carries the same chat as a floating popup.
 
@@ -71,7 +71,7 @@ In the focused view, the status renders as a badge and transitions happen throug
 
 The typical progression maps to slash commands: `/create` a draft, `/refine` it against the codebase, `/validate` the structure, `/impact` to gauge blast radius, `/break-down` into children, `/review-breakdown` to sanity-check the decomposition, `/dispatch` to the board, then `/review-impl`, `/diff`, and `/wrapup` after implementation. The steps are not mandatory or strictly linear; small specs can go straight from creation to dispatch. The full command table is under [Conversations](#conversations).
 
-`/break-down` picks its mode from the spec's state: **design mode** (sub-design specs with options and open questions) for `vague` or `drafted` specs, **tasks mode** (implementation-ready leaves with goal, steps, tests, and boundaries) for `validated` ones. Override with `/break-down design` or `/break-down tasks`, or press **b** with a spec focused. Children land in a subdirectory named after the parent file.
+`/break-down` picks its mode from the spec's state: **design mode** (sub-design specs with options and open questions) for `vague` or `drafted` specs, **tasks mode** (implementation-ready leaves with goal, steps, tests, and boundaries) for `validated` ones. Override with `/break-down design` or `/break-down tasks`, or click **Break Down** in the focused view. Children land in a subdirectory named after the parent file.
 
 Planning rounds that write spec files are committed per round and can be undone from the latest assistant response; the undo is a forward `git revert`, so history is preserved.
 
@@ -81,7 +81,7 @@ The Plan chat and the chat popup on every other page share one engine: the same 
 
 Each thread keeps its own agent session and message history. Threads persist on disk under `~/.wallfacer/agent-sessions/<fingerprint>/threads/`, keyed by the active workspace paths, so reloading the page or restarting the server restores them. A new chat is a draft until its first message is sent. Only one agent turn runs at a time across all threads; messages sent to a busy thread queue locally, stay editable while queued, and drain oldest-first.
 
-Press **Enter** to send (**Shift+Enter** for a newline); the arrow next to the send button switches to **Cmd+Enter to send** mode, remembered per browser. Responses stream in with tool activity collapsed under each response. The send button becomes a stop button during streaming. The harness picker beside it chooses the harness for the thread's turns and lists the usable harnesses only.
+Press **Enter** to send (**Shift+Enter** for a newline). Responses stream in with tool activity collapsed under each response. The send button becomes a stop button during streaming. The harness picker beside it chooses the harness for the thread's turns and lists the usable harnesses only.
 
 Type `@` to autocomplete workspace file paths; mentioned files are attached as context for the agent's next turn. Type `/` for the built-in commands, each expanded server-side into a structured prompt:
 
@@ -104,7 +104,7 @@ Most commands operate on the focused spec, which is set by clicking a spec in th
 
 ## Dispatch to the board
 
-Dispatching turns a validated leaf spec into a board task: press **d**, click **Dispatch** in the focused view, use `/dispatch` in chat, or multi-select specs in the explorer and dispatch the batch. Dispatching a validated non-leaf expands to its subtree's leaves.
+Dispatching turns a validated leaf spec into a board task: click **Dispatch** in the focused view, use `/dispatch` in chat, or multi-select specs in the explorer and dispatch the batch. Dispatching a validated non-leaf expands to its subtree's leaves.
 
 For each leaf, the server creates a task whose prompt is the spec body, tagged `spec-dispatched` plus the track name, wires `depends_on` relationships into task dependencies, and writes the task's ID back into the spec's `dispatched_task_id`. The whole batch is atomic: task creation and frontmatter writes either all succeed or all roll back. Drafted ancestors of a dispatched leaf are promoted along the way. Dispatching a spec that is not validated, or a non-leaf directly, fails without mutating anything.
 
@@ -134,16 +134,6 @@ The explorer's **Task Prompts** section lists the board's backlog tasks (plus wa
 Archiving takes a spec out of circulation without deleting it: the spec (and, cascading, all non-archived descendants) moves under `specs/.archive/` with statuses flipped, in a single commit. The cascade is rejected with a conflict error if any target still has a live dispatched task; cancel or finish the task first. Archived specs are hidden from the tree by default (**Show archived** reveals them) and are skipped by drift checks, staleness scans, and the empty-workspace detection, so archiving the last spec flips Plan back to the chat-first layout.
 
 Unarchive prefers the lossless path: it locates the archive commit and runs `git revert`, restoring every descendant's prior status exactly. When the commit cannot be found or the revert conflicts, it falls back to moving the single spec back with status `drafted`.
-
-## Keyboard shortcuts
-
-| Key | Action |
-|---|---|
-| `p` | Toggle between Board and Plan |
-| `e` | Toggle the explorer |
-| `c` | Toggle the chat popup (no-op in chat-first layout) |
-| `d` | Dispatch the focused spec |
-| `b` | Break down the focused spec |
 
 ## See also
 

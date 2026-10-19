@@ -57,8 +57,8 @@ Pages that need a workspace show a folder picker on first visit. Pick one or mor
 
 The board has four columns: Backlog, In Progress, Waiting, and Done.
 
-1. Press `n` (or click the composer) and describe the change in plain language. Press `Ctrl+Enter` to save. The card lands in Backlog.
-2. Click **Start** on the card (or focus it and press `s`). The task moves to In Progress: a dedicated git worktree is created on branch `task/<id>`, and the implementation agent runs there.
+1. Click the composer and describe the change in plain language, then save it. The card lands in Backlog.
+2. Click **Start** on the card. The task moves to In Progress: a dedicated git worktree is created on branch `task/<id>`, and the implementation agent runs there.
 3. Open the card to watch live log output stream into the task detail timeline while the agent works.
 4. When the agent finishes, the card moves to Waiting. Open the **Changes** tab to review the diff. Leave comments directly on diff lines to send feedback; the task resumes with the comments as instructions.
 5. Accept the work by clicking **Done** (or pressing `d` on the focused card). The task passes through a brief committing phase where the commit message agent writes the commit, then lands in Done.
@@ -83,4 +83,4 @@ Everything is stored under `~/.wallfacer/`:
 
 - [Concepts](concepts.md): the mental model, from chat to full automation
 - [Board](board.md): task lifecycle, review, and feedback in detail
-- [Configuration](configuration.md): settings, CLI reference, environment variables, and shortcuts
+- [Configuration](configuration.md): settings, CLI reference, and environment variables

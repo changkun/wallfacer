@@ -96,7 +96,7 @@ function onNavigate() {
     <button
       type="button"
       class="rail-search"
-      title="Search or command (⌘K)"
+      title="Search or command"
       aria-label="Search or command"
       @click="emit('palette')"
     >
@@ -105,7 +105,6 @@ function onNavigate() {
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
       </svg>
       <span class="rail-search-label">Search or command</span>
-      <kbd class="key rail-search-hint">⌘K</kbd>
     </button>
 
     <nav class="rail-nav" aria-label="Sections">

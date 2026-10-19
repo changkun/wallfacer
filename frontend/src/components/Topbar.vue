@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The one bar every page shares: a crumb on the left (workspace › page › leaf)
 // and, on the right, the page's own actions (a component the page registers
-// on the ui store) followed by the console-wide keyboard shortcuts control. Below the phone breakpoint a menu button opens the rail
+// on the ui store). Below the phone breakpoint a menu button opens the rail
 // drawer. See specs/shared/console-redesign/shell.md.
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
@@ -51,18 +51,6 @@ const crumb = computed(() => [workspaceName.value, pageName.value, ui.crumbLeaf]
       <div v-if="ui.topbarActions" id="topbar-actions" class="topbar-page-actions">
         <component :is="ui.topbarActions" />
       </div>
-      <button
-        type="button"
-        class="icon-btn"
-        title="Keyboard shortcuts (?)"
-        aria-label="Keyboard shortcuts"
-        data-action="shortcuts"
-        @click="ui.openShortcuts()"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="2" y="6" width="20" height="12" rx="2"></rect><line x1="6" y1="10" x2="6" y2="10"></line><line x1="10" y1="10" x2="10" y2="10"></line><line x1="14" y1="10" x2="14" y2="10"></line><line x1="18" y1="10" x2="18" y2="10"></line><line x1="8" y1="14" x2="16" y2="14"></line>
-        </svg>
-      </button>
     </div>
   </header>
 </template>

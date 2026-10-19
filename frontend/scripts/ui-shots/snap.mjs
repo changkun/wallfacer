@@ -36,7 +36,7 @@ const SURFACES = {
   // Workspace switcher open — guards the sidebar-popover anchoring against
   // chrome changes (e.g. backdrop-filter establishing a new containing block).
   switcher: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 400 }] },
-  palette: { route: '/', steps: [{ key: 'Meta+k' }, { wait: 700 }] },
+  palette: { route: '/', steps: [{ click: '.rail-search' }, { wait: 700 }] },
   // The workspace picker list, opened from the rail's workspace popover.
   picker: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 300 }, { click: '.sb-ws-popover__add' }, { waitFor: '.ws-picker' }, { wait: 400 }] },
   // The explorer panel beside the board.

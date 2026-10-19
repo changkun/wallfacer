@@ -20,7 +20,6 @@ export const useUiStore = defineStore('ui', () => {
   const showSystemPrompts = ref(false);
   const showExplorer = ref(false);
   const showTrash = ref(false);
-  const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
   // True while a workspace switch is in flight. AppLayout renders a full-UI
@@ -82,12 +81,11 @@ export const useUiStore = defineStore('ui', () => {
   function closeExplorer() { showExplorer.value = false; }
   function toggleExplorer() { showExplorer.value = !showExplorer.value; }
   function openTrash() { showTrash.value = true; }
-  function openShortcuts() { showShortcuts.value = true; }
 
   return {
     showWorkspaces, editWorkspaceId, showPalette,
     showSystemPrompts,
-    showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
+    showExplorer, showTrash, showArchived, setShowArchived,
     switchingWorkspace,
     crumbLeaf, setCrumbLeaf, clearCrumbLeaf,
     topbarActions, setTopbarActions, clearTopbarActions,
@@ -99,6 +97,5 @@ export const useUiStore = defineStore('ui', () => {
     openPaletteWith,
     openExplorer, closeExplorer, toggleExplorer,
     openTrash,
-    openShortcuts,
   };
 });

@@ -485,10 +485,11 @@ SCENES['settings'] = async (page) => {
 };
 
 // The command palette (specs/shared/console-redesign/panels-and-overlays.md):
-// ⌘K opens a 640px popover near the top of the viewport, inside it, with the
+// the rail's search button opens a 640px popover near the top of the viewport,
+// inside it, with the
 // first row selected and no blur anywhere on the page.
 SCENES['palette'] = async (page) => {
-  await page.keyboard.press('Meta+k');
+  await page.click('.rail-search', { timeout: 5000 });
   await page.waitForSelector('.command-palette-panel', { state: 'visible', timeout: 5000 }).catch(() => {});
   const panel = await firstBox(page, '.command-palette-panel');
   expect('palette', !!panel, 'command palette did not open on Meta+k');

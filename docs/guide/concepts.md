@@ -94,5 +94,5 @@ The value of the spectrum is spending attention where it matters and delegating 
 - [Getting Started](getting-started.md): installation and the first task
 - [Board](board.md) and [Plan](plan.md): the two main working surfaces
 - [Automation](automation.md): the autopilot level
-- [Configuration](configuration.md): settings, environment variables, shortcuts
+- [Configuration](configuration.md): settings and environment variables
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

@@ -8,7 +8,6 @@ import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import WorkspaceEditModal from '../components/WorkspaceEditModal.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
-import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import Toaster from '../components/Toaster.vue';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
@@ -16,7 +15,6 @@ import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useWorkspacesStore } from '../stores/workspaces';
 import { useUiStore } from '../stores/ui';
-import { useKeyboard } from '../composables/useKeyboard';
 import { getStored, setStored } from '../lib/storage';
 import { shouldRefetchOnVisible } from '../lib/visibility';
 import type { Task } from '../api/types';
@@ -140,21 +138,6 @@ watch(connected, (now) => {
     disconnectTimer = null;
   }, 1000);
 });
-
-useKeyboard({
-  onSearch: () => { ui.showPalette = true; },
-  onFocusSearch: () => document.querySelector<HTMLInputElement>('.task-search-input')?.focus(),
-  onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
-  onSettings: () => { void router.push('/settings'); },
-  onShortcuts: () => { ui.openShortcuts(); },
-  onExplorer: () => {
-    // The explorer is an in-board panel now; jump to the board first if we're
-    // on another route, then toggle it.
-    if (router.currentRoute.value.path === '/') ui.toggleExplorer();
-    else { void router.push('/'); ui.openExplorer(); }
-  },
-  onToggleMode: () => { void router.push(router.currentRoute.value.path.startsWith('/plan') ? '/' : '/plan'); },
-});
 </script>
 
 <template>
@@ -189,7 +172,6 @@ useKeyboard({
     <WorkspacePicker v-model="ui.showWorkspaces" />
     <WorkspaceEditModal v-if="ui.editWorkspaceId" />
     <SystemPromptsManager v-model="ui.showSystemPrompts" />
-    <KeyboardShortcutsModal v-model="ui.showShortcuts" />
     <ConfirmDialog />
     <Toaster />
     <SpecChatPopup v-if="showChatPopup" />

@@ -118,11 +118,6 @@
   gap: 8px;
 }
 
-.pcp-send-hint {
-  font-size: 10px;
-  color: var(--ink-4);
-}
-
 /* Send affordance spring: scales in from the right edge when a draft appears and
    collapses back out when the field empties. */
 .pcp-send-pop-enter-active {
@@ -151,7 +146,7 @@
   }
 }
 
-/* The send is the ink button; the shortcut toggle rides its right edge. */
+/* The send is the ink button. */
 .pcp-send-group {
   display: inline-flex;
   align-items: stretch;
@@ -159,8 +154,7 @@
   overflow: hidden;
 }
 
-.pcp-send,
-.pcp-send-toggle {
+.pcp-send {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -170,19 +164,12 @@
   cursor: pointer;
   transition: background var(--dur-hover), color var(--dur-hover);
 }
-.pcp-send:hover,
-.pcp-send-toggle:hover { background: var(--accent); color: var(--accent-fg); }
+.pcp-send:hover { background: var(--accent); color: var(--accent-fg); }
 
 .pcp-send {
   min-width: 36px;
   height: 30px;
   padding: 0 12px;
-}
-
-.pcp-send-toggle {
-  border-left: 1px solid color-mix(in srgb, var(--bg) 25%, transparent);
-  width: 24px;
-  height: 30px;
 }
 
 .pcp-send:disabled {

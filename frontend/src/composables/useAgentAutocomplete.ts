@@ -4,7 +4,7 @@
 //
 // Returned `handleKeydown` returns `true` when the autocomplete consumed
 // the event (and called preventDefault). Callers should bail before
-// running their own Enter / send-mode logic in that case.
+// running their own Enter logic in that case.
 import { ref, type Ref } from 'vue';
 import { api } from '../api/client';
 import { mentionQueryAt, filterMentionFiles } from '../lib/mentions';

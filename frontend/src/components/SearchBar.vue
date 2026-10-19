@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 
@@ -37,19 +37,6 @@ function onKeydown(e: KeyboardEvent) {
 function clearQuery() {
   query.value = '';
 }
-
-// Global "/" focuses the filter (unless already typing in a field).
-function onGlobalKeydown(e: KeyboardEvent) {
-  if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-  const el = document.activeElement as HTMLElement | null;
-  const tag = (el?.tagName || '').toUpperCase();
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
-  e.preventDefault();
-  inputRef.value?.focus();
-}
-
-onMounted(() => document.addEventListener('keydown', onGlobalKeydown));
-onUnmounted(() => document.removeEventListener('keydown', onGlobalKeydown));
 </script>
 
 <template>
