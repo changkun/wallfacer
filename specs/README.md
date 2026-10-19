@@ -19,14 +19,15 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 Foundations - 7/7 complete (see Archive)
 
 Pure-local - the 2026-10-19 cleanup (the active program)
-  ◐ Pure-Local Wallfacer (decision record; task options removal open)
+  ◐ Pure-Local Wallfacer (decision record; every removal listed is done)
   ⊘ removed: artifacts, routines, latere.ai sign-in and cloud mode, the
     coordination plane and spec comments, the hosted server, the sandbox
     proxy, the Topos harness, container execution, the GitHub integration,
     Whiteboard, Mission Control, Analytics, the terminal, the /chat page,
     keyboard shortcuts, automation and review on a second model, in-app CLI
     sign-in, metrics and OpenTelemetry, prompt overrides, the docs page,
-    multi-folder workspaces
+    multi-folder workspaces, batch create, the test run, task dependencies,
+    title generation
 
 Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
