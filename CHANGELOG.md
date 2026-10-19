@@ -65,15 +65,40 @@ committed: the commit log already holds that.
 
 - The Artifacts gallery: the console has no Artifacts page, and the
   `/api/artifacts` and `/artifact/{path...}` routes are gone; files under a
-  workspace's `artifacts/` directory stay where they are, and a page meant to
-  be seen is published by pushing it to a repository on the Latere platform,
-  whose Apps capability builds and hosts it.
+  workspace's `artifacts/` directory stay where they are.
 
 - Routines: the console has no Routines page, routine card controls or
   Schedule toggle in the composer, and the `/api/routines` routes are gone. A
   saved routine card stays on disk unread, with one warning at startup naming
   how many there are; tasks a routine already spawned stay on the board as
   ordinary tasks. A one-time scheduled start for a backlog task is unchanged.
+
+- Sign-in to latere.ai and cloud mode: the console has no sign-in button,
+  account menu or organization switcher, `wallfacer auth` and the device
+  sign-in are gone, and the `/login`, `/callback`, `/logout`, `/api/me` and
+  `/api/auth/{device,orgs,me}` routes are gone, as are `WALLFACER_CLOUD` and the
+  `AUTH_*` settings. Wallfacer runs on your machine only, and its one
+  credential is the per-machine server key. Tasks, events and workspaces no
+  longer record who created them: `created_by`, `org_id`, `actor_sub` and
+  `actor_type` drop from a record the next time it is saved. Files earlier
+  releases wrote for sign-in and coordination (`~/.wallfacer/cookie-key`,
+  `coordination-opt-in`, `instance-id`, and the shared `latere/token.json`
+  under the user config directory) stay on disk unread.
+
+- Spec comments and the coordination connection to wf.latere.ai: specs show
+  no comment layer, the `/api/spec-comments` and `/api/coordination/*` routes
+  are gone, and `WALLFACER_COORDINATION`, `WALLFACER_COORDINATION_URL` and the
+  `WALLFACER_DATABASE_*` settings are ignored.
+
+- The hosted server: `wallfacer web` is gone, and a release publishes the
+  binaries only, with no container image or deployment.
+
+- The Topos harness: the harness pickers no longer offer it, the task trace
+  view and `GET /api/tasks/{id}/trace` are gone, and a task or setting that
+  still names `topos` runs on the default harness.
+
+- Browser telemetry and the language setting, which only the sign-in and
+  product pages used; the console is in English.
 
 ### Fixed
 
