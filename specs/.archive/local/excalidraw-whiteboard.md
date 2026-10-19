@@ -18,6 +18,8 @@ dispatched_task_id: null
 
 # Whiteboard
 
+> **Removed 2026-10-19.** The maintainer asked for the whiteboard to go as part of the pure-local cleanup. The page, `/api/whiteboard` and the Excalidraw and React dependencies are deleted; saved scenes stay on disk unread. A fresh whiteboard without Excalidraw may come back later as a separate library. See [pure-local](../../shared/pure-local.md).
+
 ## Overview
 
 Add a whiteboard as a peer view alongside the board, plan, and map views. Users

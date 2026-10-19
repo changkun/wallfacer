@@ -18,6 +18,8 @@ dispatched_task_id: null
 
 # Terminal: Multiple Sessions with Tabs
 
+> **Removed 2026-10-19.** The maintainer asked for the terminal to go as part of the pure-local cleanup. The terminal websocket, the PTY package and `WALLFACER_TERMINAL_ENABLED` are deleted. See [pure-local](../../shared/pure-local.md).
+
 ---
 
 ## Current State

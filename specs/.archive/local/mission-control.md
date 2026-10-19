@@ -22,6 +22,8 @@ dispatched_task_id: null
 
 # Mission Control — Graph-Driven Coordination & Live Execution
 
+> **Removed 2026-10-19.** The maintainer asked for Mission Control to go as part of the pure-local cleanup. The `/mission` and `/map` pages, `GET /api/graph` and `internal/graph` are deleted. See [pure-local](../../shared/pure-local.md).
+
 ## Overview
 
 The Map (shipped in [[map-mission-control]]) turned the orphaned dependency

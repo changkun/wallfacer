@@ -18,6 +18,8 @@ dispatched_task_id: null
 
 # Dockable Panel Workspace
 
+> **Removed 2026-10-19.** The maintainer asked for the terminal to go as part of the pure-local cleanup, and the dock went with it. A fresh terminal may come back later as a separate library. See [pure-local](../../shared/pure-local.md).
+
 ## Overview
 
 Replace the single bottom-drawer terminal with a VS Code-style dockable panel

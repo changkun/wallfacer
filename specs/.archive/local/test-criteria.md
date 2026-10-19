@@ -22,6 +22,8 @@ dispatched_task_id: null
 
 # Task Test Criteria for Post-Run Verification
 
+> **Removed 2026-10-19.** The manual test run that read these criteria is removed with the pure-local cleanup. See [pure-local](../../shared/pure-local.md).
+
 Supersedes the archived [[validation-barrier]] (specs/local/validation-barrier.md), which was written against the deleted vanilla-JS frontend and the removed `Goal` / refine subsystem. This spec is rewritten against the current Task data model and Vue frontend.
 
 ## Problem

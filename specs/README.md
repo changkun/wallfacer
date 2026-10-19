@@ -5,10 +5,7 @@ Wallfacer roadmap, organized by track and connected by shared design foundations
 A spec that shipped or was retired lives under `specs/.archive/`, at the same
 relative path, with `status: archived`. Its row stays in its track's table,
 labeled **Complete** when it shipped and **Archived** when it was retired, and
-the [Archive](#archive) section at the bottom lists the rest. One exception:
-the console redesign tree stays in the active tree with `status: complete`,
-because the frontend's tests and the screenshot suite cite and render it as the
-design reference.
+the [Archive](#archive) section at the bottom lists the rest.
 
 Statuses in this index mirror each spec's frontmatter. `Drafted` means designed
 and unbuilt; it does not mean scheduled. `Stale` means the text is known to be
@@ -22,10 +19,14 @@ What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not s
 Foundations - 7/7 complete (see Archive)
 
 Pure-local - the 2026-10-19 cleanup (the active program)
-  ◐ Pure-Local Wallfacer (decision record; container execution removal open)
+  ◐ Pure-Local Wallfacer (decision record; task options removal open)
   ⊘ removed: artifacts, routines, latere.ai sign-in and cloud mode, the
     coordination plane and spec comments, the hosted server, the sandbox
-    proxy, the Topos harness
+    proxy, the Topos harness, container execution, the GitHub integration,
+    Whiteboard, Mission Control, Analytics, the terminal, the /chat page,
+    keyboard shortcuts, automation and review on a second model, in-app CLI
+    sign-in, metrics and OpenTelemetry, prompt overrides, the docs page,
+    multi-folder workspaces
 
 Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
@@ -33,22 +34,20 @@ Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Planning Chat Threads         ✅ Spec State Control Plane
 
 Local Product - shipped work in the Archive; five designs unbuilt
-  ✅ Terminal Sessions             ✅ OAuth Token Setup
   ✅ Pixel Agent Avatars           ✅ Refinement Into Plan
   ✅ Vue Frontend Migration        ✅ Rebrand Module Path
   ✅ Backend Redundancy Cleanup    ✅ Editor Tabs
-  ✅ Diff Review Comments          ✅ Excalidraw Whiteboard
-  ✅ Map Mission Control           ✅ Mission Control
-  ✅ Free-Form Specs               ✅ Archive Active Task Guard
-  ✅ Unified Transcript Render     ✅ Agent Resource Governance
-  ✅ Remove Idea-Agent Subsystem   ✅ Chat Model Transparency
-  ✅ Dockable Terminal (splits closed)
-  ✅ Test Criteria                 ✅ Visual Verification (in CI)
-  ✅ Adversarial Review (now review on a second model)
+  ✅ Diff Review Comments          ✅ Free-Form Specs
+  ✅ Archive Active Task Guard     ✅ Unified Transcript Render
+  ✅ Agent Resource Governance     ✅ Remove Idea-Agent Subsystem
+  ✅ Chat Model Transparency       ✅ Visual Verification (in CI)
   ✅ Workspace Model
   ⊘ removed: Desktop App, Container Exec, Routine Tasks, Static Artifacts,
     Agents & Flows and the agent graph, Topos runtime and live events,
-    Live Serve (never built), First-Run Onboarding (stub)
+    Live Serve (never built), First-Run Onboarding (stub); on 2026-10-19
+    Terminal Sessions, OAuth Token Setup, Excalidraw Whiteboard, Map Mission
+    Control, Mission Control, Dockable Terminal, Test Criteria, Adversarial
+    Review
 
   Designed, unbuilt, not scheduled
     ○ Task Prompt Attachments      ○ Scoped Command Registry
@@ -126,13 +125,13 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts and feedback: per-task blobs, staged into the worktree under `.attachments/` and listed in the first-turn prompt for the agent's file-read tool. Harness-neutral. Unbuilt. |
 | [inline-file-panel.md](.archive/local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
 | [inline-diff-feedback.md](.archive/local/inline-diff-feedback.md) | **Complete** | Code-review-style inline comments anchored to Changes-tab diff lines, batched into the existing feedback channel, with the inline surface login-gated server-side like spec comments. Implemented directly (not dispatched); also fixed the `submitFeedback` `feedback`/`message` key bug. |
-| [map-mission-control.md](.archive/local/map-mission-control.md) | **Complete** | Rebuilt the orphaned read-only Map into an actionable mission-control surface: a server-side unified spec+task graph (`GET /api/graph` + pure `internal/graph` builder), a clean hand-rolled-SVG renderer (no new dep; RAF-batched drag, curved edges) replacing the ~4,583-line vendored depgraph, and inline node actions (dispatch a validated spec, start a ready task, jump to Board/Plan) with operational "ready to act" highlighting. |
-| [mission-control.md](.archive/local/mission-control.md) | **Complete** | Evolve the Map into **Mission Control**: rename the surface (`/mission`, redirect `/map`), drive the full spec-coordination lifecycle from the graph (server transitions via widened `available_actions` from the state machine; generative ops by focusing the node's spec and mounting the existing `SpecChatPopup`), and visualize running tasks live (SSE-driven in-place node animation + "you are here" on the critical path). Design = reuse, not a new engine. |
+| [map-mission-control.md](.archive/local/map-mission-control.md) | **Archived** | Shipped, then removed on 2026-10-19 ([pure-local](shared/pure-local.md)). Rebuilt the orphaned read-only Map into an actionable mission-control surface: a server-side unified spec+task graph (`GET /api/graph` + pure `internal/graph` builder), a clean hand-rolled-SVG renderer (no new dep; RAF-batched drag, curved edges) replacing the ~4,583-line vendored depgraph, and inline node actions (dispatch a validated spec, start a ready task, jump to Board/Plan) with operational "ready to act" highlighting. |
+| [mission-control.md](.archive/local/mission-control.md) | **Archived** | Shipped, then removed on 2026-10-19 ([pure-local](shared/pure-local.md)). Evolve the Map into **Mission Control**: rename the surface (`/mission`, redirect `/map`), drive the full spec-coordination lifecycle from the graph (server transitions via widened `available_actions` from the state machine; generative ops by focusing the node's spec and mounting the existing `SpecChatPopup`), and visualize running tasks live (SSE-driven in-place node animation + "you are here" on the critical path). Design = reuse, not a new engine. |
 | [workspace-model.md](.archive/local/workspace-model.md) | **Complete** | **Foundation redesign.** Decoupled a workspace's identity (stable UUID + `DataKey` storage handle) from its membership (a mutable folder set), owned by a personal user or org. Retired the "identity = hash of sorted paths" model (`InstructionsKey`→`WorkspaceDataKey`) that orphaned scoped data (`data/<key>/`) on any folder edit. `MigrateToWorkspaces` rewrites `workspace-groups.json`→`workspaces.json` moving zero bytes (live groups keep their existing data-dir hash) and adopts orphaned task history as dormant workspaces (dry-run-validated on real data: 9 live + 11 dormant + 6 empty skipped). Manager by-id CRUD + safe `UpdateFolders`; HTTP CRUD + activate-by-id; Vue store/picker/editor. Renamed `Group`→`Workspace` across Go/API/Vue. Cloud workspace objects, multi-repo association, folder sandboxing, and a live-instance round-trip deferred (see Outcome). |
-| [dockable-panel-workspace.md](.archive/local/dockable-panel-workspace.md) | **Complete** | The terminal docks to any edge, maximizes, and is dragged by its header onto a drop zone, with the layout persisted (`DockWorkspace`, dock store, pure reducers). Splits, tab groups and the explorer as a dock panel were not built and are closed with the spec; their unwired reducers were removed. |
-| [test-criteria.md](.archive/local/test-criteria.md) | **Complete** | User-defined free-form test criteria persisted on a task (`Task.Criteria`), settable in the composer, and fed to the manual test trigger, the auto-tester and review. Supersedes the archived validation-barrier. |
+| [dockable-panel-workspace.md](.archive/local/dockable-panel-workspace.md) | **Archived** | Shipped, then removed on 2026-10-19 ([pure-local](shared/pure-local.md)). The terminal docks to any edge, maximizes, and is dragged by its header onto a drop zone, with the layout persisted (`DockWorkspace`, dock store, pure reducers). Splits, tab groups and the explorer as a dock panel were not built and are closed with the spec; their unwired reducers were removed. |
+| [test-criteria.md](.archive/local/test-criteria.md) | **Archived** | Shipped, then removed on 2026-10-19 ([pure-local](shared/pure-local.md)). User-defined free-form test criteria persisted on a task (`Task.Criteria`), settable in the composer, and fed to the manual test trigger, the auto-tester and review. Supersedes the archived validation-barrier. |
 | [static-artifacts.md](.archive/local/static-artifacts.md) | **Archived** | Static serving of self-contained HTML artifacts from `<workspace>/artifacts/` with a gallery at `/artifacts`. Shipped, then removed on 2026-10-02 by [retire-artifacts](.archive/shared/platform-native/retire-artifacts.md). |
-| [review-adversarial-verification.md](.archive/local/review-adversarial-verification.md) | **Complete** | Post-run adversarial multi-agent review: critics over all five harnesses, a session proposer on the fork-session path, and an auto-review step in the autoimplement loop behind a toggle (off by default). Shipped, then revised on 2026-06-26 after a review of v1 found runaway auto-runs; the revision in the spec is the design of record. |
+| [review-adversarial-verification.md](.archive/local/review-adversarial-verification.md) | **Archived** | Shipped, then removed on 2026-10-19 ([pure-local](shared/pure-local.md)). Post-run adversarial multi-agent review: critics over all five harnesses, a session proposer on the fork-session path, and an auto-review step in the autoimplement loop behind a toggle (off by default). Shipped, then revised on 2026-06-26 after a review of v1 found runaway auto-runs; the revision in the spec is the design of record. |
 | [visual-verification.md](.archive/local/visual-verification.md) | **Complete** | Browser-based UI regression checks (`frontend/scripts/ui-shots/checks.mjs`, `make ui-test`) that catch render crashes and broken layout with deterministic geometry assertions, not pixel-diffing. Runs in CI. |
 | [unified-transcript-rendering.md](.archive/local/unified-transcript-rendering.md) | **Complete** | Activity tab gets a `Raw ↔ Rendered` transcript toggle (default Rendered) that works for all five harnesses. Hybrid normalization: Claude keeps the rich FE `prettyNdjson` parser; cursor/opencode/pi render from the backend canonical `harness.Event` via a new `?format=normalized` on the logs stream; codex's `item.*` gets enriched; additive `KindThinking`. Fixes the prose-only raw-JSON dump and renders the answer prose. Review gets only a raw toggle (no refactor). |
 | [internal-consolidation.md](local/internal-consolidation.md) | Drafted | Behavior-preserving refactors surfaced by a codebase audit: a handler mutate-commit helper family, a runner `failTask` terminal-state helper, a shared one-shot LLM-call + NDJSON-parse path, one source of truth for the prompts template-name set, and workspace storage-identity out of the prompts package. Unbuilt; the audit's mechanical cleanups already landed. |
@@ -142,7 +141,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [agent-resource-governance.md](.archive/local/agent-resource-governance.md) | **Complete** | Stop Test/Review from pegging the machine: host agents run in their own process group throttled to background priority (macOS `PRIO_DARWIN_BG`, Linux nice), a global `WALLFACER_MAX_AGENTS` budget (opt-in), review defaulted to its floor (1 fork / 3 rounds), and forks/rounds/cost-cap/nice/budget surfaced in the Execution settings tab via `/api/env`. OQ-3 (darwin child-backgrounding permission) pending empirical confirmation. |
 | [terminal-ui.md](local/terminal-ui.md) | Drafted | Full TUI mode over the same HTTP API: interactive terminal board, log streaming, task lifecycle via Bubble Tea (`internal/tui/`). Unbuilt. |
 | [archive-active-task-guard.md](.archive/local/archive-active-task-guard.md) | **Complete** | Spec archive guard blocks only when a dispatched task is still active; terminal (done/failed/cancelled) or stale links no longer 409. Fixes a complete tree refusing to archive. |
-| [excalidraw-whiteboard.md](.archive/local/excalidraw-whiteboard.md) | **Complete** | Whiteboard drawing/brainstorm canvas as a peer Vue view, backed by a per-workspace scene file (`GET`/`PUT /api/whiteboard`). Excalidraw runs in a lazily-loaded React island; the app entry chunk stays React-free. |
+| [excalidraw-whiteboard.md](.archive/local/excalidraw-whiteboard.md) | **Archived** | Shipped, then removed on 2026-10-19 ([pure-local](shared/pure-local.md)). Whiteboard drawing/brainstorm canvas as a peer Vue view, backed by a per-workspace scene file (`GET`/`PUT /api/whiteboard`). Excalidraw runs in a lazily-loaded React island; the app entry chunk stays React-free. |
 | [free-form-specs.md](.archive/local/free-form-specs.md) | **Complete** | Render frontmatter-less markdown specs read-only in spec mode (previously they silently collapsed the tree to empty), plus a non-blocking, dismissible suggestion to migrate them into wallfacer lifecycle-managed specs via opt-in frontmatter scaffolding. Shipped: `ErrMissingFrontmatter` sentinel + `BuildTree` doc nodes, `InjectFrontmatter`, `migrate` transition action, explorer doc-node rendering + adopt banner. |
 | [refinement-into-plan.md](.archive/local/refinement-into-plan.md) | **Complete** | Retired the bespoke refine pipeline. Plan mode edits task prompts directly via a Task Prompts explorer section and a task-aware `update_task_prompt` tool. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
 | [backend-redundancy-cleanup.md](.archive/local/backend-redundancy-cleanup.md) | **Complete** | Umbrella for follow-ups to the June 2026 pass-1 cleanup. All children landed or retired: the 6 API-surface leaves collapsed verb-specific routes into PATCH/parameterised endpoints (123 → 113 routes). `ideate` archived; `transitionTask` helper deferred. |
@@ -321,9 +320,9 @@ Sign-in, account and org isolation, and collaboration. All of it was removed on 
 | [provider-secret-store.md](.archive/local/provider-secret-store.md) | Provider credentials in the system keyring, explicit migration, safe temporary tests, and launch-time resolution without plaintext fallback. |
 | [task-commit-history.md](.archive/local/task-commit-history.md) | Durable commit metadata and patches across feedback turns, retries, native execution, and worktree cleanup, with a live Changes list. |
 | [desktop-app.md](.archive/local/desktop-app.md) | Wails native wrapper, archived, code removed 2026-06-14 |
-| [terminal-sessions.md](.archive/local/terminal-sessions.md) | Multiple concurrent terminal sessions with tab bar |
+| [terminal-sessions.md](.archive/local/terminal-sessions.md) | Multiple concurrent terminal sessions with tab bar; removed 2026-10-19 with the pure-local cleanup |
 | [terminal-container-exec.md](.archive/local/terminal-container-exec.md) | Attach to running task containers from the terminal panel |
-| [oauth-token-setup.md](.archive/local/oauth-token-setup.md) | Browser-based OAuth sign-in for Claude and Codex credentials |
+| [oauth-token-setup.md](.archive/local/oauth-token-setup.md) | Browser-based OAuth sign-in for Claude and Codex credentials; removed 2026-10-19 with the pure-local cleanup |
 | [pixel-agents.md](.archive/local/pixel-agents.md) | Pixel art office view, animated characters representing task agents |
 | [vue-frontend-migration.md](.archive/local/vue-frontend-migration.md) | Converged the vanilla-JS `ui/` board and the Vue `frontend/` site into one Vue 3 + TypeScript SPA; legacy `ui/` and its build/CI pipeline removed, single embedded `frontend/dist` served by the Go server. Superseded typescript-migration and typed-dom-hooks. |
 

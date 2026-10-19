@@ -26,6 +26,8 @@ dispatched_task_id: null
 
 # Review Adversarial Verification
 
+> **Removed 2026-10-19.** The maintainer asked for review on a second model to go as part of the pure-local cleanup. The reviewer, `POST /api/tasks/{id}/review`, the transcript route and the `WALLFACER_REVIEW_*` settings are deleted. See [pure-local](../../shared/pure-local.md).
+
 ## Revision 2026-06-26: review outcome, hybrid execution model
 
 The first implementation shipped (commits `67d055fd`…`5958313e`) but a review

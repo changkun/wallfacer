@@ -18,6 +18,8 @@ dispatched_task_id: null
 
 # OAuth Token Setup
 
+> **Removed 2026-10-19.** The maintainer asked for the in-app CLI sign-in to go as part of the pure-local cleanup. `internal/oauth` and the `/api/auth/{provider}/*` routes are deleted; the CLIs use their own sign-in or the credentials in the env file. See [pure-local](../../shared/pure-local.md).
+
 ## Problem
 
 Setting up Claude and Codex credentials in Wallfacer requires users to manually obtain tokens from external tools and paste them into the Settings UI:

@@ -23,6 +23,8 @@ dispatched_task_id: null
 
 # Map as Mission Control
 
+> **Removed 2026-10-19.** The maintainer asked for Mission Control to go as part of the pure-local cleanup. The page, `GET /api/graph` and `internal/graph` are deleted. See [pure-local](../../shared/pure-local.md).
+
 ## Overview
 
 The Map (`/map`) is today an orphaned, read-only visualization built on ~4,583
