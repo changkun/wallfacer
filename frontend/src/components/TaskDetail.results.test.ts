@@ -121,7 +121,7 @@ describe('TaskDetail Verification tab', () => {
     const { app, host } = await mountVerification(['implementation answer only.']);
 
     const section = host.querySelector('[data-main-tab-section="verification"]')!;
-    expect(section.textContent).toContain('No review has run');
+    expect(section.textContent).toContain('No test-agent run for this task yet.');
     expect(section.querySelector('.result-entry')).toBeNull();
 
     app.unmount();

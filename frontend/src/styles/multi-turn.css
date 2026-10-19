@@ -237,11 +237,6 @@ pre.result-entry-body {
     scroll-snap-align: start;
   }
 
-  .automation-menu {
-    right: -4px;
-    min-width: min(280px, calc(100vw - 28px));
-  }
-
   /* --- The sheet and dialogs become bottom sheets --- */
   .modal-overlay {
     align-items: flex-end !important;

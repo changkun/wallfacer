@@ -2,11 +2,6 @@
 import { ref, onMounted } from 'vue';
 import { api } from '../../api/client';
 
-interface ContainerCircuit {
-  state: string;
-  failures: number;
-}
-
 interface TaskStates {
   in_progress?: number;
   waiting?: number;
@@ -19,7 +14,6 @@ interface RuntimeStatus {
   go_goroutine_count?: number;
   go_heap_alloc_bytes?: number;
   active_containers?: number;
-  container_circuit?: ContainerCircuit;
   task_states?: TaskStates;
 }
 
@@ -33,11 +27,6 @@ function formatBytes(bytes: number): string {
   if (bytes < MB) return (bytes / KB).toFixed(2) + ' KB';
   if (bytes < GB) return (bytes / MB).toFixed(2) + ' MB';
   return (bytes / GB).toFixed(2) + ' GB';
-}
-
-// The breaker's state as a pill: closed is the healthy state.
-function circuitPill(state: string): string {
-  return state === 'closed' ? 'pill-ok' : 'pill-warn';
 }
 
 function taskStatesText(ts: TaskStates): string {
@@ -104,13 +93,6 @@ onMounted(async () => {
       <div class="set-row">
         <div class="set-row__main"><span class="set-row__label">Active agents</span></div>
         <div class="set-row__end"><span class="mono">{{ status.active_containers || 0 }}</span></div>
-      </div>
-      <div v-if="status.container_circuit" class="set-row">
-        <div class="set-row__main"><span class="set-row__label">Circuit breaker</span></div>
-        <div class="set-row__end">
-          <span class="pill" :class="circuitPill(status.container_circuit.state)">{{ status.container_circuit.state }}</span>
-          <span v-if="status.container_circuit.failures > 0" class="set-row__help">{{ status.container_circuit.failures }} failures</span>
-        </div>
       </div>
       <div v-if="hasTaskStates(status.task_states)" class="set-row">
         <div class="set-row__main"><span class="set-row__label">Tasks</span></div>

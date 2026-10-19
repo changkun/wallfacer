@@ -12,13 +12,9 @@ import { cardActionsFor, primaryCardAction, CARD_ACTION_DEFS, type CardAction } 
 import HarnessLogo from './HarnessLogo.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
-import { useNow } from '../composables/useNow';
 import { toRef } from 'vue';
 
 const props = defineProps<{ task: Task; rank?: number }>();
-
-// Shared 1s clock: one interval across all cards rather than one per card.
-const now = useNow();
 
 // One-shot "just created" pulse for cards freshly dispatched from Plan mode.
 const uiStore = useUiStore();
@@ -232,7 +228,6 @@ const signals = computed<Signal[]>(() => {
   if (testBadge.value) out.push(testBadge.value);
   if (failureBadge.value) out.push({ label: failureBadge.value, cls: 'pill-err', title: 'Failure reason: ' + props.task.failure_category });
   if (depBadge.value) out.push({ label: depBadgeText.value, cls: depBadgeClass.value, title: depBadgeTitle.value });
-  if (scheduledLabel.value) out.push({ label: scheduledLabel.value, cls: 'pill-neutral', title: 'Scheduled start' });
   return out;
 });
 const qualifier = computed(() => signals.value[0] ?? null);
@@ -249,20 +244,7 @@ const costBar = computed(() => {
   return { pct, color, title: `Cost: $${spent.toFixed(4)} of $${max.toFixed(2)} budget` };
 });
 
-// Scheduled badge with relative time on backlog cards (one-shot scheduled_at).
-const scheduledLabel = computed(() => {
-  const t = props.task;
-  if (t.status !== 'backlog' || !t.scheduled_at) return '';
-  const at = new Date(t.scheduled_at).getTime();
-  if (Number.isNaN(at)) return '';
-  const diff = at - now.value;
-  if (diff <= 0) return 'scheduled';
-  const m = Math.round(diff / 60000);
-  if (m < 60) return `in ${m}m`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `in ${h}h`;
-  return `in ${Math.round(h / 24)}d`;
-});
+
 
 // Clicking a tag chip filters the board to that exact tag using the
 // `#tag` search prefix matchesFilter understands. stopPropagation keeps

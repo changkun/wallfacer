@@ -6,7 +6,7 @@ import { useTaskActivity } from '../composables/useTaskActivity';
 import { parseDiffFiles, type DiffFile } from '../lib/diff';
 import { highlightDiffFile, type HighlightedDiffLine } from '../lib/diffHighlight';
 import type { ActivityRow } from '../lib/prettyNdjson';
-import type { Task, ReviewTranscript } from '../api/types';
+import type { Task } from '../api/types';
 import { useMentions } from '../composables/useMentions';
 import { useDialogStore } from '../stores/dialog';
 import { statusPill } from '../lib/statusPill';
@@ -17,7 +17,6 @@ import { formatBatchFeedback } from '../lib/diffComments';
 import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
-import ReviewVerification from './ReviewVerification.vue';
 import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
@@ -155,50 +154,8 @@ const resultsLoading = ref(false);
 const resultsError = ref('');
 const resultsFetched = ref(false);
 
-// Review verification trajectory — the live proposer/critic debate, polled while
-// a run is in flight and rendered alongside the test-agent results.
-const reviewTranscript = ref<ReviewTranscript | null>(null);
-// Review transcript view: the rendered fork/round debate (default) ↔ the raw
-// transcript payload (the fork/round records + bodies the server assembled).
-let reviewPollTimer: ReturnType<typeof setTimeout> | null = null;
-// After triggering a run, keep polling until this time even before the session
-// appears, so a just-started run's first rounds show up live.
-let reviewWatchUntil = 0;
-
-function stopReviewPoll() {
-  if (reviewPollTimer !== null) {
-    clearTimeout(reviewPollTimer);
-    reviewPollTimer = null;
-  }
-}
-
-async function fetchReviewTranscript() {
-  if (!props.task || !isReviewable.value) {
-    reviewTranscript.value = null;
-    return;
-  }
-  try {
-    reviewTranscript.value = await api<ReviewTranscript>(
-      'GET',
-      `/api/tasks/${props.task.id}/review/transcript`,
-    );
-  } catch {
-    // 404 (no run yet) is the common case — show the empty state, not an error.
-    reviewTranscript.value = null;
-  }
-  // Keep polling while the run is in flight (or within the post-trigger watch
-  // window, to catch a just-started run's session appearing) and the tab is open.
-  stopReviewPoll();
-  const keepPolling = reviewTranscript.value?.running || Date.now() < reviewWatchUntil;
-  if (mainTab.value === 'verification' && keepPolling) {
-    reviewPollTimer = setTimeout(fetchReviewTranscript, 2500);
-  }
-}
-
 async function fetchResults() {
   if (!props.task) return;
-  // Kick off the review trajectory fetch alongside the test-agent results.
-  void fetchReviewTranscript();
   resultsLoading.value = true;
   resultsError.value = '';
   try {
@@ -380,7 +337,6 @@ const retryHistory = computed(() => props.task.retry_history ?? []);
 const promptHistory = computed(() => props.task.prompt_history ?? []);
 
 function fetchForTab(t: MainTab) {
-  if (t !== 'verification') stopReviewPoll();
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
   if (t === 'verification' && !resultsFetched.value) fetchResults();
@@ -416,7 +372,6 @@ watch(
   () => {
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
     resultsFetched.value = false; testResults.value = [];
-    stopReviewPoll(); reviewTranscript.value = null;
     eventsFetched.value = false; events.value = [];
     diffFetched.value = false; diffFiles.value = []; behindCounts.value = {};
     if (mainTab.value === 'timeline') fetchSpans();
@@ -579,11 +534,6 @@ const gitBranches = computed(() => {
   return repos.length ? repos.join(', ') : '—';
 });
 
-// A task is reviewable when it has a worktree: the reviewer reads the diff,
-// not an agent session, so tasks on every harness qualify. Mirrors the
-// server's reviewable check.
-const isReviewable = computed(() => Object.keys(props.task?.worktree_paths || {}).length > 0);
-
 const gitWorktrees = computed(() => {
   const n = Object.keys(props.task.worktree_paths || {}).length;
   return n ? `${n} ${n === 1 ? 'repo' : 'repos'}` : 'none';
@@ -697,25 +647,6 @@ async function testTask() {
   const body = criteria.trim() ? { criteria: criteria.trim() } : undefined;
   await api('POST', `/api/tasks/${props.task.id}/test`, body);
 }
-async function reviewTask() {
-  // The run is asynchronous and takes minutes; acknowledge the trigger so the
-  // click isn't silent, and surface failures (shared runAction only logs them).
-  // Progress and the verdict appear in the task timeline.
-  try {
-    await api('POST', `/api/tasks/${props.task.id}/review`);
-    toast.push('Review verification started — this runs in the background (minutes).', {
-      kind: 'success',
-      timeout: 4000,
-    });
-    // Surface the live trajectory: jump to the verification tab and watch for
-    // the session to appear (it is created a moment after the trigger).
-    reviewWatchUntil = Date.now() + 90_000;
-    mainTab.value = 'verification';
-    void fetchReviewTranscript();
-  } catch (e) {
-    toast.push(`Review failed to start: ${e instanceof Error ? e.message : String(e)}`, { kind: 'error' });
-  }
-}
 async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
 }
@@ -743,22 +674,11 @@ const EDIT_SANDBOX_OPTIONS = computed(() => [
 ]);
 const editTags = ref('');
 const editDeps = ref<string[]>([]);
-const editScheduledAt = ref('');
 const editMaxCost = ref<number | null>(null);
 const editMaxTokens = ref<number | null>(null);
 const editSaving = ref(false);
 
 const editPromptHtml = computed(() => renderResultMarkdown(editPrompt.value || ''));
-
-// Convert an ISO timestamp to the value a <input type="datetime-local"> expects
-// (local YYYY-MM-DDTHH:MM), mirroring modal-core.js.
-function toDatetimeLocal(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function openBacklogEdit() {
   const t = props.task;
@@ -770,7 +690,6 @@ function openBacklogEdit() {
   editSandbox.value = t.sandbox ?? '';
   editTags.value = (t.tags ?? []).join(', ');
   editDeps.value = [...(t.depends_on ?? [])];
-  editScheduledAt.value = toDatetimeLocal(t.scheduled_at);
   editMaxCost.value = t.max_cost_usd && t.max_cost_usd > 0 ? t.max_cost_usd : null;
   editMaxTokens.value = t.max_input_tokens && t.max_input_tokens > 0 ? t.max_input_tokens : null;
   editingBacklog.value = true;
@@ -789,8 +708,6 @@ async function saveBacklogEdit() {
     const parsedTags = editTags.value.split(',').map((x) => x.trim()).filter(Boolean);
     if (JSON.stringify(parsedTags) !== JSON.stringify(t.tags ?? [])) patch.tags = parsedTags;
     if (JSON.stringify(editDeps.value) !== JSON.stringify(t.depends_on ?? [])) patch.depends_on = [...editDeps.value];
-    const nextScheduled = editScheduledAt.value ? new Date(editScheduledAt.value).toISOString() : null;
-    if ((nextScheduled ?? '') !== (t.scheduled_at ?? '')) patch.scheduled_at = nextScheduled;
     if ((editMaxCost.value ?? 0) !== (t.max_cost_usd ?? 0)) patch.max_cost_usd = editMaxCost.value ?? 0;
     if ((editMaxTokens.value ?? 0) !== (t.max_input_tokens ?? 0)) patch.max_input_tokens = editMaxTokens.value ?? 0;
     if (Object.keys(patch).length === 0) { editingBacklog.value = false; return; }
@@ -896,7 +813,6 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown);
   stopOversightPolling();
-  stopReviewPoll();
 });
 
 const status = computed(() => props.task.status);
@@ -1004,8 +920,6 @@ async function submitReview() {
         <div class="sheet-head__pills">
           <span class="pill" :class="pillClassFor(status)" data-role="state">{{ status }}</span>
           <span v-if="task.sandbox" class="pill pill-neutral">{{ task.sandbox }}</span>
-          <span v-if="task.review_unresolved === 0" class="pill pill-ok" title="Review: no open findings">Review: clean</span>
-          <span v-else-if="task.review_unresolved !== undefined" class="pill pill-err" :title="task.review_headline || ''">Review: {{ task.review_unresolved }} unresolved</span>
           <span class="sheet-head__meta">{{ relativeTime(task.updated_at) }}</span>
           <span class="sheet-head__meta" title="Task ID">{{ task.id.slice(0, 8) }}</span>
         </div>
@@ -1463,9 +1377,6 @@ async function submitReview() {
                      the latest result shows in Spec, so they're not repeated
                      here. -->
                 <div data-main-tab-section="verification">
-                  <!-- Adversarial verification (review): config, outcome, live trajectory -->
-                  <ReviewVerification :task="task" :transcript="reviewTranscript" />
-
                   <!-- Test-agent verification (separate phase, its own empty state) -->
                   <section class="ta-verify-sec">
                     <h3 class="ta-events__h">Test agent</h3>
@@ -1544,7 +1455,7 @@ async function submitReview() {
               <span class="aside-action__icon" aria-hidden="true">&#9998;</span>
               <span class="aside-action__body">
                 <span class="aside-action__label">Edit task</span>
-                <span class="aside-action__hint">prompt, deps, schedule, budget</span>
+                <span class="aside-action__hint">prompt, deps, budget</span>
               </span>
             </button>
             <button v-if="isWaiting" type="button" class="aside-action aside-action--success" :class="{ 'is-busy': busyAction === 'done' }" :disabled="busy" data-action="done" @click="runAction('done', completeTask)">
@@ -1566,13 +1477,6 @@ async function submitReview() {
               <span class="aside-action__body">
                 <span class="aside-action__label">Test</span>
                 <span class="aside-action__hint">run test verification</span>
-              </span>
-            </button>
-            <button v-if="isWaiting && isReviewable" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'review' }" :disabled="busy" data-action="review" @click="runAction('review', reviewTask)">
-              <span class="aside-action__icon" aria-hidden="true">&#9878;</span>
-              <span class="aside-action__body">
-                <span class="aside-action__label">Review</span>
-                <span class="aside-action__hint">adversarial verification</span>
               </span>
             </button>
             <button v-if="budgetExceeded && (isWaiting || isFailed)" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'budget' }" :disabled="busy" data-action="budget" @click="runAction('budget', raiseBudget)">
@@ -1658,10 +1562,6 @@ async function submitReview() {
                   <span>Depends on</span>
                   <DependencyPicker v-model="editDeps" :exclude-id="props.task.id" />
                 </div>
-                <label class="backlog-edit__field">
-                  <span>Scheduled</span>
-                  <input v-model="editScheduledAt" class="field" type="datetime-local" />
-                </label>
                 <label class="backlog-edit__field">
                   <span>Tags</span>
                   <input v-model="editTags" class="field" type="text" placeholder="comma,separated" />

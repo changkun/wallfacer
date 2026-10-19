@@ -80,81 +80,11 @@ export interface Task {
   max_cost_usd?: number;
   max_input_tokens?: number;
   test_run_start_turn?: number;
-  scheduled_at?: string | null;
   prompt_history?: string[];
   retry_history?: RetryRecord[];
   parent_task_id?: string | null;
   spec_source_path?: string;
   environment?: ExecutionEnvironment | null;
-  // Review verdict: open findings when the last review session ended (0 =
-  // approved). Absent = no review has finished since the task's last turn.
-  review_unresolved?: number;
-  review_headline?: string;
-}
-
-// Review transcript (GET /api/tasks/{id}/review/transcript): the task's newest
-// review session, round by round.
-export interface ReviewFinding {
-  severity: 'high' | 'medium' | 'low' | string;
-  claim: string;
-  location?: string;
-}
-export interface ReviewerAnswer {
-  verdict: 'approve' | 'changes_requested' | string;
-  findings: ReviewFinding[];
-  summary?: string;
-  model?: string;
-  harness?: string;
-  tokens?: number;
-  ts: string;
-}
-export interface ReviewFailedAttempt {
-  code: string;
-  message: string;
-  // The reviewer's output when it answered in a form that could not be read.
-  raw?: string;
-  ts: string;
-}
-export interface ReviewRound {
-  round: number;
-  reviewer?: ReviewerAnswer;
-  failed_attempts?: ReviewFailedAttempt[];
-  // The message the findings were sent to the task in.
-  feedback?: string;
-  // The task's reply after the turn the feedback started.
-  reply?: string;
-}
-export interface ReviewRunConfig {
-  max_rounds: number;
-  cost_cap: number;
-  // Empty when WALLFACER_REVIEW_MODEL is not set.
-  reviewer_model: string;
-}
-export interface ReviewSkip {
-  code: string;
-  message: string;
-  detail?: string;
-}
-export interface ReviewOutcome {
-  termination: 'approved' | 'max_rounds' | 'cost_cap' | 'skipped' | 'superseded' | 'unreadable' | string;
-  rounds: number;
-  unresolved: number;
-  headline?: string;
-  tokens: number;
-  usd: number;
-  skip?: ReviewSkip;
-}
-export interface ReviewTranscript {
-  session_id: string;
-  running: boolean;
-  // Recorded by an earlier version of the review; its rounds are not shown.
-  legacy?: boolean;
-  config?: ReviewRunConfig;
-  outcome?: ReviewOutcome;
-  rounds: ReviewRound[];
-  // Set when the server could not read the transcript to its end; rounds then
-  // holds only the rounds before that point.
-  truncated?: boolean;
 }
 
 // Runtime environment captured at the start of a task run (reproducibility
@@ -189,11 +119,9 @@ export interface Workspace {
   folders: string[];
   dormant: boolean;
   active: boolean;
-  // Per-workspace parallelism overrides. null/absent means "use the global
-  // default". Surfaced as the registry editor's Max parallel / Max test
-  // parallel inputs.
+  // Per-workspace parallel task limit. null/absent means "use the global
+  // default". Surfaced as the registry editor's Max parallel input.
   max_parallel?: number | null;
-  max_test_parallel?: number | null;
 }
 
 export interface WorkspaceGroup {
@@ -205,7 +133,6 @@ export interface WorkspaceGroup {
   workspaces: string[];
   key: string;
   max_parallel?: number;
-  max_test_parallel?: number;
 }
 
 export interface ServerConfig {
@@ -216,18 +143,12 @@ export interface ServerConfig {
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
   prompts_dir?: string;
-  autoimplement: boolean;
-  autotest: boolean;
-  autosubmit: boolean;
-  autosync: boolean;
-  autopush: boolean;
   max_parallel: number;
   sandboxes: string[];
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
   sandbox_usable?: Record<string, boolean>;
   default_sandbox: string;
   terminal_enabled: boolean;
-  ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }
 
@@ -246,17 +167,10 @@ export interface EnvConfig {
   default_sandbox: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks: number;
-  max_test_parallel_tasks: number;
   max_agents: number;
   agent_nice: number;
-  review_rounds: number;
-  review_cost_cap: number;
-  // The reviewer's model (WALLFACER_REVIEW_MODEL); empty when unset.
-  review_model: string;
   oversight_interval: number;
   archived_tasks_per_page: number;
-  auto_push_enabled: boolean;
-  auto_push_threshold: number;
 }
 
 export interface EnvUpdatePayload {
@@ -274,16 +188,10 @@ export interface EnvUpdatePayload {
   default_sandbox?: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks?: number;
-  max_test_parallel_tasks?: number;
   max_agents?: number;
   agent_nice?: number;
-  review_rounds?: number;
-  review_cost_cap?: number;
-  review_model?: string;
   oversight_interval?: number;
   archived_tasks_per_page?: number;
-  auto_push_enabled?: boolean;
-  auto_push_threshold?: number;
 }
 
 export interface SystemPromptTemplate {
