@@ -12,15 +12,12 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/authkit/jwt"
-	"latere.ai/x/pkg/circuitbreaker"
-	"latere.ai/x/pkg/envutil"
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/pubsub"
 	"latere.ai/x/pkg/syncmap"
 	"latere.ai/x/pkg/trackedwg"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
@@ -95,12 +92,9 @@ type Runner struct {
 	taskProcesses    syncmap.Map[uuid.UUID, executor.Handle] // taskID → running agent process
 	liveLogs         syncmap.Map[uuid.UUID, *livelog.Log]    // live log buffers for in-progress turns
 	oversightMu      syncmap.Map[string, *sync.Mutex]        // per-task mutex for serializing oversight generation
-	containerCB      *circuitbreaker.Breaker                 // circuit breaker for container launch operations
 	backend          executor.Backend                        // pluggable sandbox backend (local podman/docker, host, future: k8s)
 	backgroundWg     trackedwg.WaitGroup                     // tracks fire-and-forget background goroutines
-	stopReasonMu     sync.RWMutex
-	onStopReason     func(taskID uuid.UUID, stopReason string)
-	agentSession     *agentsession.Runtime // agent session for chat; may be nil
+	agentSession     *agentsession.Runtime                   // agent session for chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
@@ -130,42 +124,6 @@ func (r *Runner) ShutdownCtx() context.Context {
 	return r.shutdownCtx
 }
 
-// ContainerCircuitAllow returns true when the container circuit breaker
-// permits a new launch. Use this in handlers before promoting a task to
-// in-progress to avoid firing launches that would immediately fail.
-func (r *Runner) ContainerCircuitAllow() bool {
-	return r.containerCB.Allow()
-}
-
-// ContainerCircuitOpen reports whether the container launch circuit breaker
-// is currently open (runtime considered unavailable). It reads the breaker
-// state WITHOUT side effects — unlike ContainerCircuitAllow, it never consumes
-// the half-open probe or restarts the open window. Read-only callers such as
-// the Prometheus gauge (scraped on a fixed interval) must use this; calling the
-// mutating ContainerCircuitAllow on every scrape would steal the recovery probe
-// from a real launch and make the gauge flap.
-func (r *Runner) ContainerCircuitOpen() bool {
-	return r.containerCB.State() != circuitbreaker.Closed
-}
-
-// RecordContainerFailure records a single container launch failure against
-// the circuit breaker. Exposed primarily for testing.
-func (r *Runner) RecordContainerFailure() {
-	r.containerCB.RecordFailure()
-}
-
-// ContainerCircuitState returns the human-readable state of the container
-// circuit breaker ("closed", "open", or "half-open").
-func (r *Runner) ContainerCircuitState() string {
-	return r.containerCB.State().String()
-}
-
-// ContainerCircuitFailures returns the current consecutive failure count of
-// the container circuit breaker.
-func (r *Runner) ContainerCircuitFailures() int {
-	return r.containerCB.Failures()
-}
-
 // WaitBackground blocks until all fire-and-forget background goroutines
 // (RunBackground, oversight generation, etc.) have completed. Intended for
 // use in tests to avoid cleanup races with goroutines that write to
@@ -178,25 +136,6 @@ func (r *Runner) WaitBackground() {
 // goroutines that have been started but not yet completed.
 func (r *Runner) PendingGoroutines() []string {
 	return r.backgroundWg.Pending()
-}
-
-// SetStopReasonHandler registers a callback that is notified when a non-terminal
-// stop_reason is encountered (for example max_tokens).
-func (r *Runner) SetStopReasonHandler(fn func(taskID uuid.UUID, stopReason string)) {
-	r.stopReasonMu.Lock()
-	r.onStopReason = fn
-	r.stopReasonMu.Unlock()
-}
-
-// notifyStopReason invokes the registered stop-reason callback (if any) under
-// a read lock. Used to inform handlers when max_tokens triggers auto-continue.
-func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
-	r.stopReasonMu.RLock()
-	fn := r.onStopReason
-	r.stopReasonMu.RUnlock()
-	if fn != nil {
-		fn(taskID, stopReason)
-	}
 }
 
 // SetAgentSession registers the agent session so that chat runs through
@@ -241,7 +180,7 @@ func (r *Runner) Shutdown() {
 }
 
 // RunBackground launches Run in a background goroutine tracked by backgroundWg.
-// Callers (handlers, autoimplement) should use this instead of a bare "go r.Run(...)"
+// Callers should use this instead of a bare "go r.Run(...)"
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
@@ -326,13 +265,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	}
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
 
-	// Initialize container circuit breaker.
-	// Defaults: 5 consecutive failures trip the breaker; it stays open for
-	// 30 s before allowing a single probe (half-open).
-	// Both values can be overridden via environment variables.
-	cbThreshold := envutil.IntMin("WALLFACER_CONTAINER_CB_THRESHOLD", constants.DefaultCBThreshold, 1)
-	cbOpenSec := envutil.IntMin("WALLFACER_CONTAINER_CB_OPEN_SECONDS", 30, 1)
-	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	// Best-effort construction: an unresolved agent binary yields a backend
 	// whose Launch returns a clear error, rather than crashing the process.
 	// The run command fails fast separately via executor.RequireClaude, so the

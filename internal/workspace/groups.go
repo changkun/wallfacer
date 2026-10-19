@@ -31,20 +31,6 @@ type Workspace struct {
 	// normalized to nil (inherit the env-file default). Pointer so that an
 	// absent field in on-disk JSON deserializes to nil rather than 0.
 	MaxParallel *int `json:"max_parallel,omitempty"`
-	// MaxTestParallel does the same for WALLFACER_MAX_TEST_PARALLEL.
-	MaxTestParallel *int `json:"max_test_parallel,omitempty"`
-
-	// Automation toggles are per-workspace so that switching workspaces does
-	// not carry an "autoimplement on" state into a workspace the user expected
-	// to operate manually. Pointers so that absent fields in on-disk JSON
-	// deserialize to nil (meaning "unset, default off"), distinguishable
-	// from an explicit false the user saved. Autopush is intentionally
-	// NOT per-workspace: push credentials / remote setup are global, so the
-	// auto-push flag continues to live in the env file.
-	Autoimplement *bool `json:"autoimplement,omitempty"`
-	Autotest      *bool `json:"autotest,omitempty"`
-	Autosubmit    *bool `json:"autosubmit,omitempty"`
-	Autosync      *bool `json:"autosync,omitempty"`
 
 	// Dormant marks a workspace recovered from orphaned task history during
 	// migration: its DataKey addresses real history but its Folders may be
@@ -150,7 +136,6 @@ func NormalizeGroups(groups []Workspace) []Workspace {
 		normalized := group
 		normalized.Folders = ws
 		normalized.MaxParallel = sanitizeLimit(group.MaxParallel)
-		normalized.MaxTestParallel = sanitizeLimit(group.MaxTestParallel)
 		out = append(out, normalized)
 	}
 	return out

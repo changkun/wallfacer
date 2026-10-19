@@ -104,22 +104,6 @@ type runAgentOpts struct {
 	// container is still alive. Heavyweight roles wire this to their
 	// liveLogs registry.
 	LiveLogWriter io.Writer
-	// CircuitBreaker, when set, is consulted before every launch
-	// attempt (Allow returning false short-circuits to an error) and
-	// notified of failures (RecordFailure) and successes
-	// (RecordSuccess). Only the heavyweight container-runtime CB is
-	// currently wired.
-	CircuitBreaker runAgentCircuitBreaker
-}
-
-// runAgentCircuitBreaker is the narrow surface runAgent needs from the
-// container-runtime circuit breaker. Defined as an interface so tests
-// and future backends can substitute a fake without importing the
-// circuitbreaker package.
-type runAgentCircuitBreaker interface {
-	Allow() bool
-	RecordFailure()
-	RecordSuccess()
 }
 
 // agentResult is runAgent's return envelope. It bundles the parsed
@@ -325,12 +309,6 @@ func (r *Runner) launchOne(
 	task *store.Task,
 	opts runAgentOpts,
 ) (*agentResult, error) {
-	// Short-circuit on an open container-runtime circuit breaker. Only
-	// heavyweight callers wire this today; the header roles pass nil.
-	if opts.CircuitBreaker != nil && !opts.CircuitBreaker.Allow() {
-		return nil, fmt.Errorf("%s: container circuit breaker open: container runtime may be unavailable", role.Slug)
-	}
-
 	// Resolve the model with the explicit override > role-specific
 	// resolver > env-derived default. This mirrors the priority
 	// buildContainerSpecForSandbox applied before the migration.
@@ -370,9 +348,6 @@ func (r *Runner) launchOne(
 
 	handle, launchErr := r.backend.Launch(ctx, spec)
 	if launchErr != nil {
-		if opts.CircuitBreaker != nil {
-			opts.CircuitBreaker.RecordFailure()
-		}
 		return nil, fmt.Errorf("launch %s container: %w", role.Slug, launchErr)
 	}
 	if opts.OnLaunch != nil {
@@ -421,9 +396,7 @@ func (r *Runner) launchOne(
 		}
 		if exitCode != 0 {
 			// No wait error: distinguish this from a crash so the
-			// auto-retry classifier treats it as Unknown (no retry).
-			// Matches pre-migration behavior in the heavyweight
-			// runContainer path.
+			// failure classifier records it as Unknown.
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
 				role.Slug, exitCode, truncate(string(rawStderr), 200))
 		}
@@ -449,12 +422,6 @@ func (r *Runner) launchOne(
 	if exitCode != 0 {
 		logger.Runner.Warn(role.Slug+": container exited non-zero but produced valid output",
 			"code", exitCode, "sandbox", sb, "model", model)
-	}
-	// Successful happy-path → mark the circuit breaker healthy if one
-	// is configured. Opening-then-closing tracks runtime state when a
-	// transient engine issue resolved itself.
-	if opts.CircuitBreaker != nil {
-		opts.CircuitBreaker.RecordSuccess()
 	}
 	output.ActualSandbox = sb
 	return &agentResult{

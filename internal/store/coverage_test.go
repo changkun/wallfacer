@@ -74,20 +74,6 @@ func TestNewStateChangeData_Basic(t *testing.T) {
 	}
 }
 
-func TestNewStateChangeData_WithExtra(t *testing.T) {
-	extra := map[string]string{"reason": "manual", "note": "test"}
-	data := NewStateChangeData(TaskStatusFailed, TaskStatusBacklog, TriggerAutoRetry, extra)
-	if data["from"] != "failed" {
-		t.Errorf("from = %q, want failed", data["from"])
-	}
-	if data["reason"] != "manual" {
-		t.Errorf("reason = %q, want manual", data["reason"])
-	}
-	if data["note"] != "test" {
-		t.Errorf("note = %q, want test", data["note"])
-	}
-}
-
 func TestStore_DataDir(t *testing.T) {
 	dir := t.TempDir()
 	s, err := newTestFileStore(t, dir)
@@ -478,170 +464,6 @@ func TestArchiveAllDone_SkipsAlreadyArchived(t *testing.T) {
 	}
 }
 
-func TestUpdateTaskPendingTestFeedback_SetAndClear(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "feedback task", Timeout: 5})
-
-	if err := s.UpdateTaskPendingTestFeedback(bg(), task.ID, "tests failed: assert eq"); err != nil {
-		t.Fatalf("UpdateTaskPendingTestFeedback set: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.PendingTestFeedback != "tests failed: assert eq" {
-		t.Errorf("PendingTestFeedback = %q, want tests failed: assert eq", got.PendingTestFeedback)
-	}
-
-	if err := s.UpdateTaskPendingTestFeedback(bg(), task.ID, ""); err != nil {
-		t.Fatalf("UpdateTaskPendingTestFeedback clear: %v", err)
-	}
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.PendingTestFeedback != "" {
-		t.Errorf("PendingTestFeedback should be empty after clear, got %q", got.PendingTestFeedback)
-	}
-}
-
-func TestUpdateTaskPendingTestFeedback_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.UpdateTaskPendingTestFeedback(bg(), uuid.New(), "msg"); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-func TestIncrementAutoRetryCount_BasicIncrement(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryCount != 1 {
-		t.Errorf("AutoRetryCount = %d, want 1", got.AutoRetryCount)
-	}
-}
-
-func TestIncrementAutoRetryCount_DecrementsBudget(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	s.mu.Lock()
-	s.tasks[task.ID].AutoRetryBudget = map[FailureCategory]int{
-		FailureCategoryTimeout: 3,
-	}
-	s.mu.Unlock()
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryCount != 1 {
-		t.Errorf("AutoRetryCount = %d, want 1", got.AutoRetryCount)
-	}
-	if got.AutoRetryBudget[FailureCategoryTimeout] != 2 {
-		t.Errorf("AutoRetryBudget[timeout] = %d, want 2", got.AutoRetryBudget[FailureCategoryTimeout])
-	}
-}
-
-func TestIncrementAutoRetryCount_BudgetFloorAtZero(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	s.mu.Lock()
-	s.tasks[task.ID].AutoRetryBudget = map[FailureCategory]int{
-		FailureCategoryTimeout: 0,
-	}
-	s.mu.Unlock()
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryBudget[FailureCategoryTimeout] != 0 {
-		t.Errorf("AutoRetryBudget[timeout] = %d, want 0", got.AutoRetryBudget[FailureCategoryTimeout])
-	}
-}
-
-func TestIncrementAutoRetryCount_InitializesNilBudget(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryAgentError); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryBudget == nil {
-		t.Error("expected AutoRetryBudget to be initialized")
-	}
-}
-
-func TestIncrementAutoRetryCount_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.IncrementAutoRetryCount(bg(), uuid.New(), FailureCategoryTimeout); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-// --- IsAutoRetryEligible ---
-
-func TestIsAutoRetryEligible_Eligible(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 2},
-		AutoRetryCount:  0,
-	}
-	if !IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected eligible with budget>0 and count<max")
-	}
-}
-
-func TestIsAutoRetryEligible_BudgetZero(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 0},
-		AutoRetryCount:  0,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible with zero budget")
-	}
-}
-
-func TestIsAutoRetryEligible_BudgetMissing(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{},
-		AutoRetryCount:  0,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible with missing category in budget")
-	}
-}
-
-func TestIsAutoRetryEligible_NilBudget(t *testing.T) {
-	task := Task{AutoRetryCount: 0}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible with nil budget")
-	}
-}
-
-func TestIsAutoRetryEligible_CountAtMax(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 5},
-		AutoRetryCount:  constants.MaxAutoRetries,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible when count has reached max")
-	}
-}
-
-func TestIsAutoRetryEligible_CountAboveMax(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 5},
-		AutoRetryCount:  constants.MaxAutoRetries + 1,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible when count exceeds max")
-	}
-}
-
 // --- Store.ReadBlob / ListBlobs ---
 
 func TestStore_ReadBlob(t *testing.T) {
@@ -777,120 +599,6 @@ func TestCancelTask_UnknownID(t *testing.T) {
 	}
 }
 
-// --- IncrementTestFailCount / ResetTestFailCount ---
-
-func TestIncrementTestFailCount(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test fail", Timeout: 5})
-
-	if err := s.IncrementTestFailCount(bg(), task.ID); err != nil {
-		t.Fatalf("IncrementTestFailCount: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.TestFailCount != 1 {
-		t.Errorf("TestFailCount = %d, want 1", got.TestFailCount)
-	}
-
-	if err := s.IncrementTestFailCount(bg(), task.ID); err != nil {
-		t.Fatalf("IncrementTestFailCount: %v", err)
-	}
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.TestFailCount != 2 {
-		t.Errorf("TestFailCount = %d, want 2", got.TestFailCount)
-	}
-}
-
-func TestIncrementTestFailCount_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.IncrementTestFailCount(bg(), uuid.New()); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-func TestResetTestFailCount(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test fail", Timeout: 5})
-
-	s.IncrementTestFailCount(bg(), task.ID) //nolint:errcheck
-	s.IncrementTestFailCount(bg(), task.ID) //nolint:errcheck
-
-	if err := s.ResetTestFailCount(bg(), task.ID); err != nil {
-		t.Fatalf("ResetTestFailCount: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.TestFailCount != 0 {
-		t.Errorf("TestFailCount = %d, want 0", got.TestFailCount)
-	}
-}
-
-func TestResetTestFailCount_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.ResetTestFailCount(bg(), uuid.New()); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-// --- RecordFetchFailure / ClearFetchFailure ---
-
-func TestRecordFetchFailure(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "fetch fail", Timeout: 5})
-
-	if err := s.RecordFetchFailure(bg(), task.ID, "connection refused"); err != nil {
-		t.Fatalf("RecordFetchFailure: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.LastFetchError != "connection refused" {
-		t.Errorf("LastFetchError = %q, want %q", got.LastFetchError, "connection refused")
-	}
-	if got.LastFetchErrorAt == nil {
-		t.Error("LastFetchErrorAt should be set")
-	}
-}
-
-func TestRecordFetchFailure_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.RecordFetchFailure(bg(), uuid.New(), "err"); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-func TestClearFetchFailure(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "fetch fail", Timeout: 5})
-
-	s.RecordFetchFailure(bg(), task.ID, "error") //nolint:errcheck
-
-	if err := s.ClearFetchFailure(bg(), task.ID); err != nil {
-		t.Fatalf("ClearFetchFailure: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.LastFetchError != "" {
-		t.Errorf("LastFetchError = %q, want empty", got.LastFetchError)
-	}
-	if got.LastFetchErrorAt != nil {
-		t.Error("LastFetchErrorAt should be nil after clear")
-	}
-}
-
-func TestClearFetchFailure_NoopWhenNoFailure(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no fail", Timeout: 5})
-
-	// Should be a no-op (fast path, no write).
-	if err := s.ClearFetchFailure(bg(), task.ID); err != nil {
-		t.Fatalf("ClearFetchFailure: %v", err)
-	}
-}
-
-func TestClearFetchFailure_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	// Unknown ID with no task in s.tasks → early return (no error, no write).
-	if err := s.ClearFetchFailure(bg(), uuid.New()); err != nil {
-		t.Fatalf("ClearFetchFailure for unknown ID should silently return nil, got: %v", err)
-	}
-}
-
 // --- maps.Equal on sandbox-by-activity maps ---
 
 // --- PurgeExpiredTombstones ---
@@ -992,45 +700,6 @@ func TestCreateTaskWithOptions_PreAssignedID(t *testing.T) {
 	}
 	if task.ID != preID {
 		t.Errorf("ID = %s, want %s", task.ID, preID)
-	}
-}
-
-func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
-	s := newTestStore(t)
-	scheduled := time.Now().Add(time.Hour)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:             "full opts",
-		Timeout:            30,
-		MountWorktrees:     true,
-		Kind:               TaskKindPlanning,
-		Tags:               []string{"tag1", "tag2"},
-		Sandbox:            harness.Claude,
-		SandboxByActivity:  map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
-		MaxCostUSD:         10.0,
-		MaxInputTokens:     50000,
-		ScheduledAt:        &scheduled,
-		DependsOn:          []string{uuid.New().String()},
-		ModelOverride:      "  claude-opus-4-5  ",
-		CustomPassPatterns: []string{"PASS"},
-		CustomFailPatterns: []string{"FAIL"},
-	})
-	if err != nil {
-		t.Fatalf("CreateTaskWithOptions: %v", err)
-	}
-	if task.Kind != TaskKindPlanning {
-		t.Errorf("Kind = %q, want planning", task.Kind)
-	}
-	if task.ModelOverride == nil || *task.ModelOverride != "claude-opus-4-5" {
-		t.Errorf("ModelOverride = %v, want claude-opus-4-5", task.ModelOverride)
-	}
-	if len(task.CustomPassPatterns) != 1 {
-		t.Errorf("CustomPassPatterns = %v, want [PASS]", task.CustomPassPatterns)
-	}
-	if len(task.CustomFailPatterns) != 1 {
-		t.Errorf("CustomFailPatterns = %v, want [FAIL]", task.CustomFailPatterns)
-	}
-	if task.ScheduledAt == nil {
-		t.Error("ScheduledAt should be set")
 	}
 }
 
@@ -1777,14 +1446,6 @@ func TestRebuildSearchIndex_RepairsChangedEntriesCoverage(t *testing.T) {
 	}
 }
 
-func TestCriticalPathScores_MalformedDepCoverage(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad dep", Timeout: 5, DependsOn: []string{"not-a-uuid"}})
-	if score := s.CriticalPathScores([]uuid.UUID{task.ID})[task.ID]; score != 1 {
-		t.Errorf("expected 1, got %d", score)
-	}
-}
-
 func TestSaveOversight_NotInSearchIndexCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no idx", Timeout: 5})
@@ -1913,5 +1574,53 @@ func TestResetTaskForRetry_TruncationPreservesUTF8(t *testing.T) {
 	}
 	if want := strings.Repeat("汉", 2000) + "…"; result != want {
 		t.Errorf("result not rune-truncated: %d runes", len([]rune(result)))
+	}
+}
+
+func TestNewStateChangeData_WithExtra(t *testing.T) {
+	extra := map[string]string{"reason": "manual", "note": "test"}
+	data := NewStateChangeData(TaskStatusFailed, TaskStatusBacklog, TriggerUser, extra)
+	if data["from"] != "failed" {
+		t.Errorf("from = %q, want failed", data["from"])
+	}
+	if data["reason"] != "manual" {
+		t.Errorf("reason = %q, want manual", data["reason"])
+	}
+	if data["note"] != "test" {
+		t.Errorf("note = %q, want test", data["note"])
+	}
+}
+
+func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
+		Prompt:             "full opts",
+		Timeout:            30,
+		MountWorktrees:     true,
+		Kind:               TaskKindPlanning,
+		Tags:               []string{"tag1", "tag2"},
+		Sandbox:            harness.Claude,
+		SandboxByActivity:  map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
+		MaxCostUSD:         10.0,
+		MaxInputTokens:     50000,
+		DependsOn:          []string{uuid.New().String()},
+		ModelOverride:      "  claude-opus-4-5  ",
+		CustomPassPatterns: []string{"PASS"},
+		CustomFailPatterns: []string{"FAIL"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	if task.Kind != TaskKindPlanning {
+		t.Errorf("Kind = %q, want planning", task.Kind)
+	}
+	if task.ModelOverride == nil || *task.ModelOverride != "claude-opus-4-5" {
+		t.Errorf("ModelOverride = %v, want claude-opus-4-5", task.ModelOverride)
+	}
+	if len(task.CustomPassPatterns) != 1 {
+		t.Errorf("CustomPassPatterns = %v, want [PASS]", task.CustomPassPatterns)
+	}
+	if len(task.CustomFailPatterns) != 1 {
+		t.Errorf("CustomFailPatterns = %v, want [FAIL]", task.CustomFailPatterns)
 	}
 }

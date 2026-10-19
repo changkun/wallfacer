@@ -213,12 +213,6 @@ func (r *Runner) buildBaseContainerSpec(containerName string, sb harness.ID) exe
 	return spec
 }
 
-// sandboxForTask returns the resolved sandbox type for the task's implementation activity.
-// Shorthand for sandboxForTaskActivity(task, activityImplementation).
-func (r *Runner) sandboxForTask(task *store.Task) harness.ID {
-	return r.sandboxForTaskActivity(task, activityImplementation)
-}
-
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
 // Resolution priority: per-task per-activity override → per-task sandbox → env-file
 // per-activity setting → env-file default sandbox → the configured default harness
@@ -388,7 +382,6 @@ func (r *Runner) runContainer(
 		BoardDir:          boardDir,
 		SiblingMounts:     siblingMounts,
 		LiveLogWriter:     ll,
-		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
 		// Register the process so KillContainer can signal the running
 		// agent when the user cancels the task mid-run.
@@ -474,7 +467,6 @@ func (r *Runner) runContainerOnSandbox(
 		BoardDir:          boardDir,
 		SiblingMounts:     siblingMounts,
 		LiveLogWriter:     ll,
-		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
 		// Register the fallback launch's handle too, so a cancel during
 		// the codex-fallback turn can still kill the running agent.

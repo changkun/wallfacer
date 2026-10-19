@@ -23,7 +23,7 @@ import (
 // closeFeedbackWaitingSpan emits a span_end event to close the feedback_waiting
 // span that was opened when the task entered the waiting state. This must be
 // called on every path that transitions a task out of waiting (complete, cancel,
-// test run, auto-submit, etc.) so the timeline doesn't show an ever-growing
+// test run, feedback) so the timeline doesn't show an ever-growing
 // "Waiting for Feedback" bar.
 func (h *Handler) closeFeedbackWaitingSpan(ctx context.Context, taskID uuid.UUID) {
 	s, ok := h.currentStore()
@@ -134,21 +134,19 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
-	// Acquire promoteMu BEFORE reading/modifying the task to prevent races
-	// with tryAutoSubmit (which also holds promoteMu in Phase 2). Without
-	// this, auto-submit can transition the task to committing between our
-	// status check and the UpdateTaskStatus call, causing the feedback to
-	// fail while the commit pipeline cleans up the worktree.
-	promoteMu.Lock()
+	// Acquire transitionMu BEFORE reading/modifying the task so a concurrent
+	// Done cannot move the task to committing between our status check and
+	// the UpdateTaskStatus call.
+	transitionMu.Lock()
 
 	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
-		promoteMu.Unlock()
+		transitionMu.Unlock()
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
 	if task.Status != store.TaskStatusWaiting {
-		promoteMu.Unlock()
+		transitionMu.Unlock()
 		http.Error(w, "task is not in waiting status", http.StatusBadRequest)
 		return
 	}
@@ -157,59 +155,29 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	// This must happen AFTER the status check to avoid clearing test state
 	// when the transition will fail (e.g. task already moved to committing).
 	if err := s.UpdateTaskTestRun(r.Context(), id, false, ""); err != nil {
-		promoteMu.Unlock()
+		transitionMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Submitting feedback to a waiting task is always allowed even when max
-	// concurrent tasks is reached. The task was previously in_progress and
-	// paused for user input — blocking it would leave it stuck when autoimplement
-	// fills all slots.
-	if err := h.resumeWaitingTaskWithFeedbackLocked(r.Context(), task, req.Message, store.TriggerFeedback, ""); err != nil {
-		promoteMu.Unlock()
+	// concurrent tasks is reached: the task was previously in_progress and
+	// paused for user input.
+	if err := h.resumeWaitingTaskWithFeedbackLocked(r.Context(), s, task, req.Message); err != nil {
+		transitionMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	promoteMu.Unlock()
+	transitionMu.Unlock()
 
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
 // resumeWaitingTaskWithFeedbackLocked transitions a waiting task back to
 // in_progress with the given feedback message and launches the runner in
-// the background. Must be called with promoteMu held to prevent races
-// with tryAutoSubmit.
-func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task *store.Task, message string, trigger store.Trigger, systemMessage string) error {
-	s, ok := h.currentStore()
-	if !ok {
-		return nil
-	}
-	return h.resumeWaitingTaskWithFeedbackOnStoreLocked(ctx, s, task, message, trigger, systemMessage)
-}
-
-// resumeWaitingTaskWithFeedbackOnStoreLocked is resumeWaitingTaskWithFeedbackLocked
-// on a given store, for callers that captured the task's store before a
-// long-running step (the review) and must not follow a workspace-group switch
-// to another one. Must be called with promoteMu held.
-func (h *Handler) resumeWaitingTaskWithFeedbackOnStoreLocked(ctx context.Context, s *store.Store, task *store.Task, message string, trigger store.Trigger, systemMessage string) error {
+// the background. Must be called with transitionMu held.
+func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, s *store.Store, task *store.Task, message string) error {
 	if err := s.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
-		return err
-	}
-	if err := s.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
-		return err
-	}
-	// Clear the review verdict: it was computed against the pre-resume diff and is
-	// stale once this resumed run lands new commits, so the task should be
-	// reviewed again after it returns to waiting. Whether that continues the
-	// open review session (the review sent this feedback) or starts a new one
-	// is decided by the session record, not here.
-	if err := s.ClearReviewResult(ctx, task.ID); err != nil {
-		return err
-	}
-	// Reset the consecutive test failure counter so the auto-resume cycle
-	// can start fresh after manual intervention.
-	if err := s.ResetTestFailCount(ctx, task.ID); err != nil {
 		return err
 	}
 	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
@@ -220,12 +188,7 @@ func (h *Handler) resumeWaitingTaskWithFeedbackOnStoreLocked(ctx context.Context
 		"message": message,
 	})
 	h.insertEventOrLogTo(ctx, s, task.ID, store.EventTypeStateChange,
-		store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, trigger, nil))
-	if systemMessage != "" {
-		h.insertEventOrLogTo(ctx, s, task.ID, store.EventTypeSystem, map[string]string{
-			"result": systemMessage,
-		})
-	}
+		store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerFeedback, nil))
 
 	sessionID := ""
 	if task.SessionID != nil {
@@ -238,7 +201,7 @@ func (h *Handler) resumeWaitingTaskWithFeedbackOnStoreLocked(ctx context.Context
 // runCommitTransition launches the commit pipeline in a background goroutine.
 // On success it transitions the task to done; on failure it transitions to
 // failed (or back to waiting for recoverable commit-message errors). The
-// trigger identifies whether this was user-initiated or auto-submit.
+// trigger is recorded on the state-change events.
 func (h *Handler) runCommitTransition(s *store.Store, taskID uuid.UUID, sessionID string, trigger store.Trigger, failurePrefix string) {
 	go func() {
 		if s == nil {
@@ -278,9 +241,6 @@ func (h *Handler) runCommitTransition(s *store.Store, taskID uuid.UUID, sessionI
 					h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeSystem, map[string]string{
 						"result": "Commit aborted: commit message generation failed. Task returned to waiting for review.",
 					})
-					if trigger != store.TriggerUser {
-						h.pauseAllAutomation(&taskID, "auto-submit", err.Error())
-					}
 					return
 				}
 			}
@@ -292,9 +252,6 @@ func (h *Handler) runCommitTransition(s *store.Store, taskID uuid.UUID, sessionI
 			})
 			h.insertEventOrLogTo(bgCtx, s, taskID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusFailed, trigger, nil))
-			if trigger != store.TriggerUser {
-				h.pauseAllAutomation(&taskID, "auto-submit", err.Error())
-			}
 			return
 		}
 		if statusErr := s.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone); statusErr != nil {
@@ -312,16 +269,14 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		return
 	}
 
-	// Hold promoteMu across the read-check-write so a concurrent tryAutoSubmit
-	// cannot transition the task between our status check and the status write.
-	// Without this, auto-submit can move waiting→committing and start the commit
-	// pipeline while CompleteTask's validation-bypassing ForceUpdateTaskStatus
-	// launches a SECOND pipeline, double-committing and tearing down the worktree
-	// under the other. Mirrors SubmitFeedback/ResumeTask/SyncTask. The background
-	// runCommitTransition goroutine does not take promoteMu, so holding it until
-	// this handler returns cannot deadlock.
-	promoteMu.Lock()
-	defer promoteMu.Unlock()
+	// Hold transitionMu across the read-check-write so a second Done (or a
+	// feedback, resume or sync) cannot act on the task between our status check
+	// and the status write; two commit pipelines would double-commit and tear
+	// down the worktree under each other. The background runCommitTransition
+	// goroutine does not take transitionMu, so holding it until this handler
+	// returns cannot deadlock.
+	transitionMu.Lock()
+	defer transitionMu.Unlock()
 
 	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
@@ -458,23 +413,14 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	prevStatus := task.Status
 
 	// Resuming a failed task is always allowed even when max concurrent tasks
-	// is reached. When autoimplement is on, all slots are filled by auto-promotion
-	// and the user would otherwise be unable to resume any failed task. The
-	// autoimplement will naturally refrain from promoting another backlog task while
-	// this resumed task is running, so the over-capacity is transient.
-	promoteMu.Lock()
+	// is reached: it is follow-up work on an existing task.
+	transitionMu.Lock()
 	if err := s.ResumeTask(r.Context(), id, req.Timeout); err != nil {
-		promoteMu.Unlock()
+		transitionMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	promoteMu.Unlock()
-
-	// Clear any stale review verdict so the resumed task is re-verified once it
-	// returns to waiting (no-op for a failed task, which never had one set).
-	if err := s.ClearReviewResult(r.Context(), id); err != nil {
-		logger.Handler.Warn("resume: clear review result", "task", id, "error", err)
-	}
+	transitionMu.Unlock()
 
 	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 		store.NewStateChangeData(prevStatus, store.TaskStatusInProgress, store.TriggerUser, nil))
@@ -551,13 +497,13 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 
-	// Hold promoteMu across the read-check-write so a concurrent tryAutoSubmit
-	// cannot move the task to committing between our status check and the
+	// Hold transitionMu across the read-check-write so a concurrent Done cannot
+	// move the task to committing between our status check and the
 	// status/test-run writes (which would otherwise leave IsTestRun set on a task
-	// now in the commit pipeline and return a confusing 500). Mirrors
-	// SubmitFeedback; RunBackground below runs under the lock as it does there.
-	promoteMu.Lock()
-	defer promoteMu.Unlock()
+	// now in the commit pipeline). Mirrors SubmitFeedback; RunBackground below
+	// runs under the lock as it does there.
+	transitionMu.Lock()
+	defer transitionMu.Unlock()
 
 	task, err := s.GetTask(r.Context(), id)
 	if err != nil {
@@ -612,66 +558,6 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	h.runner.RunBackground(id, testPrompt, "", false)
 
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
-}
-
-// The error a manual review trigger returns for a task with nothing to review:
-// no worktree, or one that is gone or is not a git repository.
-const (
-	codeReviewNoWorktree    = "review_no_worktree"
-	messageReviewNoWorktree = "This task has no usable worktree, so there is no change to review."
-)
-
-// ReviewTask runs one review round for a waiting task, whatever the review
-// toggle says. The task must be waiting and have its worktrees present. The round runs
-// asynchronously; 202 Accepted is returned immediately with the task's review
-// state directory, and the transcript route shows the round as it lands.
-func (h *Handler) ReviewTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	s, ok := h.requireStore(w)
-	if !ok {
-		return
-	}
-
-	task, err := s.GetTask(r.Context(), id)
-	if err != nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
-	}
-	if task.Status != store.TaskStatusWaiting {
-		http.Error(w, "only waiting tasks can be verified by review", http.StatusConflict)
-		return
-	}
-	if !reviewable(task) || len(missingTaskWorktrees(task)) > 0 {
-		httpjson.WriteError(w, http.StatusBadRequest, httpjson.Error{
-			Code:    codeReviewNoWorktree,
-			Message: messageReviewNoWorktree,
-		})
-		return
-	}
-
-	// Reserve the in-flight slot so a manual trigger neither double-fires on a
-	// double-click nor stacks on top of an auto-review run for the same task.
-	if !h.beginReview(id) {
-		http.Error(w, "review verification already running for this task", http.StatusConflict)
-		return
-	}
-
-	// The review writes its session under the state directory; the session's
-	// path is set on the task when the session finishes. It lives beside the
-	// worktree (not inside it) so it is never committed, see reviewStateDir.
-	stateDir := reviewStateDir(primaryWorktree(task.WorktreePaths))
-
-	go func() {
-		defer h.endReview(id)
-		if err := h.runReview(context.Background(), s, *task); err != nil {
-			logger.Handler.Warn("review: manual round failed",
-				"task", id, "error", err)
-		}
-	}()
-
-	httpjson.Write(w, http.StatusAccepted, map[string]string{
-		"status":    "running",
-		"state_dir": stateDir,
-	})
 }
 
 // buildTestPrompt constructs a prompt for the test verification agent.
@@ -748,15 +634,14 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	// valid operational flow not in the automated state machine.
 	// Syncing a waiting/failed task must not be blocked by the regular
 	// in-progress capacity limit. Like resume/feedback, this is follow-up work
-	// on an existing task, and rejecting it when autoimplement has filled all slots
-	// leaves the user unable to recover or update the task.
-	promoteMu.Lock()
+	// on an existing task.
+	transitionMu.Lock()
 	if err := s.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
-		promoteMu.Unlock()
+		transitionMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	promoteMu.Unlock()
+	transitionMu.Unlock()
 	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 		store.NewStateChangeData(oldStatus, store.TaskStatusInProgress, store.TriggerUser, nil))
 
@@ -765,15 +650,8 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		sessionID = *task.SessionID
 	}
 	h.diffCache.invalidate(id)
-	for repoPath, worktreePath := range task.WorktreePaths {
-		h.commitsBehindCache.invalidate(repoPath, worktreePath)
-	}
-	worktreePaths := task.WorktreePaths
 	h.runner.SyncWorktreesBackground(id, sessionID, oldStatus, func() {
 		h.diffCache.invalidate(id)
-		for repoPath, worktreePath := range worktreePaths {
-			h.commitsBehindCache.invalidate(repoPath, worktreePath)
-		}
 	})
 	httpjson.Write(w, http.StatusOK, map[string]string{"status": "syncing"})
 }

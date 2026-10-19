@@ -20,20 +20,13 @@ func (r *Runner) finalizeTestRun(
 	result string,
 ) {
 	// Parse the test agent's output to determine pass/fail. When no verdict
-	// is detectable, default to "fail" to prevent auto-submit from promoting
-	// a potentially broken task to done without human review.
+	// is detectable, default to "fail" so a possibly broken task is not shown
+	// as passing.
 	verdict := parseTestVerdict(result, task.CustomPassPatterns, task.CustomFailPatterns)
 	if verdict == "" {
 		verdict = "fail"
 	}
 	_ = r.taskStore(taskID).UpdateTaskTestRun(ctx, taskID, false, verdict)
-
-	if verdict == "fail" {
-		_ = r.taskStore(taskID).IncrementTestFailCount(ctx, taskID)
-		_ = r.taskStore(taskID).UpdateTaskPendingTestFeedback(ctx, taskID, buildTestFailureFeedback(result))
-	} else {
-		_ = r.taskStore(taskID).ResetTestFailCount(ctx, taskID)
-	}
 
 	// GenerateTestOversight is synchronous: oversight must be in terminal
 	// state before the task becomes visible as 'waiting'.

@@ -2,13 +2,12 @@
 // task board server.
 //
 // The [Handler] struct is the central dependency container, holding references
-// to the task store, runner, workspace manager, prompt manager, metrics registry,
-// and automation state (autoimplement, autotest, autosubmit, etc.). Each concern is
-// implemented in a separate file: tasks, configuration, git operations, streaming,
-// refinement, oversight, and more. The package uses stdlib net/http
-// (Go 1.22+ pattern routing) with no framework. Background automation watchers
-// (auto-promote, auto-test, auto-submit, auto-sync, auto-push) run as goroutines
-// managed by this package.
+// to the task store, runner, workspace manager, prompt manager and metrics
+// registry. Each concern is implemented in a separate file: tasks,
+// configuration, git operations, streaming, refinement, oversight,
+// and more. The package uses stdlib net/http (Go 1.22+ pattern routing) with no
+// framework. Tasks move only on a request: nothing starts, tests or commits a
+// task on its own.
 //
 // # Connected packages
 //
@@ -16,8 +15,7 @@
 // Depends on [runner] for task orchestration, [store] for persistence, [workspace]
 // for workspace switching, [envconfig] for configuration, [instructions] for
 // AGENTS.md, [gitutil] (indirectly via runner), [constants], [logger], [metrics],
-// and several internal/pkg utilities ([circuitbreaker], [cache],
-// [watcher], [atomicfile]).
+// and several internal/pkg utilities ([cache], [atomicfile]).
 // Consumed by [cli] which registers these handlers on the HTTP mux.
 // Changes to [store.Task] fields, [runner.Interface] methods, or [apicontract]
 // routes typically require corresponding handler updates.

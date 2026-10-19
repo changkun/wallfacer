@@ -1,18 +1,13 @@
 package handler
 
 import (
-	"context"
-	"fmt"
 	"math"
 	"net/http"
 	"path/filepath"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
-	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/metrics"
 
@@ -20,91 +15,11 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/oauth"
-	"latere.ai/x/wallfacer/internal/review"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
-
-// watcherBreaker is a per-watcher circuit breaker that suppresses a specific
-// watcher when it encounters repeated failures. Unlike pauseAllAutomation it
-// leaves all other watchers unaffected and auto-heals after a backoff period.
-//
-// It wraps the generic [circuitbreaker.BackoffBreaker] and adds domain-specific
-// metadata (last failure reason and task ID) for health reporting.
-type watcherBreaker struct {
-	breaker    *circuitbreaker.BackoffBreaker
-	mu         sync.Mutex
-	lastReason string
-	lastTaskID *uuid.UUID
-}
-
-// newWatcherBreaker creates a watcherBreaker with default backoff configuration.
-func newWatcherBreaker() *watcherBreaker {
-	return &watcherBreaker{
-		breaker: circuitbreaker.NewBackoff(circuitbreaker.BackoffConfig{}),
-	}
-}
-
-// isOpen reports whether the breaker is currently in the open (tripped) state.
-func (wb *watcherBreaker) isOpen() bool {
-	return wb.breaker.IsOpen()
-}
-
-// recordFailure records a failure with metadata for health reporting and
-// delegates to the underlying backoff breaker. Returns the new failure count.
-func (wb *watcherBreaker) recordFailure(taskID *uuid.UUID, reason string) int {
-	wb.mu.Lock()
-	wb.lastReason = reason
-	if taskID != nil {
-		cp := *taskID
-		wb.lastTaskID = &cp
-	} else {
-		wb.lastTaskID = nil
-	}
-	wb.mu.Unlock()
-	return wb.breaker.RecordFailure()
-}
-
-// recordSuccess resets the failure state and clears the last failure metadata.
-func (wb *watcherBreaker) recordSuccess() {
-	wb.breaker.RecordSuccess()
-	wb.mu.Lock()
-	wb.lastReason = ""
-	wb.lastTaskID = nil
-	wb.mu.Unlock()
-}
-
-// watcherHealthEntry is the per-watcher health state returned by GET /api/config.
-type watcherHealthEntry struct {
-	Name       string     `json:"name"`
-	Healthy    bool       `json:"healthy"`
-	Failures   int        `json:"failures,omitempty"`
-	RetryAt    *time.Time `json:"retry_at,omitempty"`
-	LastReason string     `json:"last_reason,omitempty"`
-}
-
-// healthEntry builds a watcherHealthEntry snapshot for inclusion in the
-// GET /api/config response, reporting current breaker state and last failure.
-func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
-	open := wb.breaker.IsOpen()
-	entry := watcherHealthEntry{
-		Name:     name,
-		Healthy:  !open,
-		Failures: wb.breaker.Failures(),
-	}
-	if open {
-		if retryAt, ok := wb.breaker.RetryAt(); ok {
-			entry.RetryAt = &retryAt
-		}
-		wb.mu.Lock()
-		entry.LastReason = wb.lastReason
-		wb.mu.Unlock()
-	}
-	return entry
-}
 
 // Handler holds dependencies for all HTTP API handlers.
 type Handler struct {
@@ -127,35 +42,11 @@ type Handler struct {
 	startTime     time.Time
 	reg           *metrics.Registry
 
-	autoimplement atomic.Bool
-	autotest      atomic.Bool
-	autosubmit    atomic.Bool
-	autosync      atomic.Bool
-	autopush      atomic.Bool
-	reviewEnabled atomic.Bool
-
-	// verifier runs the post-run review, one round per call. It is set once in
-	// NewHandler and never mutated; ReviewEnabled() is the runtime gate.
-	verifier review.Verifier
-
-	// reviewInFlight tracks tasks with a review round currently executing, so
-	// a round is not re-launched on every watcher tick (ReviewUnresolved is
-	// only written when the session finishes). Guarded by reviewMu, which also
-	// enforces the maxConcurrentReview cap atomically.
-	reviewMu       sync.Mutex
-	reviewInFlight map[uuid.UUID]struct{}
-
-	// breakers holds per-watcher circuit breakers. Keyed by watcher name
-	// (e.g. "auto-promote"). These are transient and auto-heal; they do not
-	// affect the user-controlled toggle flags.
-	breakers map[string]*watcherBreaker
-
 	oauthManager *oauth.Manager
 
-	diffCache          *diffCache
-	commitsBehindCache *commitsBehindCache
-	fileIndex          *fileIndex
-	spanCache          spanStatsCache
+	diffCache *diffCache
+	fileIndex *fileIndex
+	spanCache spanStatsCache
 
 	// explorerCommitMu serializes explorer auto-commits per workspace so a
 	// burst of rapid saves queues on the git index instead of colliding on
@@ -163,32 +54,22 @@ type Handler struct {
 	// path; values are *sync.Mutex.
 	explorerCommitMu sync.Map
 
-	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
-	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
-	// re-parse the env file on every call. Invalidate on env config update.
-	cachedMaxParallel     *lazy[int]
-	cachedMaxTestParallel *lazy[int]
+	// cachedMaxParallel caches the configured parallel task limit so that
+	// maxConcurrentTasks does not re-parse the env file on every call.
+	// Invalidate on env config update.
+	cachedMaxParallel *lazy[int]
 
 	// groupLimitsMu guards groupLimits, the in-memory cache of per-workspace-
 	// group concurrency overrides loaded from workspace-groups.json. Refreshed
 	// by reloadGroupLimits on startup and after each group save.
 	groupLimitsMu sync.RWMutex
-	groupLimits   map[string]groupLimitEntry
+	groupLimits   map[string]*int
 
 	agentSession    *agentsession.Runtime
 	commandRegistry *agentsession.CommandRegistry
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[harness.ID]bool
-	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
-	// tryAutoPromote precisely when the soonest scheduled task becomes due.
-	scheduledPromoteMu    sync.Mutex
-	scheduledPromoteTimer *time.Timer
-
-	// testPhase1Done is called by tryAutoPromote after Phase 1 completes and
-	// before Phase 2 begins. It is nil in production; tests set it to
-	// coordinate goroutine timing and verify Phase 1 runs concurrently.
-	testPhase1Done func()
 }
 
 // NewHandler constructs a Handler with the given dependencies.
@@ -201,30 +82,20 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		wsMgr = workspace.NewStatic(s, workspaces)
 	}
 	h := &Handler{
-		store:              s,
-		workspace:          wsMgr,
-		runner:             r,
-		configDir:          configDir,
-		workspaces:         workspaces,
-		envFile:            r.EnvFile(),
-		diffCache:          newDiffCache(),
-		commitsBehindCache: newCommitsBehindCache(constants.CommitsBehindCacheTTL),
-		fileIndex:          newFileIndex(),
-		startTime:          time.Now(),
-		reg:                reg,
+		store:      s,
+		workspace:  wsMgr,
+		runner:     r,
+		configDir:  configDir,
+		workspaces: workspaces,
+		envFile:    r.EnvFile(),
+		diffCache:  newDiffCache(),
+		fileIndex:  newFileIndex(),
+		startTime:  time.Now(),
+		reg:        reg,
 		sandboxTestPassed: map[harness.ID]bool{
 			harness.Claude: false,
 			harness.Codex:  false,
 		},
-		breakers: map[string]*watcherBreaker{
-			"auto-promote": newWatcherBreaker(),
-			"auto-retry":   newWatcherBreaker(),
-			"auto-test":    newWatcherBreaker(),
-			"auto-submit":  newWatcherBreaker(),
-			"auto-sync":    newWatcherBreaker(),
-			"auto-review":  newWatcherBreaker(),
-		},
-		reviewInFlight: make(map[uuid.UUID]struct{}),
 	}
 	oauthMgr := oauth.NewManager()
 	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)
@@ -247,19 +118,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		}
 		return limit
 	})
-	h.cachedMaxTestParallel = newLazy(func() int {
-		cfg, err := envconfig.Parse(h.envFile)
-		if err != nil || cfg.MaxTestParallelTasks <= 0 {
-			return constants.DefaultMaxTestConcurrentTasks
-		}
-		return cfg.MaxTestParallelTasks
-	})
-	// Initialize the review verifier once; ReviewEnabled() is the runtime gate.
-	h.verifier = review.New(r)
-	// Initialize auto-push from env config so the header toggle reflects the persisted state.
-	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
-		h.autopush.Store(envCfg.AutoPushEnabled)
-	}
 	// Populate the per-group concurrency override cache from disk.
 	h.reloadGroupLimits()
 	// Initialize handler state from the current workspace snapshot.
@@ -364,104 +222,6 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	if h.agentSession != nil {
 		h.agentSession.UpdateWorkspaces(snap.Workspaces, snap.Key)
 	}
-
-	// Switching groups must also swap the automation toggle state so a
-	// group the user expected to operate manually does not inherit an
-	// autoimplement-on flag from the previous group. Autopush is a global
-	// env-file flag and is not touched here.
-	h.applyGroupToggles(snap.Workspaces)
-}
-
-// applyGroupToggles syncs the in-memory automation toggle atomics to the
-// values persisted for the given workspace group. A group whose fields
-// are nil (never configured or saved pre-migration) resets every toggle
-// to off, which matches the user expectation that a brand-new group
-// starts fully manual.
-func (h *Handler) applyGroupToggles(ws []string) {
-	var g *workspace.Workspace
-	if len(ws) > 0 {
-		groups, err := workspace.LoadGroups(h.configDir)
-		if err == nil {
-			key := workspace.GroupKey(ws)
-			for i := range groups {
-				if workspace.GroupKey(groups[i].Folders) == key {
-					g = &groups[i]
-					break
-				}
-			}
-		}
-	}
-	pick := func(v *bool) bool {
-		if v == nil {
-			return false
-		}
-		return *v
-	}
-	if g == nil {
-		h.autoimplement.Store(false)
-		h.autotest.Store(false)
-		h.autosubmit.Store(false)
-		h.autosync.Store(false)
-		return
-	}
-	h.autoimplement.Store(pick(g.Autoimplement))
-	h.autotest.Store(pick(g.Autotest))
-	h.autosubmit.Store(pick(g.Autosubmit))
-	h.autosync.Store(pick(g.Autosync))
-}
-
-// persistCurrentGroupToggles writes the current in-memory toggle state
-// into the workspace-groups.json entry for the currently viewed group,
-// creating a new entry if the group is not yet persisted. Called from
-// UpdateConfig after the user flips any automation toggle so switching
-// to another group and back restores their choice.
-func (h *Handler) persistCurrentGroupToggles() {
-	ws := h.currentWorkspaces()
-	if len(ws) == 0 {
-		return
-	}
-	groups, err := workspace.LoadGroups(h.configDir)
-	if err != nil {
-		logger.Handler.Warn("persist group toggles: load groups", "error", err)
-		return
-	}
-	key := workspace.GroupKey(ws)
-	b := func(v bool) *bool { x := v; return &x }
-	autoimplement := b(h.autoimplement.Load())
-	autotest := b(h.autotest.Load())
-	autosubmit := b(h.autosubmit.Load())
-	autosync := b(h.autosync.Load())
-	found := false
-	for i := range groups {
-		if workspace.GroupKey(groups[i].Folders) == key {
-			groups[i].Autoimplement = autoimplement
-			groups[i].Autotest = autotest
-			groups[i].Autosubmit = autosubmit
-			groups[i].Autosync = autosync
-			found = true
-			break
-		}
-	}
-	if !found {
-		groups = append([]workspace.Workspace{{
-			Folders:       ws,
-			Autoimplement: autoimplement,
-			Autotest:      autotest,
-			Autosubmit:    autosubmit,
-			Autosync:      autosync,
-		}}, groups...)
-	}
-	if err := workspace.SaveGroups(h.configDir, groups); err != nil {
-		logger.Handler.Warn("persist group toggles: save groups", "error", err)
-	}
-}
-
-// groupLimitEntry caches the optional concurrency overrides for a single
-// workspace group. nil means "inherit the env-file default"; 0 means
-// "unlimited for this group"; positive means "hard cap".
-type groupLimitEntry struct {
-	maxParallel     *int
-	maxTestParallel *int
 }
 
 // reloadGroupLimits re-reads workspace-groups.json and rebuilds the in-memory
@@ -470,16 +230,13 @@ type groupLimitEntry struct {
 // handler construction and from UpdateConfig after each SaveGroups.
 func (h *Handler) reloadGroupLimits() {
 	groups, err := workspace.LoadGroups(h.configDir)
-	limits := make(map[string]groupLimitEntry, len(groups))
+	limits := make(map[string]*int, len(groups))
 	if err == nil {
 		for _, g := range groups {
-			if g.MaxParallel == nil && g.MaxTestParallel == nil {
+			if g.MaxParallel == nil {
 				continue
 			}
-			limits[workspace.GroupKey(g.Folders)] = groupLimitEntry{
-				maxParallel:     g.MaxParallel,
-				maxTestParallel: g.MaxTestParallel,
-			}
+			limits[workspace.GroupKey(g.Folders)] = g.MaxParallel
 		}
 	}
 	h.groupLimitsMu.Lock()
@@ -490,27 +247,18 @@ func (h *Handler) reloadGroupLimits() {
 // currentGroupParallelLimit returns the per-group concurrency override for
 // the currently viewed workspace group, if one is set. The second return
 // value reports whether an override applies; when false, callers should fall
-// back to the env-file default. testRun selects between the regular
-// (MaxParallel) and test-run (MaxTestParallel) overrides.
-func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
+// back to the env-file default. A nil limit means "inherit the env-file
+// default"; 0 means "unlimited for this group"; positive means "hard cap".
+func (h *Handler) currentGroupParallelLimit() (int, bool) {
 	ws := h.currentWorkspaces()
 	if len(ws) == 0 {
 		return 0, false
 	}
 	key := workspace.GroupKey(ws)
 	h.groupLimitsMu.RLock()
-	entry, ok := h.groupLimits[key]
+	v, ok := h.groupLimits[key]
 	h.groupLimitsMu.RUnlock()
-	if !ok {
-		return 0, false
-	}
-	var v *int
-	if testRun {
-		v = entry.maxTestParallel
-	} else {
-		v = entry.maxParallel
-	}
-	if v == nil {
+	if !ok || v == nil {
 		return 0, false
 	}
 	// A stored value of 0 is a deliberate "unlimited" override. Return a
@@ -522,47 +270,17 @@ func (h *Handler) currentGroupParallelLimit(testRun bool) (int, bool) {
 	return *v, true
 }
 
-// forCurrentStore calls fn only for the currently viewed workspace group's
-// store. This scopes automation actions (auto-promote, auto-retry, auto-test,
-// auto-submit, auto-sync) to the viewed group: tasks already
-// running in other groups finish as normal, but no new automation fires on
-// their backlogs.
-func (h *Handler) forCurrentStore(fn func(s *store.Store, ws []string)) {
-	s, ok := h.currentStore()
-	if !ok || s == nil {
-		return
-	}
-	ws := h.currentWorkspaces()
-	fn(s, ws)
-}
-
 // countGlobalInProgress returns the number of non-test in-progress tasks in
 // the currently viewed workspace group. Parallel limits
 // (WALLFACER_MAX_PARALLEL) are scoped per group so each group has its own
 // independent concurrency budget; tasks still running in other groups after
 // a switch do not consume this budget.
 func (h *Handler) countGlobalInProgress() int {
-	total := 0
-	h.forCurrentStore(func(s *store.Store, _ []string) {
-		total += s.CountRegularInProgress()
-	})
-	return total
-}
-
-// countGlobalTestsInProgress returns the number of test-run in-progress tasks
-// in the currently viewed workspace group. Scoped per-group for the same
-// reason as countGlobalInProgress.
-func (h *Handler) countGlobalTestsInProgress(ctx context.Context) int {
-	total := 0
-	h.forCurrentStore(func(s *store.Store, _ []string) {
-		inProgress, _ := s.ListTasksByStatus(ctx, store.TaskStatusInProgress)
-		for i := range inProgress {
-			if inProgress[i].IsTestRun {
-				total++
-			}
-		}
-	})
-	return total
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		return 0
+	}
+	return s.CountRegularInProgress()
 }
 
 // hasStore reports whether the handler has a configured store.
@@ -579,28 +297,6 @@ func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
-	})
-}
-
-// incAutoimplementAction increments the autoimplement action counter for the given
-// watcher and outcome. It is a no-op when no registry is configured.
-func (h *Handler) incAutoimplementAction(watcher, outcome string) {
-	if h.reg == nil {
-		return
-	}
-	h.reg.Counter("wallfacer_autoimplement_actions_total", "").Inc(map[string]string{
-		"watcher": watcher,
-		"outcome": outcome,
-	})
-}
-
-// incAutoimplementPhase2Miss increments the phase-2 miss counter for the named watcher.
-func (h *Handler) incAutoimplementPhase2Miss(watcher string) {
-	if h.reg == nil {
-		return
-	}
-	h.reg.Counter("wallfacer_autoimplement_phase2_miss_total", "").Inc(map[string]string{
-		"watcher": watcher,
 	})
 }
 
@@ -632,73 +328,4 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	if ok {
 		h.setSandboxTestPassed(harness.Codex, true)
 	}
-}
-
-// AutoimplementEnabled returns whether autoimplement mode is active.
-func (h *Handler) AutoimplementEnabled() bool { return h.autoimplement.Load() }
-
-// SetAutoimplement enables or disables autoimplement mode.
-func (h *Handler) SetAutoimplement(enabled bool) { h.autoimplement.Store(enabled) }
-
-// AutotestEnabled returns whether auto-test mode is active.
-func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }
-
-// SetAutotest enables or disables auto-test mode.
-func (h *Handler) SetAutotest(enabled bool) { h.autotest.Store(enabled) }
-
-// ReviewEnabled returns whether the automatic review of waiting tasks is active.
-func (h *Handler) ReviewEnabled() bool { return h.reviewEnabled.Load() }
-
-// SetReview enables or disables the automatic review of waiting tasks.
-func (h *Handler) SetReview(enabled bool) { h.reviewEnabled.Store(enabled) }
-
-// AutosubmitEnabled returns whether auto-submit mode is active.
-func (h *Handler) AutosubmitEnabled() bool { return h.autosubmit.Load() }
-
-// SetAutosubmit enables or disables auto-submit mode.
-func (h *Handler) SetAutosubmit(enabled bool) { h.autosubmit.Store(enabled) }
-
-// AutosyncEnabled returns whether auto-sync (catch up) mode is active.
-func (h *Handler) AutosyncEnabled() bool { return h.autosync.Load() }
-
-// SetAutosync enables or disables auto-sync (catch up) mode.
-func (h *Handler) SetAutosync(enabled bool) { h.autosync.Store(enabled) }
-
-// AutopushEnabled returns whether auto-push mode is active.
-func (h *Handler) AutopushEnabled() bool { return h.autopush.Load() }
-
-// SetAutopush enables or disables auto-push mode.
-func (h *Handler) SetAutopush(enabled bool) { h.autopush.Store(enabled) }
-
-// openWatcherBreaker opens the circuit breaker for a specific watcher.
-// It does NOT disable other watchers. Returns true if the breaker was
-// previously closed (i.e., this is a new failure).
-func (h *Handler) openWatcherBreaker(watcherName string, taskID *uuid.UUID, reason string) bool {
-	wb, ok := h.breakers[watcherName]
-	if !ok {
-		logger.Handler.Error("unknown watcher breaker", "watcher", watcherName)
-		return false
-	}
-	wasHealthy := !wb.isOpen()
-	failures := wb.recordFailure(taskID, reason)
-	if taskID != nil {
-		h.insertEventOrLog(h.runner.ShutdownCtx(), *taskID, store.EventTypeSystem, map[string]string{
-			"result": fmt.Sprintf("[%s] circuit breaker opened: %s", watcherName, reason),
-		})
-	}
-	logger.Handler.Warn("watcher circuit breaker opened",
-		"watcher", watcherName,
-		"task", taskID,
-		"reason", reason,
-		"failures", failures,
-	)
-	return wasHealthy
-}
-
-// pauseAllAutomation opens the circuit breaker for the watcher that failed.
-// Despite the name (kept for backward compatibility), it no longer disables
-// all board-level toggles; the circuit breaker is a transient, auto-healing
-// layer that suppresses only the affected watcher.
-func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
-	return h.openWatcherBreaker(watcher, taskID, reason)
 }

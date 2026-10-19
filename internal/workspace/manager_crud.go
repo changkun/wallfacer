@@ -247,10 +247,10 @@ func (m *Manager) Rename(id, name string) (Workspace, error) {
 	return out, nil
 }
 
-// SetLimits sets (or clears) a workspace's per-workspace concurrency overrides.
-// A nil value clears the override so the workspace inherits the global default;
-// a non-negative value caps it (0 meaning unlimited, per Group semantics).
-func (m *Manager) SetLimits(id string, maxParallel, maxTestParallel *int) (Workspace, error) {
+// SetLimits sets (or clears) a workspace's parallel task limit. A nil value
+// clears the override so the workspace inherits the global default; a
+// non-negative value caps it (0 meaning unlimited, per Group semantics).
+func (m *Manager) SetLimits(id string, maxParallel *int) (Workspace, error) {
 	var out Workspace
 	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
 		i := findByID(groups, id)
@@ -258,7 +258,6 @@ func (m *Manager) SetLimits(id string, maxParallel, maxTestParallel *int) (Works
 			return nil, fmt.Errorf("workspace not found: %s", id)
 		}
 		groups[i].MaxParallel = maxParallel
-		groups[i].MaxTestParallel = maxTestParallel
 		groups[i].UpdatedAt = nowStamp()
 		out = groups[i]
 		return groups, nil

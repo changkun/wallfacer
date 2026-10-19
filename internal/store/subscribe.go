@@ -26,18 +26,6 @@ func (s *Store) Unsubscribe(id int) {
 	s.hub.Unsubscribe(id)
 }
 
-// SubscribeWake registers a lightweight wake channel that receives a struct{}
-// signal whenever task state changes. The channel has capacity 1 so that rapid
-// bursts of notifications coalesce.
-func (s *Store) SubscribeWake() (int, <-chan struct{}) {
-	return s.hub.SubscribeWake()
-}
-
-// UnsubscribeWake removes the wake subscriber.
-func (s *Store) UnsubscribeWake(id int) {
-	s.hub.UnsubscribeWake(id)
-}
-
 // notify stamps a TaskDelta with a sequence number and fans out to all
 // subscribers. Must be called with s.mu held (at least read-locked) so
 // that the task pointer is stable while we copy it.

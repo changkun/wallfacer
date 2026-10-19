@@ -33,12 +33,6 @@ type Interface interface {
 	TaskLogReader(taskID uuid.UUID) *livelog.Reader
 	KillContainer(taskID uuid.UUID)
 
-	// Container circuit breaker.
-	ContainerCircuitAllow() bool
-	ContainerCircuitState() string
-	ContainerCircuitFailures() int
-	RecordContainerFailure()
-
 	// Background goroutine tracking.
 	PendingGoroutines() []string
 	WaitBackground()
@@ -57,19 +51,9 @@ type Interface interface {
 	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
 
-	// RunReviewer runs the review role for a task on the reviewer model and
-	// returns its parsed findings and verdict. It refuses with a
-	// *ReviewRefusal, without launching anything, when the reviewer model is
-	// unset or equals the task's model.
-	RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
-
 	// Agent-session title generation (task-free flavor). Names a chat
 	// thread from its opening user message using the lightweight title model.
 	GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error)
-
-	// Auto-push for a single workspace (task-free flavor). Used by callers
-	// that do not have a task ID in scope, e.g. the plan commit pipeline.
-	MaybeAutoPushWorkspace(ctx context.Context, ws string)
 
 	// Host Codex auth.
 	HostCodexAuthStatus(now time.Time) (bool, string)

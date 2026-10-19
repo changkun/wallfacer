@@ -2,6 +2,8 @@ package runner
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -11,6 +13,16 @@ import (
 // mock backend accepts any id and would hide that), with a fake agent binary
 // standing in for the subprocess harnesses and a scripted model standing in
 // for the gateway the in-process harness calls.
+
+// writeEnvFile writes lines to a fresh .env file and returns its path.
+func writeEnvFile(t *testing.T, lines string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	return path
+}
 
 // TestGenerateAgentSessionTitle_SubprocessDefault asserts a subprocess default
 // harness still produces the thread title through the agent binary.

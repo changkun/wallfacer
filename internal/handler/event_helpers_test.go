@@ -43,12 +43,24 @@ func (h *logCaptureHandler) hasError(msg string) bool {
 	return false
 }
 
+// TestInsertEventOrLog_NilRegistryNoPanic verifies that insertEventOrLog
+// handles a nil registry gracefully (incAutoimplementAction is a no-op when
+// h.reg == nil).
+func TestInsertEventOrLog_NilRegistryNoPanic(t *testing.T) {
+	// newTestHandler creates a Handler with a nil registry.
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	missingID := uuid.New()
+	// Must not panic even with nil registry and a missing task ID.
+	h.insertEventOrLog(ctx, missingID, store.EventTypeSystem, map[string]string{"msg": "probe"})
+}
+
 // TestInsertEventOrLog_ErrorNoPanic verifies that insertEventOrLog does not
 // panic when InsertEvent returns an error (task deleted between status update
-// and event write), increments the autoimplement error counter, and emits a
-// structured ERROR log record.
+// and event write) and emits a structured ERROR log record.
 func TestInsertEventOrLog_ErrorNoPanic(t *testing.T) {
-	h, reg := newTestHandlerWithRegistry(t)
+	h := newTestHandler(t)
 	ctx := context.Background()
 
 	// Create a task so we have a valid ID, then delete it to force
@@ -71,46 +83,8 @@ func TestInsertEventOrLog_ErrorNoPanic(t *testing.T) {
 	// Must not panic.
 	h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "probe"})
 
-	// (b) The error counter must have been incremented.
-	got := autoimplementCounterValue(t, reg, "event_write", "error")
-	if got != 1 {
-		t.Errorf("expected event_write/error counter = 1, got %v", got)
-	}
-
-	// (c) A structured ERROR log line must have been emitted.
+	// A structured ERROR log line must have been emitted.
 	if !capture.hasError("InsertEvent failed") {
 		t.Error("expected an ERROR log record with message \"InsertEvent failed\" but none found")
 	}
-}
-
-// TestInsertEventOrLog_SuccessNoCounter verifies that insertEventOrLog does
-// NOT increment the error counter when InsertEvent succeeds.
-func TestInsertEventOrLog_SuccessNoCounter(t *testing.T) {
-	h, reg := newTestHandlerWithRegistry(t)
-	ctx := context.Background()
-
-	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "probe", Timeout: 30, Kind: store.TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	h.insertEventOrLog(ctx, task.ID, store.EventTypeSystem, map[string]string{"msg": "ok"})
-
-	got := autoimplementCounterValue(t, reg, "event_write", "error")
-	if got != 0 {
-		t.Errorf("expected event_write/error counter = 0, got %v", got)
-	}
-}
-
-// TestInsertEventOrLog_NilRegistryNoPanic verifies that insertEventOrLog
-// handles a nil registry gracefully (incAutoimplementAction is a no-op when
-// h.reg == nil).
-func TestInsertEventOrLog_NilRegistryNoPanic(t *testing.T) {
-	// newTestHandler creates a Handler with a nil registry.
-	h := newTestHandler(t)
-	ctx := context.Background()
-
-	missingID := uuid.New()
-	// Must not panic even with nil registry and a missing task ID.
-	h.insertEventOrLog(ctx, missingID, store.EventTypeSystem, map[string]string{"msg": "probe"})
 }

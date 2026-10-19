@@ -112,16 +112,10 @@ type envConfigResponse struct {
 	DefaultSandbox       harness.ID                           `json:"default_sandbox"`
 	SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
-	MaxTestParallelTasks int                                  `json:"max_test_parallel_tasks"`
 	MaxAgents            int                                  `json:"max_agents"`
 	AgentNice            int                                  `json:"agent_nice"`
-	ReviewRounds         int                                  `json:"review_rounds"`
-	ReviewCostCap        int                                  `json:"review_cost_cap"`
-	ReviewModel          string                               `json:"review_model"`
 	OversightInterval    int                                  `json:"oversight_interval"`
 	ArchivedTasksPerPage int                                  `json:"archived_tasks_per_page"`
-	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
-	AutoPushThreshold    int                                  `json:"auto_push_threshold"`
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
@@ -167,29 +161,12 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	if maxParallel <= 0 {
 		maxParallel = constants.DefaultMaxConcurrentTasks
 	}
-	maxTestParallel := cfg.MaxTestParallelTasks
-	if maxTestParallel <= 0 {
-		maxTestParallel = constants.DefaultMaxTestConcurrentTasks
-	}
-	autoPushThreshold := cfg.AutoPushThreshold
-	if autoPushThreshold <= 0 {
-		autoPushThreshold = 1
-	}
 	archivedTasksPerPage := cfg.ArchivedTasksPerPage
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = constants.DefaultArchivedTasksPerPage
 	}
-	// Review bounds: report the effective value (env override, else the
-	// defaults). agentNice 0 reports the backend default; negative means
-	// throttling is disabled. maxAgents 0 means unlimited.
-	reviewRounds := cfg.ReviewMaxRounds
-	if reviewRounds <= 0 {
-		reviewRounds = reviewMaxRounds
-	}
-	reviewCap := cfg.ReviewCostCap
-	if reviewCap <= 0 {
-		reviewCap = reviewCostCap
-	}
+	// agentNice 0 reports the backend default; negative means throttling is
+	// disabled. maxAgents 0 means unlimited.
 	agentNice := cfg.AgentNice
 	if agentNice == 0 {
 		agentNice = executor.DefaultAgentNice
@@ -208,16 +185,10 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		DefaultSandbox:       cfg.DefaultSandbox,
 		SandboxByActivity:    cfg.SandboxByActivity(),
 		MaxParallelTasks:     maxParallel,
-		MaxTestParallelTasks: maxTestParallel,
 		MaxAgents:            cfg.MaxAgents,
 		AgentNice:            agentNice,
-		ReviewRounds:         reviewRounds,
-		ReviewCostCap:        reviewCap,
-		ReviewModel:          cfg.ReviewModel,
 		OversightInterval:    cfg.OversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
-		AutoPushEnabled:      cfg.AutoPushEnabled,
-		AutoPushThreshold:    autoPushThreshold,
 	})
 }
 
@@ -445,16 +416,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		DefaultSandbox       *harness.ID                          `json:"default_sandbox"`
 		SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
-		MaxTestParallelTasks *int                                 `json:"max_test_parallel_tasks"`
 		MaxAgents            *int                                 `json:"max_agents"`
 		AgentNice            *int                                 `json:"agent_nice"`
-		ReviewRounds         *int                                 `json:"review_rounds"`
-		ReviewCostCap        *int                                 `json:"review_cost_cap"`
-		ReviewModel          *string                              `json:"review_model"`
 		OversightInterval    *int                                 `json:"oversight_interval"`
 		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
-		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
-		AutoPushThreshold    *int                                 `json:"auto_push_threshold"`
 		TerminalEnabled      *bool                                `json:"terminal_enabled"`
 	}](w, r)
 	if !ok {
@@ -482,14 +447,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		maxParallel = &s
 	}
 
-	// Convert max_test_parallel_tasks int to string for the env file.
-	var maxTestParallel *string
-	if req.MaxTestParallelTasks != nil {
-		v := max(*req.MaxTestParallelTasks, 1)
-		s := fmt.Sprintf("%d", v)
-		maxTestParallel = &s
-	}
-
 	// Convert max_agents int to string. Clamp to [0, ∞): 0 = unlimited.
 	var maxAgents *string
 	if req.MaxAgents != nil {
@@ -507,21 +464,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		agentNice = &s
 	}
 
-	// Convert review rounds and cost cap, each clamped to [1, ∞). They apply
-	// live: reviewTuning re-reads them on each round.
-	var reviewRounds *string
-	if req.ReviewRounds != nil {
-		v := max(*req.ReviewRounds, 1)
-		s := fmt.Sprintf("%d", v)
-		reviewRounds = &s
-	}
-	var reviewCostCap *string
-	if req.ReviewCostCap != nil {
-		v := max(*req.ReviewCostCap, 1)
-		s := fmt.Sprintf("%d", v)
-		reviewCostCap = &s
-	}
-
 	// Convert oversight_interval int to string for the env file.
 	// Clamp to [0, 120]: 0 = disabled; 120 minutes = max.
 	var oversightInterval *string
@@ -535,25 +477,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		v := min(max(*req.ArchivedTasksPerPage, 1), 200)
 		s := fmt.Sprintf("%d", v)
 		archivedTasksPerPage = &s
-	}
-
-	// Convert auto_push_enabled bool to string for the env file.
-	var autoPush *string
-	if req.AutoPushEnabled != nil {
-		v := "false"
-		if *req.AutoPushEnabled {
-			v = "true"
-		}
-		autoPush = &v
-	}
-
-	// Convert auto_push_threshold int to string for the env file.
-	// Clamp to [1, ∞): minimum threshold is 1 commit ahead.
-	var autoPushThreshold *string
-	if req.AutoPushThreshold != nil {
-		v := max(*req.AutoPushThreshold, 1)
-		s := fmt.Sprintf("%d", v)
-		autoPushThreshold = &s
 	}
 
 	var terminalEnabled *string
@@ -596,16 +519,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		CodexDefaultModel:    req.CodexDefaultModel,
 		CodexTitleModel:      req.CodexTitleModel,
 		MaxParallel:          maxParallel,
-		MaxTestParallel:      maxTestParallel,
 		MaxAgents:            maxAgents,
 		AgentNice:            agentNice,
-		ReviewRounds:         reviewRounds,
-		ReviewCostCap:        reviewCostCap,
-		ReviewModel:          req.ReviewModel,
 		OversightInterval:    oversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
-		AutoPush:             autoPush,
-		AutoPushThreshold:    autoPushThreshold,
 		TerminalEnabled:      terminalEnabled,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
@@ -626,19 +543,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Invalidate the cached parallel-limit values so the next call to
-	// maxConcurrentTasks / maxTestConcurrentTasks re-reads from the env file.
+	// Invalidate the cached parallel limit so the next call to
+	// maxConcurrentTasks re-reads it from the env file.
 	h.cachedMaxParallel.Invalidate()
-	h.cachedMaxTestParallel.Invalidate()
-
-	// When the parallel task limit changes, re-evaluate immediately so new
-	// capacity is filled without waiting for the next store event.
-	if req.MaxParallelTasks != nil {
-		go h.tryAutoPromote(h.runner.ShutdownCtx())
-	}
-	if req.MaxTestParallelTasks != nil {
-		go h.tryAutoTest(h.runner.ShutdownCtx())
-	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

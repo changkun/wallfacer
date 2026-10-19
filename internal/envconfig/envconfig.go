@@ -24,16 +24,10 @@ type Config struct {
 	DefaultModel           string // CLAUDE_DEFAULT_MODEL
 	TitleModel             string // CLAUDE_TITLE_MODEL
 	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
-	MaxTestParallelTasks   int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
 	MaxAgents              int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
 	AgentNice              int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
 	OversightInterval      int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
 	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
-	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
-	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
-	ReviewMaxRounds        int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
-	ReviewCostCap          int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
-	ReviewModel            string // WALLFACER_REVIEW_MODEL: the reviewer's model; empty means the review does not run
 	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
 
 	// OpenAI Codex sandbox fields.
@@ -85,16 +79,10 @@ var knownKeys = []string{
 	"CURSOR_API_KEY",
 	"OPENCODE_SERVER_PASSWORD",
 	"WALLFACER_MAX_PARALLEL",
-	"WALLFACER_MAX_TEST_PARALLEL",
 	"WALLFACER_MAX_AGENTS",
 	"WALLFACER_AGENT_NICE",
 	"WALLFACER_OVERSIGHT_INTERVAL",
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
-	"WALLFACER_AUTO_PUSH",
-	"WALLFACER_AUTO_PUSH_THRESHOLD",
-	"WALLFACER_REVIEW_ROUNDS",
-	"WALLFACER_REVIEW_COST_CAP",
-	"WALLFACER_REVIEW_MODEL",
 	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
 	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
@@ -157,10 +145,6 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
 			}
-		case "WALLFACER_MAX_TEST_PARALLEL":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.MaxTestParallelTasks = n
-			}
 		case "WALLFACER_MAX_AGENTS":
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 				cfg.MaxAgents = n
@@ -179,22 +163,6 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.ArchivedTasksPerPage = n
 			}
-		case "WALLFACER_AUTO_PUSH":
-			cfg.AutoPushEnabled = v == "true"
-		case "WALLFACER_AUTO_PUSH_THRESHOLD":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.AutoPushThreshold = n
-			}
-		case "WALLFACER_REVIEW_ROUNDS":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.ReviewMaxRounds = n
-			}
-		case "WALLFACER_REVIEW_COST_CAP":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.ReviewCostCap = n
-			}
-		case "WALLFACER_REVIEW_MODEL":
-			cfg.ReviewModel = v
 		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
 			// 0 means "all time"; negative values are rejected silently (keeps
 			// the initialized default of 30). WALLFACER_PLANNING_WINDOW_DAYS is
@@ -404,16 +372,10 @@ type Updates struct {
 	CodexDefaultModel    *string
 	CodexTitleModel      *string
 	MaxParallel          *string
-	MaxTestParallel      *string
 	MaxAgents            *string
 	AgentNice            *string
-	ReviewRounds         *string
-	ReviewCostCap        *string
-	ReviewModel          *string
 	OversightInterval    *string
 	ArchivedTasksPerPage *string
-	AutoPush             *string
-	AutoPushThreshold    *string
 	TerminalEnabled      *string
 	Workspaces           *string
 }
@@ -436,16 +398,10 @@ func Update(path string, u Updates) error {
 		"CODEX_DEFAULT_MODEL":               u.CodexDefaultModel,
 		"CODEX_TITLE_MODEL":                 u.CodexTitleModel,
 		"WALLFACER_MAX_PARALLEL":            u.MaxParallel,
-		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
 		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
 		"WALLFACER_AGENT_NICE":              u.AgentNice,
-		"WALLFACER_REVIEW_ROUNDS":           u.ReviewRounds,
-		"WALLFACER_REVIEW_COST_CAP":         u.ReviewCostCap,
-		"WALLFACER_REVIEW_MODEL":            u.ReviewModel,
 		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
-		"WALLFACER_AUTO_PUSH":               u.AutoPush,
-		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
 		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}

@@ -206,38 +206,12 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	})
 }
 
-// UpdateTaskReview persists a finished review session onto a task. unresolved
-// is the number of open findings at the end (0 when the reviewer approved);
-// headline is the most severe open finding's claim. sessionDir is the absolute
-// path to the session's .review/sessions/<id>/ folder.
-func (s *Store) UpdateTaskReview(_ context.Context, id uuid.UUID, unresolved int, headline, sessionDir string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.ReviewUnresolved = &unresolved
-		t.ReviewHeadline = headline
-		t.ReviewSessionDir = sessionDir
-		return nil
-	})
-}
-
 // UpdateTaskCriteria sets a task's free-form acceptance Criteria. Callers gate
 // this to backlog status (same constraint as editing the prompt); the store
 // records it unconditionally.
 func (s *Store) UpdateTaskCriteria(_ context.Context, id uuid.UUID, criteria string) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.Criteria = criteria
-		return nil
-	})
-}
-
-// ClearReviewResult clears a task's review verdict (ReviewUnresolved back to nil) so
-// the task is eligible for re-verification. Called when a task is resumed for
-// more work: the prior verdict was computed against an earlier diff and is stale
-// once new commits land. A no-op when nothing was set.
-func (s *Store) ClearReviewResult(_ context.Context, id uuid.UUID) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.ReviewUnresolved = nil
-		t.ReviewHeadline = ""
-		t.ReviewSessionDir = ""
 		return nil
 	})
 }
@@ -266,23 +240,8 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 	})
 }
 
-// UpdateTaskScheduledAt sets or clears the scheduled start time for a task.
-// Pass nil to clear the schedule (task will be eligible for immediate promotion).
-func (s *Store) UpdateTaskScheduledAt(_ context.Context, id uuid.UUID, scheduledAt *time.Time) error {
-	return s.mutateTask(id, func(t *Task) error {
-		if scheduledAt == nil {
-			t.ScheduledAt = nil
-		} else {
-			ts := *scheduledAt
-			t.ScheduledAt = &ts
-		}
-		return nil
-	})
-}
-
-// UpdateTaskDependsOn sets the list of task UUID strings that must all reach
-// TaskStatusDone before this task is auto-promoted. An empty or nil slice clears
-// all dependencies.
+// UpdateTaskDependsOn sets the list of task UUID strings this task builds on.
+// An empty or nil slice clears all dependencies.
 func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn []string) error {
 	return s.mutateTask(id, func(t *Task) error {
 		if len(dependsOn) == 0 {
@@ -516,16 +475,6 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.BaseCommitHashes = nil
 	t.IsTestRun = false
 	t.LastTestResult = ""
-	t.PendingTestFeedback = ""
-	t.TestFailCount = 0
-	// Reset auto-retry counters so that a manual retry after budget exhaustion
-	// grants a fresh allowance and the auto-retrier can act on the next failure.
-	t.AutoRetryCount = 0
-	t.AutoRetryBudget = map[FailureCategory]int{
-		FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
-		FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
-		FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
-	}
 	t.CurrentRefinement = nil
 	if freshStart {
 		t.RefineSessions = nil
