@@ -124,7 +124,6 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 
 | Method + Path | Purpose |
 |---|---|
-| `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
 | `/` | Serves the embedded SPA index on `GET` and `HEAD` for every path no other route matches outside `/api`, so client-side routes survive a hard load. Other methods answer 405 with an `Allow` header. Method-agnostic because ServeMux would treat `GET /` and the `/api/` catch-all as conflicting patterns |
 | `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/webserver/catchall.go`) |
 | `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |
@@ -146,20 +145,20 @@ flowchart TD
     StoreGuard --> Handler["Handler method"]
 ```
 
-The chain is assembled in `internal/cli/server.go` (outermost first: otel, logging, CSRF, BearerAuth, mux). `CSRFMiddleware` is unconditional:
+The chain is assembled in `internal/cli/server.go` (outermost first: logging, CSRF, BearerAuth, mux). `CSRFMiddleware` is unconditional:
 ```go
 var srvHandler http.Handler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
-srv := &http.Server{Handler: otel.Handler(loggingMiddleware(srvHandler, reg), ...), ...}
+srv := &http.Server{Handler: loggingMiddleware(srvHandler), ...}
 ```
 
 ### What each middleware does
 
 | Layer | Location | Behavior |
 |---|---|---|
-| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels; unmatched requests (404, empty `r.Pattern`) collapse to a single `route="<unmatched>"` series to bound label cardinality. |
+| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration at info level, and every other request (the SPA shell and its assets) at debug. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | Unconditional. For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`), `GET /metrics`, and streaming paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
+| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`) and streaming paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `PickFolder`, `MkdirWorkspace`, `RenameWorkspace`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`, and the workspace CRUD routes (`ListWorkspaces`, `CreateWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`, `ActivateWorkspace`), which must work before any workspace is open. |
 
@@ -282,36 +281,6 @@ wallfacer.task.prompt=<first 80 chars>
 ```
 
 These labels are set by the runner (`internal/runner/container.go`). The host backend records them per running process and surfaces them via `ContainerInfo.TaskID` on `List()`; `ListContainers()` uses this to correlate running processes to tasks. (The `Container*` Go names are legacy vocabulary; the behavior is host-process tracking, not container runtime.)
-
-## Metrics Reference
-
-All metrics are served at `GET /metrics` in Prometheus text exposition format via `metrics.Registry.WritePrometheus()`.
-
-### Counters
-
-| Metric | Labels | Description |
-|---|---|---|
-| `wallfacer_http_requests_total` | `method`, `route`, `status` | Total HTTP requests. Route uses `r.Pattern` (Go 1.22+) to collapse parameterised paths. |
-| `wallfacer_autoimplement_actions_total` | `watcher`, `outcome` | Autonomous actions taken by autoimplement watchers (e.g. promote, retry, test, submit). |
-
-### Histograms
-
-| Metric | Labels | Buckets | Description |
-|---|---|---|---|
-| `wallfacer_http_request_duration_seconds` | `method`, `route` | 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s | HTTP request latency distribution. |
-
-### Gauges (scrape-time)
-
-These are computed on each `/metrics` scrape via registered collector functions:
-
-| Metric | Labels | Description |
-|---|---|---|
-| `wallfacer_tasks_total` | `status`, `archived` | Number of tasks grouped by status and archived flag. |
-| `wallfacer_running_containers` |, | Number of running task processes currently tracked (legacy metric name; the value counts host processes). |
-| `wallfacer_background_goroutines` |, | Number of outstanding background goroutines tracked by the runner's `trackedwg.WaitGroup`. |
-| `wallfacer_store_subscribers` |, | Number of active SSE subscribers listening for task state changes. |
-| `wallfacer_failed_tasks_by_category` | `category` | Number of currently-failed (non-archived) tasks grouped by failure category. |
-| `wallfacer_circuit_breaker_open` |, | 1 when the launch circuit breaker is open (executor unavailable), 0 when closed. |
 
 ## Token Tracking & Cost
 

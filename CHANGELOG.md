@@ -27,11 +27,8 @@ committed: the commit log already holds that.
 
 - OpenTelemetry Go v1.46.0, with the log modules at v0.22.0, the slog bridge at
   v0.20.1 and otelhttp at v0.71.0, past GO-2026-6615 and GO-2026-6505, and
-  `latere.ai/x/pkg` v0.90.2. pkg v0.90.2 names the service resource with
-  semantic conventions v1.43.0, the schema of this SDK; with an older schema
-  the two conflict when merged and the server disables telemetry export at start.
-  `latere.ai/x/topos` is at v0.7.0, since the earlier pin does not build
-  against pkg v0.90.2.
+  `latere.ai/x/pkg` v0.90.2. Wallfacer exports no telemetry; these modules
+  come in only as dependencies of `latere.ai/x/pkg`.
 
 - The shared footer and product switcher follow latere-ui v1.30.1. The
   product switcher sends Lux to the platform console's Models section and no
@@ -121,6 +118,13 @@ committed: the commit log already holds that.
   `GET /api/docs`, `/api/docs/{slug...}`, `/api/docs-asset/{path...}` and
   `/api/docs-search` routes are gone, and the binary no longer embeds the
   `docs/` tree. The guides stay in the repository's `docs/` directory.
+
+- Metrics and telemetry export: `GET /metrics` and its `wallfacer_*`
+  Prometheus series are gone, as is the OpenTelemetry export of traces,
+  metrics and logs, so `OTEL_EXPORTER_OTLP_ENDPOINT` and the other `OTEL_*`
+  settings are ignored and responses no longer carry an `X-Trace-Id` header.
+  Logs still go to the terminal in the format `-log-format` (or `LOG_FORMAT`)
+  selects.
 
 ### Fixed
 

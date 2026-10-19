@@ -29,12 +29,10 @@ func (h *Handler) insertEventOrLogTo(ctx context.Context, s *store.Store, taskID
 	if s == nil {
 		logger.Handler.Error("InsertEvent skipped: no store",
 			"task", taskID, "event_type", eventType)
-		h.incAutoimplementAction("event_write", "error")
 		return
 	}
 	if err := s.InsertEvent(ctx, taskID, eventType, data); err != nil {
 		logger.Handler.Error("InsertEvent failed",
 			"task", taskID, "event_type", eventType, "error", err)
-		h.incAutoimplementAction("event_write", "error")
 	}
 }

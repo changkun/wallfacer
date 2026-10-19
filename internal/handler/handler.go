@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/metrics"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -123,7 +122,6 @@ type Handler struct {
 	scopedDataDir string
 	envFile       string
 	startTime     time.Time
-	reg           *metrics.Registry
 
 	autoimplement atomic.Bool
 	autotest      atomic.Bool
@@ -187,7 +185,7 @@ type Handler struct {
 }
 
 // NewHandler constructs a Handler with the given dependencies.
-func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces []string, reg *metrics.Registry) *Handler {
+func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces []string) *Handler {
 	wsMgr := (*workspace.Manager)(nil)
 	if r != nil {
 		wsMgr = r.WorkspaceManager()
@@ -206,7 +204,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		commitsBehindCache: newCommitsBehindCache(constants.CommitsBehindCacheTTL),
 		fileIndex:          newFileIndex(),
 		startTime:          time.Now(),
-		reg:                reg,
 		sandboxTestPassed: map[harness.ID]bool{
 			harness.Claude: false,
 			harness.Codex:  false,
@@ -571,28 +568,6 @@ func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
-	})
-}
-
-// incAutoimplementAction increments the autoimplement action counter for the given
-// watcher and outcome. It is a no-op when no registry is configured.
-func (h *Handler) incAutoimplementAction(watcher, outcome string) {
-	if h.reg == nil {
-		return
-	}
-	h.reg.Counter("wallfacer_autoimplement_actions_total", "").Inc(map[string]string{
-		"watcher": watcher,
-		"outcome": outcome,
-	})
-}
-
-// incAutoimplementPhase2Miss increments the phase-2 miss counter for the named watcher.
-func (h *Handler) incAutoimplementPhase2Miss(watcher string) {
-	if h.reg == nil {
-		return
-	}
-	h.reg.Counter("wallfacer_autoimplement_phase2_miss_total", "").Inc(map[string]string{
-		"watcher": watcher,
 	})
 }
 

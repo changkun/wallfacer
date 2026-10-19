@@ -14,7 +14,6 @@ import (
 	"latere.ai/x/pkg/authkit/jwt"
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/envutil"
-	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/pubsub"
 	"latere.ai/x/pkg/syncmap"
 	"latere.ai/x/pkg/trackedwg"
@@ -70,7 +69,6 @@ type RunnerConfig struct {
 	MaxAgents          int    // global concurrent agent-process budget (0 ⇒ unlimited)
 	TmpDir             string // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	WorkspaceManager   *workspace.Manager
-	Reg                *metrics.Registry // optional metrics registry; nil disables metric collection
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -117,7 +115,6 @@ type Runner struct {
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx         context.Context
 	shutdownCancel      context.CancelFunc
-	reg                 *metrics.Registry // optional; nil disables metric collection
 }
 
 // ShutdownCtx returns the runner's shutdown context. It is cancelled when
@@ -339,7 +336,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		MaxAgents:      cfg.MaxAgents,
 	})
 	r.backend = hb
-	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {
 		snap := r.workspaceManager.Snapshot()

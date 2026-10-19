@@ -17,9 +17,9 @@ hermetic:
 
 golangci:
   sloglint:
-    # Request-path logs use the *Context slog variants so the otelslog bridge
-    # stamps TraceId/SpanId onto exported records. CLI-mode packages keep
-    # plain calls: they have no request trace to correlate.
+    # Request-path logs use the *Context slog variants. The rule is scoped to
+    # internal/webserver/: CLI-mode packages keep plain calls, and the bar's
+    # default would apply it to every package.
     context: scope
     request_paths: internal/webserver/
   extra:
@@ -51,9 +51,8 @@ waive:
   tempdir:
     reason: >-
       the suite leaves entries under TMPDIR from three shapes of leak, each
-      of which is its own fix: os.MkdirTemp store dirs in env_test,
-      git_test and tasks_autoimplement_metrics_test (t.TempDir is the
-      replacement, applied already to stream_test and the worktree tests);
+      of which is its own fix: os.MkdirTemp store dirs in env_test and
+      git_test (t.TempDir is the replacement, applied already to stream_test and the worktree tests);
       t.TempDir directories recreated after the test returned by the
       auto-tester goroutine, which outlives its tests; and cursor-agent-logs, written by the cursor harness process
       under TMPDIR rather than under the task

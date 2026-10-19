@@ -101,7 +101,7 @@ Each watcher (auto-promote, auto-retry, auto-test, auto-submit, auto-sync, auto-
 
 ### Agent-launch breaker
 
-The runner tracks consecutive agent-launch failures. After `WALLFACER_CONTAINER_CB_THRESHOLD` consecutive failures (default 5) the breaker opens for `WALLFACER_CONTAINER_CB_OPEN_SECONDS` (default 30). While open, auto-promotion halts and container-crash auto-retries are suppressed, preventing a runtime outage from cascading across the whole backlog. The state is exported as the `wallfacer_circuit_breaker_open` Prometheus gauge.
+The runner tracks consecutive agent-launch failures. After `WALLFACER_CONTAINER_CB_THRESHOLD` consecutive failures (default 5) the breaker opens for `WALLFACER_CONTAINER_CB_OPEN_SECONDS` (default 30). While open, auto-promotion halts and container-crash auto-retries are suppressed, preventing a runtime outage from cascading across the whole backlog.
 
 ### Other safety valves
 
@@ -123,7 +123,7 @@ Every failed task carries a failure category, visible on the card and used to de
 | `agent_error` | The agent itself reported failure | No |
 | `unknown` | Unclassified | No |
 
-Triage guidance: transient categories usually clear themselves via auto-retry; recurring `container_crash` suggests a runtime or credential problem (check `wallfacer doctor`); `agent_error` and `timeout` mean the task needs a better prompt, smaller scope, or manual feedback. Failed-task counts per category are exported on `/metrics` as `wallfacer_failed_tasks_by_category`.
+Triage guidance: transient categories usually clear themselves via auto-retry; recurring `container_crash` suggests a runtime or credential problem (check `wallfacer doctor`); `agent_error` and `timeout` mean the task needs a better prompt, smaller scope, or manual feedback.
 
 ## Related pages
 

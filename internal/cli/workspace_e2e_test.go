@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"latere.ai/x/pkg/metrics"
-
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -42,8 +40,8 @@ func newWorkspaceTestServer(t *testing.T) (*httptest.Server, *workspace.Manager,
 		WtDir:        filepath.Join(configDir, "wt"),
 		WorkspaceMgr: mgr,
 	}
-	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, nil)
+	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces)
+	mux := BuildMux(h, IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv, mgr, configDir
@@ -231,8 +229,8 @@ func TestWorkspaceMigrationE2E(t *testing.T) {
 	}
 	snap := mgr.Snapshot()
 	mock := &runner.MockRunner{EnvFilePath: envPath, WtDir: filepath.Join(configDir, "wt"), WorkspaceMgr: mgr}
-	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, nil)
+	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces)
+	mux := BuildMux(h, IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 

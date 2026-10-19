@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/metrics"
 
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
@@ -55,8 +54,8 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 		WtDir:       filepath.Join(workdir, "wt"),
 	}
 
-	h := handler.NewHandler(s, mock, workdir, []string{workdir}, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, nil)
+	h := handler.NewHandler(s, mock, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 

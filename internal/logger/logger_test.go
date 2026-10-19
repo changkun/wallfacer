@@ -477,9 +477,7 @@ func TestPrettyValue(t *testing.T) {
 
 // TestAdoptRoutesNamedLoggersThroughBase verifies that Adopt rebuilds every
 // named logger on the supplied base, so records written through them reach the
-// base handler. This is the seam that puts the server tree's logs on the OTLP
-// bridge: without it, the named loggers keep their own local handler and the
-// bridge sees nothing.
+// base handler with their component attribute.
 func TestAdoptRoutesNamedLoggersThroughBase(t *testing.T) {
 	t.Cleanup(func() { Init("text") })
 
@@ -514,7 +512,7 @@ func TestAdoptRoutesNamedLoggersThroughBase(t *testing.T) {
 }
 
 // TestNewFormatHandlerFormats verifies the handler Init builds is available on
-// its own, in both formats, for handing to otel.Bootstrap as Config.Stdout.
+// its own, in both formats.
 func TestNewFormatHandlerFormats(t *testing.T) {
 	if _, ok := NewFormatHandler("json").(*slog.JSONHandler); !ok {
 		t.Error(`NewFormatHandler("json") must return a JSON handler`)

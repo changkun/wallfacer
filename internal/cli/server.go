@@ -18,8 +18,6 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/metrics"
-	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
@@ -60,10 +58,6 @@ type ServerComponents struct {
 
 	// ActualPort is the TCP port the listener is bound to.
 	ActualPort int
-
-	// TelemetryShutdown flushes traces, metrics, and buffered log records.
-	// Always non-nil; it is a noop when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
-	TelemetryShutdown func(context.Context) error
 }
 
 // shutdownTimeout is the budget for draining HTTP connections and stopping
@@ -74,9 +68,8 @@ const shutdownTimeout = 5 * time.Second
 // cancelled, then shuts everything down within shutdownTimeout. It returns nil
 // on a clean stop; http.ErrServerClosed is the normal stop signal.
 //
-// This mirrors otel.RunServer's contract, which wallfacer cannot call directly:
-// otel.RunServer owns the listen call (srv.ListenAndServe), while wallfacer
-// binds its listener up front so it can fall back to a free port and feed the
+// The listener is bound up front by initServer rather than by
+// srv.ListenAndServe, so the server can fall back to a free port and feed the
 // resolved host:port into the CSRF middleware and the browser it opens.
 func (sc *ServerComponents) Serve() error {
 	srvErr := make(chan error, 1)
@@ -101,8 +94,8 @@ func (sc *ServerComponents) Serve() error {
 	return nil
 }
 
-// Shutdown performs a graceful shutdown: drains HTTP connections, waits for
-// background runner goroutines to finish, and flushes telemetry.
+// Shutdown performs a graceful shutdown: drains HTTP connections and waits for
+// background runner goroutines to finish.
 func (sc *ServerComponents) Shutdown() {
 	sc.Stop()
 
@@ -121,13 +114,6 @@ func (sc *ServerComponents) Shutdown() {
 	logger.Main.Info("shutting down runner")
 	sc.Runner.Shutdown()
 	logger.Main.Info("shutdown complete")
-
-	// Flush telemetry last so the shutdown diagnostics above are exported too.
-	if sc.TelemetryShutdown != nil {
-		if err := sc.TelemetryShutdown(shutdownCtx); err != nil {
-			logger.Main.Error("telemetry shutdown", "error", err)
-		}
-	}
 }
 
 // initServer performs the full server initialization sequence for RunServer.
@@ -135,21 +121,8 @@ func (sc *ServerComponents) Shutdown() {
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
 func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerComponents {
-	// Bootstrap telemetry before anything else logs. This registers the
-	// TracerProvider and the W3C propagator for the process, which is what makes
-	// the otel.Transport-wrapped clients in the handler and oauth trees
-	// emit client spans and send traceparent instead of resolving to noop. The
-	// local colored handler is handed over as Config.Stdout so terminal output is
-	// unchanged while the same records also reach the OTLP log bridge.
-	baseLogger, telShutdown, telErr := otel.Bootstrap(context.Background(), otel.Config{
-		ServiceName: "wallfacer",
-		Version:     Version,
-		Stdout:      logger.NewFormatHandler(cfg.LogFormat),
-	})
-	logger.Adopt(baseLogger)
-	if telErr != nil {
-		logger.Main.Warn("otlp logs init failed; continuing on stdout", "error", telErr)
-	}
+	// Configure the log format before anything else logs.
+	logger.Init(cfg.LogFormat)
 
 	initConfigDir(configDir, cfg.EnvFile)
 
@@ -215,8 +188,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerCompon
 		envCfg = parsed
 	}
 
-	reg := metrics.NewRegistry()
-
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:            cfg.EnvFile,
 		DefaultEnvFile:     filepath.Join(configDir, ".env"),
@@ -232,7 +203,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerCompon
 		AgentNice:          envCfg.AgentNice,
 		MaxAgents:          envCfg.MaxAgents,
 		WorkspaceManager:   wsMgr,
-		Reg:                reg,
 	})
 
 	r.PruneUnknownWorktrees()
@@ -251,7 +221,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerCompon
 	go r.StartWorktreeGC(ctx)
 	go r.StartWorktreeHealthWatcher(ctx)
 
-	h := handler.NewHandler(s, r, configDir, workspaces, reg)
+	h := handler.NewHandler(s, r, configDir, workspaces)
 
 	// Delete the GitHub token cache under the config dir if one is present:
 	// wallfacer holds no GitHub credential, so the files are unread secrets.
@@ -315,110 +285,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerCompon
 	h.StartAutoSubmitter(ctx)
 	h.StartAutoReview(ctx)
 
-	reg.Gauge(
-		"wallfacer_tasks_total",
-		"Number of tasks grouped by status and archived flag.",
-		func() []metrics.LabeledValue {
-			active, ok := wsMgr.Store()
-			if !ok {
-				return nil
-			}
-			tasks, err := active.ListTasks(context.Background(), true)
-			if err != nil {
-				return nil
-			}
-			type key struct{ status, archived string }
-			counts := make(map[key]int)
-			for _, t := range tasks {
-				counts[key{string(t.Status), fmt.Sprintf("%v", t.Archived)}]++
-			}
-			vals := make([]metrics.LabeledValue, 0, len(counts))
-			for k, n := range counts {
-				vals = append(vals, metrics.LabeledValue{
-					Labels: map[string]string{"status": k.status, "archived": k.archived},
-					Value:  float64(n),
-				})
-			}
-			return vals
-		},
-	)
-	reg.Gauge(
-		"wallfacer_running_containers",
-		"Number of wallfacer sandbox containers currently tracked by the container runtime.",
-		func() []metrics.LabeledValue {
-			containers, err := r.ListContainers()
-			if err != nil {
-				return []metrics.LabeledValue{{Value: 0}}
-			}
-			return []metrics.LabeledValue{{Value: float64(len(containers))}}
-		},
-	)
-	reg.Gauge(
-		"wallfacer_background_goroutines",
-		"Number of outstanding background goroutines tracked by the runner.",
-		func() []metrics.LabeledValue {
-			return []metrics.LabeledValue{{Value: float64(len(r.PendingGoroutines()))}}
-		},
-	)
-	reg.Gauge(
-		"wallfacer_store_subscribers",
-		"Number of active SSE subscribers listening for task state changes.",
-		func() []metrics.LabeledValue {
-			active, ok := wsMgr.Store()
-			if !ok {
-				return []metrics.LabeledValue{{Value: 0}}
-			}
-			return []metrics.LabeledValue{{Value: float64(active.SubscriberCount())}}
-		},
-	)
-	reg.Gauge(
-		"wallfacer_failed_tasks_by_category",
-		"Number of currently-failed (non-archived) tasks grouped by failure_category.",
-		func() []metrics.LabeledValue {
-			active, ok := wsMgr.Store()
-			if !ok {
-				return nil
-			}
-			tasks, err := active.ListTasks(context.Background(), false)
-			if err != nil {
-				return nil
-			}
-			counts := make(map[string]int)
-			for _, t := range tasks {
-				if t.Status == store.TaskStatusFailed {
-					cat := string(t.FailureCategory)
-					if cat == "" {
-						cat = "unknown"
-					}
-					counts[cat]++
-				}
-			}
-			vals := make([]metrics.LabeledValue, 0, len(counts))
-			for cat, n := range counts {
-				vals = append(vals, metrics.LabeledValue{
-					Labels: map[string]string{"category": cat},
-					Value:  float64(n),
-				})
-			}
-			return vals
-		},
-	)
-	reg.Gauge(
-		"wallfacer_circuit_breaker_open",
-		"1 when the container launch circuit breaker is open (runtime unavailable), 0 when closed.",
-		func() []metrics.LabeledValue {
-			v := 0.0
-			if r.ContainerCircuitOpen() {
-				v = 1.0
-			}
-			return []metrics.LabeledValue{{Value: v}}
-		},
-	)
-	reg.Counter(
-		"wallfacer_autoimplement_actions_total",
-		"Total number of autonomous actions taken by autoimplement watchers, by watcher and outcome.",
-	)
-
 	// Bind the listening socket. If the requested port is taken (e.g. another
 	// wallfacer instance), fall back to an OS-assigned free port so the server
 	// still starts rather than failing outright. An address that does not
@@ -440,21 +306,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerCompon
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, vueDist)
+	mux := BuildMux(h, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, vueDist)
 
-	// Middleware stack (outermost first): otel → logging → CSRF → server key
-	// → mux.
+	// Middleware stack (outermost first): logging → CSRF → server key → mux.
 	var srvHandler http.Handler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
-	// otel.Handler is the outermost wrapper: it starts the server span, sets the
-	// X-Trace-Id response header, and records http.route from the matched
-	// ServeMux pattern. loggingMiddleware stays inside it and keeps feeding the
-	// wallfacer_* Prometheus series unchanged. It is not folded into
-	// WithMetricsHook because the hook reports a status class ("2xx") while
-	// wallfacer_http_requests_total is labeled with the exact status code, and
-	// because probes skipped for tracing must still be counted.
 	srv := &http.Server{
-		Handler:     otel.Handler(loggingMiddleware(srvHandler, reg), "wallfacer", otel.WithSkip(skipTracing)),
+		Handler:     loggingMiddleware(srvHandler),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 
@@ -466,8 +324,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerCompon
 		Ctx:          ctx,
 		Stop:         stop,
 		ActualPort:   actualPort,
-
-		TelemetryShutdown: telShutdown,
 	}
 }
 
@@ -661,7 +517,7 @@ func withAssetCache(next http.Handler) http.Handler {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, vueDist fs.FS) *http.ServeMux {
+func BuildMux(h *handler.Handler, indexData IndexViewData, vueDist fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	if vueDist != nil {
@@ -879,12 +735,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		mux.Handle(route.FullPattern(), registered)
 	}
 
-	// Prometheus metrics endpoint (not an API route; excluded from the contract).
-	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-		reg.WritePrometheus(w)
-	})
-
 	return mux
 }
 
@@ -929,52 +779,15 @@ func (w *statusResponseWriter) Flush() {
 	}
 }
 
-// skipTracing filters requests that must not produce a server span. The
-// Prometheus scrape runs on a fixed interval and would otherwise dominate trace
-// volume while saying nothing about user-visible work.
-func skipTracing(r *http.Request) bool {
-	return r.URL.Path == "/metrics"
-}
-
-// loggingMiddleware logs each HTTP request and records Prometheus metrics.
-// It uses r.Pattern (set by ServeMux in Go 1.22+) as the route label so that
-// parameterised routes like "GET /api/tasks/{id}" are collapsed to a single
-// time series. When r.Pattern is empty it falls back to r.URL.Path.
-func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
-	httpReqs := reg.Counter(
-		"wallfacer_http_requests_total",
-		"Total number of HTTP requests partitioned by method, route, and status code.",
-	)
-	httpDur := reg.Histogram(
-		"wallfacer_http_request_duration_seconds",
-		"HTTP request latency in seconds partitioned by method and route.",
-		metrics.DefaultDurationBuckets,
-	)
+// loggingMiddleware logs each HTTP request with its status and duration: API
+// requests at info level, everything else (the SPA shell and its assets) at
+// debug.
+func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
 		dur := time.Since(start)
-
-		// Use the matched pattern when available so parameterised routes are
-		// collapsed (e.g. "GET /api/tasks/{id}" rather than a unique path per task).
-		// Unmatched requests (404, e.g. write methods to unknown paths) have an
-		// empty r.Pattern; collapse them into a single sentinel series instead of
-		// the raw URL path, which would give unbounded metric label cardinality.
-		route := r.Pattern
-		if route == "" {
-			route = "<unmatched>"
-		}
-
-		httpReqs.Inc(map[string]string{
-			"method": r.Method,
-			"route":  route,
-			"status": strconv.Itoa(sw.status),
-		})
-		httpDur.Observe(map[string]string{
-			"method": r.Method,
-			"route":  route,
-		}, dur.Seconds())
 
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			logger.Handler.Info(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur.Round(time.Millisecond))

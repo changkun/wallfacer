@@ -12,8 +12,8 @@
 // This is the top-level orchestrator that depends on nearly every internal package:
 // [apicontract] for route registration, [handler] for HTTP handlers, [runner] for
 // task execution, [store] for persistence, [workspace] for workspace lifecycle,
-// [envconfig] for configuration, [logger] for logging, [metrics] for instrumentation,
-// [constants] for system parameters, and [prompts] for template management.
+// [envconfig] for configuration, [logger] for logging,
+// and [constants] for system parameters.
 // Changes to any of these packages may require corresponding updates in cli.
 //
 // # Usage

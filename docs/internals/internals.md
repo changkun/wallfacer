@@ -36,7 +36,7 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 [API & Transport](api-and-transport.md)
 
-Full HTTP route reference, SSE streaming, Prometheus metrics, and middleware. Covers task, git, config, agent session, spec tree, explorer, and image endpoints.
+Full HTTP route reference, SSE streaming, and middleware. Covers task, git, config, agent session, spec tree, explorer, and image endpoints.
 
 ### 6. Automation
 

@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,9 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"latere.ai/x/pkg/metrics"
-
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -76,10 +71,9 @@ func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {
 // TestLoggingMiddleware_LogsForApiAndUiRoutes verifies that the logging
 // middleware preserves the status code for both API and UI routes.
 func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
-	reg := metrics.NewRegistry()
 	apiHandler := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-	}), reg)
+	}))
 	apiRR := httptest.NewRecorder()
 	apiReq := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	apiHandler.ServeHTTP(apiRR, apiReq)
@@ -91,39 +85,9 @@ func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
 	uiReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
-	}), reg).ServeHTTP(uiRR, uiReq)
+	})).ServeHTTP(uiRR, uiReq)
 	if uiRR.Code != http.StatusOK {
 		t.Fatalf("expected UI middleware to preserve default status, got %d", uiRR.Code)
-	}
-}
-
-// TestLoggingMiddleware_UnmatchedRoutesCollapseToSentinel verifies that
-// requests with no matched mux pattern (r.Pattern empty, e.g. 404s) are
-// recorded under a single "<unmatched>" route label rather than their raw URL
-// path, which would give unbounded Prometheus label cardinality on path scans.
-func TestLoggingMiddleware_UnmatchedRoutesCollapseToSentinel(t *testing.T) {
-	reg := metrics.NewRegistry()
-	h := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}), reg)
-
-	for _, p := range []string{"/api/does-not-exist", "/another/unknown/path", "/random"} {
-		rr := httptest.NewRecorder()
-		// A bare handler never sets r.Pattern, mirroring an unmatched mux route.
-		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, p, nil))
-	}
-
-	var buf bytes.Buffer
-	reg.WritePrometheus(&buf)
-	out := buf.String()
-
-	if got := strings.Count(out, `route="<unmatched>"`); got == 0 {
-		t.Fatalf("expected an <unmatched> route series, got none:\n%s", out)
-	}
-	for _, p := range []string{"/api/does-not-exist", "/another/unknown/path", "/random"} {
-		if strings.Contains(out, `route="`+p+`"`) {
-			t.Fatalf("raw path %q must not appear as a metric label:\n%s", p, out)
-		}
 	}
 }
 
@@ -152,9 +116,8 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, stubVueFS(t))
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, stubVueFS(t))
 
 	paths := []struct {
 		method string
@@ -212,9 +175,8 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, nil)
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
@@ -241,48 +203,14 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, nil)
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid UUID in output, got %d", rr.Code)
-	}
-}
-
-// TestBuildMux_MetricsEndpoint verifies that the /metrics endpoint returns
-// Prometheus-format text.
-func TestBuildMux_MetricsEndpoint(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, nil)
-
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /metrics: status %d, want 200", rr.Code)
-	}
-	ct := rr.Header().Get("Content-Type")
-	if !strings.Contains(ct, "text/plain") {
-		t.Fatalf("expected text/plain content type, got %q", ct)
 	}
 }
 
@@ -304,9 +232,8 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, stubVueFS(t))
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{ServerAPIKey: "test-key"}, stubVueFS(t))
 
 	// "/" serves the injected SPA index. The key is released to a loopback
 	// peer (httptest's default RemoteAddr is not loopback).
@@ -430,49 +357,6 @@ func TestRequiresStore(t *testing.T) {
 	}
 }
 
-// TestInitServer_MetricsScrapesGauges verifies that the Prometheus metrics
-// endpoint triggers the gauge callbacks registered during initServer.
-func TestInitServer_MetricsScrapesGauges(t *testing.T) {
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	sc := initServer(configDir, ServerConfig{
-		LogFormat: "text",
-		Addr:      ":0",
-		DataDir:   filepath.Join(configDir, "data"),
-		EnvFile:   envFile,
-	}, testFS(t))
-	defer sc.Shutdown()
-
-	// Start the server in the background.
-	go func() { _ = sc.Srv.Serve(sc.Ln) }()
-
-	// Scrape /metrics to trigger gauge callbacks.
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", sc.ActualPort))
-	if err != nil {
-		t.Fatalf("GET /metrics: %v", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /metrics: status %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	metricsText := string(body)
-
-	// Verify gauge metrics appear.
-	for _, want := range []string{
-		"wallfacer_circuit_breaker_open",
-		"wallfacer_background_goroutines",
-	} {
-		if !strings.Contains(metricsText, want) {
-			t.Errorf("expected %q in metrics output", want)
-		}
-	}
-}
-
 // TestInitServer_WithExistingStore verifies that initServer handles an existing
 // store with tasks, covering the recovery and workspace instructions paths.
 func TestInitServer_WithExistingStore(t *testing.T) {
@@ -552,99 +436,5 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 
 	if sc.Srv == nil {
 		t.Fatal("expected non-nil server")
-	}
-}
-
-// TestGauge_BackgroundGoroutines validates the pending goroutines gauge.
-func TestGauge_BackgroundGoroutines(t *testing.T) {
-	workdir := t.TempDir()
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-
-	collector := func() []metrics.LabeledValue {
-		return []metrics.LabeledValue{{Value: float64(len(r.PendingGoroutines()))}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(vals))
-	}
-	if vals[0].Value != 0 {
-		t.Errorf("expected 0 pending goroutines, got %v", vals[0].Value)
-	}
-}
-
-// TestGauge_StoreSubscribers validates the store subscribers gauge.
-func TestGauge_StoreSubscribers(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := storetest.NewFileStore(t, dataDir)
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	collector := func() []metrics.LabeledValue {
-		return []metrics.LabeledValue{{Value: float64(s.SubscriberCount())}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(vals))
-	}
-	if vals[0].Value != 0 {
-		t.Errorf("expected 0 subscribers initially, got %v", vals[0].Value)
-	}
-}
-
-// TestGauge_CircuitBreakerOpen validates the circuit-breaker gauge: starts at
-// 0 (closed), then flips to 1 (open) after exceeding the failure threshold.
-func TestGauge_CircuitBreakerOpen(t *testing.T) {
-	workdir := t.TempDir()
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-
-	// Circuit should be closed initially.
-	collector := func() []metrics.LabeledValue {
-		v := 0.0
-		if r.ContainerCircuitOpen() {
-			v = 1.0
-		}
-		return []metrics.LabeledValue{{Value: v}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Value != 0.0 {
-		t.Errorf("circuit breaker open = %v, want 0 (closed)", vals[0].Value)
-	}
-
-	// Trip the circuit breaker by recording failures above the threshold.
-	for range constants.DefaultCBThreshold + 1 {
-		r.RecordContainerFailure()
-	}
-
-	vals = collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Value != 1.0 {
-		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
 	}
 }

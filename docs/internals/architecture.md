@@ -143,10 +143,10 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl -> test 
 
 ### Request middleware
 
-The request handler chain is wired in `RunServer` (`internal/cli/server.go`) and wraps the mux outside-in, so requests flow otel -> logging -> CSRF -> server key -> mux:
+The request handler chain is wired in `RunServer` (`internal/cli/server.go`) and wraps the mux outside-in, so requests flow logging -> CSRF -> server key -> mux:
 
 - `handler.CSRFMiddleware(hostPort)`, unconditional CSRF protection (no skip flag).
-- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes, embedded assets and `GET /metrics` are public; SSE paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
+- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes and embedded assets are public; SSE paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
 
 ## End-to-End Walkthrough: Task Creation to Merge
 
@@ -325,7 +325,6 @@ Every `internal/` package and its role in the system:
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery` |
-| `oteltest` | Test-only: installs a recording OpenTelemetry SDK and a trace-header-recording HTTP server, so instrumentation is checked by the spans it ends and the `traceparent` that reaches the server | `Install()`, `SpanNames()`, `NewServer()`, `Server` |
 | `review` | Review of a waiting task's change by a reviewer on a second model: one round per call, findings sent back as feedback until approval, the round limit or the token budget; the session record lives beside the worktree | `Verifier`, `New()`, `Newest()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
@@ -345,7 +344,7 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader.ReadChunk()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
-General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, git operations (`gitutil`), and the Prometheus-compatible metrics registry (`metrics`), come from the `latere.ai/x/pkg` module.
+General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, and git operations (`gitutil`), come from the `latere.ai/x/pkg` module.
 
 ## Handler Organization
 
@@ -406,7 +405,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Circuit breakers**, Per-watcher exponential backoff suppresses individual automation loops on failure; an agent-launch circuit breaker blocks launches when a CLI is unavailable. See [Automation](../guide/automation.md).
 
-**Observability**, SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics. See [API & Transport](api-and-transport.md) for the metrics reference.
+**Observability**, SSE event streams, append-only trace timeline per task, span timing, structured logs.
 
 **Middleware**, See [API & Transport](api-and-transport.md) for the middleware chain.
 

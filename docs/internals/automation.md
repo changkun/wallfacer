@@ -261,7 +261,7 @@ Using the same session ID means the agent has full context of the original task 
 
 ## Circuit Breakers
 
-Agent launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when agent launches are persistently failing. The `CONTAINER` in the env var names (and the `wallfacer_circuit_breaker_open` gauge's container-era comments) is legacy vocabulary; the breaker guards host-process launches.
+Agent launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`, default: 5), the circuit opens and rejects further launches until it resets. This prevents cascading failures when agent launches are persistently failing. The `CONTAINER` in the env var names is legacy vocabulary; the breaker guards host-process launches.
 
 The circuit breaker lifecycle:
 

@@ -253,7 +253,6 @@ Iterates over tasks in `in_progress`, `waiting`, and `committing` states. For ea
 For each flagged task (skipping those with an empty `BranchName`):
 1. Calls `ensureTaskWorktrees()` to recreate the worktree from the existing branch
 2. Inserts a `system` event: "worktree restored by health watcher"
-3. Increments the `wallfacer_worktree_restorations_total` Prometheus counter
 
 ### Timing
 

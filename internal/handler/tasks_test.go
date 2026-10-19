@@ -2230,7 +2230,7 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutoimplementEnabled(t *tes
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 
-	h := NewHandler(s, r, t.TempDir(), []string{repo}, nil)
+	h := NewHandler(s, r, t.TempDir(), []string{repo})
 	// Only one task is promoted here and nothing else occupies a slot, so the
 	// default cap of 1 is enough — no parallelism override needed.
 	h.SetAutoimplement(true)

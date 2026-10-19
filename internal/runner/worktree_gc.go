@@ -63,9 +63,8 @@ func (r *Runner) ScanMissingTaskWorktrees(ctx context.Context) ([]store.Task, er
 
 // RestoreMissingTaskWorktrees attempts to recreate worktrees for each task in
 // the slice by calling ensureTaskWorktrees. On success it appends a system
-// event to the task's audit trail and increments the
-// wallfacer_worktree_restorations_total counter. Returns the count of
-// successfully restored tasks.
+// event to the task's audit trail. Returns the count of successfully restored
+// tasks.
 func (r *Runner) RestoreMissingTaskWorktrees(ctx context.Context, tasks []store.Task) int {
 	s := r.currentStore()
 	if s == nil {
@@ -86,10 +85,6 @@ func (r *Runner) RestoreMissingTaskWorktrees(ctx context.Context, tasks []store.
 			"message": "worktree restored by health watcher",
 		}); err != nil {
 			logger.Runner.Warn("worktree health: insert event failed", "task", task.ID, "error", err)
-		}
-		if r.reg != nil {
-			r.reg.Counter("wallfacer_worktree_restorations_total",
-				"Total number of task worktrees restored by the health watcher.").Inc(nil)
 		}
 		restored++
 	}

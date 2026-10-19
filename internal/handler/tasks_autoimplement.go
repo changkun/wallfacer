@@ -266,7 +266,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			regularInProgress := h.countGlobalInProgress()
 			availableSlots := h.maxConcurrentTasks() - regularInProgress
 			if availableSlots <= 0 && len(candidates) == 0 {
-				h.incAutoimplementAction("auto_promoter", "skipped_capacity")
 				return nil, nil
 			}
 
@@ -286,7 +285,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					for i := range backlogTasks {
 						t := &backlogTasks[i]
 						if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
-							h.incAutoimplementAction("auto_promoter", "skipped_scheduled")
 							if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
 								nextScheduled = t.ScheduledAt
 							}
@@ -294,11 +292,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 						}
 						satisfied, err := s.AreDependenciesSatisfied(ctx, t.ID)
 						if err != nil || !satisfied {
-							h.incAutoimplementAction("auto_promoter", "skipped_dependency")
 							continue
 						}
 						if locked, threadID := h.isTaskLockedByAgent(t.ID.String()); locked {
-							h.incAutoimplementAction("auto_promoter", "skipped_locked")
 							logger.Handler.Debug("auto-promote: skipping locked task",
 								"task", t.ID, "thread", threadID)
 							continue
@@ -350,9 +346,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			return &candidates[0].task, nil
 		},
 		AfterPhase1: h.testPhase1Done,
-		OnPhase2Miss: func(_ *store.Task) {
-			h.incAutoimplementPhase2Miss("auto_promoter")
-		},
 		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
 			// Phase 2 (under promoteMu): process all collected candidates.
 			promoted := false
@@ -386,7 +379,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 						h.breakers["auto-promote"].recordFailure(&freshTask.ID, err.Error())
 						continue
 					}
-					h.incAutoimplementAction("auto_promoter", "resumed_failed_test")
 					h.breakers["auto-promote"].recordSuccess()
 					promoted = true
 					continue
@@ -397,7 +389,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				// have promoted tasks, increasing the count.
 				freshInProgress := h.countGlobalInProgress()
 				if freshInProgress >= h.maxConcurrentTasks() {
-					h.incAutoimplementAction("auto_promoter", "skipped_capacity")
 					break
 				}
 
@@ -413,7 +404,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				// Re-check under the Phase-2 lock: a plan turn may have started
 				// between Phase 1 and Phase 2 and pinned this task.
 				if locked, threadID := h.isTaskLockedByAgent(c.task.ID.String()); locked {
-					h.incAutoimplementAction("auto_promoter", "skipped_locked")
 					logger.Handler.Debug("auto-promote Phase 2: skipping locked task",
 						"task", c.task.ID, "thread", threadID)
 					continue
@@ -428,7 +418,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					h.breakers["auto-promote"].recordFailure(&c.task.ID, err.Error())
 					continue
 				}
-				h.incAutoimplementAction("auto_promoter", "promoted")
 				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
 					store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerAutoPromote, nil))
 				h.cascadeArchiveThreadsForTask(c.task.ID.String())
@@ -469,21 +458,18 @@ func (h *Handler) tryAutoRetry(ctx context.Context, s *store.Store, task store.T
 		logger.Handler.Info("auto-retry suppressed: category budget exhausted",
 			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
 			"category", task.FailureCategory)
-		h.incAutoimplementAction("auto_retrier", "suppressed_budget")
 		return
 	}
 	if task.AutoRetryCount >= constants.MaxAutoRetries {
 		logger.Handler.Info("auto-retry suppressed: global retry cap reached",
 			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
 			"max", constants.MaxAutoRetries, "category", task.FailureCategory)
-		h.incAutoimplementAction("auto_retrier", "suppressed_max_count")
 		return
 	}
 	// For container-crash failures, honor the circuit breaker.
 	if task.FailureCategory == store.FailureCategoryContainerCrash && !h.runner.ContainerCircuitAllow() {
 		logger.Handler.Warn("auto-retry suppressed: container circuit breaker open",
 			"task", task.ID)
-		h.incAutoimplementAction("auto_retrier", "suppressed_circuit")
 		return
 	}
 	logger.Handler.Info("auto-retrying failed task",
@@ -494,7 +480,6 @@ func (h *Handler) tryAutoRetry(ctx context.Context, s *store.Store, task store.T
 		h.breakers["auto-retry"].recordFailure(&task.ID, err.Error())
 		return
 	}
-	h.incAutoimplementAction("auto_retrier", "retried")
 	h.breakers["auto-retry"].recordSuccess()
 	h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusFailed, store.TaskStatusBacklog, store.TriggerAutoRetry, map[string]string{
@@ -615,7 +600,6 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			h.breakers["auto-sync"].recordFailure(&t.ID, err.Error())
 			continue
 		}
-		h.incAutoimplementAction("sync_watcher", "synced")
 		h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerSync, nil))
 		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
@@ -697,9 +681,6 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		OnPhase1Error: func(err error) {
 			h.breakers["auto-test"].recordFailure(nil, err.Error())
 		},
-		OnPhase2Miss: func(_ *store.Task) {
-			h.incAutoimplementPhase2Miss("auto_tester")
-		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build the list of eligible candidates scoped
 			// to the currently viewed workspace group. Git I/O (CommitsBehind)
@@ -780,7 +761,6 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				if testInProgress >= maxTestTasks {
 					logger.Handler.Info("auto-test: test concurrency limit reached, deferring remaining tests",
 						"limit", maxTestTasks)
-					h.incAutoimplementAction("auto_tester", "skipped_capacity")
 					break
 				}
 
@@ -818,7 +798,6 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
 				testInProgress++
 				triggered = true
-				h.incAutoimplementAction("auto_tester", "tested")
 			}
 
 			if !h.breakers["auto-test"].isOpen() {
@@ -879,9 +858,6 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		Name: "auto-submit",
 		OnPhase1Error: func(err error) {
 			h.breakers["auto-submit"].recordFailure(nil, err.Error())
-		},
-		OnPhase2Miss: func(_ *store.Task) {
-			h.incAutoimplementPhase2Miss("auto_submitter")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Scan the currently viewed workspace group's store for
@@ -968,7 +944,6 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						break
 					}
 					if hasConflict {
-						h.incAutoimplementAction("auto_submitter", "skipped_conflict")
 						skip = true
 						break
 					}
@@ -981,7 +956,6 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				// with remotes. Local-only and non-git repos can never be
 				// behind and don't need fetch protection.
 				if hasRemoteRepo && t.LastFetchErrorAt != nil && time.Since(*t.LastFetchErrorAt) < constants.FetchErrorGracePeriod {
-					h.incAutoimplementAction("auto_submitter", "skipped_stale_fetch")
 					continue
 				}
 
@@ -1058,7 +1032,6 @@ func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCan
 		h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerAutoSubmit, nil))
 	}
-	h.incAutoimplementAction("auto_submitter", "submitted")
 	return true
 }
 

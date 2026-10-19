@@ -1,6 +1,6 @@
 # Oversight
 
-Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and per-task cost and timing. This guide covers each surface, from a single task's oversight summary to the Prometheus endpoint for external monitoring.
+Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and per-task cost and timing. This guide covers each surface, from a single task's oversight summary to its per-turn usage records.
 
 ## Oversight summaries
 
@@ -92,22 +92,6 @@ Each task also exposes one usage record per turn, including token counts, cost, 
 ```
 GET /api/tasks/{id}/turn-usage
 ```
-
-## Prometheus metrics
-
-The server exposes `GET /metrics` in Prometheus text format for external monitoring:
-
-| Metric | Type | Labels |
-|---|---|---|
-| `wallfacer_tasks_total` | gauge | `status`, `archived` |
-| `wallfacer_running_containers` | gauge | |
-| `wallfacer_background_goroutines` | gauge | |
-| `wallfacer_store_subscribers` | gauge | |
-| `wallfacer_failed_tasks_by_category` | gauge | `category` |
-| `wallfacer_circuit_breaker_open` | gauge | |
-| `wallfacer_autoimplement_actions_total` | counter | `watcher`, `outcome` |
-| `wallfacer_http_requests_total` | counter | `method`, `route`, `status` |
-| `wallfacer_http_request_duration_seconds` | histogram | `method`, `route` |
 
 ## See also
 
