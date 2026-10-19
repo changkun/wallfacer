@@ -146,7 +146,7 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl -> test 
 The request handler chain is wired in `RunServer` (`internal/cli/server.go`) and wraps the mux outside-in, so requests flow otel -> logging -> CSRF -> server key -> mux:
 
 - `handler.CSRFMiddleware(hostPort)`, unconditional CSRF protection (no skip flag).
-- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes, embedded assets and `GET /metrics` are public; SSE and WebSocket paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
+- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes, embedded assets and `GET /metrics` are public; SSE paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
 
 ## End-to-End Walkthrough: Task Creation to Merge
 
@@ -322,7 +322,6 @@ Every `internal/` package and its role in the system:
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
-| `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
@@ -345,7 +344,6 @@ Shared utility packages under `internal/pkg/`:
 |---|---|---|
 | `pkg/dagscorer` | Critical-path score of a node in a dependency DAG, used to rank backlog tasks for promotion | `Score()` |
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader.ReadChunk()` |
-| `pkg/pty` | PTY allocation for the WebSocket terminal on macOS and Linux; every call fails on Windows | `Open()`, `StartWithSize()`, `Setsize()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
 General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, git operations (`gitutil`), and the Prometheus-compatible metrics registry (`metrics`), come from the `latere.ai/x/pkg` module.
@@ -367,7 +365,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `git.go` | Git workspace operations (status, push, sync, rebase, branches, checkout) | `GET /api/git/status`, `POST /api/git/push`, `POST /api/git/sync`, etc. |
 | `execute.go` | Task execution trigger (delegates to runner) |, (internal, called by task status transitions) |
 | `oversight.go` | Task oversight summary retrieval | `GET /api/tasks/{id}/oversight` (impl + test phases via `?phase=`) |
-| `spans.go` | Span timing statistics (per-task and aggregate) | `GET /api/debug/spans`, `GET /api/tasks/{id}/spans` |
+| `spans.go` | Per-task span timing | `GET /api/tasks/{id}/spans` |
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |
 | `sandbox_gate.go` | Harness usability checks (auth validation before task launch) |, (internal helpers) |
 | `watcher.go` | Shared two-phase watcher helper used by the autoimplement loops in `tasks_autoimplement.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |
@@ -377,9 +375,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `planning_undo.go` | Undo the caller session's most recent planning round via `git revert`; cancels board tasks whose `dispatched_task_id` was added in the reverted commit | `POST /api/agent/undo` |
 | `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/transition` |
 | `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
-| `terminal.go` | WebSocket terminal relay for the host shell | `GET /api/terminal/ws` |
-| `whiteboard.go` | Per-workspace whiteboard document persistence | `GET /api/whiteboard`, `PUT /api/whiteboard` |
-| `graph.go` | Unified spec+task dependency graph for Mission Control | `GET /api/graph` |
 
 There is no `refine.go` (prompt refinement is the agent session tool above) and no `containers.go` / `GET /api/containers` endpoint.
 

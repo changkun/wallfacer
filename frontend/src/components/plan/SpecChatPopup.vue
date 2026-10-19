@@ -311,7 +311,7 @@ defineExpose({
         </div>
         <ChatModelBadge class="scp-head-model" :model="chat.primaryModel.value" />
         <div class="scp-header-actions">
-          <button type="button" class="scp-iconbtn" title="Hide chat (C)" @click="toggle">✕</button>
+          <button type="button" class="scp-iconbtn" title="Hide chat" @click="toggle">✕</button>
         </div>
       </header>
 

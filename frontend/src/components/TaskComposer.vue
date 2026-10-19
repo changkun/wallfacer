@@ -24,7 +24,6 @@ const mentions = useMentions({ setValue: (v) => { prompt.value = v; }, priorityP
 const submitting = ref(false);
 const expanded = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
 // Advanced fields.
 // Tag chips: committed tags + a pending draft. comma/Enter commit the draft;
@@ -65,7 +64,7 @@ const timeoutMin = computed<number | null>(() => {
   return Number(timeoutPreset.value);
 });
 
-const promptPlaceholder = `Describe the task… (Markdown, @ to mention files, ${modKey}↵ to save)`;
+const promptPlaceholder = 'Describe the task… (Markdown, @ to mention files)';
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
 const model = ref('');

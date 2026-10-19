@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useAgentStore } from '../stores/agentSession';
@@ -39,14 +39,13 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
 //
 // In three-pane mode the chat is a floating, draggable popup that overlays the
 // focused view (SpecChatPopup owns its own open/position/size persistence). The
-// page only needs a ref to toggle it (C shortcut, focused-view chat button) and
+// page only needs a ref to toggle it (the focused-view chat button) and
 // to forward Break Down sends. In chat-first mode the popup isn't mounted; the
 // full-width AgentChatPanel covers the empty-workspace case.
 //
 // Gates the three-pane agent chat: the floating popup, its focused-view
-// toggle button, and the C shortcut. Set false to hide chat in Plan mode
-// (the dedicated /chat surface is unaffected); true shows the popup launcher
-// in the bottom-right. The chat-first empty-workspace onboarding is unaffected
+// toggle button. Set false to hide chat in Plan mode;
+// true shows the popup launcher in the bottom-right. The chat-first empty-workspace onboarding is unaffected
 // either way (it's the only content when there are no specs).
 const AGENT_CHAT_ENABLED = true;
 
@@ -224,32 +223,6 @@ useSse({
     heartbeat() { /* keepalive */ },
   },
 });
-
-// ── Keyboard shortcut: C toggles chat ─────────────────────────────
-
-const focusedViewRef = ref<{ dispatchFocused: () => void; breakdownFocused: () => void } | null>(null);
-
-function onKeydown(ev: KeyboardEvent) {
-  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-  // Ignore when typing into a form field.
-  const t = ev.target as HTMLElement;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-  // c = toggle chat, d = dispatch focused spec, b = break it down (spec mode).
-  if (ev.key === 'c' || ev.key === 'C') {
-    if (!AGENT_CHAT_ENABLED || layout.value === 'chat-first') return;
-    ev.preventDefault();
-    toggleChat();
-  } else if (ev.key === 'd' || ev.key === 'D') {
-    ev.preventDefault();
-    focusedViewRef.value?.dispatchFocused();
-  } else if (ev.key === 'b' || ev.key === 'B') {
-    ev.preventDefault();
-    focusedViewRef.value?.breakdownFocused();
-  }
-}
-
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>
 
 <template>
@@ -313,7 +286,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
     </template>
     <SpecFocusedView
       v-if="layout === 'three-pane'"
-      ref="focusedViewRef"
+     
       :chat-visible="chatVisible"
       :chat-enabled="AGENT_CHAT_ENABLED"
       @toggle-chat="toggleChat"

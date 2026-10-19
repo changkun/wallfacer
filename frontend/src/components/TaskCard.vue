@@ -344,21 +344,6 @@ function onCardKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowUp')   { e.preventDefault(); focusSibling('prev'); return; }
   if (e.key === 'ArrowLeft') { e.preventDefault(); focusSibling('left'); return; }
   if (e.key === 'ArrowRight'){ e.preventDefault(); focusSibling('right'); return; }
-
-  // Per-status quick actions. Only fire when the action is in the matrix
-  // for this card's current status (e.g. "s" → start on backlog only).
-  if (e.key === 's' || e.key === 'd' || e.key === 'r' || e.key === 't' || e.key === 'p') {
-    const wanted: CardAction | null =
-      e.key === 's' ? 'start'
-        : e.key === 'd' ? 'done'
-        : e.key === 'r' ? (props.task.session_id && props.task.status === 'waiting' ? 'resume' : 'retry')
-        : e.key === 't' ? 'test'
-        : 'plan';
-    if (wanted && cardActionsFor(props.task).includes(wanted)) {
-      e.preventDefault();
-      void runCardAction(wanted, e);
-    }
-  }
 }
 </script>
 

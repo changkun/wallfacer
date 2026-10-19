@@ -3,7 +3,7 @@
 // in a chat surface's header. Sourced from the model the harness reports in its
 // init line; renders nothing until one has been observed. The raw model id
 // (with any context-variant suffix) is preserved on hover. Shared by the three
-// chat surfaces (ChatPage, AgentChatPanel, SpecChatPopup) so they stay in
+// chat surfaces (AgentChatPanel, SpecChatPopup) so they stay in
 // lockstep. The chat runtime is Claude-only today, so the harness is fixed.
 import { computed } from 'vue';
 import HarnessBadge from '../HarnessBadge.vue';

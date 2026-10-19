@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -933,7 +932,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Debug & monitoring.
 		"Health":            h.Health,
-		"GetSpanStats":      h.GetSpanStats,
 		"GetRuntimeStatus":  h.GetRuntimeStatus,
 		"BoardManifest":     h.BoardManifest,
 		"TaskBoardManifest": withID(h.TaskBoardManifest),
@@ -957,7 +955,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Spec tree.
 		"GetSpecTree":               h.GetSpecTree,
 		"SpecTreeStream":            h.SpecTreeStream,
-		"GetGraph":                  h.GetGraph,
 		"SpecTransition":            h.SpecTransition,
 		"StaleCandidates":           h.StaleCandidates,
 		"DismissAllStaleCandidates": h.DismissAllStaleCandidates,
@@ -992,10 +989,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateSystemPrompt": h.UpdateSystemPrompt,
 		"DeleteSystemPrompt": h.DeleteSystemPrompt,
 
-		// Whiteboard.
-		"GetWhiteboard": http.HandlerFunc(h.GetWhiteboard),
-		"PutWhiteboard": http.HandlerFunc(h.PutWhiteboard),
-
 		// File explorer.
 		"ExplorerTree":        h.ExplorerTree,
 		"ExplorerStream":      h.ExplorerStream,
@@ -1016,8 +1009,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"OpenFolder":       h.OpenFolder,
 
 		// Usage & statistics.
-		"GetUsageStats": h.GetUsageStats,
-		"GetStats":      h.GetStats,
 
 		// Task collection (no {id}).
 		"ListTasks":                h.ListTasks,
@@ -1058,7 +1049,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			h.ServeOutput(w, r, id, r.PathValue("filename"))
 		},
 
-		// Task span / oversight analytics.
+		// Task spans and oversight.
 		"GetTaskSpans": withID(h.GetTaskSpans),
 		"GetOversight": withID(h.GetOversight),
 
@@ -1069,7 +1060,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
-	// not listed here have no MaxBytesReader applied (e.g. GET, SSE, WebSocket).
+	// not listed here have no MaxBytesReader applied (e.g. GET, SSE).
 	bodyLimits := map[string]int64{
 		// Server configuration.
 		"UpdateConfig": handler.BodyLimitDefault,
@@ -1093,9 +1084,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// System prompt templates.
 		"UpdateSystemPrompt": handler.BodyLimitDefault,
-
-		// Whiteboard scene (allows embedded images, so larger than default).
-		"PutWhiteboard": handler.BodyLimitWhiteboard,
 
 		// Workspace browser.
 		"MkdirWorkspace":  handler.BodyLimitDefault,
@@ -1145,10 +1133,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		mux.Handle(route.FullPattern(), registered)
 	}
 
-	// WebSocket endpoint: interactive host terminal. Not in apicontract because
-	// WebSocket upgrades don't follow REST request/response semantics.
-	mux.HandleFunc("GET /api/terminal/ws", h.HandleTerminalWS)
-
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
@@ -1197,15 +1181,6 @@ func (w *statusResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
-}
-
-// Hijack delegates to the wrapped writer's Hijack if it implements http.Hijacker.
-// This is required for WebSocket upgrades through the logging middleware.
-func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if h, ok := w.ResponseWriter.(http.Hijacker); ok {
-		return h.Hijack()
-	}
-	return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
 }
 
 // skipTracing filters requests that must not produce a server span. The

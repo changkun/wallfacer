@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -166,7 +165,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		{http.MethodGet, "/", http.StatusOK},
 		{http.MethodGet, "/api/config", http.StatusOK},
 		{http.MethodGet, "/api/debug/health", http.StatusOK},
-		{http.MethodGet, "/api/debug/spans", http.StatusOK},
 		{http.MethodGet, "/api/debug/runtime", http.StatusOK},
 		{http.MethodGet, "/api/files", http.StatusOK},
 		{http.MethodGet, "/api/tasks", http.StatusOK},
@@ -513,49 +511,6 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?token=test-key", nil))
 	if !strings.Contains(rr.Body.String(), `"test-key"`) {
 		t.Fatalf("GET /?token=<key> (remote peer): expected injected key, got %q", rr.Body.String())
-	}
-}
-
-// TestStatusResponseWriter_HijackNotSupported verifies that Hijack returns an
-// error when the underlying writer doesn't implement http.Hijacker.
-func TestStatusResponseWriter_HijackNotSupported(t *testing.T) {
-	rr := httptest.NewRecorder()
-	sw := &statusResponseWriter{ResponseWriter: rr, status: http.StatusOK}
-
-	// httptest.ResponseRecorder does not implement Hijacker, so this should
-	// return an error about the underlying writer.
-	_, _, err := sw.Hijack()
-	if err == nil {
-		t.Fatal("expected error from Hijack on non-Hijacker writer")
-	}
-	if !strings.Contains(err.Error(), "does not implement http.Hijacker") {
-		t.Fatalf("unexpected error message: %v", err)
-	}
-}
-
-// fakeHijackWriter implements http.ResponseWriter and http.Hijacker for testing.
-type fakeHijackWriter struct {
-	http.ResponseWriter
-}
-
-func (f *fakeHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return nil, nil, nil
-}
-
-// TestStatusResponseWriter_HijackSupported verifies that Hijack delegates to
-// the underlying writer when it implements http.Hijacker.
-func TestStatusResponseWriter_HijackSupported(t *testing.T) {
-	rr := httptest.NewRecorder()
-	hw := &fakeHijackWriter{ResponseWriter: rr}
-	sw := &statusResponseWriter{ResponseWriter: hw, status: http.StatusOK}
-
-	conn, rw, err := sw.Hijack()
-	if err != nil {
-		t.Fatalf("expected no error from Hijack, got: %v", err)
-	}
-	// The fake returns nil for both.
-	if conn != nil || rw != nil {
-		t.Fatalf("expected nil conn and rw from fake hijacker")
 	}
 }
 

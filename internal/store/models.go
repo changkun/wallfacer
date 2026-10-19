@@ -27,8 +27,7 @@ type TaskUsage struct {
 
 // Add accumulates every field of other into u. Centralized so callers
 // can't accidentally drop one of the cache-token fields when summing
-// usage across tasks (a bug the per-bucket aggregations in
-// /api/stats used to have).
+// usage across tasks.
 func (u *TaskUsage) Add(other TaskUsage) {
 	u.InputTokens += other.InputTokens
 	u.OutputTokens += other.OutputTokens
@@ -425,7 +424,7 @@ type Tombstone struct {
 
 // TaskSummary is an immutable snapshot written exactly once when a task
 // transitions to TaskStatusDone. It captures the final cost, usage breakdown,
-// and key metadata so that analytics endpoints can avoid re-reading the full
+// and key metadata so that summary readers can avoid re-reading the full
 // task.json for completed tasks.
 type TaskSummary struct {
 	TaskID                   uuid.UUID                     `json:"task_id"`

@@ -20,23 +20,20 @@ Start here for the full reading order.
 ### Use Wallfacer
 
 - [Board](board.md). The task board: lifecycle, dependencies, batch creation, search, the task detail view.
-- [Chat](chat.md). The dedicated chat surface: sessions, slash commands, @mentions.
 - [Plan](plan.md). Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations.
-- [Whiteboard](whiteboard.md). The free-form drawing canvas.
 
 ### Operate
 
 - [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
-- [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, cost and usage analytics.
-- [Mission Control](mission-control.md). The unified spec and task graph, acting on the pipeline.
+- [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, per-task cost and usage.
 - [Workspaces](workspaces.md). Workspace management, git integration, branches.
-- [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference, keyboard shortcuts.
+- [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference.
 
 ## Common Workflows
 
 ### Plan mode workflow
 
-1. Sketch the idea in the agent chat (Plan mode, press **P**).
+1. Sketch the idea in the agent chat (Plan mode).
 2. Issue `/create` to scaffold a first draft.
 3. Refine with `/refine`, `/impact`, then `/validate`.
 4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.

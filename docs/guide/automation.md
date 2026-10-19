@@ -130,6 +130,5 @@ Triage guidance: transient categories usually clear themselves via auto-retry; r
 - [Board](board.md) for the task lifecycle these watchers drive.
 - [Plan](plan.md) for dispatching specs into the board tasks automation picks up.
 - [Oversight](oversight.md) for timelines, verdicts, and cost attribution.
-- [Mission Control](mission-control.md) for a pipeline-wide view of specs and tasks in flight.
 - [Configuration](configuration.md) for the full environment variable reference.
 - [Internals: automation](../internals/automation.md) for watcher design and the two-phase protocol.

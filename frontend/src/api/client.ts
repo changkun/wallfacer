@@ -54,7 +54,7 @@ export function authHeaders(): Record<string, string> {
 }
 
 // withAuthToken appends the server API key as a ?token= query parameter, used
-// by EventSource/WebSocket endpoints that cannot set an Authorization header.
+// by EventSource endpoints that cannot set an Authorization header.
 // It is a no-op when no key is configured.
 export function withAuthToken(url: string): string {
   const key = getServerApiKey();

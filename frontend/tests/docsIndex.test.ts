@@ -20,7 +20,7 @@ describe('docs index generation', () => {
 
   it('every reading-order slug resolves to a guide file, and vice versa', () => {
     const slugs = parseReadingOrder(usageMd).map((e) => e.slug);
-    expect(slugs.length).toBeGreaterThanOrEqual(10);
+    expect(slugs.length).toBeGreaterThanOrEqual(5);
     const files = readdirSync(resolve(root, 'docs/guide'))
       .filter((f) => f.endsWith('.md'))
       .map((f) => f.replace(/\.md$/, ''));

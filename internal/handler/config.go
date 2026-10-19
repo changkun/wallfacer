@@ -198,29 +198,27 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	resp := map[string]any{
-		"workspaces":                workspaces,
-		"workspace_id":              h.activeWorkspaceID(),
-		"workspace_browser_path":    workspaceBrowserPath,
-		"workspace_groups":          keyedGroups,
-		"prompts_dir":               promptsDir,
-		"sandbox_activities":        store.SandboxActivities,
-		"sandboxes":                 harness.All(),
-		"default_sandbox":           harness.Claude,
-		"sandbox_usable":            allSandboxesUsable(),
-		"sandbox_reasons":           map[string]string{},
-		"activity_sandboxes":        map[string]string{},
-		"autoimplement":             h.AutoimplementEnabled(),
-		"autotest":                  h.AutotestEnabled(),
-		"autosubmit":                h.AutosubmitEnabled(),
-		"autosync":                  h.AutosyncEnabled(),
-		"autopush":                  h.AutopushEnabled(),
-		"review":                    h.ReviewEnabled(),
-		"default_model":             "",
-		"payload_limits":            payloadLimits,
-		"watcher_health":            watcherHealth,
-		"active_groups":             h.activeGroupInfos(ctx),
-		"terminal_enabled":          true,
-		"agent_session_window_days": 30,
+		"workspaces":             workspaces,
+		"workspace_id":           h.activeWorkspaceID(),
+		"workspace_browser_path": workspaceBrowserPath,
+		"workspace_groups":       keyedGroups,
+		"prompts_dir":            promptsDir,
+		"sandbox_activities":     store.SandboxActivities,
+		"sandboxes":              harness.All(),
+		"default_sandbox":        harness.Claude,
+		"sandbox_usable":         allSandboxesUsable(),
+		"sandbox_reasons":        map[string]string{},
+		"activity_sandboxes":     map[string]string{},
+		"autoimplement":          h.AutoimplementEnabled(),
+		"autotest":               h.AutotestEnabled(),
+		"autosubmit":             h.AutosubmitEnabled(),
+		"autosync":               h.AutosyncEnabled(),
+		"autopush":               h.AutopushEnabled(),
+		"review":                 h.ReviewEnabled(),
+		"default_model":          "",
+		"payload_limits":         payloadLimits,
+		"watcher_health":         watcherHealth,
+		"active_groups":          h.activeGroupInfos(ctx),
 	}
 	if cfg == nil {
 		return resp
@@ -248,8 +246,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["sandbox_reasons"] = sandboxReasons
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
-	resp["terminal_enabled"] = cfg.TerminalEnabled
-	resp["agent_session_window_days"] = cfg.AgentSessionWindowDays
 	return resp
 }
 

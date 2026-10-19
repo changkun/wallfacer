@@ -6,21 +6,13 @@ export const NOT_FOUND_ROUTE = 'not-found';
 
 // needsWorkspace marks routes that render workspace-scoped data; App.vue
 // shows the WorkspaceRequired prompt for these when no workspace is visible,
-// so the board, plan/chat, analytics, etc. stay consistent with /api/config's
+// so the board and plan stay consistent with /api/config's
 // "no workspace" state. Settings, docs and the not-found page are
 // workspace-independent.
 export const routes: RouteRecordRaw[] = [
   { path: '/', component: () => import('./views/BoardPage.vue'), meta: { needsWorkspace: true } },
-  { path: '/analytics', component: () => import('./views/AnalyticsPage.vue'), meta: { needsWorkspace: true } },
-  // /chat is the dedicated chat surface; /plan is the spec-mode page (kept as
-  // "Plan" in the UI for non-technical friendliness — the route is unchanged).
-  { path: '/chat', component: () => import('./views/ChatPage.vue'), meta: { needsWorkspace: true } },
+  // /plan is the spec-mode page, named "Plan" in the UI.
   { path: '/plan', component: () => import('./views/PlanPage.vue'), meta: { needsWorkspace: true } },
-  { path: '/whiteboard', component: () => import('./views/WhiteboardPage.vue'), meta: { needsWorkspace: true } },
-  // The pipeline graph surface, renamed "Mission Control" in the UI; the
-  // MapPage.vue component keeps its filename to avoid churn. /map redirects.
-  { path: '/mission', component: () => import('./views/MapPage.vue'), meta: { needsWorkspace: true } },
-  { path: '/map', redirect: '/mission', meta: { needsWorkspace: true } },
   { path: '/settings', component: () => import('./views/SettingsPage.vue') },
   { path: '/docs', component: () => import('./views/LocalDocsPage.vue') },
   { path: '/docs/:slug(.*)', component: () => import('./views/LocalDocsPage.vue') },

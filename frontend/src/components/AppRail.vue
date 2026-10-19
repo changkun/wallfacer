@@ -12,7 +12,7 @@ import { useTaskStore } from '../stores/tasks';
 import { useUiStore } from '../stores/ui';
 import { derivePresence } from '../lib/presence';
 import { hasUnseen } from '../lib/unread';
-import { NAV_GROUPS, activeNavId, type NavItem } from '../lib/nav';
+import { NAV_GROUPS, activeNavId } from '../lib/nav';
 
 const props = defineProps<{
   collapsed: boolean;
@@ -50,9 +50,6 @@ onMounted(() => { if (route.path === '/') markBoardSeen(); });
 
 const activeId = computed(() => activeNavId(route.path));
 
-function onAction(item: NavItem) {
-  if (item.id === 'terminal') ui.toggleTerminal();
-}
 function onNavigate() {
   // A tap on a drawer row closes the drawer; a click on the desktop rail is a no-op.
   ui.closeRail();
@@ -99,7 +96,7 @@ function onNavigate() {
     <button
       type="button"
       class="rail-search"
-      title="Search or command (⌘K)"
+      title="Search or command"
       aria-label="Search or command"
       @click="emit('palette')"
     >
@@ -108,7 +105,6 @@ function onNavigate() {
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
       </svg>
       <span class="rail-search-label">Search or command</span>
-      <kbd class="key rail-search-hint">⌘K</kbd>
     </button>
 
     <nav class="rail-nav" aria-label="Sections">
@@ -117,7 +113,6 @@ function onNavigate() {
           <div v-if="group.label" class="eyebrow rail-eyebrow">{{ group.label }}</div>
           <template v-for="item in group.items" :key="item.id">
             <RouterLink
-              v-if="item.to"
               :to="item.to"
               class="nav-btn"
               :class="{ active: activeId === item.id }"
@@ -131,19 +126,6 @@ function onNavigate() {
               <span v-if="item.id === 'board' && boardCount > 0" class="count nav-count" :title="`${store.inProgress.length} running, ${store.waiting.length} waiting`">{{ boardCount }}</span>
               <span v-else-if="item.id === 'board' && boardUnread && activeId !== 'board'" class="nav-dot" aria-label="New tasks" />
             </RouterLink>
-            <button
-              v-else
-              type="button"
-              class="nav-btn"
-              :class="{ on: item.id === 'terminal' && ui.showTerminal }"
-              :aria-pressed="item.id === 'terminal' ? ui.showTerminal : undefined"
-              :title="collapsed ? item.label : undefined"
-              :data-nav="item.id"
-              @click="onAction(item)"
-            >
-              <span class="nav-ico"><NavIcon :name="item.icon" /></span>
-              <span class="nav-label">{{ item.label }}</span>
-            </button>
           </template>
         </div>
       </template>

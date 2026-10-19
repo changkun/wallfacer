@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api } from '../api/client';
 import { useTaskStore } from '../stores/tasks';
@@ -429,27 +429,7 @@ function onOverlayClick(e: MouseEvent) {
   if (e.target === e.currentTarget) close();
 }
 
-function globalToggle(e: KeyboardEvent) {
-  if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) {
-    const tag = (document.activeElement?.tagName || '').toUpperCase();
-    const editable =
-      document.activeElement instanceof HTMLElement &&
-      document.activeElement.isContentEditable;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || editable) {
-      // Allow toggle from anywhere when our own palette input is focused.
-      if (!props.modelValue) return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    emit('update:modelValue', !props.modelValue);
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', globalToggle, true);
-});
 onUnmounted(() => {
-  window.removeEventListener('keydown', globalToggle, true);
   if (serverTimer) clearTimeout(serverTimer);
 });
 </script>
@@ -475,7 +455,6 @@ onUnmounted(() => {
             placeholder="Search tasks, specs, docs, or a task id"
             autocomplete="off"
           />
-          <kbd class="key">esc</kbd>
         </div>
         <div class="command-palette-results">
           <template v-if="sections.length">
@@ -592,11 +571,6 @@ onUnmounted(() => {
           <div v-if="!sections.length && !specMatches.length && !docMatches.length" class="command-palette-empty">
             {{ query.trim() ? 'No matches' : 'No tasks yet' }}
           </div>
-        </div>
-        <div class="command-palette-foot" aria-hidden="true">
-          <span><kbd class="key">↑</kbd><kbd class="key">↓</kbd> move</span>
-          <span><kbd class="key">↵</kbd> open</span>
-          <span><kbd class="key">esc</kbd> close</span>
         </div>
       </div>
     </div>

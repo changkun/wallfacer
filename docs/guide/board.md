@@ -55,7 +55,7 @@ When a task fails, the failure is categorized: `timeout`, `budget_exceeded`, `wo
 
 ## Creating tasks
 
-Click **+ New Task** in the Backlog header, or press **n** anywhere on the board. The composer offers:
+Click **+ New Task** in the Backlog header. The composer offers:
 
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
@@ -100,7 +100,7 @@ Full per-state action availability in the detail view:
 
 The **Depends on** picker (in the composer's More section and the backlog Edit panel) declares prerequisite tasks. A task with unmet dependencies is not promoted by automation even when capacity is free: promotion requires every dependency to be `done`, the scheduled time (if any) to have passed, and a free parallel slot.
 
-Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status. The cross-task dependency graph is visualized on [Mission Control](mission-control.md), not on the board itself.
+Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status.
 
 ## Scheduled tasks
 
@@ -108,11 +108,11 @@ Set **Schedule start** in the backlog Edit panel to defer a task to a future dat
 
 ## Search and filtering
 
-The header search bar filters visible cards live by title, prompt, and tags. Use `#tagname` to filter by tag. Press `/` to focus the bar, Escape to clear. Prefixing a query with `@` hands it to the command palette's server-side search, which covers all tasks (including archived) by title, prompt, tags, and oversight summaries.
+The header search bar filters visible cards live by title, prompt, and tags. Use `#tagname` to filter by tag. Escape clears it. Prefixing a query with `@` hands it to the command palette's server-side search, which covers all tasks (including archived) by title, prompt, tags, and oversight summaries.
 
 ## Command palette
 
-Press **Cmd+K** (Ctrl+K) to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
+Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
 
 - Backlog: **Plan** (open task-mode chat in Plan), **Start**
 - Waiting: **Resume** (with session), **Test**, **Done**, **Sync**
@@ -151,7 +151,7 @@ and marks the task failed so it can be retried after storage is repaired.
 
 ### Inline diff comments
 
-While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box (Cmd+Enter saves). Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
+While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box. Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input. On a hosted deployment (`WALLFACER_CLOUD`), reviewing requires a signed-in account; a local instance offers it signed in or not.
 
 ### Verification and Review
 
@@ -161,7 +161,7 @@ The **Test** action launches a separate verification agent against the task's wo
 
 ### Timeline
 
-The **Timeline** tab renders every recorded span (worktree setup, agent turns, commits) as a Gantt-style flamegraph with idle time compressed, plus a detail table. Aggregated timing lives on the Analytics page; see [Oversight](oversight.md).
+The **Timeline** tab renders every recorded span (worktree setup, agent turns, commits) as a Gantt-style flamegraph with idle time compressed, plus a detail table.
 
 ## Automation menu
 
@@ -190,10 +190,8 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 ## See also
 
 - [Plan](plan.md): author and dispatch specs that become board tasks
-- [Chat](chat.md): conversational planning with the same agent engine
-- [Mission Control](mission-control.md): the combined spec and task dependency graph
 - [Automation](automation.md): watchers, retry budgets, and circuit breakers
-- [Oversight](oversight.md): summaries, usage, cost, and timing analytics
+- [Oversight](oversight.md): summaries, usage, cost, and timing
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings
 - [Configuration](configuration.md): environment variables and settings tabs
 - [API & Transport internals](../internals/api-and-transport.md): the HTTP API behind every board action

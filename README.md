@@ -94,7 +94,7 @@ graph LR
 
 Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one. Specs move through a seven-state lifecycle (`vague` to `drafted` to `validated` to `testing` to `complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
 
-Read more: [Concepts](docs/guide/concepts.md), [Plan](docs/guide/plan.md), and [Chat](docs/guide/chat.md).
+Read more: [Concepts](docs/guide/concepts.md) and [Plan](docs/guide/plan.md).
 
 ## How execution is structured
 
@@ -125,22 +125,20 @@ Inspect what happened, when, and why before you accept any automated output. Eve
 
 ### Cost and usage visibility
 
-![Usage and cost breakdown](./assets/usage.png)
-
-Track token usage and cost by task, activity, and turn, so operations stay measurable as automation scales. The per-activity breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
+Each task records token usage and cost per turn and per activity (implementation, testing, oversight), shown in its detail view, so you can see where budget goes.
 
 ## Capability Stack
 
 - **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
 - **Spec.** Seven-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
 - **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
-- **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
+- **Code.** File explorer with editor, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
 ## Roadmap
 
 Wallfacer is a local tool: a task board on one machine over the coding-agent CLIs installed there. The current program is a cleanup that keeps that shape and removes what it no longer needs ([`specs/shared/pure-local.md`](specs/shared/pure-local.md)). See [`specs/README.md`](specs/README.md) for the full spec index.
 
-**Foundations** (complete): Execution backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
+**Foundations** (complete): Execution backend interface, storage backend interface, file explorer, multi-workspace groups, Windows support.
 
 **Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection) is complete. Designed and unbuilt: file and image attachments on task prompts, host path references, scoped slash commands, a terminal UI, internal consolidation, and task revert.
 
@@ -162,19 +160,16 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 | Guide | Topics |
 |-------|--------|
 | [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
-| [Chat](docs/guide/chat.md) | Chat sessions, slash commands, @mentions |
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
-| [Whiteboard](docs/guide/whiteboard.md) | Free-form drawing canvas per workspace |
 
 **Operate**
 
 | Guide | Topics |
 |-------|--------|
 | [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers |
-| [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, analytics |
-| [Mission Control](docs/guide/mission-control.md) | Unified spec and task graph, acting on the pipeline |
+| [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, usage |
 | [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |
-| [Configuration](docs/guide/configuration.md) | Settings, env vars, harnesses, CLI, shortcuts |
+| [Configuration](docs/guide/configuration.md) | Settings, env vars, harnesses, CLI |
 
 **Build On (Internals)** is the deep reference for how the system works. Start at **[Technical Internals](docs/internals/internals.md)**.
 
@@ -184,7 +179,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, spec document model |
 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
-| [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
+| [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, middleware |
 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers |
 | [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |

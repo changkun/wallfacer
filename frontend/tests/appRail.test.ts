@@ -56,7 +56,7 @@ describe('AppRail', () => {
     const board = host.querySelector('[data-nav="board"]')!;
     expect(board.classList.contains('active')).toBe(true);
     expect(board.getAttribute('aria-current')).toBe('page');
-    expect(host.querySelector('.nav-label')!.textContent).toBe('Chat');
+    expect(host.querySelector('.nav-label')!.textContent).toBe('Plan');
     app.unmount(); host.remove();
   });
 

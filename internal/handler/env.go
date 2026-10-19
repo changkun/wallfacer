@@ -455,7 +455,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
 		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
 		AutoPushThreshold    *int                                 `json:"auto_push_threshold"`
-		TerminalEnabled      *bool                                `json:"terminal_enabled"`
 	}](w, r)
 	if !ok {
 		return
@@ -556,15 +555,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		autoPushThreshold = &s
 	}
 
-	var terminalEnabled *string
-	if req.TerminalEnabled != nil {
-		v := "false"
-		if *req.TerminalEnabled {
-			v = "true"
-		}
-		terminalEnabled = &v
-	}
-
 	// Validate the base URL if provided to prevent SSRF.
 	if req.BaseURL != nil && *req.BaseURL != "" {
 		if err := validateBaseURL(*req.BaseURL); err != nil {
@@ -606,7 +596,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPush:             autoPush,
 		AutoPushThreshold:    autoPushThreshold,
-		TerminalEnabled:      terminalEnabled,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return

@@ -2,14 +2,13 @@
 // topbar's crumb, so a destination is named the same way in both places.
 
 export type NavIcon =
-  | 'chat' | 'plan' | 'whiteboard' | 'board'
-  | 'map' | 'terminal' | 'analytics' | 'docs' | 'settings';
+  | 'plan' | 'board' | 'docs' | 'settings';
 
 export interface NavItem {
   id: string;
   label: string;
-  /** Route path; absent for an action row (terminal). */
-  to?: string;
+  /** Route path. */
+  to: string;
   icon: NavIcon;
 }
 
@@ -24,18 +23,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Workspace',
     items: [
-      { id: 'chat', label: 'Chat', to: '/chat', icon: 'chat' },
       { id: 'plan', label: 'Plan', to: '/plan', icon: 'plan' },
-      { id: 'whiteboard', label: 'Whiteboard', to: '/whiteboard', icon: 'whiteboard' },
       { id: 'board', label: 'Board', to: '/', icon: 'board' },
-      { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },
-    ],
-  },
-  {
-    label: 'Inspect',
-    items: [
-      { id: 'terminal', label: 'Terminal', icon: 'terminal' },
-      { id: 'analytics', label: 'Analytics', to: '/analytics', icon: 'analytics' },
     ],
   },
   {
@@ -48,13 +37,12 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 // activeNavId maps a route path to the nav row it belongs to. `/` is the
-// board; `/docs/...` stays on Docs; `/map` is the Mission Control alias. A
-// path no row owns yields an id that matches no row.
+// board; `/docs/...` stays on Docs. A path no row owns yields an id that
+// matches no row.
 export function activeNavId(path: string): string {
   path = path.split('?')[0].split('#')[0];
   if (path === '/') return 'board';
   if (path.startsWith('/docs')) return 'docs';
-  if (path.startsWith('/mission') || path.startsWith('/map')) return 'map';
   return path.slice(1).split('/')[0];
 }
 

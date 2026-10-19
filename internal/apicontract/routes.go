@@ -34,11 +34,6 @@ var Routes = []Route{
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/debug/spans", Name: "GetSpanStats",
-		Description: "Aggregate span timing statistics across all tasks.",
-		Tags:        []string{"debug"},
-	},
-	{
 		Method: http.MethodGet, Pattern: "/api/debug/runtime", Name: "GetRuntimeStatus",
 		Description: "Live server internals: pending goroutines, memory, task states, containers.",
 		Tags:        []string{"debug"},
@@ -134,11 +129,6 @@ var Routes = []Route{
 		Method: http.MethodGet, Pattern: "/api/specs/stream", Name: "SpecTreeStream",
 		Description: "SSE stream of spec tree change notifications.",
 		Tags:        []string{"specs", "sse"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/graph", Name: "GetGraph",
-		Description: "Get the unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for the Map.",
-		Tags:        []string{"specs", "tasks"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/specs/stale-candidates", Name: "StaleCandidates",
@@ -280,19 +270,6 @@ var Routes = []Route{
 		Tags:        []string{"system-prompts"},
 	},
 
-	// --- Whiteboard ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/whiteboard", Name: "GetWhiteboard",
-		Description: "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
-		Tags:        []string{"whiteboard"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/whiteboard", Name: "PutWhiteboard",
-		Description: "Save the active workspace's whiteboard scene JSON.",
-		Tags:        []string{"whiteboard"},
-	},
-
 	// --- Git workspace operations ---
 
 	{
@@ -342,17 +319,6 @@ var Routes = []Route{
 	},
 
 	// --- Usage & statistics ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/usage", Name: "GetUsageStats",
-		Description: "Aggregated token and cost usage statistics.",
-		Tags:        []string{"stats"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/stats", Name: "GetStats",
-		Description: "Task status and workspace cost statistics. Optional ?workspace=<repo-root-path> restricts aggregation to tasks for that workspace (400 if no tasks match).",
-		Tags:        []string{"stats"},
-	},
 
 	// --- Task collection (no {id}) ---
 

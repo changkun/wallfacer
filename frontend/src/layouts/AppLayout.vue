@@ -8,8 +8,6 @@ import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import WorkspaceEditModal from '../components/WorkspaceEditModal.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
-import DockWorkspace from '../components/DockWorkspace.vue';
-import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import Toaster from '../components/Toaster.vue';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
@@ -17,7 +15,6 @@ import { useSse } from '../composables/useSse';
 import { useTaskStore } from '../stores/tasks';
 import { useWorkspacesStore } from '../stores/workspaces';
 import { useUiStore } from '../stores/ui';
-import { useKeyboard } from '../composables/useKeyboard';
 import { getStored, setStored } from '../lib/storage';
 import { shouldRefetchOnVisible } from '../lib/visibility';
 import type { Task } from '../api/types';
@@ -37,7 +34,7 @@ watch(sidebarCollapsed, (v) => setStored(SIDEBAR_KEY, v ? '1' : '0'));
 // triggered from any tab (board, agents, flows, …). The dedicated Chat tab and
 // the Plan view own their own chat surface, so the global popup stands down on
 // those routes to avoid two chat sessions racing on the shared agent store.
-const CHAT_OWNING_ROUTES = ['/chat', '/plan'];
+const CHAT_OWNING_ROUTES = ['/plan'];
 const showChatPopup = computed(() =>
   !CHAT_OWNING_ROUTES.some((p) => router.currentRoute.value.path.startsWith(p)),
 );
@@ -141,22 +138,6 @@ watch(connected, (now) => {
     disconnectTimer = null;
   }, 1000);
 });
-
-useKeyboard({
-  onSearch: () => { ui.showPalette = true; },
-  onFocusSearch: () => document.querySelector<HTMLInputElement>('.task-search-input')?.focus(),
-  onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
-  onSettings: () => { void router.push('/settings'); },
-  onTerminal: () => { ui.toggleTerminal(); },
-  onShortcuts: () => { ui.openShortcuts(); },
-  onExplorer: () => {
-    // The explorer is an in-board panel now; jump to the board first if we're
-    // on another route, then toggle it.
-    if (router.currentRoute.value.path === '/') ui.toggleExplorer();
-    else { void router.push('/'); ui.openExplorer(); }
-  },
-  onToggleMode: () => { void router.push(router.currentRoute.value.path.startsWith('/plan') ? '/' : '/plan'); },
-});
 </script>
 
 <template>
@@ -181,15 +162,16 @@ useKeyboard({
         <span aria-hidden="true">⚠</span>
         Live updates paused — server unreachable. Reconnecting…
       </div>
-      <DockWorkspace>
-        <slot :connected="connected" :conn-state="connState" />
-      </DockWorkspace>
+      <div class="app-page">
+        <div class="app-page__body">
+          <slot :connected="connected" :conn-state="connState" />
+        </div>
+      </div>
     </div>
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
     <WorkspaceEditModal v-if="ui.editWorkspaceId" />
     <SystemPromptsManager v-model="ui.showSystemPrompts" />
-    <KeyboardShortcutsModal v-model="ui.showShortcuts" />
     <ConfirmDialog />
     <Toaster />
     <SpecChatPopup v-if="showChatPopup" />
@@ -241,9 +223,24 @@ useKeyboard({
 }
 /* Everything under the topbar scrolls as one column when a page spills past
  * the viewport; height-constrained pages own their scroll and never overflow. */
-.app-main > :deep(.dock-ws) {
+.app-page {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
   overflow-y: auto;
   overflow-x: hidden;
+}
+/* The page itself: a column that fills the card under the topbar. */
+.app-page__body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .rail-scrim {
   display: none;

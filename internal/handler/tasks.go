@@ -46,7 +46,7 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 
 // ListSummaries returns all immutable task summaries (one per completed task).
 // Unlike ListTasks, it reads summary.json files directly without loading the
-// full task.json, making it efficient for cost dashboards and analytics.
+// full task.json, making it efficient for external cost dashboards.
 // Tasks that completed before summary.json was introduced are omitted.
 func (h *Handler) ListSummaries(w http.ResponseWriter, _ *http.Request) {
 	s, ok := h.requireStore(w)

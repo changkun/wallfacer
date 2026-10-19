@@ -1,6 +1,6 @@
-# Oversight and Analytics
+# Oversight
 
-Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and workspace-level cost and timing analytics. This guide covers each surface, from a single task's oversight summary to the Prometheus endpoint for external monitoring.
+Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and per-task cost and timing. This guide covers each surface, from a single task's oversight summary to the Prometheus endpoint for external monitoring.
 
 ## Oversight summaries
 
@@ -81,38 +81,20 @@ A filter box above the rows narrows the transcript to matching entries. The brow
 
 The **Changes** tab shows the task's diff against the default branch. While a task is waiting for review, the diff supports an inline comment flow:
 
-1. Click the gutter button on a line to open a comment box anchored beneath it. Press Cmd/Ctrl+Enter to save, Escape to cancel.
+1. Click the gutter button on a line to open a comment box anchored beneath it, then **Save** or **Cancel**.
 2. Add as many comments as needed, across any number of files. Lines with comments show a filled gutter marker.
 3. The **Review comments** panel collects all comments grouped by file, each editable and deletable, alongside an optional general feedback field. Click a line reference to scroll back to the anchored diff line.
 4. Click **Submit** to send everything as one batched feedback message. Comments are serialized with their file and line anchors so the agent can locate each one, and the task resumes with the feedback.
 
-## Analytics
+## Usage records
 
-Open **Analytics** from the sidebar (or navigate to `/analytics`). The page has three tabs; the active tab is kept in the URL, so views can be bookmarked.
-
-![Analytics page with cost tiles, daily spend chart, and per-activity tables](images/analytics.png)
-
-### Usage
-
-Token and cost accounting over a selectable period (last 7, 30, or 90 days, or all time): total cost and task count, plus **By Status** and **By Sub-Agent** tables. Sub-agents cover implementation, test, refinement, title generation, oversight, testing oversight, and agent sessions.
-
-### Tokens & cost
-
-The cost dashboard: summary tiles for total cost, input, output, and cache tokens; a daily spend chart over the last 30 days; tables by status, by activity, and by workspace; agent-session usage with a trend sparkline; and the top 10 tasks by cost, each clickable to open the task.
-
-Numbers for completed tasks come from immutable task summaries: snapshots written exactly once when a task reaches done, covering final cost, per-activity usage, duration, and turn count. The summaries are also served directly for external dashboards:
+Numbers for completed tasks come from immutable task summaries: snapshots written exactly once when a task reaches done, covering final cost, per-activity usage, duration, and turn count. The summaries are served for external dashboards:
 
 ```
 GET /api/tasks/summaries
 ```
 
-### Execution timing
-
-Per-phase latency aggregated across all tasks: completed and failed counts, success rate, median and P95 execution time, a daily-completions chart, and a per-phase table (worktree setup, agent turn, harness run, commit pipeline) with min, median, mean, P95, P99, and max durations. Duration cells are color-coded: green under 5 seconds, amber between 5 and 30 seconds, red over 30 seconds.
-
-### Per-turn usage
-
-For granular analysis, each task exposes one usage record per turn, including token counts, cost, stop reason, harness, and sub-agent:
+Each task also exposes one usage record per turn, including token counts, cost, stop reason, harness, and sub-agent:
 
 ```
 GET /api/tasks/{id}/turn-usage

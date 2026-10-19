@@ -1,42 +1,5 @@
 export type TaskStatus = 'backlog' | 'in_progress' | 'waiting' | 'committing' | 'done' | 'failed' | 'cancelled';
 
-// --- Unified spec+task graph (GET /api/graph) ---
-// Mirrors internal/graph.Graph. The Map renders and drives this.
-
-export type GraphNodeKind = 'spec' | 'task';
-export type GraphEdgeKind = 'containment' | 'dispatch' | 'spec_dep' | 'task_dep';
-export type GraphAction =
-  | 'dispatch'
-  | 'undispatch'
-  | 'validate'
-  | 'force-complete'
-  | 'unstale'
-  | 'unarchive'
-  | 'start';
-
-export interface GraphNode {
-  id: string; // "spec:<path>" or "task:<uuid>"
-  kind: GraphNodeKind;
-  label: string;
-  status: string; // spec lifecycle or task status
-  ref: string; // spec path or task id, for deep-jumps + actions
-  depth: number;
-  available_actions?: GraphAction[];
-}
-
-export interface GraphEdge {
-  from: string;
-  to: string;
-  kind: GraphEdgeKind;
-}
-
-export interface Graph {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  critical_path: string[];
-  blocked: string[];
-}
-
 export interface TaskUsage {
   input_tokens: number;
   output_tokens: number;
@@ -226,7 +189,6 @@ export interface ServerConfig {
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
   sandbox_usable?: Record<string, boolean>;
   default_sandbox: string;
-  terminal_enabled: boolean;
   ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }

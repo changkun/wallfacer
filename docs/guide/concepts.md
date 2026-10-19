@@ -6,7 +6,7 @@ Most AI coding tools pin work to one interaction mode: a chatbot that needs cons
 
 ### Chat: conversational exploration
 
-The [Chat](chat.md) page runs a persistent agent session against the active workspace. Describe a problem, explore trade-offs, and let the agent read code and answer questions before anything is committed to a plan. Sessions stream live, survive reloads, and can be reattached or retried. This is the entry point when the shape of the work is still unknown.
+The chat runs a persistent agent session against the active workspace, from the chat popup on any page or from [Plan](plan.md), which opens as a full chat when the workspace has no specs yet. Describe a problem, explore trade-offs, and let the agent read code and answer questions before anything is committed to a plan. Sessions stream live, survive reloads, and can be reattached or retried. This is the entry point when the shape of the work is still unknown.
 
 ### Plan: structured design
 
@@ -18,7 +18,7 @@ The [Board](board.md) is where most day-to-day work happens. Each card is a conc
 
 ### Autopilot: automation
 
-With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md) and [Mission Control](mission-control.md).
+With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md).
 
 The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing automated task can be pulled down to manual review, debugged in the built-in terminal, and resumed with feedback.
 
@@ -85,14 +85,14 @@ A sixth, separate toggle enables **Review**, where a second model reviews the ch
 Work flows up and down the spectrum:
 
 - **Up (more autonomy):** a chat conversation produces a spec; the spec is broken into tasks; tasks execute and verify automatically.
-- **Down (more control):** a failing task surfaces a problem; inspect the diff, open the terminal in the worktree, fix the issue by hand, and let the agent continue from the corrected state.
+- **Down (more control):** a failing task surfaces a problem; inspect the diff, fix the issue by hand in the task's worktree, and let the agent continue from the corrected state.
 
 The value of the spectrum is spending attention where it matters and delegating the rest.
 
 ## See also
 
 - [Getting Started](getting-started.md): installation and the first task
-- [Board](board.md), [Chat](chat.md), [Plan](plan.md): the three main working surfaces
+- [Board](board.md) and [Plan](plan.md): the two main working surfaces
 - [Automation](automation.md): the autopilot level
-- [Configuration](configuration.md): settings, environment variables, shortcuts
+- [Configuration](configuration.md): settings and environment variables
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

@@ -9,7 +9,6 @@ flowchart TB
   subgraph UI["Browser UI"]
     ModePlan["PlanPage.vue"]
     Explorer["SpecTreePanel.vue"]
-    Minimap["MapPage.vue"]
     Chat["AgentChatPanel.vue"]
   end
   subgraph Server
@@ -364,7 +363,6 @@ The Plan Mode UI lives in the Vue SPA under `frontend/src/`:
 
 - `views/PlanPage.vue` + `components/plan/SpecFocusedView.vue`, layout state machine. Toggles between the three-pane (tree + focused spec + chat) and chat-first layouts; preserves the focused spec across refresh via the `?spec=<path>` query string on the `/plan` route.
 - `components/plan/SpecTreePanel.vue`, tree rendering. Groups roots by track, pins the roadmap entry when `TreeResponse.Index` is present, and draws status badges and per-spec progress indicators using `TreeResponse.Progress`.
-- `views/MapPage.vue`, dependency DAG map. Renders the `depends_on` graph using the adjacency data from `TreeResponse`.
 - `components/plan/AgentChatPanel.vue`, chat pane. Streams `GET /api/agent/messages/stream` responses, handles slash-command autocomplete against `GET /api/agent/commands`, renders the session tab bar, queues user messages as chips while the agent is busy, and wires the interrupt and undo buttons to their respective endpoints.
 
 These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/stream`) and the session CRUD endpoints (`/api/agent/sessions`) to stay in sync with server-side state.
@@ -375,4 +373,3 @@ These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/
 - [Data & Storage](data-and-storage.md)
 - [API & Transport](api-and-transport.md)
 - [Plan](../guide/plan.md)
-- [Chat](../guide/chat.md)
