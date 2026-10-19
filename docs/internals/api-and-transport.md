@@ -21,7 +21,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
-| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits). `chat_sandboxes` lists the harnesses the chat runtime can launch, a subset of `sandboxes` without the in-process ones. |
+| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits). |
 | `PUT /api/config` | Update server configuration (autoimplement, autotest, autosubmit, harness assignments) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
@@ -83,7 +83,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
 | `POST /api/tasks/{id}/review` | Run one review round for a waiting task, whatever the review toggle says; 400 with code `review_no_worktree` for a task without a worktree, 409 while a round is in flight |
 | `GET /api/tasks/{id}/review/transcript` | The task's newest review session: `rounds` (each with the reviewer's answer, failed attempts, the feedback sent and the task's reply), `outcome` once the session ended (termination, open findings, headline, tokens, skip reason), the current `config`, and `running` from the in-flight set. `legacy: true` with empty `rounds` for a session the earlier debate engine recorded. `truncated: true` when the transcript could not be read to its end (an I/O error, or a record over the line cap in `internal/review/record.go`); `rounds` then holds the rounds before that point, and the server logs the error |
-| `GET /api/tasks/{id}/trace` | Agent trace graph recorded by a run on the in-process topos harness |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |
@@ -96,7 +95,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/auth/{provider}/status` | Poll flow status; returns `{state, error?}` |
 | `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
-| `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk. In cloud mode it requires the `platform_admin` role; a local instance gates it with the server key like every other route |
+| `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
 | **Spec tree & graph** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
@@ -104,12 +103,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/specs/stale-candidates` | List specs flagged as potentially stale by the drift pipeline |
 | `POST /api/specs/dismiss-stale-candidates` | Dismiss all pending stale-candidate flags |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |
-| **Spec comments & coordination** | |
-| `GET /api/spec-comments` | List inline spec comment threads |
-| `POST /api/spec-comments` | Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection; the coordinator is authoritative and echoes the result over SSE |
-| `GET /api/spec-comments/stream` | SSE: spec comment updates |
-| `GET /api/coordination/status` | Report whether the coordination opt-in is enabled (and available) |
-| `POST /api/coordination/opt-in` | Flip the coordination opt-in (the data-boundary gate). Body `{enabled}` |
 | **Whiteboard** | |
 | `GET /api/whiteboard` | Read the per-workspace whiteboard document |
 | `PUT /api/whiteboard` | Write the per-workspace whiteboard document (dedicated body limit) |
@@ -118,7 +111,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/agent` | Start the agent session (idempotent) |
 | `DELETE /api/agent` | Stop the agent session |
 | `GET /api/agent/messages` | Retrieve conversation history. `?thread=<id>` selects the session; defaults to the active session. |
-| `POST /api/agent/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the session. Body `harness` selects the harness for the turn (empty or unknown means the default). A harness the chat runtime cannot launch (`agentsession.Launchable` false: the in-process `topos`) answers 422 `harness_unavailable_in_chat` before the message is stored. |
+| `POST /api/agent/messages` | Send user message (triggers agent execution). Body `thread` field (or `?thread=`) selects the session. Body `harness` selects the harness for the turn (empty or unknown means the default). |
 | `DELETE /api/agent/messages` | Clear a session's conversation history and resume state (`?thread=<id>`). |
 | `GET /api/agent/messages/stream` | Stream agent response tokens for the in-flight session. Returns 204 when `?thread=<id>` does not match the session that owns the exec. |
 | `POST /api/agent/messages/interrupt` | Interrupt current agent turn. `?thread=<id>` must match the in-flight session or 409. |
@@ -130,19 +123,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/agent/sessions` | Create a new session. Body `{name?}`; omitted name auto-generates `Chat N`. |
 | `PATCH /api/agent/sessions/{id}` | Mutate a session. Body `{name}` renames; `{state}` transitions it; `archived` hides it from the tab bar (409 if in-flight), `visible` restores it, `active` records the UI's active session. |
 | `DELETE /api/agent/sessions/{id}` | Delete a session and its stored conversation |
-| **Principal & sign-in** (available by default against `auth.latere.ai`; `WALLFACER_CLOUD=true` only forces login, anonymous local use stays first-class) | |
-| `GET /login` | Begin the hosted sign-in flow. Answers 503 with the error `redirect_sign_in_unavailable` on an instance bound to a port its default redirect URL does not name; the org switch below answers the same error there, before clearing the session |
-| `GET /callback` | OAuth2 authorization-code callback; sets the session cookie |
-| `GET /logout` | Clear the session cookie and redirect to the sign-in page |
-| `GET /logout/notify` | Front-channel logout: clear the local cookie when the user signs out centrally |
-| `GET /api/me` | Return the current principal (user + active org), or 204 when unauthenticated |
-| `GET /api/auth/orgs` | List the user's organizations; 204 when single-org or unauthenticated |
-| `PATCH /api/auth/me` | Mutate the signed-in principal (currently only `org_id`); clears the session and redirects to `/login?org_id=<target>` to switch the active organization |
-| `POST /api/me/switch-org` | Switch the active organization (latere-ui session convention); validates membership, clears the session, returns `{redirect}` to `/login?org_id=<target>` |
-| **Local device-code sign-in** (RFC 8628; local mode) | |
-| `POST /api/auth/device/start` | Start a device-code flow; returns the user code and verification URI |
-| `GET /api/auth/device/poll` | Poll the in-flight flow; returns `{status: idle\|pending\|done\|denied\|expired}`. The `done` response also sets the session cookie (minted from the issued token via `oidc.SessionFromToken`), so a subsequent `/api/me` reflects the sign-in. |
-| `POST /api/auth/device/cancel` | Cancel the in-flight device-code flow |
 
 ### Triggering Task Execution
 
@@ -160,21 +140,17 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 
 | Method + Path | Purpose |
 |---|---|
-| `GET /api/terminal/ws` | Interactive host shell over WebSocket (PTY relay). Refused with 403 `terminal_unavailable` in cloud mode. See [WebSocket Terminal](#websocket-terminal). |
+| `GET /api/terminal/ws` | Interactive host shell over WebSocket (PTY relay). See [WebSocket Terminal](#websocket-terminal). |
 | `GET /api/docs` | List embedded docs (`{slug, title, category, order}`), reading-order sorted |
 | `GET /api/docs/{slug...}` | Serve one embedded doc as `text/markdown` (path-traversal guarded) |
 | `GET /api/docs-asset/{path...}` | Serve embedded doc images; only whitelisted image extensions are served |
 | `GET /api/docs-search` | Full-text search over embedded doc bodies (not just titles), capped at 20 hits; backs the command palette |
 | `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
-| `/internal/sandbox-proxy/llm/anthropic/` | Trust-plane LLM proxy (Anthropic). Forwards only `POST /v1/messages` and `POST /v1/messages/count_tokens`; every other path 404s |
-| `/internal/sandbox-proxy/llm/openai/` | Trust-plane LLM proxy (OpenAI). Forwards only `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/embeddings`, `GET /v1/models`; every other path 404s |
 | `/` | Serves the embedded SPA index on `GET` and `HEAD` for every path no other route matches outside `/api`, so client-side routes survive a hard load. Other methods answer 405 with an `Allow` header. Method-agnostic because ServeMux would treat `GET /` and the `/api/` catch-all as conflicting patterns |
-| `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/webserver/catchall.go`, which `wallfacer web` mounts too) |
+| `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/webserver/catchall.go`) |
 | `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |
 | `GET /static/` | Embedded SPA assets served without the cache wrapper |
 | `GET /favicon.ico` | Embedded favicon, 404 when the build did not produce one |
-
-The `/internal/sandbox-proxy/*` endpoints are server-to-server calls the sandbox credential sidecar makes, not part of the browser contract. They are wired unconditionally but respond 503 when `SandboxProxyConfig.Enabled` is false (local runs with no provider key). When `SANDBOX_PROXY_AUTH_URL` is set, requests are validated against the JWKS built from `SANDBOX_PROXY_AUTH_JWKS_URL` and `SANDBOX_PROXY_AUTH_ISSUER`. When it is unset no validator is built, and `requireClaims` fails closed: an enabled proxy rejects every trust-plane request with 503 rather than treating the caller as anonymous-but-authorized.
 
 ## Request Middleware Chain
 
@@ -184,27 +160,18 @@ The HTTP server wraps the `ServeMux` in a layered middleware chain. Each request
 flowchart TD
     Request --> Logging["loggingMiddleware<br/>(server.go)"]
     Logging --> CSRF["CSRFMiddleware<br/>(handler/middleware.go)"]
-    CSRF --> Cookie["CookieAuth<br/>(internal/auth)"]
-    Cookie --> Optional["OptionalAuth<br/>(internal/auth)"]
-    Optional --> Bearer["BearerAuthMiddleware<br/>(handler/middleware.go)"]
-    Bearer --> Force["ForceLogin<br/>(handler/force_login.go)"]
-    Force --> Mux["ServeMux route matching"]
+    CSRF --> Bearer["BearerAuthMiddleware<br/>(handler/middleware.go)"]
+    Bearer --> Mux["ServeMux route matching"]
     Mux --> BodyLimit["MaxBytesMiddleware<br/>(per-route,<br/>handler/middleware.go)"]
     BodyLimit --> StoreGuard["RequireStoreMiddleware<br/>(per-route,<br/>handler/handler.go)"]
     StoreGuard --> Handler["Handler method"]
 ```
 
-The chain is assembled in `internal/cli/server.go` (outermost first: logging, CSRF, CookieAuth, OptionalAuth, BearerAuth, ForceLogin, mux). `CSRFMiddleware` is unconditional. `ForceLogin` is only inserted in cloud mode:
+The chain is assembled in `internal/cli/server.go` (outermost first: otel, logging, CSRF, BearerAuth, mux). `CSRFMiddleware` is unconditional:
 ```go
-srvHandler := mux
-if cloud {
-    srvHandler = h.ForceLogin(mux)
-}
-srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey, cloud)(srvHandler)
-srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
-srvHandler = auth.CookieAuth(authClient, srvHandler)
+var srvHandler http.Handler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
-srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
+srv := &http.Server{Handler: otel.Handler(loggingMiddleware(srvHandler, reg), ...), ...}
 ```
 
 ### What each middleware does
@@ -213,13 +180,9 @@ srv := &http.Server{Handler: loggingMiddleware(srvHandler, reg), ...}
 |---|---|---|
 | **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels; unmatched requests (404, empty `r.Pattern`) collapse to a single `route="<unmatched>"` series to bound label cardinality. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | Unconditional. For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **CookieAuth** | `internal/auth` `CookieAuth(authClient, next)` | Resolves the session cookie into a principal (user + org claims) and injects it into the request context. No-op when the request has no cookie. Takes the auth client and the next handler (no JWT validator). |
-| **OptionalAuth** | `internal/auth` `OptionalAuth(jwtValidator, next)` | If a `Bearer` JWT is present, validates it against the configured JWKS and puts the resulting `*Claims` into the request context. JWT wins over the cookie when both are present; missing tokens pass through. |
-| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`), `GET /metrics`, the two requests of the redirect sign-in (`GET /login`, `GET /callback`) when the TCP peer is loopback, and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead. An identity already populated by CookieAuth or OptionalAuth stands in for the key in two cases only: in cloud mode, from any peer, so cookie-only browser requests succeed alongside script clients; and outside cloud mode, from a loopback TCP peer, which the index page hands the key to anyway. Outside cloud mode a peer on another host needs the key whatever identity it presents. `/logout` and `/logout/notify` are not exempt: a signed-in browser on this machine, or on any host in cloud mode, reaches `/logout` through its session. No-op when no API key is configured. |
-| **ForceLogin** | `handler/force_login.go` `ForceLogin()` | Cloud-mode only: redirects unauthenticated browser requests for the app shell to `/login`. API routes return 401 instead. Not inserted in local mode. |
+| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`), `GET /metrics`, and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `PickFolder`, `MkdirWorkspace`, `RenameWorkspace`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`, and the workspace CRUD routes (`ListWorkspaces`, `CreateWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`, `ActivateWorkspace`), which must work before any workspace is open. |
-| **Principal guard** | `handler/handler.go` `RequirePrincipalMiddleware()` | Applied per-route via `requiresPrincipal()`, which decides per mode. `ListSpecComments`, `SubmitSpecComment`, and `StreamSpecComments` require a signed-in principal in every mode; `SubmitFeedback` requires one in cloud mode only. Without one the route answers 401 `sign_in_required`. |
 
 ## SSE Live Updates
 
@@ -334,7 +297,7 @@ The handler (`internal/handler/terminal.go`) manages multiple concurrent shell s
 
 Every session is a host shell rooted at the workspace directory. (Earlier builds could exec into a sandbox container; the shipping host-process runtime has no container to exec into, so the `create_session` message carries no target and always spawns a host shell.)
 
-The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). A cloud-mode deployment refuses it regardless of that setting, before any other check: the shell would run on the server host as the server's own user, shared by every signed-in principal, so the request answers 403 with the `terminal_unavailable` envelope and `GET /api/config` reports `terminal_enabled: false`. Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
+The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
 
 ### Message Protocol
 
@@ -372,7 +335,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 
 ## Host Execution
 
-Each task runs as a host process: the runner builds a launch spec and the host backend (`internal/executor`) execs the selected agent CLI (`claude`, `codex`, `cursor-agent`, `opencode`, or `pi`, chosen by the agent the flow step references) directly, with the task's git worktree as the working directory. There is no container daemon, image pull, or bind-mount; cancellation is `SIGTERM` then `SIGKILL` on the host process. The `topos` harness is the exception: it runs in-process through `internal/agentgraph`, with no subprocess at all.
+Each task runs as a host process: the runner builds a launch spec and the host backend (`internal/executor`) execs the selected agent CLI (`claude`, `codex`, `cursor-agent`, `opencode`, or `pi`, chosen by the task's resolved harness) directly, with the task's git worktree as the working directory. There is no container daemon, image pull, or bind-mount; cancellation is `SIGTERM` then `SIGKILL` on the host process.
 
 ### Process Tracking
 

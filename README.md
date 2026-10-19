@@ -62,7 +62,7 @@ wallfacer run                    # execs your chosen harness CLI directly as a h
 
 A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full walkthrough.
 
-Other commands: `wallfacer status` (print or watch board state), `wallfacer spec` (validate or scaffold specs), and `wallfacer auth` (cloud sign-in). Run `wallfacer <command> -help` for flags.
+Other commands: `wallfacer status` (print or watch board state) and `wallfacer spec` (validate or scaffold specs). Run `wallfacer <command> -help` for flags.
 
 ## How It Works
 
@@ -138,13 +138,11 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 
 ## Roadmap
 
-Development is organized into three parallel tracks with shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
+Development is organized into a product track and cross-track design work on shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
 
 **Foundations** (complete): Execution backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
 
 **Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection), file and image attachments, host mounts, oversight risk scoring, visual verification.
-
-**Cloud Platform**: Two axes over the Latere platform. Axis A, the coordination plane (signed-in local instances connect over one outbound connection for presence, spec comments, and metadata projection; local stays the source of truth). Axis B, demand-gated remote execution: a task chosen to run remotely runs as a hosted agent session on the platform, and its repository travels by git.
 
 **Shared Design**: Cross-track specs. Authentication, agent abstraction, native sandboxes (Linux, macOS, Windows), overlay snapshots.
 
@@ -156,7 +154,7 @@ Development is organized into three parallel tracks with shared foundations. See
 
 | Guide | Topics |
 |-------|--------|
-| [Getting Started](docs/guide/getting-started.md) | Installation, credentials, sign-in, first task |
+| [Getting Started](docs/guide/getting-started.md) | Installation, credentials, first task |
 | [Concepts](docs/guide/concepts.md) | Mental model: workspaces, tasks, specs, agents, autonomy |
 
 **Use Wallfacer**
@@ -187,10 +185,7 @@ Development is organized into three parallel tracks with shared foundations. See
 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
-| [Auth & Identity](docs/internals/auth-and-identity.md) | OIDC, device sign-in, principal context, cloud mode |
-| [Service Identity](docs/internals/service-identity.md) | Wallfacer's slice of the latere.ai family identity shape: the sandbox-proxy inbound audience, per-route scopes, fail-closed validator |
 | [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers |
-| [Agent Graph Runtime](docs/internals/agent-graph-runtime.md) | Embedded topos runtime, the native in-process harness, live traces |
 | [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |
@@ -207,8 +202,8 @@ Wallfacer is pre-1.0 and released from `main` as tagged versions. The HTTP API
 (documented in [API & Transport](docs/internals/api-and-transport.md)), the
 on-disk layout under `~/.wallfacer/`, and the `WALLFACER_*` environment
 variables can still change between releases. Per-release changes are recorded
-in [docs/releases/](docs/releases/). The command surface is `wallfacer run`,
-`status`, `spec`, `auth`, `web`, and `doctor`. Every Go package lives under
+in [CHANGELOG.md](CHANGELOG.md). The command surface is `wallfacer run`,
+`status`, `spec`, and `doctor`. Every Go package lives under
 `internal/`, so this repository exposes no importable public Go API.
 
 ## License

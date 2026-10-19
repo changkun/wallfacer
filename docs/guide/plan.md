@@ -92,18 +92,6 @@ What happens when a dispatched task finishes depends on the drift tester gate:
 
 Independent of the pipeline, the explorer offers staleness tooling: **Rescan staleness** flags specs whose `affects` paths changed since completion, flagged specs show a stale-candidate banner (**Mark Stale** / **Dismiss**), and **Dismiss all** clears the current candidates.
 
-## Spec comments
-
-Selecting text in a rendered spec (three or more characters) raises a **Comment** button that opens a composer anchored to the selection. Threads render as cards in a right-hand margin rail, aligned with their anchor lines; anchors that can no longer be located fall back to gutter markers, and a triage panel lists orphaned or outdated threads for resolution. Threads support reply, resolve, and reopen.
-
-Comments are stored server-side and stream live to other open views. What the spec view shows depends on sign-in and on coordination:
-
-- **Signed out**: the spec renders with no comment controls.
-- **Signed in, coordination off**: a banner above the spec says spec comments are off and offers **Enable**, which turns coordination on for the instance. No other comment controls appear until it is on.
-- **Signed in, coordination on**: comments sync across machines through the coordination connector. A bar above the spec shows the open-comment count, **Show resolved**, a control to hide or show the margin rail, the triage entry when threads need triage, and the connection state (synced, connecting, or why it is not connected).
-
-A cloud-mode deployment runs no coordination connector and shows no comment controls. Threads are keyed by the repository's git remote, so a spec in a folder without a remote takes no comments. See [Configuration](configuration.md) for sign-in and `WALLFACER_COORDINATION`.
-
 ## Free-form specs
 
 A `specs/` directory of plain markdown files without frontmatter still renders: each file appears as a read-only *doc node* with a muted title and no lifecycle controls. When doc nodes are present, a dismissible banner offers **Adopt frontmatter**, which prepends a `drafted` frontmatter block to each file (title taken from the first heading), preserving the prose and committing the change. Dismissal persists per browser; adoption is optional.
@@ -136,5 +124,5 @@ Unarchive prefers the lossless path: it locates the archive commit and runs `git
 - [Chat](chat.md): the same agent engine without the spec tree
 - [Mission Control](mission-control.md): specs and tasks on one dependency graph
 - [Getting Started](getting-started.md): first workspace and first spec
-- [Configuration](configuration.md): sign-in, coordination, and the drift tester gate
+- [Configuration](configuration.md): the drift tester gate and the other settings
 - [Plan Mode internals](../internals/plan-mode.md): tree building, dispatch, drift, and undo implementation

@@ -62,9 +62,7 @@ Every task runs the same built-in pipeline: implementation, then testing, then a
 
 ### Harness
 
-A harness is the coding CLI that executes an agent turn. Five subprocess harnesses are supported: **Claude** (default), **Codex**, **Cursor**, **OpenCode**, and **Pi**, plus the experimental in-process **Topos**. Harness selection is layered: a task-level or per-activity setting wins over the per-activity environment override, which wins over the global default, which falls back to Claude. Credentials and routing are covered in [Configuration](configuration.md#harness-tab).
-
-A task pinned to Topos runs as a single agent inside the Wallfacer process, in the task's worktree, and shows its run as a trace on the task. The path is opt-in, needs an API key as its model credential (a run without one is refused before it starts), and does not support session resume; treat it as a preview.
+A harness is the coding CLI that executes an agent turn. Five harnesses are supported: **Claude** (default), **Codex**, **Cursor**, **OpenCode**, and **Pi**. Harness selection is layered: a task-level or per-activity setting wins over the per-activity environment override, which wins over the global default, which falls back to Claude. Credentials and routing are covered in [Configuration](configuration.md#harness-tab).
 
 ### Worktree isolation
 

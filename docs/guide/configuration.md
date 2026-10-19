@@ -17,7 +17,7 @@ Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The
 
 ### Appearance tab
 
-- **Mode**: Light, Dark, or Auto (follow the operating system). Also cycled from the account menu; stored at `wallfacer-theme` in browser storage.
+- **Mode**: Light, Dark, or Auto (follow the operating system). Stored at `wallfacer-theme` in browser storage.
 - **Color theme**: named palettes applied to the whole workspace in both light and dark mode. `Clay` (the clay accent on a neutral canvas) is the default; `Paper` is the original cream canvas, and `Indigo`, `Amber`, `Rose`, and `Copper` are alternatives. Stored at `wallfacer-palette`; the choice is per browser.
 
 ### Harness tab
@@ -134,32 +134,6 @@ wallfacer doctor
 
 Output marks passing checks `[ok]`, issues `[!]`, and unconfigured optional items `[ ]`. Credential values are masked.
 
-### wallfacer auth
-
-Sign the CLI (and the local web UI) in to auth.latere.ai using the device-authorization flow. The token is stored at `<UserConfigDir>/latere/token.json`, shared with the `latere` CLI.
-
-```
-wallfacer auth login    # Sign in (opens a browser for confirmation)
-wallfacer auth logout   # Remove the locally stored token
-wallfacer auth whoami   # Print the saved token's expiry
-```
-
-Login flags: `-auth-url` (default `https://auth.latere.ai`), `-client-id` (default `wallfacer-cli`), `-scopes`, `-org` (scope the login to an organization), `-personal` (force personal context), `-no-browser` (print the verification URL instead of opening it).
-
-### wallfacer web
-
-Start the cloud-mode server (`wallfacerd`): OIDC-authenticated SPA, coordination WebSocket acceptor, and spec comment store (Postgres via `WALLFACER_DATABASE_URL`, falling back to memory).
-
-```
-wallfacer web [flags]
-```
-
-| Flag | Env var | Default | Description |
-|---|---|---|---|
-| `-addr` | `WALLFACERD_ADDR` | `:8080` | Listen address |
-
-Cloud deployment is documented in [Auth & Identity](../internals/auth-and-identity.md).
-
 ## Environment variables
 
 All variables live in `~/.wallfacer/.env` unless set in the shell environment, which takes precedence.
@@ -205,15 +179,14 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |
-| `WALLFACER_TERMINAL_ENABLED` | `true` | Integrated host terminal panel; set `false` to disable. A hosted deployment (`WALLFACER_CLOUD`) never offers the terminal, whatever this is set to |
+| `WALLFACER_TERMINAL_ENABLED` | `true` | Integrated host terminal panel; set `false` to disable |
 | `WALLFACER_WORKSPACES` | | Active workspace folders (colon-separated on Unix, semicolon on Windows) |
-| `WALLFACER_CLOUD` | `false` | Forces sign-in for HTML navigation; sign-in stays available either way |
 
 ### Operational
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_SERVER_API_KEY` | generated at `~/.wallfacer/server-api-key` | Require `Authorization: Bearer <key>` on API requests. A signed-in identity replaces the key for a client on the same machine, and for every client in cloud mode; outside cloud mode a client on another host presents the key whether or not it is signed in. SSE endpoints accept `?token=`. A local run without a configured key generates one on first start and logs the file path; `wallfacer status` and the e2e scripts read it from there. The browser receives the key through the page only over a loopback connection, so a client on another host opens `http://<host>:<port>/?token=<key>` once |
+| `WALLFACER_SERVER_API_KEY` | generated at `~/.wallfacer/server-api-key` | Require `Authorization: Bearer <key>` on API requests. SSE endpoints accept `?token=`. A local run without a configured key generates one on first start and logs the file path; `wallfacer status` and the e2e scripts read it from there. The browser receives the key through the page only over a loopback connection, so a client on another host opens `http://<host>:<port>/?token=<key>` once |
 | `WALLFACER_DRIFT_TESTER` | off | Experimental spec drift pipeline: on task completion, an assessment agent classifies the linked spec as complete or stale instead of completing it directly |
 | `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days soft-deleted tasks remain restorable from the Trash |
 | `WALLFACER_MAX_TURN_OUTPUT_BYTES` | `8388608` | Per-turn output budget; longer output is truncated (0 = unlimited) |
@@ -223,15 +196,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_PROMPT_HISTORY_LIMIT` | | Cap on retained prompt revisions per task |
 | `WALLFACER_RETRY_HISTORY_LIMIT` | | Cap on retained retry records per task |
 | `WALLFACER_REFINE_SESSIONS_LIMIT` | | Cap on retained refine sessions per task |
-| `WALLFACER_COORDINATION` | on | Set `0` to disable the coordination connector when signed in. The connector runs on a local instance only; a cloud-mode deployment (`WALLFACER_CLOUD`) does not start it |
-| `WALLFACER_COORDINATION_URL` | derived | Override the coordination endpoint for staging or self-hosted deployments |
-| `WALLFACER_DATABASE_URL` | | Postgres DSN for cloud-mode spec comment storage |
-
-### Sign-in and cloud (OIDC)
-
-A plain `wallfacer run` fills these with the public secret-less client against `https://auth.latere.ai`; explicit values take precedence. `AUTH_URL`, `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_REDIRECT_URL`, `AUTH_COOKIE_KEY` (auto-generated at `~/.wallfacer/cookie-key` for the public client), `AUTH_ISSUER`, and `AUTH_JWKS_URL`. `WALLFACERD_ADDR` sets the cloud server address. Cloud deployment details are in [Auth & Identity](../internals/auth-and-identity.md).
-
-`AUTH_REDIRECT_URL` defaults to `http://localhost:<port>/callback` for the requested listen port. When that port is taken, for instance by another Wallfacer instance on the same machine, `wallfacer run` starts on a free port and the default callback URL no longer leads to it. Sign-in by browser redirect is off on such an instance: the server logs a warning at startup, `/login` and organization switching answer the error `redirect_sign_in_unavailable`, and the account menu shows the reason. Device-code sign-in from the account menu and `wallfacer auth login` work on any port. An explicitly set `AUTH_REDIRECT_URL` is used as given, whatever port the server is on.
 
 ### Flags as environment variables
 
@@ -247,9 +211,7 @@ A plain `wallfacer run` fills these with the public secret-less client against `
 | `~/.wallfacer/worktrees/` | Per-task git worktrees |
 | `~/.wallfacer/prompts/` | System prompt template overrides |
 | `~/.wallfacer/agent-sessions/` | Chat and Plan session history |
-| `~/.wallfacer/cookie-key` | Session cookie encryption key |
 | `~/.wallfacer/tmp/` | Scratch space |
-| `<UserConfigDir>/latere/token.json` | latere.ai sign-in token, shared with the `latere` CLI |
 
 ## Keyboard shortcuts
 
@@ -304,8 +266,8 @@ save. Wallfacer moves saved provider tokens into the operating system keyring
 and leaves only `WALLFACER_SECRET_STORE=keyring` and a
 `WALLFACER_SECRET_BUNDLE` reference in `.env`. Ordinary settings remain in the
 file. This covers Claude, Anthropic gateway, OpenAI, Cursor, and OpenCode
-credentials saved by Wallfacer. Native CLI sign-ins and server authentication
-have their own storage.
+credentials saved by Wallfacer. Native CLI sign-ins and the server key have
+their own storage.
 
 Unlock the keyring before saving or starting agents. On Linux, a running Secret
 Service and session bus are required. If a credential cannot be read, Wallfacer

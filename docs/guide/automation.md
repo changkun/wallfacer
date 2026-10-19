@@ -81,7 +81,7 @@ Scope and behavior:
 - Eligible waiting tasks are reviewed automatically when the `review` toggle is on. One round runs at a time per task, and at most 2 rounds run at once across tasks, outside the regular task caps.
 - A reviewer run that fails, or answers in a form that cannot be read, does not use up a round: the task timeline says so, and the round is retried once the auto-review breaker's backoff has passed.
 - The reviewer reads the diff from its prompt, capped at 16,000 bytes, and runs without access to the workspace, so it cannot change the task's worktree.
-- The task detail's Verification tab shows each round's findings, the feedback sent, and the task's reply. Reviewer spend is attributed to the task's usage breakdown under `review`. A task on the in-process Topos harness reports no usage yet, so its review is bounded by the round limit alone.
+- The task detail's Verification tab shows each round's findings, the feedback sent, and the task's reply. Reviewer spend is attributed to the task's usage breakdown under `review`.
 
 Settings, as environment variables:
 
@@ -121,7 +121,6 @@ Every failed task carries a failure category, visible on the card and used to de
 | `timeout` | Task exceeded its time limit | No |
 | `budget_exceeded` | Token or cost budget exhausted | No |
 | `agent_error` | The agent itself reported failure | No |
-| `model_credential_missing` | A run on the in-process `topos` harness was refused because no model credential is set; nothing ran | No |
 | `unknown` | Unclassified | No |
 
 Triage guidance: transient categories usually clear themselves via auto-retry; recurring `container_crash` suggests a runtime or credential problem (check `wallfacer doctor`); `agent_error` and `timeout` mean the task needs a better prompt, smaller scope, or manual feedback. Failed-task counts per category are exported on `/metrics` as `wallfacer_failed_tasks_by_category`.

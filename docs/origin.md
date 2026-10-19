@@ -12,6 +12,6 @@ As the projects grew in complexity, raw task prompts became insufficient. Design
 
 The integrated development environment now includes a file explorer with editor, an interactive host terminal, system prompt customization, and prompt templates, all accessible from the browser.
 
-The latest evolution is cloud mode: sign-in identity with organization scoping, so tasks carry an owner and an org, and the board shows each principal only the work that belongs to their tenant.
+The latest evolution narrows it back to a local tool: Wallfacer runs on one machine, drives the coding-agent CLIs installed there, and has no hosted service, sign-in or cloud mode behind it.
 
 Most of Wallfacer's recent capabilities were developed by Wallfacer itself, creating a compounding loop where the system continuously improves its own engineering process.

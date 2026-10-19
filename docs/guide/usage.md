@@ -9,12 +9,12 @@ Start here for the full reading order.
      beneath it becomes an entry in that section, in order. To add a guide,
      drop a link under the right section heading. Keep example link syntax
      out of this comment: the parser scrapes any link it sees here.
-     frontend/scripts/gen-docs-index.mjs derives the cloud docs index from
+     frontend/scripts/gen-docs-index.mjs derives the console docs index from
      this same section; run it after editing (see the docs-rewrite spec). -->
 
 ### Get Started
 
-- [Getting Started](getting-started.md). Installation, credentials, sign-in, first task end to end.
+- [Getting Started](getting-started.md). Installation, credentials, first task end to end.
 - [Concepts](concepts.md). The mental model: workspaces, tasks, specs, agents, and the autonomy spectrum.
 
 ### Use Wallfacer

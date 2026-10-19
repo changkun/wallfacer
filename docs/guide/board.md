@@ -51,7 +51,7 @@ stateDiagram-v2
 
 Note that `in_progress` never jumps straight to `committing` or `done`: completion always passes through `waiting`, where a review, a test verdict, or auto-submit decides whether to commit. **Mark as Done** (or the auto-submit watcher) moves a waiting task into `committing`, which rebases the task branch onto the default branch, fast-forward merges it, and cleans up the worktree. Details in [Task Lifecycle internals](../internals/task-lifecycle.md) and [Git Worktrees](../internals/git-worktrees.md).
 
-When a task fails, the failure is categorized: `timeout`, `budget_exceeded`, `worktree_setup`, `container_crash` (unexpected agent-process exit), `agent_error`, `sync_error`, `model_credential_missing` (an in-process run refused because no model credential is set), or `unknown`. Categories drive the auto-retry budgets described in [Automation](automation.md).
+When a task fails, the failure is categorized: `timeout`, `budget_exceeded`, `worktree_setup`, `container_crash` (unexpected agent-process exit), `agent_error`, `sync_error`, or `unknown`. Categories drive the auto-retry budgets described in [Automation](automation.md).
 
 ## Creating tasks
 
@@ -128,7 +128,7 @@ Click any card to open the detail view. A left rail carries the header (status, 
 
 | Tab | Content |
 |---|---|
-| **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy), the agent trace graph, and, for waiting tasks, the inline feedback box. |
+| **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy) and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
 | **Changes** | Task commits with expandable patches, followed by the aggregate diff and a commits-behind warning. |
 | **Verification** | The Review panel and the test agent's per-turn results. |

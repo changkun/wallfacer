@@ -53,15 +53,6 @@ Pages that need a workspace show a folder picker on first visit. Pick one or mor
 
 ![The task board](images/board.png)
 
-## Optional: sign in via latere.ai
-
-Sign-in is available but never required; the board is fully functional anonymously. Signing in adds:
-
-- Spec comment sync across machines through the coordination connector.
-- Identity attribution on tasks and events, plus organization switching.
-
-To sign in, open the account menu at the bottom of the sidebar (below Docs and Settings) and choose **Sign in via latere.ai**. A modal shows a short device code and a verification URL; confirm the code in the browser and the session completes automatically. Where the device flow is unavailable, the UI falls back to a browser redirect through `/login`. A second instance on the same machine starts on a free port when its own is taken; the browser redirect and organization switching are off there, the account menu says why, and the device code works as usual (see [Configuration](configuration.md#sign-in-and-cloud-oidc)). On headless machines, run `wallfacer auth login` instead; the token is stored at the shared latere location and carries over to the web UI.
-
 ## First task, end to end
 
 The board has four columns: Backlog, In Progress, Waiting, and Done.
@@ -86,10 +77,7 @@ Everything is stored under `~/.wallfacer/`:
 | `worktrees/` | Per-task git worktrees |
 | `prompts/` | User overrides for system prompt templates |
 | `agent-sessions/` | Chat and plan session history |
-| `cookie-key` | Session cookie encryption key |
 | `tmp/` | Scratch space |
-
-The latere.ai sign-in token lives outside this directory at `<UserConfigDir>/latere/token.json` and is shared with the `latere` CLI, so one login covers both tools.
 
 ## Next steps
 

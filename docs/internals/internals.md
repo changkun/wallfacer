@@ -4,7 +4,7 @@ These documents are for maintainers and contributors who need to understand how 
 
 Agents run as host processes: the runner execs the selected CLI directly with the task's git worktree as the working directory (`internal/executor/host.go`). There is no container daemon, image pull, or bind-mount at runtime.
 
-For the cloud control plane (identity, tenancy, deployment topology), see [Auth & Identity](auth-and-identity.md).
+Wallfacer runs on one machine with no hosted service behind it. The API is gated by a per-machine server key that the console receives on a loopback request.
 
 ## Reading Order
 
@@ -12,7 +12,7 @@ For the cloud control plane (identity, tenancy, deployment topology), see [Auth 
 
 [Architecture](architecture.md)
 
-System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the dispatch layer (the five built-in roles, their runner bindings, and how the runner picks between the turn loop and the native in-process topos path). Package map covering all `internal/` and `internal/pkg/` packages. Handler organization table. Start here to build a mental model of how all the pieces fit together.
+System overview, design decisions, component map, and an end-to-end walkthrough tracing a task from creation to merge. Covers the dispatch layer (the five built-in roles and their runner bindings). Package map covering all `internal/` and `internal/pkg/` packages. Handler organization table. Start here to build a mental model of how all the pieces fit together.
 
 ### 2. Data & Storage
 
@@ -38,40 +38,26 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, agent session, spec tree, explorer, image, and OAuth endpoints.
 
-### 6. Auth & Identity
-
-[Auth & Identity](auth-and-identity.md)
-
-Identity end to end: OIDC browser login and the session cookie, the RFC 8628 device flow (in-UI modal, `wallfacer auth` CLI, shared token store), the middleware chain, principal context and actor attribution, what sign-in enables (coordination connector, org switching), and cloud mode (forced login, org isolation, superadmin gates, the sandbox trust-plane proxy, wallfacerd).
-
-For wallfacer's slice of the latere.ai family identity shape (the `wallfacer-sandbox-proxy` inbound audience, its per-route scopes, and the fail-closed validator), see [Service identity](service-identity.md).
-
-### 7. Automation
+### 6. Automation
 
 [Automation](automation.md)
 
 Background watchers, the autoimplement promotion loop, auto-test, auto-review, auto-submit, auto-retry, circuit breakers, and startup sequence.
 
-### 8. Agent Graph Runtime
-
-[Agent Graph Runtime](agent-graph-runtime.md)
-
-The embedded topos runtime: the `internal/agentgraph` import seam and its boundary test, model resolution (fake / Lux gateway / direct key), the native in-process `topos` harness and how the runner dispatches to it, trace persistence and the live trace mapping onto the task timeline, and the sub-agent roles of an in-process task.
-
-### 9. Plan Mode
+### 7. Plan Mode
 
 [Plan Mode](plan-mode.md)
 
 Spec document model, spec tree building, agent-session sandbox, slash commands, dispatch pipeline, archive/unarchive, planning undo via git revert, and the SSE spec tree stream.
 
-### 10. Workspaces & Configuration
+### 8. Workspaces & Configuration
 
 [Workspaces & Configuration](workspaces-and-config.md)
 
 Workspace manager, harness routing, system prompt templates, environment configuration, runtime workspace switching, and AGENTS.md instructions.
 
-### 11. Development Setup
+### 9. Development Setup
 
 [Development Setup](development.md)
 
-Building from source, running tests, make targets, the release image, and the release workflow.
+Building from source, running tests, make targets, and the release workflow.

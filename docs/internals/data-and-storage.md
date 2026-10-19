@@ -83,7 +83,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `StopReason` | `*string` | `stop_reason` | Why the agent stopped (`end_turn`, `max_tokens`, etc.) |
 | `Turns` | `int` | `turns` | Number of agent turns completed |
 | `Timeout` | `int` | `timeout` | Timeout in minutes (clamped to 1-1440, default 60) |
-| `Sandbox` | `harness.ID` | `sandbox` | Workspace-level harness hint (e.g. `"claude"`, `"codex"`, `"cursor"`, `"opencode"`, `"pi"`, `"topos"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's resolver reads it below a role's per-call harness pin. |
+| `Sandbox` | `harness.ID` | `sandbox` | Workspace-level harness hint (e.g. `"claude"`, `"codex"`, `"cursor"`, `"opencode"`, `"pi"`, or empty). Set via `PATCH /api/tasks/{id}` after creation; POST no longer accepts this field. The runner's resolver reads it below a role's per-call harness pin. |
 | `SandboxByActivity` | `map[SandboxActivity]harness.ID` | `sandbox_by_activity` | **Deprecated.** Per-activity harness overrides. New tasks don't populate this; harness routing lives on the agent definition now. The runner still reads it if present for back-compat. |
 | `ModelOverride` | `*string` | `model_override` | Per-task model override; nil = global default |
 | `Environment` | `*ExecutionEnvironment` | `environment` | Runtime environment snapshot for reproducibility |
@@ -106,17 +106,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `Usage` | `TaskUsage` | `usage` | Accumulated token/cost totals |
 | `UsageBreakdown` | `map[SandboxActivity]TaskUsage` | `usage_breakdown` | Per-sub-agent usage attribution |
 | `TruncatedTurns` | `[]int` | `truncated_turns` | Turns whose output was truncated by size budget |
-
-### Ownership and Tenancy
-
-Two principal fields scope a task to a user and an org in cloud deployments. Both are empty for anonymous tasks (local deployments, or requests without JWT claims in context). They are populated by the handler from the request principal; the store never resolves claims itself.
-
-| Field | Type | JSON Key | Description |
-|---|---|---|---|
-| `CreatedBy` | `string` | `created_by` | Principal ID (JWT `sub`) of the user who dispatched the task. Empty for anonymous tasks. |
-| `OrgID` | `string` | `org_id` | Organization (JWT `org_id`) that owns the task in multi-tenant deployments. Empty for anonymous tasks and users with no current org. Cloud queries filter on this field via `TasksForPrincipal`; local queries ignore it. |
-
-See [Tenant Filtering](#tenant-filtering) below for the visibility rules.
 
 ### Worktree Isolation
 
@@ -357,7 +346,6 @@ Machine-readable root cause classification for failed tasks:
 | `FailureCategoryContainerCrash` | `"container_crash"` | Agent host process exited unexpectedly |
 | `FailureCategoryAgentError` | `"agent_error"` | Agent returned an error |
 | `FailureCategorySyncError` | `"sync_error"` | Rebase/sync operation failed |
-| `FailureCategoryModelCredential` | `"model_credential_missing"` | In-process run refused before start: no model credential configured |
 | `FailureCategoryUnknown` | `"unknown"` | Unclassified failure |
 
 The `FailureCategoryContainerCrash` symbol and its `"container_crash"` value are legacy vocabulary; the behavior they classify is a host-process exit.
@@ -463,20 +451,6 @@ After every write, `notify()` stamps a monotonically increasing sequence number 
 1. Appends to a bounded replay buffer (512 entries) so reconnecting SSE clients can catch up without a full snapshot.
 2. Non-blocking send to all active subscriber channels (capacity 256, `pubsub.DefaultChannelSize`). If a subscriber's buffer is full, the delta is dropped for that subscriber.
 3. Wake signal to lightweight wake-only subscribers (capacity 1, coalesces bursts).
-
-## Tenant Filtering
-
-In multi-tenant cloud deployments the store filters task reads by the calling principal. The `Principal` type (`internal/store/principal.go`) is the minimal identity surface the store needs; it carries only `Sub` (JWT `sub`, used for attribution) and `OrgID` (JWT `org_id`, used for tenant isolation). It is defined in the store package so the domain layer never imports the HTTP or JWT packages; handlers translate `auth.Claims` to `*store.Principal` at the request boundary.
-
-`TasksForPrincipal(ctx, p, includeArchived)` returns the tasks visible to a principal. Three task shapes get different visibility:
-
-| Task shape | Who sees it |
-|---|---|
-| `CreatedBy=""`, `OrgID=""` (legacy) | Any signed-in user plus local mode |
-| `CreatedBy=U`, `OrgID=""` (self) | Only user U |
-| `CreatedBy=*`, `OrgID=X` (org) | Anyone whose `claims.OrgID = X` |
-
-Legacy tasks (created before the cloud/org concept) have no recorded owner and are treated as deployment-shared, so single-user upgrades to cloud mode keep their history. A `nil` principal (local mode or anonymous call) bypasses filtering entirely and sees all tasks. Sort order matches `ListTasks` (position, then creation time).
 
 ## Event Sourcing
 

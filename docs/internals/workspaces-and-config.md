@@ -24,9 +24,7 @@ type Workspace struct {
     Autosubmit      *bool
     Autosync        *bool
 
-    CreatedBy string // principal sub in cloud mode; empty locally
-    OrgID     string // org scope; empty for personal/legacy workspaces
-    Dormant   bool   // history recovered by migration; folders await re-pointing
+    Dormant bool // history recovered by migration; folders await re-pointing
 }
 ```
 
@@ -98,18 +96,17 @@ Wallfacer does not generate or inject a workspace-level instructions file. Each 
 
 ### Registered harnesses
 
-The `internal/harness` package defines harness identities as `ID` constants and keeps a package-level registry (`internal/harness/registry.go`). Five subprocess harnesses register at init time, plus one in-process harness:
+The `internal/harness` package defines harness identities as `ID` constants and keeps a package-level registry (`internal/harness/registry.go`). Five harnesses register at init time:
 
 - **`Claude`** (`"claude"`): execs the Claude Code CLI. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`. `harness.Default()` returns Claude.
 - **`Codex`** (`"codex"`): execs the OpenAI Codex CLI. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
 - **`Cursor`** (`"cursor"`): adapts the `cursor-agent` CLI and emits Claude-style stream-json so the runner parses it on the same path. Authenticates via `CURSOR_API_KEY`.
 - **`OpenCode`** (`"opencode"`): execs the opencode CLI; provider auth is managed by `opencode auth login` on the host.
 - **`Pi`** (`"pi"`): execs the pi CLI; no credential fields.
-- **`Topos`** (`"topos"`): in-process, not a subprocess. Runs through the embedded topos runtime (`internal/agentgraph`); supports system prompts and usage reporting but not resume or MCP. Experimental/opt-in.
 
-Execution for the subprocess harnesses is host-process. The runner execs the selected CLI as a host process with the task's git worktree as CWD (`internal/runner/runner.go`, `HostBackend` in `internal/executor/host.go`); there is no container start, image pull, or bind-mount. The `WALLFACER_AGENT` env var the runner injects records which CLI was selected.
+Execution is host-process. The runner execs the selected CLI as a host process with the task's git worktree as CWD (`internal/runner/runner.go`, `HostBackend` in `internal/executor/host.go`); there is no container start, image pull, or bind-mount. The `WALLFACER_AGENT` env var the runner injects records which CLI was selected.
 
-`harness.DefaultFrom(value)` returns the parsed identity or falls back to `Claude` for unknown values.
+`harness.DefaultFrom(value)` returns the parsed identity or falls back to `Claude` for unknown values, such as a task or setting that names a harness no longer registered.
 
 ### Activity routing
 
@@ -176,7 +173,6 @@ The `Config` struct covers all known keys. Key categories:
 | **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
-| **Cloud** | `Cloud` (`WALLFACER_CLOUD`; gates cloud-only UI surfaces and routes) |
 
 ### Atomic Updates
 

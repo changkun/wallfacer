@@ -50,7 +50,7 @@ Every task keeps an event-sourced audit trail. Events are appended, never rewrit
 
 Event types: `state_change`, `output`, `feedback`, `error`, `system`, `span_start`, `span_end`, `prompt_round`, and `prompt_round_revert`.
 
-Each state change records a trigger explaining what caused it: `user`, `auto_promote`, `auto_retry`, `auto_test`, `auto_submit`, `feedback`, `sync`, `recovery`, or `system`. When sign-in is enabled, events also carry actor attribution: the principal that caused the event and its type (signed-in user, service account, API-key caller, or the system itself).
+Each state change records a trigger explaining what caused it: `user`, `auto_promote`, `auto_retry`, `auto_test`, `auto_submit`, `feedback`, `sync`, `recovery`, or `system`.
 
 View the trail in the **Events** tab of the task detail modal, which also surfaces usage, retry history, and prompt history. The same data is available at `GET /api/tasks/{id}/events`, with optional cursor pagination (`after`, `limit`, `types`).
 
@@ -72,7 +72,7 @@ While a task runs, the **Activity** tab streams the agent transcript in real tim
 
 The transcript has two views, switched by the toggle button above it:
 
-- **Rendered** (the default): the transcript parsed into structured rows (thinking, tool calls, tool results, text). Rendering works across all harnesses: Claude Code output is parsed in the browser, and every other harness (Codex, Cursor, opencode, pi, Topos) is rendered from the server's normalized event stream.
+- **Rendered** (the default): the transcript parsed into structured rows (thinking, tool calls, tool results, text). Rendering works across all harnesses: Claude Code output is parsed in the browser, and every other harness (Codex, Cursor, opencode, pi) is rendered from the server's normalized event stream.
 - **Raw**: the harness-native output with no interpretation.
 
 A filter box above the rows narrows the transcript to matching entries. The browser caps rendering at 5,000 rows and the server caps each turn's output at 8 MB; banners indicate truncation, with a link to download the full log. When nothing parses into rows, the view falls back to raw output automatically.
@@ -85,8 +85,6 @@ The **Changes** tab shows the task's diff against the default branch. While a ta
 2. Add as many comments as needed, across any number of files. Lines with comments show a filled gutter marker.
 3. The **Review comments** panel collects all comments grouped by file, each editable and deletable, alongside an optional general feedback field. Click a line reference to scroll back to the anchored diff line.
 4. Click **Submit** to send everything as one batched feedback message. Comments are serialized with their file and line anchors so the agent can locate each one, and the task resumes with the feedback.
-
-On a hosted deployment (`WALLFACER_CLOUD`), submitting feedback requires a signed-in account; a local instance accepts it signed in or not.
 
 ## Analytics
 

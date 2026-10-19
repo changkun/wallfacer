@@ -4,7 +4,7 @@ Wallfacer is a host-native Go service that coordinates autonomous coding agents,
 
 ## Host-Process Execution (the core decision)
 
-Each agent turn runs as a host `os/exec` of the selected CLI (`claude`, `codex`, `cursor`, `opencode`, or `pi`) with the task's git worktree as the working directory. Isolation comes from the worktree, not a container: there is no daemon, no image pull, and no `/workspace` bind-mount in the shipping runtime. A sixth harness, `topos`, is not a subprocess at all; it runs in-process through `internal/agentgraph` (see the dispatch layer below).
+Each agent turn runs as a host `os/exec` of the selected CLI (`claude`, `codex`, `cursor`, `opencode`, or `pi`) with the task's git worktree as the working directory. Isolation comes from the worktree, not a container: there is no daemon, no image pull, and no `/workspace` bind-mount in the shipping runtime.
 
 The runner unconditionally selects `executor.HostBackend` (the only `executor.Backend` implementation) and sets `hostMode = true` (`internal/runner/runner.go:491-498`). The backend execs the CLI directly (`internal/executor/host.go`). Cancellation is `SIGTERM` then `SIGKILL` on the host process (`internal/executor/host.go`), not a runtime kill command.
 
@@ -52,7 +52,7 @@ graph TB
 
 **Worktree isolation, not container isolation.** Every agent turn is a host process whose CWD is the task's git worktree. Tasks isolate from each other through separate worktrees and `task/<id>` branches, not through a sandboxed runtime. Tasks work in parallel without merge conflicts during execution; rebase and merge happen at commit time.
 
-**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`, or in-process `topos`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
+**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
 
 **Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds).
 
@@ -60,7 +60,7 @@ graph TB
 
 The codebase moved off three older designs. The docs and symbols below reflect the current state:
 
-- `sandbox.Type` -> `harness.ID`. The `internal/sandbox` package is deleted; harness identities now live in `internal/harness` (`claude`, `codex`, `cursor`, `opencode`, `pi`, plus the in-process `topos`).
+- `sandbox.Type` -> `harness.ID`. The `internal/sandbox` package is deleted; harness identities now live in `internal/harness` (`claude`, `codex`, `cursor`, `opencode`, `pi`).
 - Container -> host process. Execution is a host `os/exec`; the `Container*` Go names are kept as legacy vocabulary.
 - Refine retired. There is no `refine` agent or `refine-only` flow. Prompt refinement is the Plan task-mode chat (`POST /api/agent/tool/update_task_prompt`).
 
@@ -114,10 +114,7 @@ The six entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartWaitingS
 
 Every task runs one built-in pipeline. `internal/agents/` holds its **Role** descriptors: exactly five built-ins (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`). A role names what an agent is and which prompt template it renders; the runner's binding table (`internal/runner/agent_bindings.go`) holds the dispatch plumbing per slug (activity, mount mode, timeout, result parser). Each role's harness follows the task's harness, its per-activity override, or the `WALLFACER_SANDBOX_*` settings.
 
-Task execution picks one of two paths (`internal/runner/execute.go`):
-
-- a task whose resolved harness is `topos` -> `runNativeTopos`, which runs the task as one in-process agent through `internal/agentgraph`, the seam onto the embedded topos runtime, and persists the resulting trace graph on the task. This path is experimental and opt-in. See [Agent Graph Runtime](agent-graph-runtime.md).
-- every other task -> the turn-loop path in `execute.go` (impl -> test -> commit pipeline with full session-recovery semantics).
+Task execution runs the turn loop in `internal/runner/execute.go`: impl -> test -> commit pipeline, with full session-recovery semantics. A task or setting that names a harness no longer registered resolves to the next routing tier and, last, to `harness.Default()`.
 
 `Task.FlowID` is a record field kept for stored tasks and is not read for dispatch; a stored task that names a fleet gets one notice on its timeline and runs the same pipeline.
 
@@ -131,9 +128,9 @@ Task execution picks one of two paths (`internal/runner/execute.go`):
 
 **Executor** (`internal/executor/`), The `Backend` seam (`Launch`/cancellation) plus `HostBackend`, the single shipping implementation that execs the CLI as a host process and relays its stream-json stdout.
 
-**Harness** (`internal/harness/`), Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus the in-process `topos` harness. `harness.Default()` returns Claude. The `cursor` harness adapts the `cursor-agent` CLI and emits Claude-style stream-json.
+**Harness** (`internal/harness/`), Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`). `harness.Default()` returns Claude. The `cursor` harness adapts the `cursor-agent` CLI and emits Claude-style stream-json.
 
-**Webserver** (`internal/webserver/`), Serves the SPA embedded from `frontend/dist` and passed in as an `fs.FS` (`MountSPA`, `internal/webserver/spa.go`). It owns the catch-all routes that both `wallfacer run` and `wallfacer web` mount (`MountCatchAll`, `internal/webserver/catchall.go`): `index.html` for client-side routes on `GET` and `HEAD`, and the JSON error envelope for a path under `/api` that no route serves.
+**Webserver** (`internal/webserver/`), Owns the catch-all routes `wallfacer run` mounts behind its API (`MountCatchAll`, `internal/webserver/catchall.go`): `index.html` for client-side routes on `GET` and `HEAD`, and the JSON error envelope for a path under `/api` that no route serves. The SPA itself is embedded from `frontend/dist` and served by `mountVueSPA` in `internal/cli/server.go`.
 
 **Frontend** (`frontend/`), Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia). Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
@@ -144,18 +141,12 @@ Task execution picks one of two paths (`internal/runner/execute.go`):
 - `store.StorageBackend` (`internal/store/backend.go`) abstracts the three persistence concerns: tasks (structured, indexed), events (ordered, append-heavy), and blobs (named bytes per task). Domain concepts map onto these primitives; for example `SaveOversight` becomes `SaveBlob(id, "oversight", data)`. Oversight persists as a single blob (`oversight.json`, and `oversight-test.json` for the test phase) via `SaveBlob`, not a per-id file under `oversights/`.
 - `executor.Backend` (`internal/executor/`) abstracts agent launch. `HostBackend` is the only implementation.
 
-### Cloud-mode middleware
+### Request middleware
 
-Cloud Identity is wired in `RunServer` (`internal/cli/server.go`). The request handler chain wraps the mux outside-in, so requests flow CSRF -> CookieAuth -> OptionalAuth -> BearerAuth -> (ForceLogin in cloud mode) -> mux:
+The request handler chain is wired in `RunServer` (`internal/cli/server.go`) and wraps the mux outside-in, so requests flow otel -> logging -> CSRF -> server key -> mux:
 
 - `handler.CSRFMiddleware(hostPort)`, unconditional CSRF protection (no skip flag).
-- `auth.CookieAuth(authClient, next)`, two args; resolves an `Identity` from the session cookie. There is no separate jwt validator argument and no CSRF skip.
-- `auth.OptionalAuth(jwtValidator, next)`, populates the principal from a bearer JWT when present, without forcing auth.
-- `handler.BearerAuthMiddleware(serverAPIKey, cloudMode)`, static-key check that an already populated identity satisfies in cloud mode, so a cookie-only browser request succeeds, and outside cloud mode only for a loopback peer; a peer on another host of a local instance needs the key whatever identity it presents.
-- `Handler.ForceLogin(mux)`, applied only when `cloudMode` is true; a local `wallfacer run` stays reachable anonymously.
-- `auth.RequireSuperadmin(next)`, a per-route admin gate (`adminOnly` in `BuildMux`), applied only when `cloudMode` is true and not part of the global chain.
-
-Tasks carry `CreatedBy` and `OrgID` (`internal/store/models.go`); `TasksForPrincipal` (`internal/store/principal.go`) tenant-filters listings. The principal route is `GET /api/me`; `PATCH /api/auth/me` switches org.
+- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes, embedded assets and `GET /metrics` are public; SSE and WebSocket paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
 
 ## End-to-End Walkthrough: Task Creation to Merge
 
@@ -310,7 +301,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `latere.ai/x/pkg/gitutil/ops.go` |
 | Add a new automation watcher | `internal/handler/tasks_autoimplement.go` (follow `SubscribeWake` pattern) |
 | Change the agent launch spec | `internal/runner/container.go` (`buildContainerSpecForSandbox()`) + `internal/executor/host.go` |
-| Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `opencode.go`, `pi.go`, `topos.go`, `registry.go`) |
+| Add or change a harness | `internal/harness/` (`claude.go`, `codex.go`, `cursor.go`, `opencode.go`, `pi.go`, `registry.go`) |
 | Add a new env config variable | `internal/envconfig/envconfig.go` |
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
 | Debug a failing rebase | `latere.ai/x/pkg/gitutil/ops.go` + `latere.ai/x/pkg/gitutil/stash.go` |
@@ -319,7 +310,6 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
 | Change pub/sub behavior | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
-| Change cloud auth wiring | `internal/cli/server.go` (middleware chain) + `internal/auth/` |
 
 ## Package Map
 
@@ -327,30 +317,26 @@ Every `internal/` package and its role in the system:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `agentgraph` | The seam onto the embedded topos runtime: runs one agent in-process for the native `topos` harness and returns final text plus a trace graph in topos-free types | `RunAgent()`, `ModelConfig`, `Result`, `Event`, `Trace` |
 | `agents` | The five built-in role descriptors: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Role`, `BuiltinAgents` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
-| `auth` | JWT + cookie principal resolution, optional auth, and superadmin gating for cloud mode | `OptionalAuth()`, `CookieAuth()`, `RequireSuperadmin()`, `Validator`, `Identity`, `PrincipalFromContext()` |
-| `cli` | CLI subcommand implementations (run, status, doctor/env, spec, auth, web) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `RunAuth()`, `RunWeb()`, `BuildMux()`, `ConfigDir()` |
-| `coordinator` | Cloud coordination plane: the wallfacerd role signed-in local instances connect to over one outbound WebSocket (presence, spec comments, metadata projection) | `Registry`, `CommentStore` (memory + Postgres) |
+| `cli` | CLI subcommand implementations (run, status, doctor/env, spec) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
 | `graph` | Server-side unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) behind `GET /api/graph` | `Build()` |
-| `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()`, `ForceLogin()` |
-| `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) plus in-process `topos`; replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Topos`, `Harness`, `Register()`, `Lookup()`, `Default()` |
+| `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
+| `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `oteltest` | Test-only: installs a recording OpenTelemetry SDK and a trace-header-recording HTTP server, so instrumentation is checked by the spans it ends and the `traceparent` that reaches the server | `Install()`, `SpanNames()`, `NewServer()`, `Server` |
 | `review` | Review of a waiting task's change by a reviewer on a second model: one round per call, findings sent back as feedback until approval, the round limit or the token budget; the session record lives beside the worktree | `Verifier`, `New()`, `Newest()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
-| `testenv` | Test-only: runs a package's tests with the per-user directories pointed at a temporary directory and the coding-agent CLIs removed from `PATH`, so tests never touch the real sign-in or configuration and never launch a real agent | `RunIsolated()`, `AgentCLIs`, `AgentCLIsOnPath()`, `Within()` |
-| `webserver` | Serves the SPA embedded from `frontend/dist` and the catch-all routes beside the API | `MountSPA()`, `SPAFallback()`, `MountCatchAll()` |
+| `testenv` | Test-only: runs a package's tests with the per-user directories pointed at a temporary directory and the coding-agent CLIs removed from `PATH`, so tests never touch the real configuration and never launch a real agent | `RunIsolated()`, `AgentCLIs`, `AgentCLIsOnPath()`, `Within()` |
+| `webserver` | The catch-all routes beside the API: the SPA shell for client routes, the JSON error envelope for unmatched `/api` paths | `MountCatchAll()` |
 | `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism/automation settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
-| `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex). The latere.ai device-code sign-in is separate: `internal/handler/device_auth.go` drives RFC 8628 against the auth service | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
+| `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; seven-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
-| `speccomment` | Domain types for inline spec comments (the coordinator-authoritative collaboration artifact of the coordination plane) | `Comment`, `Thread`, `Anchor`, `NewID()` |
 | `prompts` | System prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Manager`, `NewManager()`, `WorkspaceDataKey()`, `NewDataKey()` |
 
 Shared utility packages under `internal/pkg/`:
@@ -372,10 +358,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 |---|---|---|
 | `handler.go` | Core `Handler` struct, constructor, autoimplement toggle state, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
-| `principal.go` | Request principal plumbing used by auth/cloud middleware |, (internal) |
-| `force_login.go` | Force-login gate applied in cloud mode (`Handler.ForceLogin`) |, (internal) |
-| `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/me`, `GET /api/auth/orgs`, `PATCH /api/auth/me` |
-| `login.go` | Cloud sign-in flow handler | `GET /login`, `GET /callback`, `GET /logout`, `GET /logout/notify` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
 | `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-review, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoReview()`, etc. |
@@ -396,10 +378,8 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `specs.go` | Spec tree with metadata, progress, and archive/unarchive transitions | `GET /api/specs/tree`, `GET /api/specs/stream`, `POST /api/specs/transition` |
 | `specs_dispatch.go` | Atomic dispatch/undispatch pipeline that creates board tasks from validated leaf specs and writes `dispatched_task_id` back into the spec frontmatter | `POST /api/specs/transition` (`action: dispatch\|undispatch`) |
 | `terminal.go` | WebSocket terminal relay for the host shell | `GET /api/terminal/ws` |
-| `device_auth.go` | Local device-code sign-in (RFC 8628) against the latere.ai auth service; the done-poll mints the session cookie | `POST /api/auth/device/start`, `GET /api/auth/device/poll`, `POST /api/auth/device/cancel` |
 | `whiteboard.go` | Per-workspace whiteboard document persistence | `GET /api/whiteboard`, `PUT /api/whiteboard` |
 | `graph.go` | Unified spec+task dependency graph for Mission Control | `GET /api/graph` |
-| `speccomments.go` / `commentrelay.go` | Inline spec comments and the coordination relay | `GET/POST /api/spec-comments`, `GET /api/spec-comments/stream`, `GET /api/coordination/status`, `POST /api/coordination/opt-in` |
 
 There is no `refine.go` (prompt refinement is the agent session tool above) and no `containers.go` / `GET /api/containers` endpoint.
 
@@ -429,7 +409,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Recovery**, On startup, `RecoverOrphanedTasks` inspects `in_progress` and `committing` tasks against actual process and worktree state, recovering or failing them as appropriate.
 
-**Security**, API key + cookie/JWT auth, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits, superadmin gating for admin routes.
+**Security**, a per-machine server key, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits.
 
 **Circuit breakers**, Per-watcher exponential backoff suppresses individual automation loops on failure; an agent-launch circuit breaker blocks launches when a CLI is unavailable. See [Automation](../guide/automation.md).
 

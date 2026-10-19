@@ -27,7 +27,7 @@ Escape closes any open Excalidraw dialog (the library panel, export dialogs, and
 ## Current limits
 
 - One scene per workspace; there is no support for multiple named boards yet.
-- Scenes are stored by the local server only; cloud sync between machines is not available.
+- Scenes are stored by the local server only.
 - Libraries live in the browser's local storage, so they do not follow the workspace to another browser or machine.
 
 ## See also
