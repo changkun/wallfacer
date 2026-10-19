@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 
 export type Theme = 'light' | 'dark' | 'auto';
-export type Locale = 'en' | 'zh';
 
 // Color palettes are a separate axis from light/dark: a palette defines the
 // hues, the theme picks the mode. `clay` (clay accent on a neutral canvas) is
@@ -29,13 +28,10 @@ export const PALETTES: PaletteInfo[] = [
   { name: 'copper', label: 'Copper', swatches: ['#9a5b2e', '#faf8f4', '#c88a4e', '#121009'] },
 ];
 
-// Theme key matches the legacy ui/ so both UIs read/write the same
-// preference. Without this, cloud and local mode (and the legacy and Vue
-// surfaces during the migration) end up with disagreeing themes when
-// opened in different tabs.
+// The inline script in index.html reads the same keys to paint the first
+// frame in the stored theme and palette.
 const THEME_KEY = 'wallfacer-theme';
 const PALETTE_KEY = 'wallfacer-palette';
-const LOCALE_KEY = 'latere-lang';
 
 function hasStorage(): boolean {
   try { return typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'; }
@@ -54,14 +50,6 @@ function readPalette(): PaletteName {
   return PALETTES.some((p) => p.name === v) ? (v as PaletteName) : 'clay';
 }
 
-function readLocale(): Locale {
-  if (!hasStorage()) return 'en';
-  const v = localStorage.getItem(LOCALE_KEY);
-  if (v === 'en' || v === 'zh') return v;
-  if (typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('zh')) return 'zh';
-  return 'en';
-}
-
 function resolveTheme(t: Theme): 'light' | 'dark' {
   if (t !== 'auto') return t;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -78,12 +66,6 @@ function applyPalette(p: PaletteName) {
   else document.documentElement.setAttribute('data-palette', p);
 }
 
-function applyLocale(l: Locale) {
-  if (typeof document === 'undefined') return;
-  document.documentElement.setAttribute('lang', l);
-  document.cookie = `${LOCALE_KEY}=${l};path=/;max-age=31536000;SameSite=Lax`;
-}
-
 const mediaQuery = typeof window !== 'undefined' && window.matchMedia
   ? window.matchMedia('(prefers-color-scheme: dark)')
   : null;
@@ -91,11 +73,9 @@ const mediaQuery = typeof window !== 'undefined' && window.matchMedia
 export const usePrefsStore = defineStore('prefs', () => {
   const theme = ref<Theme>(readTheme());
   const palette = ref<PaletteName>(readPalette());
-  const locale = ref<Locale>(readLocale());
 
   applyTheme(theme.value);
   applyPalette(palette.value);
-  applyLocale(locale.value);
 
   watch(theme, (t) => {
     if (hasStorage()) localStorage.setItem(THEME_KEY, t);
@@ -104,10 +84,6 @@ export const usePrefsStore = defineStore('prefs', () => {
   watch(palette, (p) => {
     if (hasStorage()) localStorage.setItem(PALETTE_KEY, p);
     applyPalette(p);
-  });
-  watch(locale, (l) => {
-    if (hasStorage()) localStorage.setItem(LOCALE_KEY, l);
-    applyLocale(l);
   });
 
   if (mediaQuery) {
@@ -121,7 +97,6 @@ export const usePrefsStore = defineStore('prefs', () => {
   }
   function setTheme(t: Theme) { theme.value = t; }
   function setPalette(p: PaletteName) { palette.value = p; }
-  function setLocale(l: Locale) { locale.value = l; }
 
-  return { theme, palette, locale, toggleTheme, setTheme, setPalette, setLocale };
+  return { theme, palette, toggleTheme, setTheme, setPalette };
 });
