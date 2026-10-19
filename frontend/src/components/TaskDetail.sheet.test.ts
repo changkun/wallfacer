@@ -13,7 +13,7 @@ function makeTask(over: Partial<Task> = {}): Task {
     id: 't1', title: 'Task', prompt: 'p', status: 'backlog', archived: false, result: null, stop_reason: null,
     turns: 0, timeout: 0, usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, cost_usd: 0 },
     sandbox: '', position: 0, created_at: '', updated_at: '', branch_name: '', commit_message: '', model: '', kind: '',
-    tags: [], depends_on: [], failure_category: '', fresh_start: false, is_test_run: false, last_test_result: '',
+    tags: [], failure_category: '', fresh_start: false,
     session_id: null, worktree_paths: {}, usage_breakdown: {}, ...over,
   } as Task;
 }
@@ -48,9 +48,9 @@ const ghosts = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButto
 describe('TaskDetail sheet', () => {
   it.each([
     ['backlog', {}, ['start'], ['edit']],
-    ['waiting', { session_id: 's', worktree_paths: { '/repo': '/wt/repo' } }, ['done'], ['test', 'sync', 'cancel']],
-    ['failed', { session_id: 's' }, ['resume'], ['test', 'sync', 'retry']],
-    ['done', {}, [], ['test', 'archive']],
+    ['waiting', { session_id: 's', worktree_paths: { '/repo': '/wt/repo' } }, ['done'], ['sync', 'cancel']],
+    ['failed', { session_id: 's' }, ['resume'], ['sync', 'retry']],
+    ['done', {}, [], ['archive']],
   ] as const)('%s: one ink action, the rest ghosts', async (status, over, wantInk, wantGhost) => {
     const { app, host } = await mount(makeTask({ status: status as Task['status'], ...over }));
     expect(ink(host)).toEqual(wantInk);

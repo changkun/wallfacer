@@ -11,7 +11,7 @@ Start here for the full reading order.
 
 ### Use Wallfacer
 
-- [Board](board.md). The task board: lifecycle, dependencies, batch creation, search, the task detail view.
+- [Board](board.md). The task board: lifecycle, search, the task detail view.
 - [Plan](plan.md). Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations.
 
 ### Operate
@@ -28,7 +28,7 @@ Start here for the full reading order.
 2. Issue `/create` to scaffold a first draft.
 3. Refine with `/refine`, `/impact`, then `/validate`.
 4. If the spec is too large, `/break-down` into sub-specs or leaf tasks.
-5. When leaves are ready, `/dispatch` to push them to the board with dependency wiring.
+5. When leaves are ready, `/dispatch` to push them to the board.
 6. After tasks finish, `/review-impl` and `/wrapup` to close out the parent.
 
 ### Parallel feature development
@@ -40,13 +40,6 @@ Create multiple Backlog tasks and start each one; Wallfacer runs them concurrent
 1. Create a task and run it.
 2. Review the diff and mark it Done if it looks right, or send feedback if it needs adjustment.
 3. Continue the feedback loop until the result is satisfactory, then mark Done.
-
-### Test-driven acceptance
-
-1. Write a task prompt that includes clear acceptance criteria.
-2. Run the task; when it reaches Waiting, click Test (see [Oversight](oversight.md)).
-3. If it fails, send feedback with the test output; re-run until passing.
-4. Mark Done to commit.
 
 ## For Developers
 

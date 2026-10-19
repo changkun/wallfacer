@@ -49,9 +49,9 @@ graph TB
 
 **Worktree isolation, not container isolation.** Every agent turn is a host process whose CWD is the task's git worktree. Tasks isolate from each other through separate worktrees and `task/<id>` branches, not through a sandboxed runtime. Tasks work in parallel without merge conflicts during execution; rebase and merge happen at commit time.
 
-**Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
+**Activity-routed harness + model.** Different activities (implementation, oversight, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
 
-**Runs start on request.** No background loop starts, tests, submits, syncs, or retries a task. Each run begins with a request (start, feedback, test, sync, Mark as Done), and the parallel limit is checked when a task starts.
+**Runs start on request.** No background loop starts, submits, syncs, or retries a task. Each run begins with a request (start, feedback, sync, Mark as Done), and the parallel limit is checked when a task starts.
 
 ### Recent migrations
 
@@ -91,13 +91,13 @@ flowchart TD
 
 ## Background Work
 
-No background loop starts, tests, submits, syncs, or retries a task; each run begins with a request. Besides the goroutines those requests start, the server runs the startup recovery pass and two worktree maintenance goroutines (`StartWorktreeGC`, `StartWorktreeHealthWatcher`). See [Background Work and Recovery](background-work.md).
+No background loop starts, submits, syncs, or retries a task; each run begins with a request. Besides the goroutines those requests start, the server runs the startup recovery pass and two worktree maintenance goroutines (`StartWorktreeGC`, `StartWorktreeHealthWatcher`). See [Background Work and Recovery](background-work.md).
 
 ## Agent Roles and the Dispatch Layer
 
-Every task runs one built-in pipeline. `internal/agents/` holds its **Role** descriptors: exactly five built-ins (`title`, `oversight`, `commit-msg`, `impl`, `test`; `internal/agents/builtins.go`). A role names what an agent is and which prompt template it renders; the runner's binding table (`internal/runner/agent_bindings.go`) holds the dispatch plumbing per slug (activity, mount mode, timeout, result parser). Each role's harness follows the task's harness, its per-activity override, or the `WALLFACER_SANDBOX_*` settings.
+Every task runs one built-in pipeline. `internal/agents/` holds its **Role** descriptors: exactly four built-ins (`oversight`, `commit-msg`, `impl`, `review`; `internal/agents/builtins.go`). A role names what an agent is and which prompt template it renders; the runner's binding table (`internal/runner/agent_bindings.go`) holds the dispatch plumbing per slug (activity, mount mode, timeout, result parser). Each role's harness follows the task's harness, its per-activity override, or the `WALLFACER_SANDBOX_*` settings.
 
-Task execution runs the turn loop in `internal/runner/execute.go`: impl, then test when requested, then the commit pipeline, with full session-recovery semantics. A task or setting that names a harness no longer registered resolves to the next routing tier and, last, to `harness.Default()`.
+Task execution runs the turn loop in `internal/runner/execute.go`: impl, then the commit pipeline, with full session-recovery semantics. A task or setting that names a harness no longer registered resolves to the next routing tier and, last, to `harness.Default()`.
 
 `Task.FlowID` is a record field kept for stored tasks and is not read for dispatch; a stored task that names a fleet gets one notice on its timeline and runs the same pipeline.
 
@@ -105,7 +105,7 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl, then te
 
 **Store** (`internal/store/`), In-memory task state guarded by `sync.RWMutex`, persisted through the `StorageBackend` seam. Enforces the state machine via a transition table. Provides pub/sub for live deltas and a full-text search index.
 
-**Runner** (`internal/runner/`), Orchestration engine. Creates worktrees, builds launch specs, execs the agent CLI as a host process, runs the turn loop, accumulates usage, enforces budgets, runs the commit pipeline, and generates titles/oversight in the background.
+**Runner** (`internal/runner/`), Orchestration engine. Creates worktrees, builds launch specs, execs the agent CLI as a host process, runs the turn loop, accumulates usage, enforces budgets, runs the commit pipeline, and generates oversight in the background.
 
 **Handler** (`internal/handler/`), REST API and SSE endpoints organized by concern.
 
@@ -121,7 +121,7 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl, then te
 
 ### Two storage seams
 
-- `store.StorageBackend` (`internal/store/backend.go`) abstracts the three persistence concerns: tasks (structured, indexed), events (ordered, append-heavy), and blobs (named bytes per task). Domain concepts map onto these primitives; for example `SaveOversight` becomes `SaveBlob(id, "oversight", data)`. Oversight persists as a single blob (`oversight.json`, and `oversight-test.json` for the test phase) via `SaveBlob`, not a per-id file under `oversights/`.
+- `store.StorageBackend` (`internal/store/backend.go`) abstracts the three persistence concerns: tasks (structured, indexed), events (ordered, append-heavy), and blobs (named bytes per task). Domain concepts map onto these primitives; for example `SaveOversight` becomes `SaveBlob(id, "oversight", data)`. Oversight persists as a single blob (`oversight.json`) via `SaveBlob`, not a per-id file under `oversights/`.
 - `executor.Backend` (`internal/executor/`) abstracts agent launch. `HostBackend` is the only implementation.
 
 ### Request middleware
@@ -149,7 +149,6 @@ sequenceDiagram
     H->>S: CreateTaskWithOptions()
     S->>S: saveTask() + notify()
     S-->>SSE: SequencedDelta (new task)
-    H->>R: GenerateTitleBackground()
 
     B->>H: PATCH /api/tasks/{id} {status: in_progress}
     H->>S: UpdateTaskStatus()
@@ -195,7 +194,7 @@ sequenceDiagram
 
 ### 1. Task creation
 
-The browser sends `POST /api/tasks` with a prompt and optional goal. `Handler.CreateTask` (`internal/handler/tasks.go`) decodes the request, validates harness availability, and calls `Store.CreateTaskWithOptions` (`internal/store/tasks_create_delete.go`). The store assigns a UUID, writes `task.json` atomically (temp file + rename), adds the task to the in-memory map, and calls `notify()` which fans the new `SequencedDelta` to all SSE subscribers. Back in the handler, `Runner.GenerateTitleBackground` (`internal/runner/runner.go`) fires a background goroutine tracked by `backgroundWg` that runs a lightweight host-process agent to generate a short title from the prompt.
+The browser sends `POST /api/tasks` with a prompt and optional goal. `Handler.CreateTask` (`internal/handler/tasks.go`) decodes the request, validates harness availability, and calls `Store.CreateTaskWithOptions` (`internal/store/tasks_create_delete.go`). The store assigns a UUID, takes the title from the request or else from the prompt's first non-blank line (`store.DeriveTitle`), writes `task.json` atomically (temp file + rename), adds the task to the in-memory map, and calls `notify()` which fans the new `SequencedDelta` to all SSE subscribers.
 
 ### 2. Move to in_progress
 
@@ -234,7 +233,7 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 ### Goroutine model
 
-There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedwg.WaitGroup`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
+There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedwg.WaitGroup`) tracks all fire-and-forget background work: oversight generation (`GenerateOversightBackground`) and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"oversight:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
 ### Pub/sub channels
 
@@ -294,7 +293,7 @@ Every `internal/` package and its role in the system:
 
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
-| `agents` | The five built-in role descriptors: `title`, `oversight`, `commit-msg`, `impl`, `test` | `Role`, `BuiltinAgents` |
+| `agents` | The four built-in role descriptors: `oversight`, `commit-msg`, `impl`, `review` | `Role`, `BuiltinAgents` |
 | `apicontract` | Single source of truth for all HTTP API routes; generates `docs/internals/api-contract.json` | `Route`, `Routes` (slice), `Route.FullPattern()` |
 | `cli` | CLI subcommand implementations (run, status, doctor/env, spec) and shared helpers | `RunServer()`, `RunStatus()`, `RunDoctor()`, `RunSpec()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
@@ -310,7 +309,7 @@ Every `internal/` package and its role in the system:
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; seven-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
-| `prompts` | Embedded system prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Title()`, `CommitMessage()`, `Oversight()`, `WorkspaceDataKey()`, `NewDataKey()` |
+| `prompts` | Embedded system prompt templates (commit, oversight, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `CommitMessage()`, `Oversight()`, `WorkspaceDataKey()`, `NewDataKey()` |
 
 Shared utility packages under `internal/pkg/`:
 
@@ -329,9 +328,9 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 |---|---|---|
 | `handler.go` | Core `Handler` struct, constructor, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
-| `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
+| `tasks.go` | Task CRUD, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
-| `tasks_concurrency.go` | The transition lock, the parallel-task limit, and dependency cycle checks | `checkConcurrencyAndUpdateStatus()`, `taskReachable()` (internal helpers) |
+| `tasks_concurrency.go` | The transition lock and the parallel-task limit | `checkConcurrencyAndUpdateStatus()` (internal helper) |
 | `stream.go` | SSE streaming for live task updates and agent logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |
 | `config.go` | Server configuration (workspaces, workspace groups and their parallel limits, harness list) | `GET /api/config`, `PUT /api/config` |
 | `env.go` | Environment configuration (API tokens, model settings, harness routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |
@@ -389,7 +388,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 - [Development Setup](development.md), building from source, tests, make targets, releases
 - [Data & Storage](data-and-storage.md), persistence, models, migrations, search index
-- [Task Lifecycle](task-lifecycle.md), states, turn loop, dependencies, board context
+- [Task Lifecycle](task-lifecycle.md), states, turn loop, board context
 - [Git Operations](git-worktrees.md), worktrees, commit pipeline, branch management
 - [Workspaces & Configuration](workspaces-and-config.md), workspace manager, AGENTS.md, harnesses, templates
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

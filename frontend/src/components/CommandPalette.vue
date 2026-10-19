@@ -158,7 +158,6 @@ function tabJumps(task: Task): { tab: string; label: string }[] {
   if (task.status === 'backlog') return [];
   const jumps = [{ tab: 'changes', label: 'Open changes' }];
   if (task.turns > 0) {
-    jumps.push({ tab: 'verification', label: 'Open verification' });
     jumps.push({ tab: 'timeline', label: 'Open timeline' });
   }
   return jumps;
@@ -316,7 +315,6 @@ async function runTaskAction(action: CardAction, task: Task) {
     case 'retry': await api('PATCH', `/api/tasks/${id}`, { status: 'backlog' }); break;
     case 'done': await api('POST', `/api/tasks/${id}/done`); break;
     case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
-    case 'test': await api('POST', `/api/tasks/${id}/test`); break;
     case 'sync': await api('POST', '/api/git/sync', { task_id: id }); break;
   }
   close();

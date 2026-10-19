@@ -13,7 +13,6 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
-	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
@@ -70,7 +69,7 @@ func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 		return
 	}
 
-	phases, err := r.runOversightAgent(taskID, store.SandboxActivityOversight, log)
+	phases, err := r.runOversightAgent(taskID, log)
 	if err != nil {
 		logger.Runner.Warn("oversight: agent failed", "task", taskID, "error", err)
 		_ = r.taskStore(taskID).SaveOversight(taskID, store.TaskOversight{
@@ -89,72 +88,9 @@ func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 	}
 }
 
-// GenerateTestOversight produces a high-level aggregated summary of the test
-// agent's execution turns and persists it as oversight-test.json in the task
-// directory. fromTurn is the implementation's last turn count; only turns
-// strictly after this boundary (fromTurn+1 onwards) are included.
-//
-// It is called synchronously after a test run transitions the task back to
-// "waiting", so the summary is always in a terminal state when the task
-// becomes visible as "waiting".
-//
-// Concurrent calls for the same task are serialized via a per-task mutex.
-func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
-	mu := r.oversightLock(taskID)
-	mu.Lock()
-	defer mu.Unlock()
-	r.generateTestOversightLocked(taskID, fromTurn)
-}
-
-// generateTestOversightLocked is the implementation of GenerateTestOversight.
-// The caller must hold the per-task oversightLock before calling this function.
-func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
-	ctx := r.shutdownCtx
-
-	_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
-		Status: store.OversightStatusGenerating,
-	})
-
-	log, err := r.buildActivityLog(ctx, taskID, fromTurn+1)
-	if err != nil {
-		logger.Runner.Warn("test oversight: build activity log", "task", taskID, "error", err)
-		_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
-			Status: store.OversightStatusFailed,
-			Error:  fmt.Sprintf("build activity log: %v", err),
-		})
-		return
-	}
-
-	if len(log) == 0 {
-		_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
-			Status: store.OversightStatusFailed,
-			Error:  "no test agent activity found",
-		})
-		return
-	}
-
-	phases, err := r.runOversightAgent(taskID, store.SandboxActivityOversightTest, log)
-	if err != nil {
-		logger.Runner.Warn("test oversight: agent failed", "task", taskID, "error", err)
-		_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
-			Status: store.OversightStatusFailed,
-			Error:  fmt.Sprintf("oversight agent: %v", err),
-		})
-		return
-	}
-
-	if err := r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
-		Status:      store.OversightStatusReady,
-		GeneratedAt: time.Now(),
-		Phases:      phases,
-	}); err != nil {
-		logger.Runner.Warn("test oversight: save failed", "task", taskID, "error", err)
-	}
-}
-
 // oversightIntervalFromEnv reads WALLFACER_OVERSIGHT_INTERVAL from the env file
 // and returns it as a time.Duration. Returns 0 if the file is missing, unset,
-// or set to 0 (disabled). Mirrors the pattern used by titleModelFromEnvForSandbox.
+// or set to 0 (disabled).
 func (r *Runner) oversightIntervalFromEnv() time.Duration {
 	if r.envFile == "" {
 		return 0
@@ -674,10 +610,7 @@ type oversightResult struct {
 // roleOversight is the headless-tier descriptor for the oversight-
 // summary sub-agent. Parses the post-run event timeline and returns a
 // structured []OversightPhase; the caller then fills in missing phase
-// timestamps from the real activity log. Both the regular and the
-// test-run oversight share this descriptor; callers pass the
-// activity-specific label via runAgentOpts.ActivityOverride so usage
-// is split correctly in the cost dashboard.
+// timestamps from the real activity log.
 // parseOversightAgentResult decodes the structured JSON the oversight
 // agent emits into a typed store.OversightPhase list. The runner-side
 // binding wires this in agent_bindings.go.
@@ -690,9 +623,9 @@ func parseOversightAgentResult(o *agentOutput) (any, error) {
 }
 
 // runOversightAgent runs a lightweight agent container with the activity log and
-// parses the structured JSON it produces. agent is the sub-agent activity used for
-// usage attribution (SandboxActivityOversight or SandboxActivityOversightTest).
-func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity, activities []turnActivity) ([]store.OversightPhase, error) {
+// parses the structured JSON it produces. Its usage is attributed to
+// SandboxActivityOversight.
+func (r *Runner) runOversightAgent(taskID uuid.UUID, activities []turnActivity) ([]store.OversightPhase, error) {
 	log := formatActivityLog(activities)
 
 	// Cap total log size to avoid exceeding prompt limits.
@@ -708,17 +641,13 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	}
 
 	res, err := r.runAgent(r.shutdownCtx, agents.Oversight, task, prompt, runAgentOpts{
-		EmitSpanEvents:   true,
-		TrackUsage:       true,
-		Turn:             1,
-		ActivityOverride: agent,
-		// Oversight historically uses the same "small model" env var
-		// as title so operators can route both to a cheaper model.
-		ModelResolver: func(sb harness.ID) string { return r.titleModelFromEnvForSandbox(sb) },
+		EmitSpanEvents: true,
+		TrackUsage:     true,
+		Turn:           1,
 	})
 	if err != nil {
 		logger.Runner.Warn("oversight: agent container failed",
-			"task", taskID, "agent", agent, "error", err)
+			"task", taskID, "error", err)
 		return nil, err
 	}
 	phases, _ := res.Parsed.([]store.OversightPhase)

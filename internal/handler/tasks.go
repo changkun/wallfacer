@@ -3,9 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -14,7 +12,6 @@ import (
 	"latere.ai/x/pkg/statemachine"
 
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -164,38 +161,29 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 	return filtered
 }
 
-// taskCreateFields are the fields of a new task that both POST /api/tasks
-// and each task of POST /api/tasks/batch accept. Both request types embed
-// it, so the JSON fields and their mapping onto the stored task are defined
-// once and a field single create takes cannot be missing from batch create.
-// Each request type adds only what differs: batch create's ref, dependency
-// refs and spec source path, and the sandbox fields both reject in their
-// own shape.
+// taskCreateFields are the fields of a new task that POST /api/tasks
+// accepts, with their mapping onto the stored task in apply.
 type taskCreateFields struct {
-	Prompt             string         `json:"prompt"`
-	Criteria           string         `json:"criteria"`
-	Timeout            int            `json:"timeout"`
-	Kind               store.TaskKind `json:"kind"`
-	Tags               []string       `json:"tags"`
-	CustomPassPatterns []string       `json:"custom_pass_patterns,omitempty"`
-	CustomFailPatterns []string       `json:"custom_fail_patterns,omitempty"`
-	MaxCostUSD         float64        `json:"max_cost_usd"`
-	MaxInputTokens     int            `json:"max_input_tokens"`
-	Model              string         `json:"model"`
+	Title          string         `json:"title"`
+	Prompt         string         `json:"prompt"`
+	Timeout        int            `json:"timeout"`
+	Kind           store.TaskKind `json:"kind"`
+	Tags           []string       `json:"tags"`
+	MaxCostUSD     float64        `json:"max_cost_usd"`
+	MaxInputTokens int            `json:"max_input_tokens"`
+	Model          string         `json:"model"`
 }
 
-// apply copies the fields into opts. The store normalizes the model and the
-// budget: a negative limit becomes unlimited and a blank model leaves the
-// global default in effect. The caller validates the prompt and the custom
-// patterns first.
+// apply copies the fields into opts. The store normalizes the title, the
+// model and the budget: a blank title is derived from the prompt, a negative
+// limit becomes unlimited, and a blank model leaves the global default in
+// effect. The caller validates the prompt first.
 func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
+	opts.Title = f.Title
 	opts.Prompt = f.Prompt
-	opts.Criteria = f.Criteria
 	opts.Timeout = f.Timeout
 	opts.Kind = f.Kind
 	opts.Tags = f.Tags
-	opts.CustomPassPatterns = f.CustomPassPatterns
-	opts.CustomFailPatterns = f.CustomFailPatterns
 	opts.MaxCostUSD = f.MaxCostUSD
 	opts.MaxInputTokens = f.MaxInputTokens
 	opts.ModelOverride = f.Model
@@ -233,10 +221,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
-	if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	s, ok2 := h.requireStore(w)
 	if !ok2 {
 		return
@@ -253,323 +237,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
 
-	h.runner.GenerateTitleBackground(task.ID, task.Prompt)
-
 	httpjson.Write(w, http.StatusCreated, task)
-}
-
-// batchTaskInput describes a single task in a BatchCreateTasks request.
-//
-// The embedded taskCreateFields carries every field POST /api/tasks takes
-// for a new task. Sandbox + SandboxByActivity are typed as pointers so the
-// handler can distinguish "not sent" (nil) from "explicitly empty" and
-// reject callers that still pass the deprecated fields rather than
-// silently dropping them.
-type batchTaskInput struct {
-	taskCreateFields
-	Ref               string                                `json:"ref"`
-	Sandbox           *harness.ID                           `json:"sandbox,omitempty"`
-	SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
-	DependsOnRefs     []string                              `json:"depends_on_refs"`
-	SpecSourcePath    string                                `json:"spec_source_path"`
-}
-
-type batchCreateRequest struct {
-	Tasks []batchTaskInput `json:"tasks"`
-}
-
-// batchRefLabel returns a human-readable label for a batch task in error
-// messages: its caller-supplied ref, or "<index N>" when no ref was given.
-func batchRefLabel(ref string, i int) string {
-	if ref != "" {
-		return ref
-	}
-	return fmt.Sprintf("<index %d>", i)
-}
-
-// BatchCreateTasks creates multiple tasks atomically with dependency wiring via
-// symbolic ref names declared within the batch. The handler runs a full preflight
-// validation phase before any persistence: duplicate refs, empty prompts, sandbox
-// validity, existence of external dependency UUIDs, self-dependencies, and cycle
-// detection against the combined graph of existing tasks plus proposed edges.
-// If validation fails the store is untouched and the handler returns 400 or 422.
-// On success it returns 201 Created with tasks (in input order) and ref_to_id.
-func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
-	req, ok := httpjson.DecodeBody[batchCreateRequest](w, r)
-	if !ok {
-		return
-	}
-
-	if len(req.Tasks) == 0 {
-		http.Error(w, "tasks must not be empty", http.StatusBadRequest)
-		return
-	}
-	if len(req.Tasks) > 50 {
-		http.Error(w, "tasks must not exceed 50 items", http.StatusBadRequest)
-		return
-	}
-
-	// Capture the store once so all validation and persistence use the same
-	// workspace group, regardless of concurrent workspace switches.
-	s, ok2 := h.requireStore(w)
-	if !ok2 {
-		return
-	}
-
-	n := len(req.Tasks)
-
-	// =========================================================================
-	// PREFLIGHT VALIDATION — zero side effects; all checks run before any write
-	// =========================================================================
-
-	// 1. Collect refs and validate uniqueness.
-	refToIdx := make(map[string]int, n)
-	for i, t := range req.Tasks {
-		if t.Ref == "" {
-			continue
-		}
-		if _, dup := refToIdx[t.Ref]; dup {
-			http.Error(w, fmt.Sprintf("duplicate ref: %q", t.Ref), http.StatusBadRequest)
-			return
-		}
-		refToIdx[t.Ref] = i
-	}
-
-	// 2. Validate prompts and the custom test-verdict patterns, which
-	//    POST /api/tasks rejects with the same message.
-	for i, t := range req.Tasks {
-		if strings.TrimSpace(t.Prompt) == "" {
-			ref := t.Ref
-			if ref == "" {
-				ref = "<unnamed>"
-			}
-			http.Error(w, fmt.Sprintf("ref %q: prompt is required", ref), http.StatusBadRequest)
-			return
-		}
-		if err := validateCustomPatterns(t.CustomPassPatterns, t.CustomFailPatterns); err != nil {
-			http.Error(w, fmt.Sprintf("ref %q: %v", batchRefLabel(t.Ref, i), err), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// 3. Reject the sandbox / sandbox_by_activity fields. Batch callers
-	// set a task's harness the same way POST /api/tasks callers do:
-	// via PATCH /api/tasks/{id} after the batch lands.
-	for i, t := range req.Tasks {
-		if t.Sandbox != nil {
-			ref := batchRefLabel(t.Ref, i)
-			http.Error(w, fmt.Sprintf("ref %q: \"sandbox\" is not accepted on POST /api/tasks/batch; set the task's harness via PATCH /api/tasks/{id} after creation", ref), http.StatusBadRequest)
-			return
-		}
-		if t.SandboxByActivity != nil {
-			ref := batchRefLabel(t.Ref, i)
-			http.Error(w, fmt.Sprintf("ref %q: \"sandbox_by_activity\" is not accepted on POST /api/tasks/batch; set the task's per-activity harnesses via PATCH /api/tasks/{id} after creation", ref), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// 4. Validate each depends_on_refs entry is a known batch ref or a valid UUID syntax.
-	for i, t := range req.Tasks {
-		for _, dep := range t.DependsOnRefs {
-			if _, ok := refToIdx[dep]; !ok {
-				if _, err := uuid.Parse(dep); err != nil {
-					ref := batchRefLabel(t.Ref, i)
-					http.Error(w, fmt.Sprintf("ref %q: unknown ref in depends_on_refs: %q", ref, dep), http.StatusBadRequest)
-					return
-				}
-			}
-		}
-	}
-
-	// 5. Topological sort on batch-internal edges (Kahn's algorithm) to detect
-	//    internal cycles and compute creation order. Tasks are created in this
-	//    order so that a task's dependencies always exist before the task itself.
-	inDegree := make([]int, n)
-	// batchAdj[i] holds the indices of tasks that depend on task i (forward edges).
-	batchAdj := make([][]int, n)
-	for i, t := range req.Tasks {
-		for _, dep := range t.DependsOnRefs {
-			if depIdx, ok := refToIdx[dep]; ok {
-				batchAdj[depIdx] = append(batchAdj[depIdx], i)
-				inDegree[i]++
-			}
-		}
-	}
-	// Seed the queue with tasks that have no batch-internal dependencies.
-	queue := make([]int, 0, n)
-	for i := range n {
-		if inDegree[i] == 0 {
-			queue = append(queue, i)
-		}
-	}
-	// Process: when a task is emitted, decrement its dependents' in-degree.
-	topoOrder := make([]int, 0, n)
-	for len(queue) > 0 {
-		curr := queue[0]
-		queue = queue[1:]
-		topoOrder = append(topoOrder, curr)
-		for _, next := range batchAdj[curr] {
-			inDegree[next]--
-			if inDegree[next] == 0 {
-				queue = append(queue, next)
-			}
-		}
-	}
-	// If not all tasks were emitted, the remaining ones form a cycle.
-	if len(topoOrder) != n {
-		processed := make(map[int]bool, len(topoOrder))
-		for _, idx := range topoOrder {
-			processed[idx] = true
-		}
-		var cycleRefs []string
-		for i, t := range req.Tasks {
-			if !processed[i] {
-				ref := batchRefLabel(t.Ref, i)
-				cycleRefs = append(cycleRefs, ref)
-			}
-		}
-		httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
-			"error": "cycle detected",
-			"cycle": cycleRefs,
-		})
-		return
-	}
-
-	// 6. Pre-assign UUIDs so external-dep existence checks and full-graph cycle
-	//    detection can reason about the complete post-creation dependency graph.
-	preAssignedIDs := make([]uuid.UUID, n)
-	for i := range req.Tasks {
-		preAssignedIDs[i] = uuid.New()
-	}
-
-	// 7. Verify every external UUID dep actually exists in the store.
-	//    Batch-internal refs (including a task referencing its own ref) are
-	//    already validated by Kahn's topo sort in step 5: a self-loop leaves
-	//    inDegree > 0, so the batch fails with 422 there before reaching here.
-	for i, t := range req.Tasks {
-		for _, dep := range t.DependsOnRefs {
-			if _, ok := refToIdx[dep]; ok {
-				continue
-			}
-			// External UUID — verify it exists.
-			depID, _ := uuid.Parse(dep) // already confirmed parseable in step 4
-			if _, err := s.GetTask(r.Context(), depID); err != nil {
-				ref := batchRefLabel(t.Ref, i)
-				httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
-					"error": fmt.Sprintf("ref %q: dependency task not found: %s", ref, dep),
-				})
-				return
-			}
-		}
-	}
-
-	// 8. Full combined-graph cycle check: build an adjacency map that merges
-	//    existing task edges with the proposed batch edges (using pre-assigned
-	//    UUIDs) and confirm no new cycle is introduced.
-	//    Note: existing tasks cannot reference the freshly pre-assigned UUIDs, so
-	//    cycles through external deps are mathematically impossible here; this
-	//    check is defence-in-depth and guards against any future store changes.
-	allTasks, _ := s.ListTasks(r.Context(), true)
-	combinedAdj := make(map[uuid.UUID][]uuid.UUID, len(allTasks)+n)
-	for _, t := range allTasks {
-		for _, depStr := range t.DependsOn {
-			if depID, err := uuid.Parse(depStr); err == nil {
-				combinedAdj[t.ID] = append(combinedAdj[t.ID], depID)
-			}
-		}
-	}
-	for i, t := range req.Tasks {
-		myID := preAssignedIDs[i]
-		for _, dep := range t.DependsOnRefs {
-			var depID uuid.UUID
-			if depIdx, ok := refToIdx[dep]; ok {
-				depID = preAssignedIDs[depIdx]
-			} else {
-				var parseErr error
-				depID, parseErr = uuid.Parse(dep)
-				if parseErr != nil {
-					logger.Handler.Warn("batch create: invalid dependency ref UUID", "ref", dep, "error", parseErr)
-				}
-			}
-			combinedAdj[myID] = append(combinedAdj[myID], depID)
-		}
-	}
-	for i, t := range req.Tasks {
-		myID := preAssignedIDs[i]
-		for _, depID := range combinedAdj[myID] {
-			if taskReachableInAdj(combinedAdj, depID, myID) {
-				ref := batchRefLabel(t.Ref, i)
-				httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
-					"error": fmt.Sprintf("ref %q: dependency would create a cycle", ref),
-				})
-				return
-			}
-		}
-	}
-
-	// =========================================================================
-	// PERSISTENCE — all validation passed; create tasks in topological order
-	// =========================================================================
-
-	// refToID maps each batch ref to its created UUID for dependency resolution.
-	refToID := make(map[string]uuid.UUID, n)
-
-	for _, idx := range topoOrder {
-		t := req.Tasks[idx]
-
-		// Resolve depends_on_refs to UUID strings before the store call so the
-		// task is persisted in final form (no post-create UpdateTaskDependsOn).
-		depStrs := make([]string, 0, len(t.DependsOnRefs))
-		for _, dep := range t.DependsOnRefs {
-			if depID, ok := refToID[dep]; ok {
-				depStrs = append(depStrs, depID.String())
-			} else {
-				depStrs = append(depStrs, dep)
-			}
-		}
-
-		batchOpts := store.TaskCreateOptions{
-			ID:             preAssignedIDs[idx],
-			DependsOn:      depStrs,
-			SpecSourcePath: t.SpecSourcePath,
-		}
-		t.apply(&batchOpts)
-		task, err := s.CreateTaskWithOptions(r.Context(), batchOpts)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
-			store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
-
-		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
-
-		if t.Ref != "" {
-			refToID[t.Ref] = task.ID
-		}
-	}
-
-	// Return tasks in input order.
-	finalTasks := make([]store.Task, n)
-	for i := range req.Tasks {
-		updated, err := s.GetTask(r.Context(), preAssignedIDs[i])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		finalTasks[i] = *updated
-	}
-
-	refToIDStr := make(map[string]string, len(refToID))
-	for ref, id := range refToID {
-		refToIDStr[ref] = id.String()
-	}
-
-	httpjson.Write(w, http.StatusCreated, map[string]any{
-		"tasks":     finalTasks,
-		"ref_to_id": refToIDStr,
-	})
 }
 
 // UpdateTask handles PATCH requests: status transitions, position, prompt, etc.
@@ -578,12 +246,10 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Status            *store.TaskStatus                     `json:"status"`
 		Position          *int                                  `json:"position"`
 		Prompt            *string                               `json:"prompt"`
-		Criteria          *string                               `json:"criteria"`
 		Timeout           *int                                  `json:"timeout"`
 		FreshStart        *bool                                 `json:"fresh_start"`
 		Sandbox           *harness.ID                           `json:"sandbox"`
 		SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
-		DependsOn         *[]string                             `json:"depends_on"`
 		Tags              *[]string                             `json:"tags"`
 		// Archived flips the archived flag (replaces POST /archive,/unarchive).
 		Archived *bool `json:"archived"`
@@ -593,9 +259,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		MaxCostUSD     *float64 `json:"max_cost_usd"`
 		MaxInputTokens *int     `json:"max_input_tokens"`
 		// Model sets the per-task model override; empty string clears it.
-		Model              *string  `json:"model"`
-		CustomPassPatterns []string `json:"custom_pass_patterns,omitempty"`
-		CustomFailPatterns []string `json:"custom_fail_patterns,omitempty"`
+		Model *string `json:"model"`
 	}](w, r)
 	if !ok {
 		return
@@ -653,8 +317,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, criteria, timeout, fresh_start, sandbox, model, budget, and custom patterns for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
+	// Allow editing prompt, timeout, fresh_start, sandbox, model, and budget for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -667,19 +331,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
 		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
-		}
-		if req.Criteria != nil {
-			if err := s.UpdateTaskCriteria(r.Context(), id, *req.Criteria); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 		}
 		if req.Sandbox != nil {
 			if err := s.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {
@@ -689,20 +343,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 		if req.Model != nil {
 			if err := s.UpdateTaskModelOverride(r.Context(), id, *req.Model); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		if req.CustomPassPatterns != nil || req.CustomFailPatterns != nil {
-			passP := req.CustomPassPatterns
-			failP := req.CustomFailPatterns
-			if passP == nil {
-				passP = task.CustomPassPatterns
-			}
-			if failP == nil {
-				failP = task.CustomFailPatterns
-			}
-			if err := s.UpdateTaskCustomPatterns(r.Context(), id, passP, failP); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -719,42 +359,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	if req.Position != nil {
 		if err := s.UpdateTaskPosition(r.Context(), id, *req.Position); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	if req.DependsOn != nil {
-		parsedDeps := make([]uuid.UUID, 0, len(*req.DependsOn))
-		for _, depStr := range *req.DependsOn {
-			depID, err := uuid.Parse(depStr)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid dependency UUID %q: %v", depStr, err), http.StatusBadRequest)
-				return
-			}
-			if depID == id {
-				http.Error(w, "task cannot depend on itself", http.StatusBadRequest)
-				return
-			}
-			if _, err := s.GetTask(r.Context(), depID); err != nil {
-				http.Error(w, fmt.Sprintf("dependency task not found: %s", depStr), http.StatusBadRequest)
-				return
-			}
-			parsedDeps = append(parsedDeps, depID)
-		}
-		// Cycle detection using full graph including archived tasks.
-		allTasks, _ := s.ListTasks(r.Context(), true)
-		for _, depID := range parsedDeps {
-			if taskReachable(allTasks, depID, id) {
-				http.Error(w, fmt.Sprintf("dependency on %s would create a cycle", depID), http.StatusBadRequest)
-				return
-			}
-		}
-		strs := make([]string, len(parsedDeps))
-		for i, d := range parsedDeps {
-			strs[i] = d.String()
-		}
-		if err := s.UpdateTaskDependsOn(r.Context(), id, strs); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -838,7 +442,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			return
 		}
 		// Enforce concurrency limit for manual backlog → in_progress transitions.
-		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
+		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
 			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, newStatus) {
 				return
 			}
@@ -864,10 +468,10 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		// failed; backlog is handled above). These transitions only flip the
 		// status and consume a concurrency slot — they do NOT launch an agent
 		// worker, leaving the task stuck in_progress with no worker. Resuming a
-		// waiting/failed task must go through ResumeTask/TestTask/SubmitFeedback,
-		// which pair the status flip with a RunBackground launch.
-		if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
-			http.Error(w, "cannot move a task to in_progress via PATCH; use resume, test, or feedback to start a worker", http.StatusBadRequest)
+		// waiting/failed task must go through ResumeTask/SubmitFeedback, which
+		// pair the status flip with a RunBackground launch.
+		if newStatus == store.TaskStatusInProgress {
+			http.Error(w, "cannot move a task to in_progress via PATCH; use resume or feedback to start a worker", http.StatusBadRequest)
 			return
 		}
 
@@ -885,15 +489,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		if oldStatus == store.TaskStatusBacklog || oldStatus == store.TaskStatusWaiting {
 			h.cascadeArchiveThreadsForTask(id.String())
 		}
-
-		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
-			sessionID := ""
-			if !task.FreshStart && task.SessionID != nil {
-				sessionID = *task.SessionID
-			}
-			h.runner.RunBackground(id, task.Prompt, sessionID, false)
-		}
-
 	}
 
 	updated, err := s.GetTask(r.Context(), id)
@@ -960,21 +555,5 @@ func (h *Handler) applyRestore(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	h.cascadeUnarchiveThreadsForTask(id.String())
-	return nil
-}
-
-// validateCustomPatterns compiles each pattern to ensure it is valid RE2 syntax.
-// Returns a 400-friendly error message that includes the offending pattern.
-func validateCustomPatterns(passPatterns, failPatterns []string) error {
-	for _, p := range passPatterns {
-		if _, err := regexp.Compile(p); err != nil {
-			return fmt.Errorf("invalid custom_pass_pattern %q: %v", p, err)
-		}
-	}
-	for _, p := range failPatterns {
-		if _, err := regexp.Compile(p); err != nil {
-			return fmt.Errorf("invalid custom_fail_pattern %q: %v", p, err)
-		}
-	}
 	return nil
 }

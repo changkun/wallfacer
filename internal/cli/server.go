@@ -625,8 +625,6 @@ func BuildMux(h *handler.Handler, indexData IndexViewData, vueDist fs.FS) *http.
 		"ListTasks":                h.ListTasks,
 		"StreamTasks":              h.StreamTasks,
 		"CreateTask":               h.CreateTask,
-		"BatchCreateTasks":         h.BatchCreateTasks,
-		"GenerateMissingTitles":    h.GenerateMissingTitles,
 		"GenerateMissingOversight": h.GenerateMissingOversight,
 		"SearchTasks":              h.SearchTasks,
 		"ArchiveAllDone":           h.ArchiveAllDone,
@@ -641,7 +639,6 @@ func BuildMux(h *handler.Handler, indexData IndexViewData, vueDist fs.FS) *http.
 		"CompleteTask":   withID(h.CompleteTask),
 		"ResumeTask":     withID(h.ResumeTask),
 		"SyncTask":       withID(h.SyncTask),
-		"TestTask":       withID(h.TestTask),
 
 		"TaskCommits":  withID(h.TaskCommits),
 		"TaskDiff":     withID(h.TaskDiff),
@@ -700,8 +697,6 @@ func BuildMux(h *handler.Handler, indexData IndexViewData, vueDist fs.FS) *http.
 
 		// Task collection.
 		"CreateTask":               handler.BodyLimitDefault,
-		"BatchCreateTasks":         handler.BodyLimitDefault,
-		"GenerateMissingTitles":    handler.BodyLimitDefault,
 		"GenerateMissingOversight": handler.BodyLimitDefault,
 		"ArchiveAllDone":           handler.BodyLimitDefault,
 
@@ -711,7 +706,6 @@ func BuildMux(h *handler.Handler, indexData IndexViewData, vueDist fs.FS) *http.
 		"SubmitFeedback": handler.BodyLimitFeedback,
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
-		"TestTask":       handler.BodyLimitDefault,
 	}
 
 	// Register all routes from the contract. A missing handler entry panics at

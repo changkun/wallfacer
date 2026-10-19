@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"sync"
 
 	"github.com/google/uuid"
@@ -55,38 +54,4 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 		return false
 	}
 	return true
-}
-
-// taskReachable reports whether target is reachable from start by following
-// DependsOn edges (i.e., target is a transitive dependency of start).
-// Used to detect cycles before accepting a new dependency edge.
-func taskReachable(taskList []store.Task, start, target uuid.UUID) bool {
-	adj := make(map[uuid.UUID][]uuid.UUID, len(taskList))
-	for _, t := range taskList {
-		for _, s := range t.DependsOn {
-			if id, err := uuid.Parse(s); err == nil {
-				adj[t.ID] = append(adj[t.ID], id)
-			}
-		}
-	}
-	return taskReachableInAdj(adj, start, target)
-}
-
-// taskReachableInAdj reports whether target is reachable from start by following
-// edges in the provided adjacency map (task → its dependencies).
-// Used by BatchCreateTasks for full-graph cycle detection.
-func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) bool {
-	visited := make(map[uuid.UUID]bool)
-	var dfs func(uuid.UUID) bool
-	dfs = func(cur uuid.UUID) bool {
-		if cur == target {
-			return true
-		}
-		if visited[cur] {
-			return false
-		}
-		visited[cur] = true
-		return slices.ContainsFunc(adj[cur], dfs)
-	}
-	return dfs(start)
 }

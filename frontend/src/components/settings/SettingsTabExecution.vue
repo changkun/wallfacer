@@ -25,10 +25,6 @@ const maxParallelStatus = ref('');
 const archivedStatus = ref('');
 const oversightStatus = ref('');
 
-const titlesLimit = ref('10');
-const titlesStatus = ref('');
-const titlesBusy = ref(false);
-
 const oversightLimit = ref('10');
 const oversightGenStatus = ref('');
 const oversightGenBusy = ref(false);
@@ -110,25 +106,6 @@ interface GenerateResponse {
   message?: string;
 }
 
-async function generateMissingTitles() {
-  if (titlesBusy.value) return;
-  titlesBusy.value = true;
-  const limit = parseInt(titlesLimit.value, 10) || 0;
-  titlesStatus.value = 'Generating titles…';
-  try {
-    const resp = await api<GenerateResponse>('POST', '/api/tasks/generate-titles', { limit });
-    const n = resp?.generated ?? resp?.count ?? 0;
-    titlesStatus.value = resp?.message || (n > 0 ? `Generated ${n} title(s).` : 'No tasks needed titles.');
-    setTimeout(() => {
-      if (titlesStatus.value && !titlesStatus.value.startsWith('Error')) titlesStatus.value = '';
-    }, 4000);
-  } catch (e) {
-    titlesStatus.value = 'Error: ' + (e instanceof Error ? e.message : String(e));
-  } finally {
-    titlesBusy.value = false;
-  }
-}
-
 async function generateMissingOversight() {
   if (oversightGenBusy.value) return;
   oversightGenBusy.value = true;
@@ -190,16 +167,6 @@ async function generateMissingOversight() {
   <div class="card compact">
     <div class="card-head"><span class="eyebrow">Maintenance</span></div>
     <div class="rows">
-      <div class="set-row">
-        <div class="set-row__main">
-          <span class="set-row__label">Task titles</span>
-          <span id="generate-titles-status" class="set-row__help">{{ titlesStatus || 'Generate a title for tasks that have none.' }}</span>
-        </div>
-        <div class="set-row__end">
-          <AppSelect v-model="titlesLimit" :options="LIMIT_OPTIONS" aria-label="Max tasks to generate titles for" title="Max tasks to generate titles for" />
-          <button type="button" class="btn sm ghost" :disabled="titlesBusy" @click="generateMissingTitles">Generate missing</button>
-        </div>
-      </div>
       <div class="set-row">
         <div class="set-row__main">
           <span class="set-row__label">Trace oversight</span>

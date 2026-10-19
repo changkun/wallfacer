@@ -104,7 +104,7 @@ func (claudeHarness) ParseEvent(raw []byte) (Event, error) {
 
 	// Terminal result line: claude emits it either typeless or with
 	// type:"result". Key on the line shape, not on a non-empty result —
-	// the waiting / test-run states carry an empty result with an empty
+	// the waiting state carries an empty result with an empty
 	// stop_reason and must still be recognized as the terminal event.
 	var res claudeResultLine
 	if err := json.Unmarshal(raw, &res); err != nil {

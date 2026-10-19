@@ -727,25 +727,20 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 // maybeAutoTitleThread names an untitled ("Chat N") agent session from its
-// opening user message, using the lightweight title model. It is a no-op when
-// the thread already has a user/auto-assigned title, the runner is absent, or
-// the message is blank. Runs inline on the caller's (already detached) exec
-// goroutine; title generation carries its own timeout and never blocks the
-// HTTP response.
+// opening user message by the rule a new task's title follows
+// (store.DeriveTitle). It is a no-op when the thread already has a
+// user-assigned or derived title, or the message has no non-blank line.
 func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, firstMessage string) {
-	if h.runner == nil || strings.TrimSpace(firstMessage) == "" {
+	title := store.DeriveTitle(firstMessage)
+	if title == "" {
 		return
 	}
 	meta, err := tm.Meta(threadID)
-	if err != nil || !agentsession.IsDefaultThreadName(meta.Name) {
-		return
-	}
-	title, err := h.runner.GenerateAgentSessionTitle(context.Background(), firstMessage)
 	if err != nil {
-		slog.Warn("agent session auto-title failed", "thread", threadID, "err", err)
+		slog.Warn("agent session auto-title: read thread", "thread", threadID, "err", err)
 		return
 	}
-	if title == "" {
+	if !agentsession.IsDefaultThreadName(meta.Name) {
 		return
 	}
 	if err := tm.Rename(threadID, title); err != nil {

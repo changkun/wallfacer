@@ -45,19 +45,10 @@ func (s *Store) CountByStatus(status TaskStatus) int {
 	return len(s.tasksByStatus[status])
 }
 
-// CountRegularInProgress returns the count of in-progress tasks that are not
-// test runs. This is O(k) where k is the number of in-progress tasks, not O(n)
-// over all tasks. Must not be called while s.mu is held.
+// CountRegularInProgress returns the count of in-progress tasks in O(1).
+// Must not be called while s.mu is held.
 func (s *Store) CountRegularInProgress() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	count := 0
-	for id := range s.tasksByStatus[TaskStatusInProgress] {
-		if t := s.tasks[id]; t != nil && !t.IsTestRun {
-			count++
-		}
-	}
-	return count
+	return s.CountByStatus(TaskStatusInProgress)
 }
 
 // ListSummaries returns all task summaries by finding tasks that have a
@@ -184,29 +175,6 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 	hasMoreAfter := start > 0
 	hasMoreBefore := end < total
 	return page, total, hasMoreBefore, hasMoreAfter, nil
-}
-
-// TasksDependingOn returns all non-terminal tasks whose DependsOn contains
-// taskID. Non-terminal statuses are backlog, in_progress, waiting, and failed.
-// The returned slice contains deep copies safe for use outside the lock.
-func (s *Store) TasksDependingOn(_ context.Context, taskID uuid.UUID) ([]*Task, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	taskIDStr := taskID.String()
-	var result []*Task
-	for _, t := range s.tasks {
-		switch t.Status {
-		case TaskStatusBacklog, TaskStatusInProgress, TaskStatusWaiting, TaskStatusFailed:
-		default:
-			continue
-		}
-		if slices.Contains(t.DependsOn, taskIDStr) {
-			cp := deepCloneTask(t)
-			result = append(result, &cp)
-		}
-	}
-	return result, nil
 }
 
 // cloneTask returns a deep copy of t so that callers cannot accidentally

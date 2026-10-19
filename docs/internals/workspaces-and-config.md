@@ -90,7 +90,7 @@ After a successful swap:
 
 #### Runner task-to-store resolution
 
-Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateTitle()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
+Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateOversight()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
 
 Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams and the runner) to react to workspace switches.
 
@@ -121,7 +121,7 @@ Execution is host-process. The runner execs the selected CLI as a host process w
 1. **Role harness pin** (`role.Harness` if set and valid). The built-in role descriptors leave it empty; a caller that must reach a particular harness sets it on a copy of a built-in role for one call. This top tier wins over every per-task and env tier, so a role pinned to `codex` always reaches Codex regardless of task or env settings.
 2. **Per-task per-activity override, deprecated** (`task.SandboxByActivity[activity]` if set and valid). Back-compat only: new tasks do not populate this map (matching `data-and-storage.md`), but the runner still reads it when present.
 3. **Per-task default** (`task.Sandbox` if set and valid).
-4. **Env-file per-activity setting** (`WALLFACER_SANDBOX_<ACTIVITY>`, e.g. `WALLFACER_SANDBOX_TESTING=codex`).
+4. **Env-file per-activity setting** (`WALLFACER_SANDBOX_<ACTIVITY>`, e.g. `WALLFACER_SANDBOX_OVERSIGHT=codex`).
 5. **Env-file default** (`WALLFACER_DEFAULT_SANDBOX`).
 6. **Hardcoded fallback** (`Claude`).
 
@@ -132,12 +132,10 @@ Activities consulted by the env-file tier (`Runner.sandboxFromEnvForActivity()`,
 | Activity | Env variable | Purpose |
 |---|---|---|
 | `implementation` | `WALLFACER_SANDBOX_IMPLEMENTATION` | Main task execution |
-| `testing` | `WALLFACER_SANDBOX_TESTING` | Test verification agent |
-| `title` | `WALLFACER_SANDBOX_TITLE` | Auto title generation |
 | `oversight` | `WALLFACER_SANDBOX_OVERSIGHT` | Oversight summary generation |
 | `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
 
-The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `agent-session`, `test`, and `oversight-test`. These are not switched on by the env-file tier (the resolution switch covers only the six rows above). `test` and `oversight-test` exist for usage attribution, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent.
+The `SandboxActivity` constant set in `internal/store/models.go` also includes `refinement`, `agent-session`, and `review`. These are not switched on by the env-file tier (the resolution switch covers only the rows above). `review` exists for usage attribution and resolves through the task's harness, and `refinement` is vestigial now that prompt refinement runs as the Plan task-mode chat rather than a dedicated routed agent. An env file or stored task that still names the `testing` or `title` activity loads; the entry routes nothing.
 
 ### Host CLI resolution
 
@@ -149,8 +147,10 @@ There is no `--image` flag and no container start. The host backend selects the 
 
 `Runner.modelFromEnvForSandbox()` reads the model from the env file:
 
-- Claude: `CLAUDE_DEFAULT_MODEL` (title generation uses `CLAUDE_TITLE_MODEL` with fallback to the default).
-- Codex: `CODEX_DEFAULT_MODEL` (title generation uses `CODEX_TITLE_MODEL` with fallback to the default).
+- Claude: `CLAUDE_DEFAULT_MODEL`.
+- Codex: `CODEX_DEFAULT_MODEL`.
+
+The oversight and commit-message agents run on the same default model.
 
 ### Credential gate
 
@@ -171,11 +171,11 @@ The `Config` struct covers all known keys. Key categories:
 | Category | Fields |
 |---|---|
 | **Authentication** | `OAuthToken` (`CLAUDE_CODE_OAUTH_TOKEN`), `APIKey` (`ANTHROPIC_API_KEY`), `AuthToken` (`ANTHROPIC_AUTH_TOKEN`), `ServerAPIKey` (`WALLFACER_SERVER_API_KEY`) |
-| **Claude model** | `BaseURL`, `DefaultModel`, `TitleModel` |
-| **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
+| **Claude model** | `BaseURL`, `DefaultModel` |
+| **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel` |
 | **Cursor/OpenCode** | `CursorAPIKey` (`CURSOR_API_KEY`), `OpenCodeServerPassword` (`OPENCODE_SERVER_PASSWORD`) |
 | **Parallelism** | `MaxParallelTasks` |
-| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
+| **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
 | **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage` |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
@@ -210,9 +210,7 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 
 | Embedded file | Function | Used for |
 |---|---|---|
-| `title.tmpl` | `Title` | Auto-generating task titles from prompts |
 | `commit.tmpl` | `CommitMessage` | Generating commit messages during the commit pipeline |
-| `test.tmpl` | `TestVerification` | Test verification agent prompt |
 | `oversight.tmpl` | `Oversight` | Oversight summarization of task activity |
 | `conflict.tmpl` | `ConflictResolution` | Rebase conflict resolution agent |
 | `task_prompt_refine.tmpl` | `TaskPromptRefine` | Task prompt refinement in Plan mode |

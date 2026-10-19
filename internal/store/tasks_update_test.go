@@ -374,7 +374,7 @@ func TestResetTaskForRetry_RefreshesSearchIndex(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "oldprompt-needle", Timeout: 60, Kind: TaskKindTask})
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "oldprompt-needle", Title: "Retry", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

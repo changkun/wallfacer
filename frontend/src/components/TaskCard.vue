@@ -10,7 +10,7 @@ import { highlightMatch } from '../lib/highlight';
 import { orderTags } from '../lib/tagBadge';
 import { cardActionsFor, primaryCardAction, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
 import HarnessLogo from './HarnessLogo.vue';
-import { dependencyBadge, failureLabel } from '../lib/cardBadges';
+import { failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { toRef } from 'vue';
 
@@ -111,23 +111,6 @@ async function syncFromCard(e: Event) {
   } catch { /* handled by SSE state refresh */ }
 }
 
-// Test-verification badge for the card's Row 1. Mirrors ui/js/render.js:
-// pass → ✓ verified; fail → ✗ verify failed; unknown → no verdict; an
-// untested waiting task → unverified. Other statuses get nothing.
-const testBadge = computed<{ label: string; cls: string; title: string } | null>(() => {
-  const t = props.task;
-  switch (t.last_test_result) {
-    case 'pass': return { label: 'verified', cls: 'pill-ok', title: 'Verification passed' };
-    case 'fail': return { label: 'verify failed', cls: 'pill-err', title: 'Verification failed' };
-    case 'unknown': return { label: 'no verdict', cls: 'pill-neutral', title: 'Tested — no clear verdict detected' };
-    default:
-      if (t.status === 'waiting') {
-        return { label: 'unverified', cls: 'pill-neutral', title: 'Not yet verified' };
-      }
-      return null;
-  }
-});
-
 // Tags as one meta line: priority, impact, labels.
 const tags = computed(() => orderTags(props.task.tags ?? []));
 
@@ -185,37 +168,6 @@ const taskStore = useTaskStore();
 // Highlight the active board filter inside the card title (legacy parity).
 const titleHtml = computed(() => highlightMatch(props.task.title || '', taskStore.filterQuery));
 
-// Dependency-state badge for backlog cards (blocked / ready / cancelled),
-// resolved against the live task list. Mirrors render.js renderDependencyBadge.
-const depBadge = computed(() => {
-  // Only backlog cards carry a dependency badge; skip the map lookup entirely
-  // for every other card so a tasks change does not touch them.
-  if (props.task.status !== 'backlog') return null;
-  return dependencyBadge(props.task, taskStore.tasksById);
-});
-const depBadgeClass = computed(() => {
-  switch (depBadge.value?.kind) {
-    case 'blocked': return 'pill-warn';
-    case 'ready': return 'pill-ok';
-    case 'cancelled': return 'pill-warn';
-    default: return '';
-  }
-});
-const depBadgeText = computed(() => {
-  const b = depBadge.value;
-  if (!b) return '';
-  if (b.kind === 'ready') return 'ready';
-  if (b.kind === 'cancelled') return 'dependency cancelled';
-  return `${b.count} dep${b.count !== 1 ? 's' : ''}`;
-});
-const depBadgeTitle = computed(() => {
-  const b = depBadge.value;
-  if (!b) return '';
-  if (b.kind === 'blocked') return `Blocked by: ${b.blocking}`;
-  if (b.kind === 'cancelled') return 'A dependency was cancelled or removed; this task may be unblocked after the next sync';
-  return 'All dependencies satisfied; ready for promotion';
-});
-
 // Friendly failure-category label (Timeout/Budget/…) for failed cards.
 const failureBadge = computed(() => failureLabel(props.task.failure_category));
 
@@ -225,9 +177,7 @@ const failureBadge = computed(() => failureLabel(props.task.failure_category));
 interface Signal { label: string; cls: string; title: string }
 const signals = computed<Signal[]>(() => {
   const out: Signal[] = [];
-  if (testBadge.value) out.push(testBadge.value);
   if (failureBadge.value) out.push({ label: failureBadge.value, cls: 'pill-err', title: 'Failure reason: ' + props.task.failure_category });
-  if (depBadge.value) out.push({ label: depBadgeText.value, cls: depBadgeClass.value, title: depBadgeTitle.value });
   return out;
 });
 const qualifier = computed(() => signals.value[0] ?? null);
@@ -263,7 +213,6 @@ async function runCardAction(action: CardAction, e: Event) {
     case 'retry': await api('PATCH', `/api/tasks/${id}`, { status: 'backlog' }); break;
     case 'done': await api('POST', `/api/tasks/${id}/done`); break;
     case 'resume': await api('POST', `/api/tasks/${id}/resume`); break;
-    case 'test': await api('POST', `/api/tasks/${id}/test`); break;
   }
 }
 
@@ -357,9 +306,6 @@ function onCardKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Row 2: title -->
-    <div v-if="props.task.title_generating" class="task-card__title" role="status" aria-live="polite">
-      <span class="spinner" aria-hidden="true"></span> Generating title…
-    </div>
     <div v-if="props.task.title" class="task-card__title" :title="props.task.title" v-html="titleHtml"></div>
 
     <!-- Row 3: the meta line. priority · impact · labels · the signals that

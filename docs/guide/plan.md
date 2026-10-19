@@ -106,7 +106,7 @@ Most commands operate on the focused spec, which is set by clicking a spec in th
 
 Dispatching turns a validated leaf spec into a board task: click **Dispatch** in the focused view, use `/dispatch` in chat, or multi-select specs in the explorer and dispatch the batch. Dispatching a validated non-leaf expands to its subtree's leaves.
 
-For each leaf, the server creates a task whose prompt is the spec body, tagged `spec-dispatched` plus the track name, wires `depends_on` relationships into task dependencies, and writes the task's ID back into the spec's `dispatched_task_id`. The whole batch is atomic: task creation and frontmatter writes either all succeed or all roll back. Drafted ancestors of a dispatched leaf are promoted along the way. Dispatching a spec that is not validated, or a non-leaf directly, fails without mutating anything.
+For each leaf, the server creates a task whose prompt is the spec body, tagged `spec-dispatched` plus the track name, and writes the task's ID back into the spec's `dispatched_task_id`. A spec's `depends_on` stays in the spec tree; the created tasks carry no ordering between them. The whole batch is atomic: task creation and frontmatter writes either all succeed or all roll back. Drafted ancestors of a dispatched leaf are promoted along the way. Dispatching a spec that is not validated, or a non-leaf directly, fails without mutating anything.
 
 **Undispatch** reverses the link: the linked task is cancelled if still live, `dispatched_task_id` is cleared, and the spec returns to `validated`.
 

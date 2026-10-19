@@ -85,14 +85,6 @@ type DriftData struct {
 	Diff         string
 }
 
-// TestData holds template variables for the test verification prompt.
-type TestData struct {
-	OriginalPrompt string
-	Criteria       string // optional
-	ImplResult     string // optional
-	Diff           string // optional
-}
-
 // --- Renderers ---
 
 // TaskPromptRefine renders the task-mode spec-mode agent system prompt.
@@ -107,11 +99,6 @@ func Oversight(activityLog string) string {
 	return render("oversight.tmpl", struct{ ActivityLog string }{activityLog})
 }
 
-// Title renders the title-generation prompt for the given task prompt.
-func Title(taskPrompt string) string {
-	return render("title.tmpl", struct{ Prompt string }{taskPrompt})
-}
-
 // CommitMessage renders the commit message generation prompt.
 func CommitMessage(d CommitData) string { return render("commit.tmpl", d) }
 
@@ -120,9 +107,6 @@ func DriftAssessment(d DriftData) string { return render("drift.tmpl", d) }
 
 // ConflictResolution renders the rebase conflict resolution prompt.
 func ConflictResolution(d ConflictData) string { return render("conflict.tmpl", d) }
-
-// TestVerification renders the test verification agent prompt.
-func TestVerification(d TestData) string { return render("test.tmpl", d) }
 
 // Spec renders the spec-mode agent system prompt.
 func Spec() string { return render("spec.tmpl", nil) }

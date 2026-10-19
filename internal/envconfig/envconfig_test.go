@@ -1,12 +1,15 @@
 package envconfig_test
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/envconfig"
+	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/store"
 )
 
 // writeEnvFile creates a temporary .env file with the given content and returns its path.
@@ -27,7 +30,6 @@ CLAUDE_CODE_OAUTH_TOKEN=oauth-abc
 ANTHROPIC_API_KEY=sk-ant-123
 ANTHROPIC_BASE_URL=https://example.com
 CLAUDE_DEFAULT_MODEL=claude-opus-4-5
-CLAUDE_TITLE_MODEL=claude-haiku-4-5
 UNKNOWN_KEY=ignored
 `
 	path := writeEnvFile(t, content)
@@ -47,8 +49,36 @@ UNKNOWN_KEY=ignored
 	if cfg.DefaultModel != "claude-opus-4-5" {
 		t.Errorf("DefaultModel = %q; want claude-opus-4-5", cfg.DefaultModel)
 	}
-	if cfg.TitleModel != "claude-haiku-4-5" {
-		t.Errorf("TitleModel = %q; want claude-haiku-4-5", cfg.TitleModel)
+}
+
+// removedKeys are env keys that files written by earlier releases may carry
+// but that no setting reads any more.
+var removedKeys = []string{
+	"CLAUDE_TITLE_MODEL",
+	"CODEX_TITLE_MODEL",
+	"WALLFACER_SANDBOX_TITLE",
+	"WALLFACER_SANDBOX_TESTING",
+	"WALLFACER_MAX_TEST_PARALLEL",
+}
+
+// TestParse_RemovedKeysIgnored verifies that a file carrying every removed key
+// parses, that the keys around them still load, and that none of them routes
+// an activity.
+func TestParse_RemovedKeysIgnored(t *testing.T) {
+	content := "CLAUDE_DEFAULT_MODEL=claude-opus-4-5\nWALLFACER_SANDBOX_IMPLEMENTATION=codex\n"
+	for _, k := range removedKeys {
+		content += k + "=claude\n"
+	}
+	cfg, err := envconfig.Parse(writeEnvFile(t, content))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.DefaultModel != "claude-opus-4-5" {
+		t.Errorf("DefaultModel = %q; want claude-opus-4-5", cfg.DefaultModel)
+	}
+	want := map[store.SandboxActivity]harness.ID{store.SandboxActivityImplementation: harness.Codex}
+	if got := cfg.SandboxByActivity(); !maps.Equal(got, want) {
+		t.Errorf("SandboxByActivity = %v; want %v", got, want)
 	}
 }
 
@@ -94,7 +124,7 @@ func TestParseEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if cfg.OAuthToken != "" || cfg.APIKey != "" || cfg.BaseURL != "" || cfg.DefaultModel != "" || cfg.TitleModel != "" {
+	if cfg.OAuthToken != "" || cfg.APIKey != "" || cfg.BaseURL != "" || cfg.DefaultModel != "" {
 		t.Errorf("expected all empty, got %+v", cfg)
 	}
 }
@@ -232,7 +262,7 @@ func TestUpdateClearsField(t *testing.T) {
 // removed every whitespace-only line, collapsing the seeded template's blank
 // separators on the first update.
 func TestUpdatePreservesBlankSeparators(t *testing.T) {
-	content := "CLAUDE_DEFAULT_MODEL=m1\nANTHROPIC_BASE_URL=https://old\n\nCLAUDE_TITLE_MODEL=m2\n"
+	content := "CLAUDE_DEFAULT_MODEL=m1\nANTHROPIC_BASE_URL=https://old\n\nCODEX_DEFAULT_MODEL=m2\n"
 	path := writeEnvFile(t, content)
 
 	// Clear only the middle key; the blank separator after it must survive.
@@ -256,9 +286,9 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	if err := envconfig.Update(path, envconfig.Updates{
-		BaseURL:      new("https://example.com"),
-		DefaultModel: new("claude-sonnet-4-5"),
-		TitleModel:   new("claude-haiku-4-5"),
+		BaseURL:           new("https://example.com"),
+		DefaultModel:      new("claude-sonnet-4-5"),
+		CodexDefaultModel: new("codex-mini-latest"),
 	}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -270,8 +300,8 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	if !strings.Contains(string(raw), "CLAUDE_DEFAULT_MODEL=claude-sonnet-4-5") {
 		t.Errorf("expected CLAUDE_DEFAULT_MODEL in file, got:\n%s", raw)
 	}
-	if !strings.Contains(string(raw), "CLAUDE_TITLE_MODEL=claude-haiku-4-5") {
-		t.Errorf("expected CLAUDE_TITLE_MODEL in file, got:\n%s", raw)
+	if !strings.Contains(string(raw), "CODEX_DEFAULT_MODEL=codex-mini-latest") {
+		t.Errorf("expected CODEX_DEFAULT_MODEL in file, got:\n%s", raw)
 	}
 }
 
@@ -311,7 +341,6 @@ func TestParseCodexFields(t *testing.T) {
 	content := `OPENAI_API_KEY=sk-openai-abc
 OPENAI_BASE_URL=https://api.openai.com/v1
 CODEX_DEFAULT_MODEL=codex-mini-latest
-CODEX_TITLE_MODEL=codex-mini-latest
 `
 	path := writeEnvFile(t, content)
 	cfg, err := envconfig.Parse(path)
@@ -326,9 +355,6 @@ CODEX_TITLE_MODEL=codex-mini-latest
 	}
 	if cfg.CodexDefaultModel != "codex-mini-latest" {
 		t.Errorf("CodexDefaultModel = %q; want codex-mini-latest", cfg.CodexDefaultModel)
-	}
-	if cfg.CodexTitleModel != "codex-mini-latest" {
-		t.Errorf("CodexTitleModel = %q; want codex-mini-latest", cfg.CodexTitleModel)
 	}
 }
 
@@ -373,9 +399,6 @@ func TestParseCodexFieldsAbsent(t *testing.T) {
 	}
 	if cfg.CodexDefaultModel != "" {
 		t.Errorf("CodexDefaultModel = %q; want empty", cfg.CodexDefaultModel)
-	}
-	if cfg.CodexTitleModel != "" {
-		t.Errorf("CodexTitleModel = %q; want empty", cfg.CodexTitleModel)
 	}
 }
 

@@ -2,15 +2,19 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 )
 
@@ -183,6 +187,96 @@ func TestFilesystemBackend_LoadAll_LeavesRoutineCardsUnread(t *testing.T) {
 		}
 		if string(got) != string(want) {
 			t.Errorf("routine card %s was rewritten:\n got %s\nwant %s", id, got, want)
+		}
+	}
+}
+
+// removedTaskFields are task.json keys that records written by earlier
+// releases may carry but Task no longer declares.
+var removedTaskFields = map[string]string{
+	"depends_on":            `["11111111-1111-1111-1111-111111111111"]`,
+	"title_generating":      `true`,
+	"is_test_run":           `true`,
+	"last_test_result":      `"fail"`,
+	"test_run_start_turn":   `3`,
+	"pending_test_feedback": `"tests fail"`,
+	"test_fail_count":       `2`,
+	"custom_pass_patterns":  `["ok"]`,
+	"custom_fail_patterns":  `["FAIL"]`,
+	"criteria":              `"run make test"`,
+}
+
+// removedActivities are sandbox_by_activity keys that records written by
+// earlier releases may carry but no activity routes by any more.
+var removedActivities = []string{"title", "testing"}
+
+// TestFilesystemBackend_LoadAll_DropsRemovedTaskFields writes two records
+// carrying every removed field and every removed activity: one in an older
+// schema, which LoadAll migrates and rewrites, and one in the current schema,
+// which LoadAll leaves on disk until the task's next save. Both load with the
+// removed activities dropped from their routing, and no removed key survives
+// a save.
+func TestFilesystemBackend_LoadAll_DropsRemovedTaskFields(t *testing.T) {
+	b := newTestBackend(t)
+
+	write := func(schema int) uuid.UUID {
+		t.Helper()
+		id := uuid.New()
+		raw := `{"id":"` + id.String() + `","prompt":"stored","status":"backlog","timeout":60,` +
+			`"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z",` +
+			`"auto_retry_budget":{"container_crash":2},"schema_version":` + strconv.Itoa(schema) +
+			`,"sandbox_by_activity":{"implementation":"claude"`
+		for _, a := range removedActivities {
+			raw += `,"` + a + `":"codex"`
+		}
+		raw += "}"
+		for k, v := range removedTaskFields {
+			raw += `,"` + k + `":` + v
+		}
+		raw += "}"
+		if err := os.MkdirAll(filepath.Join(b.dir, id.String()), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(b.dir, id.String(), "task.json"), []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	older := write(1)
+	current := write(constants.CurrentTaskSchemaVersion)
+
+	tasks, err := b.LoadAll()
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected both stored tasks to load, got %d", len(tasks))
+	}
+	for _, task := range tasks {
+		want := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
+		if !maps.Equal(task.SandboxByActivity, want) {
+			t.Errorf("task %s sandbox_by_activity = %v, want %v", task.ID, task.SandboxByActivity, want)
+		}
+		if task.ID == current {
+			if err := b.SaveTask(task); err != nil {
+				t.Fatalf("SaveTask: %v", err)
+			}
+		}
+	}
+
+	for _, id := range []uuid.UUID{older, current} {
+		raw, err := os.ReadFile(filepath.Join(b.dir, id.String(), "task.json"))
+		if err != nil {
+			t.Fatalf("read %s: %v", id, err)
+		}
+		var saved map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &saved); err != nil {
+			t.Fatalf("parse saved %s: %v", id, err)
+		}
+		for k := range removedTaskFields {
+			if _, ok := saved[k]; ok {
+				t.Errorf("task %s still carries %q after a save", id, k)
+			}
 		}
 	}
 }

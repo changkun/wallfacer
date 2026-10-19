@@ -130,39 +130,29 @@ const (
 
 // SandboxActivity identifies which phase of a task a container run belongs to.
 // The routing constants (Implementation through AgentSession) are used for
-// sandbox-per-activity configuration. Test and OversightTest are
-// usage-attribution-only values that appear in UsageBreakdown and turn logs.
+// sandbox-per-activity configuration. A stored task's UsageBreakdown and turn
+// logs may also carry keys of phases that no longer run, such as "test" or
+// "title"; they load as plain map keys.
 type SandboxActivity string
 
 // SandboxActivity constants for routing and usage attribution.
 const (
 	// SandboxActivityImplementation is the main implementation phase.
 	SandboxActivityImplementation SandboxActivity = "implementation"
-	// SandboxActivityTesting is the automated test-execution phase.
-	SandboxActivityTesting SandboxActivity = "testing"
 	// SandboxActivityRefinement is the prompt-refinement phase.
 	SandboxActivityRefinement SandboxActivity = "refinement"
-	// SandboxActivityTitle is the background title-generation phase.
-	SandboxActivityTitle SandboxActivity = "title"
 	// SandboxActivityOversight is the oversight summary generation phase.
 	SandboxActivityOversight SandboxActivity = "oversight"
 	// SandboxActivityCommitMessage is the commit-message generation phase.
 	SandboxActivityCommitMessage SandboxActivity = "commit_message"
 	// SandboxActivityAgentSession is the interactive agent-session (chat) phase.
 	SandboxActivityAgentSession SandboxActivity = "agent-session"
-
-	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
-	SandboxActivityTest SandboxActivity = "test"
-	// SandboxActivityOversightTest is a usage-attribution-only activity for test oversight generation.
-	SandboxActivityOversightTest SandboxActivity = "oversight-test"
 )
 
 // SandboxActivities lists activities that support per-activity sandbox routing.
 var SandboxActivities = []SandboxActivity{
 	SandboxActivityImplementation,
-	SandboxActivityTesting,
 	SandboxActivityRefinement,
-	SandboxActivityTitle,
 	SandboxActivityOversight,
 	SandboxActivityCommitMessage,
 	SandboxActivityAgentSession,
@@ -238,16 +228,10 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion   int       `json:"schema_version"`
-	ID              uuid.UUID `json:"id"`
-	Title           string    `json:"title,omitempty"`
-	TitleGenerating bool      `json:"title_generating,omitempty"`
-	Prompt          string    `json:"prompt"`
-	// Criteria is user-defined free-form acceptance criteria for the test
-	// verification agent (and review critics). When non-empty it renders into the
-	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not
-	// a hard gate. omitempty keeps existing task.json files deserializing clean.
-	Criteria      string        `json:"criteria,omitempty"`
+	SchemaVersion int           `json:"schema_version"`
+	ID            uuid.UUID     `json:"id"`
+	Title         string        `json:"title,omitempty"`
+	Prompt        string        `json:"prompt"`
 	PromptHistory []string      `json:"prompt_history,omitempty"`
 	RetryHistory  []RetryRecord `json:"retry_history,omitempty"`
 	// ExecutionAttempt survives pruning of older retry records. Zero uses the legacy history length.
@@ -286,17 +270,6 @@ type Task struct {
 	Model            string            `json:"model,omitempty"`              // deprecated: retained for migration compatibility
 	ModelOverride    *string           `json:"model_override,omitempty"`     // per-task model override; nil means use global default
 
-	// Test verification fields.
-	IsTestRun        bool   `json:"is_test_run,omitempty"`         // true while the task is running as a test verifier
-	LastTestResult   string `json:"last_test_result,omitempty"`    // "pass", "fail", or "" (not yet tested)
-	TestRunStartTurn int    `json:"test_run_start_turn,omitempty"` // turn count when the test run started (implementation turn boundary)
-
-	// CustomPassPatterns are user-supplied regex patterns applied to test output
-	// before the built-in heuristics. A match on any pattern returns "pass".
-	CustomPassPatterns []string `json:"custom_pass_patterns,omitempty"`
-	// CustomFailPatterns are checked first; a match returns "fail" immediately.
-	CustomFailPatterns []string `json:"custom_fail_patterns,omitempty"`
-
 	// Kind identifies the execution mode (e.g. TaskKindTask, TaskKindPlanning).
 	// Empty string and "task" are equivalent: a standard implementation task.
 	Kind TaskKind `json:"kind,omitempty"`
@@ -317,11 +290,6 @@ type Task struct {
 	// dispatched from (e.g. "specs/local/foo.md"). Empty for tasks created
 	// directly on the board. Enables reverse navigation from task → spec.
 	SpecSourcePath string `json:"spec_source_path,omitempty"`
-
-	// DependsOn lists UUIDs of tasks this task builds on. It is recorded for
-	// the reader; nothing starts a task on its own.
-	// Nil/empty means no dependencies.
-	DependsOn []string `json:"depends_on,omitempty"`
 
 	// FailureCategory records the machine-readable root cause of the last
 	// failure transition. Set automatically by the runner at every
@@ -384,7 +352,6 @@ type TaskSummary struct {
 	TotalTurns               int                           `json:"total_turns"`
 	TotalCostUSD             float64                       `json:"total_cost_usd"`
 	ByActivity               map[SandboxActivity]TaskUsage `json:"by_activity"`
-	TestResult               string                        `json:"test_result"`
 	PhaseCount               int                           `json:"phase_count"`
 	FailureCategory          FailureCategory               `json:"failure_category,omitempty"`
 }

@@ -139,8 +139,8 @@ func (r *Runner) SetAgentSession(p *agentsession.Runtime) {
 
 // Shutdown waits for all tracked background goroutines to complete before
 // returning. Call this after the HTTP server has stopped accepting new requests
-// to ensure that oversight generation, title generation, and other
-// fire-and-forget work finishes before the process exits.
+// to ensure that oversight generation and other fire-and-forget work
+// finishes before the process exits.
 // In-progress task containers are intentionally left running; they continue
 // to completion independently and will be recovered on the next server start.
 // must be called at most once.
@@ -227,12 +227,6 @@ func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, pre
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
 	r.taskBackground("oversight", taskID, func() { r.GenerateOversight(taskID) })
-}
-
-// GenerateTitleBackground launches GenerateTitle in a background goroutine
-// tracked by backgroundWg so that WaitBackground can drain it before cleanup.
-func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
-	r.taskBackground("title", taskID, func() { r.GenerateTitle(taskID, prompt) })
 }
 
 // NewRunner constructs a Runner from the given store and config. The returned

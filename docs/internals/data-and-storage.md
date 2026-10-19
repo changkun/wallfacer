@@ -26,7 +26,6 @@ data/<data-key>/
 │   │   └── ...
 │   ├── turn-usage.jsonl       # Per-turn token usage log (append-only)
 │   ├── oversight.json         # Oversight summary (generated async)
-│   ├── oversight-test.json    # Test-agent oversight summary
 │   ├── summary.json           # Immutable completion snapshot (cost dashboard)
 │   └── tombstone.json         # Soft-delete marker (only if deleted)
 ├── <uuid-2>/
@@ -44,7 +43,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 |---|---|---|---|
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
-| `Title` | `string` | `title` | Display title (auto-generated or user-set) |
+| `Title` | `string` | `title` | Display title: the create request's `title`, else the prompt's first non-blank line (`store.DeriveTitle`) |
 | `Kind` | `TaskKind` | `kind` | Execution mode. `""` for a standard task, `"planning"` for the planning task mode. A historical `"idea-agent"` value may persist on old rows; it plays no role in dispatch. Records with `"routine"` are skipped at load and stay on disk unread. |
 | `FlowID` | `string` | `flow_id` | Slug of the user-authored fleet a stored task names. Kept so stored tasks load unchanged; no writer sets it and dispatch does not read it. A run of a task whose `FlowID` is set and is not `implement` writes one `system` event of kind `fleet:removed` on its timeline (`internal/runner/removed_fleet.go`). |
 | `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"priority:1"`) |
@@ -59,7 +58,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `CreatedAt` | `time.Time` | `created_at` | Task creation timestamp |
 | `StartedAt` | `*time.Time` | `started_at` | First transition to `in_progress` |
 | `UpdatedAt` | `time.Time` | `updated_at` | Last mutation timestamp |
-| `DependsOn` | `[]string` | `depends_on` | UUIDs of tasks meant to reach `done` first (recorded, not enforced at start) |
 
 `TaskStatus` values: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
 
@@ -114,16 +112,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `BaseCommitHashes` | `map[string]string` | `base_commit_hashes` | Default branch HEAD before merge |
 | `SnapshotDiffs` | `map[string]string` | `snapshot_diffs` | Pre-computed diffs for non-git workspaces (repoPath → diff text) |
 | `CommitMessage` | `string` | `commit_message` | Generated commit message from commit pipeline |
-
-### Test Verification
-
-| Field | Type | JSON Key | Description |
-|---|---|---|---|
-| `IsTestRun` | `bool` | `is_test_run` | True while task is running as a test verifier |
-| `LastTestResult` | `string` | `last_test_result` | `"pass"`, `"fail"`, or `""` |
-| `TestRunStartTurn` | `int` | `test_run_start_turn` | Turn boundary between implementation and test phases |
-| `CustomPassPatterns` | `[]string` | `custom_pass_patterns` | User regex patterns that force "pass" verdict |
-| `CustomFailPatterns` | `[]string` | `custom_fail_patterns` | User regex patterns that force "fail" verdict |
 
 ## Supporting Data Models
 
@@ -216,7 +204,7 @@ type OversightPhase struct {
 
 `OversightStatus` values: `pending`, `generating`, `ready`, `failed`.
 
-Stored in `oversight.json` (implementation) and `oversight-test.json` (test agent) alongside `task.json`.
+Stored in `oversight.json` alongside `task.json`. An `oversight-test.json` left by an earlier release stays on disk unread.
 
 ### TaskSummary
 
@@ -234,7 +222,6 @@ type TaskSummary struct {
     TotalTurns              int                          `json:"total_turns"`
     TotalCostUSD            float64                      `json:"total_cost_usd"`
     ByActivity              map[SandboxActivity]TaskUsage `json:"by_activity"`
-    TestResult              string                       `json:"test_result"`
     PhaseCount              int                          `json:"phase_count"`
     FailureCategory         FailureCategory              `json:"failure_category,omitempty"`
 }
@@ -320,13 +307,9 @@ Identifies which phase of a task a host-process run belongs to. It drives **usag
 | Constant | Value | Usage |
 |---|---|---|
 | `SandboxActivityImplementation` | `"implementation"` | Main implementation phase (routing + attribution) |
-| `SandboxActivityTesting` | `"testing"` | Test execution phase (routing + attribution) |
 | `SandboxActivityRefinement` | `"refinement"` | Prompt refinement (routing + attribution) |
-| `SandboxActivityTitle` | `"title"` | Title generation (routing + attribution) |
 | `SandboxActivityOversight` | `"oversight"` | Oversight generation (routing + attribution) |
 | `SandboxActivityCommitMessage` | `"commit_message"` | Commit message generation (routing + attribution) |
-| `SandboxActivityTest` | `"test"` | Attribution-only (not used for harness routing) |
-| `SandboxActivityOversightTest` | `"oversight-test"` | Attribution-only (not used for harness routing) |
 
 ### FailureCategory
 
@@ -571,9 +554,10 @@ The store uses a forward-only migration system in `internal/store/migrate.go`. E
 
 1. Move the deprecated `Model` field to `ModelOverride` when `ModelOverride` is unset, then clear `Model`.
 2. Default missing values: `Status` to `"backlog"`, `Timeout` to `60`, `CreatedAt`/`UpdatedAt` from file mod time.
-3. Canonicalize `DependsOn`: trim whitespace, validate UUIDs, deduplicate, sort.
-4. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
-5. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
+3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
+4. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
+
+Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on`, `title_generating`, `is_test_run`, `last_test_result`, `custom_pass_patterns` or `criteria`, are dropped on load and disappear on the record's next save. A `sandbox_by_activity` entry for an activity that no longer routes (`testing`, `title`) is dropped by the same normalization.
 
 If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `3`) and is incremented whenever a new migration step is added.
 

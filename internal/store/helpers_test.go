@@ -127,7 +127,6 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.CommitHashes = map[string]string{"/repo": "commit-1"}
 	task.BaseCommitHashes = map[string]string{"/repo": "base-1"}
 	task.Tags = []string{"tag-1"}
-	task.DependsOn = []string{"dep-1"}
 
 	return deepCloneTask(task)
 }
@@ -141,7 +140,6 @@ func mutateTaskCloneForIsolation(task *Task) {
 	task.RetryHistory[0].Prompt = "mutated-retry-prompt"
 	task.RefineSessions[0].Messages[0].Content = "mutated-refine-message"
 	task.Tags[0] = "mutated-tag"
-	task.DependsOn[0] = "mutated-dependency"
 	task.SandboxByActivity[SandboxActivityImplementation] = "mutated-sandbox"
 	task.UsageBreakdown[SandboxActivityImplementation] = TaskUsage{InputTokens: 999}
 	task.Environment.ModelName = "mutated-model"

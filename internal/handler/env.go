@@ -106,9 +106,7 @@ type envConfigResponse struct {
 	OpenAIBaseURL        string                               `json:"openai_base_url"`
 	CursorAPIKey         string                               `json:"cursor_api_key"` // masked
 	DefaultModel         string                               `json:"default_model"`
-	TitleModel           string                               `json:"title_model"`
 	CodexDefaultModel    string                               `json:"codex_default_model"`
-	CodexTitleModel      string                               `json:"codex_title_model"`
 	DefaultSandbox       harness.ID                           `json:"default_sandbox"`
 	SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
@@ -119,14 +117,15 @@ type envConfigResponse struct {
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
-// smoke-check via POST /api/env/test.
+// smoke-check via POST /api/env/test. Passed is true when the probe run
+// ended with the harness's answer rather than an error.
 type sandboxTestResponse struct {
-	TaskID         string     `json:"task_id"`
-	Sandbox        harness.ID `json:"sandbox"`
-	Status         string     `json:"status"`
-	LastTestResult string     `json:"last_test_result,omitempty"`
-	Result         string     `json:"result,omitempty"`
-	StopReason     string     `json:"stop_reason,omitempty"`
+	TaskID     string     `json:"task_id"`
+	Sandbox    harness.ID `json:"sandbox"`
+	Status     string     `json:"status"`
+	Passed     bool       `json:"passed"`
+	Result     string     `json:"result,omitempty"`
+	StopReason string     `json:"stop_reason,omitempty"`
 }
 
 // sandboxTestRequest is the JSON body accepted by POST /api/env/test.
@@ -142,9 +141,7 @@ type sandboxTestRequest struct {
 	OpenAIBaseURL     *string                              `json:"openai_base_url"`
 	CursorAPIKey      *string                              `json:"cursor_api_key"`
 	DefaultModel      *string                              `json:"default_model"`
-	TitleModel        *string                              `json:"title_model"`
 	CodexDefaultModel *string                              `json:"codex_default_model"`
-	CodexTitleModel   *string                              `json:"codex_title_model"`
 	DefaultSandbox    *harness.ID                          `json:"default_sandbox"`
 	SandboxByActivity map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 }
@@ -178,9 +175,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		OpenAIBaseURL:        cfg.OpenAIBaseURL,
 		CursorAPIKey:         envconfig.MaskToken(cfg.CursorAPIKey),
 		DefaultModel:         cfg.DefaultModel,
-		TitleModel:           cfg.TitleModel,
 		CodexDefaultModel:    cfg.CodexDefaultModel,
-		CodexTitleModel:      cfg.CodexTitleModel,
 		DefaultSandbox:       cfg.DefaultSandbox,
 		SandboxByActivity:    cfg.SandboxByActivity(),
 		MaxParallelTasks:     maxParallel,
@@ -274,10 +269,6 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := s.UpdateTaskTestRun(r.Context(), task.ID, true, ""); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
 	probeRunner := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:       tempEnvFile,
@@ -287,6 +278,10 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		CodexAuthPath: h.runner.CodexAuthPath(),
 	})
 	probeRunner.Run(task.ID, prompt, "", false)
+	// Run starts the oversight summary in the background when the probe ends
+	// its turn; wait for it so it runs on the probed credentials before the
+	// deferred cleanup removes the temporary env file.
+	probeRunner.WaitBackground()
 
 	updated, err := s.GetTask(r.Context(), task.ID)
 	if err != nil {
@@ -294,11 +289,12 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Keep test tasks visible for auditability and quick re-test.
-	// In the happy path a sandbox connectivity test that returns a PASS
-	// is represented as a terminal done task; failures keep their natural
+	// The probe passes when the run ends waiting for review with no failure
+	// category: the harness started, authenticated and answered. A probe
+	// that passes is recorded as a done task; failures keep their natural
 	// terminal state from the runner.
-	if updated.Status == store.TaskStatusWaiting && updated.LastTestResult == "pass" {
+	passed := updated.Status == store.TaskStatusWaiting && updated.FailureCategory == ""
+	if passed {
 		if err := s.ForceUpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -318,10 +314,10 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := sandboxTestResponse{
-		TaskID:         updated.ID.String(),
-		Sandbox:        sb,
-		Status:         string(updated.Status),
-		LastTestResult: updated.LastTestResult,
+		TaskID:  updated.ID.String(),
+		Sandbox: sb,
+		Status:  string(updated.Status),
+		Passed:  passed,
 	}
 	if updated.Result != nil {
 		resp.Result = *updated.Result
@@ -330,8 +326,6 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		resp.StopReason = *updated.StopReason
 	}
 
-	passed := strings.EqualFold(updated.LastTestResult, "pass") &&
-		(updated.Status == store.TaskStatusDone || updated.Status == store.TaskStatusWaiting)
 	h.setSandboxTestPassed(sb, passed)
 
 	httpjson.Write(w, http.StatusOK, resp)
@@ -366,9 +360,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		OpenAIBaseURL:     req.OpenAIBaseURL,
 		CursorAPIKey:      req.CursorAPIKey,
 		DefaultModel:      req.DefaultModel,
-		TitleModel:        req.TitleModel,
 		CodexDefaultModel: req.CodexDefaultModel,
-		CodexTitleModel:   req.CodexTitleModel,
 	}); err != nil {
 		return "", err
 	}
@@ -403,9 +395,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OpenAIBaseURL        *string                              `json:"openai_base_url"`
 		CursorAPIKey         *string                              `json:"cursor_api_key"`
 		DefaultModel         *string                              `json:"default_model"`
-		TitleModel           *string                              `json:"title_model"`
 		CodexDefaultModel    *string                              `json:"codex_default_model"`
-		CodexTitleModel      *string                              `json:"codex_title_model"`
 		DefaultSandbox       *harness.ID                          `json:"default_sandbox"`
 		SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
@@ -498,9 +488,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OpenAIBaseURL:        req.OpenAIBaseURL,
 		CursorAPIKey:         req.CursorAPIKey,
 		DefaultModel:         req.DefaultModel,
-		TitleModel:           req.TitleModel,
 		CodexDefaultModel:    req.CodexDefaultModel,
-		CodexTitleModel:      req.CodexTitleModel,
 		MaxParallel:          maxParallel,
 		MaxAgents:            maxAgents,
 		AgentNice:            agentNice,

@@ -78,63 +78,6 @@ func TestGetOversight_NotExist_ReturnsPending(t *testing.T) {
 	}
 }
 
-func TestSaveAndGetTestOversight(t *testing.T) {
-	s := newTestStore(t)
-	ctx := bg()
-
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	oversight := TaskOversight{
-		Status:      OversightStatusReady,
-		GeneratedAt: time.Now().UTC().Truncate(time.Second),
-		Phases: []OversightPhase{
-			{Title: "Test Phase", Summary: "Ran test suite"},
-		},
-	}
-
-	if err := s.SaveTestOversight(task.ID, oversight); err != nil {
-		t.Fatalf("SaveTestOversight: %v", err)
-	}
-
-	got, err := s.GetTestOversight(task.ID)
-	if err != nil {
-		t.Fatalf("GetTestOversight: %v", err)
-	}
-	if got == nil {
-		t.Fatal("GetTestOversight returned nil")
-	}
-	if got.Status != OversightStatusReady {
-		t.Errorf("Status = %q, want %q", got.Status, OversightStatusReady)
-	}
-	if len(got.Phases) != 1 || got.Phases[0].Title != "Test Phase" {
-		t.Errorf("unexpected phases: %+v", got.Phases)
-	}
-}
-
-func TestGetTestOversight_NotExist_ReturnsPending(t *testing.T) {
-	s := newTestStore(t)
-	ctx := bg()
-
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	got, err := s.GetTestOversight(task.ID)
-	if err != nil {
-		t.Fatalf("GetTestOversight on missing file: %v", err)
-	}
-	if got == nil {
-		t.Fatal("GetTestOversight should return non-nil pending when file missing")
-	}
-	if got.Status != OversightStatusPending {
-		t.Errorf("Status = %q, want %q", got.Status, OversightStatusPending)
-	}
-}
-
 func TestLoadOversightText_NotExist_ReturnsEmpty(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()

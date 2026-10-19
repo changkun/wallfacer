@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -247,6 +248,41 @@ func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
 	}
 	if got[0].Name != "Named Workspace" {
 		t.Errorf("round-trip: expected Name=%q, got %q", "Named Workspace", got[0].Name)
+	}
+}
+
+// TestLoadGroups_DropsRemovedKeys verifies that a workspaces file carrying the
+// test-run concurrency cap and the auto-test toggle of earlier releases loads,
+// and that the keys are gone after the next save.
+func TestLoadGroups_DropsRemovedKeys(t *testing.T) {
+	configDir := t.TempDir()
+	ws := t.TempDir()
+	folders, err := json.Marshal([]string{ws})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := `[{"name":"Stored","folders":` + string(folders) + `,"max_parallel":2,"max_test_parallel":3,"autotest":true}]`
+	if err := os.WriteFile(workspacesFilePath(configDir), []byte(raw), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, err := LoadGroups(configDir)
+	if err != nil {
+		t.Fatalf("LoadGroups: %v", err)
+	}
+	if len(got) != 1 || got[0].MaxParallel == nil || *got[0].MaxParallel != 2 {
+		t.Fatalf("loaded groups = %+v, want one group with max_parallel 2", got)
+	}
+	if err := SaveGroups(configDir, got); err != nil {
+		t.Fatalf("SaveGroups: %v", err)
+	}
+	saved, err := os.ReadFile(workspacesFilePath(configDir))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	for _, key := range []string{"max_test_parallel", "autotest"} {
+		if strings.Contains(string(saved), `"`+key+`"`) {
+			t.Errorf("saved workspaces file still carries %q: %s", key, saved)
+		}
 	}
 }
 

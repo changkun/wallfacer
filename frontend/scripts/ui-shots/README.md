@@ -24,8 +24,8 @@ node frontend/scripts/ui-shots/snap.mjs --base http://localhost:8099 --out /tmp/
 Writes a deterministic store under `<data>/<groupKey>/<uuid>/` matching the
 real on-disk schema (`internal/store/models.go`): `task.json`, `traces/`,
 `oversight.json`. Seven tasks span backlog / in_progress / waiting / done /
-failed, with varied badges: `priority:*` / `impact:*` tags, test pass/fail
-(`last_test_result`), and a backlog card with `depends_on` deps.
+failed, with varied badges: `priority:*` / `impact:*` tags and a failure
+category.
 
 Why an isolated HOME: the config dir is `$HOME/.wallfacer` (no flag overrides
 it). The board only renders cards when a non-empty workspace set is active, so

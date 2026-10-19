@@ -30,9 +30,7 @@ const openaiApiKey = ref('');
 const openaiBaseUrl = ref('');
 const cursorApiKey = ref('');
 const defaultModel = ref('');
-const titleModel = ref('');
 const codexDefaultModel = ref('');
-const codexTitleModel = ref('');
 const defaultSandbox = ref('');
 
 const claudeModels = computed(() => claudeModelsFor(claudeBaseUrl.value));
@@ -78,9 +76,7 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   claudeBaseUrl.value = cfg?.base_url || '';
   openaiBaseUrl.value = cfg?.openai_base_url || '';
   defaultModel.value = cfg?.default_model || '';
-  titleModel.value = cfg?.title_model || '';
   codexDefaultModel.value = cfg?.codex_default_model || '';
-  codexTitleModel.value = cfg?.codex_title_model || '';
   defaultSandbox.value = cfg?.default_sandbox || '';
   claudeTestStatus.value = '';
   codexTestStatus.value = '';
@@ -106,9 +102,7 @@ function buildSavePayload(): EnvUpdatePayload {
   const cursorRaw = cursorApiKey.value.trim();
   if (cursorRaw) body.cursor_api_key = cursorRaw;
   body.default_model = defaultModel.value.trim();
-  body.title_model = titleModel.value.trim();
   body.codex_default_model = codexDefaultModel.value.trim();
-  body.codex_title_model = codexTitleModel.value.trim();
   body.default_sandbox = defaultSandbox.value.trim();
   // Activity-specific routing is retired — send empty map so the server
   // clears any legacy WALLFACER_SANDBOX_* entries.
@@ -146,7 +140,6 @@ interface ClaudeTestPayload {
   sandbox_by_activity: Record<string, string>;
   base_url?: string;
   default_model?: string;
-  title_model?: string;
   oauth_token?: string;
   api_key?: string;
 }
@@ -157,7 +150,6 @@ interface CodexTestPayload {
   sandbox_by_activity: Record<string, string>;
   openai_base_url?: string;
   codex_default_model?: string;
-  codex_title_model?: string;
   openai_api_key?: string;
 }
 
@@ -200,7 +192,6 @@ function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'openc
       sandbox_by_activity: raw.sandbox_by_activity || {},
       base_url: raw.base_url,
       default_model: raw.default_model,
-      title_model: raw.title_model,
     };
     if (raw.oauth_token) p.oauth_token = raw.oauth_token;
     if (raw.api_key) p.api_key = raw.api_key;
@@ -237,7 +228,6 @@ function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'openc
     sandbox_by_activity: raw.sandbox_by_activity || {},
     openai_base_url: raw.openai_base_url,
     codex_default_model: raw.codex_default_model,
-    codex_title_model: raw.codex_title_model,
   };
   if (raw.openai_api_key) p.openai_api_key = raw.openai_api_key;
   return p;
@@ -245,16 +235,11 @@ function buildTestPayload(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'openc
 
 function summarizeTestResult(resp: SandboxTestResponse | null | undefined): string {
   if (!resp) return 'No response';
-  const normalized = (resp.last_test_result || '').toUpperCase();
-  if (normalized === 'PASS') return 'PASS';
-  if (normalized === 'FAIL') return 'FAIL';
+  if (resp.passed) return 'PASS';
   if (resp.status === 'failed' && (resp.result || resp.stop_reason)) {
     return (resp.result || resp.stop_reason || '').slice(0, 120);
   }
-  if (resp.status === 'done' || resp.status === 'waiting') {
-    return 'Test completed';
-  }
-  return `status ${resp.status}`;
+  return 'FAIL';
 }
 
 function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode', text: string): void {
@@ -378,15 +363,6 @@ const defaultSandboxOptions = computed(() => [
       <datalist id="env-claude-model-list">
         <option v-for="m in claudeModels" :key="m" :value="m" />
       </datalist>
-      <div class="set-row set-row--stack">
-        <div class="set-row__main">
-          <span class="set-row__label">Title model <code>CLAUDE_TITLE_MODEL</code></span>
-          <span class="set-row__help">Model for auto-generating task titles. Falls back to the default model.</span>
-        </div>
-        <div class="set-row__end">
-          <input id="env-title-model" v-model="titleModel" type="text" class="field mono" placeholder="e.g. claude-haiku-4.5" autocomplete="off" list="env-claude-model-list" />
-        </div>
-      </div>
     </div>
     <div class="card-foot">
       <button type="button" class="btn sm ghost" @click="testSandbox('claude')">Test</button>
@@ -431,15 +407,6 @@ const defaultSandboxOptions = computed(() => [
       <datalist id="env-codex-model-list">
         <option v-for="m in codexModels" :key="m" :value="m" />
       </datalist>
-      <div class="set-row set-row--stack">
-        <div class="set-row__main">
-          <span class="set-row__label">Title model <code>CODEX_TITLE_MODEL</code></span>
-          <span class="set-row__help">Model for auto-generating task titles. Falls back to the Codex default model.</span>
-        </div>
-        <div class="set-row__end">
-          <input id="env-codex-title-model" v-model="codexTitleModel" type="text" class="field mono" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-codex-model-list" />
-        </div>
-      </div>
     </div>
     <div class="card-foot">
       <button type="button" class="btn sm ghost" @click="testSandbox('codex')">Test</button>
@@ -509,7 +476,7 @@ const defaultSandboxOptions = computed(() => [
       <div class="set-row">
         <div class="set-row__main">
           <span class="set-row__label">Default harness <code>WALLFACER_DEFAULT_SANDBOX</code></span>
-          <span class="set-row__help">Activity-specific routing (Implementation, Testing, …) lives on the agent definition: clone a built-in from the Agents tab and set its Harness field. This is the workspace-wide fallback.</span>
+          <span class="set-row__help">Activity-specific routing (Implementation, Oversight, …) lives on the agent definition: clone a built-in from the Agents tab and set its Harness field. This is the workspace-wide fallback.</span>
         </div>
         <div class="set-row__end">
           <AppSelect v-model="defaultSandbox" :options="defaultSandboxOptions" aria-label="Default Harness" />

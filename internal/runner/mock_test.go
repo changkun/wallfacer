@@ -50,22 +50,6 @@ func TestMockRunner_CleanupWorktrees_RecordsCalls(t *testing.T) {
 	}
 }
 
-// TestMockRunner_GenerateTitle_RecordsCalls verifies that GenerateTitleBackground
-// records the task ID in the call log.
-func TestMockRunner_GenerateTitle_RecordsCalls(t *testing.T) {
-	m := &MockRunner{}
-	id := uuid.New()
-	m.GenerateTitleBackground(id, "prompt")
-
-	m.mu.Lock()
-	recorded := m.GenerateTitleCalls
-	m.mu.Unlock()
-
-	if len(recorded) != 1 || recorded[0] != id {
-		t.Errorf("expected 1 title call, got %d: %v", len(recorded), recorded)
-	}
-}
-
 // TestMockRunner_MultipleCalls verifies that multiple calls are accumulated.
 func TestMockRunner_MultipleCalls(t *testing.T) {
 	m := &MockRunner{}

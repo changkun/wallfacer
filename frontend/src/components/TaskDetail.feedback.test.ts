@@ -30,11 +30,8 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     model: '',
     kind: '',
     tags: [],
-    depends_on: [],
     failure_category: '',
     fresh_start: false,
-    is_test_run: false,
-    last_test_result: '',
     session_id: null,
     worktree_paths: {},
     usage_breakdown: {},
@@ -73,7 +70,7 @@ async function settle() {
 }
 
 describe('TaskDetail feedback submit', () => {
-  it.each(['spec', 'activity', 'changes', 'verification', 'events', 'timeline'])('keeps the latest reply and feedback reachable from %s', async (initialTab) => {
+  it.each(['spec', 'activity', 'changes', 'events', 'timeline'])('keeps the latest reply and feedback reachable from %s', async (initialTab) => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }],

@@ -8,9 +8,9 @@ The Board is the execution surface of wallfacer: a four-column kanban where task
 
 | Column | Statuses shown | Meaning |
 |---|---|---|
-| **Backlog** | `backlog` | Queued tasks. Prompt, settings, and dependencies are editable here. |
+| **Backlog** | `backlog` | Queued tasks. Prompt and settings are editable here. |
 | **In Progress** | `in_progress`, `committing` | An agent is running in the task's worktree, or the commit pipeline is merging its result. |
-| **Waiting** | `waiting`, `failed` | The agent paused for input, a verdict, or a budget raise; failed tasks land here for retry. |
+| **Waiting** | `waiting`, `failed` | The agent paused for input or a budget raise; failed tasks land here for retry. |
 | **Done** | `done`, `cancelled` | Terminal states. Done tasks have their changes merged; cancelled tasks keep their history. |
 
 The In Progress column header shows a `max N` tag: the effective parallel-execution cap for the active workspace. The value resolves from the workspace's `max_parallel` override, then `WALLFACER_MAX_PARALLEL`, with a default of 5 (`0` renders as unlimited). Starting a task while the cap is reached is refused until a running task finishes; see [Workspaces](workspaces.md).
@@ -74,11 +74,9 @@ Click **+ New Task** in the Backlog header. The composer offers:
 - **Prompt**: the work description, with Markdown support and `@` file mentions. The draft auto-saves to local storage, so navigating away loses nothing.
 - **Tags**: press Enter or comma to add a label. Tags are lowercase; `priority:N` and `impact:N` get special card styling.
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
-- **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), a **Depends on** picker, and a harness override.
+- **More** expands: a model override, budget limits (max cost in USD and max input tokens), and a harness override.
 
-**Batch mode** on the action row splits the prompt on blank lines and creates one task per section in a single atomic call. The underlying `POST /api/tasks/batch` endpoint also supports symbolic dependency wiring: each task may carry a `ref` name, and `depends_on_refs` entries name those refs or existing task UUIDs. Cycles are rejected before anything is created.
-
-Every task carries a short **Title** (auto-generated after creation, or set manually) and the full **Prompt**.
+Every task carries a short **Title** and the full **Prompt**. The title is the first non-blank line of the prompt, with a leading Markdown heading marker removed and shortened at a word boundary when it runs long.
 
 ## Starting, resuming, and completing
 
@@ -90,12 +88,11 @@ When the agent pauses or finishes, the task lands in **Waiting**. From there:
 |---|---|
 | **Submit feedback** | Send a message (with `@` file mentions); the agent resumes in the same session. |
 | **Mark as Done** | Trigger the commit pipeline and merge the changes. |
-| **Test** | Launch a verification agent, optionally with acceptance criteria. |
 | **Sync** | Rebase the task's worktree onto the latest default branch without merging. |
 | **Raise budget** | Shown when a cost or token limit was hit; adjust the limit and continue. |
 | **Cancel** | Discard the worktree and move to Cancelled; history and logs are preserved. |
 
-Failed tasks offer **Resume** (continue the existing agent session with an extended timeout, available when a session exists), **Retry** (back to Backlog, optionally with an edited prompt and a fresh or resumed session), **Test**, and **Sync**. Done tasks can still be tested or archived; cancelled tasks can be retried.
+Failed tasks offer **Resume** (continue the existing agent session with an extended timeout, available when a session exists), **Retry** (back to Backlog, optionally with an edited prompt and a fresh or resumed session), and **Sync**. Done tasks can be archived; cancelled tasks can be retried.
 
 Full per-state action availability in the detail view:
 
@@ -103,17 +100,11 @@ Full per-state action availability in the detail view:
 |---|---|
 | `backlog` | Start task, Edit task, Delete |
 | `in_progress` / `committing` | Cancel, Delete |
-| `waiting` | Mark as Done, Test, Raise budget (when budget-hit), Sync, Cancel, Delete |
-| `failed` | Resume (with session), Test, Raise budget, Sync, Retry, Delete |
-| `done` | Test, Archive, Delete |
+| `waiting` | Mark as Done, Raise budget (when budget-hit), Sync, Cancel, Delete |
+| `failed` | Resume (with session), Raise budget, Sync, Retry, Delete |
+| `done` | Archive, Delete |
 | `cancelled` | Retry, Archive, Delete |
 | archived | Unarchive, Delete |
-
-## Dependencies
-
-The **Depends on** picker (in the composer's More section and the backlog Edit panel) declares prerequisite tasks. Dependencies record the intended order; nothing enforces it, so a task with unmet dependencies can still be started by hand.
-
-Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status.
 
 ## Search and filtering
 
@@ -124,14 +115,14 @@ The header search bar filters visible cards live by title, prompt, and tags. Use
 Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, and spec matches from the Plan tree. When a task is highlighted, state-dependent actions appear:
 
 - Backlog: **Plan** (open task-mode chat in Plan), **Start**
-- Waiting: **Resume** (with session), **Test**, **Done**, **Sync**
+- Waiting: **Resume** (with session), **Done**, **Sync**
 - Failed: **Resume** (with session), **Retry**, **Sync**
 - Done / Cancelled: **Retry**
-- Any non-backlog task: **Open changes**; once at least one turn has run, **Open verification** and **Open timeline**
+- Any non-backlog task: **Open changes**; once at least one turn has run, **Open timeline**
 
 ## Task detail view
 
-Click any card to open the detail view. A left rail carries the header (status, tags, elapsed time, cost, short ID), settings, the dependency panel, and the action buttons; the main pane switches between six tabs.
+Click any card to open the detail view. A left rail carries the header (status, tags, elapsed time, cost, short ID), settings, and the action buttons; the main pane switches between five tabs.
 
 ![Task detail view with the tab bar and actions rail](images/task-detail.png)
 
@@ -140,7 +131,6 @@ Click any card to open the detail view. A left rail carries the header (status, 
 | **Spec** | The prompt and latest result as rendered Markdown (raw toggle, copy) and, for waiting tasks, the inline feedback box. |
 | **Activity** | Oversight summaries per phase followed by the parsed agent transcript (thinking, tool calls, results) with a filter box; raw output fallback. |
 | **Changes** | Task commits with expandable patches, followed by the aggregate diff and a commits-behind warning. |
-| **Verification** | The test agent's per-turn results. |
 | **Events** | The event audit trail grouped by type, usage statistics, per-agent usage, retry history, and prompt history. |
 | **Timeline** | Execution spans rendered as a flamegraph with a time axis, an optional cumulative-cost overlay, and a span table sorted by duration. |
 
@@ -161,10 +151,6 @@ and marks the task failed so it can be retried after storage is repaired.
 ### Inline diff comments
 
 While a task is waiting, each line in the **Changes** tab gets a gutter button that opens an inline comment box. Comments collect in a **Review comments** panel grouped by file, alongside a general feedback box. **Submit** batches every line comment plus the general text into a single feedback message, and the agent resumes with the full review as its next input.
-
-### Verification
-
-The **Test** action launches a separate verification agent against the task's worktree; it runs the relevant checks and reports a pass or fail verdict shown as a badge on the card. Acceptance criteria can be supplied when starting the run, and repeated runs overwrite the previous verdict.
 
 ### Timeline
 

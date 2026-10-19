@@ -33,19 +33,11 @@ async function mountCard(t: Task, rank?: number) {
 }
 
 describe('TaskCard', () => {
-  it('shows title generation without hiding the task prompt', async () => {
-    const { host, app } = await mountCard(task({ title: '', title_generating: true } as Partial<Task>));
-    expect(host.querySelector('[role="status"]')?.textContent).toContain('Generating title');
-    expect(host.textContent).toContain('Show a badge');
-    app.unmount(); host.remove();
-  });
   it('renders one state pill and at most one qualifier', async () => {
-    const { host, app } = await mountCard(task({ status: 'failed', last_test_result: 'fail', failure_category: 'agent_error', session_id: 's' }));
+    const { host, app } = await mountCard(task({ status: 'failed', failure_category: 'agent_error', session_id: 's' }));
     expect(host.querySelector('[data-role="state"]')!.classList.contains('pill-err')).toBe(true);
     expect(host.querySelectorAll('.task-card__pills .pill').length).toBeLessThanOrEqual(2);
-    expect(host.querySelector('[data-role="qualifier"]')!.textContent).toContain('verify failed');
-    // The failure category did not vanish: it moved to the meta line.
-    expect(host.querySelector('.task-card__tags')!.textContent).toContain('Agent Error');
+    expect(host.querySelector('[data-role="qualifier"]')!.textContent).toContain('Agent Error');
     app.unmount(); host.remove();
   });
 
@@ -62,7 +54,7 @@ describe('TaskCard', () => {
   it('renders the forward transition as the ink button and the rest as ghosts', async () => {
     const { host, app } = await mountCard(task({ status: 'waiting', session_id: 's' }));
     const btns = Array.from(host.querySelectorAll<HTMLButtonElement>('.task-card__actions .btn'));
-    expect(btns.map((b) => b.dataset.action)).toEqual(['resume', 'test', 'done']);
+    expect(btns.map((b) => b.dataset.action)).toEqual(['resume', 'done']);
     expect(btns.filter((b) => !b.classList.contains('ghost')).map((b) => b.dataset.action)).toEqual(['done']);
     app.unmount(); host.remove();
   });

@@ -41,7 +41,6 @@ type MockRunner struct {
 	RunBackgroundCalls    []uuid.UUID
 	KillContainerCalls    []uuid.UUID
 	CleanupWorktreesCalls []uuid.UUID
-	GenerateTitleCalls    []uuid.UUID
 	CommitCalls           []uuid.UUID
 
 	// Optional override for ContainerName return value.
@@ -55,10 +54,6 @@ type MockRunner struct {
 
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
-
-	// GenerateAgentSessionTitleFn lets tests stub the task-free agent-session
-	// thread title generation. When nil, the method returns ("", nil).
-	GenerateAgentSessionTitleFn func(ctx context.Context, firstUserMessage string) (string, error)
 }
 
 // compile-time assertion.
@@ -138,13 +133,6 @@ func (m *MockRunner) PendingGoroutines() []string { return nil }
 // WaitBackground is a no-op in the mock.
 func (m *MockRunner) WaitBackground() {}
 
-// GenerateTitleBackground records a title-generation call.
-func (m *MockRunner) GenerateTitleBackground(taskID uuid.UUID, _ string) {
-	m.mu.Lock()
-	m.GenerateTitleCalls = append(m.GenerateTitleCalls, taskID)
-	m.mu.Unlock()
-}
-
 // GenerateOversight is a no-op in the mock.
 func (m *MockRunner) GenerateOversight(_ uuid.UUID) {}
 
@@ -191,15 +179,6 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 		return m.AssessDriftFn(ctx, specBody, affects, changedFiles, diff)
 	}
 	return spec.DriftVerdict{}, nil
-}
-
-// GenerateAgentSessionTitle delegates to GenerateAgentSessionTitleFn when
-// set; the default returns ("", nil) so callers skip the rename.
-func (m *MockRunner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error) {
-	if m.GenerateAgentSessionTitleFn != nil {
-		return m.GenerateAgentSessionTitleFn(ctx, firstUserMessage)
-	}
-	return "", nil
 }
 
 // WorkspaceManager returns the injected manager (or nil, the default, which

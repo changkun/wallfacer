@@ -50,29 +50,26 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **Task collection (no {id})** | |
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
-| `POST /api/tasks` | Create a new task in the backlog. **Does not accept `sandbox` or `sandbox_by_activity`**; a task's harness and per-activity harnesses are set via `PATCH /api/tasks/{id}` after creation, and otherwise follow the `WALLFACER_SANDBOX_*` settings. |
-| `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring. Each task takes the fields the singular endpoint takes, plus `ref`, `depends_on_refs` and `spec_source_path`. Same harness-rejection policy as the singular endpoint. |
-| `POST /api/tasks/generate-titles` | Bulk-generate titles for tasks that lack one |
+| `POST /api/tasks` | Create a new task in the backlog. An optional `title` is kept as given; without one the title is the prompt's first non-blank line, cut at a word boundary. **Does not accept `sandbox` or `sandbox_by_activity`**; a task's harness and per-activity harnesses are set via `PATCH /api/tasks/{id}` after creation, and otherwise follow the `WALLFACER_SANDBOX_*` settings. |
 | `POST /api/tasks/generate-oversight` | Bulk-generate oversight summaries for eligible tasks |
 | `GET /api/tasks/search` | Search tasks by keyword |
 | `POST /api/tasks/archive-done` | Archive all tasks in the done state |
 | `GET /api/tasks/summaries` | List immutable task summaries for completed tasks (cost dashboard) |
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
-| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, harness, dependencies, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
+| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, harness, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
 | `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
 | `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |
 | `POST /api/tasks/{id}/resume` | Resume a failed or waiting task using its existing session |
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto the latest default branch |
-| `POST /api/tasks/{id}/test` | Trigger the test agent for a task |
 | `GET /api/tasks/{id}/diff` | Git diff of task worktrees versus the default branch |
 | `GET /api/tasks/{id}/logs` | Live log stream for a running task (`text/plain`, not SSE; see [Live Task Logs](#live-task-logs-get-apitasksidlogs)) |
 | `GET /api/tasks/{id}/outputs/{filename}` | Raw Claude Code output file for a single agent turn |
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
-| `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
+| `GET /api/tasks/{id}/oversight` | Oversight summary for a task |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |
@@ -294,7 +291,7 @@ Usage is displayed on task cards and aggregated in the Done column header. It pe
 
 In addition to the aggregate `TaskUsage`, each task records:
 
-- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `title`, `oversight`, `commit_message`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `oversight`, `commit_message`. Tasks stored by earlier releases may also carry `test`, `oversight-test`, `title` and `review` keys. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
 - Per-turn `TurnUsageRecord` entries accessible via `GET /api/tasks/{id}/turn-usage`, providing detailed per-turn token consumption, stop reasons, and sub-agent labels.
 
 ## Task Search

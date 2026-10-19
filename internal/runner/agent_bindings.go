@@ -42,13 +42,6 @@ type agentBinding struct {
 // coverage test, and at run time runAgent surfaces a clear error
 // rather than running with zero-value fields.
 var agentBindings = map[string]agentBinding{
-	agents.Title.Slug: {
-		Activity:    store.SandboxActivityTitle,
-		Timeout:     func(*store.Task) time.Duration { return constants.TitleAgentTimeout },
-		MountMode:   mountNone,
-		SingleTurn:  true,
-		ParseResult: parseTitleResult,
-	},
 	agents.Oversight.Slug: {
 		Activity:    store.SandboxActivityOversight,
 		Timeout:     func(*store.Task) time.Duration { return constants.OversightAgentTimeout },
@@ -65,18 +58,6 @@ var agentBindings = map[string]agentBinding{
 	},
 	agents.Implementation.Slug: {
 		Activity: store.SandboxActivityImplementation,
-		Timeout: func(t *store.Task) time.Duration {
-			if t == nil {
-				return 0
-			}
-			return time.Duration(t.Timeout) * time.Minute
-		},
-		MountMode:   mountReadWrite,
-		SingleTurn:  false,
-		ParseResult: passthroughParse,
-	},
-	agents.Testing.Slug: {
-		Activity: store.SandboxActivityTesting,
 		Timeout: func(t *store.Task) time.Duration {
 			if t == nil {
 				return 0

@@ -316,16 +316,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/batch", Name: "BatchCreateTasks",
-		Description: "Create multiple tasks atomically with symbolic dependency wiring.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/generate-titles", Name: "GenerateMissingTitles",
-		Description: "Bulk-generate titles for tasks that lack one.",
-		Tags:        []string{"tasks"},
-	},
-	{
 		Method: http.MethodPost, Pattern: "/api/tasks/generate-oversight", Name: "GenerateMissingOversight",
 		Description: "Bulk-generate oversight summaries for eligible tasks.",
 		Tags:        []string{"tasks"},
@@ -389,12 +379,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/test", Name: "TestTask",
-		Description: "Trigger the test agent for a task.",
-		Tags:        []string{"tasks"},
-	},
-
-	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/commits", Name: "TaskCommits",
 		Description: "Read preserved task commits and patches across feedback turns and retries.",
 		Tags:        []string{"tasks"},
@@ -426,7 +410,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/oversight", Name: "GetOversight",
-		Description: "Oversight summary for a task. ?phase=impl (default) or ?phase=test selects the implementation- or test-agent summary.",
+		Description: "Oversight summary for a task.",
 		Tags:        []string{"tasks"},
 	},
 

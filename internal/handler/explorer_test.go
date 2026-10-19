@@ -1199,8 +1199,9 @@ func TestTaskPromptsEndpoint_TitleTruncationPreservesUTF8(t *testing.T) {
 	}
 }
 
-// TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget verifies the fallback
-// title is capped at 80 runes plus the ellipsis, not 80 bytes.
+// TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget verifies the title of a
+// task created from a long multi-byte prompt is cut at the title rune budget
+// plus the ellipsis, not at a byte offset.
 func TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	ctx := t.Context()
@@ -1228,8 +1229,8 @@ func TestTaskPromptsEndpoint_TitleTruncatesAtRuneBudget(t *testing.T) {
 	if strings.ContainsRune(title, '\uFFFD') {
 		t.Fatalf("title contains replacement char: %q", title)
 	}
-	if want := strings.Repeat("汉", 80) + "…"; title != want {
-		t.Errorf("expected 80 runes plus ellipsis, got %q", title)
+	if want := strings.Repeat("汉", store.TitleMaxRunes-1) + "…"; title != want {
+		t.Errorf("expected %d runes plus ellipsis, got %q", store.TitleMaxRunes-1, title)
 	}
 }
 

@@ -5,17 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
 	"latere.ai/x/pkg/httpjson"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/prompts"
 	runnerpkg "latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -23,7 +19,7 @@ import (
 // closeFeedbackWaitingSpan emits a span_end event to close the feedback_waiting
 // span that was opened when the task entered the waiting state. This must be
 // called on every path that transitions a task out of waiting (complete, cancel,
-// test run, feedback) so the timeline doesn't show an ever-growing
+// feedback) so the timeline doesn't show an ever-growing
 // "Waiting for Feedback" bar.
 func (h *Handler) closeFeedbackWaitingSpan(ctx context.Context, taskID uuid.UUID) {
 	s, ok := h.currentStore()
@@ -151,15 +147,6 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
-	// Any further implementation work invalidates prior test verification.
-	// This must happen AFTER the status check to avoid clearing test state
-	// when the transition will fail (e.g. task already moved to committing).
-	if err := s.UpdateTaskTestRun(r.Context(), id, false, ""); err != nil {
-		transitionMu.Unlock()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	// Submitting feedback to a waiting task is always allowed even when max
 	// concurrent tasks is reached: the task was previously in_progress and
 	// paused for user input.
@@ -177,9 +164,6 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 // in_progress with the given feedback message and launches the runner in
 // the background. Must be called with transitionMu held.
 func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, s *store.Store, task *store.Task, message string) error {
-	if err := s.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
-		return err
-	}
 	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		return err
 	}
@@ -477,132 +461,6 @@ func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bo
 		h.cascadeUnarchiveThreadsForTask(task.ID.String())
 	}
 	return nil
-}
-
-// TestTask runs a verification agent on the same task to check its acceptance criteria.
-// The task transitions from "waiting" back to "in_progress" with IsTestRun=true so the UI
-// can distinguish a test run from normal work. On end_turn the runner moves it back to
-// "waiting" (instead of "done") and records a pass/fail verdict.
-func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	// Body is optional — empty body is accepted; present body is decoded strictly.
-	req, ok := httpjson.DecodeOptionalBody[struct {
-		Criteria string `json:"criteria"`
-	}](w, r)
-	if !ok {
-		return
-	}
-
-	s, ok := h.requireStore(w)
-	if !ok {
-		return
-	}
-
-	// Hold transitionMu across the read-check-write so a concurrent Done cannot
-	// move the task to committing between our status check and the
-	// status/test-run writes (which would otherwise leave IsTestRun set on a task
-	// now in the commit pipeline). Mirrors SubmitFeedback; RunBackground below
-	// runs under the lock as it does there.
-	transitionMu.Lock()
-	defer transitionMu.Unlock()
-
-	task, err := s.GetTask(r.Context(), id)
-	if err != nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
-	}
-	if task.Status != store.TaskStatusWaiting {
-		http.Error(w, "only waiting tasks can be tested", http.StatusBadRequest)
-		return
-	}
-
-	// Include the implementation agent's result as context so the test agent
-	// knows what was reported as done without re-reading the whole codebase.
-	implResult := ""
-	if task.Result != nil {
-		implResult = *task.Result
-	}
-
-	// Generate a git diff from each worktree so the test agent can focus
-	// directly on the changed files instead of exploring from scratch.
-	diff := generateWorktreeDiff(task.WorktreePaths)
-
-	// Resolve criteria: an explicit per-run override wins; otherwise fall back
-	// to the criteria persisted on the task (the unattended path's source).
-	criteria := strings.TrimSpace(req.Criteria)
-	if criteria == "" {
-		criteria = task.Criteria
-	}
-	testPrompt := buildTestPrompt(task.Prompt, criteria, implResult, diff)
-
-	h.closeFeedbackWaitingSpan(r.Context(), id)
-
-	// Mark task as a test run and clear any previous verdict.
-	if err := s.UpdateTaskTestRun(r.Context(), id, true, ""); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Transition waiting → in_progress.
-	if err := s.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
-		store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerUser, nil))
-	h.insertEventOrLog(r.Context(), id, store.EventTypeSystem, map[string]string{
-		"result":      "Test verification started",
-		"test_prompt": testPrompt,
-	})
-
-	// Run the test agent in a fresh session so it doesn't continue the implementation session.
-	h.runner.RunBackground(id, testPrompt, "", false)
-
-	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
-}
-
-// buildTestPrompt constructs a prompt for the test verification agent.
-// implResult is the implementation agent's self-reported summary (may be empty).
-// diff is a git diff of the changes made (may be empty).
-func buildTestPrompt(originalPrompt, criteria, implResult, diff string) string {
-	return prompts.TestVerification(prompts.TestData{
-		OriginalPrompt: originalPrompt,
-		Criteria:       strings.TrimSpace(criteria),
-		ImplResult:     strings.TrimSpace(implResult),
-		Diff:           strings.TrimSpace(diff),
-	})
-}
-
-// generateWorktreeDiff produces a unified git diff for each worktree showing
-// all changes on the task branch relative to the default branch. Returns an
-// empty string if no worktrees are provided or no diffs are found.
-func generateWorktreeDiff(worktreePaths map[string]string) string {
-	if len(worktreePaths) == 0 {
-		return ""
-	}
-	var parts []string
-	for repoPath, worktreePath := range worktreePaths {
-		if !gitutil.IsGitRepo(repoPath) {
-			continue
-		}
-		defBranch, err := gitutil.DefaultBranch(repoPath)
-		if err != nil {
-			continue
-		}
-		out, err := cmdexec.Git(worktreePath, "diff", defBranch+"..HEAD", "--", ".").Output()
-		if err != nil || len(out) == 0 {
-			continue
-		}
-		diff := out
-		if len(worktreePaths) > 1 {
-			diff = "# " + filepath.Base(repoPath) + "\n" + diff
-		}
-		parts = append(parts, diff)
-	}
-	combined := strings.Join(parts, "\n")
-	if len(combined) > constants.MaxDiffBytes {
-		combined = strings.ToValidUTF8(combined[:constants.MaxDiffBytes], "") + "\n... (diff truncated)"
-	}
-	return combined
 }
 
 // SyncTask rebases task worktrees onto the latest default branch without merging.

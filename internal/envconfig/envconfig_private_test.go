@@ -83,16 +83,12 @@ func TestStripEnvInlineComment(t *testing.T) {
 func TestSandboxByActivity(t *testing.T) {
 	cfg := Config{
 		ImplementationSandbox: "claude",
-		TestingSandbox:        "codex",
-		TitleSandbox:          "claude",
 		OversightSandbox:      "codex",
 		CommitMessageSandbox:  "codex",
 	}
 	got := cfg.SandboxByActivity()
 	want := map[store.SandboxActivity]string{
 		store.SandboxActivityImplementation: "claude",
-		store.SandboxActivityTesting:        "codex",
-		store.SandboxActivityTitle:          "claude",
 		store.SandboxActivityOversight:      "codex",
 		store.SandboxActivityCommitMessage:  "codex",
 	}
@@ -119,7 +115,7 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	initial := strings.Join([]string{
 		"WALLFACER_DEFAULT_SANDBOX=claude",
 		"WALLFACER_SANDBOX_IMPLEMENTATION=claude",
-		"WALLFACER_SANDBOX_TESTING=codex",
+		"WALLFACER_SANDBOX_COMMIT_MESSAGE=codex",
 		"UNRELATED=keep",
 		"",
 	}, "\n")
@@ -130,7 +126,7 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	defaultSandbox := harness.Codex
 	if err := UpdateSandboxSettings(path, &defaultSandbox, map[store.SandboxActivity]harness.ID{
 		store.SandboxActivityImplementation: harness.Codex,
-		store.SandboxActivityTitle:          harness.Claude,
+		store.SandboxActivityOversight:      harness.Claude,
 		store.SandboxActivityCommitMessage:  "",
 	}); err != nil {
 		t.Fatalf("UpdateSandboxSettings: %v", err)
@@ -147,14 +143,11 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	if cfg.ImplementationSandbox != "codex" {
 		t.Errorf("ImplementationSandbox = %q, want codex", cfg.ImplementationSandbox)
 	}
-	if cfg.TestingSandbox != "" {
-		t.Errorf("TestingSandbox should be cleared, got %q", cfg.TestingSandbox)
-	}
 	if cfg.CommitMessageSandbox != "" {
 		t.Errorf("CommitMessageSandbox should be cleared, got %q", cfg.CommitMessageSandbox)
 	}
-	if cfg.TitleSandbox != "claude" {
-		t.Errorf("TitleSandbox = %q, want claude", cfg.TitleSandbox)
+	if cfg.OversightSandbox != "claude" {
+		t.Errorf("OversightSandbox = %q, want claude", cfg.OversightSandbox)
 	}
 
 	raw, err := os.ReadFile(path)

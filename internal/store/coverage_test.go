@@ -364,57 +364,6 @@ func TestUpdateTaskModelOverride_UnknownID(t *testing.T) {
 	}
 }
 
-func TestUpdateTaskCustomPatterns_SetAndClear(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pattern task", Timeout: 5})
-
-	pass := []string{"PASS", "OK"}
-	fail := []string{"FAIL", "ERROR"}
-	if err := s.UpdateTaskCustomPatterns(bg(), task.ID, pass, fail); err != nil {
-		t.Fatalf("UpdateTaskCustomPatterns set: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if len(got.CustomPassPatterns) != 2 || got.CustomPassPatterns[0] != "PASS" {
-		t.Errorf("CustomPassPatterns = %v, want [PASS OK]", got.CustomPassPatterns)
-	}
-	if len(got.CustomFailPatterns) != 2 || got.CustomFailPatterns[0] != "FAIL" {
-		t.Errorf("CustomFailPatterns = %v, want [FAIL ERROR]", got.CustomFailPatterns)
-	}
-
-	if err := s.UpdateTaskCustomPatterns(bg(), task.ID, nil, nil); err != nil {
-		t.Fatalf("UpdateTaskCustomPatterns clear: %v", err)
-	}
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.CustomPassPatterns != nil {
-		t.Errorf("CustomPassPatterns should be nil after clearing, got %v", got.CustomPassPatterns)
-	}
-	if got.CustomFailPatterns != nil {
-		t.Errorf("CustomFailPatterns should be nil after clearing, got %v", got.CustomFailPatterns)
-	}
-}
-
-func TestUpdateTaskCustomPatterns_EmptySliceClearsField(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pattern task", Timeout: 5})
-
-	s.UpdateTaskCustomPatterns(bg(), task.ID, []string{"PASS"}, []string{"FAIL"}) //nolint:errcheck
-
-	if err := s.UpdateTaskCustomPatterns(bg(), task.ID, []string{}, []string{}); err != nil {
-		t.Fatalf("UpdateTaskCustomPatterns empty: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.CustomPassPatterns != nil {
-		t.Errorf("CustomPassPatterns should be nil when empty slice provided, got %v", got.CustomPassPatterns)
-	}
-}
-
-func TestUpdateTaskCustomPatterns_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.UpdateTaskCustomPatterns(bg(), uuid.New(), nil, nil); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
 func TestArchiveAllDone_ArchivesDoneAndCancelled(t *testing.T) {
 	s := newTestStore(t)
 
@@ -569,25 +518,6 @@ func TestCancelTask_MovesToCancelled(t *testing.T) {
 	}
 }
 
-func TestCancelTask_RemovesOrphanedDependents(t *testing.T) {
-	s := newTestStore(t)
-	parent, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "parent", Timeout: 5})
-	child, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:    "child",
-		Timeout:   5,
-		DependsOn: []string{parent.ID.String()},
-	})
-
-	if err := s.CancelTask(bg(), parent.ID); err != nil {
-		t.Fatalf("CancelTask: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), child.ID)
-	if len(got.DependsOn) != 0 {
-		t.Errorf("child DependsOn = %v, want empty after parent cancelled", got.DependsOn)
-	}
-}
-
 func TestCancelTask_UnknownID(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.CancelTask(bg(), uuid.New()); err == nil {
@@ -680,22 +610,6 @@ func TestCreateTaskWithOptions_NegativeBudgets(t *testing.T) {
 	}
 	if task.MaxInputTokens != 0 {
 		t.Errorf("MaxInputTokens = %d, want 0", task.MaxInputTokens)
-	}
-}
-
-func TestCreateTaskWithOptions_PreAssignedID(t *testing.T) {
-	s := newTestStore(t)
-	preID := uuid.New()
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		ID:      preID,
-		Prompt:  "pre-assigned",
-		Timeout: 5,
-	})
-	if err != nil {
-		t.Fatalf("CreateTaskWithOptions: %v", err)
-	}
-	if task.ID != preID {
-		t.Errorf("ID = %s, want %s", task.ID, preID)
 	}
 }
 
@@ -822,17 +736,6 @@ func TestGetOversight_ReturnsError(t *testing.T) {
 }
 
 // --- SaveTestOversight / GetTestOversight ---
-
-func TestGetTestOversight_InvalidJSON(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "bad json", Timeout: 5})
-	s.backend.SaveBlob(task.ID, "oversight-test.json", []byte("bad")) //nolint:errcheck
-
-	_, err := s.GetTestOversight(task.ID)
-	if err == nil {
-		t.Error("expected error for invalid JSON")
-	}
-}
 
 // --- GetEventsPage: type filter, lazy loading ---
 
@@ -1407,19 +1310,6 @@ func TestSaveOversight_NotInSearchIndexCoverage(t *testing.T) {
 	}
 }
 
-func TestDeleteTask_RemovesOrphanedDepsMultipleCoverage(t *testing.T) {
-	s := newTestStore(t)
-	parent, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "parent", Timeout: 5})
-	child1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c1", Timeout: 5, DependsOn: []string{parent.ID.String()}})
-	child2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c2", Timeout: 5, DependsOn: []string{parent.ID.String()}})
-	s.DeleteTask(bg(), parent.ID, "cleanup") //nolint:errcheck
-	got1, _ := s.GetTask(bg(), child1.ID)
-	got2, _ := s.GetTask(bg(), child2.ID)
-	if len(got1.DependsOn) != 0 || len(got2.DependsOn) != 0 {
-		t.Error("children should have empty DependsOn after parent delete")
-	}
-}
-
 func TestResetTaskForRetry_TruncatesLongResultCoverage(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "long", Timeout: 5})
@@ -1544,18 +1434,15 @@ func TestNewStateChangeData_WithExtra(t *testing.T) {
 func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	s := newTestStore(t)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:             "full opts",
-		Timeout:            30,
-		Kind:               TaskKindPlanning,
-		Tags:               []string{"tag1", "tag2"},
-		Sandbox:            harness.Claude,
-		SandboxByActivity:  map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
-		MaxCostUSD:         10.0,
-		MaxInputTokens:     50000,
-		DependsOn:          []string{uuid.New().String()},
-		ModelOverride:      "  claude-opus-4-5  ",
-		CustomPassPatterns: []string{"PASS"},
-		CustomFailPatterns: []string{"FAIL"},
+		Prompt:            "full opts",
+		Timeout:           30,
+		Kind:              TaskKindPlanning,
+		Tags:              []string{"tag1", "tag2"},
+		Sandbox:           harness.Claude,
+		SandboxByActivity: map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
+		MaxCostUSD:        10.0,
+		MaxInputTokens:    50000,
+		ModelOverride:     "  claude-opus-4-5  ",
 	})
 	if err != nil {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
@@ -1565,11 +1452,5 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	}
 	if task.ModelOverride == nil || *task.ModelOverride != "claude-opus-4-5" {
 		t.Errorf("ModelOverride = %v, want claude-opus-4-5", task.ModelOverride)
-	}
-	if len(task.CustomPassPatterns) != 1 {
-		t.Errorf("CustomPassPatterns = %v, want [PASS]", task.CustomPassPatterns)
-	}
-	if len(task.CustomFailPatterns) != 1 {
-		t.Errorf("CustomFailPatterns = %v, want [FAIL]", task.CustomFailPatterns)
 	}
 }

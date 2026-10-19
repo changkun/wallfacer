@@ -35,11 +35,11 @@ func TestBuiltinAgents_SlugsAreUnique(t *testing.T) {
 	}
 }
 
-// TestBuiltinAgents_AreTheFiveRoles pins the table to the five roles the
+// TestBuiltinAgents_AreTheThreeRoles pins the table to the three roles the
 // built-in pipeline runs, and checks none carries a harness pin: a pin is set
 // per call on a copy, never on the shared descriptor.
-func TestBuiltinAgents_AreTheFiveRoles(t *testing.T) {
-	want := []string{"title", "oversight", "commit-msg", "impl", "test"}
+func TestBuiltinAgents_AreTheThreeRoles(t *testing.T) {
+	want := []string{"oversight", "commit-msg", "impl"}
 	if len(BuiltinAgents) != len(want) {
 		t.Fatalf("BuiltinAgents has %d roles, want %d", len(BuiltinAgents), len(want))
 	}

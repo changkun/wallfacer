@@ -12,10 +12,6 @@ import "time"
 // DefaultTaskTimeout is the default timeout for task execution.
 const DefaultTaskTimeout = 60 * time.Minute
 
-// TitleAgentTimeout bounds the background title-generation agent. Short
-// because the agent is headless and only needs to emit a 2–5 word summary.
-const TitleAgentTimeout = 60 * time.Second
-
 // OversightAgentTimeout bounds the oversight-summary agent. Generous
 // because oversight reads the full task event timeline before summarizing.
 const OversightAgentTimeout = 3 * time.Minute
@@ -80,10 +76,6 @@ const ExplorerMaxFileSize int64 = 2 * 1024 * 1024
 // budget. Outputs exceeding this limit are truncated server-side.
 const DefaultMaxTurnOutputBytes = 8 * 1024 * 1024 // 8 MB
 
-// MaxDiffBytes is the maximum number of bytes to include from the git diff in
-// the test prompt.
-const MaxDiffBytes = 16000
-
 // MaxOversightLogBytes caps the total log size to avoid exceeding prompt limits.
 const MaxOversightLogBytes = 40000
 
@@ -102,9 +94,6 @@ const MaxSearchResults = 50
 // SnippetPadding is the number of context characters shown on each side of a
 // search match in task search results.
 const SnippetPadding = 60
-
-// MaxTailLines is the number of tail lines checked for test verdict detection.
-const MaxTailLines = 15
 
 // LogValueMaxLen is the maximum length for value truncation in pretty logging.
 const LogValueMaxLen = 200

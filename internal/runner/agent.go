@@ -56,9 +56,7 @@ type runAgentOpts struct {
 	// index. Defaults to 1 for single-turn roles.
 	Turn int
 	// ActivityOverride lets a caller attribute usage under a different
-	// activity tag than the role's default. Oversight uses this to
-	// split regular-run oversight and test-run oversight accounting
-	// while sharing a single descriptor.
+	// activity tag than the role's default.
 	ActivityOverride store.SandboxActivity
 	// ContainerName, when non-empty, overrides the default
 	// wallfacer-<role.Slug>-<uuid8> pattern. Refinement and ideation
@@ -82,8 +80,7 @@ type runAgentOpts struct {
 	// use this for per-task model pinning.
 	ModelOverride string
 	// ModelResolver, when set, provides a per-call model lookup
-	// used when ModelOverride is empty. Title and oversight use this
-	// to route to the small-model env var without mutating the role
+	// used when ModelOverride is empty, without mutating the role
 	// descriptor.
 	ModelResolver func(harness.ID) string
 	// WorktreeOverrides maps workspace host paths to the task's
@@ -180,8 +177,7 @@ func (r *Runner) runAgent(
 	}
 
 	// Activity used for sandbox resolution, label, span events, and
-	// usage attribution. Callers may override via opts to split
-	// sub-variants of the same role (oversight vs oversight-test).
+	// usage attribution. Callers may override it via opts.
 	activity := binding.Activity
 	if opts.ActivityOverride != "" {
 		activity = opts.ActivityOverride

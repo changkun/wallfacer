@@ -271,10 +271,9 @@ A session is either **spec-mode** (pinned to a spec path via `FocusedSpec`) or *
 
 ```mermaid
 flowchart LR
-    P1["Phase 1<br/>Resolve + validate paths<br/>status=validated, unarchived,<br/>leaf, not dispatched"] --> P2["Phase 2<br/>Pre-assign UUIDs<br/>resolve intra-batch deps<br/>fall back to dispatched IDs<br/>skip archived deps"]
-    P2 --> P3["Phase 3<br/>CreateTaskWithOptions<br/>rollback previous tasks<br/>on any failure"]
-    P3 --> P4["Phase 4<br/>Write dispatched_task_id<br/>into frontmatter<br/>rollback tasks + previously<br/>written frontmatter on failure"]
-    P4 --> P5["Phase 5 (optional)<br/>if req.Run:<br/>UpdateTaskStatus → in_progress<br/>runner.RunBackground"]
+    P1["Phase 1<br/>Resolve + validate paths<br/>status=validated, unarchived,<br/>leaf, not dispatched"] --> P2["Phase 2<br/>CreateTaskWithOptions<br/>rollback previous tasks<br/>on any failure"]
+    P2 --> P3["Phase 3<br/>Write dispatched_task_id<br/>into frontmatter<br/>rollback tasks + previously<br/>written frontmatter on failure"]
+    P3 --> P4["Phase 4 (optional)<br/>if req.Run:<br/>UpdateTaskStatus → in_progress<br/>runner.RunBackground"]
 ```
 
 Every task carries `SpecSourcePath` so the completion hook can find its way back. `SpecCompletionHook(workspaceFn)` returns a `func(store.Task)` wired into `store.OnDone`: when a dispatched task reaches `done`, the hook resolves the spec via `findSpecFile(workspaces, task.SpecSourcePath)` and flips its frontmatter to `status: complete` with an updated date. A nil `SpecSourcePath` is the no-op case for non-dispatched tasks.

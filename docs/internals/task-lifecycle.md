@@ -19,7 +19,7 @@ stateDiagram-v2
     committing --> done : commit ok
     committing --> failed : commit fail
 
-    waiting --> in_progress : feedback / test
+    waiting --> in_progress : feedback
     waiting --> committing : mark done
     waiting --> cancelled : cancel
 
@@ -51,7 +51,7 @@ Transition labels are shortened for legibility. In full:
 | `in_progress` to `in_progress` | `stop_reason` of `max_tokens` or `pause_turn`, auto-continued in the same session |
 | `in_progress` to `waiting` | `stop_reason` of `end_turn`, or an empty/unknown `stop_reason` |
 | `in_progress` to `failed` | Process error, agent error, timeout, or a budget limit exceeded |
-| `waiting` to `in_progress` | User feedback, or a test run (`IsTestRun`) |
+| `waiting` to `in_progress` | User feedback |
 | `committing` to `done` / `failed` | Commit pipeline success or failure |
 | `failed` to `backlog` | Retry |
 
@@ -155,43 +155,13 @@ RetryRecord {
 
 The list is capped at `DefaultRetryHistoryLimit` (10) entries. This allows operators to inspect the history of failed attempts.
 
-## Title Generation
+## Titles
 
-When a task is created, a background goroutine (`runner.GenerateTitle`) runs a lightweight host process to generate a short title from the prompt. Titles are stored on the task and displayed on the board cards instead of the full prompt text. `POST /api/tasks/generate-titles` can retroactively generate titles for older untitled tasks.
+A task's title is set when the task is created and never changes afterwards. A `title` sent with `POST /api/tasks` is kept as given (trimmed). Otherwise `store.DeriveTitle` takes the prompt's first non-blank line, removes a leading Markdown heading marker (one to six `#` and a space), collapses runs of whitespace, and, when the line is longer than `store.TitleMaxRunes` (60) runes, cuts it at the last word boundary that fits and appends an ellipsis. Spec dispatch derives the title the same way from the spec body, so a spec's `# Heading` becomes its task's title. A chat thread still named `Chat N` after its first turn is renamed by the same rule from its opening message. Titles are displayed on the board cards instead of the full prompt text; titles stored by earlier releases are kept as they are.
 
 ## Prompt Refinement
 
 Prompt refinement is the Plan task-mode chat. There are no dedicated refine routes or background refinement jobs. The agent session converses with the user about the task, and when both agree on an improved prompt the agent calls the `update_task_prompt` tool, which the console forwards as `POST /api/agent/tool/update_task_prompt` (`internal/handler/agentsession_tool.go`). The handler moves the prior prompt into history and sets the task's prompt to the new text. See [Plan Mode](plan-mode.md) for the task-mode chat flow.
-
-## Test Verification
-
-Once a task has reached `waiting` (Claude finished but the user hasn't committed yet), a test verification agent can be triggered to check whether the implementation meets acceptance criteria.
-
-```
-POST /api/tasks/{id}/test
-  body: { criteria?: string }   // optional additional acceptance criteria
-  ↓
-  Sets IsTestRun = true, clears LastTestResult.
-  Transitions waiting → in_progress.
-  Launches a fresh host process (separate session, no --resume) with a test prompt.
-
-Test agent runs (IsTestRun = true):
-  Process executes: inspect code, run tests, verify requirements.
-  Agent must end its response with **PASS** or **FAIL**.
-
-On end_turn:
-  parseTestVerdict() extracts "pass", "fail", or "unknown" from the result.
-  Records verdict in LastTestResult.
-  Transitions in_progress → waiting (no commit).
-  Test output is shown separately from implementation output in the task detail panel.
-```
-
-The test verdict is displayed as a badge on the task card and in the task detail panel. Multiple test runs are allowed; each overwrites the previous verdict. The `TestRunStartTurn` field records which turn the test started so the UI can split implementation vs. test output.
-
-After reviewing the verdict, the user can:
-- Mark the task done (commit pipeline runs) if the verdict is PASS
-- Provide feedback to fix issues, then re-test
-- Cancel the task
 
 ## Board Context
 
@@ -244,67 +214,6 @@ See [Data & Storage](data-and-storage.md).
 ## Soft Delete Implementation
 
 See [Data & Storage](data-and-storage.md).
-
----
-
-## Dependency Resolution
-
-Tasks can declare dependencies on other tasks via `DependsOn []string` (a list of task UUID strings). Dependencies are recorded and validated for cycles, and the board shows whether they are met; starting a task does not check them.
-
-### DAG Validation in Batch Create
-
-`POST /api/tasks/batch` (`Handler.BatchCreateTasks` in `internal/handler/tasks.go`) performs comprehensive DAG validation before creating any tasks. The entire validation phase has zero side effects, if any check fails, no tasks are created.
-
-#### Step-by-Step Validation
-
-1. **Ref uniqueness**: Each task in the batch can have a symbolic `ref` string. Duplicate refs are rejected.
-
-2. **Prompt and pattern validation**: Every task must have a non-empty prompt, and every entry of its `custom_pass_patterns` and `custom_fail_patterns` must compile as a regular expression.
-
-3. **Field validation**: The request body is decoded strictly, so an unknown field (including the `flow` field earlier releases accepted) is rejected with a 400. The `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400 that names `PATCH /api/tasks/{id}`, where a task's harness is set after creation.
-
-4. **Dependency reference resolution**: Each `depends_on_refs` entry must be either a known batch ref or a syntactically valid UUID.
-
-5. **Batch-internal cycle detection (Kahn's algorithm)**: The batch-internal dependency edges are extracted into an adjacency list. Kahn's topological sort algorithm processes nodes with in-degree 0 iteratively:
-
-   ```
-   inDegree[i] = number of batch tasks that task i depends on
-   batchAdj[i] = indices of tasks that depend on task i
-
-   queue = all tasks with inDegree == 0
-   while queue is not empty:
-       curr = dequeue
-       topoOrder.append(curr)
-       for each next in batchAdj[curr]:
-           inDegree[next]--
-           if inDegree[next] == 0: enqueue(next)
-
-   if len(topoOrder) != n: cycle detected
-   ```
-
-   When a cycle is detected, the response includes the refs of all tasks involved in the cycle.
-
-6. **UUID pre-assignment**: UUIDs are pre-assigned for all batch tasks so that cross-reference resolution and full-graph cycle detection can reason about the complete post-creation dependency graph.
-
-7. **External dependency existence**: Every UUID-format dependency that is not a batch ref is verified to exist in the store via `GetTask`.
-
-8. **Full combined-graph cycle detection**: A combined adjacency map is built from all existing tasks plus the proposed batch tasks (using pre-assigned UUIDs). For each new task, `taskReachableInAdj` performs a DFS to check whether the task can reach itself through its dependencies:
-
-   ```go
-   func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) bool {
-       // DFS from start; returns true if target is reachable
-   }
-   ```
-
-   This catches cycles that span both existing tasks and new batch tasks.
-
-#### Creation Order
-
-Tasks are created in topological order (from the Kahn's sort output), so each task's dependencies already exist in the store by the time it is created. The response returns tasks in the original input order with a `ref_to_id` mapping.
-
-### Single-Task Dependency Update
-
-`PATCH /api/tasks/{id}` with a `depends_on` field rejects a malformed UUID, a self-dependency, and an unknown task, then runs `taskReachable` over every task (archived included) and answers 400 when a new edge would close a cycle. The list is stored via `UpdateTaskDependsOn`.
 
 ---
 

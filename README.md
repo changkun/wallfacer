@@ -100,7 +100,7 @@ Read more: [Concepts](docs/guide/concepts.md) and [Plan](docs/guide/plan.md).
 
 Wallfacer runs every task through one built-in pipeline:
 
-- **Tasks** run implementation turns in their own git worktree, a test run when requested, then a commit message, title, and oversight summary. A task's instructions come from the repository's instruction files (AGENTS.md, CLAUDE.md) and its prompt.
+- **Tasks** run implementation turns in their own git worktree, then a commit message and an oversight summary. A task's title is the first line of its prompt. A task's instructions come from the repository's instruction files (AGENTS.md, CLAUDE.md) and its prompt.
 - **Agent roles** carry the pipeline: impl, test, commit-msg, title, and oversight. Each runs on the task's harness (Claude, Codex, Cursor, OpenCode, or Pi), and a per-role setting can route one role to a different harness.
 
 Task prompts are refined in place from Plan mode.
@@ -111,7 +111,7 @@ Read more: [Concepts](docs/guide/concepts.md) and [Configuration](docs/guide/con
 
 ### Task board: managed execution
 
-The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and start tasks up to the parallel limit. Each task runs as a host process in its own git worktree.
+The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, refine prompts before execution, and start tasks up to the parallel limit. Each task runs as a host process in its own git worktree.
 
 ### Plan mode: structured design
 
@@ -131,7 +131,7 @@ Each task records token usage and cost per turn and per activity (implementation
 
 - **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
 - **Spec.** Seven-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
-- **Task.** Host-process execution, per-task git worktrees, test verification, cost and token budgets, oversight summaries.
+- **Task.** Host-process execution, per-task git worktrees, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
 ## Roadmap
@@ -159,7 +159,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 
 | Guide | Topics |
 |-------|--------|
-| [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
+| [Board](docs/guide/board.md) | Task board, lifecycle, search, task detail |
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
 
 **Operate**
@@ -176,7 +176,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 |-----------|--------|
 | [Architecture](docs/internals/architecture.md) | System design, package map, handler organization, end-to-end walkthrough |
 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, spec document model |
-| [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
+| [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, middleware |
 | [Background Work](docs/internals/background-work.md) | Goroutine model, startup recovery, worktree maintenance, oversight generation |

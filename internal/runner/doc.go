@@ -2,10 +2,10 @@
 //
 // It manages the complete task lifecycle: worktree setup, launching the
 // selected harness CLI as a host process via os/exec, agent communication,
-// commit pipelines, title and oversight generation, and error recovery with
-// failure classification. The [Runner] struct implements the [Interface] which
-// exposes a minimal surface for test mocking. Background operations (title gen,
-// oversight, sync) are tracked via a labeled WaitGroup for clean shutdown.
+// commit pipelines, oversight generation, and error recovery with failure
+// classification. The [Runner] struct implements the [Interface] which exposes
+// a minimal surface for test mocking. Background operations (oversight, sync)
+// are tracked via a labeled WaitGroup for clean shutdown.
 //
 // # Connected packages
 //

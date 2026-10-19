@@ -7,7 +7,6 @@ vi.mock('../api/client', () => ({
 }));
 
 import { useTaskStore } from './tasks';
-import { dependencyBadge } from '../lib/cardBadges';
 import type { Task } from '../api/types';
 
 beforeEach(() => {
@@ -32,32 +31,6 @@ describe('tasks store create payloads', () => {
 
     expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks', { prompt: 'ship it', timeout: 45 });
   });
-
-  it('omits timeout for batch tasks when unset', async () => {
-    const store = useTaskStore();
-
-    await store.batchCreateTasks(['one', 'two'], { tags: ['x'] });
-
-    expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks/batch', {
-      tasks: [
-        { prompt: 'one', tags: ['x'] },
-        { prompt: 'two', tags: ['x'] },
-      ],
-    });
-  });
-
-  it('keeps an explicit batch timeout', async () => {
-    const store = useTaskStore();
-
-    await store.batchCreateTasks(['one', 'two'], { timeout: 45 });
-
-    expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks/batch', {
-      tasks: [
-        { prompt: 'one', timeout: 45 },
-        { prompt: 'two', timeout: 45 },
-      ],
-    });
-  });
 });
 
 describe('tasks store tasksById', () => {
@@ -73,17 +46,6 @@ describe('tasks store tasksById', () => {
     store.setTasks([{ id: 'c' } as Task]);
     expect(store.tasksById.has('a')).toBe(false);
     expect(store.tasksById.get('c')?.id).toBe('c');
-  });
-
-  it('resolves a backlog blocked badge via the shared map', () => {
-    const store = useTaskStore();
-    const dep = { id: 'dep', title: 'Build deps', status: 'in_progress' } as Task;
-    const card = { id: 'card', status: 'backlog', depends_on: ['dep'] } as Task;
-    store.setTasks([dep, card]);
-
-    const badge = dependencyBadge(card, store.tasksById);
-    expect(badge?.kind).toBe('blocked');
-    expect(badge?.blocking).toBe('Build deps');
   });
 });
 

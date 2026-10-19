@@ -347,9 +347,9 @@ export function useChatSession(): ChatSession {
     drainNextQueued();
   }
 
-  // After a thread's first turn the backend auto-titles it, replacing the
-  // default "Chat N" name. Title generation runs async server-side and may land
-  // after the turn finishes, so poll a few times until the name changes (or give
+  // After a thread's first turn the backend names it from the first line of its
+  // opening message, replacing the default "Chat N" name. The rename lands with
+  // the end of the turn, so poll a few times until the name changes (or give
   // up). Uses refreshBusy, which picks up in-place renames without reassigning
   // activeThreadId or reloading history (loadThreads would yank the active
   // selection). No-op once the thread already has a non-default name. The Chat

@@ -37,8 +37,7 @@ type Interface interface {
 	PendingGoroutines() []string
 	WaitBackground()
 
-	// Title & oversight generation.
-	GenerateTitleBackground(taskID uuid.UUID, prompt string)
+	// Oversight generation.
 	GenerateOversight(taskID uuid.UUID)
 	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID) (*BoardManifest, error)
 
@@ -50,10 +49,6 @@ type Interface interface {
 	// spec against a task's actual changes; the drift pipeline consumes the
 	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
-
-	// Agent-session title generation (task-free flavor). Names a chat
-	// thread from its opening user message using the lightweight title model.
-	GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error)
 
 	// Host Codex auth.
 	HostCodexAuthStatus(now time.Time) (bool, string)

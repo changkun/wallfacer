@@ -38,22 +38,6 @@ func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes m
 	})
 }
 
-// UpdateTaskTestRun sets the IsTestRun flag and LastTestResult on a task atomically.
-// Call with isTestRun=true and empty lastTestResult to mark the start of a test run;
-// call with isTestRun=false and a verdict ("pass"/"fail"/"") when the test completes.
-func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun bool, lastTestResult string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.IsTestRun = isTestRun
-		t.LastTestResult = lastTestResult
-		if isTestRun {
-			// Record the current turn count so we know which turn files belong to
-			// the implementation phase vs the test phase.
-			t.TestRunStartTurn = t.Turns
-		}
-		return nil
-	})
-}
-
 // SetTaskFailureCategory sets the failure_category field on a task.
 // It is called immediately after a TaskStatusFailed transition to record
 // the machine-readable root cause. The field is persisted atomically so

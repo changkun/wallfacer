@@ -18,6 +18,5 @@
 //
 // # Usage
 //
-//	rendered := prompts.Title(taskPrompt)
 //	commit := prompts.CommitMessage(prompts.CommitData{Prompt: p, DiffStat: stat})
 package prompts

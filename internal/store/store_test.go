@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 	"time"
 
@@ -122,9 +121,8 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := newTestFileStore(t, dir)
 
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Timeout: 15})
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Title: "Round Trip Title", Timeout: 15})
 	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
-	_ = s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, TaskUsage{InputTokens: 100, CostUSD: 0.5})
 	_ = s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "task/rt")
 	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
@@ -196,12 +194,10 @@ func transitionToDone(t *testing.T, s *Store, id uuid.UUID) {
 func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary test", Timeout: 10})
-	_ = s.UpdateTaskTitle(bg(), task.ID, "Summary Test")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary test", Title: "Summary Test", Timeout: 10})
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
-	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
-	_ = s.UpdateTaskTurns(bg(), task.ID, 3)
+	_ = s.UpdateTaskResult(bg(), task.ID, "", "", "end_turn", 3)
 
 	transitionToDone(t, s, task.ID)
 
@@ -228,9 +224,6 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	if math.Abs(summary.TotalCostUSD-0.42) > 1e-9 {
 		t.Errorf("TotalCostUSD = %v, want 0.42", summary.TotalCostUSD)
 	}
-	if summary.TestResult != "pass" {
-		t.Errorf("TestResult = %q, want 'pass'", summary.TestResult)
-	}
 	implUsage, ok := summary.ByActivity[SandboxActivityImplementation]
 	if !ok {
 		t.Error("ByActivity missing 'implementation'")
@@ -248,12 +241,10 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force done task", Timeout: 10})
-	_ = s.UpdateTaskTitle(bg(), task.ID, "Force Done Task")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force done task", Title: "Force Done Task", Timeout: 10})
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 50, OutputTokens: 25, CostUSD: 0.21})
-	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
-	_ = s.UpdateTaskTurns(bg(), task.ID, 2)
+	_ = s.UpdateTaskResult(bg(), task.ID, "", "", "end_turn", 2)
 
 	// Skip straight to done via ForceUpdateTaskStatus (no state machine check).
 	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone); err != nil {
@@ -275,9 +266,6 @@ func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 	}
 	if summary.TotalTurns != 2 {
 		t.Errorf("TotalTurns = %d, want 2", summary.TotalTurns)
-	}
-	if summary.TestResult != "pass" {
-		t.Errorf("TestResult = %q, want 'pass'", summary.TestResult)
 	}
 }
 
@@ -388,75 +376,6 @@ func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
 	}
 	if changed {
 		t.Error("expected changed=false for already-current task JSON")
-	}
-}
-
-// TestMigrateTaskJSON_CanonicalizeDependsOn verifies that DependsOn entries
-// are trimmed, UUID-validated, deduplicated, and sorted.
-func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {
-	id1 := uuid.New()
-	id2 := uuid.New()
-	// Ensure id1 < id2 in canonical string form for predictable sort assertion.
-	if id1.String() > id2.String() {
-		id1, id2 = id2, id1
-	}
-
-	// Include: whitespace padding, duplicate (id1 repeated), invalid UUID, and
-	// uppercase variant of id2 that should round-trip to lowercase.
-	raw := []byte(fmt.Sprintf(`{
-		"schema_version": %d,
-		"id": "11111111-1111-1111-1111-111111111111",
-		"prompt": "p",
-		"status": "backlog",
-		"timeout": 30,
-		"created_at": "2024-01-01T00:00:00Z",
-		"updated_at": "2024-01-01T00:00:00Z",
-		"depends_on": [" %s ", "%s", "not-a-uuid", "%s"]
-	}`,
-		constants.CurrentTaskSchemaVersion,
-		id1.String(), id2.String(),
-		id1.String(), // duplicate
-	))
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true for DependsOn requiring canonicalization")
-	}
-
-	want := []string{id1.String(), id2.String()}
-	slices.Sort(want)
-	if !slices.Equal(task.DependsOn, want) {
-		t.Errorf("DependsOn = %v, want %v", task.DependsOn, want)
-	}
-}
-
-// TestMigrateTaskJSON_InvalidDependsOnDropped verifies that a DependsOn list
-// containing only invalid UUIDs results in nil (keeping JSON clean).
-func TestMigrateTaskJSON_InvalidDependsOnDropped(t *testing.T) {
-	now := "2024-01-01T00:00:00Z"
-	raw := []byte(fmt.Sprintf(`{
-		"schema_version": %d,
-		"id": "22222222-2222-2222-2222-222222222222",
-		"prompt": "p",
-		"status": "backlog",
-		"timeout": 30,
-		"created_at": %q,
-		"updated_at": %q,
-		"depends_on": ["not-a-uuid", "also-not", ""]
-	}`, constants.CurrentTaskSchemaVersion, now, now))
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true when invalid DependsOn entries are dropped")
-	}
-	if task.DependsOn != nil {
-		t.Errorf("DependsOn = %v, want nil after dropping all invalid entries", task.DependsOn)
 	}
 }
 
@@ -617,8 +536,8 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 
 	// After loading, schema version is already migrated to current.
 	// Perform a mutation to confirm the version stays current.
-	if err := s.UpdateTaskTitle(bg(), id, "Updated Title"); err != nil {
-		t.Fatalf("UpdateTaskTitle: %v", err)
+	if err := s.UpdateTaskTags(bg(), id, []string{"updated"}); err != nil {
+		t.Fatalf("UpdateTaskTags: %v", err)
 	}
 
 	raw, err := os.ReadFile(taskFile)
@@ -632,8 +551,8 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 	if persisted.SchemaVersion != constants.CurrentTaskSchemaVersion {
 		t.Errorf("SchemaVersion after mutation = %d, want %d", persisted.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
-	if persisted.Title != "Updated Title" {
-		t.Errorf("Title = %q, want 'Updated Title'", persisted.Title)
+	if len(persisted.Tags) != 1 || persisted.Tags[0] != "updated" {
+		t.Errorf("Tags = %v, want [updated]", persisted.Tags)
 	}
 }
 
@@ -904,14 +823,10 @@ func TestStatusIndex_SortedByPositionThenCreatedAt(t *testing.T) {
 func TestCountRegularInProgress(t *testing.T) {
 	s := newTestStore(t)
 
-	// One regular in-progress task.
-	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "regular", Timeout: 10})
+	// One in-progress task and one backlog task.
+	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "running", Timeout: 10})
 	_ = s.UpdateTaskStatus(bg(), t1.ID, TaskStatusInProgress)
-
-	// One test-run in-progress task.
-	t2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test run", Timeout: 10})
-	_ = s.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
-	_ = s.UpdateTaskTestRun(bg(), t2.ID, true, "")
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "queued", Timeout: 10})
 
 	if got := s.CountRegularInProgress(); got != 1 {
 		t.Errorf("CountRegularInProgress() = %d, want 1", got)

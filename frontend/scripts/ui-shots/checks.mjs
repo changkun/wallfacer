@@ -255,7 +255,7 @@ SCENES['contrast'] = async (page) => {
 // The task sheet (specs/.archive/shared/console-redesign/task-detail.md): open the
 // first card, the sheet fits the viewport, the aside is 340 wide, the tabs
 // row is present, the Actions card carries one ink button, and the Changes
-// and Verification tabs switch without page errors.
+// and Events tabs switch without page errors.
 SCENES['task-detail'] = async (page) => {
   await page.click('.board-grid .task-card .task-card__title', { timeout: 5000 }).catch(() => {});
   await page.waitForSelector('.sheet', { state: 'visible', timeout: 8000 }).catch(() => {});
@@ -273,7 +273,7 @@ SCENES['task-detail'] = async (page) => {
   const mainBox = await firstBox(page, '.sheet-main');
   const overflow = await page.$eval('.sheet-main', (el) => el.scrollWidth > el.clientWidth + 1);
   expect('task-detail', mainBox && !overflow, 'sheet main column overflows horizontally');
-  for (const tab of ['changes', 'verification', 'events']) {
+  for (const tab of ['changes', 'events']) {
     await page.click(`[data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(250);
   }
@@ -308,7 +308,7 @@ SCENES['feedback-live'] = async (page) => {
   await page.setViewportSize({ width: 1280, height: 760 });
   await page.goto(`${base}/?task=${task.id}&tab=spec`, { waitUntil: 'load' });
   await page.waitForSelector('.task-response textarea', { timeout: 8000 });
-  for (const tab of ['spec', 'activity', 'changes', 'verification', 'events', 'timeline']) {
+  for (const tab of ['spec', 'activity', 'changes', 'events', 'timeline']) {
     await page.click(`.sheet [data-tab="${tab}"]`);
     await page.waitForTimeout(120);
     const visible = await page.$eval('.task-response textarea', (el) => {
@@ -338,20 +338,6 @@ SCENES['feedback-live'] = async (page) => {
   task.updated_at = new Date().toISOString();
   await page.waitForFunction(() => document.querySelector('.task-commits')?.textContent.includes('Feedback commit 3'), undefined, { timeout: 8000 });
   expect('feedback-live', (await page.locator('[data-main-tab-section="changes"]').textContent()).includes('live change 3'), 'aggregate diff stayed stale');
-};
-
-SCENES['title-progress'] = async (page) => {
-  const response = await (await fixtureRequest(page, 'GET', '/api/tasks')).json();
-  const tasks = Array.isArray(response) ? response : response.tasks;
-  const task = tasks.find((t) => t.status === 'backlog');
-  task.title = '';
-  task.title_generating = true;
-  task.prompt = 'Prompt stays visible during title generation';
-  await page.route(/\/api\/tasks(?:\?.*)?$/, (route) => route.fulfill({ json: tasks }));
-  await page.route('**/api/tasks/stream*', (route) => route.fulfill({ contentType: 'text/event-stream', body: `event: snapshot\ndata: ${JSON.stringify(tasks)}\n\n` }));
-  await page.reload({ waitUntil: 'load' });
-  await page.getByText('Generating title…').waitFor({ state: 'visible' });
-  expect('title-progress', await page.getByText(task.prompt, { exact: true }).isVisible(), 'title progress hid the prompt');
 };
 
 SCENES['onboarding-guidance'] = async (page) => {

@@ -88,12 +88,11 @@ flowchart TD
 ```
 
 Served by:
-- `GET /api/tasks/{id}/oversight`, implementation run summary (default `?phase=impl`)
-- `GET /api/tasks/{id}/oversight?phase=test`, test-run summary (if a test was run)
+- `GET /api/tasks/{id}/oversight`, implementation run summary
 
 The UI renders phases in the Oversight tab and as an interactive flamegraph Timeline.
 
-The generator reads the task's trace events, passes them to the oversight agent with a summarization prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob`: the implementation summary lands in `oversight.json` and the test-agent summary in `oversight-test.json`, both directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
+The generator reads the task's trace events, passes them to the oversight agent with a summarization prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). `SaveOversight` persists it as a single blob via `SaveBlob`: the summary lands in `oversight.json` directly under the task directory (`data/<uuid>/`), matching [Data & Storage](data-and-storage.md).
 
 `POST /api/tasks/generate-oversight` generates oversight for tasks that are missing a summary, such as tasks that finished before the feature existed.
 
@@ -103,9 +102,11 @@ Records that carry `Kind = "idea-agent"` or `FlowID = "brainstorm"` load as ordi
 
 Task and workspace records written while automation and review existed load without migration. The decoder ignores their extra fields (`scheduled_at`, `auto_retry_budget`, `auto_retry_count`, `test_fail_count`, `pending_test_feedback`, `last_fetch_error`, the `review_*` fields, and the per-workspace `autoimplement`, `autotest`, `autosubmit`, `autosync`, and `max_test_parallel` keys), and the next save writes the record without them. State-change events keep the trigger they were recorded with, so an older timeline can still show `auto_promote`, `auto_retry`, `auto_test`, `auto_submit`, `auto_review`, or `sync`.
 
+Task records written while task dependencies, generated titles, the manual test run, and acceptance criteria existed load the same way. The decoder ignores `depends_on`, `title_generating`, `is_test_run`, `last_test_result`, `test_run_start_turn`, `custom_pass_patterns`, `custom_fail_patterns`, and `criteria`, and the next save writes the record without them. A stored `sandbox_by_activity` entry for `testing` or `title` is dropped on load, and the env-file keys `CLAUDE_TITLE_MODEL`, `CODEX_TITLE_MODEL`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_TESTING`, and `WALLFACER_MAX_TEST_PARALLEL` are ignored. Titles stored by earlier releases are kept as they are.
+
 ## See Also
 
-- [Task Lifecycle](task-lifecycle.md), state machine, turn loop, test verification, crash recovery
+- [Task Lifecycle](task-lifecycle.md), state machine, turn loop, crash recovery
 - [Git Worktrees](git-worktrees.md), worktree isolation, the commit pipeline, conflict resolution, GC and health watcher
 - [API & Transport](api-and-transport.md), HTTP API, SSE streams, graceful shutdown
 - [Architecture](architecture.md), high-level design decisions and persistence model

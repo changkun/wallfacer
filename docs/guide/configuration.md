@@ -11,7 +11,7 @@ Open Settings from the bottom of the sidebar. The page has four tabs.
 - **Parallel tasks**: maximum concurrent running tasks (1 to 20). Maps to `WALLFACER_MAX_PARALLEL`.
 - **Archived tasks**: page size for the archived-task list (1 to 200). Maps to `WALLFACER_ARCHIVED_TASKS_PER_PAGE`.
 - **Oversight interval**: minutes between periodic oversight summaries while a task runs (0 to 120; 0 generates summaries only at completion). Maps to `WALLFACER_OVERSIGHT_INTERVAL`.
-- **Task titles** and **Trace oversight**: batch backfill buttons that generate missing titles or oversight summaries for existing tasks, with a selectable batch limit.
+- **Trace oversight**: a batch backfill button that generates missing oversight summaries for existing tasks, with a selectable batch limit.
 
 ### Appearance tab
 
@@ -22,8 +22,8 @@ Open Settings from the bottom of the sidebar. The page has four tabs.
 
 Credentials, models, and routing for the coding CLIs. A warning banner appears on first launch while no credential is configured. Each harness has its own block with a **Test** connectivity button:
 
-- **Claude**: OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`), API key (`ANTHROPIC_API_KEY`), base URL, default and title models. With no token or key set, Claude tasks use the sign-in of the `claude` CLI on the machine.
-- **Codex**: OpenAI API key, base URL, default and title models. With no key set, Codex tasks use the sign-in of the `codex` CLI (`~/.codex/auth.json`).
+- **Claude**: OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`), API key (`ANTHROPIC_API_KEY`), base URL, and default model. With no token or key set, Claude tasks use the sign-in of the `claude` CLI on the machine.
+- **Codex**: OpenAI API key, base URL, and default model. With no key set, Codex tasks use the sign-in of the `codex` CLI (`~/.codex/auth.json`).
 - **Cursor**: `CURSOR_API_KEY`, or run `cursor-agent login` once outside Wallfacer.
 - **OpenCode**: no key field; the `opencode` CLI manages provider credentials itself (`opencode auth login`).
 - **Pi**: no key field; the `pi` CLI reads provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the same environment.
@@ -129,12 +129,10 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `ANTHROPIC_AUTH_TOKEN` | Bearer token for a gateway proxy (read-only, managed externally) |
 | `ANTHROPIC_BASE_URL` | Custom Anthropic-compatible endpoint |
 | `CLAUDE_DEFAULT_MODEL` | Default model for Claude tasks |
-| `CLAUDE_TITLE_MODEL` | Model for title generation; falls back to the default model |
 | `CLAUDE_CODE_MODEL` | Model passed through to the Claude CLI for a specific run |
 | `OPENAI_API_KEY` | OpenAI key for Codex; optional when `~/.codex/auth.json` exists |
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint |
 | `CODEX_DEFAULT_MODEL` | Default model for Codex tasks |
-| `CODEX_TITLE_MODEL` | Codex title model; falls back to `CODEX_DEFAULT_MODEL` |
 | `CURSOR_API_KEY` | Headless credential for `cursor-agent` |
 | `OPENCODE_SERVER_PASSWORD` | Reserved for a future OpenCode server-attach path |
 
@@ -149,8 +147,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |
-| `WALLFACER_SANDBOX_TESTING` | | Harness override for test verification |
-| `WALLFACER_SANDBOX_TITLE` | | Harness override for title generation |
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |

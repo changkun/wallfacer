@@ -190,47 +190,6 @@ func TestCompleteTask_AcquiresTransitionMu(t *testing.T) {
 	}
 }
 
-// TestTestTask_AcquiresTransitionMu verifies TestTask serializes its waiting→
-// in_progress transition under transitionMu, so a concurrent Mark as Done cannot
-// move the task to committing between TestTask's status check and its
-// UpdateTaskTestRun/UpdateTaskStatus writes.
-func TestTestTask_AcquiresTransitionMu(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	id := createWaitingTask(t, h, "implement something")
-
-	transitionMu.Lock()
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/test", strings.NewReader(`{}`))
-	w := httptest.NewRecorder()
-	done := make(chan struct{})
-	go func() {
-		h.TestTask(w, req, id)
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		transitionMu.Unlock()
-		t.Fatal("TestTask completed while transitionMu was held; it does not serialize the waiting transition")
-	case <-time.After(250 * time.Millisecond):
-		// Expected: blocked on transitionMu.Lock() before any write.
-	}
-
-	// Blocked before any write: the test-run flag must not be set yet.
-	if cur, _ := h.store.GetTask(ctx, id); cur.Status != store.TaskStatusWaiting || cur.IsTestRun {
-		transitionMu.Unlock()
-		t.Fatalf("task should be untouched while transitionMu held: status=%s isTestRun=%v", cur.Status, cur.IsTestRun)
-	}
-
-	transitionMu.Unlock()
-	<-done
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 after lock release, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 func TestCompleteTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	id := uuid.New()

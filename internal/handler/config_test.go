@@ -1592,23 +1592,13 @@ func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
 	ctx := context.Background()
 
 	sA, _ := h.currentStore()
-	// Create one regular in-progress task and one test in-progress task in A.
+	// Create one in-progress task in A.
 	tA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular A", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask regular A: %v", err)
 	}
 	if err := sA.UpdateTaskStatus(ctx, tA.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus regular A: %v", err)
-	}
-	tAT, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test A", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask test A: %v", err)
-	}
-	if err := sA.UpdateTaskTestRun(ctx, tAT.ID, true, ""); err != nil {
-		t.Fatalf("UpdateTaskTestRun A: %v", err)
-	}
-	if err := sA.UpdateTaskStatus(ctx, tAT.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus test A: %v", err)
 	}
 
 	// Sanity: viewed group is A; counts reflect A.

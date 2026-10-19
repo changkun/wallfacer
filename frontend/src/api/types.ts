@@ -11,9 +11,7 @@ export interface TaskUsage {
 export interface Task {
   id: string;
   title: string;
-  title_generating?: boolean;
   prompt: string;
-  criteria?: string;
   status: TaskStatus;
   archived: boolean;
   result: string | null;
@@ -31,18 +29,14 @@ export interface Task {
   kind: string;
   tags: string[];
   impact_score?: number;
-  depends_on: string[];
   failure_category: string;
   fresh_start: boolean;
-  is_test_run: boolean;
-  last_test_result: string;
   session_id: string | null;
   worktree_paths: Record<string, string>;
   usage_breakdown: Record<string, TaskUsage>;
   // Budget guardrails — 0 / missing means unlimited.
   max_cost_usd?: number;
   max_input_tokens?: number;
-  test_run_start_turn?: number;
   prompt_history?: string[];
   retry_history?: RetryRecord[];
   parent_task_id?: string | null;
@@ -122,9 +116,7 @@ export interface EnvConfig {
   openai_base_url: string;
   cursor_api_key: string;
   default_model: string;
-  title_model: string;
   codex_default_model: string;
-  codex_title_model: string;
   default_sandbox: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks: number;
@@ -143,9 +135,7 @@ export interface EnvUpdatePayload {
   openai_base_url?: string;
   cursor_api_key?: string;
   default_model?: string;
-  title_model?: string;
   codex_default_model?: string;
-  codex_title_model?: string;
   default_sandbox?: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks?: number;
@@ -159,7 +149,7 @@ export interface SandboxTestResponse {
   task_id: string;
   sandbox: string;
   status: string;
-  last_test_result?: string;
+  passed: boolean;
   result?: string;
   stop_reason?: string;
 }

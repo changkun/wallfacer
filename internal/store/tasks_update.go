@@ -109,7 +109,6 @@ func (s *Store) buildAndSaveSummary(task Task) {
 		TotalTurns:               task.Turns,
 		TotalCostUSD:             task.Usage.CostUSD,
 		ByActivity:               task.UsageBreakdown,
-		TestResult:               task.LastTestResult,
 		PhaseCount:               phaseCount,
 		FailureCategory:          task.FailureCategory,
 	}
@@ -161,40 +160,6 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	return nil
 }
 
-// UpdateTaskTitleGenerating publishes whether a title agent is running.
-func (s *Store) UpdateTaskTitleGenerating(_ context.Context, id uuid.UUID, generating bool) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.TitleGenerating = generating
-		return nil
-	})
-}
-
-// UpdateTaskTitle sets a task's display title.
-func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) error {
-	// Compute the lowercased title before acquiring the lock so that the
-	// strings.ToLower call (potentially non-trivial for long titles) does not
-	// extend the critical section.
-	loweredTitle := strings.ToLower(title)
-	return s.mutateTask(id, func(t *Task) error {
-		t.Title = title
-		if entry, ok := s.searchIndex[id]; ok {
-			entry.title = loweredTitle
-			s.searchIndex[id] = entry
-		}
-		return nil
-	})
-}
-
-// UpdateTaskTurns updates only the turn counter for a task, leaving all other
-// fields (Result, SessionID, StopReason) unchanged. Used during test runs so
-// that the implementation agent's output is not overwritten.
-func (s *Store) UpdateTaskTurns(_ context.Context, id uuid.UUID, turns int) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.Turns = turns
-		return nil
-	})
-}
-
 // UpdateTaskResult stores the final output, session ID, stop reason, and turn count.
 func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessionID, stopReason string, turns int) error {
 	return s.mutateTask(id, func(t *Task) error {
@@ -202,16 +167,6 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 		t.SessionID = &sessionID
 		t.StopReason = &stopReason
 		t.Turns = turns
-		return nil
-	})
-}
-
-// UpdateTaskCriteria sets a task's free-form acceptance Criteria. Callers gate
-// this to backlog status (same constraint as editing the prompt); the store
-// records it unconditionally.
-func (s *Store) UpdateTaskCriteria(_ context.Context, id uuid.UUID, criteria string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.Criteria = criteria
 		return nil
 	})
 }
@@ -236,19 +191,6 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent S
 func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.Position = position
-		return nil
-	})
-}
-
-// UpdateTaskDependsOn sets the list of task UUID strings this task builds on.
-// An empty or nil slice clears all dependencies.
-func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn []string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		if len(dependsOn) == 0 {
-			t.DependsOn = nil // normalize so omitempty keeps JSON clean
-		} else {
-			t.DependsOn = dependsOn
-		}
 		return nil
 	})
 }
@@ -352,24 +294,6 @@ func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model s
 	})
 }
 
-// UpdateTaskCustomPatterns replaces the custom pass/fail regex pattern slices on a task.
-// Passing a nil slice clears the corresponding field; passing a non-nil empty slice also clears it.
-func (s *Store) UpdateTaskCustomPatterns(_ context.Context, id uuid.UUID, passPatterns, failPatterns []string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		if len(passPatterns) == 0 {
-			t.CustomPassPatterns = nil
-		} else {
-			t.CustomPassPatterns = append([]string(nil), passPatterns...)
-		}
-		if len(failPatterns) == 0 {
-			t.CustomFailPatterns = nil
-		} else {
-			t.CustomFailPatterns = append([]string(nil), failPatterns...)
-		}
-		return nil
-	})
-}
-
 // UpdateTaskEnvironment records the execution environment captured at the start of Run().
 // The environment is written atomically alongside the task and broadcast to SSE subscribers.
 func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env ExecutionEnvironment) error {
@@ -439,8 +363,6 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	}
 	t.CommitHashes = nil
 	t.BaseCommitHashes = nil
-	t.IsTestRun = false
-	t.LastTestResult = ""
 	t.CurrentRefinement = nil
 	if freshStart {
 		t.RefineSessions = nil

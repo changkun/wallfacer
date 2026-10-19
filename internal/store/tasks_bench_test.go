@@ -5,7 +5,6 @@ package store
 import (
 	"context"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -19,49 +18,6 @@ func newBenchStore(b *testing.B) *Store {
 		b.Fatalf("NewStore: %v", err)
 	}
 	return s
-}
-
-// BenchmarkUpdateTaskTitle measures lock hold time for UpdateTaskTitle under
-// concurrent read pressure.  A pool of goroutines continuously calls GetTask
-// while the benchmark loop calls UpdateTaskTitle, so any work that stays inside
-// the write lock (e.g. strings.ToLower) contends directly with the readers.
-func BenchmarkUpdateTaskTitle(b *testing.B) {
-	s := newBenchStore(b)
-	ctx := context.Background()
-
-	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "benchmark prompt", Timeout: 60, Kind: TaskKindTask})
-	if err != nil {
-		b.Fatalf("CreateTask: %v", err)
-	}
-
-	// Launch background readers to simulate concurrent GetTask calls.
-	const readers = 8
-	stop := make(chan struct{})
-	var wg sync.WaitGroup
-	for range readers {
-		wg.Go(func() {
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-					s.GetTask(ctx, task.ID) //nolint:errcheck
-				}
-			}
-		})
-	}
-
-	title := strings.Repeat("benchmark title word ", 20) // ~400 chars
-
-	for b.Loop() {
-		if err := s.UpdateTaskTitle(ctx, task.ID, title); err != nil {
-			b.Fatalf("UpdateTaskTitle: %v", err)
-		}
-	}
-	b.StopTimer()
-
-	close(stop)
-	wg.Wait()
 }
 
 // BenchmarkCreateTask_LargeOversight measures the RestoreTask path with a

@@ -19,26 +19,23 @@ import (
 
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
-	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
-	ID       uuid.UUID
-	Prompt   string
-	Criteria string
-	Timeout  int
-	Kind     TaskKind
+	// Title is the task's display title. When blank after trimming, the
+	// title is derived from Prompt by DeriveTitle.
+	Title   string
+	Prompt  string
+	Timeout int
+	Kind    TaskKind
 	// FlowID sets Task.FlowID, a record field the runner does not read for
 	// dispatch (see Task.FlowID). No handler sets it; it lets a caller build
 	// a record that carries the field, as a stored task may.
-	FlowID             string
-	Tags               []string
-	Sandbox            harness.ID
-	SandboxByActivity  map[SandboxActivity]harness.ID
-	MaxCostUSD         float64
-	MaxInputTokens     int
-	DependsOn          []string
-	SpecSourcePath     string
-	ModelOverride      string
-	CustomPassPatterns []string
-	CustomFailPatterns []string
+	FlowID            string
+	Tags              []string
+	Sandbox           harness.ID
+	SandboxByActivity map[SandboxActivity]harness.ID
+	MaxCostUSD        float64
+	MaxInputTokens    int
+	SpecSourcePath    string
+	ModelOverride     string
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
@@ -50,18 +47,15 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	// field that requires a locked scan of s.tasks; it is set inside the lock
 	// below.  All search-indexed fields (Prompt, Tags) are available from opts
 	// so buildIndexEntry can run before we take any lock.
-	id := opts.ID
-	if id == (uuid.UUID{}) {
-		id = uuid.New()
-	}
+	id := uuid.New()
 
 	now := time.Now()
 
 	task := &Task{
 		SchemaVersion: constants.CurrentTaskSchemaVersion,
 		ID:            id,
+		Title:         strings.TrimSpace(opts.Title),
 		Prompt:        opts.Prompt,
-		Criteria:      opts.Criteria,
 		Status:        TaskStatusBacklog,
 		Turns:         0,
 		Timeout:       clampTimeout(opts.Timeout),
@@ -72,14 +66,13 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		UpdatedAt: now,
 	}
 
+	if task.Title == "" {
+		task.Title = DeriveTitle(opts.Prompt)
+	}
+
 	// Tags: deep-copy to protect store state from caller mutation.
 	if len(opts.Tags) > 0 {
 		task.Tags = append([]string(nil), opts.Tags...)
-	}
-
-	// DependsOn: deep-copy.
-	if len(opts.DependsOn) > 0 {
-		task.DependsOn = append([]string(nil), opts.DependsOn...)
 	}
 
 	task.SpecSourcePath = opts.SpecSourcePath
@@ -105,14 +98,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	// ModelOverride: nil when empty so omitempty keeps JSON clean.
 	if model := strings.TrimSpace(opts.ModelOverride); model != "" {
 		task.ModelOverride = &model
-	}
-
-	// CustomPassPatterns / CustomFailPatterns: deep-copy.
-	if len(opts.CustomPassPatterns) > 0 {
-		task.CustomPassPatterns = append([]string(nil), opts.CustomPassPatterns...)
-	}
-	if len(opts.CustomFailPatterns) > 0 {
-		task.CustomFailPatterns = append([]string(nil), opts.CustomFailPatterns...)
 	}
 
 	// Build the search index entry before acquiring the lock.  Position is not
@@ -197,9 +182,7 @@ func normalizeSandboxByActivity(input map[SandboxActivity]harness.ID) map[Sandbo
 // The task directory is retained on disk; the task is moved from s.tasks to
 // s.deleted so it no longer appears in ListTasks but can be restored.
 // reason is optional human-readable context for why the task was deleted.
-// After the tombstone is written, any non-terminal tasks that depend on id have
-// id removed from their DependsOn list so they are no longer permanently blocked.
-func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) error {
+func (s *Store) DeleteTask(_ context.Context, id uuid.UUID, reason string) error {
 	s.mu.Lock()
 
 	t, ok := s.tasks[id]
@@ -223,56 +206,13 @@ func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) err
 	s.deleted[id] = t
 	s.notify(t, true) // task-deleted delta — SSE clients work unchanged
 	s.mu.Unlock()
-
-	// Clean up orphaned dependencies: any backlog/in_progress/waiting/failed task
-	// that listed id in DependsOn is now permanently blocked, so remove id from
-	// each dependent's DependsOn slice.
-	s.removeOrphanedDependents(ctx, id)
 	return nil
 }
 
-// removeOrphanedDependents finds all non-terminal tasks that depend on cancelledID
-// and removes cancelledID from their DependsOn slices. This unblocks tasks whose
-// only blocker was a task that is now cancelled or deleted.
-func (s *Store) removeOrphanedDependents(ctx context.Context, cancelledID uuid.UUID) {
-	deps, err := s.TasksDependingOn(ctx, cancelledID)
-	if err != nil {
-		logger.Store.Warn("orphan cleanup: list dependents", "task", cancelledID, "error", err)
-		return
-	}
-	cancelledIDStr := cancelledID.String()
-	for _, dep := range deps {
-		if err := s.mutateTask(dep.ID, func(t *Task) error {
-			updated := t.DependsOn[:0:0] // preserve nil if empty
-			for _, idStr := range t.DependsOn {
-				if idStr != cancelledIDStr {
-					updated = append(updated, idStr)
-				}
-			}
-			if len(updated) == 0 {
-				t.DependsOn = nil
-			} else {
-				t.DependsOn = updated
-			}
-			return nil
-		}); err != nil {
-			logger.Store.Warn("orphan cleanup: remove dep", "dependent", dep.ID, "cancelled", cancelledID, "error", err)
-		} else {
-			logger.Store.Info("removed orphaned dependency", "dependent", dep.ID, "cancelled_dep", cancelledID)
-		}
-	}
-}
-
-// CancelTask moves a task to TaskStatusCancelled using ForceUpdateTaskStatus
-// (which bypasses the normal state-machine transitions) and then removes the
-// task's ID from the DependsOn list of any non-terminal tasks that reference it,
-// since a cancelled task can never reach done.
+// CancelTask moves a task to TaskStatusCancelled using ForceUpdateTaskStatus,
+// which bypasses the normal state-machine transitions.
 func (s *Store) CancelTask(ctx context.Context, id uuid.UUID) error {
-	if err := s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled); err != nil {
-		return err
-	}
-	s.removeOrphanedDependents(ctx, id)
-	return nil
+	return s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled)
 }
 
 // ListDeletedTasks returns all soft-deleted (tombstoned) tasks sorted by UpdatedAt DESC.

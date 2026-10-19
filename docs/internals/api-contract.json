@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 80,
+  "route_count": 77,
   "routes": [
     {
       "method": "GET",
@@ -467,24 +467,6 @@
     },
     {
       "method": "POST",
-      "pattern": "/api/tasks/batch",
-      "name": "BatchCreateTasks",
-      "description": "Create multiple tasks atomically with symbolic dependency wiring.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/generate-titles",
-      "name": "GenerateMissingTitles",
-      "description": "Bulk-generate titles for tasks that lack one.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "POST",
       "pattern": "/api/tasks/generate-oversight",
       "name": "GenerateMissingOversight",
       "description": "Bulk-generate oversight summaries for eligible tasks.",
@@ -593,15 +575,6 @@
       ]
     },
     {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/test",
-      "name": "TestTask",
-      "description": "Trigger the test agent for a task.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
       "method": "GET",
       "pattern": "/api/tasks/{id}/commits",
       "name": "TaskCommits",
@@ -660,7 +633,7 @@
       "method": "GET",
       "pattern": "/api/tasks/{id}/oversight",
       "name": "GetOversight",
-      "description": "Oversight summary for a task. ?phase=impl (default) or ?phase=test selects the implementation- or test-agent summary.",
+      "description": "Oversight summary for a task.",
       "tags": [
         "tasks"
       ]

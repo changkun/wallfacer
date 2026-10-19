@@ -17,10 +17,8 @@ import { formatBatchFeedback } from '../lib/diffComments';
 import DiffLineRow from './DiffLineRow.vue';
 import { useRouter } from 'vue-router';
 import SpanFlamegraph from './SpanFlamegraph.vue';
-import DependencyPicker from './DependencyPicker.vue';
 import AppSelect from './AppSelect.vue';
 import type { SpanResult, TurnUsageRecord } from '../lib/flamegraph';
-import { detectResultType } from '../lib/resultType';
 import { harnessLabel, supportedHarnesses } from '../lib/harness';
 // Re-imported as a local binding so the template can call renderMarkdown()
 // directly inside the Results tab.
@@ -34,24 +32,6 @@ const emit = defineEmits<{ close: [] }>();
 const taskStore = useTaskStore();
 const detailRouter = useRouter();
 
-// "Blocked by" dependency list — resolves depends_on against the live task
-// store, mirroring modal-core's dependency section. Each row is clickable
-// to open the blocking task; a "Waiting on X of Y" summary shows how many
-// are still unsatisfied (not done/cancelled).
-interface DepRow { id: string; label: string; status: string; satisfied: boolean }
-const blockedBy = computed<DepRow[]>(() => {
-  const ids = props.task.depends_on ?? [];
-  const byId = new Map(taskStore.tasks.map((t) => [t.id, t]));
-  return ids.map((id) => {
-    const dep = byId.get(id);
-    if (!dep) return { id, label: id.slice(0, 8) + '…', status: 'missing', satisfied: false };
-    const label = dep.title || (dep.prompt.length > 40 ? dep.prompt.slice(0, 40) + '…' : dep.prompt) || id.slice(0, 8);
-    const satisfied = dep.status === 'done' || dep.status === 'cancelled';
-    return { id, label, status: dep.status, satisfied };
-  });
-});
-const blockedByUnmet = computed(() => blockedBy.value.filter((d) => !d.satisfied).length);
-
 // Execution-environment provenance rows (harness, model, API endpoint,
 // recorded time).
 const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() => {
@@ -64,9 +44,6 @@ const envRows = computed<{ label: string; value: string; mono?: boolean }[]>(() 
   if (e.recorded_at) rows.push({ label: 'Recorded', value: relativeTime(e.recorded_at) });
   return rows;
 });
-function openDep(id: string) {
-  detailRouter.push({ path: '/', query: { task: id } });
-}
 
 // Source spec link (Links → spec). The basename is shown as the label; the
 // click deep-links to /plan focusing the spec (PlanPage honors ?spec=<path>).
@@ -93,8 +70,8 @@ useFocusTrap(modalRoot, () => !!props.task);
 const dialog = useDialogStore();
 const toast = useToastStore();
 
-type MainTab = 'spec' | 'activity' | 'changes' | 'verification' | 'events' | 'timeline';
-const MAIN_TABS: readonly MainTab[] = ['spec', 'activity', 'changes', 'verification', 'events', 'timeline'];
+type MainTab = 'spec' | 'activity' | 'changes' | 'events' | 'timeline';
+const MAIN_TABS: readonly MainTab[] = ['spec', 'activity', 'changes', 'events', 'timeline'];
 // Honor an initial tab (command-palette tab-switch jumps / deep links).
 const mainTab = ref<MainTab>(
   MAIN_TABS.includes(props.initialTab as MainTab) ? (props.initialTab as MainTab) : 'spec',
@@ -134,63 +111,6 @@ async function fetchDiff() {
   } finally {
     diffLoading.value = false;
   }
-}
-
-// --- Results (multi-turn) tab ---
-//
-// One entry per "output" event with a non-empty result text. Implementation
-// turns vs test turns are separated using task.test_run_start_turn: turns
-// before that index are implementation, turns >= are test. Newest-first
-// to match ui/js/modal-results.js (line 603).
-
-interface ResultEntry {
-  turn: number;      // 1-based chronological turn number
-  text: string;
-  type: 'plan' | 'result';
-  showRaw: boolean;
-}
-const testResults = ref<ResultEntry[]>([]);
-const resultsLoading = ref(false);
-const resultsError = ref('');
-const resultsFetched = ref(false);
-
-async function fetchResults() {
-  if (!props.task) return;
-  resultsLoading.value = true;
-  resultsError.value = '';
-  try {
-    const data = await api<{ events?: { event_type: string; data?: { result?: string } }[] } | { event_type: string; data?: { result?: string } }[]>(
-      'GET',
-      `/api/tasks/${props.task.id}/events?type=output`,
-    );
-    const events = Array.isArray(data) ? data : (data?.events ?? []);
-    const outputs = events
-      .filter((e) => e.event_type === 'output' && typeof e.data?.result === 'string' && e.data.result.length > 0)
-      .map((e) => e.data!.result as string);
-    // The Verification tab shows only the test/verify-phase transcript: turns at
-    // or after task.test_run_start_turn (1-based) belong to the test agent.
-    // Earlier (implementation) turns live in Activity and Spec, so they're not
-    // repeated here.
-    const startTurn = props.task.test_run_start_turn ?? 0;
-    const splitIdx = startTurn > 0 ? Math.min(startTurn - 1, outputs.length) : outputs.length;
-    const tests = outputs.slice(splitIdx);
-    testResults.value = tests.map((text, i) => ({
-      turn: splitIdx + i + 1,
-      text,
-      type: detectResultType(text),
-      showRaw: false,
-    })).reverse();
-    resultsFetched.value = true;
-  } catch (e) {
-    resultsError.value = e instanceof Error ? e.message : String(e);
-  } finally {
-    resultsLoading.value = false;
-  }
-}
-
-function copyResult(entry: ResultEntry) {
-  void navigator.clipboard.writeText(entry.text);
-  toast.push('Copied to clipboard', { kind: 'success', timeout: 2000 });
 }
 
 // Spec/Result markdown helper actions (toggle rendered/raw + copy), mirroring
@@ -339,7 +259,6 @@ const promptHistory = computed(() => props.task.prompt_history ?? []);
 function fetchForTab(t: MainTab) {
   if (t === 'changes' && !diffFetched.value) fetchDiff();
   if (t === 'activity') fetchOversight();
-  if (t === 'verification' && !resultsFetched.value) fetchResults();
   if (t === 'timeline' && !spansFetched.value) fetchSpans();
   if (t === 'events' && !eventsFetched.value) fetchEvents();
 }
@@ -348,7 +267,6 @@ watch(mainTab, fetchForTab);
 // updates, so refresh the visible data tab while an agent is running too.
 function refreshVisibleData() {
   spansFetched.value = false;
-  resultsFetched.value = false;
   eventsFetched.value = false;
   diffFetched.value = false;
   fetchForTab(mainTab.value);
@@ -371,11 +289,9 @@ watch(
   () => props.task?.id,
   () => {
     spansFetched.value = false; spans.value = []; turnUsages.value = [];
-    resultsFetched.value = false; testResults.value = [];
     eventsFetched.value = false; events.value = [];
     diffFetched.value = false; diffFiles.value = []; behindCounts.value = {};
     if (mainTab.value === 'timeline') fetchSpans();
-    if (mainTab.value === 'verification') fetchResults();
     if (mainTab.value === 'events') fetchEvents();
     if (mainTab.value === 'changes') fetchDiff();
   },
@@ -445,9 +361,6 @@ interface OversightPhase {
 const oversightStatus = ref('');
 const oversightPhases = ref<OversightPhase[]>([]);
 const oversightError = ref('');
-// Test-phase oversight (the test agent's run), shown as a parallel "Testing"
-// section. Sourced from /oversight?phase=test.
-const testOversightPhases = ref<OversightPhase[]>([]);
 let oversightTimer: ReturnType<typeof setTimeout> | null = null;
 let oversightTaskId = '';
 
@@ -465,13 +378,7 @@ async function fetchOversight() {
     oversightStatus.value = '';
     oversightPhases.value = [];
     oversightError.value = '';
-    testOversightPhases.value = [];
   }
-  // Test-phase oversight (best-effort; only present once a test agent has run).
-  try {
-    const t = await api<{ phases?: OversightPhase[] }>('GET', `/api/tasks/${props.task.id}/oversight?phase=test`);
-    testOversightPhases.value = t?.phases ?? [];
-  } catch { testOversightPhases.value = []; }
   try {
     const data = await api<{ status?: string; phases?: OversightPhase[]; error?: string }>(
       'GET',
@@ -537,11 +444,6 @@ const gitBranches = computed(() => {
 const gitWorktrees = computed(() => {
   const n = Object.keys(props.task.worktree_paths || {}).length;
   return n ? `${n} ${n === 1 ? 'repo' : 'repos'}` : 'none';
-});
-
-const dependsOnDisplay = computed(() => {
-  const n = (props.task.depends_on || []).length;
-  return n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : 'none';
 });
 
 // Budget usage as a percentage of the configured cost/token cap (0 when no cap).
@@ -635,18 +537,6 @@ async function completeTask() {
 async function resumeTask() {
   await api('POST', `/api/tasks/${props.task.id}/resume`);
 }
-async function testTask() {
-  // Optional acceptance criteria — when set, the test agent focuses on
-  // the exact checks the user described. Empty / cancelled = generic run.
-  const criteria = await dialog.prompt({
-    title: 'Test verification',
-    message: 'Acceptance criteria (optional). Leave blank for a generic verification run.',
-    placeholder: 'e.g. all unit tests pass; CHANGELOG updated',
-  });
-  if (criteria === null) return;
-  const body = criteria.trim() ? { criteria: criteria.trim() } : undefined;
-  await api('POST', `/api/tasks/${props.task.id}/test`, body);
-}
 async function syncTask() {
   await api('POST', `/api/tasks/${props.task.id}/sync`);
 }
@@ -654,10 +544,9 @@ async function syncTask() {
 // Backlog editing — surfaces a few common knobs (timeout, model, budgets,
 // tags) as an inline editor that PATCHes the task. Lets the user adjust
 // settings after creation without having to retype the prompt. Mirrors
-// the legacy modal-core editable settings (timeout/tags/deps/budget).
+// the legacy modal-core editable settings (timeout/tags/budget).
 const editingBacklog = ref(false);
 const editPrompt = ref('');
-const editCriteria = ref('');
 const editPromptPreview = ref(false);
 const editTimeout = ref<number | null>(null);
 const editModel = ref('');
@@ -673,7 +562,6 @@ const EDIT_SANDBOX_OPTIONS = computed(() => [
   })),
 ]);
 const editTags = ref('');
-const editDeps = ref<string[]>([]);
 const editMaxCost = ref<number | null>(null);
 const editMaxTokens = ref<number | null>(null);
 const editSaving = ref(false);
@@ -683,13 +571,11 @@ const editPromptHtml = computed(() => renderResultMarkdown(editPrompt.value || '
 function openBacklogEdit() {
   const t = props.task;
   editPrompt.value = t.prompt ?? '';
-  editCriteria.value = t.criteria ?? '';
   editPromptPreview.value = false;
   editTimeout.value = t.timeout > 0 ? Math.round(t.timeout / 60) : null;
   editModel.value = t.model ?? '';
   editSandbox.value = t.sandbox ?? '';
   editTags.value = (t.tags ?? []).join(', ');
-  editDeps.value = [...(t.depends_on ?? [])];
   editMaxCost.value = t.max_cost_usd && t.max_cost_usd > 0 ? t.max_cost_usd : null;
   editMaxTokens.value = t.max_input_tokens && t.max_input_tokens > 0 ? t.max_input_tokens : null;
   editingBacklog.value = true;
@@ -701,13 +587,11 @@ async function saveBacklogEdit() {
     const t = props.task;
     const patch: Record<string, unknown> = {};
     if (editPrompt.value.trim() !== (t.prompt ?? '').trim()) patch.prompt = editPrompt.value.trim();
-    if (editCriteria.value.trim() !== (t.criteria ?? '').trim()) patch.criteria = editCriteria.value.trim();
     if (editTimeout.value !== null && editTimeout.value > 0) patch.timeout = editTimeout.value * 60;
     if (editModel.value.trim() !== (t.model ?? '').trim()) patch.model = editModel.value.trim();
     if (editSandbox.value !== (t.sandbox ?? '')) patch.sandbox = editSandbox.value;
     const parsedTags = editTags.value.split(',').map((x) => x.trim()).filter(Boolean);
     if (JSON.stringify(parsedTags) !== JSON.stringify(t.tags ?? [])) patch.tags = parsedTags;
-    if (JSON.stringify(editDeps.value) !== JSON.stringify(t.depends_on ?? [])) patch.depends_on = [...editDeps.value];
     if ((editMaxCost.value ?? 0) !== (t.max_cost_usd ?? 0)) patch.max_cost_usd = editMaxCost.value ?? 0;
     if ((editMaxTokens.value ?? 0) !== (t.max_input_tokens ?? 0)) patch.max_input_tokens = editMaxTokens.value ?? 0;
     if (Object.keys(patch).length === 0) { editingBacklog.value = false; return; }
@@ -964,16 +848,6 @@ async function submitReview() {
             <button
               type="button"
               class="tab"
-              :class="{ on: mainTab === 'verification' }"
-              role="tab"
-              :aria-selected="mainTab === 'verification'"
-              aria-controls="sheet-body"
-              data-tab="verification"
-              @click="mainTab = 'verification'"
-            >Verification</button>
-            <button
-              type="button"
-              class="tab"
               :class="{ on: mainTab === 'events' }"
               role="tab"
               :aria-selected="mainTab === 'events'"
@@ -1078,16 +952,6 @@ async function submitReview() {
                       <div v-if="oversightPhases.length" class="ta-oversight">
                         <div class="ta-oversight__label">Oversight summary</div>
                         <div v-for="(ph, pi) in oversightPhases" :key="pi" class="ta-oversight__phase">
-                          <div class="ta-oversight__title">{{ ph.title }}</div>
-                          <div class="ta-oversight__summary">{{ ph.summary }}</div>
-                          <div v-if="ph.tools_used?.length" class="ta-oversight__tools">
-                            <span v-for="t in ph.tools_used" :key="t" class="ta-oversight__tool">{{ t }}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div v-if="testOversightPhases.length" class="ta-oversight" style="margin-top: 10px;">
-                        <div class="ta-oversight__label">Testing oversight</div>
-                        <div v-for="(ph, pi) in testOversightPhases" :key="'test' + pi" class="ta-oversight__phase">
                           <div class="ta-oversight__title">{{ ph.title }}</div>
                           <div class="ta-oversight__summary">{{ ph.summary }}</div>
                           <div v-if="ph.tools_used?.length" class="ta-oversight__tools">
@@ -1371,43 +1235,6 @@ async function submitReview() {
                   </section>
                 </div>
 
-                <!-- RESULTS tab (multi-turn) -->
-                <!-- Verification: the test/verify-phase transcript only. The
-                     implementation turns live in Activity (full transcript) and
-                     the latest result shows in Spec, so they're not repeated
-                     here. -->
-                <div data-main-tab-section="verification">
-                  <!-- Test-agent verification (separate phase, its own empty state) -->
-                  <section class="ta-verify-sec">
-                    <h3 class="ta-events__h">Test agent</h3>
-                    <div v-if="resultsLoading" class="text-xs text-v-secondary">Loading…</div>
-                    <div v-else-if="resultsError" class="text-xs text-err">{{ resultsError }}</div>
-                    <div v-else-if="!testResults.length" class="text-xs text-v-muted">No test-agent run for this task yet.</div>
-                    <template v-else>
-                      <details
-                        v-for="(entry, idx) in testResults"
-                        :key="`test-${entry.turn}`"
-                        class="result-entry"
-                        :open="idx === 0"
-                      >
-                        <summary class="result-entry-summary">
-                          <div class="result-entry-labels">
-                            <span v-if="entry.type === 'plan'" class="result-type-badge result-type-plan">Plan</span>
-                            <span class="result-turn-label">Turn {{ entry.turn }}</span>
-                          </div>
-                        </summary>
-                        <div class="result-entry-actions flex items-center gap-1.5">
-                          <button type="button" class="btn sm ghost" @click="copyResult(entry)">Copy</button>
-                          <button type="button" class="btn sm ghost" @click="entry.showRaw = !entry.showRaw">{{ entry.showRaw ? 'Rendered' : 'Raw' }}</button>
-                        </div>
-                        <pre v-if="entry.showRaw" class="result-entry-body">{{ entry.text }}</pre>
-                        <!-- eslint-disable-next-line vue/no-v-html — renderMarkdown sanitizes -->
-                        <div v-else class="result-entry-body prose-content" v-html="renderResultMarkdown(entry.text)" />
-                      </details>
-                    </template>
-                  </section>
-                </div>
-
                 <!-- TIMELINE tab (span flamegraph) -->
                 <div data-main-tab-section="timeline">
                   <h3 class="section-title">Timeline</h3>
@@ -1419,26 +1246,6 @@ async function submitReview() {
 
         <!-- Right aside -->
         <aside class="sheet-aside">
-          <!-- Blocked by: the dependency list with its readiness summary. -->
-          <section v-if="blockedBy.length" class="mdl-section">
-            <div class="mdl-h">
-              Blocked by
-              <span v-if="blockedByUnmet > 0" class="pill pill-warn deps-summary">waiting on {{ blockedByUnmet }} of {{ blockedBy.length }}</span>
-              <span v-else class="pill pill-ok deps-summary">all satisfied</span>
-            </div>
-            <button
-              v-for="d in blockedBy"
-              :key="d.id"
-              type="button"
-              class="dep-row"
-              :title="`Open ${d.label}`"
-              @click="openDep(d.id)"
-            >
-              <span class="pill" :class="pillClassFor(d.status)">{{ d.status === 'in_progress' ? 'in progress' : d.status }}</span>
-              <span class="dep-row__label">{{ d.label }}</span>
-            </button>
-          </section>
-
           <!-- Actions: a stack of explicit rows, each with a glyph, a label and
                a hint. The forward transition takes the accent, done the green,
                cancel the warn tone and delete the red. -->
@@ -1455,7 +1262,7 @@ async function submitReview() {
               <span class="aside-action__icon" aria-hidden="true">&#9998;</span>
               <span class="aside-action__body">
                 <span class="aside-action__label">Edit task</span>
-                <span class="aside-action__hint">prompt, deps, budget</span>
+                <span class="aside-action__hint">prompt, budget</span>
               </span>
             </button>
             <button v-if="isWaiting" type="button" class="aside-action aside-action--success" :class="{ 'is-busy': busyAction === 'done' }" :disabled="busy" data-action="done" @click="runAction('done', completeTask)">
@@ -1470,13 +1277,6 @@ async function submitReview() {
               <span class="aside-action__body">
                 <span class="aside-action__label">Resume</span>
                 <span class="aside-action__hint">continue existing session</span>
-              </span>
-            </button>
-            <button v-if="isWaiting || isDone || isFailed" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'test' }" :disabled="busy" data-action="test" @click="runAction('test', testTask)">
-              <span class="aside-action__icon" aria-hidden="true">&#9654;</span>
-              <span class="aside-action__body">
-                <span class="aside-action__label">Test</span>
-                <span class="aside-action__hint">run test verification</span>
               </span>
             </button>
             <button v-if="budgetExceeded && (isWaiting || isFailed)" type="button" class="aside-action" :class="{ 'is-busy': busyAction === 'budget' }" :disabled="busy" data-action="budget" @click="runAction('budget', raiseBudget)">
@@ -1543,10 +1343,6 @@ async function submitReview() {
                   <div v-else class="backlog-edit__preview prose-content" v-html="editPromptHtml"></div>
                 </div>
                 <label class="backlog-edit__field">
-                  <span>Test criteria</span>
-                  <textarea v-model="editCriteria" class="field backlog-edit__prompt" rows="3" placeholder="What the test agent and review critics should verify (optional)"></textarea>
-                </label>
-                <label class="backlog-edit__field">
                   <span>Timeout (min)</span>
                   <input v-model.number="editTimeout" class="field" type="number" min="1" placeholder="15" />
                 </label>
@@ -1558,10 +1354,6 @@ async function submitReview() {
                   <span>Harness</span>
                   <AppSelect v-model="editSandbox" :options="EDIT_SANDBOX_OPTIONS" aria-label="Harness" block />
                 </label>
-                <div class="backlog-edit__field">
-                  <span>Depends on</span>
-                  <DependencyPicker v-model="editDeps" :exclude-id="props.task.id" />
-                </div>
                 <label class="backlog-edit__field">
                   <span>Tags</span>
                   <input v-model="editTags" class="field" type="text" placeholder="comma,separated" />
@@ -1614,7 +1406,6 @@ async function submitReview() {
                 <template v-else>—</template>
               </span>
             </div>
-            <div class="row"><span class="k">depends on</span><span class="v">{{ dependsOnDisplay }}</span></div>
           </section>
 
           <section v-if="envRows.length" class="mdl-section">
@@ -1821,11 +1612,6 @@ async function submitReview() {
 }
 .backlog-edit__actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
 
-/* Blocked-by rows in the Git card. */
-.deps-summary { margin-left: auto; }
-.dep-row { width: 100%; border: none; border-top: 1px solid var(--rule); background: transparent; text-align: left; font: inherit; color: var(--ink); }
-.dep-row__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
-
 /* Usage-by-agent table. */
 .usage-breakdown { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .usage-breakdown th {
@@ -1852,7 +1638,6 @@ async function submitReview() {
 /* Events tab sections. */
 .ta-events__sec { padding: 14px 0; border-top: 1px solid var(--rule); }
 .ta-events__sec:first-child { padding-top: 0; border-top: none; }
-.ta-verify-sec { margin-top: 4px; }
 .ta-events__h {
   font: 600 var(--fs-9) / 1 var(--font-mono);
   letter-spacing: var(--tracking-label);

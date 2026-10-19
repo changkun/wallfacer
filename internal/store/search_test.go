@@ -11,17 +11,13 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 )
 
-// createTaskWithTitle is a helper that creates a task and sets its title.
+// createTaskWithTitle is a helper that creates a task with an explicit title.
 func createTaskWithTitle(t *testing.T, s *Store, prompt, title string) *Task {
 	t.Helper()
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: prompt, Timeout: 60, Kind: TaskKindTask})
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: prompt, Title: title, Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
-	if err := s.UpdateTaskTitle(bg(), task.ID, title); err != nil {
-		t.Fatalf("UpdateTaskTitle: %v", err)
-	}
-	task.Title = title
 	return task
 }
 
@@ -46,7 +42,7 @@ func TestSearchTasks_MatchTitle(t *testing.T) {
 
 func TestSearchTasks_MatchPrompt(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "find-me-in-prompt unique content", Timeout: 60, Kind: TaskKindTask})
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "find-me-in-prompt unique content", Title: "Prompt match", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -149,7 +145,7 @@ func TestSearchTasks_NoMatch(t *testing.T) {
 
 func TestSearchTasks_MissingOversight(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "matchable-prompt-text", Timeout: 60, Kind: TaskKindTask})
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "matchable-prompt-text", Title: "No oversight", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -205,7 +201,7 @@ func TestSearchTasks_SnippetTruncation(t *testing.T) {
 
 func TestSearchTasks_CaseInsensitive(t *testing.T) {
 	s := newTestStore(t)
-	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "lowercase-needle content", Timeout: 60, Kind: TaskKindTask})
+	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "lowercase-needle content", Title: "Case check", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -375,45 +371,11 @@ func TestBuildSnippet_NoEllipsis(t *testing.T) {
 
 // --- Index consistency tests ---
 
-// TestSearchIndex_UpdateTaskTitle verifies the search index is updated when a
-// task's title changes via UpdateTaskTitle.
-func TestSearchIndex_UpdateTaskTitle(t *testing.T) {
-	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-
-	// Title is initially empty; searching for "new-title-xyz" should return nothing.
-	results, err := s.SearchTasks(bg(), "new-title-xyz")
-	if err != nil {
-		t.Fatalf("SearchTasks: %v", err)
-	}
-	if len(results) != 0 {
-		t.Fatalf("expected 0 results before title update, got %d", len(results))
-	}
-
-	if err := s.UpdateTaskTitle(bg(), task.ID, "new-title-xyz"); err != nil {
-		t.Fatalf("UpdateTaskTitle: %v", err)
-	}
-
-	results, err = s.SearchTasks(bg(), "new-title-xyz")
-	if err != nil {
-		t.Fatalf("SearchTasks: %v", err)
-	}
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result after title update, got %d", len(results))
-	}
-	if results[0].MatchedField != "title" {
-		t.Errorf("expected matched_field=title, got %q", results[0].MatchedField)
-	}
-}
-
 // TestSearchIndex_UpdateTaskBacklog verifies the search index is updated when a
 // task's prompt changes via UpdateTaskBacklog.
 func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt content", Timeout: 60, Kind: TaskKindTask})
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt content", Title: "Backlog edit", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -449,7 +411,7 @@ func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 // task's prompt changes via ApplyRefinement.
 func TestSearchIndex_ApplyRefinement(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pre-refinement-prompt", Timeout: 60, Kind: TaskKindTask})
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pre-refinement-prompt", Title: "Refinement", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

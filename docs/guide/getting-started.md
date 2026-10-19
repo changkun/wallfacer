@@ -63,7 +63,7 @@ The board has four columns: Backlog, In Progress, Waiting, and Done.
 4. When the agent finishes, the card moves to Waiting. Open the **Changes** tab to review the diff. Leave comments directly on diff lines to send feedback; the task resumes with the comments as instructions.
 5. Accept the work by clicking **Done** (or pressing `d` on the focused card). The task passes through a brief committing phase where the commit message agent writes the commit, then lands in Done.
 
-Failed tasks carry a failure category and can be retried or sent back to Backlog. The [Board](board.md) guide covers verification and feedback in depth.
+Failed tasks carry a failure category and can be retried or sent back to Backlog. The [Board](board.md) guide covers feedback and completion in depth.
 
 ## Where data lives
 

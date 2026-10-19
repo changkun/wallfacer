@@ -82,7 +82,6 @@ func RunDoctor(configDir string, args []string) {
 	}
 	printOptionalVar(vals, "ANTHROPIC_BASE_URL", "using default")
 	printOptionalVar(vals, "CLAUDE_DEFAULT_MODEL", "using Claude Code default")
-	printOptionalVar(vals, "CLAUDE_TITLE_MODEL", "falls back to default model")
 
 	// --- OpenAI Codex sandbox credentials ---
 	fmt.Println()
@@ -94,7 +93,6 @@ func RunDoctor(configDir string, args []string) {
 	}
 	printOptionalVar(vals, "OPENAI_BASE_URL", "using OpenAI default")
 	printOptionalVar(vals, "CODEX_DEFAULT_MODEL", "using Codex default")
-	printOptionalVar(vals, "CODEX_TITLE_MODEL", "falls back to CODEX_DEFAULT_MODEL")
 
 	fmt.Println()
 	issues += checkHostBackend(vals)

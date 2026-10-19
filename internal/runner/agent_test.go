@@ -59,7 +59,7 @@ const tokenLimitStdout = `{"type":"result","subtype":"error","is_error":true,"re
 func makeTestRole(t *testing.T, slug string, mode mountMode) agents.Role {
 	t.Helper()
 	registerTestBinding(t, slug, agentBinding{
-		Activity:    store.SandboxActivityTitle,
+		Activity:    store.SandboxActivityOversight,
 		Timeout:     func(*store.Task) time.Duration { return 5 * time.Second },
 		MountMode:   mode,
 		SingleTurn:  true,
@@ -96,7 +96,7 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	backend.responses = []ContainerResponse{{Stdout: []byte(happyHeadlessStdout)}}
 
 	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{
-		Prompt: "write a title please", Timeout: 10,
+		Prompt: "summarize the run", Timeout: 10,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -127,7 +127,7 @@ func TestRunAgent_HeadlessHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTurnUsages: %v", err)
 	}
-	if len(records) != 1 || records[0].SubAgent != store.SandboxActivityTitle {
+	if len(records) != 1 || records[0].SubAgent != store.SandboxActivityOversight {
 		t.Errorf("turn usage not attributed correctly: %+v", records)
 	}
 }

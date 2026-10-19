@@ -14,7 +14,7 @@ On the [Plan](plan.md) page, ideas crystallize into specs: structured markdown d
 
 ### Board: managed execution
 
-The [Board](board.md) is where most day-to-day work happens. Each card is a concrete, trackable task. Starting a task runs the built-in Implement pipeline in an isolated worktree; results wait for review before landing. Diff comments and verification runs attach to the card.
+The [Board](board.md) is where most day-to-day work happens. Each card is a concrete, trackable task. Starting a task runs the built-in Implement pipeline in an isolated worktree; results wait for review before landing. Diff comments and reviews attach to the card.
 
 The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing task can be inspected and resumed with feedback.
 
@@ -26,13 +26,13 @@ A workspace is a named project folder with a stable identity. The identity survi
 
 ### Task
 
-A task is a card on the board: a prompt, an optional title, a harness selection, and dependencies. Tasks move through seven lifecycle states:
+A task is a card on the board: a prompt, an optional title, and a harness selection. Tasks move through seven lifecycle states:
 
 | State | Meaning |
 |---|---|
 | `backlog` | Created, not yet started |
 | `in progress` | An agent is working in the task's worktree |
-| `waiting` | Work finished, awaiting review or verification |
+| `waiting` | Work finished, awaiting review |
 | `committing` | Accepted, the commit message agent is writing the commit |
 | `done` | Committed and complete |
 | `failed` | Stopped with a failure category (timeout, agent error, worktree setup, and others) |
@@ -46,15 +46,14 @@ A spec is a design document with a lifecycle of its own: `vague`, `drafted`, `va
 
 ### Agent roles
 
-Five built-in agent roles cover the task pipeline:
+Four built-in agent roles cover the task pipeline:
 
 - **Implementation**: the multi-turn coding agent with write access to the worktree.
-- **Testing**: verifies finished work and produces a pass/fail verdict.
-- **Title**: names the task from its prompt.
 - **Oversight**: writes a review summary of what the agent did.
 - **Commit message**: writes the final commit.
+- **Review**: checks the change on a second model when Review is on.
 
-Every task runs the same built-in pipeline: implementation, testing when requested, then a parallel finishing step (commit message, title, oversight). The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
+Every task runs the same built-in pipeline: implementation, then a parallel finishing step (commit message, oversight). A task's title is the first line of its prompt. The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
 
 ### Harness
 
