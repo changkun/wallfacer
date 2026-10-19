@@ -50,7 +50,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/board", Name: "TaskBoardManifest",
-		Description: "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+		Description: "Board manifest as it appeared to a specific task (is_self=true for that task).",
 		Tags:        []string{"tasks", "debug"},
 	},
 

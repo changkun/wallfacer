@@ -141,7 +141,7 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 	m.WaitBackground()
 	m.GenerateOversight(id)
 
-	manifest, mErr := m.GenerateBoardManifest(ctx, id, false)
+	manifest, mErr := m.GenerateBoardManifest(ctx, id)
 	if mErr != nil {
 		t.Errorf("GenerateBoardManifest returned unexpected error: %v", mErr)
 	}

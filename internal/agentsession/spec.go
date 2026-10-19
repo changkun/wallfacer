@@ -30,9 +30,9 @@ func (p *Runtime) buildSpec(name string, sb harness.ID) executor.ContainerSpec {
 	return spec
 }
 
-// hostWorkDir returns the first configured workspace as an absolute host
-// path, used as the runtime process's CWD. Empty when no workspace is
-// configured (the host backend then inherits its own CWD).
+// hostWorkDir returns the workspace folder as an absolute host path, used as
+// the runtime process's CWD. Empty when no workspace is open (the host
+// backend then inherits its own CWD).
 func (p *Runtime) hostWorkDir() string {
 	for _, ws := range p.workspaces {
 		if ws = strings.TrimSpace(ws); ws != "" {

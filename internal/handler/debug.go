@@ -106,10 +106,10 @@ type boardManifestResponse struct {
 }
 
 // BoardManifest returns the board manifest as it would appear to a newly-started
-// task: no self-task, no worktree mounts. Useful for debugging the board state
-// without spinning up a container.
+// task: no self-task. Useful for debugging the board state without running an
+// agent.
 func (h *Handler) BoardManifest(w http.ResponseWriter, r *http.Request) {
-	manifest, err := h.runner.GenerateBoardManifest(r.Context(), uuid.Nil, false)
+	manifest, err := h.runner.GenerateBoardManifest(r.Context(), uuid.Nil)
 	if err != nil {
 		http.Error(w, "failed to generate board manifest: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -124,8 +124,7 @@ func (h *Handler) BoardManifest(w http.ResponseWriter, r *http.Request) {
 }
 
 // TaskBoardManifest returns the board manifest as it would appear to the
-// specified task: is_self=true for that task's entry, MountWorktrees matching
-// the task's setting.
+// specified task: is_self=true for that task's entry.
 func (h *Handler) TaskBoardManifest(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	s, ok := h.requireStore(w)
 	if !ok {
@@ -136,7 +135,7 @@ func (h *Handler) TaskBoardManifest(w http.ResponseWriter, r *http.Request, id u
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	manifest, err := h.runner.GenerateBoardManifest(r.Context(), id, task.MountWorktrees)
+	manifest, err := h.runner.GenerateBoardManifest(r.Context(), id)
 	if err != nil {
 		http.Error(w, "failed to generate board manifest: "+err.Error(), http.StatusInternalServerError)
 		return

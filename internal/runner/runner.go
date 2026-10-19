@@ -106,13 +106,12 @@ type Runner struct {
 	// when no task has changed since the last generation. Keyed by
 	// (boardChangeSeq, selfTaskID): a cache hit means no store mutation
 	// occurred and the requesting task hasn't changed, so the serialized
-	// board.json and sibling mount map can be reused as-is.
+	// board.json can be reused as-is.
 	boardCache struct {
 		mu         sync.Mutex
-		seq        uint64                       // snapshot of boardChangeSeq at generation time
-		selfTaskID uuid.UUID                    // which task the cached result was built for
-		json       []byte                       // serialized board.json
-		mounts     map[string]map[string]string // shortID → (repoPath → worktreePath)
+		seq        uint64    // snapshot of boardChangeSeq at generation time
+		selfTaskID uuid.UUID // which task the cached result was built for
+		json       []byte    // serialized board.json
 	}
 	boardChangeSeq      atomic.Uint64  // incremented on every store notification
 	shutdownCh          chan struct{}  // closed by Shutdown to stop the subscription goroutine

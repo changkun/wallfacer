@@ -166,7 +166,7 @@ func (m *MockRunner) GenerateTitleBackground(taskID uuid.UUID, _ string) {
 func (m *MockRunner) GenerateOversight(_ uuid.UUID) {}
 
 // GenerateBoardManifest returns an empty manifest in the mock.
-func (m *MockRunner) GenerateBoardManifest(_ context.Context, _ uuid.UUID, _ bool) (*BoardManifest, error) {
+func (m *MockRunner) GenerateBoardManifest(_ context.Context, _ uuid.UUID) (*BoardManifest, error) {
 	return &BoardManifest{}, nil
 }
 

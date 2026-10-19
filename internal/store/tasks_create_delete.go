@@ -30,12 +30,11 @@ var defaultAutoRetryBudget = map[FailureCategory]int{
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
-	ID             uuid.UUID
-	Prompt         string
-	Criteria       string
-	Timeout        int
-	MountWorktrees bool
-	Kind           TaskKind
+	ID       uuid.UUID
+	Prompt   string
+	Criteria string
+	Timeout  int
+	Kind     TaskKind
 	// FlowID sets Task.FlowID, a record field the runner does not read for
 	// dispatch (see Task.FlowID). No handler sets it; it lets a caller build
 	// a record that carries the field, as a stored task may.
@@ -70,16 +69,15 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	now := time.Now()
 
 	task := &Task{
-		SchemaVersion:  constants.CurrentTaskSchemaVersion,
-		ID:             id,
-		Prompt:         opts.Prompt,
-		Criteria:       opts.Criteria,
-		Status:         TaskStatusBacklog,
-		Turns:          0,
-		Timeout:        clampTimeout(opts.Timeout),
-		MountWorktrees: opts.MountWorktrees,
-		Kind:           opts.Kind,
-		FlowID:         opts.FlowID,
+		SchemaVersion: constants.CurrentTaskSchemaVersion,
+		ID:            id,
+		Prompt:        opts.Prompt,
+		Criteria:      opts.Criteria,
+		Status:        TaskStatusBacklog,
+		Turns:         0,
+		Timeout:       clampTimeout(opts.Timeout),
+		Kind:          opts.Kind,
+		FlowID:        opts.FlowID,
 		// Position is set under the lock after scanning existing backlog tasks.
 		CreatedAt: now,
 		UpdatedAt: now,

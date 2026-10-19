@@ -344,20 +344,18 @@ func TestRuntimeExec_BackendError(t *testing.T) {
 
 // --- buildSpec workspace selection, empty workspace, no env file ---
 
-// TestBuildContainerSpec_MultiWorkspaceUsesFirst documents that the host
-// runtime runs in the first configured workspace; subsequent workspaces are
-// reachable as siblings but do not change the process CWD.
-func TestBuildContainerSpec_MultiWorkspaceUsesFirst(t *testing.T) {
-	first := t.TempDir()
-	second := t.TempDir()
+// TestBuildContainerSpec_WorkDirIsWorkspaceFolder verifies that the host
+// runtime runs in the workspace folder.
+func TestBuildContainerSpec_WorkDirIsWorkspaceFolder(t *testing.T) {
+	folder := t.TempDir()
 	p := New(Config{
-		Workspaces:  []string{first, second},
-		Fingerprint: "multi",
+		Workspaces:  []string{folder},
+		Fingerprint: "one",
 	})
 
-	spec := p.buildSpec("wallfacer-agent-multi", harness.Claude)
-	if spec.WorkDir != first {
-		t.Errorf("WorkDir = %q, want first workspace %q", spec.WorkDir, first)
+	spec := p.buildSpec("wallfacer-agent-one", harness.Claude)
+	if spec.WorkDir != folder {
+		t.Errorf("WorkDir = %q, want the workspace folder %q", spec.WorkDir, folder)
 	}
 }
 

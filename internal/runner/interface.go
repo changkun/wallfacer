@@ -46,7 +46,7 @@ type Interface interface {
 	// Title & oversight generation.
 	GenerateTitleBackground(taskID uuid.UUID, prompt string)
 	GenerateOversight(taskID uuid.UUID)
-	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error)
+	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID) (*BoardManifest, error)
 
 	// Commit-message generation (task-free flavor). Used by callers that do
 	// not have a task ID in scope, e.g. the plan commit pipeline.

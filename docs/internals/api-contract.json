@@ -42,7 +42,7 @@
       "method": "GET",
       "pattern": "/api/tasks/{id}/board",
       "name": "TaskBoardManifest",
-      "description": "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+      "description": "Board manifest as it appeared to a specific task (is_self=true for that task).",
       "tags": [
         "tasks",
         "debug"

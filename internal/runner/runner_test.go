@@ -655,20 +655,20 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	}
 }
 
-// TestParallelTasksTwoRepos verifies that two tasks working on different
-// repos (mounted as separate workspaces) each get independent worktrees
-// and commits merge into their respective repos.
+// TestParallelTasksTwoRepos verifies that a task stored with worktrees in two
+// repos (from before a workspace became one folder) still commits: each repo's
+// worktree merges into that repo, though the workspace now names one folder.
 func TestParallelTasksTwoRepos(t *testing.T) {
 	repoX := setupTestRepo(t)
 	repoY := setupTestRepo(t)
-	s, runner := setupTestRunner(t, []string{repoX, repoY})
+	s, runner := setupTestRunner(t, []string{repoX})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Change both repos", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wtPaths, brName, err := runner.setupWorktrees(task.ID)
+	wtPaths, brName, err := runner.EnsureTaskWorktrees(task.ID, map[string]string{repoX: "", repoY: ""}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

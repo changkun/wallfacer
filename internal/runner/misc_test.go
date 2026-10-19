@@ -468,7 +468,7 @@ func TestRunContainerSuccess(t *testing.T) {
 	cmd := fakeCmdScript(t, endTurnOutput, 0)
 	r := runnerWithCmd(t, cmd)
 
-	out, stdout, stderr, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	out, stdout, stderr, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestRunContainerNonZeroExitWithValidOutput(t *testing.T) {
 	cmd := fakeCmdScript(t, endTurnOutput, 1)
 	r := runnerWithCmd(t, cmd)
 
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected no error for non-zero exit with valid output, got: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestRunContainerEmptyOutputNonZeroExit(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for empty container output with non-zero exit")
 	}
@@ -512,7 +512,7 @@ func TestRunContainerEmptyOutputZeroExit(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 0)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for empty container output with exit 0")
 	}
@@ -528,7 +528,7 @@ func TestRunContainerWithSessionID(t *testing.T) {
 	r := runnerWithCmd(t, cmd)
 
 	// Should succeed; session ID is passed to args (verified via args tests).
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "sess-xyz", nil, "", nil, "", "")
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "sess-xyz", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -545,7 +545,7 @@ func TestRunContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 	cmd := fakeStatefulCmd(t, []string{tokenLimit, endTurnOutput})
 	r := runnerWithCmd(t, cmd)
 
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected fallback success, got error: %v", err)
 	}
@@ -569,7 +569,7 @@ func TestRunContainerRegistersHandleForKill(t *testing.T) {
 	taskID := uuid.New()
 	done := make(chan error, 1)
 	go func() {
-		_, _, _, err := r.runContainer(context.Background(), taskID, "prompt", "", nil, "", nil, "", "")
+		_, _, _, err := r.runContainer(context.Background(), taskID, "prompt", "", nil, "", "", "")
 		done <- err
 	}()
 
@@ -784,7 +784,7 @@ func TestRunContainerParseErrorExitZero(t *testing.T) {
 	cmd := fakeCmdScript(t, "this is not valid json output at all", 0)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for non-JSON output")
 	}
@@ -800,7 +800,7 @@ func TestRunContainerParseErrorWithExitCode(t *testing.T) {
 	cmd := fakeCmdScript(t, "not valid json", 1)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for invalid JSON with exit code 1")
 	}
@@ -819,7 +819,7 @@ func TestRunContainerContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	_, _, _, err := r.runContainer(ctx, uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(ctx, uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error when context is cancelled")
 	}
