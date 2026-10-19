@@ -502,22 +502,4 @@ var Routes = []Route{
 		Description: "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
 		Tags:        []string{"explorer"},
 	},
-
-	// --- OAuth authentication ---
-
-	{
-		Method: http.MethodPost, Pattern: "/api/auth/{provider}/start", Name: "StartOAuth",
-		Description: "Start an OAuth authorization flow for the given provider (claude or codex).",
-		Tags:        []string{"auth"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/auth/{provider}/status", Name: "OAuthStatus",
-		Description: "Poll the current status of an OAuth flow for the given provider.",
-		Tags:        []string{"auth"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/auth/{provider}/cancel", Name: "CancelOAuth",
-		Description: "Cancel an in-progress OAuth flow for the given provider.",
-		Tags:        []string{"auth"},
-	},
 }

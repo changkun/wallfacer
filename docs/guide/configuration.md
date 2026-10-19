@@ -24,8 +24,8 @@ Open Settings from the bottom of the sidebar. The page has four tabs.
 
 Credentials, models, and routing for the coding CLIs. A warning banner appears on first launch while no credential is configured. Each harness has its own block with a **Test** connectivity button:
 
-- **Claude**: OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`), API key (`ANTHROPIC_API_KEY`), base URL, default and title models, plus a **Sign in with Claude** OAuth button.
-- **Codex**: OpenAI API key, base URL, default and title models, plus a **Sign in with OpenAI** button.
+- **Claude**: OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`), API key (`ANTHROPIC_API_KEY`), base URL, default and title models. With no token or key set, Claude tasks use the sign-in of the `claude` CLI on the machine.
+- **Codex**: OpenAI API key, base URL, default and title models. With no key set, Codex tasks use the sign-in of the `codex` CLI (`~/.codex/auth.json`).
 - **Cursor**: `CURSOR_API_KEY`, or run `cursor-agent login` once outside Wallfacer.
 - **OpenCode**: no key field; the `opencode` CLI manages provider credentials itself (`opencode auth login`).
 - **Pi**: no key field; the `pi` CLI reads provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the same environment.

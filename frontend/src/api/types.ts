@@ -261,7 +261,6 @@ export interface SandboxTestResponse {
   last_test_result?: string;
   result?: string;
   stop_reason?: string;
-  reauth_available?: boolean;
 }
 
 export interface TaskCommit {

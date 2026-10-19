@@ -45,16 +45,18 @@ func TestEnvKeyringSettingsAndTestIsolation(t *testing.T) {
 	if err != nil || cfg.APIKey != "provider-secret-value" {
 		t.Fatal("test modified saved credentials")
 	}
-	if err := newOAuthTokenWriter(path)("CLAUDE_CODE_OAUTH_TOKEN", "oauth-secret"); err != nil {
-		t.Fatal(err)
+	putToken := httptest.NewRecorder()
+	h.UpdateEnvConfig(putToken, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"oauth_token":"oauth-secret"}`)))
+	if putToken.Code != 204 {
+		t.Fatalf("save token: %d %s", putToken.Code, putToken.Body.String())
 	}
 	cfg, err = envconfig.Parse(path)
 	if err != nil || cfg.OAuthToken != "oauth-secret" || cfg.APIKey != "provider-secret-value" {
-		t.Fatal("OAuth did not preserve provider storage")
+		t.Fatal("saving the OAuth token did not preserve provider storage")
 	}
 	raw, _ = os.ReadFile(path)
 	if strings.Contains(string(raw), "oauth-secret") {
-		t.Fatal("OAuth wrote plaintext")
+		t.Fatal("saving the OAuth token wrote plaintext")
 	}
 	keyring.MockInitWithError(errors.New("locked"))
 	failed := httptest.NewRecorder()

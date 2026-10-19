@@ -87,10 +87,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `PUT /api/explorer/file` | Write file contents to a workspace |
 | `GET /api/explorer/file/stream` | SSE stream of change notifications for a single file |
 | `GET /api/explorer/task-prompts` | List backlog (and optionally waiting) tasks as virtual entries for the explorer Task Prompts section |
-| **OAuth authentication** (agent CLI sign-in) | |
-| `POST /api/auth/{provider}/start` | Start OAuth flow; returns `{authorize_url}` |
-| `GET /api/auth/{provider}/status` | Poll flow status; returns `{state, error?}` |
-| `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
 | **Spec tree & graph** | |

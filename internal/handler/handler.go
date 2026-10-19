@@ -21,7 +21,6 @@ import (
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/oauth"
 	"latere.ai/x/wallfacer/internal/review"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -149,8 +148,6 @@ type Handler struct {
 	// affect the user-controlled toggle flags.
 	breakers map[string]*watcherBreaker
 
-	oauthManager *oauth.Manager
-
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache
 	fileIndex          *fileIndex
@@ -224,9 +221,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		},
 		reviewInFlight: make(map[uuid.UUID]struct{}),
 	}
-	oauthMgr := oauth.NewManager()
-	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)
-	h.oauthManager = oauthMgr
 	h.cachedMaxParallel = newLazy(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		limit := constants.DefaultMaxConcurrentTasks

@@ -100,6 +100,15 @@ committed: the commit log already holds that.
 - Browser telemetry and the language setting, which only the sign-in and
   product pages used; the console is in English.
 
+- Signing the Claude and Codex CLIs in from Settings: the Harness tab has no
+  **Sign in with Claude**, **Sign in with OpenAI** or **Sign in again**
+  button, and the `/api/auth/{provider}/start`, `/api/auth/{provider}/status`
+  and `/api/auth/{provider}/cancel` routes and the `reauth_available` field of
+  `POST /api/env/test` are gone. Agents use the sign-in each CLI keeps on the
+  machine, or `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and
+  `OPENAI_API_KEY` in `~/.wallfacer/.env`, which are unchanged; a token an
+  earlier sign-in saved there keeps working.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when

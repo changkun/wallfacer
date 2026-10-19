@@ -1052,11 +1052,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Task spans and oversight.
 		"GetTaskSpans": withID(h.GetTaskSpans),
 		"GetOversight": withID(h.GetOversight),
-
-		// OAuth authentication
-		"StartOAuth":  http.HandlerFunc(h.StartOAuth),
-		"OAuthStatus": http.HandlerFunc(h.OAuthStatus),
-		"CancelOAuth": http.HandlerFunc(h.CancelOAuth),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
