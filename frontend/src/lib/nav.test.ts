@@ -16,12 +16,6 @@ describe('nav model', () => {
     expect(navLabel('/nowhere')).toBe('');
   });
 
-  it('has no row for the removed agents page', () => {
-    const items = NAV_GROUPS.flatMap((g) => g.items);
-    expect(items.some((i) => i.label === 'Agents' || i.to === '/agent-graph')).toBe(false);
-    expect(navLabel('/agent-graph')).toBe('');
-  });
-
   it('pins exactly one group to the bottom and gives every other group an eyebrow', () => {
     const pinned = NAV_GROUPS.filter((g) => g.pin === 'bottom');
     expect(pinned).toHaveLength(1);

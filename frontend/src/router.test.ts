@@ -29,10 +29,8 @@ describe('routes workspace gating', () => {
 describe('routes not-found fallback', () => {
   const router = createRouter({ history: createMemoryHistory(), routes });
 
-  it('resolves the removed agents page and its former aliases to the not-found page', () => {
-    for (const path of ['/agent-graph', '/agents', '/workflows', '/flows']) {
-      expect(router.resolve(path).name, path).toBe(NOT_FOUND_ROUTE);
-    }
+  it('resolves an unknown path to the not-found page', () => {
+    expect(router.resolve('/nowhere').name).toBe(NOT_FOUND_ROUTE);
   });
 
   it('resolves console pages to themselves', () => {

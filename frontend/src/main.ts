@@ -58,4 +58,7 @@ void router.isReady().then(() => {
   if (target) void router.replace(target).catch(() => {});
 });
 
-app.mount('#app');
+// Mount once the initial navigation has resolved, so components that read the
+// route during setup (the workspace URL sync in AppLayout) see the requested
+// page rather than the start location.
+void router.isReady().then(() => app.mount('#app'));
