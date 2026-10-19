@@ -126,10 +126,10 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl, then te
 
 ### Request middleware
 
-The request handler chain is wired in `RunServer` (`internal/cli/server.go`) and wraps the mux outside-in, so requests flow otel -> logging -> CSRF -> server key -> mux:
+The request handler chain is wired in `RunServer` (`internal/cli/server.go`) and wraps the mux outside-in, so requests flow logging -> CSRF -> server key -> mux:
 
 - `handler.CSRFMiddleware(hostPort)`, unconditional CSRF protection (no skip flag).
-- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes, embedded assets and `GET /metrics` are public; SSE paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
+- `handler.BearerAuthMiddleware(serverAPIKey)`, the per-machine server key check. UI shell routes and embedded assets are public; SSE paths take the key as `?token=`. The browser receives the key in `index.html` on a loopback request (`indexKeyAllowed`, `internal/cli/serverkey.go`).
 
 ## End-to-End Walkthrough: Task Creation to Merge
 
@@ -283,7 +283,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
 | Debug a failing rebase | `latere.ai/x/pkg/gitutil/ops.go` + `latere.ai/x/pkg/gitutil/stash.go` |
 | Understand why a task failed | `data/<key>/<uuid>/traces/` + `outputs/turn-NNNN.json` |
-| Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
+| Add a new system prompt | a `.tmpl` file in `internal/prompts/`, its data type and rendering function in `internal/prompts/prompts.go` |
 | Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
 | Change pub/sub behavior | `internal/store/subscribe.go` (`notify()`, `Subscribe()`) |
@@ -301,18 +301,16 @@ Every `internal/` package and its role in the system:
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
 | `handler` | HTTP API handlers organized by concern | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
-| `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
-| `oteltest` | Test-only: installs a recording OpenTelemetry SDK and a trace-header-recording HTTP server, so instrumentation is checked by the spans it ends and the `traceparent` that reaches the server | `Install()`, `SpanNames()`, `NewServer()`, `Server` |
+| `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `Interface` |
 | `store` | Per-task persistence (via `StorageBackend`), data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `TaskDelta`, `StorageBackend` |
 | `testenv` | Test-only: runs a package's tests with the per-user directories pointed at a temporary directory and the coding-agent CLIs removed from `PATH`, so tests never touch the real configuration and never launch a real agent | `RunIsolated()`, `AgentCLIs`, `AgentCLIsOnPath()`, `Within()` |
 | `webserver` | The catch-all routes beside the API: the SPA shell for client routes, the JSON error envelope for unmatched `/api` paths | `MountCatchAll()` |
 | `workspace` | Workspace lifecycle manager; stable-identity workspace records (`workspaces.json`, migrated from `workspace-groups.json`); DataKey-scoped data directories; hot-swap and per-workspace parallelism settings | `Manager`, `Workspace`, `Snapshot`, `NewManager()`, `LoadGroups()`, `SaveGroups()`, `MigrateToWorkspaces()` |
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
-| `oauth` | OAuth 2.0 PKCE flow engine for agent-CLI sign-in, ephemeral callback server, provider configs (Claude, Codex) | `Flow`, `Manager`, `NewManager()`, `Manager.Start()`, `Provider`, `ClaudeProvider`, `CodexProvider` |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; seven-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
-| `prompts` | System prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Manager`, `NewManager()`, `WorkspaceDataKey()`, `NewDataKey()` |
+| `prompts` | Embedded system prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Title()`, `CommitMessage()`, `Oversight()`, `WorkspaceDataKey()`, `NewDataKey()` |
 
 Shared utility packages under `internal/pkg/`:
 
@@ -321,7 +319,7 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/livelog` | Concurrency-safe append-only byte buffer with multiple readers for live streaming | `Log`, `New()`, `Log.NewReader()`, `Reader.ReadChunk()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
-General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, git operations (`gitutil`), and the Prometheus-compatible metrics registry (`metrics`), come from the `latere.ai/x/pkg` module.
+General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, and git operations (`gitutil`), come from the `latere.ai/x/pkg` module.
 
 ## Handler Organization
 
@@ -364,7 +362,6 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 | `logger.Git` | `git` | Worktree and git operations |
 | `logger.Handler` | `handler` | HTTP request handling |
 | `logger.Recovery` | `recovery` | Orphaned task recovery on startup |
-| `logger.Prompts` | `prompts` | System prompt template management |
 
 `logger.Init(format)` configures all loggers. Two formats are supported:
 - **`"text"`** (default), Human-friendly output with ANSI colors (when stdout is a terminal), aligned columns: timestamp, 3-char level badge, 8-char component, source file:line, bold message, dim key=value pairs. Respects `NO_COLOR` and `TERM=dumb`.
@@ -380,7 +377,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Security**, a per-machine server key, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits.
 
-**Observability**, SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics. See [API & Transport](api-and-transport.md) for the metrics reference.
+**Observability**, SSE event streams, append-only trace timeline per task, span timing, structured logs.
 
 **Middleware**, See [API & Transport](api-and-transport.md) for the middleware chain.
 

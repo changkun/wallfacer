@@ -1,6 +1,6 @@
 # Oversight
 
-Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and per-task cost and timing. This guide covers each surface, from a single task's oversight summary to the Prometheus endpoint for external monitoring.
+Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and per-task cost and timing. This guide covers each surface, from a single task's oversight summary to its per-turn usage records.
 
 ## Oversight summaries
 
@@ -36,13 +36,6 @@ POST /api/tasks/generate-oversight?limit=10
 ```
 
 Eligible tasks are those in a terminal or waiting state with at least one turn and no ready summary. The response reports how many tasks were queued (`queued`), their ids (`task_ids`), and the total count still without oversight (`total_without_oversight`).
-
-### Customizing the prompt
-
-The oversight agent's system prompt can be overridden by writing
-`~/.wallfacer/prompts/oversight.tmpl`, or through `PUT /api/system-prompts/oversight`.
-Delete the file, or send `DELETE /api/system-prompts/oversight`, to restore the
-built-in template.
 
 ## Task timeline
 
@@ -99,21 +92,6 @@ Each task also exposes one usage record per turn, including token counts, cost, 
 ```
 GET /api/tasks/{id}/turn-usage
 ```
-
-## Prometheus metrics
-
-The server exposes `GET /metrics` in Prometheus text format for external monitoring:
-
-| Metric | Type | Labels |
-|---|---|---|
-| `wallfacer_tasks_total` | gauge | `status`, `archived` |
-| `wallfacer_running_containers` | gauge | |
-| `wallfacer_background_goroutines` | gauge | |
-| `wallfacer_store_subscribers` | gauge | |
-| `wallfacer_failed_tasks_by_category` | gauge | `category` |
-| `wallfacer_worktree_restorations_total` | counter | |
-| `wallfacer_http_requests_total` | counter | `method`, `route`, `status` |
-| `wallfacer_http_request_duration_seconds` | histogram | `method`, `route` |
 
 ## See also
 

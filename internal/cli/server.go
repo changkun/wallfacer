@@ -3,7 +3,6 @@ package cli
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,8 +18,6 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/metrics"
-	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
@@ -29,7 +26,6 @@ import (
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/webserver"
@@ -62,10 +58,6 @@ type ServerComponents struct {
 
 	// ActualPort is the TCP port the listener is bound to.
 	ActualPort int
-
-	// TelemetryShutdown flushes traces, metrics, and buffered log records.
-	// Always non-nil; it is a noop when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
-	TelemetryShutdown func(context.Context) error
 }
 
 // shutdownTimeout is the budget for draining HTTP connections and stopping
@@ -76,9 +68,8 @@ const shutdownTimeout = 5 * time.Second
 // cancelled, then shuts everything down within shutdownTimeout. It returns nil
 // on a clean stop; http.ErrServerClosed is the normal stop signal.
 //
-// This mirrors otel.RunServer's contract, which wallfacer cannot call directly:
-// otel.RunServer owns the listen call (srv.ListenAndServe), while wallfacer
-// binds its listener up front so it can fall back to a free port and feed the
+// The listener is bound up front by initServer rather than by
+// srv.ListenAndServe, so the server can fall back to a free port and feed the
 // resolved host:port into the CSRF middleware and the browser it opens.
 func (sc *ServerComponents) Serve() error {
 	srvErr := make(chan error, 1)
@@ -103,8 +94,8 @@ func (sc *ServerComponents) Serve() error {
 	return nil
 }
 
-// Shutdown performs a graceful shutdown: drains HTTP connections, waits for
-// background runner goroutines to finish, and flushes telemetry.
+// Shutdown performs a graceful shutdown: drains HTTP connections and waits for
+// background runner goroutines to finish.
 func (sc *ServerComponents) Shutdown() {
 	sc.Stop()
 
@@ -123,35 +114,15 @@ func (sc *ServerComponents) Shutdown() {
 	logger.Main.Info("shutting down runner")
 	sc.Runner.Shutdown()
 	logger.Main.Info("shutdown complete")
-
-	// Flush telemetry last so the shutdown diagnostics above are exported too.
-	if sc.TelemetryShutdown != nil {
-		if err := sc.TelemetryShutdown(shutdownCtx); err != nil {
-			logger.Main.Error("telemetry shutdown", "error", err)
-		}
-	}
 }
 
 // initServer performs the full server initialization sequence for RunServer.
 // It creates the workspace manager, runner, handler,
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
-func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *ServerComponents {
-	// Bootstrap telemetry before anything else logs. This registers the
-	// TracerProvider and the W3C propagator for the process, which is what makes
-	// the otel.Transport-wrapped clients in the handler and oauth trees
-	// emit client spans and send traceparent instead of resolving to noop. The
-	// local colored handler is handed over as Config.Stdout so terminal output is
-	// unchanged while the same records also reach the OTLP log bridge.
-	baseLogger, telShutdown, telErr := otel.Bootstrap(context.Background(), otel.Config{
-		ServiceName: "wallfacer",
-		Version:     Version,
-		Stdout:      logger.NewFormatHandler(cfg.LogFormat),
-	})
-	logger.Adopt(baseLogger)
-	if telErr != nil {
-		logger.Main.Warn("otlp logs init failed; continuing on stdout", "error", telErr)
-	}
+func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerComponents {
+	// Configure the log format before anything else logs.
+	logger.Init(cfg.LogFormat)
 
 	initConfigDir(configDir, cfg.EnvFile)
 
@@ -217,9 +188,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		envCfg = parsed
 	}
 
-	reg := metrics.NewRegistry()
-
-	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:            cfg.EnvFile,
 		DefaultEnvFile:     filepath.Join(configDir, ".env"),
@@ -234,9 +202,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		HostPiBinary:       envCfg.HostPiBinary,
 		AgentNice:          envCfg.AgentNice,
 		MaxAgents:          envCfg.MaxAgents,
-		Prompts:            prompts.NewManager(promptsDir),
 		WorkspaceManager:   wsMgr,
-		Reg:                reg,
 	})
 
 	r.PruneUnknownWorktrees()
@@ -254,7 +220,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	go r.StartWorktreeGC(ctx)
 	go r.StartWorktreeHealthWatcher(ctx)
 
-	h := handler.NewHandler(s, r, configDir, workspaces, reg)
+	h := handler.NewHandler(s, r, configDir, workspaces)
 
 	// Delete the GitHub token cache under the config dir if one is present:
 	// wallfacer holds no GitHub credential, so the files are unread secrets.
@@ -302,95 +268,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	h.SetAgentSession(p)
 	r.SetAgentSession(p)
 
-	reg.Gauge(
-		"wallfacer_tasks_total",
-		"Number of tasks grouped by status and archived flag.",
-		func() []metrics.LabeledValue {
-			active, ok := wsMgr.Store()
-			if !ok {
-				return nil
-			}
-			tasks, err := active.ListTasks(context.Background(), true)
-			if err != nil {
-				return nil
-			}
-			type key struct{ status, archived string }
-			counts := make(map[key]int)
-			for _, t := range tasks {
-				counts[key{string(t.Status), fmt.Sprintf("%v", t.Archived)}]++
-			}
-			vals := make([]metrics.LabeledValue, 0, len(counts))
-			for k, n := range counts {
-				vals = append(vals, metrics.LabeledValue{
-					Labels: map[string]string{"status": k.status, "archived": k.archived},
-					Value:  float64(n),
-				})
-			}
-			return vals
-		},
-	)
-	reg.Gauge(
-		"wallfacer_running_containers",
-		"Number of wallfacer sandbox containers currently tracked by the container runtime.",
-		func() []metrics.LabeledValue {
-			containers, err := r.ListContainers()
-			if err != nil {
-				return []metrics.LabeledValue{{Value: 0}}
-			}
-			return []metrics.LabeledValue{{Value: float64(len(containers))}}
-		},
-	)
-	reg.Gauge(
-		"wallfacer_background_goroutines",
-		"Number of outstanding background goroutines tracked by the runner.",
-		func() []metrics.LabeledValue {
-			return []metrics.LabeledValue{{Value: float64(len(r.PendingGoroutines()))}}
-		},
-	)
-	reg.Gauge(
-		"wallfacer_store_subscribers",
-		"Number of active SSE subscribers listening for task state changes.",
-		func() []metrics.LabeledValue {
-			active, ok := wsMgr.Store()
-			if !ok {
-				return []metrics.LabeledValue{{Value: 0}}
-			}
-			return []metrics.LabeledValue{{Value: float64(active.SubscriberCount())}}
-		},
-	)
-	reg.Gauge(
-		"wallfacer_failed_tasks_by_category",
-		"Number of currently-failed (non-archived) tasks grouped by failure_category.",
-		func() []metrics.LabeledValue {
-			active, ok := wsMgr.Store()
-			if !ok {
-				return nil
-			}
-			tasks, err := active.ListTasks(context.Background(), false)
-			if err != nil {
-				return nil
-			}
-			counts := make(map[string]int)
-			for _, t := range tasks {
-				if t.Status == store.TaskStatusFailed {
-					cat := string(t.FailureCategory)
-					if cat == "" {
-						cat = "unknown"
-					}
-					counts[cat]++
-				}
-			}
-			vals := make([]metrics.LabeledValue, 0, len(counts))
-			for cat, n := range counts {
-				vals = append(vals, metrics.LabeledValue{
-					Labels: map[string]string{"category": cat},
-					Value:  float64(n),
-				})
-			}
-			return vals
-		},
-	)
-
 	// Bind the listening socket. If the requested port is taken (e.g. another
 	// wallfacer instance), fall back to an OS-assigned free port so the server
 	// still starts rather than failing outright. An address that does not
@@ -412,21 +289,13 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist)
+	mux := BuildMux(h, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, vueDist)
 
-	// Middleware stack (outermost first): otel → logging → CSRF → server key
-	// → mux.
+	// Middleware stack (outermost first): logging → CSRF → server key → mux.
 	var srvHandler http.Handler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
-	// otel.Handler is the outermost wrapper: it starts the server span, sets the
-	// X-Trace-Id response header, and records http.route from the matched
-	// ServeMux pattern. loggingMiddleware stays inside it and keeps feeding the
-	// wallfacer_* Prometheus series unchanged. It is not folded into
-	// WithMetricsHook because the hook reports a status class ("2xx") while
-	// wallfacer_http_requests_total is labeled with the exact status code, and
-	// because probes skipped for tracing must still be counted.
 	srv := &http.Server{
-		Handler:     otel.Handler(loggingMiddleware(srvHandler, reg), "wallfacer", otel.WithSkip(skipTracing)),
+		Handler:     loggingMiddleware(srvHandler),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 
@@ -438,8 +307,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		Ctx:          ctx,
 		Stop:         stop,
 		ActualPort:   actualPort,
-
-		TelemetryShutdown: telShutdown,
 	}
 }
 
@@ -459,9 +326,9 @@ func requireClaudeOrExit(envFile string) {
 }
 
 // RunServer implements the `wallfacer run` subcommand.
-// vueDist and docsFS are the embedded filesystems containing the Vue SPA
-// dist (frontend/dist) and docs/ directory tree respectively.
-func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
+// vueDist is the embedded filesystem containing the Vue SPA dist
+// (frontend/dist).
+func RunServer(configDir string, args []string, vueDist fs.FS) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", cmp.Or(os.Getenv("LOG_FORMAT"), "text"), `log output format: "text" or "json"`)
@@ -484,7 +351,7 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 		Addr:      *addr,
 		DataDir:   *dataDir,
 		EnvFile:   *envFile,
-	}, vueDist, docsFS)
+	}, vueDist)
 	defer sc.Stop()
 
 	if !*noBrowser {
@@ -626,27 +493,6 @@ func withAssetCache(next http.Handler) http.Handler {
 	})
 }
 
-// docAssetContentType maps a docs asset path to its image content type, or ""
-// if the extension is not an embeddable doc image. The whitelist doubles as an
-// access guard: only image files under docs/ are reachable via the asset route,
-// never markdown or other embedded content.
-func docAssetContentType(p string) string {
-	switch {
-	case strings.HasSuffix(p, ".png"):
-		return "image/png"
-	case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
-		return "image/jpeg"
-	case strings.HasSuffix(p, ".svg"):
-		return "image/svg+xml"
-	case strings.HasSuffix(p, ".webp"):
-		return "image/webp"
-	case strings.HasSuffix(p, ".gif"):
-		return "image/gif"
-	default:
-		return ""
-	}
-}
-
 // BuildMux constructs the HTTP request router.
 //
 // All API routes are registered from apicontract.Routes (the single source of
@@ -654,227 +500,12 @@ func docAssetContentType(p string) string {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, docsFS, vueDist fs.FS) *http.ServeMux {
+func BuildMux(h *handler.Handler, indexData IndexViewData, vueDist fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	if vueDist != nil {
 		mountVueSPA(mux, vueDist, indexData.ServerAPIKey)
 	}
-
-	// Docs API — list and serve embedded documentation.
-	//
-	// Guide reading order is derived from docs/guide/usage.md: the server
-	// parses markdown links of the form [Title](file.md) under numbered
-	// "### N." headings in the "Reading Order" section. This keeps the
-	// order in a single place (the index doc) rather than hardcoded here.
-	// parseReadingOrder extracts an ordered list of .md filenames from
-	// the "## Reading Order" section of an index document. Each link of
-	// the form [Title](file.md) under a numbered ### heading is collected
-	// in order. This is used for both guide and internals indexes.
-	type readingEntry struct {
-		name    string
-		section string // nearest preceding "### " heading; "" if none
-	}
-	parseReadingOrder := func(path string) []readingEntry {
-		var order []readingEntry
-		indexData, err := fs.ReadFile(docsFS, path)
-		if err != nil {
-			return order
-		}
-		inReadingOrder := false
-		section := ""
-		for line := range strings.SplitSeq(string(indexData), "\n") {
-			trimmed := strings.TrimSpace(line)
-			// Enter the reading order section.
-			if trimmed == "## Reading Order" {
-				inReadingOrder = true
-				continue
-			}
-			// Exit on next ## heading.
-			if inReadingOrder && strings.HasPrefix(trimmed, "## ") && trimmed != "## Reading Order" {
-				break
-			}
-			if !inReadingOrder {
-				continue
-			}
-			// A "### " heading opens a sidebar section.
-			if s, ok := strings.CutPrefix(trimmed, "### "); ok {
-				section = strings.TrimSpace(s)
-				continue
-			}
-			// Match markdown links like [Title](file.md), optionally a "- " bullet.
-			if _, after, ok := strings.Cut(trimmed, "]("); ok {
-				if target, _, ok := strings.Cut(after, ")"); ok {
-					// Only .md files in the same directory (no path separators).
-					if strings.HasSuffix(target, ".md") && !strings.Contains(target, "/") {
-						name := strings.TrimSuffix(target, ".md")
-						order = append(order, readingEntry{name: name, section: section})
-					}
-				}
-			}
-		}
-		return order
-	}
-	guideOrder := parseReadingOrder("docs/guide/usage.md")
-	internalsOrder := parseReadingOrder("docs/internals/internals.md")
-	mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, _ *http.Request) {
-		type docEntry struct {
-			Slug     string `json:"slug"`
-			Title    string `json:"title"`
-			Category string `json:"category"`
-			Section  string `json:"section,omitempty"` // sidebar sub-group within a category
-			Order    int    `json:"order"`             // 1-based reading order; 0 = unordered
-		}
-
-		// Helper: read title from first "# " line in a markdown file.
-		readTitle := func(path, fallback string) string {
-			data, _ := fs.ReadFile(docsFS, path)
-			for _, line := range strings.SplitN(string(data), "\n", 10) {
-				if title, ok := strings.CutPrefix(line, "# "); ok {
-					return title
-				}
-			}
-			return fallback
-		}
-
-		var entries []docEntry
-
-		// Guide: emit usage.md (the index page) first, then the
-		// defined reading order, then any remaining guide files.
-		firstSection := ""
-		if len(guideOrder) > 0 {
-			firstSection = guideOrder[0].section
-		}
-		if title := readTitle("docs/guide/usage.md", "User Manual"); true {
-			entries = append(entries, docEntry{Slug: "guide/usage", Title: title, Category: "guide", Section: firstSection})
-		}
-		ordered := make(map[string]bool, len(guideOrder)+1)
-		ordered["usage"] = true
-		seq := 0
-		for _, e := range guideOrder {
-			ordered[e.name] = true
-			path := "docs/guide/" + e.name + ".md"
-			if _, err := fs.ReadFile(docsFS, path); err != nil {
-				continue
-			}
-			seq++
-			slug := "guide/" + e.name
-			title := readTitle(path, e.name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Section: e.section, Order: seq})
-		}
-		// Append any guide docs not in the explicit order.
-		if dir, err := fs.ReadDir(docsFS, "docs/guide"); err == nil {
-			for _, f := range dir {
-				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
-					continue
-				}
-				name := strings.TrimSuffix(f.Name(), ".md")
-				if ordered[name] {
-					continue
-				}
-				slug := "guide/" + name
-				title := readTitle("docs/guide/"+f.Name(), name)
-				entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: 0})
-			}
-		}
-
-		// Internals: emit internals.md (the index page) first, then
-		// the defined reading order, then any remaining internals files.
-		if title := readTitle("docs/internals/internals.md", "Technical Internals"); true {
-			entries = append(entries, docEntry{Slug: "internals/internals", Title: title, Category: "internals"})
-		}
-		intOrdered := make(map[string]bool, len(internalsOrder)+1)
-		intOrdered["internals"] = true
-		intSeq := 0
-		for _, e := range internalsOrder {
-			intOrdered[e.name] = true
-			path := "docs/internals/" + e.name + ".md"
-			if _, err := fs.ReadFile(docsFS, path); err != nil {
-				continue
-			}
-			intSeq++
-			slug := "internals/" + e.name
-			title := readTitle(path, e.name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: intSeq})
-		}
-		// Append any internals docs not in the explicit order.
-		if dir, err := fs.ReadDir(docsFS, "docs/internals"); err == nil {
-			for _, f := range dir {
-				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
-					continue
-				}
-				name := strings.TrimSuffix(f.Name(), ".md")
-				if intOrdered[name] {
-					continue
-				}
-				slug := "internals/" + name
-				title := readTitle("docs/internals/"+f.Name(), name)
-				entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: 0})
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(entries); err != nil {
-			logger.Main.Debug("docs list response write failed", "error", err)
-		}
-	})
-	mux.HandleFunc("GET /api/docs/{slug...}", func(w http.ResponseWriter, r *http.Request) {
-		slug := r.PathValue("slug")
-		// Prevent path traversal.
-		if strings.Contains(slug, "..") {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		data, err := fs.ReadFile(docsFS, "docs/"+slug+".md")
-		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-		if _, err := w.Write(data); err != nil {
-			logger.Main.Debug("docs content response write failed", "error", err)
-		}
-	})
-
-	// Docs assets — serve embedded images referenced by guide markdown, e.g.
-	// ![](images/board.png). The client rewrites a doc-relative src to
-	// /api/docs-asset/<category>/<path>; only whitelisted image extensions are
-	// served, so this cannot leak markdown or other embedded files.
-	mux.HandleFunc("GET /api/docs-asset/{path...}", func(w http.ResponseWriter, r *http.Request) {
-		p := r.PathValue("path")
-		if strings.Contains(p, "..") {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		ctype := docAssetContentType(p)
-		if ctype == "" {
-			http.Error(w, "unsupported asset type", http.StatusBadRequest)
-			return
-		}
-		data, err := fs.ReadFile(docsFS, "docs/"+p)
-		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", ctype)
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		if _, err := w.Write(data); err != nil {
-			logger.Main.Debug("docs asset response write failed", "error", err)
-		}
-	})
-
-	// Docs full-text search — scans the embedded markdown body (not just
-	// titles) so the command palette can find docs by content.
-	mux.HandleFunc("GET /api/docs-search", func(w http.ResponseWriter, r *http.Request) {
-		hits := searchDocs(docsFS, r.URL.Query().Get("q"), 20)
-		if hits == nil {
-			hits = []DocSearchHit{}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(hits); err != nil {
-			logger.Main.Debug("docs search response write failed", "error", err)
-		}
-	})
 
 	// withID wraps a handler that needs a parsed task UUID from the {id} path
 	// segment, converting the UUID-accepting signature to http.HandlerFunc.
@@ -951,12 +582,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateEnvConfig": h.UpdateEnvConfig,
 		"TestSandbox":     h.TestSandbox,
 
-		// System prompt templates.
-		"ListSystemPrompts":  h.ListSystemPrompts,
-		"GetSystemPrompt":    h.GetSystemPrompt,
-		"UpdateSystemPrompt": h.UpdateSystemPrompt,
-		"DeleteSystemPrompt": h.DeleteSystemPrompt,
-
 		// File explorer.
 		"ExplorerTree":        h.ExplorerTree,
 		"ExplorerStream":      h.ExplorerStream,
@@ -1018,11 +643,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Task spans and oversight.
 		"GetTaskSpans": withID(h.GetTaskSpans),
 		"GetOversight": withID(h.GetOversight),
-
-		// OAuth authentication
-		"StartOAuth":  http.HandlerFunc(h.StartOAuth),
-		"OAuthStatus": http.HandlerFunc(h.OAuthStatus),
-		"CancelOAuth": http.HandlerFunc(h.CancelOAuth),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
@@ -1047,9 +667,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,
 		"TestSandbox":     handler.BodyLimitDefault,
-
-		// System prompt templates.
-		"UpdateSystemPrompt": handler.BodyLimitDefault,
 
 		// Workspace browser.
 		"MkdirWorkspace":  handler.BodyLimitDefault,
@@ -1098,12 +715,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		mux.Handle(route.FullPattern(), registered)
 	}
 
-	// Prometheus metrics endpoint (not an API route; excluded from the contract).
-	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-		reg.WritePrometheus(w)
-	})
-
 	return mux
 }
 
@@ -1148,52 +759,15 @@ func (w *statusResponseWriter) Flush() {
 	}
 }
 
-// skipTracing filters requests that must not produce a server span. The
-// Prometheus scrape runs on a fixed interval and would otherwise dominate trace
-// volume while saying nothing about user-visible work.
-func skipTracing(r *http.Request) bool {
-	return r.URL.Path == "/metrics"
-}
-
-// loggingMiddleware logs each HTTP request and records Prometheus metrics.
-// It uses r.Pattern (set by ServeMux in Go 1.22+) as the route label so that
-// parameterised routes like "GET /api/tasks/{id}" are collapsed to a single
-// time series. When r.Pattern is empty it falls back to r.URL.Path.
-func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
-	httpReqs := reg.Counter(
-		"wallfacer_http_requests_total",
-		"Total number of HTTP requests partitioned by method, route, and status code.",
-	)
-	httpDur := reg.Histogram(
-		"wallfacer_http_request_duration_seconds",
-		"HTTP request latency in seconds partitioned by method and route.",
-		metrics.DefaultDurationBuckets,
-	)
+// loggingMiddleware logs each HTTP request with its status and duration: API
+// requests at info level, everything else (the SPA shell and its assets) at
+// debug.
+func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
 		dur := time.Since(start)
-
-		// Use the matched pattern when available so parameterised routes are
-		// collapsed (e.g. "GET /api/tasks/{id}" rather than a unique path per task).
-		// Unmatched requests (404, e.g. write methods to unknown paths) have an
-		// empty r.Pattern; collapse them into a single sentinel series instead of
-		// the raw URL path, which would give unbounded metric label cardinality.
-		route := r.Pattern
-		if route == "" {
-			route = "<unmatched>"
-		}
-
-		httpReqs.Inc(map[string]string{
-			"method": r.Method,
-			"route":  route,
-			"status": strconv.Itoa(sw.status),
-		})
-		httpDur.Observe(map[string]string{
-			"method": r.Method,
-			"route":  route,
-		}, dur.Seconds())
 
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			logger.Handler.Info(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur.Round(time.Millisecond))

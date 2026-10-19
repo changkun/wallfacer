@@ -17,7 +17,6 @@ export const useUiStore = defineStore('ui', () => {
   // Edit. A single app-level modal reads this so any surface can raise it.
   const editWorkspaceId = ref<string | null>(null);
   const showPalette = ref(false);
-  const showSystemPrompts = ref(false);
   const showExplorer = ref(false);
   const showTrash = ref(false);
   const showArchived = ref(readShowArchived());
@@ -84,7 +83,6 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     showWorkspaces, editWorkspaceId, showPalette,
-    showSystemPrompts,
     showExplorer, showTrash, showArchived, setShowArchived,
     switchingWorkspace,
     crumbLeaf, setCrumbLeaf, clearCrumbLeaf,

@@ -9,13 +9,11 @@ import (
 	"time"
 
 	"latere.ai/x/pkg/httpjson"
-	"latere.ai/x/pkg/metrics"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/oauth"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -39,9 +37,6 @@ type Handler struct {
 	scopedDataDir string
 	envFile       string
 	startTime     time.Time
-	reg           *metrics.Registry
-
-	oauthManager *oauth.Manager
 
 	diffCache *diffCache
 	fileIndex *fileIndex
@@ -71,7 +66,7 @@ type Handler struct {
 }
 
 // NewHandler constructs a Handler with the given dependencies.
-func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces []string, reg *metrics.Registry) *Handler {
+func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces []string) *Handler {
 	wsMgr := (*workspace.Manager)(nil)
 	if r != nil {
 		wsMgr = r.WorkspaceManager()
@@ -89,15 +84,11 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		diffCache:  newDiffCache(),
 		fileIndex:  newFileIndex(),
 		startTime:  time.Now(),
-		reg:        reg,
 		sandboxTestPassed: map[harness.ID]bool{
 			harness.Claude: false,
 			harness.Codex:  false,
 		},
 	}
-	oauthMgr := oauth.NewManager()
-	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)
-	h.oauthManager = oauthMgr
 	h.cachedMaxParallel = newLazy(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		limit := constants.DefaultMaxConcurrentTasks

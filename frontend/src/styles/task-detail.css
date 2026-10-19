@@ -212,10 +212,3 @@ pre {
   display: block;
 }
 
-/* --- Editable preview (rendered markdown next to a textarea) --- */
-.editable-preview {
-  max-height: 40vh;
-  overflow-y: auto;
-  padding: 8px 10px;
-}
-

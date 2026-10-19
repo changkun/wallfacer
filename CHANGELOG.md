@@ -19,11 +19,8 @@ committed: the commit log already holds that.
 
 - OpenTelemetry Go v1.46.0, with the log modules at v0.22.0, the slog bridge at
   v0.20.1 and otelhttp at v0.71.0, past GO-2026-6615 and GO-2026-6505, and
-  `latere.ai/x/pkg` v0.90.2. pkg v0.90.2 names the service resource with
-  semantic conventions v1.43.0, the schema of this SDK; with an older schema
-  the two conflict when merged and the server disables telemetry export at start.
-  `latere.ai/x/topos` is at v0.7.0, since the earlier pin does not build
-  against pkg v0.90.2.
+  `latere.ai/x/pkg` v0.90.2. Wallfacer exports no telemetry; these modules
+  come in only as dependencies of `latere.ai/x/pkg`.
 
 ### Removed
 
@@ -115,6 +112,35 @@ committed: the commit log already holds that.
 - Keyboard shortcuts: no global key bindings, shortcuts dialog, letter keys on
   cards or in Plan, or editor tab hotkeys. The command palette opens from the
   rail; in chat, Enter sends and Shift+Enter starts a new line.
+
+- Signing the Claude and Codex CLIs in from Settings: the Harness tab has no
+  **Sign in with Claude**, **Sign in with OpenAI** or **Sign in again**
+  button, and the `/api/auth/{provider}/start`, `/api/auth/{provider}/status`
+  and `/api/auth/{provider}/cancel` routes and the `reauth_available` field of
+  `POST /api/env/test` are gone. Agents use the sign-in each CLI keeps on the
+  machine, or `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and
+  `OPENAI_API_KEY` in `~/.wallfacer/.env`, which are unchanged; a token an
+  earlier sign-in saved there keeps working.
+
+- Prompt template overrides: the `GET /api/system-prompts` and
+  `GET`, `PUT` and `DELETE /api/system-prompts/{name}` routes and the
+  `prompts_dir` field of `GET /api/config` are gone, `wallfacer doctor` no
+  longer prints a prompts directory, and every agent runs on the templates
+  built into the binary. Files under `~/.wallfacer/prompts/` stay on disk
+  unread.
+
+- The docs reader in the console: the sidebar has no **Docs** entry, the
+  command palette no longer searches the guides, the `/docs` page and the
+  `GET /api/docs`, `/api/docs/{slug...}`, `/api/docs-asset/{path...}` and
+  `/api/docs-search` routes are gone, and the binary no longer embeds the
+  `docs/` tree. The guides stay in the repository's `docs/` directory.
+
+- Metrics and telemetry export: `GET /metrics` and its `wallfacer_*`
+  Prometheus series are gone, as is the OpenTelemetry export of traces,
+  metrics and logs, so `OTEL_EXPORTER_OTLP_ENDPOINT` and the other `OTEL_*`
+  settings are ignored and responses no longer carry an `X-Trace-Id` header.
+  Logs still go to the terminal in the format `-log-format` (or `LOG_FORMAT`)
+  selects.
 
 ### Fixed
 

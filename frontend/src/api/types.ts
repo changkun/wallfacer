@@ -105,7 +105,6 @@ export interface ServerConfig {
   workspace_id?: string;
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
-  prompts_dir?: string;
   max_parallel: number;
   sandboxes: string[];
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
@@ -156,12 +155,6 @@ export interface EnvUpdatePayload {
   archived_tasks_per_page?: number;
 }
 
-export interface SystemPromptTemplate {
-  name: string;
-  has_override: boolean;
-  content: string;
-}
-
 export interface SandboxTestResponse {
   task_id: string;
   sandbox: string;
@@ -169,7 +162,6 @@ export interface SandboxTestResponse {
   last_test_result?: string;
   result?: string;
   stop_reason?: string;
-  reauth_available?: boolean;
 }
 
 export interface TaskCommit {

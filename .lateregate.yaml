@@ -7,7 +7,7 @@ cover:
   exempt:
     # The value is the reason. lateregate rejects an empty one.
     x/wallfacer: >-
-      main() wires the embedded SPA and docs into internal/cli and dispatches;
+      main() wires the embedded SPA into internal/cli and dispatches;
       the dispatch table is tested through internal/cli directly
 
 hermetic:
@@ -17,9 +17,9 @@ hermetic:
 
 golangci:
   sloglint:
-    # Request-path logs use the *Context slog variants so the otelslog bridge
-    # stamps TraceId/SpanId onto exported records. CLI-mode packages keep
-    # plain calls: they have no request trace to correlate.
+    # Request-path logs use the *Context slog variants. The rule is scoped to
+    # internal/webserver/: CLI-mode packages keep plain calls, and the bar's
+    # default would apply it to every package.
     context: scope
     request_paths: internal/webserver/
   extra:

@@ -37,7 +37,6 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Printf("Config directory:  %s\n", configDir)
 	fmt.Printf("Data directory:    %s\n", cmp.Or(os.Getenv("DATA_DIR"), filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
-	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
 	fmt.Println()
 
 	// --- Config directory ---

@@ -11,7 +11,7 @@
 //
 // Depends on [store] (task mutations and event sourcing), [workspace] (workspace
 // paths and instructions), [envconfig] (agent environment), [harness] (per-CLI
-// argv/event adapters), [constants] (timeouts and limits), [logger], [metrics],
+// argv/event adapters), [constants] (timeouts and limits), [logger],
 // [prompts] (system prompt templates), and several internal/pkg utilities:
 // [cmdexec] (git and process commands),
 // [keyedmu] (per-task locking), [trackedwg] (goroutine tracking).

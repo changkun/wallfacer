@@ -65,7 +65,7 @@ Every failed task carries a failure category, shown on the card:
 | `agent_error` | The agent itself reported failure |
 | `unknown` | Unclassified |
 
-Recurring `container_crash` failures point to a CLI or credential problem, which `wallfacer doctor` checks. `agent_error` and `timeout` call for a clearer prompt, a smaller scope, or feedback on the task. `sync_error` and `worktree_setup` failures often clear on **Retry** once the repository is back in a clean state. Failed-task counts per category are exported on `/metrics` as `wallfacer_failed_tasks_by_category`.
+Recurring `container_crash` failures point to a CLI or credential problem, which `wallfacer doctor` checks. `agent_error` and `timeout` call for a clearer prompt, a smaller scope, or feedback on the task. `sync_error` and `worktree_setup` failures often clear on **Retry** once the repository is back in a clean state.
 
 ## Creating tasks
 
@@ -121,7 +121,7 @@ The header search bar filters visible cards live by title, prompt, and tags. Use
 
 ## Command palette
 
-Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
+Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, and spec matches from the Plan tree. When a task is highlighted, state-dependent actions appear:
 
 - Backlog: **Plan** (open task-mode chat in Plan), **Start**
 - Waiting: **Resume** (with session), **Test**, **Done**, **Sync**

@@ -174,12 +174,6 @@ func (m *MockRunner) TmpDir() string { return "" }
 // EnvFile returns the configured env file path.
 func (m *MockRunner) EnvFile() string { return m.EnvFilePath }
 
-// Prompts returns a default prompts manager (empty overrides dir) so tests
-// that construct a Handler with a MockRunner don't panic calling
-// h.runner.Prompts().PromptsDir(). Override via m.PromptsFn if a test needs
-// a specific manager.
-func (m *MockRunner) Prompts() *prompts.Manager { return prompts.NewManager("") }
-
 // GenerateCommitMessage delegates to GenerateCommitMessageFn when set; the
 // default returns ("", nil) so callers hit their deterministic fallback
 // path without signaling an error.

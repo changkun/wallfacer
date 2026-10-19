@@ -46,7 +46,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 
-	h := NewHandler(s, r, t.TempDir(), nil, nil)
+	h := NewHandler(s, r, t.TempDir(), nil)
 	return h, envPath
 }
 
@@ -67,7 +67,7 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 	r := runner.NewRunner(s, runner.RunnerConfig{AgentNice: -1, EnvFile: envPath, CodexAuthPath: codexAuthDir})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	h := NewHandler(s, r, t.TempDir(), nil, nil)
+	h := NewHandler(s, r, t.TempDir(), nil)
 	return h, envPath, codexAuthDir
 }
 
@@ -636,30 +636,5 @@ func TestUpdateEnvConfig_SetTitleModel(t *testing.T) {
 	}
 	if cfg.TitleModel != model {
 		t.Errorf("TitleModel = %q; want %q", cfg.TitleModel, model)
-	}
-}
-
-func TestIsAuthError(t *testing.T) {
-	tests := []struct {
-		result, lastTestResult string
-		want                   bool
-	}{
-		{"", "pass", false},
-		{"timeout", "fail", false},
-		{"401 unauthorized", "fail", true},
-		{"", "401", true},
-		{"invalid token provided", "", true},
-		{"Error: authentication failed", "", true},
-		{"permission denied", "", true},
-		{"403 Forbidden", "fail", true},
-		{"expired_token", "", true},
-		{"invalid_api_key", "", true},
-		{"network error", "fail", false},
-	}
-	for _, tt := range tests {
-		got := isAuthError(tt.result, tt.lastTestResult)
-		if got != tt.want {
-			t.Errorf("isAuthError(%q, %q) = %v; want %v", tt.result, tt.lastTestResult, got, tt.want)
-		}
 	}
 }

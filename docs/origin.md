@@ -10,7 +10,7 @@ Work is no longer one monolithic prompt per task. A dispatch layer composes spec
 
 As the projects grew in complexity, raw task prompts became insufficient. Design specs emerged as the thinking layer between ideas and executable tasks: structured documents with lifecycle states, dependency graphs, and recursive progress tracking. An agent chat made specs conversational: explore an idea in chat, iterate on the design, break it into tasks, dispatch to the board. The same chat handles prompt refinement, editing a task's instructions in place rather than through a separate flow.
 
-The integrated development environment now includes a file explorer with editor, system prompt customization, and prompt templates, all accessible from the browser.
+The integrated development environment now includes a file explorer with an editor, accessible from the browser.
 
 The latest evolution narrows it back to a local tool: Wallfacer runs on one machine, drives the coding-agent CLIs installed there, and has no hosted service, sign-in or cloud mode behind it.
 

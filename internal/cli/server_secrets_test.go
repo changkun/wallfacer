@@ -10,7 +10,7 @@ import (
 
 func TestStartupRejectsUnavailableSecretsBeforeServing(t *testing.T) {
 	if dir := os.Getenv("WALLFACER_TEST_SECRET_STARTUP"); dir != "" {
-		sc := initServer(dir, ServerConfig{LogFormat: "text", Addr: "127.0.0.1:0", DataDir: filepath.Join(dir, "data"), EnvFile: filepath.Join(dir, ".env")}, testFS(t), testFS(t))
+		sc := initServer(dir, ServerConfig{LogFormat: "text", Addr: "127.0.0.1:0", DataDir: filepath.Join(dir, "data"), EnvFile: filepath.Join(dir, ".env")}, testFS(t))
 		defer sc.Shutdown()
 		t.Fatal("server started with unresolved credentials")
 	}

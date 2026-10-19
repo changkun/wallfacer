@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { api } from '../../api/client';
 import { useTaskStore } from '../../stores/tasks';
 import { useEnvConfig } from '../../composables/useEnvConfig';
@@ -39,18 +39,11 @@ const claudeModels = computed(() => claudeModelsFor(claudeBaseUrl.value));
 const codexModels = computed(() => codexModelsFor(openaiBaseUrl.value));
 
 const claudeTestStatus = ref('');
-const claudeTestReauth = ref(false);
 const codexTestStatus = ref('');
-const codexTestReauth = ref(false);
 const cursorTestStatus = ref('');
 const piTestStatus = ref('');
 const opencodeTestStatus = ref('');
 const saveStatus = ref('');
-
-const claudeOauthStatus = ref('');
-const codexOauthStatus = ref('');
-const claudeOauthBusy = ref(false);
-const codexOauthBusy = ref(false);
 
 // Placeholders for token fields show the masked value from /api/env.
 const oauthTokenPlaceholder = computed(() => env.value?.oauth_token || '(not set)');
@@ -76,10 +69,6 @@ const cursorHasCreds = computed(() => {
 // legacy envconfig.js "No API credentials configured" alert.
 const noCredentials = computed(() => env.value != null && !claudeHasCreds.value && !codexHasCreds.value);
 
-// OAuth sign-in buttons hide when a custom base URL is set.
-const showClaudeOauthBtn = computed(() => !claudeBaseUrl.value);
-const showCodexOauthBtn = computed(() => !openaiBaseUrl.value);
-
 function applyEnvToForm(cfg: EnvConfig | null): void {
   secretStore.value = cfg?.secret_store || 'file';
   oauthToken.value = '';
@@ -94,9 +83,7 @@ function applyEnvToForm(cfg: EnvConfig | null): void {
   codexTitleModel.value = cfg?.codex_title_model || '';
   defaultSandbox.value = cfg?.default_sandbox || '';
   claudeTestStatus.value = '';
-  claudeTestReauth.value = false;
   codexTestStatus.value = '';
-  codexTestReauth.value = false;
   cursorTestStatus.value = '';
   piTestStatus.value = '';
   opencodeTestStatus.value = '';
@@ -270,13 +257,11 @@ function summarizeTestResult(resp: SandboxTestResponse | null | undefined): stri
   return `status ${resp.status}`;
 }
 
-function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode', text: string, reauth: boolean): void {
+function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode', text: string): void {
   if (sandbox === 'claude') {
     claudeTestStatus.value = text;
-    claudeTestReauth.value = reauth;
   } else if (sandbox === 'codex') {
     codexTestStatus.value = text;
-    codexTestReauth.value = reauth;
   } else if (sandbox === 'pi') {
     piTestStatus.value = text;
   } else if (sandbox === 'opencode') {
@@ -287,127 +272,30 @@ function setTestStatus(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode
 }
 
 async function testSandbox(sandbox: 'claude' | 'codex' | 'cursor' | 'pi' | 'opencode'): Promise<void> {
-  setTestStatus(sandbox, 'Testing…', false);
+  setTestStatus(sandbox, 'Testing…');
   try {
     const resp = await api<SandboxTestResponse>('POST', '/api/env/test', buildTestPayload(sandbox));
     const text = summarizeTestResult(resp);
-    setTestStatus(sandbox, text, !!resp.reauth_available);
+    setTestStatus(sandbox, text);
     window.setTimeout(() => {
       const isFailish =
         text.includes('FAIL') ||
         text.startsWith('status failed') ||
-        text.startsWith('No response') ||
-        resp.reauth_available;
+        text.startsWith('No response');
       if (isFailish) return;
-      setTestStatus(sandbox, '', false);
+      setTestStatus(sandbox, '');
     }, 6000);
   } catch (e) {
     const msg = 'Error: ' + (e instanceof Error ? e.message : String(e));
-    setTestStatus(sandbox, msg, false);
-    window.setTimeout(() => setTestStatus(sandbox, '', false), 6000);
+    setTestStatus(sandbox, msg);
+    window.setTimeout(() => setTestStatus(sandbox, ''), 6000);
   }
-}
-
-// --- OAuth flow ---
-const oauthPollers: Record<string, number | undefined> = {};
-
-interface OAuthStartResponse {
-  authorize_url?: string;
-}
-
-interface OAuthStatusResponse {
-  state: 'pending' | 'success' | 'error';
-  error?: string;
-}
-
-function setOauthState(provider: 'claude' | 'codex', text: string, busy: boolean): void {
-  if (provider === 'claude') {
-    claudeOauthStatus.value = text;
-    claudeOauthBusy.value = busy;
-  } else {
-    codexOauthStatus.value = text;
-    codexOauthBusy.value = busy;
-  }
-}
-
-function stopOauthPolling(provider: 'claude' | 'codex', errorMessage: string): void {
-  const id = oauthPollers[provider];
-  if (id !== undefined) {
-    window.clearInterval(id);
-    oauthPollers[provider] = undefined;
-  }
-  setOauthState(provider, errorMessage, false);
-}
-
-function pollOauth(provider: 'claude' | 'codex'): void {
-  const existing = oauthPollers[provider];
-  if (existing !== undefined) {
-    window.clearInterval(existing);
-  }
-  let pollCount = 0;
-  const maxPolls = 150;
-  oauthPollers[provider] = window.setInterval(async () => {
-    pollCount++;
-    if (pollCount > maxPolls) {
-      stopOauthPolling(provider, 'Timed out waiting for authorization.');
-      return;
-    }
-    try {
-      const result = await api<OAuthStatusResponse>('GET', `/api/auth/${provider}/status`);
-      if (result.state === 'success') {
-        stopOauthPolling(provider, 'Signed in!');
-        await fetchEnv();
-        window.setTimeout(() => {
-          setOauthState(provider, '', false);
-        }, 3000);
-      } else if (result.state === 'error') {
-        stopOauthPolling(provider, result.error || 'Authorization failed.');
-      }
-    } catch {
-      // Network error — keep polling, it might recover.
-    }
-  }, 2000);
-}
-
-async function startOauthFlow(provider: 'claude' | 'codex'): Promise<void> {
-  setOauthState(provider, 'Starting...', true);
-  try {
-    const result = await api<OAuthStartResponse>('POST', `/api/auth/${provider}/start`);
-    if (!result.authorize_url) {
-      setOauthState(provider, 'Error: no authorize URL returned', false);
-      return;
-    }
-    window.open(result.authorize_url, '_blank');
-    setOauthState(provider, 'Waiting for browser...', true);
-    pollOauth(provider);
-  } catch (e) {
-    setOauthState(provider, 'Error: ' + (e instanceof Error ? e.message : String(e)), false);
-  }
-}
-
-async function cancelOauthFlow(provider: 'claude' | 'codex'): Promise<void> {
-  try {
-    await api('POST', `/api/auth/${provider}/cancel`);
-  } catch {
-    // ignore
-  }
-  stopOauthPolling(provider, 'Cancelled.');
 }
 
 // --- Mount ---
 onMounted(async () => {
   await fetchEnv();
   applyEnvToForm(env.value);
-});
-
-onUnmounted(() => {
-  for (const provider of ['claude', 'codex'] as const) {
-    const id = oauthPollers[provider];
-    if (id !== undefined) {
-      window.clearInterval(id);
-      oauthPollers[provider] = undefined;
-    }
-  }
 });
 
 function capitalize(s: string): string {
@@ -434,7 +322,7 @@ const defaultSandboxOptions = computed(() => [
 
   <div v-if="noCredentials" class="set-notice" data-settings-tab="sandbox">
     <strong>No API credentials configured.</strong>
-    Sign in below or enter a Claude OAuth token / Anthropic API key (or an OpenAI key for Codex) to start running tasks.
+    Enter a Claude OAuth token or Anthropic API key (or an OpenAI key for Codex) below to start running tasks, or sign in with the agent's own CLI on this machine.
   </div>
 
   <div class="card compact">
@@ -457,17 +345,8 @@ const defaultSandboxOptions = computed(() => [
           <input id="env-oauth-token" v-model="oauthToken" type="password" class="field mono" :placeholder="oauthTokenPlaceholder" autocomplete="off" />
         </div>
       </div>
-      <div class="set-row">
-        <div class="set-row__main">
-          <span id="claude-oauth-status" class="set-row__help">
-            {{ claudeOauthStatus }}
-            <a v-if="claudeOauthBusy && claudeOauthStatus.startsWith('Waiting')" href="#" class="set-link" @click.prevent="cancelOauthFlow('claude')">Cancel</a>
-          </span>
-          <span v-if="!claudeHasCreds" id="claude-no-creds-hint" class="set-status set-status--warn">No token configured, sign in to get started</span>
-        </div>
-        <div class="set-row__end">
-          <button v-if="showClaudeOauthBtn" id="claude-oauth-signin-btn" type="button" class="btn sm" :class="{ ghost: claudeHasCreds }" :disabled="claudeOauthBusy" @click="startOauthFlow('claude')">Sign in with Claude</button>
-        </div>
+      <div v-if="!claudeHasCreds" class="set-row">
+        <span id="claude-no-creds-hint" class="set-status set-status--warn">No token configured, add one or sign in with <code>claude</code> on this machine</span>
       </div>
       <div class="set-row set-row--stack">
         <div class="set-row__main">
@@ -511,10 +390,7 @@ const defaultSandboxOptions = computed(() => [
     </div>
     <div class="card-foot">
       <button type="button" class="btn sm ghost" @click="testSandbox('claude')">Test</button>
-      <span id="env-claude-test-status" class="set-status">
-        {{ claudeTestStatus }}
-        <button v-if="claudeTestReauth" type="button" class="btn sm ghost" @click="startOauthFlow('claude')">Sign in again</button>
-      </span>
+      <span id="env-claude-test-status" class="set-status">{{ claudeTestStatus }}</span>
     </div>
   </div>
 
@@ -531,17 +407,8 @@ const defaultSandboxOptions = computed(() => [
           <input id="env-openai-api-key" v-model="openaiApiKey" type="password" class="field mono" :placeholder="openaiApiKeyPlaceholder" autocomplete="off" />
         </div>
       </div>
-      <div class="set-row">
-        <div class="set-row__main">
-          <span id="codex-oauth-status" class="set-row__help">
-            {{ codexOauthStatus }}
-            <a v-if="codexOauthBusy && codexOauthStatus.startsWith('Waiting')" href="#" class="set-link" @click.prevent="cancelOauthFlow('codex')">Cancel</a>
-          </span>
-          <span v-if="!codexHasCreds" id="codex-no-creds-hint" class="set-status set-status--warn">No API key configured, sign in to get started</span>
-        </div>
-        <div class="set-row__end">
-          <button v-if="showCodexOauthBtn" id="codex-oauth-signin-btn" type="button" class="btn sm" :class="{ ghost: codexHasCreds }" :disabled="codexOauthBusy" @click="startOauthFlow('codex')">Sign in with OpenAI</button>
-        </div>
+      <div v-if="!codexHasCreds" class="set-row">
+        <span id="codex-no-creds-hint" class="set-status set-status--warn">No API key configured, add one or sign in with <code>codex</code> on this machine</span>
       </div>
       <div class="set-row set-row--stack">
         <div class="set-row__main">
@@ -576,10 +443,7 @@ const defaultSandboxOptions = computed(() => [
     </div>
     <div class="card-foot">
       <button type="button" class="btn sm ghost" @click="testSandbox('codex')">Test</button>
-      <span id="env-codex-test-status" class="set-status">
-        {{ codexTestStatus }}
-        <button v-if="codexTestReauth" type="button" class="btn sm ghost" @click="startOauthFlow('codex')">Sign in again</button>
-      </span>
+      <span id="env-codex-test-status" class="set-status">{{ codexTestStatus }}</span>
     </div>
   </div>
 

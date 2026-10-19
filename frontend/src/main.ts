@@ -24,7 +24,6 @@ import './styles/command-palette.css';
 import './styles/workspace-picker.css';
 import './styles/explorer.css';
 import './styles/spec-mode.css';
-import './styles/docs.css';
 import './styles/syntax.css';
 import './styles/utilities.css';
 import './styles/scroll-fade.css';

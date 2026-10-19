@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 87,
+  "route_count": 80,
   "routes": [
     {
       "method": "GET",
@@ -353,42 +353,6 @@
       "description": "Test sandbox configuration by running a lightweight probe task.",
       "tags": [
         "env"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/system-prompts",
-      "name": "ListSystemPrompts",
-      "description": "List all built-in system prompt templates with override status and content.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "GetSystemPrompt",
-      "description": "Get a single built-in system prompt template by name.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "PUT",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "UpdateSystemPrompt",
-      "description": "Write a user override for a built-in system prompt template; validates the template before writing.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "DELETE",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "DeleteSystemPrompt",
-      "description": "Remove the user override for a built-in system prompt template, restoring the embedded default.",
-      "tags": [
-        "system-prompts"
       ]
     },
     {
@@ -764,33 +728,6 @@
       "description": "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
       "tags": [
         "explorer"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/auth/{provider}/start",
-      "name": "StartOAuth",
-      "description": "Start an OAuth authorization flow for the given provider (claude or codex).",
-      "tags": [
-        "auth"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/auth/{provider}/status",
-      "name": "OAuthStatus",
-      "description": "Poll the current status of an OAuth flow for the given provider.",
-      "tags": [
-        "auth"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/auth/{provider}/cancel",
-      "name": "CancelOAuth",
-      "description": "Cancel an in-progress OAuth flow for the given provider.",
-      "tags": [
-        "auth"
       ]
     }
   ]
