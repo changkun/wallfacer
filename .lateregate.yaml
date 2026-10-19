@@ -50,13 +50,12 @@ waive:
     until: 2026-10-31
   tempdir:
     reason: >-
-      the suite leaves entries under TMPDIR from three shapes of leak, each
-      of which is its own fix: os.MkdirTemp store dirs in env_test,
-      git_test and tasks_autoimplement_metrics_test (t.TempDir is the
-      replacement, applied already to stream_test and the worktree tests);
-      t.TempDir directories recreated after the test returned by the
-      auto-tester goroutine, which outlives its tests; and cursor-agent-logs, written by the cursor harness process
-      under TMPDIR rather than under the task
+      the suite leaves entries under TMPDIR from two shapes of leak, each of
+      which is its own fix: os.MkdirTemp store dirs in the handler and runner
+      tests (env_test, git_test, config_test, the store race tests and
+      others; t.TempDir is the replacement, applied already to stream_test
+      and the worktree tests); and cursor-agent-logs, written by the cursor
+      harness process under TMPDIR rather than under the task
     until: 2026-10-31
   cover:
     reason: >-
