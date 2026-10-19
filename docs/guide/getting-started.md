@@ -34,7 +34,7 @@ The doctor prints the config paths, checks that `~/.wallfacer/.env` exists, veri
 
 Wallfacer reads credentials from `~/.wallfacer/.env`. The file is created with a commented template on the first run; edit it directly or use **Settings > Harness** in the UI.
 
-A Claude credential is required for tasks to run. Set one of:
+Claude tasks run on the sign-in of the `claude` CLI on the machine. To run them on another account or on an API key instead, set one of:
 
 - `CLAUDE_CODE_OAUTH_TOKEN`: an OAuth token from `claude setup-token` (Claude Pro/Max subscription). Takes precedence when both are set.
 - `ANTHROPIC_API_KEY`: an API key from console.anthropic.com.
