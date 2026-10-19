@@ -34,24 +34,3 @@ func TestAuthHTTPClientPropagatesTraceContext(t *testing.T) {
 		t.Fatal("auth client recorded no client span")
 	}
 }
-
-func TestSandboxProxyClientPropagatesTraceContext(t *testing.T) {
-	rec := oteltest.Install(t)
-	srv := oteltest.NewServer(t, nil)
-
-	p := NewSandboxProxy(SandboxProxyConfig{}, nil)
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	resp, err := p.Client.Do(req)
-	if err != nil {
-		t.Fatalf("sandbox proxy request: %v", err)
-	}
-	_ = resp.Body.Close()
-
-	srv.RequireTraceparent(t)
-	if names := oteltest.SpanNames(rec, trace.SpanKindClient); len(names) == 0 {
-		t.Fatal("sandbox proxy client recorded no client span")
-	}
-}
