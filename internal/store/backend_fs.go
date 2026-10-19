@@ -50,6 +50,7 @@ func (b *FilesystemBackend) LoadAll() ([]*Task, error) {
 	}
 
 	var tasks []*Task
+	routines := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -87,6 +88,10 @@ func (b *FilesystemBackend) LoadAll() ([]*Task, error) {
 			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
+		if task.Kind == routineKind {
+			routines++
+			continue
+		}
 
 		// Persist migrated task back to disk so future loads skip migration.
 		if changed {
@@ -97,8 +102,18 @@ func (b *FilesystemBackend) LoadAll() ([]*Task, error) {
 
 		tasks = append(tasks, &task)
 	}
+	if routines > 0 {
+		logger.Store.Warn("routine cards are no longer read; their files stay on disk",
+			"count", routines, "dir", b.dir)
+	}
 	return tasks, nil
 }
+
+// routineKind is the kind a stored routine card carries. Wallfacer has no
+// routines: LoadAll leaves these records on disk unread and unrewritten, so a
+// schedule template never loads as an ordinary backlog task that the
+// auto-promoter would run.
+const routineKind TaskKind = "routine"
 
 // SaveTask atomically writes a task's metadata to its task.json file.
 func (b *FilesystemBackend) SaveTask(t *Task) error {

@@ -15,7 +15,6 @@ import (
 	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/metrics"
-	"latere.ai/x/pkg/routine"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/constants"
@@ -216,12 +215,6 @@ type Handler struct {
 
 	agentSession    *agentsession.Runtime
 	commandRegistry *agentsession.CommandRegistry
-
-	// routineEngine multiplexes per-routine scheduled fires. Nil until
-	// StartRoutineEngine runs at server start; guarded by routineMu so
-	// tests that reinitialize the engine don't race with reconcile calls.
-	routineMu     sync.Mutex
-	routineEngine *routine.Engine
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[harness.ID]bool

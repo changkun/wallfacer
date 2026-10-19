@@ -50,7 +50,7 @@ For wallfacer's slice of the latere.ai family identity shape (the `wallfacer-san
 
 [Automation](automation.md)
 
-Background watchers, the autoimplement promotion loop, auto-test, auto-review, auto-submit, auto-retry, circuit breakers, routine scheduling, and startup sequence.
+Background watchers, the autoimplement promotion loop, auto-test, auto-review, auto-submit, auto-retry, circuit breakers, and startup sequence.
 
 ### 8. Agent Graph Runtime
 

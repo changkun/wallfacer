@@ -130,7 +130,6 @@ type TaskKind string
 const (
 	TaskKindTask     TaskKind = ""         // default; regular implementation task
 	TaskKindPlanning TaskKind = "planning" // spec planning session task
-	TaskKindRoutine  TaskKind = "routine"  // scheduler template; spawns instance tasks on its interval
 )
 
 // SandboxActivity identifies which phase of a task a container run belongs to.
@@ -342,7 +341,7 @@ type Task struct {
 	// CustomFailPatterns are checked first; a match returns "fail" immediately.
 	CustomFailPatterns []string `json:"custom_fail_patterns,omitempty"`
 
-	// Kind identifies the execution mode (e.g. TaskKindTask, TaskKindRoutine).
+	// Kind identifies the execution mode (e.g. TaskKindTask, TaskKindPlanning).
 	// Empty string and "task" are equivalent: a standard implementation task.
 	Kind TaskKind `json:"kind,omitempty"`
 
@@ -355,7 +354,7 @@ type Task struct {
 	FlowID string `json:"flow_id,omitempty"`
 
 	// Tags are labels attached to a task for categorization (e.g.
-	// "spawned-by:<routine-id>" for tasks created by a routine).
+	// "priority:high").
 	Tags []string `json:"tags,omitempty"`
 
 	// SpecSourcePath is the relative path of the spec file this task was
@@ -402,32 +401,6 @@ type Task struct {
 	// LastFetchErrorAt is when the last fetch failure was recorded.
 	LastFetchErrorAt *time.Time `json:"last_fetch_error_at,omitempty"`
 
-	// Routine fields — only set when Kind == TaskKindRoutine. A routine card is
-	// a schedule template, not an executable task; the routine engine fires it
-	// at RoutineNextRun and spawns a fresh ordinary task with the routine's
-	// prompt.
-
-	// RoutineIntervalSeconds is the fixed interval between scheduled fires.
-	// Zero means the routine is paused. Must be >= 60 when set via the API.
-	RoutineIntervalSeconds int `json:"routine_interval_seconds,omitempty"`
-	// RoutineEnabled toggles the schedule without discarding the interval, so
-	// users can pause and resume a routine without re-entering its config.
-	RoutineEnabled bool `json:"routine_enabled,omitempty"`
-	// RoutineNextRun is the next scheduled fire time. Written by the handler
-	// whenever the engine re-arms; displayed in the UI as a countdown. Nil
-	// when the routine is disabled or paused.
-	RoutineNextRun *time.Time `json:"routine_next_run,omitempty"`
-	// RoutineLastFiredAt records when the routine most recently spawned an
-	// instance task (successful or not). Used by the UI to show "fired Xm ago".
-	RoutineLastFiredAt *time.Time `json:"routine_last_fired_at,omitempty"`
-	// RoutineSpawnKind and RoutineSpawnFlow are the task kind and the
-	// user-authored fleet a stored routine names for its instances. They are
-	// kept as record fields so stored routines load unchanged; no writer sets
-	// them and the routine engine does not read them, so every routine spawns
-	// an ordinary task.
-	RoutineSpawnKind TaskKind `json:"routine_spawn_kind,omitempty"`
-	RoutineSpawnFlow string   `json:"routine_spawn_flow,omitempty"`
-
 	// Review verdict fields, set when a review session finishes (auto-review
 	// or the manual /api/tasks/{id}/review trigger) and cleared on resume.
 	// nil ReviewUnresolved means no review has finished since the last turn.
@@ -458,13 +431,6 @@ func (t *Task) EffectiveModel() string {
 		return *t.ModelOverride
 	}
 	return t.Model
-}
-
-// IsRoutine reports whether the task is a routine schedule template.
-// Routine cards live outside the normal lifecycle — they stay in backlog
-// forever and are filtered out of autoimplement, archiving, and dep-graph walks.
-func (t *Task) IsRoutine() bool {
-	return t.Kind == TaskKindRoutine
 }
 
 // cloneRefinementSessionSlice deep-copies a []RefinementSession, duplicating

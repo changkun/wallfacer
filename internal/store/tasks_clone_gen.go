@@ -43,6 +43,14 @@ func deepCloneTask(t *Task) Task {
 		result := *t.Result
 		cp.Result = &result
 	}
+	if t.Trace != nil {
+		trace := *t.Trace
+		cp.Trace = &trace
+	}
+	if t.Lineage != nil {
+		lineage := *t.Lineage
+		cp.Lineage = &lineage
+	}
 	if t.StopReason != nil {
 		stopReason := *t.StopReason
 		cp.StopReason = &stopReason
@@ -67,13 +75,9 @@ func deepCloneTask(t *Task) Task {
 		lastFetchErrorAt := *t.LastFetchErrorAt
 		cp.LastFetchErrorAt = &lastFetchErrorAt
 	}
-	if t.RoutineNextRun != nil {
-		routineNextRun := *t.RoutineNextRun
-		cp.RoutineNextRun = &routineNextRun
-	}
-	if t.RoutineLastFiredAt != nil {
-		routineLastFiredAt := *t.RoutineLastFiredAt
-		cp.RoutineLastFiredAt = &routineLastFiredAt
+	if t.ReviewUnresolved != nil {
+		reviewUnresolved := *t.ReviewUnresolved
+		cp.ReviewUnresolved = &reviewUnresolved
 	}
 
 	return cp

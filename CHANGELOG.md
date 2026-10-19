@@ -69,6 +69,12 @@ committed: the commit log already holds that.
   be seen is published by pushing it to a repository on the Latere platform,
   whose Apps capability builds and hosts it.
 
+- Routines: the console has no Routines page, routine card controls or
+  Schedule toggle in the composer, and the `/api/routines` routes are gone. A
+  saved routine card stays on disk unread, with one warning at startup naming
+  how many there are; tasks a routine already spawned stay on the board as
+  ordinary tasks. A one-time scheduled start for a backlog task is unchanged.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when

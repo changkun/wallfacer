@@ -62,10 +62,7 @@ Click **+ New Task** in the Backlog header, or press **n** anywhere on the board
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
 - **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), a **Depends on** picker, and a harness override.
 
-Two toggles sit on the action row:
-
-- **Batch mode** splits the prompt on blank lines and creates one task per section in a single atomic call. The underlying `POST /api/tasks/batch` endpoint also supports symbolic dependency wiring: each task may carry a `ref` name, and `depends_on_refs` entries name those refs or existing task UUIDs. Cycles are rejected before anything is created.
-- **Schedule** does not create a one-shot task: it creates a recurring [routine](routines.md) with the given interval.
+**Batch mode** on the action row splits the prompt on blank lines and creates one task per section in a single atomic call. The underlying `POST /api/tasks/batch` endpoint also supports symbolic dependency wiring: each task may carry a `ref` name, and `depends_on_refs` entries name those refs or existing task UUIDs. Cycles are rejected before anything is created.
 
 Every task carries a short **Title** (auto-generated after creation, or set manually) and the full **Prompt**.
 
@@ -107,7 +104,7 @@ Backlog cards show a dependency badge: amber **blocked** with the unmet count, g
 
 ## Scheduled tasks
 
-Set **Schedule start** in the backlog Edit panel to defer a task to a future date and time. The auto-promoter skips it until the time arrives (a precise one-shot timer fires within milliseconds of the due time), then treats it like any other backlog task. The card shows a relative indicator such as `in 3h` until then. Recurring work belongs in [Routines](routines.md) instead.
+Set **Schedule start** in the backlog Edit panel to defer a task to a future date and time. The auto-promoter skips it until the time arrives (a precise one-shot timer fires within milliseconds of the due time), then treats it like any other backlog task. The card shows a relative indicator such as `in 3h` until then.
 
 ## Search and filtering
 

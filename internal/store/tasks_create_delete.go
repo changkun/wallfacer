@@ -52,16 +52,6 @@ type TaskCreateOptions struct {
 	CustomPassPatterns []string
 	CustomFailPatterns []string
 
-	// Routine fields — only meaningful when Kind == TaskKindRoutine. Ignored
-	// for any other Kind.
-	RoutineIntervalSeconds int
-	RoutineEnabled         bool
-	// RoutineSpawnKind and RoutineSpawnFlow set the record fields of the
-	// same names, which the routine engine does not read. No handler sets
-	// them; they let a caller build a routine record that carries them.
-	RoutineSpawnKind TaskKind
-	RoutineSpawnFlow string
-
 	// Principal / org attribution. Empty on anonymous / local calls;
 	// populated at the handler boundary from auth.PrincipalFromContext.
 	CreatedBy string
@@ -160,16 +150,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	// strings) remain empty and JSON round-trips via omitempty.
 	task.CreatedBy = opts.CreatedBy
 	task.OrgID = opts.OrgID
-
-	// Routine fields: only persisted when the kind matches so a misuse of
-	// the options struct for a non-routine task doesn't accidentally set
-	// schedule metadata that the engine would then try to act on.
-	if opts.Kind == TaskKindRoutine {
-		task.RoutineIntervalSeconds = opts.RoutineIntervalSeconds
-		task.RoutineEnabled = opts.RoutineEnabled
-		task.RoutineSpawnKind = opts.RoutineSpawnKind
-		task.RoutineSpawnFlow = opts.RoutineSpawnFlow
-	}
 
 	// Build the search index entry before acquiring the lock.  Position is not
 	// a search-indexed field, so the entry is fully accurate even though

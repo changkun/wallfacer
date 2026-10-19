@@ -22,7 +22,7 @@ graph TB
         Handler["Handler<br/>REST API + SSE"]
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
-        Automation["Automation Loops<br/>promote / test / review / submit<br/>sync / retry / routines"]
+        Automation["Automation Loops<br/>promote / test / review / submit<br/>sync / retry"]
         Plan["Plan Mode<br/>spec tree + agent session<br/>dispatch + undo"]
 
         Handler --> Runner
@@ -54,7 +54,7 @@ graph TB
 
 **Activity-routed harness + model.** Different activities (implementation, testing, oversight, title, commit-msg) can route to different harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`, or in-process `topos`) and models, so cheap operations use smaller models. Routing selects a CLI and model, not an image.
 
-**Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds). Scheduled work runs through the routine engine.
+**Automation with guardrails.** Background loops handle promotion, testing, submission, sync, and retry, each with explicit controls (toggles, budgets, thresholds).
 
 ### Recent migrations
 
@@ -94,7 +94,7 @@ flowchart TD
 
 ## Background Automation
 
-Seven long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go`). Scheduled work, including recurring idea generation, is not a watcher; it is a routine fired by the routine engine (recurring ideation is an ordinary routine tagged `system:ideation`, not a distinct engine).
+Six long-lived watchers run, each as a single goroutine started in `RunServer` (`internal/cli/server.go`).
 
 ```mermaid
 flowchart LR
@@ -106,10 +106,9 @@ flowchart LR
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
     PubSub --> Review["Auto-review<br/>a second model reviews<br/>waiting tasks with a worktree<br/>(supersedes auto-test when on)"]
-    PubSub --> Routines["Routine engine<br/>fire scheduled routines<br/>(user-defined)<br/>spawn ordinary tasks"]
 ```
 
-The seven entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`. There is no auto-refiner.
+The six entry points are `StartAutoPromoter`, `StartAutoRetrier`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`. There is no auto-refiner.
 
 ### Agent roles and the dispatch layer
 
@@ -264,7 +263,7 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedwg.WaitGroup`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), and worktree sync (`SyncWorktreesBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
-The seven automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartRoutineEngine`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
+The six automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartWaitingSyncWatcher`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoReview`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
 
 ### Pub/sub channels
 
@@ -363,7 +362,7 @@ Shared utility packages under `internal/pkg/`:
 | `pkg/pty` | PTY allocation for the WebSocket terminal on macOS and Linux; every call fails on Windows | `Open()`, `StartWithSize()`, `Setsize()` |
 | `pkg/sse` | Server-Sent Events writer for `http.ResponseWriter` | `Writer`, `NewWriter()`, `Writer.Event()`, `Writer.JSON()`, `Writer.Heartbeat()` |
 
-General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, git operations (`gitutil`), the Prometheus-compatible metrics registry (`metrics`) and the routine scheduler engine (`routine`), come from the `latere.ai/x/pkg` module.
+General-purpose helpers shared with other latere.ai services, such as atomic file writes, JSON request and response helpers, caches, circuit breakers, state machines, DAG operations, git operations (`gitutil`), and the Prometheus-compatible metrics registry (`metrics`), come from the `latere.ai/x/pkg` module.
 
 ## Handler Organization
 
@@ -375,8 +374,6 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
 | `principal.go` | Request principal plumbing used by auth/cloud middleware |, (internal) |
 | `force_login.go` | Force-login gate applied in cloud mode (`Handler.ForceLogin`) |, (internal) |
-| `routines.go` | Routine card CRUD (list, create, update schedule, trigger) | `GET/POST /api/routines`, `PATCH /api/routines/{id}/schedule`, `POST /api/routines/{id}/trigger` |
-| `routines_engine.go` | Scheduler loop that fires routine tasks (user-defined) on their cadence | `StartRoutineEngine()` (internal loop) |
 | `orgs.go` | Organization listing and switching for cloud-mode principals | `GET /api/me`, `GET /api/auth/orgs`, `PATCH /api/auth/me` |
 | `login.go` | Cloud sign-in flow handler | `GET /login`, `GET /callback`, `GET /logout`, `GET /logout/notify` |
 | `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |

@@ -125,6 +125,68 @@ func TestFilesystemBackend_LoadAll_SkipsOrphanDirQuietly(t *testing.T) {
 	}
 }
 
+// TestFilesystemBackend_LoadAll_LeavesRoutineCardsUnread writes two routine
+// cards in an older schema, which migrateTaskJSON would otherwise rewrite,
+// next to an ordinary task. LoadAll returns only the ordinary task, warns
+// once with the count, and leaves both routine files byte-for-byte unchanged.
+func TestFilesystemBackend_LoadAll_LeavesRoutineCardsUnread(t *testing.T) {
+	b := newTestBackend(t)
+
+	valid := &Task{
+		ID:            uuid.New(),
+		Prompt:        "valid",
+		Status:        TaskStatusBacklog,
+		SchemaVersion: constants.CurrentTaskSchemaVersion,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+	if err := b.Init(valid.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SaveTask(valid); err != nil {
+		t.Fatal(err)
+	}
+
+	routines := map[uuid.UUID][]byte{}
+	for range 2 {
+		id := uuid.New()
+		raw := []byte(`{"id":"` + id.String() + `","prompt":"nightly","status":"backlog","kind":"routine",` +
+			`"routine_interval_seconds":3600,"routine_enabled":true}`)
+		if err := os.MkdirAll(filepath.Join(b.dir, id.String()), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(b.dir, id.String(), "task.json"), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		routines[id] = raw
+	}
+
+	capture := &levelCaptureHandler{}
+	orig := logger.Store
+	logger.Store = slog.New(capture)
+	t.Cleanup(func() { logger.Store = orig })
+
+	tasks, err := b.LoadAll()
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(tasks) != 1 || tasks[0].ID != valid.ID {
+		t.Fatalf("expected only the ordinary task, got %d tasks", len(tasks))
+	}
+	if got := capture.countAtLevel(slog.LevelWarn); got != 1 {
+		t.Errorf("expected exactly 1 WARN for the routine cards, got %d", got)
+	}
+	for id, want := range routines {
+		got, err := os.ReadFile(filepath.Join(b.dir, id.String(), "task.json"))
+		if err != nil {
+			t.Fatalf("read routine card %s: %v", id, err)
+		}
+		if string(got) != string(want) {
+			t.Errorf("routine card %s was rewritten:\n got %s\nwant %s", id, got, want)
+		}
+	}
+}
+
 func TestFilesystemBackend_SaveTaskLoadAll(t *testing.T) {
 	b := newTestBackend(t)
 	id := uuid.New()

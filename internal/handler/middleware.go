@@ -199,7 +199,7 @@ func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
 	case "/", "/favicon.ico", "/install", "/dashboard",
-		"/routines", "/analytics", "/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs":
+		"/analytics", "/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs":
 		return true
 	}
 	return strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/fonts/") ||

@@ -16,13 +16,24 @@ affects:
   - ui/js/render.js
 effort: large
 created: 2026-04-18
-updated: 2026-04-19
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 
 # Routine Tasks
+
+> **Removed 2026-10-19.** The maintainer asked for routines to go as part of
+> a cleanup toward a smaller, local tool. The Routines page, the routine card
+> footer, the composer's Schedule toggle, the four `/api/routines` routes,
+> the scheduler engine and the `Routine*` task fields are deleted. A stored
+> routine card (`kind: routine`) is skipped when the store loads: its file
+> stays on disk, unread and unrewritten, and the store logs one warning with
+> the count. Instance tasks a routine spawned load as ordinary tasks; their
+> `spawned-by:*` tag shows as a plain label. One-shot scheduled start
+> (`ScheduledAt`) is a separate feature and stays. The text below describes
+> what shipped before that.
 
 ## Overview
 

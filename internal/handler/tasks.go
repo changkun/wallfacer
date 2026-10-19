@@ -811,10 +811,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		newStatus := *req.Status
 
 		// Cancel is a side-effecting transition (kill container, clean
-		// worktrees, cascade to routine children) that bypasses the state
-		// machine. Intercept it before the routine guard and agent-session-lock
-		// check below so cancelling a routine card still runs its cascade,
-		// matching the old POST /api/tasks/{id}/cancel behavior.
+		// worktrees) that bypasses the state machine. Intercept it before the
+		// agent-session-lock check below, matching the old
+		// POST /api/tasks/{id}/cancel behavior.
 		if newStatus == store.TaskStatusCancelled {
 			if !cancellableStatuses[oldStatus] {
 				http.Error(w, "task cannot be cancelled in its current status", http.StatusBadRequest)
@@ -830,15 +829,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				return
 			}
 			httpjson.Write(w, http.StatusOK, updated)
-			return
-		}
-
-		// Routine cards are schedule templates, not executable work. They
-		// live outside the normal lifecycle and must stay in backlog; any
-		// attempt to move them via the generic PATCH is a programmer
-		// error on the client.
-		if task.IsRoutine() {
-			http.Error(w, "routine tasks cannot change status; use /api/routines endpoints", http.StatusUnprocessableEntity)
 			return
 		}
 

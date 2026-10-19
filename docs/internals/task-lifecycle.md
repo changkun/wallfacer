@@ -207,7 +207,7 @@ After reviewing the verdict, the user can:
 
 ## Autoimplement
 
-Seven background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, routine engine, waiting-sync, auto-tester, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
+Six background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, waiting-sync, auto-tester, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
 
 ## Board Context
 
@@ -434,6 +434,6 @@ See [Data & Storage](data-and-storage.md).
 - [Internals Index](internals.md), Overview and reading order for all internals docs
 - [Architecture](architecture.md), System design, component overview, and design decisions
 - [Data & Storage](data-and-storage.md), Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
-- [Automation](automation.md), Autoimplement, oversight generation, scheduled routines
+- [Automation](automation.md), Autoimplement, oversight generation
 - [Git Worktrees](git-worktrees.md), Worktree lifecycle, branch naming, cleanup
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

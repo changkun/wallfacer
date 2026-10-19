@@ -436,9 +436,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
-	// Ideation is now one instance of the routine primitive — its timer
-	// lives inside the scheduler engine via a system:ideation routine.
-	h.StartRoutineEngine(ctx)
 	h.StartWaitingSyncWatcher(ctx)
 	h.StartAutoTester(ctx)
 	h.StartAutoSubmitter(ctx)
@@ -1251,12 +1248,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetCoordinationStatus": h.GetCoordinationStatus,
 		"SetCoordinationOptIn":  h.SetCoordinationOptIn,
 
-		// Routines.
-		"ListRoutines":          h.ListRoutines,
-		"CreateRoutine":         h.CreateRoutine,
-		"UpdateRoutineSchedule": h.UpdateRoutineSchedule,
-		"TriggerRoutine":        h.TriggerRoutine,
-
 		// Agent session.
 		"GetAgentSessionStatus": h.GetAgentSessionStatus,
 		"StartAgentSession":     h.StartAgentSession,
@@ -1396,11 +1387,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Spec comments.
 		"SubmitSpecComment": handler.BodyLimitDefault,
-
-		// Routines.
-		"CreateRoutine":         handler.BodyLimitDefault,
-		"UpdateRoutineSchedule": handler.BodyLimitDefault,
-		"TriggerRoutine":        handler.BodyLimitDefault,
 
 		// Agent session.
 		"StartAgentSession":     handler.BodyLimitDefault,

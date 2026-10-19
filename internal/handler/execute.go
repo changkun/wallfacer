@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -383,9 +382,8 @@ var cancellableStatuses = map[store.TaskStatus]bool{
 }
 
 // applyCancel runs the full cancellation cascade for a task: kill its
-// container, clean worktrees, archive task-mode threads, and cascade to
-// routine children / disarm the parent routine. The caller must verify
-// the task is in a cancellableStatuses state. Invoked from the PATCH
+// container, clean worktrees, and archive task-mode threads. The caller must
+// verify the task is in a cancellableStatuses state. Invoked from the PATCH
 // status=cancelled path (UpdateTask).
 func (h *Handler) applyCancel(ctx context.Context, task store.Task) error {
 	if err := h.cancelTaskInternal(ctx, task); err != nil {
@@ -394,112 +392,13 @@ func (h *Handler) applyCancel(ctx context.Context, task store.Task) error {
 	if task.Status == store.TaskStatusBacklog || task.Status == store.TaskStatusWaiting {
 		h.cascadeArchiveThreadsForTask(task.ID.String())
 	}
-
-	// If this is a routine card, cascade Cancel to any still-live spawned
-	// instances so orphaned backlog/in_progress/waiting children don't
-	// keep running or clutter the board. Terminal children (done/failed/
-	// cancelled) are left alone so the user can still review results.
-	if task.IsRoutine() {
-		h.cascadeCancelRoutineChildren(ctx, task.ID)
-		// Cancelling a routine card means "stop this routine for good". Clear
-		// RoutineEnabled and drop its engine timer so the enabled flag stays
-		// consistent with the cancelled status. Otherwise the card lingers in
-		// the routines list still flagged enabled, and would silently resume
-		// spawning instances if its status were ever moved back to an active
-		// lane (Done/Failed routines intentionally keep their flag so a move
-		// back to Backlog re-arms them; an explicit Cancel does not).
-		s, ok := h.currentStore()
-		if !ok {
-			return nil
-		}
-		if err := s.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
-			logger.Handler.Warn("cancel routine: clear enabled", "routine", task.ID, "error", err)
-		}
-		h.unregisterRoutine(task.ID)
-	}
-
-	// If this is the last live instance spawned by a routine, disable the
-	// routine so it stops spawning new instances. Users expect "I cancelled
-	// the thing, now make it go away" — leaving the parent routine armed
-	// keeps creating new instances on the next tick and is confusing.
-	h.cascadeDisableRoutineIfLastLiveInstance(ctx, task)
 	return nil
-}
-
-// spawnedByRoutineID extracts the parent routine id from a task's tags,
-// returning uuid.Nil if the task is not a routine-spawned instance.
-func spawnedByRoutineID(t store.Task) uuid.UUID {
-	const prefix = "spawned-by:"
-	for _, tag := range t.Tags {
-		if after, ok := strings.CutPrefix(tag, prefix); ok {
-			if id, err := uuid.Parse(after); err == nil {
-				return id
-			}
-		}
-	}
-	return uuid.Nil
-}
-
-// cascadeDisableRoutineIfLastLiveInstance disables the parent routine card
-// when the just-cancelled instance was its last live child. "Live" here
-// means backlog, in_progress, or waiting — terminal siblings (done, failed,
-// cancelled) do not count because they can't produce more work. If the
-// routine is already disabled or itself in a stopped status, this is a
-// no-op. The engine timer is explicitly unregistered in addition to
-// flipping RoutineEnabled so the next scheduled fire is cancelled
-// synchronously rather than waiting for the 250ms reconcile settle.
-func (h *Handler) cascadeDisableRoutineIfLastLiveInstance(ctx context.Context, canceled store.Task) {
-	routineID := spawnedByRoutineID(canceled)
-	if routineID == uuid.Nil {
-		return
-	}
-	s, ok := h.currentStore()
-	if !ok {
-		return
-	}
-	routine, err := s.GetTask(ctx, routineID)
-	if err != nil || routine == nil || !routine.IsRoutine() {
-		return
-	}
-	if !routine.RoutineEnabled || isRoutineStoppedStatus(routine.Status) {
-		return
-	}
-	wantTag := "spawned-by:" + routineID.String()
-	tasks, err := s.ListTasks(ctx, false)
-	if err != nil {
-		logger.Handler.Warn("cascade disable routine: list tasks", "routine", routineID, "error", err)
-		return
-	}
-	for _, t := range tasks {
-		if t.ID == canceled.ID || t.ID == routineID {
-			continue
-		}
-		if !slices.Contains(t.Tags, wantTag) {
-			continue
-		}
-		switch t.Status {
-		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
-			return // a live sibling exists — keep the routine armed
-		}
-	}
-	if err := s.UpdateRoutineEnabled(ctx, routineID, false); err != nil {
-		logger.Handler.Warn("cascade disable routine: update", "routine", routineID, "error", err)
-		return
-	}
-	h.unregisterRoutine(routineID)
-	h.insertEventOrLog(ctx, routineID, store.EventTypeSystem, map[string]any{
-		"kind":     "routine:auto_disabled",
-		"reason":   "last_live_instance_cancelled",
-		"instance": canceled.ID.String(),
-	})
-	logger.Handler.Info("routine auto-disabled after last live instance cancelled",
-		"routine", routineID, "instance", canceled.ID)
 }
 
 // cancelTaskInternal runs the full cancel pipeline (container kill, store
 // update, event emission, worktree cleanup) without writing an HTTP response.
-// It is shared by applyCancel (the PATCH status=cancelled path) and the
-// routine-cascade path. The caller validates that task.Status is cancellable.
+// applyCancel (the PATCH status=cancelled path) calls it after validating
+// that task.Status is cancellable.
 func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error {
 	oldStatus := task.Status
 	if oldStatus == store.TaskStatusWaiting {
@@ -527,37 +426,6 @@ func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error
 		h.runner.CleanupWorktrees(task.ID, task.WorktreePaths, task.BranchName)
 	}
 	return nil
-}
-
-// cascadeCancelRoutineChildren cancels any non-terminal instance tasks spawned
-// by the given routine card (tagged `spawned-by:<routineID>`). Terminal
-// children — done, failed, cancelled — are left alone so their results remain
-// inspectable. Errors are logged but not returned; cascade is best-effort.
-func (h *Handler) cascadeCancelRoutineChildren(ctx context.Context, routineID uuid.UUID) {
-	s, ok := h.currentStore()
-	if !ok {
-		return
-	}
-	tasks, err := s.ListTasks(ctx, false)
-	if err != nil {
-		logger.Handler.Warn("cascade cancel: list tasks", "routine", routineID, "error", err)
-		return
-	}
-	wantTag := "spawned-by:" + routineID.String()
-	for _, t := range tasks {
-		if t.ID == routineID {
-			continue
-		}
-		if !slices.Contains(t.Tags, wantTag) {
-			continue
-		}
-		switch t.Status {
-		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
-			if err := h.cancelTaskInternal(ctx, t); err != nil {
-				logger.Handler.Warn("cascade cancel: cancel child", "routine", routineID, "child", t.ID, "error", err)
-			}
-		}
-	}
 }
 
 // ResumeTask resumes a failed task using its existing session.
@@ -640,9 +508,9 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 }
 
 // applyArchive flips a task's archived flag and runs the matching thread
-// cascade. Archiving (archived=true) also stops any leaked worker, halts
-// routine children, and disarms the routine card. The caller verifies the
-// task exists and (for archived=true) is in a done/cancelled status.
+// cascade. Archiving (archived=true) also stops any leaked worker. The
+// caller verifies the task exists and (for archived=true) is in a
+// done/cancelled status.
 // Invoked from the PATCH archived path (UpdateTask).
 func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bool) error {
 	if archived {
@@ -665,16 +533,6 @@ func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bo
 		"trigger": string(store.TriggerUser),
 	})
 	if archived {
-		// Archiving a routine card should also stop any still-live spawned
-		// instances that were enqueued before the unregister, and clear the
-		// enabled flag so the put-away routine can never resume firing.
-		if task.IsRoutine() {
-			h.cascadeCancelRoutineChildren(ctx, task.ID)
-			if err := s.UpdateRoutineEnabled(ctx, task.ID, false); err != nil {
-				logger.Handler.Warn("archive routine: clear enabled", "routine", task.ID, "error", err)
-			}
-			h.unregisterRoutine(task.ID)
-		}
 		h.cascadeArchiveThreadsForTask(task.ID.String())
 	} else {
 		h.cascadeUnarchiveThreadsForTask(task.ID.String())

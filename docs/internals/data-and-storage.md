@@ -45,7 +45,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `SchemaVersion` | `int` | `schema_version` | On-disk schema version (currently `2`) |
 | `ID` | `uuid.UUID` | `id` | Unique task identifier |
 | `Title` | `string` | `title` | Display title (auto-generated or user-set) |
-| `Kind` | `TaskKind` | `kind` | Execution mode. `""` for a standard task, `"routine"` for routine cards, `"planning"` for the planning task mode. A historical `"idea-agent"` value may persist on old rows; it plays no role in dispatch. |
+| `Kind` | `TaskKind` | `kind` | Execution mode. `""` for a standard task, `"planning"` for the planning task mode. A historical `"idea-agent"` value may persist on old rows; it plays no role in dispatch. Records with `"routine"` are skipped at load and stay on disk unread. |
 | `FlowID` | `string` | `flow_id` | Slug of the user-authored fleet a stored task names. Kept so stored tasks load unchanged; no writer sets it and dispatch does not read it. A run of a task whose `FlowID` is set and is not `implement` writes one `system` event of kind `fleet:removed` on its timeline (`internal/runner/removed_fleet.go`). |
 | `Tags` | `[]string` | `tags` | Labels for categorization (e.g. `"priority:1"`) |
 

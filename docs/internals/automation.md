@@ -1,6 +1,6 @@
 # Automation
 
-Wallfacer runs seven background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **RoutineEngine**, **WaitingSyncWatcher**, **AutoTester**, **AutoSubmitter**, and **AutoReview** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests or review verification, submitting results, retrying failures, syncing worktrees, firing scheduled routines, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
+Wallfacer runs six background watchers that form an autonomous pipeline: **AutoPromoter**, **AutoRetrier**, **WaitingSyncWatcher**, **AutoTester**, **AutoSubmitter**, and **AutoReview** (started in that order in `internal/cli/server.go`). Together with oversight generation and circuit breakers, these watchers let the task board operate hands-free, promoting backlog tasks, running tests or review verification, submitting results, retrying failures, syncing worktrees, and generating oversight summaries without manual intervention. Auto-push is not a watcher; it runs inside the commit pipeline (see [Auto-Push](#auto-push)).
 
 ## Background Goroutine Model
 
@@ -45,15 +45,14 @@ flowchart TD
     subgraph "Handler Watchers"
         C1["h.StartAutoPromoter(ctx)"]
         C2["h.StartAutoRetrier(ctx)"]
-        C3["h.StartRoutineEngine(ctx)"]
-        C4["h.StartWaitingSyncWatcher(ctx)"]
-        C5["h.StartAutoTester(ctx)"]
-        C6["h.StartAutoSubmitter(ctx)"]
-        C7["h.StartAutoReview(ctx)"]
+        C3["h.StartWaitingSyncWatcher(ctx)"]
+        C4["h.StartAutoTester(ctx)"]
+        C5["h.StartAutoSubmitter(ctx)"]
+        C6["h.StartAutoReview(ctx)"]
     end
 
     A1 --> A2 --> B1 --> B2 --> B3 --> B4
-    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7
+    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6
 ```
 
 ### Recovery Scans
@@ -173,7 +172,7 @@ This completes the autonomous loop: autoimplement promotes â†’ agent executes â†
 
 ## Auto-Review
 
-`StartAutoReview` is the seventh watcher. When the `review` runtime toggle is on (`PUT /api/config {"review": true}`; off by default), each tick lists the waiting tasks that have a worktree and no verdict (`ListWaitingTasksForReview`: `ReviewUnresolved == nil`) and runs one review round for each through `runReview`, which skips a task whose worktree is missing or is not a git repository (`missingTaskWorktrees`), as the auto-tester does: the diff would leave that repository out, and an approval of the rest would open the auto-submit gate unreviewed. `beginReview`/`endReview` keep one round in flight per task and at most `maxConcurrentReview` (2) across tasks; the manual `POST /api/tasks/{id}/review` takes the same slot and answers 409 while a round is in flight. A round that fails records a failure on the `auto-review` breaker, so the retry waits out its backoff (30 seconds doubling to 5 minutes), and the verdict stays unset.
+`StartAutoReview` is the sixth watcher. When the `review` runtime toggle is on (`PUT /api/config {"review": true}`; off by default), each tick lists the waiting tasks that have a worktree and no verdict (`ListWaitingTasksForReview`: `ReviewUnresolved == nil`) and runs one review round for each through `runReview`, which skips a task whose worktree is missing or is not a git repository (`missingTaskWorktrees`), as the auto-tester does: the diff would leave that repository out, and an approval of the rest would open the auto-submit gate unreviewed. `beginReview`/`endReview` keep one round in flight per task and at most `maxConcurrentReview` (2) across tasks; the manual `POST /api/tasks/{id}/review` takes the same slot and answers 409 while a round is in flight. A round that fails records a failure on the `auto-review` breaker, so the retry waits out its backoff (30 seconds doubling to 5 minutes), and the verdict stays unset.
 
 A round is `review.Reviewer.Verify` (`internal/review`) on the runner's `review` role (`internal/agents`, binding in `internal/runner/agent_bindings.go`). The role mounts nothing: the reviewer reads the task prompt, the acceptance criteria and the worktree diff (capped at `constants.MaxDiffBytes`) from the `review` prompt template, so an in-process harness runs it through `launchInProcess` like the other prompt-only roles. Its harness resolves through `SandboxActivityReview` like any role's, which by default is the task's harness; its model is `WALLFACER_REVIEW_MODEL`. `Runner.RunReviewer` refuses with a `*runner.ReviewRefusal` before launching when the reviewer model is unset or equals a model the task runs on (its pin or the env default for its harness, and the model the harness reported); the refusal is recorded as a skip, once per reason, and leaves the verdict unset, so a task gated on review stays in waiting. The reviewer answers with JSON findings (severity `high`, `medium` or `low`, a one-sentence claim, an optional location) and a verdict, `approve` or `changes_requested`; an answer that does not parse is a `*runner.ReviewOutputError` and a failed attempt.
 
@@ -210,14 +209,6 @@ Multiple workspace paths can be passed at startup (`WALLFACER_WORKSPACES`) or sw
 
 Non-git directories are supported as plain mount targets (no worktree, no commit pipeline for that workspace).
 
-## RoutineEngine
-
-`StartRoutineEngine` (`internal/handler/routines_engine.go`) drives all scheduled, fire-and-forget routines on the board. It builds a single `routine.Engine` (`latere.ai/x/pkg/routine`) and attaches it to the store change stream: every store change reconciles the engine against the current routine cards.
-
-Each routine card carries `RoutineEnabled` and `RoutineIntervalSeconds`. The reconciler maps an active, enabled card with a positive interval to a `routine.FixedInterval` schedule and registers it; cancelled, done, failed, archived, or disabled cards become `routine.Disabled()` and are dropped. When a routine's timer elapses, the engine invokes `h.fireRoutine`, which spawns a fresh ordinary task with the routine's prompt.
-
-The `routine` package is stateless about tasks and stores: it owns one `time.AfterFunc` timer per registered UUID and calls back a `FireFunc`. The handler is the only consumer and reconciles the engine via `Register` / `Unregister`. A recurring idea-generation routine is one instance of this primitive (see [Recurring idea generation](#recurring-idea-generation)).
-
 ## Oversight Generation
 
 Oversight is generated asynchronously whenever a task transitions to `waiting`, `done`, or `failed`. It is also regenerated periodically during execution if `WALLFACER_OVERSIGHT_INTERVAL > 0` (minutes).
@@ -245,9 +236,9 @@ The generator reads the task's trace events, passes them to the Claude API with 
 
 `POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
 
-## Recurring idea generation
+## Records from removed features
 
-There is no dedicated ideation watcher and no separate ideation engine. Recurring idea generation is an ordinary [RoutineEngine](#routineengine) routine tagged `system:ideation`: a routine card whose prompt asks the agent to scan the repository and create tasks. Each fire spawns a normal task that runs the built-in pipeline. Records that carry `Kind = "idea-agent"`, `FlowID = "brainstorm"`, or a routine spawn kind or flow are read as ordinary tasks and routines: dispatch does not read `FlowID`, and the routine engine does not read the spawn fields, so existing routines keep firing.
+Records that carry `Kind = "idea-agent"` or `FlowID = "brainstorm"` load as ordinary tasks; dispatch does not read `FlowID`. Routine cards (`Kind = "routine"`) are skipped at load: their files stay on disk, unread and unrewritten, and the store logs one warning with their count.
 
 ## Conflict Resolution
 

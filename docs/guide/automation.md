@@ -28,7 +28,7 @@ When capacity allows, the auto-promoter moves backlog tasks to In Progress and l
 - **Dependencies**: a task is promoted only when every task it depends on is done.
 - **Scheduled time**: a task with a future `ScheduledAt` waits; a precise one-shot timer promotes it within milliseconds of the due time.
 - **Ordering**: candidates are ranked by critical-path score (tasks that unblock the most downstream work go first), then board position, then creation time.
-- **Skips**: routine cards (driven by the routine engine, see [Routines](routines.md)) and tasks currently locked by a planning agent are never promoted.
+- **Skips**: tasks currently locked by a planning agent are never promoted.
 
 The same watcher also auto-resumes waiting tasks that carry failed-test feedback, feeding the feedback back into the session, up to a cap of 3 consecutive test failures. After the cap, the task parks until manual feedback arrives.
 
@@ -129,7 +129,6 @@ Triage guidance: transient categories usually clear themselves via auto-retry; r
 ## Related pages
 
 - [Board](board.md) for the task lifecycle these watchers drive.
-- [Routines](routines.md) for scheduled task creation, which automation deliberately ignores.
 - [Plan](plan.md) for dispatching specs into the board tasks automation picks up.
 - [Oversight](oversight.md) for timelines, verdicts, and cost attribution.
 - [Mission Control](mission-control.md) for a pipeline-wide view of specs and tasks in flight.

@@ -33,11 +33,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `PUT /api/workspaces/{id}` | Update a workspace's name, folders, or per-workspace settings; identity and DataKey unchanged |
 | `DELETE /api/workspaces/{id}` | Delete a workspace record; 409 for the active workspace |
 | `POST /api/workspaces/{id}/activate` | Switch the scoped task board to this workspace |
-| **Routines** | |
-| `GET /api/routines` | List routine cards with their schedules and next-run times |
-| `POST /api/routines` | Create a routine card that spawns instance tasks on a fixed interval |
-| `PATCH /api/routines/{id}/schedule` | Update a routine's interval or enabled flag; unset fields left unchanged |
-| `POST /api/routines/{id}/trigger` | Fire a routine immediately, bypassing the schedule; the scheduled cycle continues |
 | **Environment configuration** | |
 | `GET /api/env` | Get environment configuration (tokens masked) |
 | `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |
@@ -72,7 +67,7 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/summaries` | List immutable task summaries for completed tasks (cost dashboard) |
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
-| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, harness, dependencies, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees, cascades to routine children), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
+| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, harness, dependencies, fresh_start. Also absorbs the pure transitions: `status=cancelled` (kills the worker, discards worktrees), `archived=true`/`false` (archive/unarchive a done or cancelled task), and `deleted=false` (restore a soft-deleted task). |
 | `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
@@ -565,6 +560,6 @@ sequenceDiagram
 ## See Also
 
 - [Architecture](architecture.md): System overview, design decisions, component responsibilities, concurrency model
-- [Automation](automation.md): Autoimplement watchers, auto-retry, circuit breakers, oversight, routines
+- [Automation](automation.md): Autoimplement watchers, auto-retry, circuit breakers, oversight
 - [Task Lifecycle](task-lifecycle.md): State machine, turn loop, data models
 - [Git Worktrees](git-worktrees.md): Per-task worktree isolation and commit pipeline

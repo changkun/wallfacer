@@ -82,8 +82,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 // cancel endpoints were removed with the idea-agent subsystem; any of them
 // returning anything other than 404/405 means a handler was wired back in.
 //
-// See specs/local/remove-idea-agent-subsystem.md for the rationale —
-// brainstorming is now an ordinary scheduled routine.
+// See specs/.archive/local/remove-idea-agent-subsystem.md for the rationale.
 func TestIdeateRoutesRemoved(t *testing.T) {
 	workdir := t.TempDir()
 	worktrees := filepath.Join(workdir, "worktrees")

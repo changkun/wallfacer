@@ -18,7 +18,7 @@ The [Board](board.md) is where most day-to-day work happens. Each card is a conc
 
 ### Autopilot: automation
 
-With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. [Routines](routines.md) add a schedule, firing recurring tasks without anyone at the keyboard. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md) and [Mission Control](mission-control.md).
+With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md) and [Mission Control](mission-control.md).
 
 The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing automated task can be pulled down to manual review, debugged in the built-in terminal, and resumed with feedback.
 
@@ -60,10 +60,6 @@ Five built-in agent roles cover the task pipeline:
 
 Every task runs the same built-in pipeline: implementation, then testing, then a parallel finishing step (commit message, title, oversight). The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
 
-### Routine
-
-A routine is a scheduled card: a prompt and an interval. The routine itself stays in the backlog and is excluded from automation and archiving; each time it fires, it spawns a fresh instance task that runs the built-in pipeline. See [Routines](routines.md).
-
 ### Harness
 
 A harness is the coding CLI that executes an agent turn. Five subprocess harnesses are supported: **Claude** (default), **Codex**, **Cursor**, **OpenCode**, and **Pi**, plus the experimental in-process **Topos**. Harness selection is layered: a task-level or per-activity setting wins over the per-activity environment override, which wins over the global default, which falls back to Claude. Credentials and routing are covered in [Configuration](configuration.md#harness-tab).
@@ -99,6 +95,6 @@ The value of the spectrum is spending attention where it matters and delegating 
 
 - [Getting Started](getting-started.md): installation and the first task
 - [Board](board.md), [Chat](chat.md), [Plan](plan.md): the three main working surfaces
-- [Automation](automation.md) and [Routines](routines.md): the autopilot level
+- [Automation](automation.md): the autopilot level
 - [Configuration](configuration.md): settings, environment variables, shortcuts
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

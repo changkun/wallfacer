@@ -285,12 +285,6 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					}
 					for i := range backlogTasks {
 						t := &backlogTasks[i]
-						// Skip task-kinds that the auto-promoter must not touch:
-						// routine cards are schedule templates driven by the
-						// routine engine rather than the board lifecycle.
-						if t.IsRoutine() {
-							continue
-						}
 						if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
 							h.incAutoimplementAction("auto_promoter", "skipped_scheduled")
 							if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
