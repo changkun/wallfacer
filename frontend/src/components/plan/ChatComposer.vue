@@ -2,8 +2,7 @@
 // ChatComposer — the message input. Self-contained: owns its draft text,
 // send-mode preference, and slash/mention autocomplete. Emits `send(text)` and
 // `interrupt()` so it stays decoupled from where it's mounted. The `variant`
-// prop sizes it for the entry-screen hero, the docked conversation, the legacy
-// panel, or the compact spec popup.
+// prop sizes it for the Plan chat panel or the compact chat popup.
 import { ref, computed, watch, watchEffect } from 'vue';
 import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
 import { useTaskStore } from '../../stores/tasks';
@@ -12,7 +11,7 @@ import HarnessSelect from '../HarnessSelect.vue';
 
 withDefaults(defineProps<{
   streaming: boolean;
-  variant?: 'panel' | 'hero' | 'docked' | 'compact';
+  variant?: 'panel' | 'compact';
   placeholder?: string;
 }>(), {
   variant: 'panel',

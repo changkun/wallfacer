@@ -65,7 +65,6 @@ const SURFACES = {
   },
   // The plan with a spec focused, so the three panes carry content.
   plan: { route: '/plan?spec=specs/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
-  chat: { route: '/chat', steps: [{ wait: 900 }] },
   docs: { route: '/docs', steps: [{ wait: 800 }] },
 };
 

@@ -14,7 +14,7 @@ function metaFor(path: string): boolean {
 
 describe('routes workspace gating', () => {
   it('marks every workspace-scoped view as needsWorkspace', () => {
-    for (const path of ['/', '/chat', '/plan']) {
+    for (const path of ['/', '/plan']) {
       expect(metaFor(path), `${path} should require a workspace`).toBe(true);
     }
   });

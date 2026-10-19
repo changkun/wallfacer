@@ -94,7 +94,7 @@ graph LR
 
 Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one. Specs move through a seven-state lifecycle (`vague` to `drafted` to `validated` to `testing` to `complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
 
-Read more: [Concepts](docs/guide/concepts.md), [Plan](docs/guide/plan.md), and [Chat](docs/guide/chat.md).
+Read more: [Concepts](docs/guide/concepts.md) and [Plan](docs/guide/plan.md).
 
 ## How execution is structured
 
@@ -160,7 +160,6 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 | Guide | Topics |
 |-------|--------|
 | [Board](docs/guide/board.md) | Task board, lifecycle, dependencies, search, task detail |
-| [Chat](docs/guide/chat.md) | Chat sessions, slash commands, @mentions |
 | [Plan](docs/guide/plan.md) | Spec mode, lifecycle states, dispatch, planning chat |
 
 **Operate**

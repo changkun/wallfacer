@@ -36,7 +36,7 @@ watch(sidebarCollapsed, (v) => setStored(SIDEBAR_KEY, v ? '1' : '0'));
 // triggered from any tab (board, agents, flows, …). The dedicated Chat tab and
 // the Plan view own their own chat surface, so the global popup stands down on
 // those routes to avoid two chat sessions racing on the shared agent store.
-const CHAT_OWNING_ROUTES = ['/chat', '/plan'];
+const CHAT_OWNING_ROUTES = ['/plan'];
 const showChatPopup = computed(() =>
   !CHAT_OWNING_ROUTES.some((p) => router.currentRoute.value.path.startsWith(p)),
 );

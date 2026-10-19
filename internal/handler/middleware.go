@@ -147,8 +147,7 @@ func IsLoopbackPeer(remoteAddr string) bool {
 func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
-	case "/", "/favicon.ico",
-		"/chat", "/plan", "/settings", "/docs":
+	case "/", "/favicon.ico", "/plan", "/settings", "/docs":
 		return true
 	}
 	return strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/fonts/") ||

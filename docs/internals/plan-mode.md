@@ -373,4 +373,3 @@ These consume the two SSE streams (`/api/specs/stream` and `/api/agent/messages/
 - [Data & Storage](data-and-storage.md)
 - [API & Transport](api-and-transport.md)
 - [Plan](../guide/plan.md)
-- [Chat](../guide/chat.md)

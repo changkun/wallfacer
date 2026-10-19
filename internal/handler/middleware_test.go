@@ -188,7 +188,7 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 	}))
 	public := []string{
 		"/", "/assets/app-123.js", "/assets/app-123.css", "/fonts/ui.woff2", "/static/overview.png", "/favicon.ico",
-		"/chat", "/plan", "/settings", "/docs", "/docs/guide/start",
+		"/plan", "/settings", "/docs", "/docs/guide/start",
 	}
 	for _, target := range public {
 		for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost} {

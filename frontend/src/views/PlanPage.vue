@@ -44,9 +44,8 @@ const layout = computed<'chat-first' | 'three-pane'>(() => {
 // full-width AgentChatPanel covers the empty-workspace case.
 //
 // Gates the three-pane agent chat: the floating popup, its focused-view
-// toggle button, and the C shortcut. Set false to hide chat in Plan mode
-// (the dedicated /chat surface is unaffected); true shows the popup launcher
-// in the bottom-right. The chat-first empty-workspace onboarding is unaffected
+// toggle button, and the C shortcut. Set false to hide chat in Plan mode;
+// true shows the popup launcher in the bottom-right. The chat-first empty-workspace onboarding is unaffected
 // either way (it's the only content when there are no specs).
 const AGENT_CHAT_ENABLED = true;
 

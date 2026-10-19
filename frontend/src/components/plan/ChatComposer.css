@@ -196,10 +196,7 @@
 
 /* ── Variants ──────────────────────────────────────────────────────── */
 
-/* Hero (entry screen), docked (conversation), and panel (side/popup) share one
-   generous, framed composer so every chat surface reads identically. */
-.pcp-composer--hero,
-.pcp-composer--docked,
+/* The panel composer is one generous, framed card. */
 .pcp-composer--panel {
   border-top: none;
   padding: 12px 14px 12px;
@@ -211,15 +208,11 @@
 }
 
 /* The composer card lifts when active: an accent hairline and a soft lift. */
-.pcp-composer--hero:focus-within,
-.pcp-composer--docked:focus-within,
 .pcp-composer--panel:focus-within {
   border-color: var(--accent-line);
   box-shadow: var(--sh-2);
 }
 
-.pcp-composer--hero .pcp-textarea,
-.pcp-composer--docked .pcp-textarea,
 .pcp-composer--panel .pcp-textarea {
   font-size: 14px;
   border: none;
@@ -227,15 +220,9 @@
   padding: 6px 4px;
 }
 
-.pcp-composer--hero .pcp-textarea {
-  min-height: 56px;
-}
-
-/* In the hero/docked composer the textarea is chromeless — the container owns
-   the focus glow (.pcp-composer--*:focus-within), so the inner field must drop
-   both the focus border and the focus shadow to avoid a boxed-in look. */
-.pcp-composer--hero .pcp-textarea:focus,
-.pcp-composer--docked .pcp-textarea:focus,
+/* In the panel composer the textarea is chromeless: the container owns the
+   focus glow (.pcp-composer--*:focus-within), so the inner field drops both
+   the focus border and the focus shadow to avoid a boxed-in look. */
 .pcp-composer--panel .pcp-textarea:focus {
   border: none;
   box-shadow: none;

@@ -20,7 +20,6 @@ Start here for the full reading order.
 ### Use Wallfacer
 
 - [Board](board.md). The task board: lifecycle, dependencies, batch creation, search, the task detail view.
-- [Chat](chat.md). The dedicated chat surface: sessions, slash commands, @mentions.
 - [Plan](plan.md). Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations.
 
 ### Operate

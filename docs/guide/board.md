@@ -190,7 +190,6 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 ## See also
 
 - [Plan](plan.md): author and dispatch specs that become board tasks
-- [Chat](chat.md): conversational planning with the same agent engine
 - [Automation](automation.md): watchers, retry budgets, and circuit breakers
 - [Oversight](oversight.md): summaries, usage, cost, and timing
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings

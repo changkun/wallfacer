@@ -6,7 +6,7 @@ Most AI coding tools pin work to one interaction mode: a chatbot that needs cons
 
 ### Chat: conversational exploration
 
-The [Chat](chat.md) page runs a persistent agent session against the active workspace. Describe a problem, explore trade-offs, and let the agent read code and answer questions before anything is committed to a plan. Sessions stream live, survive reloads, and can be reattached or retried. This is the entry point when the shape of the work is still unknown.
+The chat runs a persistent agent session against the active workspace, from the chat popup on any page or from [Plan](plan.md), which opens as a full chat when the workspace has no specs yet. Describe a problem, explore trade-offs, and let the agent read code and answer questions before anything is committed to a plan. Sessions stream live, survive reloads, and can be reattached or retried. This is the entry point when the shape of the work is still unknown.
 
 ### Plan: structured design
 
@@ -92,7 +92,7 @@ The value of the spectrum is spending attention where it matters and delegating 
 ## See also
 
 - [Getting Started](getting-started.md): installation and the first task
-- [Board](board.md), [Chat](chat.md), [Plan](plan.md): the three main working surfaces
+- [Board](board.md) and [Plan](plan.md): the two main working surfaces
 - [Automation](automation.md): the autopilot level
 - [Configuration](configuration.md): settings, environment variables, shortcuts
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

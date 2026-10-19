@@ -52,6 +52,19 @@ async function firstBox(page, sel) {
   return els[0] ?? null;
 }
 
+// openPopupThread opens the chat popup (if closed) and switches it to the
+// conversation named name through its session switcher.
+async function openPopupThread(page, name) {
+  if (!(await page.locator('.scp-window').isVisible())) {
+    await page.click('.scp-launcher', { timeout: 5000 });
+  }
+  await page.waitForSelector('.scp-window', { state: 'visible', timeout: 5000 });
+  if ((await page.locator('.scp-session-name').textContent()) !== name) {
+    await page.click('.scp-session-switch', { timeout: 5000 });
+    await page.click(`.scp-session-item:has-text("${name}")`, { timeout: 5000 });
+  }
+}
+
 // ---- the failure collector ------------------------------------------------
 const failures = [];
 const notes = [];
@@ -386,11 +399,13 @@ SCENES['chat-error'] = async (page) => {
     // after the message is accepted.
     const sent = await fixtureRequest(page, 'POST', '/api/agent/messages', { thread: thread.id, message: 'Exercise a failed host launch', harness: 'pi' });
     expect('chat-error', sent.status() === 202, 'test message was not accepted');
-    await page.goto(base + '/chat', { waitUntil: 'load' });
-    await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });
+    await page.goto(base + '/settings', { waitUntil: 'load' });
+    await openPopupThread(page, 'Failure surface regression');
+    await page.waitForSelector('.scp-window .pcp-bubble-error', { timeout: 8000 });
     expect('chat-error', (await page.locator('.pcp-bubble-error').textContent()).includes('could not start'), 'launch failure is not visible in chat');
     await page.reload({ waitUntil: 'load' });
-    await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });
+    await openPopupThread(page, 'Failure surface regression');
+    await page.waitForSelector('.scp-window .pcp-bubble-error', { timeout: 8000 });
     expect('chat-error', (await page.locator('.pcp-bubble-error').textContent()).includes('Settings'), 'reload lost the actionable error');
   } finally {
     await fixtureRequest(page, 'PATCH', '/api/agent/sessions/' + thread.id, { state: 'archived' });
@@ -399,28 +414,21 @@ SCENES['chat-error'] = async (page) => {
   }
 };
 
-// The chat surface (specs/shared/console-redesign/chat.md): the session list
-// and the hero composer render on /chat, the entry column stays narrow, and
-// the floating popup on another route opens inside the viewport.
-SCENES['chat'] = async (page) => {
-  await page.goto(base + '/chat', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(900);
-  const sessions = await firstBox(page, '.chat-sessions');
-  expect('chat', !!sessions, 'session list did not render');
-  const composer = await firstBox(page, '.pcp-composer');
-  expect('chat', !!composer, 'composer did not render');
-  const entry = await firstBox(page, '.chat-entry-inner');
-  expect('chat', entry && entry.width <= 681, `entry column ${entry && Math.round(entry.width)}px, want <= 680`);
-  const vw = await page.evaluate(() => window.innerWidth);
-  const vh = await page.evaluate(() => window.innerHeight);
+// The chat popup (specs/shared/console-redesign/chat.md): on a page that does
+// not own the chat, the launcher sits inside the viewport and opens a window
+// that stays inside it, with the composer ready.
+SCENES['chat-popup'] = async (page) => {
   await page.goto(base + '/settings', { waitUntil: 'load', timeout: 20000 });
   await page.waitForTimeout(700);
+  const vw = await page.evaluate(() => window.innerWidth);
+  const vh = await page.evaluate(() => window.innerHeight);
   const launcher = await firstBox(page, '.scp-launcher');
-  expect('chat', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
+  expect('chat-popup', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
   await page.click('.scp-launcher', { timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(400);
   const win = await firstBox(page, '.scp-window');
-  expect('chat', win && win.left >= 0 && win.top >= 0 && win.right <= vw + 1 && win.bottom <= vh + 1, 'chat popup outside the viewport');
+  expect('chat-popup', win && win.left >= 0 && win.top >= 0 && win.right <= vw + 1 && win.bottom <= vh + 1, 'chat popup outside the viewport');
+  expect('chat-popup', !!(await firstBox(page, '.scp-window .pcp-composer')), 'composer did not render in the popup');
 };
 
 // The plan surface (specs/shared/console-redesign/plan.md): tree rows on the
