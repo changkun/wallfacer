@@ -83,3 +83,8 @@ identity:
   # Wallfacer is a local tool: it verifies no tokens and serves no other
   # service, and its only credential is the per-instance server key.
   role: none
+
+# The database shape: wallfacer keeps its state in files and holds no
+# Postgres client.
+postgres:
+  role: none
