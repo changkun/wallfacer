@@ -19,8 +19,9 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// BoardManifest is the JSON structure written to board.json inside each
-// task container, giving Claude visibility into sibling tasks on the board.
+// BoardManifest is the JSON structure written to board.json for each task
+// run, giving the agent visibility into sibling tasks on the board. The agent
+// finds the file through WALLFACER_BOARD_JSON.
 type BoardManifest struct {
 	GeneratedAt time.Time   `json:"generated_at"`
 	SelfTaskID  string      `json:"self_task_id"`
@@ -30,20 +31,20 @@ type BoardManifest struct {
 // BoardTask is a sanitized view of a single task exposed in board.json.
 // SessionID is deliberately absent to prevent session hijacking.
 type BoardTask struct {
-	ID            string           `json:"id"`
-	ShortID       string           `json:"short_id"`
-	Title         string           `json:"title,omitempty"`
-	Prompt        string           `json:"prompt"`
-	Status        store.TaskStatus `json:"status"`
-	IsSelf        bool             `json:"is_self"`
-	Turns         int              `json:"turns"`
-	Result        *string          `json:"result"`
-	StopReason    *string          `json:"stop_reason"`
-	Usage         store.TaskUsage  `json:"usage"`
-	BranchName    string           `json:"branch_name,omitempty"`
-	WorktreeMount *string          `json:"worktree_mount"`
-	CreatedAt     time.Time        `json:"created_at"`
-	UpdatedAt     time.Time        `json:"updated_at"`
+	ID           string           `json:"id"`
+	ShortID      string           `json:"short_id"`
+	Title        string           `json:"title,omitempty"`
+	Prompt       string           `json:"prompt"`
+	Status       store.TaskStatus `json:"status"`
+	IsSelf       bool             `json:"is_self"`
+	Turns        int              `json:"turns"`
+	Result       *string          `json:"result"`
+	StopReason   *string          `json:"stop_reason"`
+	Usage        store.TaskUsage  `json:"usage"`
+	BranchName   string           `json:"branch_name,omitempty"`
+	WorktreePath *string          `json:"worktree_path"`
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
 }
 
 // sharesWorkspace reports whether a task's worktree paths overlap with any of
@@ -149,17 +150,14 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 			continue
 		}
 
-		var worktreeMount *string
+		var worktreePath *string
 		if mountWorktrees && !isSelf && canMountWorktree(t.Status, t.WorktreePaths) && len(t.WorktreePaths) > 0 {
-			// Compute the container mount path for the first workspace.
-			// All sibling worktrees are mounted under /workspace/.tasks/worktrees/<short-id>/.
-			for repoPath := range t.WorktreePaths {
-				basename := filepath.Base(repoPath)
-				p := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
-				worktreeMount = &p
-				break // just indicate the mount root; multiple repos follow the same pattern
-			}
-			// Record host-side mount paths for sibling worktrees.
+			// Name the sibling's worktree for its first workspace, in sorted
+			// order so the manifest is stable; the sibling manifest lists every
+			// workspace's worktree.
+			first := slices.Sorted(maps.Keys(t.WorktreePaths))[0]
+			p := t.WorktreePaths[first]
+			worktreePath = &p
 			mounts[shortID] = make(map[string]string, len(t.WorktreePaths))
 			maps.Copy(mounts[shortID], t.WorktreePaths)
 		}
@@ -181,20 +179,20 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		}
 
 		boardTasks = append(boardTasks, BoardTask{
-			ID:            t.ID.String(),
-			ShortID:       shortID,
-			Title:         t.Title,
-			Prompt:        prompt,
-			Status:        t.Status,
-			IsSelf:        isSelf,
-			Turns:         turns,
-			Result:        result,
-			StopReason:    t.StopReason,
-			Usage:         t.Usage,
-			BranchName:    t.BranchName,
-			WorktreeMount: worktreeMount,
-			CreatedAt:     t.CreatedAt,
-			UpdatedAt:     t.UpdatedAt,
+			ID:           t.ID.String(),
+			ShortID:      shortID,
+			Title:        t.Title,
+			Prompt:       prompt,
+			Status:       t.Status,
+			IsSelf:       isSelf,
+			Turns:        turns,
+			Result:       result,
+			StopReason:   t.StopReason,
+			Usage:        t.Usage,
+			BranchName:   t.BranchName,
+			WorktreePath: worktreePath,
+			CreatedAt:    t.CreatedAt,
+			UpdatedAt:    t.UpdatedAt,
 		})
 	}
 

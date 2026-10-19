@@ -253,10 +253,10 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 	}
 }
 
-// TestGenerateBoardContext_WorktreeMountPath verifies that generateBoardContext
-// sets worktree_mount to the correct container-side path for eligible siblings,
-// and that the self task has no worktree_mount.
-func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
+// TestGenerateBoardContext_WorktreePath verifies that generateBoardContext
+// sets worktree_path to the sibling's host worktree for eligible siblings,
+// and that the self task has no worktree_path.
+func TestGenerateBoardContext_WorktreePath(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
@@ -287,21 +287,18 @@ func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	shortID := sibling.ID.String()[:8]
-	expectedMount := "/workspace/.tasks/worktrees/" + shortID + "/" + filepath.Base(repoPath)
-
 	for _, bt := range manifest.Tasks {
 		switch bt.ID {
 		case sibling.ID.String():
-			if bt.WorktreeMount == nil {
-				t.Fatal("sibling WorktreeMount should not be nil")
+			if bt.WorktreePath == nil {
+				t.Fatal("sibling WorktreePath should not be nil")
 			}
-			if *bt.WorktreeMount != expectedMount {
-				t.Errorf("WorktreeMount = %q, want %q", *bt.WorktreeMount, expectedMount)
+			if *bt.WorktreePath != wtDir {
+				t.Errorf("WorktreePath = %q, want the sibling's worktree %q", *bt.WorktreePath, wtDir)
 			}
 		case self.ID.String():
-			if bt.WorktreeMount != nil {
-				t.Errorf("self task WorktreeMount should be nil, got %q", *bt.WorktreeMount)
+			if bt.WorktreePath != nil {
+				t.Errorf("self task WorktreePath should be nil, got %q", *bt.WorktreePath)
 			}
 		}
 	}

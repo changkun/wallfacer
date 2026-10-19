@@ -9,13 +9,6 @@ import (
 	"strings"
 )
 
-const (
-	// CodexInstructionsFilename is the per-repo instructions filename agents read under the Codex sandbox.
-	CodexInstructionsFilename = "AGENTS.md"
-	// ClaudeInstructionsFilename is the per-repo instructions filename agents read under the Claude sandbox.
-	ClaudeInstructionsFilename = "CLAUDE.md"
-)
-
 // WorkspaceDataKey returns a stable 16-char hex key derived from a set of
 // workspace folder paths. The key is the SHA-256 of the sorted, colon-joined
 // absolute paths, so the same set of folders always maps to the same key

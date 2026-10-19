@@ -15,6 +15,7 @@ import (
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
+	"latere.ai/x/wallfacer/internal/logger"
 )
 
 // requestFromClaudeSpec translates a runner-built ContainerSpec (whose Cmd
@@ -248,17 +249,34 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 		return nil, fmt.Errorf("host backend: spec.Env[WALLFACER_AGENT] is missing or unknown (got %q)", agentStr)
 	}
 
-	// Reject container paths early: a leftover /workspace/<basename> here
-	// would run the agent in the wrong directory and produce confusing diffs.
-	if strings.HasPrefix(spec.WorkDir, "/workspace/") || spec.WorkDir == "/workspace" {
-		return nil, fmt.Errorf("host backend: WorkDir %q is a container path; runner must translate to a host path", spec.WorkDir)
-	}
-
 	// Reserve a global budget slot before spawning. Held for the process
 	// lifetime and freed when the handle's Wait reaps it.
 	release, err := b.acquireSlot(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// A role that works on no workspace (title, oversight, commit message,
+	// review) starts in a fresh empty directory rather than the server's own
+	// working directory. The directory is removed when the process is reaped.
+	scratch := ""
+	if spec.WorkDir == "" {
+		dir, err := os.MkdirTemp("", "wallfacer-agent-")
+		if err != nil {
+			release()
+			return nil, fmt.Errorf("host backend: scratch directory: %w", err)
+		}
+		scratch = dir
+		spec.WorkDir = dir
+	}
+	free := func() {
+		release()
+		if scratch == "" {
+			return
+		}
+		if err := os.RemoveAll(scratch); err != nil {
+			logger.Runner.Warn("host backend: remove scratch directory", "dir", scratch, "error", err)
+		}
 	}
 
 	var h Handle
@@ -277,13 +295,13 @@ func (b *HostBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, e
 		err = fmt.Errorf("host backend: unsupported agent %q", agent)
 	}
 	if err != nil {
-		release()
+		free()
 		return nil, err
 	}
 	if hh, ok := h.(*hostHandle); ok {
-		hh.release = release
+		hh.release = free
 	} else {
-		release() // unknown handle type cannot free the slot on exit
+		free() // unknown handle type cannot free the slot on exit
 	}
 	return h, nil
 }

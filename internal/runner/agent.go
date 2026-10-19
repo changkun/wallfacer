@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -90,9 +91,9 @@ type runAgentOpts struct {
 	// place of the raw workspaces so commits land on the task's
 	// branch.
 	WorktreeOverrides map[string]string
-	// BoardDir is the host directory containing board.json, mounted
-	// read-only at /workspace/.tasks/ alongside any siblings. Only
-	// honored for mountReadWrite roles with MountBoard=true.
+	// BoardDir is the host directory holding board.json and the sibling
+	// worktree manifest, surfaced to the agent through environment
+	// variables. Only honored for mountReadWrite roles.
 	BoardDir string
 	// SiblingMounts maps shortID → (repoPath → worktreePath) for
 	// read-only mounts of other in-progress task worktrees, so the
@@ -304,6 +305,11 @@ func (r *Runner) roleModel(binding agentBinding, sb harness.ID, opts runAgentOpt
 	return r.modelFromEnvForSandbox(sb)
 }
 
+// errEmptyOutput reports an agent run that exited cleanly without writing
+// any output. The turn loop retries a resumed session that ends this way
+// with a fresh session.
+var errEmptyOutput = errors.New("empty output")
+
 // launchOne builds the container spec, invokes backend.Launch, drains
 // the streams, and parses the NDJSON result for a single sub-agent
 // invocation. It dispatches on binding.MountMode to add the right volume
@@ -428,7 +434,7 @@ func (r *Runner) launchOne(
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
 				role.Slug, exitCode, truncate(string(rawStderr), 200))
 		}
-		return nil, fmt.Errorf("%s: empty output", role.Slug)
+		return nil, fmt.Errorf("%s: %w", role.Slug, errEmptyOutput)
 	}
 
 	// Parse first so a non-zero exit with a valid final NDJSON payload

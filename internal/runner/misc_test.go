@@ -240,6 +240,35 @@ func TestResolveConflictsSuccess(t *testing.T) {
 	}
 }
 
+// TestResolveConflicts_PromptNamesTheWorktree verifies that the conflict
+// resolver is told the host path it works in, which is also its working
+// directory, rather than a path that exists only inside a container.
+func TestResolveConflicts_PromptNamesTheWorktree(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockSandboxBackend{responses: []ContainerResponse{{Stdout: []byte(endTurnOutput)}}}
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "conflict prompt path", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktreePath := t.TempDir()
+	if err := r.resolveConflicts(ctx, task.ID, repo, worktreePath, "", "main", ConflictResolverTriggerCommit, 1, 3); err != nil {
+		t.Fatalf("resolveConflicts: %v", err)
+	}
+	calls := mock.RunArgsCalls()
+	if len(calls) != 1 {
+		t.Fatalf("launches = %d, want 1", len(calls))
+	}
+	if calls[0].WorkDir != worktreePath {
+		t.Errorf("WorkDir = %q, want the worktree %q", calls[0].WorkDir, worktreePath)
+	}
+	if prompt := strings.Join(calls[0].Args, " "); !strings.Contains(prompt, worktreePath) || strings.Contains(prompt, "/workspace/") {
+		t.Errorf("prompt does not name the worktree %q: %q", worktreePath, prompt)
+	}
+}
+
 // TestResolveConflictsContainerError verifies that resolveConflicts returns a
 // wrapped error when the container itself fails.
 func TestResolveConflictsContainerError(t *testing.T) {

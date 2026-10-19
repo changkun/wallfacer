@@ -282,24 +282,6 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			missing = append(missing, repoPath)
 			continue
 		}
-		// Clean up instructions files injected by the container mount.
-		// The workspace CLAUDE.md / AGENTS.md is bind-mounted into the
-		// worktree for the agent to read, but it must not be committed.
-		// Remove the file if it is not already tracked by git (i.e. the
-		// original repo didn't have one). If the repo does track it, leave
-		// it alone so legitimate edits are preserved.
-		for _, instrFile := range []string{prompts.ClaudeInstructionsFilename, prompts.CodexInstructionsFilename} {
-			p := filepath.Join(worktreePath, instrFile)
-			if _, err := os.Stat(p); err != nil {
-				continue // file doesn't exist
-			}
-			// git ls-files exits 0 with output if the file is tracked.
-			out, err := cmdexec.Git(worktreePath, "ls-files", instrFile).WithContext(ctx).Output()
-			if err != nil || strings.TrimSpace(out) == "" {
-				_ = os.Remove(p) // untracked — remove before staging
-			}
-		}
-
 		if out, err := cmdexec.Git(worktreePath, "add", "-A").WithContext(ctx).Combined(); err != nil {
 			if ctx.Err() != nil {
 				return false, fmt.Errorf("context canceled during git add: %w", ctx.Err())
@@ -804,12 +786,10 @@ func (r *Runner) resolveConflicts(
 	attempt int,
 	maxAttempts int,
 ) error {
-	basename := filepath.Base(worktreePath)
-	containerPath := "/workspace/" + basename
 	repoName := filepath.Base(repoPath)
 
 	prompt := r.promptsMgr.ConflictResolution(prompts.ConflictData{
-		ContainerPath: containerPath,
+		WorktreePath:  worktreePath,
 		DefaultBranch: defBranch,
 	})
 

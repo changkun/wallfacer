@@ -251,7 +251,7 @@ func mockContextFor(apiName string) (any, bool) {
 		}, true
 	case "conflict_resolution":
 		return ConflictData{
-			ContainerPath: "/workspace/example",
+			WorktreePath:  "/home/example/worktree",
 			DefaultBranch: "main",
 		}, true
 	case "test_verification":
@@ -316,7 +316,7 @@ type CommitData struct {
 
 // ConflictData holds template variables for the conflict resolution prompt.
 type ConflictData struct {
-	ContainerPath string
+	WorktreePath  string // host path of the task's worktree, the agent's working directory
 	DefaultBranch string
 }
 

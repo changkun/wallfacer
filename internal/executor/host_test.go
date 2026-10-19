@@ -5,6 +5,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -236,22 +237,31 @@ func TestHostBackend_Launch_WorkDirIsUsed(t *testing.T) {
 	}
 }
 
-func TestHostBackend_Launch_RejectsContainerPath(t *testing.T) {
+// TestHostBackend_Launch_NoWorkDirRunsInScratchDir verifies that a launch with
+// no working directory runs in a fresh empty directory, not the server's own,
+// and that the directory is gone once the process is reaped.
+func TestHostBackend_Launch_NoWorkDirRunsInScratchDir(t *testing.T) {
 	bin := buildFakeAgent(t, "fakeagent")
 	b, _ := NewHostBackend(HostBackendConfig{AgentNice: -1, ClaudeBinary: bin, CodexBinary: bin})
 
+	tmp := t.TempDir()
+	for _, k := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(k, tmp)
+	}
 	spec := ContainerSpec{
-		Name:    "wallfacer-test-reject",
-		Env:     map[string]string{"WALLFACER_AGENT": "claude"},
-		Cmd:     []string{"-p", "hi"},
-		WorkDir: "/workspace/myrepo",
+		Name: "wallfacer-test-scratch",
+		Env:  map[string]string{"WALLFACER_AGENT": "claude"},
+		Cmd:  []string{"-p", "hi"},
 	}
-	_, err := b.Launch(context.Background(), spec)
-	if err == nil {
-		t.Fatal("expected error for container path WorkDir")
+	got := launchAndDrain(t, b, spec)
+	cwd, _ := got["cwd"].(string)
+	resolvedCwd, _ := filepath.EvalSymlinks(filepath.Dir(cwd))
+	resolvedTmp, _ := filepath.EvalSymlinks(tmp)
+	if resolvedCwd != resolvedTmp || !strings.HasPrefix(filepath.Base(cwd), "wallfacer-agent-") {
+		t.Errorf("cwd = %q, want a wallfacer-agent-* directory under %q", cwd, tmp)
 	}
-	if !strings.Contains(err.Error(), "container path") {
-		t.Errorf("error should mention container path; got: %v", err)
+	if _, err := os.Stat(cwd); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("scratch directory %q still exists after the process was reaped: %v", cwd, err)
 	}
 }
 

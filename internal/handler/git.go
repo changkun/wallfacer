@@ -21,7 +21,6 @@ import (
 
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/sse"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -349,15 +348,12 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 }
 
 // diffWithUntracked computes a git diff against baseRef and appends diffs for
-// untracked files. The optional excludes are passed as pathspec negations to
-// both git-diff and ls-files (e.g. ":!AGENTS.md"). Output is newline-separated
-// so each file's "diff --git" header starts on its own line.
-func diffWithUntracked(ctx context.Context, worktreePath, baseRef string, excludes ...string) string {
-	args := append([]string{"diff", baseRef, "--", "."}, excludes...)
-	out, _ := cmdexec.Git(worktreePath, args...).WithContext(ctx).Output()
+// untracked files. Output is newline-separated so each file's "diff --git"
+// header starts on its own line.
+func diffWithUntracked(ctx context.Context, worktreePath, baseRef string) string {
+	out, _ := cmdexec.Git(worktreePath, "diff", baseRef, "--", ".").WithContext(ctx).Output()
 
-	lsArgs := append([]string{"ls-files", "--others", "--exclude-standard", "--", "."}, excludes...)
-	untrackedRaw, err := cmdexec.Git(worktreePath, lsArgs...).WithContext(ctx).Output()
+	untrackedRaw, err := cmdexec.Git(worktreePath, "ls-files", "--others", "--exclude-standard", "--", ".").WithContext(ctx).Output()
 	if err == nil {
 		for file := range strings.SplitSeq(untrackedRaw, "\n") {
 			if file == "" {
@@ -506,12 +502,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		if err != nil {
 			base = defBranch
 		}
-		// Exclude instructions files (CLAUDE.md / AGENTS.md) from the diff.
-		// Podman leaves empty mount-point files in the worktree when a file
-		// is bind-mounted into a directory that is itself a bind mount; these
-		// are not real changes and should not appear in task diffs.
-		out := diffWithUntracked(r.Context(), worktreePath, base,
-			":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename)
+		out := diffWithUntracked(r.Context(), worktreePath, base)
 		appendWorkspaceDiff(&combined, multiWS, repoPath, out)
 		if n, err := gitutil.CommitsBehind(repoPath, worktreePath); err == nil && n > 0 {
 			behindCounts[filepath.Base(repoPath)] = n

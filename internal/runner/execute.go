@@ -375,7 +375,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 
 			// If resume produced empty output, drop the session and retry.
-			if sessionID != "" && strings.Contains(err.Error(), "empty output from container") {
+			if sessionID != "" && errors.Is(err, errEmptyOutput) {
 				logger.Runner.Warn("resume produced empty output, retrying without session",
 					"task", taskID, "session", sessionID)
 				_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{

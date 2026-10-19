@@ -54,7 +54,7 @@ func TestClassifyFailure(t *testing.T) {
 		},
 		{
 			name:     "container crash via empty output",
-			err:      errors.New("empty output from container"),
+			err:      fmt.Errorf("implementation: %w", errEmptyOutput),
 			isError:  false,
 			result:   "",
 			expected: store.FailureCategoryContainerCrash,

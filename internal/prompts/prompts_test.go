@@ -326,16 +326,19 @@ func TestDriftAssessment_ReturnsNonEmptyRendered(t *testing.T) {
 }
 
 // TestConflictResolution_ReturnsNonEmptyRendered verifies that the conflict
-// resolution template renders with container path and default branch populated.
+// resolution template renders with the worktree path and default branch.
 func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	data := prompts.ConflictData{
-		ContainerPath: "/workspace/myrepo",
+		WorktreePath:  "/home/me/worktrees/task/myrepo",
 		DefaultBranch: "main",
 	}
 	got := mgr.ConflictResolution(data)
 	if strings.TrimSpace(got) == "" {
 		t.Error("ConflictResolution returned empty string")
+	}
+	if !strings.Contains(got, data.WorktreePath) {
+		t.Errorf("ConflictResolution does not name the worktree path %q: %q", data.WorktreePath, got)
 	}
 	if strings.Contains(got, "{{") {
 		t.Errorf("ConflictResolution returned unreplaced template syntax: %q", got)

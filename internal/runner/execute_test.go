@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1747,6 +1748,43 @@ func TestMockMaxTokensAutoContinue(t *testing.T) {
 	calls := filterTaskCalls(mock.RunArgsCalls())
 	if len(calls) != 2 {
 		t.Fatalf("expected exactly 2 task RunArgs calls, got %d", len(calls))
+	}
+}
+
+// TestMockResumeEmptyOutputRetriesFreshSession verifies that a resumed session
+// that exits cleanly without output is retried once with a fresh session.
+func TestMockResumeEmptyOutputRetriesFreshSession(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockSandboxBackend{
+		responses: []ContainerResponse{
+			{Stdout: nil},
+			{Stdout: []byte(`{"result":"done","session_id":"sess-new","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
+		},
+	}
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "resume empty output", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "continue", "sess-old", false)
+
+	calls := filterTaskCalls(mock.RunArgsCalls())
+	if len(calls) != 2 {
+		t.Fatalf("task launches = %d, want 2 (the resume, then a fresh session)", len(calls))
+	}
+	if !slices.Contains(calls[0].Args, "--resume") {
+		t.Errorf("first launch did not resume: %v", calls[0].Args)
+	}
+	if slices.Contains(calls[1].Args, "--resume") {
+		t.Errorf("retry still resumes: %v", calls[1].Args)
+	}
+	if updated, _ := s.GetTask(ctx, task.ID); updated.Status != store.TaskStatusWaiting {
+		t.Errorf("status = %q, want waiting", updated.Status)
 	}
 }
 

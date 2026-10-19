@@ -670,10 +670,9 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 // Empty instructions file cleanup before git add -A
 // ---------------------------------------------------------------------------
 
-// TestHostStageAndCommitCleansUpEmptyInstructionsFiles verifies that empty
-// CLAUDE.md or AGENTS.md files (left behind as bind-mount points by podman)
-// are removed before staging so they don't get committed.
-func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
+// TestHostStageAndCommitKeepsNewInstructionsFiles verifies that a CLAUDE.md or
+// AGENTS.md the agent creates in its worktree is staged like any other file.
+func TestHostStageAndCommitKeepsNewInstructionsFiles(t *testing.T) {
 	repo := setupTestRepo(t)
 	worktreesDir := t.TempDir()
 	s, err := storetest.NewFileStore(t, t.TempDir())
@@ -696,70 +695,26 @@ func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
 
 	wt := worktreePaths[repo]
-
-	// Simulate the empty mount-point files that podman leaves behind.
 	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
-		if err := os.WriteFile(filepath.Join(wt, f), nil, 0755); err != nil {
+		if err := os.WriteFile(filepath.Join(wt, f), []byte("# Project notes\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	// Run staging (will fail at commit message generation, but that's fine —
-	// we only care that the empty files are removed before staging).
-	_, _ = runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "test cleanup")
+	// Commit message generation may fail with the echo command; staging runs
+	// before it, so the files are in the index either way.
+	_, _ = runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "add project notes")
 
-	// After the call, the empty files should have been removed.
 	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
-		p := filepath.Join(wt, f)
-		if _, err := os.Stat(p); err == nil {
-			t.Errorf("expected %s to be removed from worktree; file still exists", f)
+		if _, err := os.Stat(filepath.Join(wt, f)); err != nil {
+			t.Errorf("%s was removed from the worktree: %v", f, err)
 		}
-	}
-}
-
-// TestHostStageAndCommitCleansUpNonEmptyInstructionsFiles verifies that
-// non-empty CLAUDE.md files injected by the container mount are removed
-// before staging when the file is not tracked by the original repo.
-// This is a regression test for a bug where mounted instructions with
-// content survived the empty-only cleanup and got committed.
-func TestHostStageAndCommitCleansUpNonEmptyInstructionsFiles(t *testing.T) {
-	repo := setupTestRepo(t)
-	worktreesDir := t.TempDir()
-	s, err := storetest.NewFileStore(t, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	runner := NewRunner(s, RunnerConfig{
-		Command:      "echo",
-		Workspaces:   []string{repo},
-		WorktreesDir: worktreesDir,
-	})
-	t.Cleanup(func() { runner.Shutdown() })
-
-	taskID := uuid.New()
-	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
-
-	wt := worktreePaths[repo]
-
-	// Simulate non-empty instructions files left behind by the mount.
-	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
-		if err := os.WriteFile(filepath.Join(wt, f), []byte("# Workspace instructions\nDo the thing.\n"), 0644); err != nil {
-			t.Fatal(err)
+		out, err := exec.Command("git", "-C", wt, "ls-files", f).Output()
+		if err != nil {
+			t.Fatalf("git ls-files %s: %v", f, err)
 		}
-	}
-
-	_, _ = runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "test cleanup")
-
-	// Non-empty untracked instructions files must be removed.
-	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
-		p := filepath.Join(wt, f)
-		if _, err := os.Stat(p); err == nil {
-			t.Errorf("expected untracked %s to be removed from worktree; file still exists", f)
+		if strings.TrimSpace(string(out)) != f {
+			t.Errorf("%s was not staged; git ls-files printed %q", f, out)
 		}
 	}
 }

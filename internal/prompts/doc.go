@@ -9,9 +9,7 @@
 // allows users to customize agent behavior without modifying the wallfacer
 // binary.
 //
-// instructions.go holds the two per-repo instructions filenames agents read
-// ([CodexInstructionsFilename], [ClaudeInstructionsFilename]) and the workspace
-// storage keys: [WorkspaceDataKey] hashes a sorted folder set and is used only
+// instructions.go holds the workspace storage keys: [WorkspaceDataKey] hashes a sorted folder set and is used only
 // when migrating legacy workspace groups whose directories are already named by
 // that hash, while [NewDataKey] mints a random key for every new workspace.
 //
