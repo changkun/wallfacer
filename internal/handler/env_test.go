@@ -11,13 +11,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/runner"
-	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
 
@@ -71,39 +69,6 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 	t.Cleanup(r.Shutdown)
 	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath, codexAuthDir
-}
-
-// TestUpdateEnvConfig_NoAutoPromoteWhenAutoimplementOff verifies that no
-// auto-promotion happens when autoimplement is disabled.
-func TestUpdateEnvConfig_NoAutoPromoteWhenAutoimplementOff(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	// autoimplement is false by default.
-
-	ctx := context.Background()
-	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	body := `{"max_parallel_tasks": 1}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Wait long enough that a goroutine would have run.
-	time.Sleep(100 * time.Millisecond)
-
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tasks) > 0 && tasks[0].Status == "in_progress" {
-		t.Errorf("expected task to remain in backlog when autoimplement is off, got in_progress")
-	}
 }
 
 // TestValidateBaseURL_SchemeAndIPChecks verifies the scheme, bare-IP, and

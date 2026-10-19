@@ -13,7 +13,7 @@
 // paths and instructions), [envconfig] (agent environment), [harness] (per-CLI
 // argv/event adapters), [constants] (timeouts and limits), [logger], [metrics],
 // [prompts] (system prompt templates), and several internal/pkg utilities:
-// [circuitbreaker] (launch protection), [cmdexec] (git and process commands),
+// [cmdexec] (git and process commands),
 // [keyedmu] (per-task locking), [trackedwg] (goroutine tracking).
 // Consumed by [handler] (all task orchestration actions) and [cli] (server startup).
 // Changes to the [store.Task] state machine, harness adapters, or prompt

@@ -176,9 +176,8 @@ func buildAgentCmd(prompt, model string) []string {
 //
 // The configured envFile may be overridden (via ENV_FILE / --env-file) to a
 // transient location — most notably a mktemp path under /var/folders that
-// macOS's periodic tmp-reaper purges after ~3 idle days. A long-idle scheduled
-// task that fires after that window would otherwise fail to read its
-// credentials. When the configured path is missing but the canonical default
+// macOS's periodic tmp-reaper purges after ~3 idle days. A task started
+// after that window would otherwise fail to read its credentials. When the configured path is missing but the canonical default
 // (<configDir>/.env) exists, fall back to it.
 //
 // The fallback only *redirects* to a known-good default; it never silently
@@ -336,8 +335,7 @@ var (
 // runContainer executes an agent container and parses its NDJSON output.
 // Returns (output, rawStdout, rawStderr, error). Wraps runAgent with the
 // heavyweight-specific concerns: slugged container name, live-log tee,
-// container-runtime circuit breaker, and the per-activity descriptor
-// dispatch. The outer turn loop in execute.go owns session handling
+// and the per-activity descriptor dispatch. The outer turn loop in execute.go owns session handling
 // and retry policy beyond the Claude→Codex token-limit fallback.
 func (r *Runner) runContainer(
 	ctx context.Context,

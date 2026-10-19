@@ -501,7 +501,7 @@ func TestUpdateArchivedTasksPerPage(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AutoPush
+// MaskToken
 // ---------------------------------------------------------------------------
 
 // TestMaskToken verifies token redaction: empty stays empty, short tokens are fully masked,

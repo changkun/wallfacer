@@ -1310,7 +1310,7 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.
 func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	body := `{"autoimplement": true, "unknown_field": "surprise"}`
+	body := `{"workspace_groups": [], "unknown_field": "surprise"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -1324,7 +1324,7 @@ func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
 // the JSON object returns 400.
 func TestUpdateConfig_RejectsTrailingContent(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	body := `{"autoimplement": true} trailing`
+	body := `{"workspace_groups": []} trailing`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)

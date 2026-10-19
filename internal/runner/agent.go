@@ -297,8 +297,7 @@ var errEmptyOutput = errors.New("empty output")
 // launchOne builds the container spec, invokes backend.Launch, drains
 // the streams, and parses the NDJSON result for a single sub-agent
 // invocation. It dispatches on binding.MountMode to add the right volume
-// mounts and feeds optional heavyweight concerns (live-log tee,
-// circuit breaker) when supplied via opts.
+// mounts and feeds the optional live-log tee when supplied via opts.
 func (r *Runner) launchOne(
 	ctx context.Context,
 	role AgentRole,

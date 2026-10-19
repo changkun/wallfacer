@@ -559,7 +559,7 @@ func TestWrapLine(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Planning auto-push wiring tests
+// Planning commits
 // ---------------------------------------------------------------------------
 
 // TestCommitPlanningRound_IgnoresPollutedLocalIdentity verifies that a polluted

@@ -128,17 +128,6 @@ func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
 	}
 }
 
-// TestUpdateEnvConfig_ReviewForksIsGone pins the removal of the review fork
-// count: a single reviewer has no forks, so the setting is no longer accepted.
-func TestUpdateEnvConfig_ReviewForksIsGone(t *testing.T) {
-	h, _ := newTestHandlerWithEnv(t)
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"review_forks":2}`)))
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("PUT review_forks = %d, want 400 for an unknown field", w.Code)
-	}
-}
-
 // TestUpdateEnvConfig_InvalidJSON returns 400 for bad JSON.
 func TestUpdateEnvConfig_InvalidJSON(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)

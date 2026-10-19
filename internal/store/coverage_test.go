@@ -1160,48 +1160,6 @@ func TestParseNumberedTraceFile_Valid(t *testing.T) {
 	}
 }
 
-// --- AreDependenciesSatisfied edge cases ---
-
-func TestAreDependenciesSatisfied_MalformedUUID(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:    "deps",
-		Timeout:   5,
-		DependsOn: []string{"not-a-uuid"},
-	})
-
-	sat, err := s.AreDependenciesSatisfied(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("AreDependenciesSatisfied: %v", err)
-	}
-	if sat {
-		t.Error("expected unsatisfied for malformed UUID dependency")
-	}
-}
-
-func TestAreDependenciesSatisfied_DeletedDepCoverage(t *testing.T) {
-	s := newTestStore(t)
-	dep, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "dep", Timeout: 5})
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:    "main",
-		Timeout:   5,
-		DependsOn: []string{dep.ID.String()},
-	})
-
-	// Directly remove the dep from s.tasks (bypassing removeOrphanedDependents).
-	s.mu.Lock()
-	delete(s.tasks, dep.ID)
-	s.mu.Unlock()
-
-	sat, err := s.AreDependenciesSatisfied(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("AreDependenciesSatisfied: %v", err)
-	}
-	if sat {
-		t.Error("expected unsatisfied when dependency is deleted")
-	}
-}
-
 // --- RestoreTask: concurrent guard ---
 
 func TestRestoreTask_UnknownID(t *testing.T) {

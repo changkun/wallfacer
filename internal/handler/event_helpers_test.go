@@ -6,8 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/uuid"
-
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -41,19 +39,6 @@ func (h *logCaptureHandler) hasError(msg string) bool {
 		}
 	}
 	return false
-}
-
-// TestInsertEventOrLog_NilRegistryNoPanic verifies that insertEventOrLog
-// handles a nil registry gracefully (incAutoimplementAction is a no-op when
-// h.reg == nil).
-func TestInsertEventOrLog_NilRegistryNoPanic(t *testing.T) {
-	// newTestHandler creates a Handler with a nil registry.
-	h := newTestHandler(t)
-	ctx := context.Background()
-
-	missingID := uuid.New()
-	// Must not panic even with nil registry and a missing task ID.
-	h.insertEventOrLog(ctx, missingID, store.EventTypeSystem, map[string]string{"msg": "probe"})
 }
 
 // TestInsertEventOrLog_ErrorNoPanic verifies that insertEventOrLog does not

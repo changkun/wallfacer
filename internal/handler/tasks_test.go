@@ -1710,7 +1710,7 @@ func TestBatchCreateTasks_EmptyBatch(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ScheduledAt — tryAutoPromote integration tests
+// Model override
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestUpdateTask_PatchModelOverride verifies that PATCH with {"model":"claude-haiku-4-5"}
@@ -2212,10 +2212,6 @@ drain2:
 		t.Errorf("expected exactly 2 SSE deltas for 2-task batch, got %d", count)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Auto-retry integration tests
-// ---------------------------------------------------------------------------
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SearchTasks

@@ -44,7 +44,7 @@ type TaskCreateOptions struct {
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
 // All fields in opts are normalized (sandbox maps, budget clamps) and persisted
-// together, so no watcher or SSE subscriber can observe a partially-initialized
+// together, so no SSE subscriber can observe a partially-initialized
 // task.  notify is called exactly once.
 func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions) (*Task, error) {
 	// Build the task struct from opts outside the lock.  Position is the only

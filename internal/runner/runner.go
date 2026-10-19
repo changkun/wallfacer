@@ -53,8 +53,8 @@ type RunnerConfig struct {
 	// <configDir>/.env). It is used as a fallback when EnvFile is set to an
 	// override path that has gone missing at container-launch time — e.g. a
 	// mktemp path under /var/folders that macOS's tmp-reaper purges after a few
-	// idle days, which otherwise kills long-idle scheduled tasks with an opaque
-	// podman "--env-file ... no such file" exit 125. Empty disables the fallback.
+	// idle days, which otherwise leaves a task started after that window
+	// without its credentials. Empty disables the fallback.
 	DefaultEnvFile     string
 	Workspaces         []string // workspace directory paths
 	WorktreesDir       string
@@ -243,8 +243,8 @@ func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
 }
 
 // NewRunner constructs a Runner from the given store and config. The returned
-// Runner is ready for use: it has an initialized circuit breaker, sandbox
-// backend, and a background goroutine watching for store mutations to
+// Runner is ready for use: it has a sandbox backend and a background
+// goroutine watching for store mutations to
 // invalidate the board context cache. Call Shutdown() to drain background work.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	mgr := cfg.Prompts

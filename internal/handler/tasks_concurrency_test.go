@@ -226,11 +226,6 @@ func TestTaskReachableInAdj(t *testing.T) {
 	}
 }
 
-// Tests for Start* autoimplement goroutine launchers.
-// Each function spawns a goroutine that exits when ctx is cancelled.
-// Pre-cancelling the context causes the goroutine to exit almost immediately,
-// allowing tests to verify the function does not panic or block indefinitely.
-
 // --- checkConcurrencyAndUpdateStatus ---
 
 // TestCheckConcurrencyAndUpdateStatus_Success verifies that a valid backlog →
@@ -366,10 +361,6 @@ func TestUpdateEnvConfig_InvalidatesParallelLimitCache(t *testing.T) {
 		t.Fatalf("after UpdateEnvConfig: want %d, got %d", newLimit, got)
 	}
 }
-
-// Note (test 5 — runner path): The runner's tryAutoRetry is covered in
-// internal/runner/auto_retry_test.go which tests the unexported method directly
-// in the runner package.
 
 // Note (test 6 — classifyFailure): All 5 branches of classifyFailure are
 // already exhaustively covered in internal/runner/classify_failure_test.go.

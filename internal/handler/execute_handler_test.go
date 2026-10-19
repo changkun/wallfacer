@@ -144,11 +144,11 @@ func TestSubmitFeedback_Success(t *testing.T) {
 
 // --- CompleteTask ---
 
-// TestCompleteTask_AcquiresPromoteMu verifies CompleteTask serializes its
-// waiting→ transition under transitionMu, so it cannot race tryAutoSubmit into a
-// double commit. While transitionMu is held elsewhere, CompleteTask must block
-// before touching the task rather than completing the transition.
-func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
+// TestCompleteTask_AcquiresTransitionMu verifies CompleteTask serializes its
+// waiting→ transition under transitionMu, so two Mark as Done requests cannot
+// race into a double commit. While transitionMu is held elsewhere, CompleteTask
+// must block before touching the task rather than completing the transition.
+func TestCompleteTask_AcquiresTransitionMu(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
@@ -190,11 +190,11 @@ func TestCompleteTask_AcquiresPromoteMu(t *testing.T) {
 	}
 }
 
-// TestTestTask_AcquiresPromoteMu verifies TestTask serializes its waiting→
-// in_progress transition under transitionMu, so a concurrent tryAutoSubmit cannot
+// TestTestTask_AcquiresTransitionMu verifies TestTask serializes its waiting→
+// in_progress transition under transitionMu, so a concurrent Mark as Done cannot
 // move the task to committing between TestTask's status check and its
 // UpdateTaskTestRun/UpdateTaskStatus writes.
-func TestTestTask_AcquiresPromoteMu(t *testing.T) {
+func TestTestTask_AcquiresTransitionMu(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	id := createWaitingTask(t, h, "implement something")

@@ -270,37 +270,6 @@ func (s *Store) UpdateTaskTags(_ context.Context, id uuid.UUID, tags []string) e
 	})
 }
 
-// AreDependenciesSatisfied reports whether every task listed in t.DependsOn has
-// status TaskStatusDone. A missing or malformed dependency UUID is treated as
-// unsatisfied to avoid silent unblocking.
-func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return false, fmt.Errorf("task not found: %s", id)
-	}
-	for _, depStr := range t.DependsOn {
-		depID, err := uuid.Parse(depStr)
-		if err != nil {
-			return false, nil // malformed UUID → unsatisfied
-		}
-		dep, ok := s.tasks[depID]
-		if !ok {
-			// Dependency was deleted or purged. Treat as unsatisfied to
-			// prevent silent unblocking. In normal operation, DeleteTask
-			// cleans up orphaned dependency references, so this path only
-			// fires for race conditions or data corruption.
-			return false, nil
-		}
-		if dep.Status != TaskStatusDone {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
 func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]harness.ID, maxCostUSD *float64, maxInputTokens *int) error {
 	var loweredPrompt string

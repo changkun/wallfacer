@@ -786,7 +786,8 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 
 // TestRunTestRunFailVerdictWhenNoMarker verifies that when the test agent's
 // output does not contain a recognizable PASS/FAIL marker, the verdict is stored
-// as "fail" (not "") so the task is not auto-submitted without explicit confirmation.
+// as "fail" (not "", which reads as never tested), so an inconclusive run is
+// not mistaken for a missing one.
 func TestRunTestRunFailVerdictWhenNoMarker(t *testing.T) {
 	repo := setupTestRepo(t)
 
@@ -875,7 +876,7 @@ func TestRunTestRunDefaultStopReasonSetsFail(t *testing.T) {
 	if afterTest.Status != "waiting" {
 		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
 	}
-	// Must NOT be "" (unverified) — must be "fail" so the task is not auto-submitted.
+	// Must NOT be "" (never tested): an inconclusive run records "fail".
 	if afterTest.LastTestResult != "fail" {
 		t.Fatalf("expected last_test_result=fail for empty stop_reason, got %q", afterTest.LastTestResult)
 	}
@@ -1784,7 +1785,7 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-retry tests
+// Test verdicts
 // ---------------------------------------------------------------------------
 
 // TestParseTestVerdictCustomPatterns verifies that user-supplied regex patterns
