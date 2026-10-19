@@ -69,7 +69,7 @@ Other commands: `wallfacer status` (print or watch board state) and `wallfacer s
 1. **Explore.** Describe what you want to build in chat. Wallfacer helps you shape the idea.
 2. **Specify.** The idea becomes a structured spec. Iterate on it until the design is right.
 3. **Execute.** Specs break into tasks on a board. Agents implement, test, and commit in isolated git worktrees.
-4. **Ship.** Reviewed changes merge automatically. Auto-commit, auto-push, and auto-build when you're ready.
+4. **Ship.** Marking reviewed work done rebases it onto the default branch and merges it.
 
 ```mermaid
 flowchart LR
@@ -92,7 +92,7 @@ graph LR
     Task --> Code[Code<br/>surgical edits]
 ```
 
-Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level, and autonomy dials up or down independently at each one. Specs move through a seven-state lifecycle (`vague` to `drafted` to `validated` to `testing` to `complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
+Move left for more freedom and lower commitment; move right for more precision and higher commitment. Agents operate at every level. Specs move through a seven-state lifecycle (`vague` to `drafted` to `validated` to `testing` to `complete`, with `stale` and `archived` off to the side), and the planning chat exposes slash commands like `/create`, `/validate`, `/break-down`, and `/dispatch` to drive them.
 
 Read more: [Concepts](docs/guide/concepts.md), [Plan](docs/guide/plan.md), and [Chat](docs/guide/chat.md).
 
@@ -100,7 +100,7 @@ Read more: [Concepts](docs/guide/concepts.md), [Plan](docs/guide/plan.md), and [
 
 Wallfacer runs every task through one built-in pipeline:
 
-- **Tasks** run implementation turns in their own git worktree, then a test, then a commit message, title, and oversight summary. A task's instructions come from the repository's instruction files (AGENTS.md, CLAUDE.md) and its prompt.
+- **Tasks** run implementation turns in their own git worktree, a test run when requested, then a commit message, title, and oversight summary. A task's instructions come from the repository's instruction files (AGENTS.md, CLAUDE.md) and its prompt.
 - **Agent roles** carry the pipeline: impl, test, commit-msg, title, and oversight. Each runs on the task's harness (Claude, Codex, Cursor, OpenCode, or Pi), and a per-role setting can route one role to a different harness.
 
 Task prompts are refined in place from Plan mode.
@@ -111,7 +111,7 @@ Read more: [Concepts](docs/guide/concepts.md) and [Configuration](docs/guide/con
 
 ### Task board: managed execution
 
-The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autoimplement promote backlog items as capacity opens. Each task runs as a host process in its own git worktree.
+The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and start tasks up to the parallel limit. Each task runs as a host process in its own git worktree.
 
 ### Plan mode: structured design
 
@@ -121,19 +121,19 @@ Design before you build (shown above). The three-pane plan view gives you an exp
 
 ![Oversight summary, event timeline, and diff](./assets/oversight1.png)
 
-Inspect what happened, when, and why before you accept any automated output. Every task produces a structured event timeline, a diff against the default branch, and an AI-generated oversight summary.
+Inspect what happened, when, and why before you accept any agent output. Every task produces a structured event timeline, a diff against the default branch, and an AI-generated oversight summary.
 
 ### Cost and usage visibility
 
 ![Usage and cost breakdown](./assets/usage.png)
 
-Track token usage and cost by task, activity, and turn, so operations stay measurable as automation scales. The per-activity breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
+Track token usage and cost by task, activity, and turn, so operations stay measurable as more tasks run. The per-activity breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
 
 ## Capability Stack
 
 - **Chat.** Planning chat with slash commands and file-explorer context, conversational drift away from or back into specs.
 - **Spec.** Seven-state lifecycle, dependency DAG, recursive progress tracking, impact analysis, atomic dispatch and undo.
-- **Task.** Host-process execution, per-task git worktrees, autoimplement, auto-test, auto-submit, auto-retry, circuit breakers, cost and token budgets, oversight summaries.
+- **Task.** Host-process execution, per-task git worktrees, test verification, cost and token budgets, oversight summaries.
 - **Code.** File explorer with editor, integrated terminal, live logs and diff review, per-turn usage and timeline, native per-repo AGENTS.md/CLAUDE.md discovery.
 
 ## Roadmap
@@ -170,7 +170,6 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 
 | Guide | Topics |
 |-------|--------|
-| [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers |
 | [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, analytics |
 | [Mission Control](docs/guide/mission-control.md) | Unified spec and task graph, acting on the pipeline |
 | [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |
@@ -185,7 +184,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, failure categorization |
 | [Git Operations](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
 | [API & Transport](docs/internals/api-and-transport.md) | HTTP route reference, SSE, WebSocket terminal, middleware |
-| [Automation](docs/internals/automation.md) | Background watchers, autoimplement, review, circuit breakers |
+| [Background Work](docs/internals/background-work.md) | Goroutine model, startup recovery, worktree maintenance, oversight generation |
 | [Plan Mode](docs/internals/plan-mode.md) | Spec tree, agent sessions, slash commands, dispatch, undo |
 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, harness routing, templates, env config |
 | [Development Setup](docs/internals/development.md) | Building, testing, make targets, release workflow |

@@ -8,11 +8,9 @@ Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The
 
 ### Execution tab
 
-- **Automation toggles**: the same five toggles as the board header menu (autoimplement, autotest, autosubmit, autosync, autopush). See [Automation](automation.md).
 - **Parallel tasks**: maximum concurrent running tasks (1 to 20). Maps to `WALLFACER_MAX_PARALLEL`.
 - **Archived tasks**: page size for the archived-task list (1 to 200). Maps to `WALLFACER_ARCHIVED_TASKS_PER_PAGE`.
 - **Oversight interval**: minutes between periodic oversight summaries while a task runs (0 to 120; 0 generates summaries only at completion). Maps to `WALLFACER_OVERSIGHT_INTERVAL`.
-- **Auto push**: enable automatic `git push` after commits, with a threshold field (push only when the workspace is at least N commits ahead of upstream). Maps to `WALLFACER_AUTO_PUSH` and `WALLFACER_AUTO_PUSH_THRESHOLD`.
 - **Task titles** and **Trace oversight**: batch backfill buttons that generate missing titles or oversight summaries for existing tasks, with a selectable batch limit.
 
 ### Appearance tab
@@ -30,7 +28,7 @@ Credentials, models, and routing for the coding CLIs. A warning banner appears o
 - **OpenCode**: no key field; the `opencode` CLI manages provider credentials itself (`opencode auth login`).
 - **Pi**: no key field; the `pi` CLI reads provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the same environment.
 
-The **Global Harness Routing** section selects the default harness (`WALLFACER_DEFAULT_SANDBOX`) and the **Review model** (`WALLFACER_REVIEW_MODEL`), the model Review runs its reviewer on; it must differ from the task's model, or the review does not run (see [Automation](automation.md#review-on-a-second-model)). Per-activity overrides route implementation, testing, title, oversight, and commit message generation to different harnesses via the `WALLFACER_SANDBOX_*` variables below. Task-level harness selection (set when creating or editing a card) wins over all of these. Save and Revert buttons apply or discard pending edits; saved values are written to `~/.wallfacer/.env`.
+The **Global Harness Routing** section selects the default harness (`WALLFACER_DEFAULT_SANDBOX`). Per-activity overrides route implementation, testing, title, oversight, and commit message generation to different harnesses via the `WALLFACER_SANDBOX_*` variables below. Task-level harness selection (set when creating or editing a card) wins over all of these. Save and Revert buttons apply or discard pending edits; saved values are written to `~/.wallfacer/.env`.
 
 Tasks run as host processes with the account's full permissions; the tab shows this warning while active. Run Wallfacer only on trusted machines.
 
@@ -57,7 +55,7 @@ Wallfacer passes the model through to OpenCode.
 
 ### About tab
 
-Version information, the project link, license, and a read-only system status block (goroutines, memory, active agents, circuit breaker state, task counts).
+Version information, the project link, license, and a read-only system status block (goroutines, memory, active agents, task counts).
 
 ## System prompt templates
 
@@ -161,16 +159,10 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | Variable | Default | Description |
 |---|---|---|
 | `WALLFACER_MAX_PARALLEL` | `1` | Concurrent running tasks. Defaults to 1 because the harness CLIs share state under `~/.claude` and `~/.codex`; set explicitly to opt into more |
-| `WALLFACER_MAX_TEST_PARALLEL` | `2` | Concurrent test verification runs |
 | `WALLFACER_MAX_AGENTS` | unlimited | Global budget on concurrent agent processes |
 | `WALLFACER_AGENT_NICE` | | Niceness applied to agent processes; negative disables |
 | `WALLFACER_OVERSIGHT_INTERVAL` | `0` | Minutes between periodic oversight generation (0 = only at completion) |
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
-| `WALLFACER_AUTO_PUSH` | `false` | Automatic `git push` after commits |
-| `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push fires |
-| `WALLFACER_REVIEW_MODEL` | | The model Review runs its reviewer on; must differ from the task's model, or the review does not run |
-| `WALLFACER_REVIEW_ROUNDS` | `3` | Reviewer runs per Review session |
-| `WALLFACER_REVIEW_COST_CAP` | `50000` | Reviewer token budget per Review session, checked between rounds |
 | `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window for session cost analytics; 0 = all time. `WALLFACER_PLANNING_WINDOW_DAYS` is a deprecated alias |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |
@@ -186,12 +178,10 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_SERVER_API_KEY` | generated at `~/.wallfacer/server-api-key` | Require `Authorization: Bearer <key>` on API requests. SSE endpoints accept `?token=`. A local run without a configured key generates one on first start and logs the file path; `wallfacer status` and the e2e scripts read it from there. The browser receives the key through the page only over a loopback connection, so a client on another host opens `http://<host>:<port>/?token=<key>` once |
+| `WALLFACER_SERVER_API_KEY` | generated at `~/.wallfacer/server-api-key` | Require `Authorization: Bearer <key>` on API requests. SSE endpoints accept `?token=`. A local run without a configured key generates one on first start and logs the file path; `wallfacer status` reads it from there. The browser receives the key through the page only over a loopback connection, so a client on another host opens `http://<host>:<port>/?token=<key>` once |
 | `WALLFACER_DRIFT_TESTER` | off | Experimental spec drift pipeline: on task completion, an assessment agent classifies the linked spec as complete or stale instead of completing it directly |
 | `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days soft-deleted tasks remain restorable from the Trash |
 | `WALLFACER_MAX_TURN_OUTPUT_BYTES` | `8388608` | Per-turn output budget; longer output is truncated (0 = unlimited) |
-| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive agent launch failures before the circuit breaker opens |
-| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
 | `WALLFACER_WORKTREE_GC_INTERVAL` | `24h` | Interval between worktree garbage collection runs (duration syntax, e.g. `6h`) |
 | `WALLFACER_PROMPT_HISTORY_LIMIT` | | Cap on retained prompt revisions per task |
 | `WALLFACER_RETRY_HISTORY_LIMIT` | | Cap on retained retry records per task |
@@ -255,7 +245,6 @@ Press `?` anywhere to open this reference in the app. Shortcuts without modifier
 
 - [Getting Started](getting-started.md): installation and first run
 - [Concepts](concepts.md): the mental model and primitives
-- [Automation](automation.md): toggles, retries, and guard rails
 - [Workspaces](workspaces.md): folder sets and per-workspace settings
 - [Architecture](../internals/architecture.md): internals for contributors
 

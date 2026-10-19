@@ -1,8 +1,8 @@
 # Concepts
 
-Most AI coding tools pin work to one interaction mode: a chatbot that needs constant steering, or a fire-and-forget agent that surfaces hours later with unpredictable results. Wallfacer offers a spectrum between those extremes. Work happens at four levels, and moving between them is free in both directions.
+Most AI coding tools pin work to one interaction mode: a chatbot that needs constant steering, or a fire-and-forget agent that surfaces hours later with unpredictable results. Wallfacer offers a spectrum between those extremes. Work happens at three levels, and moving between them is free in both directions.
 
-## The four working levels
+## The three working levels
 
 ### Chat: conversational exploration
 
@@ -16,11 +16,7 @@ On the [Plan](plan.md) page, ideas crystallize into specs: structured markdown d
 
 The [Board](board.md) is where most day-to-day work happens. Each card is a concrete, trackable task. Starting a task runs the built-in Implement pipeline in an isolated worktree; results wait for review before landing. Diff comments and verification runs attach to the card.
 
-### Autopilot: automation
-
-With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md) and [Mission Control](mission-control.md).
-
-The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing automated task can be pulled down to manual review, debugged in the built-in terminal, and resumed with feedback.
+The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing task can be inspected, debugged in the built-in terminal, and resumed with feedback.
 
 ## The primitives
 
@@ -42,7 +38,7 @@ A task is a card on the board: a prompt, an optional title, a harness selection,
 | `failed` | Stopped with a failure category (timeout, agent error, worktree setup, and others) |
 | `cancelled` | Abandoned; can be revived to backlog |
 
-Transitions are enforced by a state machine: backlog starts into in progress; in progress can pause back to backlog, finish into waiting, fail, or be cancelled; waiting resumes, commits, or cancels; committing lands in done or failed; failed retries to backlog. Failed tasks carry a category that automation uses to decide retry eligibility.
+Transitions are enforced by a state machine: backlog starts into in progress; in progress can pause back to backlog, finish into waiting, fail, or be cancelled; waiting resumes, commits, or cancels; committing lands in done or failed; failed retries to backlog. Failed tasks carry a category that names why they stopped.
 
 ### Spec
 
@@ -58,7 +54,7 @@ Five built-in agent roles cover the task pipeline:
 - **Oversight**: writes a review summary of what the agent did.
 - **Commit message**: writes the final commit.
 
-Every task runs the same built-in pipeline: implementation, then testing, then a parallel finishing step (commit message, title, oversight). The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
+Every task runs the same built-in pipeline: implementation, testing when requested, then a parallel finishing step (commit message, title, oversight). The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
 
 ### Harness
 
@@ -68,23 +64,11 @@ A harness is the coding CLI that executes an agent turn. Five harnesses are supp
 
 Every task runs in its own git worktree under `~/.wallfacer/worktrees`, on a branch named `task/<id>` (the first eight characters of the task id). The worktree is what contains the work: an agent can edit freely without touching the main checkout, and the diff stays reviewable until accepted. Worktrees are garbage collected after tasks finish, and a health watcher prunes orphans. Non-git folders fall back to snapshot-based diffs without branch isolation.
 
-## The autonomy dial
-
-Automation is not a single switch but a set of composable toggles, reachable from the board header and **Settings > Execution**:
-
-- **Autoimplement** promotes backlog tasks as capacity opens, respecting dependencies and schedules.
-- **Autotest** runs the testing agent on finished work.
-- **Autosubmit** accepts work whose verification passed.
-- **Autosync** rebases waiting tasks onto the default branch as it moves.
-- **Autopush** pushes accepted commits to the remote.
-
-A sixth, separate toggle enables **Review**, where a second model reviews the change and sends its findings back to the task before the change is accepted. Enable any subset: autotest without autosubmit means automatic verification with manual acceptance; everything on means the board runs itself. Details and guard rails (retry budgets, circuit breakers, parallelism caps) are in [Automation](automation.md).
-
 ## Moving between levels
 
 Work flows up and down the spectrum:
 
-- **Up (more autonomy):** a chat conversation produces a spec; the spec is broken into tasks; tasks execute and verify automatically.
+- **Up (more autonomy):** a chat conversation produces a spec; the spec is broken into tasks; tasks execute in their own worktrees.
 - **Down (more control):** a failing task surfaces a problem; inspect the diff, open the terminal in the worktree, fix the issue by hand, and let the agent continue from the corrected state.
 
 The value of the spectrum is spending attention where it matters and delegating the rest.
@@ -93,6 +77,5 @@ The value of the spectrum is spending attention where it matters and delegating 
 
 - [Getting Started](getting-started.md): installation and the first task
 - [Board](board.md), [Chat](chat.md), [Plan](plan.md): the three main working surfaces
-- [Automation](automation.md): the autopilot level
 - [Configuration](configuration.md): settings, environment variables, shortcuts
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

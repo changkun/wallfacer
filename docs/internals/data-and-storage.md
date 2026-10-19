@@ -59,8 +59,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `CreatedAt` | `time.Time` | `created_at` | Task creation timestamp |
 | `StartedAt` | `*time.Time` | `started_at` | First transition to `in_progress` |
 | `UpdatedAt` | `time.Time` | `updated_at` | Last mutation timestamp |
-| `ScheduledAt` | `*time.Time` | `scheduled_at` | Optional future time before auto-promotion |
-| `DependsOn` | `[]string` | `depends_on` | UUIDs of tasks that must reach `done` first |
+| `DependsOn` | `[]string` | `depends_on` | UUIDs of tasks meant to reach `done` first (recorded, not enforced at start) |
 
 `TaskStatus` values: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
 
@@ -95,8 +94,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `MaxCostUSD` | `float64` | `max_cost_usd` | Cost ceiling (0 = unlimited) |
 | `MaxInputTokens` | `int` | `max_input_tokens` | Input token ceiling (0 = unlimited) |
 | `FailureCategory` | `FailureCategory` | `failure_category` | Root cause of last failure |
-| `AutoRetryBudget` | `map[FailureCategory]int` | `auto_retry_budget` | Per-category retry allowances |
-| `AutoRetryCount` | `int` | `auto_retry_count` | Total auto-retries consumed (capped at 3) |
 | `RetryHistory` | `[]RetryRecord` | `retry_history` | Past execution snapshots (pruned to last 10) |
 
 ### Usage
@@ -126,8 +123,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `IsTestRun` | `bool` | `is_test_run` | True while task is running as a test verifier |
 | `LastTestResult` | `string` | `last_test_result` | `"pass"`, `"fail"`, or `""` |
 | `TestRunStartTurn` | `int` | `test_run_start_turn` | Turn boundary between implementation and test phases |
-| `PendingTestFeedback` | `string` | `pending_test_feedback` | Failing test outcome awaiting auto-resume |
-| `TestFailCount` | `int` | `test_fail_count` | Consecutive test failures (caps auto-resume) |
 | `CustomPassPatterns` | `[]string` | `custom_pass_patterns` | User regex patterns that force "pass" verdict |
 | `CustomFailPatterns` | `[]string` | `custom_fail_patterns` | User regex patterns that force "fail" verdict |
 
@@ -575,15 +570,13 @@ Turn output files are also subject to a per-turn size budget (`WALLFACER_MAX_TUR
 
 The store uses a forward-only migration system in `internal/store/migrate.go`. Every `task.json` is passed through `migrateTaskJSON()` on load, which applies migration steps in order:
 
-1. Default missing values: `Status` to `"backlog"`, `Timeout` to `60`, `CreatedAt`/`UpdatedAt` from file mod time.
-2. Canonicalize `DependsOn`: trim whitespace, validate UUIDs, deduplicate, sort.
-3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
-4. Backfill `AutoRetryBudget` for tasks created before schema version 2.
+1. Move the deprecated `Model` field to `ModelOverride` when `ModelOverride` is unset, then clear `Model`.
+2. Default missing values: `Status` to `"backlog"`, `Timeout` to `60`, `CreatedAt`/`UpdatedAt` from file mod time.
+3. Canonicalize `DependsOn`: trim whitespace, validate UUIDs, deduplicate, sort.
+4. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
 5. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
 
-If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `2`) and is incremented whenever a new migration step is added.
-
-Migration also handles the deprecated `Model` field by moving its value to `ModelOverride`.
+If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `3`) and is incremented whenever a new migration step is added.
 
 ## Spec Document Model
 

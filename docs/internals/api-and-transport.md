@@ -21,8 +21,8 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
-| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits). |
-| `PUT /api/config` | Update server configuration (autoimplement, autotest, autosubmit, harness assignments) |
+| `GET /api/config` | Get server configuration (workspaces, workspace groups, harness list, payload limits). |
+| `PUT /api/config` | Update server configuration (workspace groups and their parallel limits) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
 | `POST /api/workspaces/pick-folder` | Open the native OS folder picker and return the chosen path |
@@ -81,8 +81,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task; `?phase=impl` (default) or `?phase=test` selects the implementation- or test-agent summary |
-| `POST /api/tasks/{id}/review` | Run one review round for a waiting task, whatever the review toggle says; 400 with code `review_no_worktree` for a task without a worktree, 409 while a round is in flight |
-| `GET /api/tasks/{id}/review/transcript` | The task's newest review session: `rounds` (each with the reviewer's answer, failed attempts, the feedback sent and the task's reply), `outcome` once the session ended (termination, open findings, headline, tokens, skip reason), the current `config`, and `running` from the in-flight set. `legacy: true` with empty `rounds` for a session the earlier debate engine recorded. `truncated: true` when the transcript could not be read to its end (an I/O error, or a record over the line cap in `internal/review/record.go`); `rounds` then holds the rounds before that point, and the server logs the error |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |
@@ -265,10 +263,6 @@ preventing data races.
 
 When the client disconnects, `r.Context().Done()` fires in the SSE loop. The deferred `store.Unsubscribe(subID)` removes the channel from the subscribers map and drains any buffered deltas to free memory. The channel is **not** closed; `StreamTasks` is always the caller of `Unsubscribe`, so there is no blocked receiver to wake.
 
-### Wake-Only Subscribers
-
-In addition to the full-delta channel, the store provides a lightweight `SubscribeWake()` mechanism: a `chan struct{}` with capacity 1. Rapid bursts of notifications coalesce; once the channel is full, subsequent sends are no-ops. This is used by watchers (auto-promoter, auto-retrier, etc.) that only need a "something changed" signal, not the full delta payload.
-
 ### Git Status Stream (`GET /api/git/stream`)
 
 Implemented in `Handler.GitStatusStream()` (`internal/handler/git.go`). Unlike the task stream, git status uses a **polling ticker** (every 5 seconds) rather than store-driven pub/sub. On each tick, the handler collects `git status` for all workspaces, JSON-marshals the result, compares it byte-for-byte with the previous emission, and only sends an SSE frame if the data has changed.
@@ -357,7 +351,7 @@ All metrics are served at `GET /metrics` in Prometheus text exposition format vi
 | Metric | Labels | Description |
 |---|---|---|
 | `wallfacer_http_requests_total` | `method`, `route`, `status` | Total HTTP requests. Route uses `r.Pattern` (Go 1.22+) to collapse parameterised paths. |
-| `wallfacer_autoimplement_actions_total` | `watcher`, `outcome` | Autonomous actions taken by autoimplement watchers (e.g. promote, retry, test, submit). |
+| `wallfacer_worktree_restorations_total` | | Task worktrees restored by the health watcher. |
 
 ### Histograms
 
@@ -376,7 +370,6 @@ These are computed on each `/metrics` scrape via registered collector functions:
 | `wallfacer_background_goroutines` |, | Number of outstanding background goroutines tracked by the runner's `trackedwg.WaitGroup`. |
 | `wallfacer_store_subscribers` |, | Number of active SSE subscribers listening for task state changes. |
 | `wallfacer_failed_tasks_by_category` | `category` | Number of currently-failed (non-archived) tasks grouped by failure category. |
-| `wallfacer_circuit_breaker_open` |, | 1 when the launch circuit breaker is open (executor unavailable), 0 when closed. |
 
 ## Token Tracking & Cost
 
@@ -489,13 +482,11 @@ sequenceDiagram
     participant OS as OS Signal
     participant Ctx as signal.NotifyContext
     participant Srv as http.Server
-    participant Watchers as Automation Watchers
     participant Runner as Runner
 
     OS->>Ctx: SIGTERM / SIGINT
     Ctx->>Ctx: cancel context
     Note over Ctx: All SSE handlers exit<br/>(request contexts derived from base)
-    Note over Ctx: All automation watchers exit<br/>(select on ctx.Done())
 
     Ctx->>Srv: srv.Shutdown(5s timeout)
     Note over Srv: Stop accepting new connections<br/>Wait up to 5s for in-flight requests
@@ -508,7 +499,7 @@ sequenceDiagram
 
 ### Shutdown sequence in detail
 
-1. **Signal received**. `signal.NotifyContext` cancels the base context. All SSE handlers and automation watchers detect `ctx.Done()` and exit their loops.
+1. **Signal received**. `signal.NotifyContext` cancels the base context. All SSE handlers and the worktree maintenance goroutines detect `ctx.Done()` and exit their loops.
 
 2. **HTTP server shutdown**. `srv.Shutdown()` is called with a 5-second timeout. This stops accepting new connections and waits for in-flight requests to complete. SSE handlers exit promptly because their request contexts (derived from `BaseContext`) are already cancelled.
 
@@ -518,11 +509,11 @@ sequenceDiagram
    - Waits for the board subscription goroutine via `boardSubscriptionWg.Wait()`.
    - Waits for all tracked background goroutines via `backgroundWg.Wait()`, logging pending labels every 3 seconds so operators can see what is still running.
 
-4. **In-progress tasks survive**. Running task processes are intentionally left alive. They continue to completion independently and will be recovered on the next server start via `RecoverOrphanedTasks`.
+4. **In-progress tasks are recovered on the next start**. Running agent processes are not waited for. On the next start, `RecoverOrphanedTasks` moves their tasks to `waiting` (see [Background Work and Recovery](background-work.md#recoverorphanedtasks)).
 
 ## See Also
 
 - [Architecture](architecture.md): System overview, design decisions, component responsibilities, concurrency model
-- [Automation](automation.md): Autoimplement watchers, auto-retry, circuit breakers, oversight
+- [Background Work and Recovery](background-work.md): goroutine model, startup recovery, oversight generation
 - [Task Lifecycle](task-lifecycle.md): State machine, turn loop, data models
 - [Git Worktrees](git-worktrees.md): Per-task worktree isolation and commit pipeline

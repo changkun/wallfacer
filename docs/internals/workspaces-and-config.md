@@ -17,12 +17,7 @@ type Workspace struct {
     Folders []string // mutable; absolute, clean, sorted, deduped
     DataKey string   // stable storage handle under data/<DataKey>
 
-    MaxParallel     *int  // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit)
-    MaxTestParallel *int  // same for WALLFACER_MAX_TEST_PARALLEL
-    Autoimplement   *bool // per-workspace automation toggles (autopush stays global)
-    Autotest        *bool
-    Autosubmit      *bool
-    Autosync        *bool
+    MaxParallel *int // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit, 0 = unlimited)
 
     Dormant bool // history recovered by migration; folders await re-pointing
 }
@@ -86,7 +81,7 @@ After a successful swap:
 
 Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateTitle()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
 
-Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner, autoimplement watchers) to react to workspace switches.
+Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams and the runner) to react to workspace switches.
 
 ## Repository Instructions
 
@@ -168,10 +163,10 @@ The `Config` struct covers all known keys. Key categories:
 | **Claude model** | `BaseURL`, `DefaultModel`, `TitleModel` |
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
 | **Cursor/OpenCode** | `CursorAPIKey` (`CURSOR_API_KEY`), `OpenCodeServerPassword` (`OPENCODE_SERVER_PASSWORD`) |
-| **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
+| **Parallelism** | `MaxParallelTasks` |
 | **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
 | **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
-| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
+| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 
 ### Atomic Updates
@@ -192,9 +187,9 @@ This design means that `PUT /api/env` can safely omit token fields, they are pre
 
 The env file is re-read on every agent process launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new tasks without a server restart. Already-running tasks are unaffected, they received their environment when the process was spawned.
 
-The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque `--env-file ... no such file` launch error (a failure mode inherited from the container-era backend). The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. The host backend is independently resilient, `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
+The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps a task started after a long idle period from losing its credentials. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. The host backend is independently resilient, `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
 
-Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env file changes. They read configuration values from in-memory state on the `Handler` or `Runner` structs, which are populated from the env file at startup. Some values (like `MaxParallelTasks`) are re-read from the env file whenever they are needed by the promoter logic.
+Nothing subscribes to env file changes. `MaxParallelTasks` is read once into a cache on the `Handler` (`cachedMaxParallel`) and reloaded after `PUT /api/env` invalidates it, so a limit changed in Settings applies to the next start, while a hand edit of the file applies after a restart.
 
 ## System Prompt Templates
 

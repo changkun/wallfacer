@@ -50,7 +50,7 @@ Every task keeps an event-sourced audit trail. Events are appended, never rewrit
 
 Event types: `state_change`, `output`, `feedback`, `error`, `system`, `span_start`, `span_end`, `prompt_round`, and `prompt_round_revert`.
 
-Each state change records a trigger explaining what caused it: `user`, `auto_promote`, `auto_retry`, `auto_test`, `auto_submit`, `feedback`, `sync`, `recovery`, or `system`.
+Each state change records a trigger explaining what caused it: `user`, `feedback`, `recovery`, or `system`.
 
 View the trail in the **Events** tab of the task detail modal, which also surfaces usage, retry history, and prompt history. The same data is available at `GET /api/tasks/{id}/events`, with optional cursor pagination (`after`, `limit`, `types`).
 
@@ -129,11 +129,10 @@ The server exposes `GET /metrics` in Prometheus text format for external monitor
 | `wallfacer_background_goroutines` | gauge | |
 | `wallfacer_store_subscribers` | gauge | |
 | `wallfacer_failed_tasks_by_category` | gauge | `category` |
-| `wallfacer_circuit_breaker_open` | gauge | |
-| `wallfacer_autoimplement_actions_total` | counter | `watcher`, `outcome` |
+| `wallfacer_worktree_restorations_total` | counter | |
 | `wallfacer_http_requests_total` | counter | `method`, `route`, `status` |
 | `wallfacer_http_request_duration_seconds` | histogram | `method`, `route` |
 
 ## See also
 
-[Board](board.md) for the task lifecycle and detail modal, [Automation](automation.md) for the watchers whose triggers appear in the timeline, [Configuration](configuration.md) for the environment variable reference, and [API & Transport](../internals/api-and-transport.md) for the full HTTP API.
+[Board](board.md) for the task lifecycle and detail modal, [Configuration](configuration.md) for the environment variable reference, and [API & Transport](../internals/api-and-transport.md) for the full HTTP API.
