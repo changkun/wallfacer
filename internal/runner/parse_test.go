@@ -15,10 +15,10 @@ import (
 var update = flag.Bool("update", false, "regenerate golden files instead of comparing")
 
 func TestMain(m *testing.M) {
-	// Re-exec mode: when WALLFACER_FAKE_MODE is set, the test binary acts as a
+	// Re-exec mode: when FAKE_AGENT_MODE is set, the test binary acts as a
 	// fake container command instead of running tests. This replaces shell scripts
 	// that are not portable to Windows.
-	if mode := os.Getenv("WALLFACER_FAKE_MODE"); mode != "" {
+	if mode := os.Getenv("FAKE_AGENT_MODE"); mode != "" {
 		runFakeCmd(mode)
 		return
 	}
