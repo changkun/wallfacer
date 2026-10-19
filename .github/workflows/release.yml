@@ -136,7 +136,7 @@ jobs:
         # CHANGELOG.md section for the tag, read by the lateregate this repo
         # pins; no section fails here, before anything is created. The
         # pre-push hook refuses the tag with the same reader. Notes written
-        # before this rule stay under docs/releases as history.
+        # before this rule are on their GitHub releases.
         env:
           TAG: ${{ github.ref_name }}
         run: go tool lateregate release-notes "$TAG" > notes.md

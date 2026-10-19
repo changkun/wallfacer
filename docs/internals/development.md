@@ -141,4 +141,4 @@ stamping the version for `wallfacer doctor` and usage output.
 **Release notes.** The release body is the tag's section of `CHANGELOG.md`,
 read by `go tool lateregate release-notes`. A tag without a section fails the
 workflow before anything is published, and the pre-push hook refuses it.
-Notes written before this rule stay under `docs/releases/` as history.
+Releases before that rule have their notes on GitHub.
