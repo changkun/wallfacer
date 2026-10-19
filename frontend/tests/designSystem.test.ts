@@ -6,13 +6,12 @@ import { join, resolve } from 'node:path';
 // (specs/shared/console-redesign.md). Four contracts:
 //   1. The material is matte: no backdrop-filter anywhere in src/styles, and
 //      (as surface specs land) in any component style block. `none` is allowed:
-//      it is how a shared latere-ui surface's own filter is switched off.
+//      it switches a filter off.
 //   2. Palettes set surfaces, ink, rules, accent and the semantic ramp only.
 //      Tint pairs, shadows, terminal and glass tokens derive in tokens.css.
 //   3. Every palette keeps meta text readable (ink-3 on bg >= 4.5:1) and body
 //      text off glare (bg vs ink >= 12:1) in both themes.
-//   4. The primitive classes every surface composes from exist, and the glass
-//      runtime is no longer imported.
+//   4. The primitive classes every surface composes from exist.
 //
 // CSS is read from disk (not the DOM) so the assertions stay fast and
 // independent of a full render.
@@ -100,19 +99,6 @@ describe('material is matte', () => {
   it.each(vueFiles.filter((f) => !pending.includes(f)))('%s style block carries no backdrop-filter', (file) => {
     const style = read(file).split(/<style[^>]*>/).slice(1).join('\n');
     expect(style).not.toMatch(/backdrop-filter\s*:(?!\s*none\b)/);
-  });
-
-  it('the glass runtime is not imported', () => {
-    expect(read('src/main.ts')).not.toContain('latere-ui/glass');
-    expect(read('src/App.vue')).not.toContain('useLiquidGlass');
-  });
-
-  it('glass tokens the shared components still read are pinned opaque', () => {
-    for (const k of ['--glass-blur', '--glass-blur-thin', '--glass-blur-thick']) {
-      expect(defaultLight.tokens[k]).toBe('0');
-    }
-    expect(defaultLight.tokens['--glass-bg']).toBe('var(--bg-card)');
-    expect(defaultLight.tokens['--glass-edge-top']).toBe('none');
   });
 });
 
@@ -248,13 +234,6 @@ describe('primitives.css defines the shared classes', () => {
       'src/components/Sidebar.vue', 'src/components/StatusBar.vue',
     ]) {
       expect(existsSync(resolve(root, f)), f).toBe(false);
-    }
-  });
-
-  it('the rail is wallfacer\'s own: no ConsoleSidebar or console stylesheet import', () => {
-    for (const f of walk(resolve(root, 'src'), '.vue').concat(walk(resolve(root, 'src'), '.ts'))) {
-      const src = readFileSync(f, 'utf8');
-      expect(src, rel(f)).not.toMatch(/ConsoleSidebar|latere-ui\/console|latere-ui\/glass|useLiquidGlass/);
     }
   });
 });

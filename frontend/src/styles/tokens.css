@@ -22,8 +22,7 @@
 :root,
 [data-theme="light"] {
   /* Typography — Inter for UI, the system monospace stack for data and code.
-     Instrument Serif is only used by the shared latere-ui footer wordmark on
-     the cloud landing. */
+     Instrument Serif is the wordmark face (brand-override.css). */
   --font-sans:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font-sans);
@@ -193,35 +192,6 @@
   --terminal-ink-dim: rgba(20, 19, 17, 0.45);
   --terminal-tab-hover: var(--bg-elevated);
   --terminal-tab-active: var(--bg-card);
-
-  /* Shared latere-ui components (AccountMenu, SiteFooter) still read the
-     glass ladder. Pinned to opaque, blur-free values so they render matte:
-     the package documents these as its reduce-transparency fallback. */
-  --glass-bg: var(--bg-card);
-  --glass-bg-ultrathin: var(--bg-card);
-  --glass-bg-thin: var(--bg-card);
-  --glass-bg-thick: var(--bg-card);
-  --glass-smoke: var(--ink);
-  --glass-smoke-strong: var(--ink);
-  --glass-smoke-ink: var(--bg);
-  --glass-blur: 0;
-  --glass-blur-ultrathin: 0;
-  --glass-blur-thin: 0;
-  --glass-blur-thick: 0;
-  --glass-saturate: 100%;
-  --glass-brightness: 1;
-  --glass-border: var(--rule);
-  --glass-highlight: transparent;
-  --glass-edge-top: none;
-  --glass-pill-fill: var(--bg-sunk);
-  --shadow-glass: var(--sh-pop);
-  --shadow-glass-hover: var(--sh-pop);
-  --glass-edge: var(--sh-pop);
-  --glass-edge-thick: var(--sh-pop);
-  --glass-radius: var(--r-xl);
-  --radius-pill: var(--r-pill);
-  --canvas: var(--bg);
-  --canvas-gradient: none;
 }
 
 [data-theme="dark"] {

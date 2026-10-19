@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // The color-palette axis (Slack-style selectable themes) is orthogonal to
 // light/dark: prefs.palette persists at wallfacer-palette and applies as
 // <html data-palette>, with the default palette (clay) carrying no attribute

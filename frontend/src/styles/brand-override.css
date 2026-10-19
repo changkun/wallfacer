@@ -1,16 +1,10 @@
-/* Wallfacer follows the shared Latere identity: every product wordmark is
-   Instrument Serif italic, with wallfacer painted in the coral gradient. The
-   pinned latere-ui package already renders this (brand.css/footer.css,
-   console.css, all !important); this file restates it under a [data-theme]
-   prefix so the serif-italic wordmark wins regardless of the order Vite emits
-   the stylesheets in (component-imported CSS can land after this entry-imported
-   file). The coral wallfacer gradient is pinned to --accent-gradient so it
-   tracks the active palette. */
-[data-theme] .cella-brand,
+/* Product wordmarks are Instrument Serif italic, with wallfacer painted in the
+   coral gradient. The [data-theme] prefix makes the serif-italic wordmark win
+   regardless of the order Vite emits the stylesheets in (component-imported
+   CSS can land after this entry-imported file). The coral wallfacer gradient
+   is pinned to --accent-gradient so it tracks the active palette. */
 [data-theme] .wallfacer-brand,
-[data-theme] .lux-brand,
-[data-theme] .topos-brand,
-[data-theme] .lectio-brand {
+[data-theme] .topos-brand {
   font-family: var(--font-serif) !important;
   font-style: italic !important;
   font-weight: 400 !important;
@@ -19,4 +13,3 @@
 [data-theme] .wallfacer-brand {
   background-image: var(--accent-gradient) !important;
 }
-

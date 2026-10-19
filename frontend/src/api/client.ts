@@ -1,17 +1,16 @@
-import { ApiError as SessionApiError } from 'latere-ui';
-
 // ApiError is a failed API call: the HTTP status, the parsed body, the sentence
 // to show (message), and the server's stable error code. code is set when the
 // body is the error envelope and is '' otherwise; callers branch on it instead
 // of matching the message. The envelope's developer detail stays on body.
-//
-// It extends latere-ui's ApiError because the shared session code classifies
-// failures by that class: its me() reads a 401 or 404 from /api/me as a
-// signed-out session only when the error is an instance of it.
-export class ApiError extends SessionApiError {
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
   code: string;
   constructor(status: number, body: unknown, message: string, code = '') {
-    super(status, body, message);
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
     this.code = code;
   }
 }
