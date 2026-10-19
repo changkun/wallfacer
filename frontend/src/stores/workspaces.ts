@@ -1,16 +1,18 @@
 // The workspaces store backs the first-class workspace model: a workspace has a
-// stable id, a name, and a mutable set of folder paths. Identity is decoupled
-// from membership, so renaming or re-pointing folders never loses history.
+// stable id, a name, and one folder. Identity is decoupled from the folder, so
+// renaming or re-pointing a workspace never loses history. A dormant workspace
+// waits for its folder to be chosen: it holds none (recovered history) or
+// several (saved before a workspace became one folder), and re-pointing it to
+// one folder brings its tasks back.
 //
-// Endpoints (see internal/handler/workspaces.go):
+// Endpoints (see internal/handler/workspace_crud.go). The wire keeps a
+// `folders` list so a dormant workspace can show every folder it named; writes
+// send exactly one, and the server answers 400 for more.
 //   GET    /api/workspaces            -> { workspaces, active_id }
 //   POST   /api/workspaces            -> WorkspaceDTO (201, created, not active)
-//   PUT    /api/workspaces/{id}       -> WorkspaceDTO (rename / replace folders)
-//   DELETE /api/workspaces/{id}       -> 204 (409 if active)
+//   PUT    /api/workspaces/{id}       -> WorkspaceDTO (rename / re-point / limits)
+//   DELETE /api/workspaces/{id}       -> full /api/config payload (board switches if it was active)
 //   POST   /api/workspaces/{id}/activate -> full /api/config payload, switches board
-//
-// The legacy PUT /api/workspaces { workspaces: string[] } path-based switch is
-// untouched and still served; WorkspacePicker's wizard now prefers create+activate.
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 
@@ -58,35 +60,38 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
     }
   }
 
-  // create registers a new workspace. It does NOT activate it; the returned
-  // DTO carries the new id for callers that want to activate next.
-  async function create(name: string, folders: string[]): Promise<Workspace> {
+  // create registers a new workspace on one folder. It does NOT activate it;
+  // the returned DTO carries the new id for callers that want to activate next.
+  async function create(name: string, folder: string): Promise<Workspace> {
     error.value = null;
-    const ws = await api<Workspace>('POST', '/api/workspaces', { name, folders });
+    const ws = await api<Workspace>('POST', '/api/workspaces', { name, folders: [folder] });
     workspaces.value.push(ws);
     return ws;
   }
 
-  // update renames and/or replaces the folders of a workspace in place.
-  // History is preserved server-side; the returned DTO replaces the local copy.
+  // update renames a workspace, re-points it to one folder, and/or sets its
+  // parallel caps in place. History is preserved server-side; the returned DTO
+  // replaces the local copy.
   async function update(
     id: string,
     patch: {
       name?: string;
-      folders?: string[];
+      folder?: string;
       max_parallel?: number | null;
       max_test_parallel?: number | null;
     },
   ): Promise<Workspace> {
     error.value = null;
-    const ws = await api<Workspace>('PUT', `/api/workspaces/${id}`, patch);
+    const { folder, ...rest } = patch;
+    const body = folder === undefined ? rest : { ...rest, folders: [folder] };
+    const ws = await api<Workspace>('PUT', `/api/workspaces/${id}`, body);
     const idx = workspaces.value.findIndex(w => w.id === id);
     if (idx >= 0) workspaces.value[idx] = ws;
-    // Editing the ACTIVE workspace's folders changes the active folder set
-    // server-side; refetch config so config.workspaces updates and every
-    // folder-derived view reacts (the Mission Control graph and spec tree watch
-    // it). Without this they stay stale until a tab switch re-mounts them.
-    if (patch.folders !== undefined && isActive(id)) {
+    // Re-pointing the ACTIVE workspace changes the active folder server-side;
+    // refetch config so config.workspaces updates and every folder-derived
+    // view reacts (the Mission Control graph and spec tree watch it). Without
+    // this they stay stale until a tab switch re-mounts them.
+    if (folder !== undefined && isActive(id)) {
       await useTaskStore().fetchConfig();
     }
     return ws;

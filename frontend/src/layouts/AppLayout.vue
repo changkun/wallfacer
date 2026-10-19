@@ -20,6 +20,7 @@ import { useUiStore } from '../stores/ui';
 import { useKeyboard } from '../composables/useKeyboard';
 import { getStored, setStored } from '../lib/storage';
 import { shouldRefetchOnVisible } from '../lib/visibility';
+import { basename } from '../lib/workspaceLabel';
 import type { Task } from '../api/types';
 
 const store = useTaskStore();
@@ -96,12 +97,8 @@ onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityC
 // when three tasks are in progress. Mirrors legacy ui/js/git.js title
 // updates.
 useHead(computed(() => {
-  const ws = store.config?.workspaces ?? [];
-  const wsLabel = ws.length === 0
-    ? ''
-    : ws.length === 1
-      ? ws[0].replace(/\/+$/, '').split('/').pop() || ws[0]
-      : `${ws.length} workspaces`;
+  const folder = store.config?.workspaces?.[0] ?? '';
+  const wsLabel = folder ? basename(folder) : '';
   const running = store.inProgress.length;
   const parts: string[] = ['Wallfacer'];
   if (wsLabel) parts.push(wsLabel);

@@ -350,9 +350,9 @@ SCENES['onboarding-guidance'] = async (page) => {
   await page.click('.sb-ws-switch');
   await page.click('.sb-ws-popover__add');
   await page.getByRole('button', { name: '+ New workspace' }).click();
-  expect('onboarding-guidance', (await page.locator('.dialog-sub').textContent()).includes('Agents read and edit these folders'), 'folder chooser omits workspace purpose');
+  expect('onboarding-guidance', (await page.locator('.dialog-sub').textContent()).includes('Agents read and edit this folder'), 'folder chooser omits workspace purpose');
   const next = page.getByRole('button', { name: 'Next: Name' });
-  expect('onboarding-guidance', await next.isDisabled(), 'empty folder selection can be saved');
+  expect('onboarding-guidance', await next.isDisabled(), 'an unchosen folder can be saved');
 };
 
 SCENES['credential-storage'] = async (page) => {

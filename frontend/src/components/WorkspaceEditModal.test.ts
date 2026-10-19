@@ -1,9 +1,10 @@
-// WorkspaceEditModal is the single per-workspace settings popup (name, folders,
+// WorkspaceEditModal is the single per-workspace settings popup (name, folder,
 // parallel caps, delete). These pin the behavior that must hold:
 //  - one Name field (no duplicated label/input box),
-//  - folder add/remove and caps persist via wsStore.update (never the wizard's
-//    activate-on-confirm path),
-//  - the last folder cannot be removed (server 400s on an empty set),
+//  - changing the folder and the caps persist via wsStore.update (never the
+//    wizard's activate-on-confirm path), and a change sends exactly one folder,
+//  - a dormant workspace saved with several folders offers a Keep button per
+//    folder and is re-pointed to the one kept,
 //  - the active workspace is deletable (server wipes data + auto-switches).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, nextTick, type App } from 'vue';
@@ -58,7 +59,8 @@ async function mount(): Promise<{ app: App; host: HTMLElement }> {
   return { app, host };
 }
 
-const wsA: Workspace = { id: 'a', name: 'Alpha', folders: ['/x', '/y'], dormant: false, active: false } as Workspace;
+const wsA: Workspace = { id: 'a', name: 'Alpha', folders: ['/x'], dormant: false, active: false } as Workspace;
+const wsPair: Workspace = { id: 'p', name: 'Pair', folders: ['/x', '/y'], dormant: true, active: false } as Workspace;
 
 describe('WorkspaceEditModal', () => {
   let app: App | null = null;
@@ -84,8 +86,9 @@ describe('WorkspaceEditModal', () => {
     const nameInputs = host!.querySelectorAll('#ws-edit-name');
     expect(nameInputs.length).toBe(1);
     expect((nameInputs[0] as HTMLInputElement).value).toBe('Alpha');
-    // Two folder rows are listed.
-    expect(host!.querySelectorAll('.ws-selected-item').length).toBe(2);
+    // The one folder is listed, with no per-row Keep choice.
+    expect(host!.querySelectorAll('.ws-selected-item').length).toBe(1);
+    expect(host!.querySelector('.ws-selected-item__keep')).toBeNull();
   });
 
   it('persists a rename via wsStore.update on blur (no activate call)', async () => {
@@ -103,21 +106,20 @@ describe('WorkspaceEditModal', () => {
     expect(apiCalls.some(c => c.path.includes('/activate'))).toBe(false);
   });
 
-  it('removes a folder via update, but disables removing the last one', async () => {
-    seed([{ ...wsA }], 'a');
+  it('re-points a dormant workspace saved with several folders to the one kept', async () => {
+    seed([{ ...wsPair }], 'p');
     ({ app, host } = await mount());
-    const removeBtns = host!.querySelectorAll('.ws-selected-item__remove');
-    (removeBtns[0] as HTMLButtonElement).click();
-    await nextTick();
-    const put = apiCalls.find(c => c.method === 'PUT');
-    expect((put!.body as { folders: string[] }).folders).toEqual(['/y']);
+    expect(host!.querySelector('.ws-edit__several')).not.toBeNull();
+    const keepBtns = host!.querySelectorAll<HTMLButtonElement>('.ws-selected-item__keep');
+    expect(keepBtns.length).toBe(2);
+    // Nothing is sent until the owner keeps one.
+    expect(apiCalls.some(c => c.method === 'PUT')).toBe(false);
 
-    // A single-folder workspace cannot drop its last folder.
-    apiCalls.length = 0;
-    useWorkspacesStore().workspaces = [{ ...wsA, folders: ['/only'] }];
+    keepBtns[1].click();
     await nextTick();
-    const lastBtn = host!.querySelector('.ws-selected-item__remove') as HTMLButtonElement;
-    expect(lastBtn.disabled).toBe(true);
+    const put = apiCalls.find(c => c.method === 'PUT' && c.path === '/api/workspaces/p');
+    expect((put!.body as { folders: string[] }).folders).toEqual(['/y']);
+    expect(apiCalls.some(c => c.path.includes('/activate'))).toBe(false);
   });
 
   it('clears a parallel cap by sending null when the input is emptied', async () => {
@@ -132,21 +134,21 @@ describe('WorkspaceEditModal', () => {
     expect((put!.body as { max_parallel: number | null }).max_parallel).toBeNull();
   });
 
-  it('adds a browsed folder through update', async () => {
+  it('changes the folder to a browsed one through update, sending one folder', async () => {
     browseEntries = [{ name: 'gamma', path: '/home/u/gamma', is_git_repo: false }];
     seed([{ ...wsA }], 'a');
     ({ app, host } = await mount());
     // Reveal the browser; first reveal kicks off browse('').
-    (Array.from(host!.querySelectorAll('button')).find(b => b.textContent?.includes('Add folder')) as HTMLButtonElement).click();
+    (Array.from(host!.querySelectorAll('button')).find(b => b.textContent?.includes('Change folder')) as HTMLButtonElement).click();
     await nextTick();
     await Promise.resolve();
     await nextTick();
-    const add = host!.querySelector('.ws-entry__add') as HTMLButtonElement;
-    expect(add).not.toBeNull();
-    add.click();
+    const choose = host!.querySelector('.ws-entry__choose') as HTMLButtonElement;
+    expect(choose).not.toBeNull();
+    choose.click();
     await nextTick();
     const put = apiCalls.find(c => c.method === 'PUT');
-    expect((put!.body as { folders: string[] }).folders).toEqual(['/x', '/y', '/home/u/gamma']);
+    expect((put!.body as { folders: string[] }).folders).toEqual(['/home/u/gamma']);
   });
 
   it('allows deleting the active workspace and issues DELETE', async () => {
