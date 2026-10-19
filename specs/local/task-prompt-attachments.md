@@ -117,18 +117,12 @@ Subsequent auto-continue turns send an empty prompt and are unchanged. Feedback 
 
 The mechanism is a file in the working directory plus a prompt stanza, so it
 does not depend on which harness runs the task. Every harness wallfacer
-launches (the five CLI harnesses and the in-process native one) runs with the
+launches (the five CLI harnesses) runs with the
 primary worktree as its working directory and has a file-read tool. Image and
 PDF understanding is the model's, so the stanza names each file's type and
 leaves the choice of tool to the agent. The wording in the stanza above says
 "Read tool" because that is its name in most harnesses; a harness with a
 different name for it still finds the files by path.
-
-A task whose execution target is hosted
-([topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md))
-is out of scope here. Its session clones a pushed branch, and `.attachments/`
-is excluded from git on purpose, so staged files never reach it. Sending
-attachments to a hosted session is that spec's concern.
 
 ## Phasing and Acceptance Criteria
 

@@ -58,8 +58,7 @@ The single-spec lifecycle handlers and the prompt-round pipeline repeat a
 Best-effort terminal sequences are hand-repeated across the runner.
 
 - `(*Runner).failTask(ctx, taskID, category, errEvent)` helper.
-  Sites: `internal/runner/execute.go:163, 234, 257, 357, 506, 633`,
-  `internal/runner/agentic.go:220`. The sequence
+  Sites: `internal/runner/execute.go:163, 234, 257, 357, 506, 633`. The sequence
   (SetTaskFailureCategory -> UpdateTaskStatus(Failed) -> InsertEvent(Error) ->
   StateChange in_progress->failed) repeats ~7 times; only the FailureCategory
   and error text vary. Consolidating guarantees a new fail site cannot forget

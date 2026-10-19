@@ -42,12 +42,6 @@ Two consequences shape this feature:
 
 `internal/runner/container_host_mode_test.go` (the existing host-mode tests) is the reference for how WorkDir, board context, and sibling worktrees are surfaced today: via `WALLFACER_*` env vars and turn-1 prompt text, not volumes.
 
-3. **A path reference is local.** A task whose execution target is hosted
-   ([topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md))
-   runs on a machine that has none of the host's filesystem. Host path
-   references apply to the local target only; a hosted dispatch of a task that
-   has them is refused with a message that names them.
-
 ---
 
 ## Goal

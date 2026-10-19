@@ -35,19 +35,17 @@ Beyond environment constraints, many power users simply prefer terminal interfac
 
 ## Current State (as of 2026-10-02)
 
-- **Web UI**: A Vue SPA under `frontend/src/`, built to `frontend/dist/` and embedded into the binary via `//go:embed all:frontend/dist` in `main.go`. Components live under `frontend/src/components/` (task board via `TaskCard.vue`, `TaskComposer.vue`, `TaskDetail.vue`, `ExplorerPanel.vue`, `TerminalPanel.vue`, `Topbar.vue`, etc.) with Pinia stores under `frontend/src/stores/` (`tasks.ts`, `agentSession.ts`, `auth.ts`, `workspaces.ts`). The vanilla `ui/` HTML/JS tree has been deleted. The SPA is a pure API client; the server holds no per-page render logic.
+- **Web UI**: A Vue SPA under `frontend/src/`, built to `frontend/dist/` and embedded into the binary via `//go:embed all:frontend/dist` in `main.go`. Components live under `frontend/src/components/` (task board via `TaskCard.vue`, `TaskComposer.vue`, `TaskDetail.vue`, `ExplorerPanel.vue`, `TerminalPanel.vue`, `Topbar.vue`, etc.) with Pinia stores under `frontend/src/stores/` (`tasks.ts`, `agentSession.ts`, `workspaces.ts`). The vanilla `ui/` HTML/JS tree has been deleted. The SPA is a pure API client; the server holds no per-page render logic.
 - **CLI subcommands** (dispatched from `main.go`):
   - `wallfacer run` - starts the embedded task board server (`internal/cli/server.go`) and, unless `-no-browser` is passed, opens the Vue SPA in a browser.
   - `wallfacer status` - prints a static board snapshot to the terminal; `wallfacer status -watch` clears and reprints every 2 seconds until Ctrl-C.
   - `wallfacer spec` - spec document tools (validate, ...).
   - `wallfacer doctor` / `wallfacer env` - prerequisite and config checks.
-  - `wallfacer auth` - auth login/token helpers.
-  - `wallfacer web` - separate public OIDC frontend server (`internal/cli/web.go`); not the local task board. Out of scope here.
 - **Runtime**: tasks run host-only in dedicated git worktrees via `internal/executor/` (the `executor.Backend` interface). There is no container backend; the former `internal/sandbox/` package and its `LocalBackend` have been removed. A task's configured harness is stored as `Sandbox harness.ID` ("claude", "codex", etc.) on `store.Task`.
 - **HTTP API**: all operations are exposed via REST, declared in `internal/apicontract/routes.go`. The web UI is a pure API client.
 - **SSE streams**: `GET /api/tasks/stream` pushes a full snapshot then incremental task-updated/task-deleted events; `GET /api/git/stream` pushes git status updates; `GET /api/tasks/{id}/logs` streams live task logs.
 - **WebSocket terminal**: `GET /api/terminal/ws` provides interactive host shell access (PTY-backed, `internal/handler/terminal.go`). It is mounted directly in `server.go`, not declared in `apicontract`.
-- **Server auth**: API requests authenticate via a Bearer token (`WALLFACER_SERVER_API_KEY`) or an OIDC cookie/JWT identity. The TUI client uses the Bearer path.
+- **Server auth**: API requests authenticate with the per-machine server key (`WALLFACER_SERVER_API_KEY`) as a Bearer token. The TUI client uses the same key.
 
 The existing `wallfacer status -watch` is a minimal terminal view: it polls and reprints a text table. It has no interactivity, no task management, no log viewing.
 
@@ -273,7 +271,6 @@ Wiring: `main.go` dispatches the `tui` subcommand to a new `cli.RunTUI(configDir
 - `wallfacer run` remains unchanged - starts the embedded server and opens the browser (suppress with `-no-browser`).
 - `wallfacer status` remains unchanged - static/watch text output (`-watch`).
 - `wallfacer tui` is the new fully interactive terminal experience.
-- `wallfacer web` (public OIDC frontend server) is unrelated and untouched.
 
 ---
 
@@ -516,7 +513,7 @@ The TUI should render the first frame within 200ms. This means:
 
 ## Migration & Backward Compatibility
 
-- **Additive only**: New `tui` subcommand. No changes to existing `run`, `status`, `spec`, `doctor`, `auth`, `web` commands.
+- **Additive only**: New `tui` subcommand. No changes to existing `run`, `status`, `spec`, `doctor` commands.
 - **No API changes**: The TUI consumes existing endpoints.
 - **No web UI changes**: The Vue SPA is unaffected.
 - **Go module**: New dependencies (charmbracelet) are added to `go.mod`. These are pure Go, no CGo, no platform restrictions.
