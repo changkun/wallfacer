@@ -201,13 +201,13 @@ the failure categories, and retry history.
 
 The `StartWaitingSyncWatcher` monitors tasks in `waiting` or `failed` state and rebases their worktrees onto the latest default branch when upstream changes are detected. This keeps task branches up-to-date without merging, reducing conflict risk when the commit pipeline eventually runs.
 
-Multiple workspace paths can be passed at startup (`WALLFACER_WORKSPACES`) or switched at runtime via `POST /api/workspaces/{id}/activate`. For each workspace folder:
+A workspace is one folder; the active one is switched at runtime via `POST /api/workspaces/{id}/activate`. For the workspace folder:
 
-- Git status is polled independently and shown in the UI header
-- A separate worktree is created per task per workspace
-- The commit pipeline runs phases 1-3 for each workspace in sequence
+- Git status is polled and shown in the UI header
+- Each task gets its own worktree of the folder
+- The commit pipeline runs phases 1-3 over the task's worktree map; a task stored with worktrees in several folders (from before a workspace became one folder) still gets every folder committed, in sequence
 
-Non-git directories are supported as plain mount targets (no worktree, no commit pipeline for that workspace).
+A non-git folder gets a snapshot copy instead of a worktree, tracked by a local git repository so the same commit pipeline extracts its changes back (see [Git Worktrees](git-worktrees.md)).
 
 ## Oversight Generation
 

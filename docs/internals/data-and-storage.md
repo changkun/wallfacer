@@ -6,7 +6,7 @@ The store implementation lives in `internal/store/`.
 
 ## Directory Layout
 
-Task data is scoped by workspace. Each workspace record in `~/.wallfacer/workspaces.json` carries a stable `DataKey` (a 16-hex-character storage handle, decoupled from the folder set), and the data root is `~/.wallfacer/data/<data-key>/`. Workspaces migrated from the legacy `workspace-groups.json` keep the SHA-256 path-set hash that already named their directory as their initial `DataKey`; workspaces created explicitly get a random key. Editing a workspace's folders does not change its `DataKey`, so task history stays attached. See [Workspaces & Configuration](workspaces-and-config.md).
+Task data is scoped by workspace. Each workspace record in `~/.wallfacer/workspaces.json` carries a stable `DataKey` (a 16-hex-character storage handle, decoupled from the folder), and the data root is `~/.wallfacer/data/<data-key>/`. Workspaces migrated from the legacy `workspace-groups.json` keep the SHA-256 path-set hash that already named their directory as their initial `DataKey`; workspaces created explicitly get a random key. Re-pointing a workspace to another folder does not change its `DataKey`, so task history stays attached. See [Workspaces & Configuration](workspaces-and-config.md).
 
 Within the scoped data directory, each task gets its own UUID-named directory:
 
@@ -111,13 +111,12 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 
 | Field | Type | JSON Key | Description |
 |---|---|---|---|
-| `WorktreePaths` | `map[string]string` | `worktree_paths` | Host repo path to worktree path |
+| `WorktreePaths` | `map[string]string` | `worktree_paths` | Host repo path to worktree path. One entry for a new task; a task stored when a workspace could span several folders has one per folder |
 | `BranchName` | `string` | `branch_name` | Task branch (`task/<uuid8>`) |
 | `CommitHashes` | `map[string]string` | `commit_hashes` | Post-merge commit hash per repo |
 | `BaseCommitHashes` | `map[string]string` | `base_commit_hashes` | Default branch HEAD before merge |
 | `SnapshotDiffs` | `map[string]string` | `snapshot_diffs` | Pre-computed diffs for non-git workspaces (repoPath → diff text) |
 | `CommitMessage` | `string` | `commit_message` | Generated commit message from commit pipeline |
-| `MountWorktrees` | `bool` | `mount_worktrees` | Legacy flag retained for back-compat; execution is host-process with the worktree as CWD |
 
 ### Test Verification
 

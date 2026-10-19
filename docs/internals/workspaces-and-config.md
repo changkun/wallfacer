@@ -8,13 +8,13 @@ The workspace manager (`internal/workspace/manager.go`) coordinates workspace sw
 
 ### Data Model
 
-A workspace is an owned, stably-identified set of folder paths (`internal/workspace/groups.go`). Its identity (`ID`) and its storage handle (`DataKey`) are independent of its membership (`Folders`), so the owner may change folders without orphaning history:
+A workspace is an owned, stably-identified host folder (`internal/workspace/groups.go`). Its identity (`ID`) and its storage handle (`DataKey`) are independent of the folder it points at, so the owner may re-point it without orphaning history:
 
 ```go
 type Workspace struct {
     ID      string   // stable UUIDv4, assigned once at creation/migration
     Name    string   // optional human label
-    Folders []string // mutable; absolute, clean, sorted, deduped
+    Folders []string // the one folder (absolute, clean); a list only so older records load whole
     DataKey string   // stable storage handle under data/<DataKey>
 
     MaxParallel     *int  // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit)
@@ -24,20 +24,32 @@ type Workspace struct {
     Autosubmit      *bool
     Autosync        *bool
 
-    Dormant bool // history recovered by migration; folders await re-pointing
+    Dormant bool // history kept, folder not chosen yet: recovered by migration, or saved with several folders
 }
 ```
 
-The manager's `Snapshot` (`internal/workspace/manager.go`) captures the active workspace at a point in time: `WorkspaceID` (empty for ad-hoc/legacy path switches pre-migration), `Workspaces` (the active folder set), `Store`, `ScopedDataDir`, `Key` (the active workspace's `DataKey`), and a monotonically increasing `Generation`.
+A workspace is one folder. `validate` (`internal/workspace/manager.go`) normalizes and deduplicates the requested paths and refuses more than one distinct folder with an error wrapping `ErrSeveralFolders` ("a workspace is one folder, but N folders were given"). It guards every writer: `Manager.Create`, `Manager.UpdateFolders`, and `Manager.Switch`, so `POST /api/workspaces` and `PUT /api/workspaces/{id}` answer 400 for a request naming several folders. `Folders` stays a list on disk and on the wire (`folders` in the workspace DTO) only so a record saved with several folders loads and displays whole; see below.
+
+The manager's `Snapshot` (`internal/workspace/manager.go`) captures the active workspace at a point in time: `WorkspaceID` (empty for ad-hoc/legacy path switches pre-migration), `Workspaces` (the active folder: empty, or one path), `Store`, `ScopedDataDir`, `Key` (the active workspace's `DataKey`), and a monotonically increasing `Generation`.
 
 ### DataKey: identity decoupled from paths
 
-The workspace's identity is its `ID`; its data directory is `data/<DataKey>/`. Neither is a function of the folder set. Two key sources exist:
+The workspace's identity is its `ID`; its data directory is `data/<DataKey>/`. Neither is a function of the folder. Two key sources exist:
 
-- **Explicit creation** (`Manager.Create`, `POST /api/workspaces`): a random key from `prompts.NewDataKey()`. A new workspace pointing at the same folders as an existing one starts with empty history, the core property of the redesign.
+- **Explicit creation** (`Manager.Create`, `POST /api/workspaces`): a random key from `prompts.NewDataKey()`. A new workspace pointing at the same folder as an existing one starts with empty history, the core property of the redesign.
 - **Path-seeded** (`prompts.WorkspaceDataKey(folders)`, `internal/prompts/instructions.go`): a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This hash survives only as the initial `DataKey` of records migrated from the legacy path-keyed model, and for transitional workspaces minted by plain path switches (`resolveWorkspaceForPaths`), where reusing the hash means the existing `data/<hash>/` directory keeps its history.
 
-`Manager.UpdateFolders` replaces a workspace's folder set without touching `ID` or `DataKey`, so its task store, agent-session transcripts, planning state, and whiteboard stay attached. When the workspace is active, the live snapshot's paths are refreshed in place without reopening the store.
+`Manager.UpdateFolders` re-points a workspace to one folder without touching `ID` or `DataKey`, so its task store, agent-session transcripts, planning state, and whiteboard stay attached, and clears `Dormant`. When the workspace is active, the live snapshot's path is refreshed in place without reopening the store.
+
+### Records saved with several folders
+
+Earlier versions allowed several folders per workspace. `LoadGroups` loads such a record with its `ID`, `Name`, `DataKey` and every folder intact and sets `Dormant`, so no folder is picked on the owner's behalf; the next write of `workspaces.json` persists the mark. Its history stays under `data/<DataKey>/`, unopened:
+
+- `startupWorkspaces` never restores a dormant record, even the most recently used one; startup falls through to the next valid workspace or to the empty state.
+- `Manager.SwitchByID` refuses a record with several folders (`ErrSeveralFolders`), so `POST /api/workspaces/{id}/activate` answers 400.
+- `Manager.UpdateFolders(id, [one])` re-points it, clears `Dormant`, and the next activation opens the store under the kept `DataKey`, so its tasks reappear.
+
+`NewManager` logs one warning at startup with the count of such records (`CountSeveralFolders`). The legacy migration (`MigrateToWorkspaces`) treats a legacy group with several folders the same way: it keeps the path-seeded `DataKey` of its existing data directory and writes it dormant.
 
 ### Persistence and migration
 
@@ -45,7 +57,7 @@ Workspace records are persisted in `~/.wallfacer/workspaces.json` as a JSON arra
 
 `MigrateToWorkspaces` (`internal/workspace/migrate.go`) performs the one-time migration from the legacy path-keyed model. It is idempotent: once `workspaces.json` exists it is a no-op. Live groups become workspaces with `DataKey = WorkspaceDataKey(folders)`, the very hash that already names their data directory, so no data moves. Each `data/<hash>/` directory that holds task history but matches no live group is adopted as a **dormant** workspace (folders best-effort recovered from contained `task.json` worktree paths), so stranded history stays reachable until the owner re-points it.
 
-On startup, `Manager.startupWorkspaces()` restores the most-recent workspace whose folder paths still validate, skipping stale records with a warning; if none are valid it starts with no active workspace so the picker opens instead of crashing.
+On startup, `startupWorkspaces()` restores the most recently used non-dormant workspace whose folder still validates, skipping stale records with a warning; if none are valid it starts with no active workspace so the picker opens instead of crashing. `workspaces.json` is the only record of the active workspace across restarts; nothing is mirrored into the env file.
 
 ### Workspace Scoping
 
@@ -53,21 +65,20 @@ The store is scoped by `DataKey`. Each workspace gets its own data directory at 
 
 ### Activation and hot-swap
 
-The SPA manages workspaces through the CRUD endpoints (`GET/POST /api/workspaces`, `PUT/DELETE /api/workspaces/{id}`) and switches boards via `POST /api/workspaces/{id}/activate`. Activation resolves the record by ID (`Manager.SwitchByID`) and runs `Manager.activate(ws)`, which opens or reuses the store keyed by `ws.DataKey` (not by the folder paths). `Manager.Switch(paths)` remains for path-based switches (startup, `WALLFACER_WORKSPACES`); it resolves or transitionally creates the workspace record backing those folders before delegating to the same activation path:
+The SPA manages workspaces through the CRUD endpoints (`GET/POST /api/workspaces`, `PUT/DELETE /api/workspaces/{id}`) and switches boards via `POST /api/workspaces/{id}/activate`. Activation resolves the record by ID (`Manager.SwitchByID`) and runs `Manager.activate(ws)`, which opens or reuses the store keyed by `ws.DataKey` (not by the folder paths). `Manager.Switch(paths)` remains for path-based switches (startup restore); it resolves or transitionally creates the workspace record backing that folder before delegating to the same activation path:
 
 ```mermaid
 flowchart TD
-    Validate["Validate & normalize paths<br/>(absolute, clean, exist, deduplicated, sorted)"] --> Same{"Same set as<br/>current?"}
+    Validate["Validate & normalize the path<br/>(absolute, clean, exists, at most one folder)"] --> Same{"Same folder as<br/>current?"}
     Same -->|yes| NoOp["Return current snapshot"]
     Same -->|no| Resolve["Resolve or create the Workspace record<br/>(stable ID + DataKey; workspaces.json, MRU)"]
     Resolve --> OpenStore["Open or reuse scoped store<br/>(data/&lt;DataKey&gt;/)"]
-    OpenStore --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
-    Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
+    OpenStore --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
     Swap --> Publish["Notify subscribers via channels"]
     Publish --> Close["Close previous store<br/>(unless it still has active tasks)"]
 ```
 
-All external side effects (store creation, workspace record upsert, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate. Deleting the active workspace returns 409.
+The workspace record and the store are resolved before the atomic swap, so a failure leaves the manager unchanged. Deleting the active workspace is allowed: the board switches to the next usable workspace, or to the empty state.
 
 #### Multi-store lifecycle
 

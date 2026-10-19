@@ -60,7 +60,7 @@ Start the server:
 wallfacer run                    # execs your chosen harness CLI directly as a host process
 ```
 
-A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full walkthrough.
+A browser window opens automatically and asks for the project folder; each workspace is one folder. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings**. See [Getting Started](docs/guide/getting-started.md) for the full walkthrough.
 
 Other commands: `wallfacer status` (print or watch board state) and `wallfacer spec` (validate or scaffold specs). Run `wallfacer <command> -help` for flags.
 
@@ -140,7 +140,7 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 
 Wallfacer is a local tool: a task board on one machine over the coding-agent CLIs installed there. The current program is a cleanup that keeps that shape and removes what it no longer needs ([`specs/shared/pure-local.md`](specs/shared/pure-local.md)). See [`specs/README.md`](specs/README.md) for the full spec index.
 
-**Foundations** (complete): Execution backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
+**Foundations** (complete): Execution backend interface, storage backend interface, file explorer, host terminal, workspace switching, Windows support.
 
 **Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection) is complete. Designed and unbuilt: file and image attachments on task prompts, host path references, scoped slash commands, a terminal UI, internal consolidation, and task revert.
 

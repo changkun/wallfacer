@@ -49,7 +49,7 @@ wallfacer run
 
 On startup the server checks that the `claude` binary resolves and exits with an install hint if it does not. It then creates `~/.wallfacer/` on first use, seeds the `.env` template, and opens the browser at `http://localhost:8080`. Pass `-no-browser` to skip the browser, or `-addr :9090` to change the port.
 
-Pages that need a workspace show a folder picker on first visit. Pick one or more project folders; the selection becomes a named workspace that persists across restarts. See [Workspaces](workspaces.md) for grouping folders and switching between workspaces.
+Pages that need a workspace show a folder picker on first visit. Pick the project folder; it becomes a named workspace that persists across restarts. See [Workspaces](workspaces.md) for re-pointing and switching between workspaces.
 
 ![The task board](images/board.png)
 
