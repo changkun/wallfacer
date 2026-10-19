@@ -12,14 +12,6 @@ committed: the commit log already holds that.
 
 ### Changed
 
-- Review checks a waiting task's change with a second model on the task's own
-  harness: a reviewer on the model set as `WALLFACER_REVIEW_MODEL` (the
-  **Review model** field on the Harness settings tab) reports findings and a
-  verdict, requested changes go back to the task as feedback for up to
-  `WALLFACER_REVIEW_ROUNDS` rounds, every harness with a worktree is covered
-  rather than only Claude tasks with a session, and with no reviewer model set,
-  or the task's own, the review does not run and the task timeline says why.
-
 - gRPC-Go v1.83.2, past GO-2026-6443 (GHSA-2v4p-qf9q-27wj), in which a gRPC
   xDS server crashes on a request that carries neither an `:authority` nor a
   Host header; Wallfacer runs no gRPC server and the affected code is not
@@ -33,20 +25,7 @@ committed: the commit log already holds that.
   `latere.ai/x/topos` is at v0.7.0, since the earlier pin does not build
   against pkg v0.90.2.
 
-- The shared footer and product switcher follow latere-ui v1.30.1. The
-  product switcher sends Lux to the platform console's Models section and no
-  longer offers Drive. The footer puts the lockup, the social profiles and
-  icon menus for theme and language beside four link columns (Applications
-  with Research, Platform, Company, Legal) under semibold headings in the
-  full text tone, and links the platform console in place of the separate
-  Topos, Cella, Lux and Drive entries. Wallfacer's own footer rules, which
-  overrode the shared layout, are removed.
-
 ### Removed
-
-- `WALLFACER_REVIEW_FORKS` and the `review_forks` field of `/api/env`: a review
-  runs one reviewer, so there are no forks to count; a line left in
-  `~/.wallfacer/.env` is ignored, and `PUT /api/env` refuses the field.
 
 - The GitHub integration: Settings has no GitHub tab, tasks and specs show no
   pull request, the `/api/github/*` and `/api/tasks/{id}/pr` routes and the
@@ -71,7 +50,7 @@ committed: the commit log already holds that.
   Schedule toggle in the composer, and the `/api/routines` routes are gone. A
   saved routine card stays on disk unread, with one warning at startup naming
   how many there are; tasks a routine already spawned stay on the board as
-  ordinary tasks. A one-time scheduled start for a backlog task is unchanged.
+  ordinary tasks.
 
 - Sign-in to latere.ai and cloud mode: the console has no sign-in button,
   account menu or organization switcher, `wallfacer auth` and the device
@@ -97,59 +76,51 @@ committed: the commit log already holds that.
   view and `GET /api/tasks/{id}/trace` are gone, and a task or setting that
   still names `topos` runs on the default harness.
 
-- Browser telemetry and the language setting, which only the sign-in and
-  product pages used; the console is in English.
+- Browser telemetry, the language setting, and the shared footer and product
+  switcher, which only the sign-in and product pages used; the console is in
+  English.
+
+- Automation and review: the board header has no automation menu, and no task
+  moves on its own. The auto-promote, auto-test, auto-submit, catch-up and
+  auto-push watchers, automatic retry, the launch circuit breaker, the
+  scheduled start, critical-path ordering and review on a second model are
+  gone, as are `POST /api/tasks/{id}/review`,
+  `GET /api/tasks/{id}/review/transcript`, the `autoimplement`, `autotest`,
+  `autosubmit`, `autosync`, `autopush`, `review` and `watcher_health` fields of
+  `GET /api/config`, and `WALLFACER_REVIEW_MODEL`, `WALLFACER_REVIEW_ROUNDS`,
+  `WALLFACER_REVIEW_COST_CAP`, `WALLFACER_REVIEW_FORKS`, `WALLFACER_AUTO_PUSH`,
+  `WALLFACER_AUTO_PUSH_THRESHOLD`, `WALLFACER_MAX_TEST_PARALLEL`,
+  `WALLFACER_CONTAINER_CB_THRESHOLD` and `WALLFACER_CONTAINER_CB_OPEN_SECONDS`.
+  A task's `scheduled_at`, `review_*`, `auto_retry_*`, `test_fail_count`,
+  `pending_test_feedback` and `last_fetch_error` fields, and a workspace's
+  automation flags and `max_test_parallel`, drop from a record the next time
+  it is saved; a line for a removed setting left in `~/.wallfacer/.env` is
+  ignored.
+
+- Whiteboard, Mission Control, Analytics and the terminal: the console has no
+  `/whiteboard`, `/mission`, `/map` or `/analytics` page and no terminal dock,
+  and `GET` and `PUT /api/whiteboard`, `GET /api/graph`, `GET /api/stats`,
+  `GET /api/usage`, `GET /api/debug/spans` and `GET /api/terminal/ws` are
+  gone, as are `WALLFACER_TERMINAL_ENABLED`,
+  `WALLFACER_AGENT_SESSION_WINDOW_DAYS` and its alias
+  `WALLFACER_PLANNING_WINDOW_DAYS`, and the `terminal_enabled` and
+  `agent_session_window_days` fields of `GET /api/config`. A task's own usage,
+  cost and timeline stay in its detail view, and saved whiteboard scenes stay
+  on disk unread.
+
+- The `/chat` page: conversations live in the chat popup, on every page but
+  Plan, and in Plan's chat, which opens full width when a workspace has no
+  specs.
+
+- Keyboard shortcuts: no global key bindings, shortcuts dialog, letter keys on
+  cards or in Plan, or editor tab hotkeys. The command palette opens from the
+  rail; in chat, Enter sends and Shift+Enter starts a new line.
 
 ### Fixed
-
-- A second Wallfacer instance on one machine, which starts on a free port when
-  its own is taken, no longer sends the browser to a sign-in that returns to
-  the first instance: sign-in by browser redirect and organization switching
-  are off there, the account menu says why, and device-code sign-in works as
-  before.
-
-- A signed-out browser on the machine Wallfacer runs on reaches sign-in by
-  browser redirect, where `/login` and `/callback` answered
-  `401 {"error":"unauthorized"}` because a page navigation cannot present the
-  server key; a browser on another host still needs the key there, and
-  signs in with a device code.
-
-- Switching organization on a local instance ends the session of the previous
-  organization before the browser leaves for sign-in, as it does on a hosted
-  one, so a switch abandoned at the sign-in page no longer leaves the account
-  menu in the old organization.
-
-- A review transcript that cannot be read to its end is marked incomplete in
-  the task's verification panel, and the server logs the reason, where the
-  rounds before the unreadable part were shown as the whole debate.
-
-- A task on the `topos` harness, or on a delegating fleet, is refused before it
-  starts when no model credential is configured: the task fails with the
-  `model_credential_missing` category and one sentence that names
-  `ANTHROPIC_API_KEY` and where to set it, no worktree is created, nothing runs
-  or is committed, and the harness is reported unusable until a key is set.
-
-- A task pinned to the `topos` harness gets a generated title and an oversight
-  summary, which run in-process like its commit message, and its test run uses
-  the configured default subprocess harness; each of these failed before with
-  "unsupported agent".
 
 - A chat round is recorded in the usage log under the harness that ran it, not
   always under Claude; rounds on a harness other than Claude are recorded with
   zero tokens and zero cost, because their usage is not read yet.
-
-- A client on another host needs the server key to reach the API of a local
-  instance whatever account it is signed in with; a sign-in stands in for the
-  key only on the machine Wallfacer runs on, and on a cloud-mode deployment.
-
-- The chat harness picker no longer offers the `topos` harness, which runs
-  tasks but has no chat runtime, and a chat message sent with it through the
-  API is refused with `harness_unavailable_in_chat` instead of failing after
-  it was accepted with "unsupported agent".
-
-- A chat thread gets a generated title when the default harness is `topos`:
-  the title runs in-process, as a `topos` task's title does, where it failed
-  before with "unsupported agent".
 
 - A request to a path under `/api` that no endpoint serves answers 404 with
   the JSON error envelope, `not_found`, for every method, where a `GET` got
@@ -159,56 +130,26 @@ committed: the commit log already holds that.
 
 - `POST /api/admin/rebuild-index` works on a local instance with the server
   key, where it answered 401 unless the caller was signed in as a platform
-  administrator; a cloud-mode deployment still requires that role.
-
-- A cloud-mode deployment refuses the terminal with 403
-  `terminal_unavailable` and reports it off in `GET /api/config`, whatever
-  `WALLFACER_TERMINAL_ENABLED` says, where it would have opened a shell on the
-  server host for any signed-in account; a local instance is unchanged.
-
-- Creating tasks in batch mode with a model or a cost or token budget creates
-  them with that model and budget, as single create does, where the request
-  failed with `400 invalid JSON: json: unknown field "model"`.
+  administrator.
 
 - The Events tab of a task shows the sentence of a system event, such as a
   commit phase, a recovery note or the notice that a stored fleet no longer
   exists, where it showed only the event's kind or the word "system".
 
-- `GET /api/me` on the coordination site served by `wallfacer web` answers a
-  request with no session 401 in the JSON error envelope with the
-  `not_signed_in` code, where the body was `{"error":"not authenticated"}`.
-
-- The coordination site served by `wallfacer web` answers a request to a path
-  under `/api` that no endpoint serves with 404 `not_found` in the JSON error
-  envelope, or 405 `method_not_allowed` when the path takes other methods, as
-  `wallfacer run` does, where it answered a `GET` with the web app's page and
-  200.
-
-- A browser on a local instance that is not signed in submits feedback to a
-  waiting task and reviews its changes inline, where the feedback request
-  answered `401 {"error":"sign in required"}` and the inline review was hidden
-  since sign-in became available on every run; a cloud-mode deployment still
-  requires a signed-in account for both, and spec comments still need a
-  signed-in browser on either, now answering 401 with the `sign_in_required`
-  error envelope.
-
-- On a cloud-mode deployment no browser's session reaches the host's shared
-  token store and the coordination connector does not run, so spec comments
-  are not synced through that server and `GET /api/coordination/status`
-  reports coordination unavailable; a local instance is unchanged.
-
 - `wallfacer run -addr` with an address that has no port, such as
   `-addr 127.0.0.1`, stops at startup with an error naming the address, where
   the server listened on every network interface at a random port.
 
-- Creating tasks through `POST /api/tasks/batch` with a schedule or custom
-  test pass and fail patterns creates them with that schedule and those
-  patterns, as single create does, where the request failed with
-  `400 invalid JSON: json: unknown field "scheduled_at"`.
-
 ### Security
 
 - Built with Go 1.27.2 and golang.org/x/net v0.60.0, which fix GO-2026-6611, GO-2026-6612, GO-2026-6613 and GO-2026-6617.
+
+- An agent no longer inherits Wallfacer's own `WALLFACER_*` settings from the
+  server's environment or from `~/.wallfacer/.env`, among them
+  `WALLFACER_SERVER_API_KEY`, the key to the board's API, so the commands an
+  agent runs and the output it prints do not carry it. The runner passes the
+  variables an agent needs, such as `WALLFACER_BOARD_JSON`, explicitly;
+  provider credentials in the env file still reach the agent.
 
 ## v0.6.1 - 2026-09-26
 
