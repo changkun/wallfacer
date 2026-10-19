@@ -99,7 +99,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **Spec tree & graph** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
-| `GET /api/graph` | Unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for Mission Control |
 | `GET /api/specs/stale-candidates` | List specs flagged as potentially stale by the drift pipeline |
 | `POST /api/specs/dismiss-stale-candidates` | Dismiss all pending stale-candidate flags |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |

@@ -75,7 +75,7 @@ describe('workspaces store update', () => {
   });
 
   // Editing the ACTIVE workspace's folders must refetch /api/config so
-  // folder-derived views (Mission Control graph, spec tree) refresh instead of
+  // folder-derived views (the spec tree) refresh instead of
   // staying stale until a tab switch.
   it('refetches config when the active workspace folders change', async () => {
     apiMock.mockResolvedValueOnce({ workspaces: [ws({ id: 'w1' })], active_id: 'w1' });

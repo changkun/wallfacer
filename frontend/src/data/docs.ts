@@ -18,7 +18,6 @@ export const docIndex: DocEntry[] = [
   { slug: 'plan', title: "Plan", section: "Use Wallfacer", desc: "Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations." },
   { slug: 'automation', title: "Automation", section: "Operate", desc: "Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers." },
   { slug: 'oversight', title: "Oversight", section: "Operate", desc: "Oversight summaries, timelines, logs, diff review, cost and usage analytics." },
-  { slug: 'mission-control', title: "Mission Control", section: "Operate", desc: "The unified spec and task graph, acting on the pipeline." },
   { slug: 'workspaces', title: "Workspaces", section: "Operate", desc: "Workspace management, git integration, branches." },
   { slug: 'configuration', title: "Configuration", section: "Operate", desc: "Settings, environment variables, harness selection, CLI reference, keyboard shortcuts." },
 ];

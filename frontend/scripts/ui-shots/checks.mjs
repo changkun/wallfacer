@@ -532,29 +532,6 @@ SCENES['analytics'] = async (page) => {
   }
 };
 
-// Mission Control: the canvas draws nodes on the ramp, the inspector is 300
-// wide, and a spec node opens its popover inside the viewport.
-SCENES['mission'] = async (page) => {
-  await page.goto(base + '/mission', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForSelector('.gc-node', { timeout: 10000 }).catch(() => {});
-  const nodes = await boxes(page, '.gc-node');
-  expect('mission', nodes.length > 0, 'canvas rendered no nodes');
-  const insp = await firstBox(page, '.mission__inspector');
-  expect('mission', insp && Math.abs(insp.width - 300) <= 1, `inspector width ${insp && insp.width}, want 300`);
-  const fills = await page.$$eval('.gc-dot', (els) => els.map((e) => e.style.fill));
-  expect('mission', fills.length > 0 && fills.every((f) => /var\(|color-mix\(/.test(f)), 'a node fill is not a token expression');
-  const spec = await page.$('.gc-node--spec');
-  if (spec) {
-    await spec.dblclick();
-    await page.waitForSelector('.map-popup', { timeout: 5000 }).catch(() => {});
-    const pop = await firstBox(page, '.map-popup');
-    const vw = await page.evaluate(() => window.innerWidth);
-    const vh = await page.evaluate(() => window.innerHeight);
-    expect('mission', pop && pop.left >= 0 && pop.top >= 0 && pop.right <= vw + 1 && pop.bottom <= vh + 1, 'spec popover outside the viewport');
-    expect('mission', !!(await page.$('.map-popup.pop')), 'spec popover is not the pop shape');
-  }
-};
-
 // Docs: the nav is 260 wide on the sunk surface and the reading column is at
 // most 76ch.
 SCENES['docs'] = async (page) => {

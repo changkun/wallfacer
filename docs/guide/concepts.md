@@ -18,7 +18,7 @@ The [Board](board.md) is where most day-to-day work happens. Each card is a conc
 
 ### Autopilot: automation
 
-With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md) and [Mission Control](mission-control.md).
+With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md).
 
 The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing automated task can be pulled down to manual review, debugged in the built-in terminal, and resumed with feedback.
 

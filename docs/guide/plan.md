@@ -122,7 +122,6 @@ Unarchive prefers the lossless path: it locates the archive commit and runs `git
 
 - [Board](board.md): where dispatched specs execute
 - [Chat](chat.md): the same agent engine without the spec tree
-- [Mission Control](mission-control.md): specs and tasks on one dependency graph
 - [Getting Started](getting-started.md): first workspace and first spec
 - [Configuration](configuration.md): the drift tester gate and the other settings
 - [Plan Mode internals](../internals/plan-mode.md): tree building, dispatch, drift, and undo implementation

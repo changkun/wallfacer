@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { NAV_GROUPS, activeNavId, navLabel } from './nav';
 
 describe('nav model', () => {
-  it('maps the board, docs deep links and the mission alias to their rows', () => {
+  it('maps the board and docs deep links to their rows', () => {
     expect(activeNavId('/')).toBe('board');
     expect(activeNavId('/docs/guide/usage')).toBe('docs');
-    expect(activeNavId('/mission')).toBe('map');
     expect(activeNavId('/plan')).toBe('plan');
     expect(activeNavId('/settings?tab=about')).toBe('settings');
   });

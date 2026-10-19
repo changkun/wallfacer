@@ -61,7 +61,7 @@ node snap.mjs --list                                                     # surfa
 
 Surfaces: `board`, `switcher`, `palette`, `picker`, `explorer`,
 `task-detail`, `settings`, `analytics`, `overview-spec`, `oversight`, `plan`,
-`chat`, `mission`, `docs`. Prints JSON `[{name, file, errors}]` so callers can detect page
+`chat`, `docs`. Prints JSON `[{name, file, errors}]` so callers can detect page
 errors.
 
 Works against any console origin: the embedded SPA on the booted server
@@ -108,7 +108,7 @@ Scenes, one per console surface, each asserting the geometry its design
 promises (rail and topbar sizes, card radii, column widths, dialog widths,
 reading-column width) and the material (no `backdrop-filter`, meta text
 contrast in both themes): `board`, `shell`, `switcher`, `picker`, `no-glass`,
-`contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `analytics`, `mission`, `docs`. Every
+`contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `analytics`, `docs`. Every
 scene runs in its own browser context so nothing one scene persists (a route,
 a popup) reaches the next.
 Add a scene by appending to the `SCENES` table in `checks.mjs`. Playwright runs

@@ -100,7 +100,7 @@ Full per-state action availability in the detail view:
 
 The **Depends on** picker (in the composer's More section and the backlog Edit panel) declares prerequisite tasks. A task with unmet dependencies is not promoted by automation even when capacity is free: promotion requires every dependency to be `done`, the scheduled time (if any) to have passed, and a free parallel slot.
 
-Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status. The cross-task dependency graph is visualized on [Mission Control](mission-control.md), not on the board itself.
+Backlog cards show a dependency badge: amber **blocked** with the unmet count, green **ready** when all prerequisites are done, or a warning when a dependency was cancelled. The detail view lists prerequisites under **Blocked by** with live status.
 
 ## Scheduled tasks
 
@@ -191,7 +191,6 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 
 - [Plan](plan.md): author and dispatch specs that become board tasks
 - [Chat](chat.md): conversational planning with the same agent engine
-- [Mission Control](mission-control.md): the combined spec and task dependency graph
 - [Automation](automation.md): watchers, retry budgets, and circuit breakers
 - [Oversight](oversight.md): summaries, usage, cost, and timing analytics
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings

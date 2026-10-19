@@ -84,7 +84,7 @@ export const useWorkspacesStore = defineStore('workspaces', () => {
     if (idx >= 0) workspaces.value[idx] = ws;
     // Editing the ACTIVE workspace's folders changes the active folder set
     // server-side; refetch config so config.workspaces updates and every
-    // folder-derived view reacts (the Mission Control graph and spec tree watch
+    // folder-derived view reacts (the spec tree watches
     // it). Without this they stay stale until a tab switch re-mounts them.
     if (patch.folders !== undefined && isActive(id)) {
       await useTaskStore().fetchConfig();
