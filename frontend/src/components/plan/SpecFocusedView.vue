@@ -174,7 +174,7 @@ const nextStep = computed(() => {
   if (status.value === 'archived') return 'This spec is read-only. Choose Unarchive to resume planning.';
   if (status.value === 'complete') return 'Review the completed work, then choose Archive when this spec is no longer needed.';
   if (status.value === 'stale') return 'Choose Reopen as Draft, update the design, then validate it again.';
-  if (status.value === 'testing') return 'Check verification on the linked task before completing this spec.';
+  if (status.value === 'testing') return 'Check the linked task\'s changes before completing this spec.';
   if (dispatchedTaskId.value) return 'Open the linked task to start work or review agent progress.';
   if (status.value === 'vague') return 'Describe the intended behavior and acceptance criteria in Chat to draft this spec.';
   if (!isLeaf.value) return 'Review the child specs. Use Break Down in Chat to split any remaining broad work into smaller specs.';

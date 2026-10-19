@@ -24,8 +24,8 @@ const severalWorktreesEventKind = "worktrees:several_folders"
 // sync and cleanup steps still visit every folder's worktree, so no change is
 // dropped. The event says which worktree the agent works in.
 //
-// The event is written once per task. A resumed, retried or test run of the
-// same task finds the earlier event and writes nothing. When the timeline
+// The event is written once per task. A resumed or retried run of the same
+// task finds the earlier event and writes nothing. When the timeline
 // cannot be read the notice is skipped and logged rather than risk writing a
 // duplicate.
 func (r *Runner) noteSeveralWorktrees(ctx context.Context, task *store.Task) {

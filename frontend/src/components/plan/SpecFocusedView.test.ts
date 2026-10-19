@@ -91,7 +91,7 @@ describe('SpecFocusedView mermaid rendering', () => {
     ['drafted', true, 'choose Validate'],
     ['validated', true, 'choose Dispatch'],
     ['drafted', false, 'Break Down'],
-    ['testing', true, 'verification'],
+    ['testing', true, 'linked task\'s changes'],
     ['stale', true, 'Reopen as Draft'],
     ['complete', true, 'Archive'],
     ['archived', true, 'read-only'],

@@ -19,14 +19,6 @@ export const useTaskStore = defineStore('tasks', () => {
     return matchesTaskFilter(t, filterQuery.value);
   }
 
-  // Shared id->task index, built once per tasks change. Reused by card badges
-  // so each card does not rebuild an N-entry map on every tasks update.
-  const tasksById = computed(() => {
-    const m = new Map<string, Task>();
-    for (const t of tasks.value) m.set(t.id, t);
-    return m;
-  });
-
   const backlog = computed(() =>
     tasks.value
       .filter(t => t.status === 'backlog' && !t.archived && matchesFilter(t))
@@ -144,7 +136,6 @@ export const useTaskStore = defineStore('tasks', () => {
 
   return {
     tasks, config, loading, filterQuery,
-    tasksById,
     backlog, inProgress, waiting, done,
     setTasks, updateTask, removeTask, patchTaskLocal,
     fetchTasks, fetchConfig,

@@ -33,22 +33,6 @@ describe('tasks store create payloads', () => {
   });
 });
 
-describe('tasks store tasksById', () => {
-  it('indexes tasks by id and rebuilds on change', () => {
-    const store = useTaskStore();
-    store.setTasks([
-      { id: 'a' } as Task,
-      { id: 'b' } as Task,
-    ]);
-    expect(store.tasksById.get('a')?.id).toBe('a');
-    expect(store.tasksById.get('b')?.id).toBe('b');
-
-    store.setTasks([{ id: 'c' } as Task]);
-    expect(store.tasksById.has('a')).toBe(false);
-    expect(store.tasksById.get('c')?.id).toBe('c');
-  });
-});
-
 describe('tasks store done column ordering', () => {
   it('orders done tasks by last updated time, most recent first', () => {
     const store = useTaskStore();
