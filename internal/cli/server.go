@@ -3,7 +3,6 @@ package cli
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -135,7 +134,7 @@ func (sc *ServerComponents) Shutdown() {
 // It creates the workspace manager, runner, handler,
 // HTTP mux, listener, and http.Server. The caller is responsible for starting
 // srv.Serve and managing the lifecycle (signals, shutdown).
-func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *ServerComponents {
+func initServer(configDir string, cfg ServerConfig, vueDist fs.FS) *ServerComponents {
 	// Bootstrap telemetry before anything else logs. This registers the
 	// TracerProvider and the W3C propagator for the process, which is what makes
 	// the otel.Transport-wrapped clients in the handler and oauth trees
@@ -441,7 +440,7 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist)
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, vueDist)
 
 	// Middleware stack (outermost first): otel → logging → CSRF → server key
 	// → mux.
@@ -488,9 +487,9 @@ func requireClaudeOrExit(envFile string) {
 }
 
 // RunServer implements the `wallfacer run` subcommand.
-// vueDist and docsFS are the embedded filesystems containing the Vue SPA
-// dist (frontend/dist) and docs/ directory tree respectively.
-func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
+// vueDist is the embedded filesystem containing the Vue SPA dist
+// (frontend/dist).
+func RunServer(configDir string, args []string, vueDist fs.FS) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", cmp.Or(os.Getenv("LOG_FORMAT"), "text"), `log output format: "text" or "json"`)
@@ -513,7 +512,7 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 		Addr:      *addr,
 		DataDir:   *dataDir,
 		EnvFile:   *envFile,
-	}, vueDist, docsFS)
+	}, vueDist)
 	defer sc.Stop()
 
 	if !*noBrowser {
@@ -655,27 +654,6 @@ func withAssetCache(next http.Handler) http.Handler {
 	})
 }
 
-// docAssetContentType maps a docs asset path to its image content type, or ""
-// if the extension is not an embeddable doc image. The whitelist doubles as an
-// access guard: only image files under docs/ are reachable via the asset route,
-// never markdown or other embedded content.
-func docAssetContentType(p string) string {
-	switch {
-	case strings.HasSuffix(p, ".png"):
-		return "image/png"
-	case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
-		return "image/jpeg"
-	case strings.HasSuffix(p, ".svg"):
-		return "image/svg+xml"
-	case strings.HasSuffix(p, ".webp"):
-		return "image/webp"
-	case strings.HasSuffix(p, ".gif"):
-		return "image/gif"
-	default:
-		return ""
-	}
-}
-
 // BuildMux constructs the HTTP request router.
 //
 // All API routes are registered from apicontract.Routes (the single source of
@@ -683,227 +661,12 @@ func docAssetContentType(p string) string {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, docsFS, vueDist fs.FS) *http.ServeMux {
+func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, vueDist fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	if vueDist != nil {
 		mountVueSPA(mux, vueDist, indexData.ServerAPIKey)
 	}
-
-	// Docs API — list and serve embedded documentation.
-	//
-	// Guide reading order is derived from docs/guide/usage.md: the server
-	// parses markdown links of the form [Title](file.md) under numbered
-	// "### N." headings in the "Reading Order" section. This keeps the
-	// order in a single place (the index doc) rather than hardcoded here.
-	// parseReadingOrder extracts an ordered list of .md filenames from
-	// the "## Reading Order" section of an index document. Each link of
-	// the form [Title](file.md) under a numbered ### heading is collected
-	// in order. This is used for both guide and internals indexes.
-	type readingEntry struct {
-		name    string
-		section string // nearest preceding "### " heading; "" if none
-	}
-	parseReadingOrder := func(path string) []readingEntry {
-		var order []readingEntry
-		indexData, err := fs.ReadFile(docsFS, path)
-		if err != nil {
-			return order
-		}
-		inReadingOrder := false
-		section := ""
-		for line := range strings.SplitSeq(string(indexData), "\n") {
-			trimmed := strings.TrimSpace(line)
-			// Enter the reading order section.
-			if trimmed == "## Reading Order" {
-				inReadingOrder = true
-				continue
-			}
-			// Exit on next ## heading.
-			if inReadingOrder && strings.HasPrefix(trimmed, "## ") && trimmed != "## Reading Order" {
-				break
-			}
-			if !inReadingOrder {
-				continue
-			}
-			// A "### " heading opens a sidebar section.
-			if s, ok := strings.CutPrefix(trimmed, "### "); ok {
-				section = strings.TrimSpace(s)
-				continue
-			}
-			// Match markdown links like [Title](file.md), optionally a "- " bullet.
-			if _, after, ok := strings.Cut(trimmed, "]("); ok {
-				if target, _, ok := strings.Cut(after, ")"); ok {
-					// Only .md files in the same directory (no path separators).
-					if strings.HasSuffix(target, ".md") && !strings.Contains(target, "/") {
-						name := strings.TrimSuffix(target, ".md")
-						order = append(order, readingEntry{name: name, section: section})
-					}
-				}
-			}
-		}
-		return order
-	}
-	guideOrder := parseReadingOrder("docs/guide/usage.md")
-	internalsOrder := parseReadingOrder("docs/internals/internals.md")
-	mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, _ *http.Request) {
-		type docEntry struct {
-			Slug     string `json:"slug"`
-			Title    string `json:"title"`
-			Category string `json:"category"`
-			Section  string `json:"section,omitempty"` // sidebar sub-group within a category
-			Order    int    `json:"order"`             // 1-based reading order; 0 = unordered
-		}
-
-		// Helper: read title from first "# " line in a markdown file.
-		readTitle := func(path, fallback string) string {
-			data, _ := fs.ReadFile(docsFS, path)
-			for _, line := range strings.SplitN(string(data), "\n", 10) {
-				if title, ok := strings.CutPrefix(line, "# "); ok {
-					return title
-				}
-			}
-			return fallback
-		}
-
-		var entries []docEntry
-
-		// Guide: emit usage.md (the index page) first, then the
-		// defined reading order, then any remaining guide files.
-		firstSection := ""
-		if len(guideOrder) > 0 {
-			firstSection = guideOrder[0].section
-		}
-		if title := readTitle("docs/guide/usage.md", "User Manual"); true {
-			entries = append(entries, docEntry{Slug: "guide/usage", Title: title, Category: "guide", Section: firstSection})
-		}
-		ordered := make(map[string]bool, len(guideOrder)+1)
-		ordered["usage"] = true
-		seq := 0
-		for _, e := range guideOrder {
-			ordered[e.name] = true
-			path := "docs/guide/" + e.name + ".md"
-			if _, err := fs.ReadFile(docsFS, path); err != nil {
-				continue
-			}
-			seq++
-			slug := "guide/" + e.name
-			title := readTitle(path, e.name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Section: e.section, Order: seq})
-		}
-		// Append any guide docs not in the explicit order.
-		if dir, err := fs.ReadDir(docsFS, "docs/guide"); err == nil {
-			for _, f := range dir {
-				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
-					continue
-				}
-				name := strings.TrimSuffix(f.Name(), ".md")
-				if ordered[name] {
-					continue
-				}
-				slug := "guide/" + name
-				title := readTitle("docs/guide/"+f.Name(), name)
-				entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: 0})
-			}
-		}
-
-		// Internals: emit internals.md (the index page) first, then
-		// the defined reading order, then any remaining internals files.
-		if title := readTitle("docs/internals/internals.md", "Technical Internals"); true {
-			entries = append(entries, docEntry{Slug: "internals/internals", Title: title, Category: "internals"})
-		}
-		intOrdered := make(map[string]bool, len(internalsOrder)+1)
-		intOrdered["internals"] = true
-		intSeq := 0
-		for _, e := range internalsOrder {
-			intOrdered[e.name] = true
-			path := "docs/internals/" + e.name + ".md"
-			if _, err := fs.ReadFile(docsFS, path); err != nil {
-				continue
-			}
-			intSeq++
-			slug := "internals/" + e.name
-			title := readTitle(path, e.name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: intSeq})
-		}
-		// Append any internals docs not in the explicit order.
-		if dir, err := fs.ReadDir(docsFS, "docs/internals"); err == nil {
-			for _, f := range dir {
-				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
-					continue
-				}
-				name := strings.TrimSuffix(f.Name(), ".md")
-				if intOrdered[name] {
-					continue
-				}
-				slug := "internals/" + name
-				title := readTitle("docs/internals/"+f.Name(), name)
-				entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: 0})
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(entries); err != nil {
-			logger.Main.Debug("docs list response write failed", "error", err)
-		}
-	})
-	mux.HandleFunc("GET /api/docs/{slug...}", func(w http.ResponseWriter, r *http.Request) {
-		slug := r.PathValue("slug")
-		// Prevent path traversal.
-		if strings.Contains(slug, "..") {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		data, err := fs.ReadFile(docsFS, "docs/"+slug+".md")
-		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-		if _, err := w.Write(data); err != nil {
-			logger.Main.Debug("docs content response write failed", "error", err)
-		}
-	})
-
-	// Docs assets — serve embedded images referenced by guide markdown, e.g.
-	// ![](images/board.png). The client rewrites a doc-relative src to
-	// /api/docs-asset/<category>/<path>; only whitelisted image extensions are
-	// served, so this cannot leak markdown or other embedded files.
-	mux.HandleFunc("GET /api/docs-asset/{path...}", func(w http.ResponseWriter, r *http.Request) {
-		p := r.PathValue("path")
-		if strings.Contains(p, "..") {
-			http.Error(w, "invalid path", http.StatusBadRequest)
-			return
-		}
-		ctype := docAssetContentType(p)
-		if ctype == "" {
-			http.Error(w, "unsupported asset type", http.StatusBadRequest)
-			return
-		}
-		data, err := fs.ReadFile(docsFS, "docs/"+p)
-		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", ctype)
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		if _, err := w.Write(data); err != nil {
-			logger.Main.Debug("docs asset response write failed", "error", err)
-		}
-	})
-
-	// Docs full-text search — scans the embedded markdown body (not just
-	// titles) so the command palette can find docs by content.
-	mux.HandleFunc("GET /api/docs-search", func(w http.ResponseWriter, r *http.Request) {
-		hits := searchDocs(docsFS, r.URL.Query().Get("q"), 20)
-		if hits == nil {
-			hits = []DocSearchHit{}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(hits); err != nil {
-			logger.Main.Debug("docs search response write failed", "error", err)
-		}
-	})
 
 	// withID wraps a handler that needs a parsed task UUID from the {id} path
 	// segment, converting the UUID-accepting signature to http.HandlerFunc.

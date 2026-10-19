@@ -4,14 +4,6 @@ Start here for the full reading order.
 
 ## Reading Order
 
-<!-- NOTE: The server parses this section to build the in-app docs sidebar.
-     Each "### " heading is a sidebar SECTION; every same-dir markdown link
-     beneath it becomes an entry in that section, in order. To add a guide,
-     drop a link under the right section heading. Keep example link syntax
-     out of this comment: the parser scrapes any link it sees here.
-     frontend/scripts/gen-docs-index.mjs derives the console docs index from
-     this same section; run it after editing (see the docs-rewrite spec). -->
-
 ### Get Started
 
 - [Getting Started](getting-started.md). Installation, credentials, first task end to end.

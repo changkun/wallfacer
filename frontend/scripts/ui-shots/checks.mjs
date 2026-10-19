@@ -511,30 +511,6 @@ SCENES['palette'] = async (page) => {
   expect('palette', moved === 1, `${moved} selections after ArrowDown, want 1`);
 };
 
-// Docs: the nav is 260 wide on the sunk surface and the reading column is at
-// most 76ch.
-SCENES['docs'] = async (page) => {
-  await page.goto(base + '/docs', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForSelector('.local-docs-body', { timeout: 10000 }).catch(() => {});
-  const nav = await firstBox(page, '.local-docs-nav');
-  expect('docs', nav && Math.abs(nav.width - 260) <= 1, `docs nav width ${nav && nav.width}, want 260`);
-  const wrap = await firstBox(page, '.local-docs-wrap');
-  const chPx = await page.evaluate(() => {
-    const el = document.querySelector('.local-docs-wrap');
-    if (!el) return 0;
-    const probe = document.createElement('span');
-    probe.textContent = '0';
-    probe.style.font = getComputedStyle(el).font;
-    probe.style.position = 'absolute';
-    document.body.appendChild(probe);
-    const w = probe.getBoundingClientRect().width;
-    probe.remove();
-    return w;
-  });
-  expect('docs', wrap && chPx > 0 && wrap.width <= 76 * chPx + 2, `reading column ${wrap && Math.round(wrap.width)}px exceeds 76ch (${Math.round(76 * chPx)}px)`);
-  expect('docs', !!(await page.$('.local-docs-link.is-active')), 'no active doc row');
-};
-
 if (arg('list', false) === true) {
   console.log(Object.keys(SCENES).join('\n'));
   process.exit(0);

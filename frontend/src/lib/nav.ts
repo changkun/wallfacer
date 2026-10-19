@@ -2,7 +2,7 @@
 // topbar's crumb, so a destination is named the same way in both places.
 
 export type NavIcon =
-  | 'plan' | 'board' | 'docs' | 'settings';
+  | 'plan' | 'board' | 'settings';
 
 export interface NavItem {
   id: string;
@@ -30,19 +30,16 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     pin: 'bottom',
     items: [
-      { id: 'docs', label: 'Docs', to: '/docs', icon: 'docs' },
       { id: 'settings', label: 'Settings', to: '/settings', icon: 'settings' },
     ],
   },
 ];
 
 // activeNavId maps a route path to the nav row it belongs to. `/` is the
-// board; `/docs/...` stays on Docs. A path no row owns yields an id that
-// matches no row.
+// board. A path no row owns yields an id that matches no row.
 export function activeNavId(path: string): string {
   path = path.split('?')[0].split('#')[0];
   if (path === '/') return 'board';
-  if (path.startsWith('/docs')) return 'docs';
   return path.slice(1).split('/')[0];
 }
 

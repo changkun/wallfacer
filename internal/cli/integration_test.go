@@ -56,7 +56,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 	}
 
 	h := handler.NewHandler(s, mock, workdir, []string{workdir}, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), nil)
+	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 

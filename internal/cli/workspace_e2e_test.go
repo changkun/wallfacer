@@ -43,7 +43,7 @@ func newWorkspaceTestServer(t *testing.T) (*httptest.Server, *workspace.Manager,
 		WorkspaceMgr: mgr,
 	}
 	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), nil)
+	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv, mgr, configDir
@@ -232,7 +232,7 @@ func TestWorkspaceMigrationE2E(t *testing.T) {
 	snap := mgr.Snapshot()
 	mock := &runner.MockRunner{EnvFilePath: envPath, WtDir: filepath.Join(configDir, "wt"), WorkspaceMgr: mgr}
 	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), nil)
+	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 

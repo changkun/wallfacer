@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"latere.ai/x/pkg/metrics"
 
@@ -37,7 +36,7 @@ func TestInitServer(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
@@ -155,7 +154,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), stubVueFS(t))
+	mux := BuildMux(h, reg, IndexViewData{}, stubVueFS(t))
 
 	paths := []struct {
 		method string
@@ -196,129 +195,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	}
 }
 
-// TestBuildMux_DocsEndpoints verifies the docs API returns proper responses
-// for listing docs and reading individual doc files.
-func TestBuildMux_DocsEndpoints(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
-
-	// GET /api/docs should return a JSON array.
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/docs", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/docs: status %d, want 200", rr.Code)
-	}
-	if ct := rr.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
-		t.Fatalf("expected JSON content type, got %q", ct)
-	}
-
-	// GET /api/docs/guide/usage should return markdown.
-	rr2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodGet, "/api/docs/guide/usage", nil)
-	mux.ServeHTTP(rr2, req2)
-	if rr2.Code != http.StatusOK {
-		t.Fatalf("GET /api/docs/guide/usage: status %d, want 200", rr2.Code)
-	}
-
-	// GET /api/docs/nonexistent should return 404.
-	rr3 := httptest.NewRecorder()
-	req3 := httptest.NewRequest(http.MethodGet, "/api/docs/nonexistent", nil)
-	mux.ServeHTTP(rr3, req3)
-	if rr3.Code != http.StatusNotFound {
-		t.Fatalf("GET /api/docs/nonexistent: status %d, want 404", rr3.Code)
-	}
-
-	// GET /api/docs/../etc/passwd should be rejected.
-	rr4 := httptest.NewRecorder()
-	req4 := httptest.NewRequest(http.MethodGet, "/api/docs/..%2F..%2Fetc%2Fpasswd", nil)
-	// Manually set the path value to bypass URL canonicalization.
-	req4.SetPathValue("slug", "../../etc/passwd")
-	mux.ServeHTTP(rr4, req4)
-	if rr4.Code != http.StatusBadRequest && rr4.Code != http.StatusNotFound {
-		t.Fatalf("path traversal: status %d, want 400 or 404", rr4.Code)
-	}
-}
-
-// TestBuildMux_DocsAsset verifies the docs-asset route serves embedded images
-// with the right content type, and rejects non-image extensions, traversal,
-// and missing files — so doc screenshots referenced from guide markdown render
-// in-app without leaking other embedded files.
-func TestBuildMux_DocsAsset(t *testing.T) {
-	workdir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(workdir, "worktrees"), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"), Workspaces: []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-
-	pngBytes := []byte("\x89PNG\r\n\x1a\nfake-png-bytes")
-	docsFS := fstest.MapFS{
-		"docs/guide/images/board.png": {Data: pngBytes},
-		"docs/guide/board.md":         {Data: []byte("# Board\n")},
-	}
-	mux := BuildMux(h, reg, IndexViewData{}, docsFS, nil)
-
-	// The path goes in the URL so the mux populates {path...} itself (a
-	// pre-set PathValue would be overwritten during routing).
-	get := func(urlPath string) *httptest.ResponseRecorder {
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/docs-asset/"+urlPath, nil)
-		mux.ServeHTTP(rr, req)
-		return rr
-	}
-
-	// A real image is served with the image content type and exact bytes.
-	rr := get("guide/images/board.png")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("asset: status %d, want 200", rr.Code)
-	}
-	if ct := rr.Header().Get("Content-Type"); ct != "image/png" {
-		t.Fatalf("content type %q, want image/png", ct)
-	}
-	if rr.Body.String() != string(pngBytes) {
-		t.Fatalf("asset bytes mismatch")
-	}
-
-	// Non-image extensions (e.g. markdown) are rejected, so the route cannot
-	// be used to read arbitrary embedded docs.
-	if rr := get("guide/board.md"); rr.Code != http.StatusBadRequest {
-		t.Fatalf("markdown via asset route: status %d, want 400", rr.Code)
-	}
-	// Path traversal is rejected (%2F keeps the ".." in the captured value
-	// instead of being cleaned away by the router).
-	if rr := get("..%2F..%2Fetc%2Fpasswd.png"); rr.Code != http.StatusBadRequest {
-		t.Fatalf("traversal: status %d, want 400", rr.Code)
-	}
-	// Missing image is a 404.
-	if rr := get("guide/images/missing.png"); rr.Code != http.StatusNotFound {
-		t.Fatalf("missing asset: status %d, want 404", rr.Code)
-	}
-}
-
 // TestBuildMux_WithIDInvalidUUID verifies that routes using withID return 400
 // when the UUID is malformed.
 func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
@@ -338,7 +214,7 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
+	mux := BuildMux(h, reg, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
@@ -367,7 +243,7 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
+	mux := BuildMux(h, reg, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
@@ -396,7 +272,7 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
+	mux := BuildMux(h, reg, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -407,35 +283,6 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	ct := rr.Header().Get("Content-Type")
 	if !strings.Contains(ct, "text/plain") {
 		t.Fatalf("expected text/plain content type, got %q", ct)
-	}
-}
-
-// TestBuildMux_DocsInternals verifies that the internals docs are served.
-func TestBuildMux_DocsInternals(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
-
-	// GET /api/docs/internals/internals should return the internals index.
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/docs/internals/internals", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/docs/internals/internals: status %d, want 200", rr.Code)
 	}
 }
 
@@ -459,7 +306,7 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), stubVueFS(t))
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, stubVueFS(t))
 
 	// "/" serves the injected SPA index. The key is released to a loopback
 	// peer (httptest's default RemoteAddr is not loopback).
@@ -597,7 +444,7 @@ func TestInitServer_MetricsScrapesGauges(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	// Start the server in the background.
@@ -642,7 +489,7 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	if sc.ActualPort == 0 {
@@ -673,7 +520,7 @@ func TestInitServer_PortFallback(t *testing.T) {
 		Addr:      fmt.Sprintf(":%d", occupiedPort),
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	// It should have found a different port.
@@ -700,7 +547,7 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {

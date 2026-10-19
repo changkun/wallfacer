@@ -42,7 +42,7 @@ func spaMux(t *testing.T) *http.ServeMux {
 		"frontend/dist/index.html":         {Data: []byte(`<!doctype html><head></head><body><div id="app"></div></body>`)},
 		"frontend/dist/assets/app-1a2b.js": {Data: []byte(`console.log("app")`)},
 	}
-	return BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), dist)
+	return BuildMux(h, metrics.NewRegistry(), IndexViewData{}, dist)
 }
 
 // TestBuildMux_UnknownAPIPathAnswers404JSON asserts an API path no route
@@ -117,7 +117,7 @@ func TestBuildMux_KnownAPIPathWrongMethodAnswers405(t *testing.T) {
 // to a client route still answers 405.
 func TestBuildMux_SPADeepLinksAndAssets(t *testing.T) {
 	mux := spaMux(t)
-	for _, path := range []string{"/", "/plan", "/plan?spec=specs/local/foo.md", "/board", "/settings", "/docs/guide/usage", "/some/client/route"} {
+	for _, path := range []string{"/", "/plan", "/plan?spec=specs/local/foo.md", "/board", "/settings", "/some/client/route"} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			rr := httptest.NewRecorder()
 			mux.ServeHTTP(rr, httptest.NewRequest(method, path, nil))

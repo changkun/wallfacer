@@ -122,8 +122,7 @@
   color: var(--accent);
   background: var(--accent-soft);
 }
-.command-palette-task-snippet,
-.command-palette-doc-snippet {
+.command-palette-task-snippet {
   font-size: 12px;
   line-height: 1.45;
   color: var(--ink-3);

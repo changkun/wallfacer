@@ -47,7 +47,7 @@ const SURFACES = {
     steps: [{ click: '.task-card[aria-label*="OAuth"] .task-card__title' }, { waitFor: '.sheet' }, { wait: 800 }],
   },
   settings: { route: '/settings', steps: [{ wait: 600 }] },
-  // Landing-page surfaces (richer framing than the docs equivalents).
+  // Landing-page surfaces (richer framing than the guide equivalents).
   // overview-spec focuses a real spec so the three-pane Plan view is populated;
   // oversight opens the rich OAuth task on its diff (Changes) tab.
   'overview-spec': {
@@ -65,7 +65,6 @@ const SURFACES = {
   },
   // The plan with a spec focused, so the three panes carry content.
   plan: { route: '/plan?spec=specs/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
-  docs: { route: '/docs', steps: [{ wait: 800 }] },
 };
 
 const base = arg('base', 'http://localhost:8099');

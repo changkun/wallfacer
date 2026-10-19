@@ -7,7 +7,7 @@ cover:
   exempt:
     # The value is the reason. lateregate rejects an empty one.
     x/wallfacer: >-
-      main() wires the embedded SPA and docs into internal/cli and dispatches;
+      main() wires the embedded SPA into internal/cli and dispatches;
       the dispatch table is tested through internal/cli directly
 
 hermetic:

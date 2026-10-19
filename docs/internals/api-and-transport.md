@@ -124,10 +124,6 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 
 | Method + Path | Purpose |
 |---|---|
-| `GET /api/docs` | List embedded docs (`{slug, title, category, order}`), reading-order sorted |
-| `GET /api/docs/{slug...}` | Serve one embedded doc as `text/markdown` (path-traversal guarded) |
-| `GET /api/docs-asset/{path...}` | Serve embedded doc images; only whitelisted image extensions are served |
-| `GET /api/docs-search` | Full-text search over embedded doc bodies (not just titles), capped at 20 hits; backs the command palette |
 | `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
 | `/` | Serves the embedded SPA index on `GET` and `HEAD` for every path no other route matches outside `/api`, so client-side routes survive a hard load. Other methods answer 405 with an `Allow` header. Method-agnostic because ServeMux would treat `GET /` and the `/api/` catch-all as conflicting patterns |
 | `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/webserver/catchall.go`) |

@@ -116,6 +116,12 @@ committed: the commit log already holds that.
   built into the binary. Files under `~/.wallfacer/prompts/` stay on disk
   unread.
 
+- The docs reader in the console: the sidebar has no **Docs** entry, the
+  command palette no longer searches the guides, the `/docs` page and the
+  `GET /api/docs`, `/api/docs/{slug...}`, `/api/docs-asset/{path...}` and
+  `/api/docs-search` routes are gone, and the binary no longer embeds the
+  `docs/` tree. The guides stay in the repository's `docs/` directory.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when

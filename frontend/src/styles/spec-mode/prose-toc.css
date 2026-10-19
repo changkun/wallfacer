@@ -10,7 +10,7 @@
 }
 
 /* Headings default to sans for legibility. Serif italic is only used on
-   display titles (the spec header title, docs h1 hero) — those are opted
+   display titles (the spec header title) — those are opted
    in by scoped overrides, not by default. */
 .prose-content h1,
 .prose-content h2,

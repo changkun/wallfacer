@@ -47,7 +47,7 @@ func newRunServer(t *testing.T) (*ServerComponents, string) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	t.Cleanup(sc.Shutdown)
 	return sc, readServerAPIKey(configDir)
 }

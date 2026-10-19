@@ -18,7 +18,7 @@
 //
 // # Usage
 //
-//	cli.RunServer(configDir, args, uiFS, docsFS)  // start HTTP server
-//	cli.RunStatus(configDir, args)                 // print board state
-//	cli.RunDoctor(configDir, args)                 // check prerequisites
+//	cli.RunServer(configDir, args, uiFS) // start HTTP server
+//	cli.RunStatus(configDir, args)       // print board state
+//	cli.RunDoctor(configDir, args)       // check prerequisites
 package cli

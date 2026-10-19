@@ -188,7 +188,7 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 	}))
 	public := []string{
 		"/", "/assets/app-123.js", "/assets/app-123.css", "/fonts/ui.woff2", "/static/overview.png", "/favicon.ico",
-		"/plan", "/settings", "/docs", "/docs/guide/start",
+		"/plan", "/settings",
 	}
 	for _, target := range public {
 		for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost} {
@@ -206,7 +206,7 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 		}
 	}
 	// API data and paths that are no client-side route need the key.
-	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/assets/../api/config", "/static/../api/config", "/nowhere"} {
+	for _, target := range []string{"/api/config", "/api/tasks", "/docs", "/docs/guide/start", "/assets/../api/config", "/static/../api/config", "/nowhere"} {
 		t.Run("protected"+target, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			next.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))

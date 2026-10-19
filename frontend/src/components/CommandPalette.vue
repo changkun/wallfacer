@@ -7,8 +7,6 @@ import { useAgentStore, type SpecNode } from '../stores/agentSession';
 import { useUiStore } from '../stores/ui';
 import type { Task } from '../api/types';
 import { commandPaletteActionsFor, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
-import { docIndex } from '../data/docs';
-import { rankDocs } from '../lib/docSearch';
 import { statusPill } from '../lib/statusPill';
 import { specStatusPill } from '../lib/specStatus';
 
@@ -31,18 +29,6 @@ const inputRef = ref<HTMLInputElement | null>(null);
 // (store.TaskSearchResult). The endpoint returns a bare array, not {tasks}.
 type SearchTask = Task & { matched_field?: string; snippet?: string };
 const remoteResults = ref<SearchTask[]>([]);
-
-// Server-side docs content search (GET /api/docs-search). Unlike the static
-// docIndex title/slug ranking, this matches the markdown body so the palette
-// can find docs by content. Rows carry a context snippet.
-interface DocRow {
-  slug: string;
-  title: string;
-  snippet?: string;
-}
-const docContentResults = ref<DocRow[]>([]);
-let docSeq = 0;
-let docTimer: ReturnType<typeof setTimeout> | null = null;
 
 let serverSeq = 0;
 let serverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -159,13 +145,12 @@ const sections = computed<Section[]>(() => {
 
 // Flat list of every keyboard-navigable row. Per-task actions interleave
 // directly under their parent task so ArrowDown walks Start / Resume /
-// Done / Retry without skipping. Doc rows live at the bottom.
+// Done / Retry without skipping. Spec rows live at the bottom.
 type FlatRow =
   | { kind: 'task'; task: Task }
   | { kind: 'action'; task: Task; action: ReturnType<typeof taskActions>[number] }
   | { kind: 'jump'; task: Task; tab: string; label: string }
-  | { kind: 'spec'; node: SpecNode }
-  | { kind: 'doc'; slug: string };
+  | { kind: 'spec'; node: SpecNode };
 
 // Tab-switch jumps: open a task's detail modal directly on a given tab
 // (mirrors ui/js/command-palette.js's open-task-{changes,spans,timeline}).
@@ -178,21 +163,6 @@ function tabJumps(task: Task): { tab: string; label: string }[] {
   }
   return jumps;
 }
-
-// docMatches must be declared BEFORE flatRows references it — the
-// `<script setup>` compiler keeps the top-level order, so a forward
-// reference produces a TDZ ReferenceError on first eval.
-const docMatches = computed<DocRow[]>(() => {
-  const q = query.value.trim();
-  // On empty query, dump all docs (matches OLD's open-state Docs group).
-  if (!q) return docIndex.slice(0, 20);
-  // Once the server content search returns, prefer it — it matches the doc
-  // body, not just the title/slug, and carries snippets.
-  if (docContentResults.value.length) return docContentResults.value;
-  // Instant fallback before the debounced server call resolves:
-  // title-prefix > title-substring > slug (see lib/docSearch).
-  return rankDocs(docIndex, q, 6);
-});
 
 // Spec rows for the Plan section: fuzzy match on spec title and path
 // (mirrors ui/js/command-palette.js's spec rows).
@@ -224,7 +194,6 @@ const flatRows = computed<FlatRow[]>(() => {
     }
   }
   for (const n of specMatches.value) out.push({ kind: 'spec', node: n });
-  for (const d of docMatches.value) out.push({ kind: 'doc', slug: d.slug });
   return out;
 });
 
@@ -239,9 +208,6 @@ function jumpRowIndex(task: Task, tab: string): number {
 }
 function specRowIndex(path: string): number {
   return flatRows.value.findIndex((r) => r.kind === 'spec' && r.node.path === path);
-}
-function docRowIndex(slug: string): number {
-  return flatRows.value.findIndex((r) => r.kind === 'doc' && r.slug === slug);
 }
 
 function clampActive() {
@@ -276,20 +242,11 @@ watch(
         serverTimer = null;
       }
       serverSeq++;
-      if (docTimer) {
-        clearTimeout(docTimer);
-        docTimer = null;
-      }
-      docSeq++;
-      docContentResults.value = [];
     }
   },
 );
 
 watch(query, (q) => {
-  // Docs content search runs on every query (independent of task matches) so
-  // the palette can surface docs by body text, debounced like task search.
-  scheduleDocSearch(q);
   // Reset remote when query empties or changes to short.
   if (!q || q.trim().length < 2) {
     remoteResults.value = [];
@@ -323,26 +280,6 @@ watch(query, (q) => {
   }, 200);
 });
 
-function scheduleDocSearch(q: string) {
-  const trimmed = (q || '').trim();
-  if (docTimer) clearTimeout(docTimer);
-  if (trimmed.length < 2) {
-    docContentResults.value = [];
-    return;
-  }
-  const seq = ++docSeq;
-  docTimer = setTimeout(async () => {
-    try {
-      const res = await api<DocRow[]>('GET', `/api/docs-search?q=${encodeURIComponent(trimmed)}`);
-      if (seq !== docSeq) return;
-      docContentResults.value = Array.isArray(res) ? res : [];
-    } catch {
-      if (seq !== docSeq) return;
-      docContentResults.value = [];
-    }
-  }, 200);
-}
-
 function close() {
   emit('update:modelValue', false);
 }
@@ -365,11 +302,6 @@ function pickJump(task: Task, tab: string) {
 
 function pickSpec(path: string) {
   router.push({ path: '/plan', query: { spec: path } });
-  close();
-}
-
-function pickDoc(slug: string) {
-  router.push({ path: `/docs/${slug}` });
   close();
 }
 
@@ -415,7 +347,6 @@ function onKeydown(e: KeyboardEvent) {
       else if (row.kind === 'action') void runTaskAction(row.action.id, row.task);
       else if (row.kind === 'jump') pickJump(row.task, row.tab);
       else if (row.kind === 'spec') pickSpec(row.node.path);
-      else if (row.kind === 'doc') pickDoc(row.slug);
       break;
     }
     case 'Escape':
@@ -452,7 +383,7 @@ onUnmounted(() => {
             v-model="query"
             type="text"
             class="command-palette-input"
-            placeholder="Search tasks, specs, docs, or a task id"
+            placeholder="Search tasks, specs, or a task id"
             autocomplete="off"
           />
         </div>
@@ -548,27 +479,7 @@ onUnmounted(() => {
               </div>
             </div>
           </section>
-          <section v-if="docMatches.length" class="command-palette-section">
-            <div class="eyebrow command-palette-section-title">Docs</div>
-            <div
-              v-for="d in docMatches"
-              :key="d.slug"
-              role="button"
-              tabindex="0"
-              class="command-palette-row command-palette-row-task"
-              :class="{ active: docRowIndex(d.slug) === activeIndex }"
-              @click="pickDoc(d.slug)"
-              @keydown.enter="pickDoc(d.slug)"
-              @mouseenter="activeIndex = docRowIndex(d.slug)"
-            >
-              <div class="command-palette-row-title">{{ d.title }}</div>
-              <div v-if="d.snippet" class="command-palette-doc-snippet">{{ d.snippet }}</div>
-              <div class="command-palette-row-meta">
-                <span class="command-palette-task-id">{{ d.slug }}</span>
-              </div>
-            </div>
-          </section>
-          <div v-if="!sections.length && !specMatches.length && !docMatches.length" class="command-palette-empty">
+          <div v-if="!sections.length && !specMatches.length" class="command-palette-empty">
             {{ query.trim() ? 'No matches' : 'No tasks yet' }}
           </div>
         </div>

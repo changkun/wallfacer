@@ -112,7 +112,7 @@ The header search bar filters visible cards live by title, prompt, and tags. Use
 
 ## Command palette
 
-Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, spec matches from the Plan tree, and full-text docs search. When a task is highlighted, state-dependent actions appear:
+Click **Search or command** at the top of the sidebar to open the palette. It combines fuzzy local task search, server-side task search, and spec matches from the Plan tree. When a task is highlighted, state-dependent actions appear:
 
 - Backlog: **Plan** (open task-mode chat in Plan), **Start**
 - Waiting: **Resume** (with session), **Test**, **Done**, **Sync**

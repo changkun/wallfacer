@@ -19,7 +19,7 @@ func TestInitServer_AddrWithoutPortIsReported(t *testing.T) {
 			Addr:      "127.0.0.1",
 			DataDir:   filepath.Join(dir, "data"),
 			EnvFile:   filepath.Join(dir, ".env"),
-		}, testFS(t), testFS(t))
+		}, testFS(t))
 		defer sc.Shutdown()
 		t.Fatalf("initServer accepted the listen address 127.0.0.1 and bound %s", sc.Ln.Addr())
 	}
