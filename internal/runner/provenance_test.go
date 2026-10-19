@@ -17,7 +17,6 @@ func TestCaptureExecutionEnvironment_ModelFromEnvconfig(t *testing.T) {
 	}
 
 	r := NewRunner(nil, RunnerConfig{
-		Command: "echo",
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -36,9 +35,7 @@ func TestCaptureExecutionEnvironment_ModelFromEnvconfig(t *testing.T) {
 // TestCaptureExecutionEnvironment_Sandbox verifies that the Sandbox field is
 // resolved via sandboxForTaskActivity (defaulting to "claude").
 func TestCaptureExecutionEnvironment_Sandbox(t *testing.T) {
-	r := NewRunner(nil, RunnerConfig{
-		Command: "echo",
-	})
+	r := NewRunner(nil, RunnerConfig{})
 	t.Cleanup(func() { r.Shutdown() })
 
 	// No sandbox set → defaults to "claude".
@@ -77,7 +74,6 @@ func TestCaptureExecutionEnvironment_TaskModelOverride(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewRunner(nil, RunnerConfig{
-				Command: "echo",
 				EnvFile: envFile,
 			})
 			t.Cleanup(func() { r.Shutdown() })

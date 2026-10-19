@@ -86,36 +86,10 @@ func TestMockRunner_MultipleCalls(t *testing.T) {
 	}
 }
 
-// TestMockRunner_ContainerNameFn verifies that ContainerNameFn overrides are respected.
-func TestMockRunner_ContainerNameFn(t *testing.T) {
-	id := uuid.New()
-	m := &MockRunner{
-		ContainerNameFn: func(taskID uuid.UUID) string {
-			return "mock-container-" + taskID.String()
-		},
-	}
-
-	got := m.ContainerName(id)
-	want := "mock-container-" + id.String()
-	if got != want {
-		t.Errorf("ContainerName = %q, want %q", got, want)
-	}
-}
-
-// TestMockRunner_ContainerName_Default verifies nil fn returns empty string.
-func TestMockRunner_ContainerName_Default(t *testing.T) {
-	m := &MockRunner{}
-	id := uuid.New()
-	if got := m.ContainerName(id); got != "" {
-		t.Errorf("ContainerName with nil fn = %q, want %q", got, "")
-	}
-}
-
 // TestMockRunner_NoOpMethods verifies all no-op methods don't panic and return
 // safe zero values.
 func TestMockRunner_NoOpMethods(t *testing.T) {
 	m := &MockRunner{
-		Cmd:         "echo",
 		WtDir:       "/tmp/wt",
 		EnvFilePath: "/tmp/env",
 		CodexPath:   "/tmp/codex",
@@ -189,9 +163,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 		t.Error("ShutdownCtx returned nil context")
 	}
 
-	if got := m.Command(); got != m.Cmd {
-		t.Errorf("Command = %q, want %q", got, m.Cmd)
-	}
 	if got := m.WorktreesDir(); got != m.WtDir {
 		t.Errorf("WorktreesDir = %q, want %q", got, m.WtDir)
 	}

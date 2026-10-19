@@ -11,13 +11,12 @@ import (
 )
 
 // runFakeCmd handles the re-exec mode where the test binary acts as a fake
-// container command. Called from TestMain when WALLFACER_FAKE_MODE is set.
+// agent command. Called from TestMain when WALLFACER_FAKE_MODE is set.
 //
 // Supported modes:
 //   - "simple": write WALLFACER_FAKE_DIR/output.txt to stdout, exit with WALLFACER_FAKE_EXIT
-//   - "stateful": counter-based; skip lifecycle commands (rm/kill/inspect/ps);
-//     output out<N>.txt (or last.txt), increment counter
-//   - "stderr": like simple but also writes stderr.txt to stderr; skips rm/kill
+//   - "stateful": counter-based; output out<N>.txt (or last.txt), increment counter
+//   - "stderr": like simple but also writes stderr.txt to stderr
 func runFakeCmd(mode string) {
 	dir := os.Getenv("WALLFACER_FAKE_DIR")
 	exitCode, _ := strconv.Atoi(os.Getenv("WALLFACER_FAKE_EXIT"))
@@ -29,14 +28,6 @@ func runFakeCmd(mode string) {
 		os.Exit(exitCode)
 
 	case "stateful":
-		// Skip container lifecycle subcommands without advancing the counter.
-		if len(os.Args) > 1 {
-			switch os.Args[1] {
-			case "rm", "kill", "inspect", "ps", "create", "start":
-				os.Exit(0)
-			}
-		}
-
 		counterFile := filepath.Join(dir, "counter")
 		countData, _ := os.ReadFile(counterFile)
 		count, _ := strconv.Atoi(strings.TrimSpace(string(countData)))
@@ -51,14 +42,6 @@ func runFakeCmd(mode string) {
 		os.Exit(exitCode)
 
 	case "stderr":
-		// Skip container lifecycle subcommands.
-		if len(os.Args) > 1 {
-			switch os.Args[1] {
-			case "rm", "kill":
-				os.Exit(0)
-			}
-		}
-
 		stdout, _ := os.ReadFile(filepath.Join(dir, "stdout.txt"))
 		stderr, _ := os.ReadFile(filepath.Join(dir, "stderr.txt"))
 		_, _ = os.Stdout.Write(stdout)
@@ -66,13 +49,6 @@ func runFakeCmd(mode string) {
 		os.Exit(exitCode)
 
 	case "blocking":
-		// Skip container lifecycle subcommands.
-		if len(os.Args) > 1 {
-			switch os.Args[1] {
-			case "rm", "kill", "inspect", "ps":
-				os.Exit(0)
-			}
-		}
 		// Block until killed (context cancellation). Use a long sleep
 		// so the process stays alive for the test to verify registration.
 		time.Sleep(5 * time.Minute)

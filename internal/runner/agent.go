@@ -401,13 +401,6 @@ func (r *Runner) launchOne(
 	}
 	exitCode, waitErr := handle.Wait()
 
-	// Exit code 125 is the container runtime's "engine error" signal
-	// (podman / docker). Record it against the circuit breaker even
-	// when ctx is still alive so repeated engine failures trip it.
-	if exitCode == 125 && ctx.Err() == nil && opts.CircuitBreaker != nil {
-		opts.CircuitBreaker.RecordFailure()
-	}
-
 	// Context cancellation → report as terminated (matches the legacy
 	// title/oversight/commit behavior).
 	if ctx.Err() != nil {
@@ -485,7 +478,7 @@ func (r *Runner) buildInspectorSpec(
 	sb harness.ID,
 	mode mountMode,
 ) executor.ContainerSpec {
-	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	spec := r.buildBaseContainerSpec(containerName, sb)
 	if mode != mountReadOnly {
 		return spec
 	}

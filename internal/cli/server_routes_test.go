@@ -37,7 +37,6 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 	defer s.Close()
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -96,7 +95,6 @@ func TestIdeateRoutesRemoved(t *testing.T) {
 	defer s.Close()
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -145,7 +143,6 @@ func TestRefineRoutesRemoved(t *testing.T) {
 	defer s.Close()
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -199,7 +196,6 @@ func TestFleetRoutesRemoved(t *testing.T) {
 	defer s.Close()
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -256,7 +252,6 @@ func TestGitHubRoutesRemoved(t *testing.T) {
 	defer s.Close()
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},

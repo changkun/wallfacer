@@ -381,7 +381,7 @@ func (r *Runner) runCommitContainer(
 ) (*agentOutput, error) {
 	model := r.modelFromEnvForSandbox(sb)
 
-	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	spec := r.buildBaseContainerSpec(containerName, sb)
 	spec.Labels = labels
 	spec.Cmd = buildAgentCmd(commitPrompt, model)
 

@@ -33,9 +33,6 @@ const ReviewAgentTimeout = 5 * time.Minute
 // Polling / watcher intervals
 // ---------------------------------------------------------------------------
 
-// ContainerPollInterval is the polling interval for container health monitoring.
-const ContainerPollInterval = 5 * time.Second
-
 // AutoPromoteInterval is the periodic ticker interval for the auto-promoter.
 const AutoPromoteInterval = 60 * time.Second
 

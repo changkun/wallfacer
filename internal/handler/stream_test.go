@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -650,8 +651,7 @@ func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 // --- Additional StreamLogs coverage tests ---
 
 // newTestHandlerWithMockRunner creates a Handler backed by a temp-dir store and
-// a MockRunner (not a real Runner), so individual fields like ContainerNameFn
-// can be configured per-test.
+// a MockRunner (not a real Runner), so its fields can be configured per-test.
 func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handler, *store.Store) {
 	t.Helper()
 	// t.TempDir registers its removal first, so it runs after the compaction
@@ -811,14 +811,10 @@ func TestStreamLogs_InProgressNoContainerExitsOnContextCancel(t *testing.T) {
 }
 
 // TestStreamLogs_InProgress_NoFlusher verifies that StreamLogs returns 500 when
-// the ResponseWriter does not implement http.Flusher and the task is in-progress
-// with a live container name. Uses nonFlushingWriter which deliberately omits
-// the http.Flusher interface.
+// the ResponseWriter does not implement http.Flusher and the task is in-progress.
+// Uses nonFlushingWriter which deliberately omits the http.Flusher interface.
 func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
-	mock := &runner.MockRunner{
-		Cmd:             "echo",
-		ContainerNameFn: func(_ uuid.UUID) string { return "test-container" },
-	}
+	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()
@@ -842,14 +838,9 @@ func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
 
 // TestStreamLogs_InProgress_NoLiveReader_ServesStoredLogs verifies that an
 // in-progress task with no live log reader serves stored turn output rather
-// than shelling out to a container runtime. Host execution has no container
-// log to stream, so the runner's Cmd (a nonexistent binary here) must never be
-// exec'd — a 200 with the stored output proves the container fallback is gone.
+// than failing.
 func TestStreamLogs_InProgress_NoLiveReader_ServesStoredLogs(t *testing.T) {
-	mock := &runner.MockRunner{
-		Cmd:             "/nonexistent-binary-that-must-not-run",
-		ContainerNameFn: func(_ uuid.UUID) string { return "ignored-name" },
-	}
+	mock := &runner.MockRunner{}
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()

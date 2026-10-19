@@ -104,7 +104,6 @@ func TestResolveEnvFileFallback(t *testing.T) {
 				tc.setup()
 			}
 			r := newRunnerForArgTest(t, RunnerConfig{
-				Command:        "podman",
 				EnvFile:        tc.envFile,
 				DefaultEnvFile: tc.defaultEnv,
 			})
@@ -114,7 +113,7 @@ func TestResolveEnvFileFallback(t *testing.T) {
 			}
 
 			// The spec built for every activity must carry the resolved path.
-			spec := r.buildBaseContainerSpec("c-test", "", "claude")
+			spec := r.buildBaseContainerSpec("c-test", "claude")
 			if spec.EnvFile != tc.want {
 				t.Errorf("spec.EnvFile = %q; want %q", spec.EnvFile, tc.want)
 			}
@@ -127,10 +126,10 @@ func TestResolveEnvFileFallback(t *testing.T) {
 // differ only in the WALLFACER_AGENT env var that the entrypoint reads
 // to dispatch to the right CLI.
 func TestBuildBaseContainerSpecClaudeVsCodexAgentEnv(t *testing.T) {
-	r := newRunnerForArgTest(t, RunnerConfig{Command: "podman"})
+	r := newRunnerForArgTest(t, RunnerConfig{})
 
-	claudeSpec := r.buildBaseContainerSpec("c-test", "", "claude")
-	codexSpec := r.buildBaseContainerSpec("c-test", "", "codex")
+	claudeSpec := r.buildBaseContainerSpec("c-test", "claude")
+	codexSpec := r.buildBaseContainerSpec("c-test", "codex")
 
 	if claudeSpec.Env["WALLFACER_AGENT"] != "claude" {
 		t.Errorf("claude spec: WALLFACER_AGENT = %q, want claude", claudeSpec.Env["WALLFACER_AGENT"])

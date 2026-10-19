@@ -111,11 +111,9 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 		},
 	}
 	task.Environment = &ExecutionEnvironment{
-		ContainerImage:  "image:latest",
-		ContainerDigest: "sha256:digest",
-		ModelName:       "model-1",
-		APIBaseURL:      "https://example.invalid",
-		RecordedAt:      time.Unix(1_700_000_050, 0).UTC(),
+		ModelName:  "model-1",
+		APIBaseURL: "https://example.invalid",
+		RecordedAt: time.Unix(1_700_000_050, 0).UTC(),
 	}
 	task.WorktreePaths = map[string]string{"/repo": "/worktree"}
 	task.CommitHashes = map[string]string{"/repo": "commit-1"}
@@ -141,7 +139,7 @@ func mutateTaskCloneForIsolation(task *Task) {
 	task.DependsOn[0] = "mutated-dependency"
 	task.SandboxByActivity[SandboxActivityImplementation] = "mutated-sandbox"
 	task.UsageBreakdown[SandboxActivityImplementation] = TaskUsage{InputTokens: 999}
-	task.Environment.ContainerImage = "mutated-image"
+	task.Environment.ModelName = "mutated-model"
 	task.WorktreePaths["/repo"] = "/mutated-worktree"
 	task.CommitHashes["/repo"] = "mutated-commit"
 	task.BaseCommitHashes["/repo"] = "mutated-base"

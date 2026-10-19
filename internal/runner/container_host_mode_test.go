@@ -22,7 +22,6 @@ func TestBuildContainerSpec_HostMode_WorkDirIsHostPath(t *testing.T) {
 	workspace := t.TempDir()
 	worktree := t.TempDir()
 	r := newHostModeRunner(t, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})
@@ -49,7 +48,6 @@ func TestBuildContainerSpec_HostMode_BoardAndSiblingsViaEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := newHostModeRunner(t, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})
@@ -89,7 +87,6 @@ func TestBuildContainerSpec_HostMode_NoSiblingsSkipsManifest(t *testing.T) {
 	workspace := t.TempDir()
 	boardDir := t.TempDir()
 	r := newHostModeRunner(t, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})
@@ -111,7 +108,6 @@ func TestBuildContainerSpec_HostMode_NoSiblingsSkipsManifest(t *testing.T) {
 func TestBuildContainerSpec_HostMode_CmdContainsPromptAndResume(t *testing.T) {
 	workspace := t.TempDir()
 	r := newHostModeRunner(t, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{workspace},
 		WorktreesDir: t.TempDir(),
 	})

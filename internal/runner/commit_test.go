@@ -45,7 +45,6 @@ func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	}
 	resolved := resolveTestCmd(cmd)
 	r := NewRunner(s, RunnerConfig{
-		Command:          cmd,
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
 		HostCodexBinary:  resolved,
@@ -269,7 +268,6 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	}
 	resolved := resolveTestCmd(cmd)
 	runner := NewRunner(s, RunnerConfig{
-		Command:          cmd,
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
@@ -325,7 +323,6 @@ func TestHostStageAndCommitSurfacesCommitMessageFailure(t *testing.T) {
 	}
 	resolved := resolveTestCmd(cmd)
 	runner := NewRunner(s, RunnerConfig{
-		Command:          cmd,
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
@@ -418,7 +415,6 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := NewRunner(s, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -490,7 +486,6 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	}
 	resolved := resolveTestCmd(cmd)
 	runner := NewRunner(s, RunnerConfig{
-		Command:          cmd,
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: resolved,
@@ -617,7 +612,6 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := NewRunner(s, RunnerConfig{
-		Command:      "echo", // dummy — not used for git operations
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -681,7 +675,6 @@ func TestHostStageAndCommitKeepsNewInstructionsFiles(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	runner := NewRunner(s, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
@@ -745,7 +738,6 @@ func TestHostStageAndCommitPreservesTrackedInstructionsFiles(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	runner := NewRunner(s, RunnerConfig{
-		Command:      "echo",
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})

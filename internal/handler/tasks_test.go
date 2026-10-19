@@ -2223,7 +2223,6 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutoimplementEnabled(t *tes
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:          cmdPath,
 		Workspaces:       []string{repo},
 		HostClaudeBinary: cmdPath,
 		HostCodexBinary:  cmdPath,
@@ -4006,7 +4005,6 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:          cmd,
 		Workspaces:       []string{repo},
 		WorktreesDir:     worktreesDir,
 		HostClaudeBinary: cmd,

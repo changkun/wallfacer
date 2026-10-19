@@ -31,7 +31,6 @@ type agentBinding struct {
 	Activity    store.SandboxActivity
 	Timeout     func(*store.Task) time.Duration
 	MountMode   mountMode
-	MountBoard  bool
 	SingleTurn  bool
 	ParseResult func(*agentOutput) (any, error)
 	Model       func(harness.ID) string
@@ -82,7 +81,6 @@ var agentBindings = map[string]agentBinding{
 			return time.Duration(t.Timeout) * time.Minute
 		},
 		MountMode:   mountReadWrite,
-		MountBoard:  true,
 		SingleTurn:  false,
 		ParseResult: passthroughParse,
 	},
@@ -95,7 +93,6 @@ var agentBindings = map[string]agentBinding{
 			return time.Duration(t.Timeout) * time.Minute
 		},
 		MountMode:   mountReadWrite,
-		MountBoard:  true,
 		SingleTurn:  false,
 		ParseResult: passthroughParse,
 	},

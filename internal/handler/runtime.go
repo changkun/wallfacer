@@ -7,7 +7,6 @@ import (
 
 	"latere.ai/x/pkg/httpjson"
 
-	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -26,7 +25,6 @@ type runtimeStatusResponse struct {
 	TaskStates       map[store.TaskStatus]int `json:"task_states"`
 	ActiveContainers int                      `json:"active_containers"`
 	ContainerCircuit containerCircuitStatus   `json:"container_circuit"`
-	WorkerStats      executor.WorkerStatsInfo `json:"worker_stats"`
 	Timestamp        time.Time                `json:"timestamp"`
 }
 
@@ -82,7 +80,6 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 			State:    h.runner.ContainerCircuitState(),
 			Failures: h.runner.ContainerCircuitFailures(),
 		},
-		WorkerStats: h.runner.WorkerStats(),
-		Timestamp:   time.Now().UTC(),
+		Timestamp: time.Now().UTC(),
 	})
 }

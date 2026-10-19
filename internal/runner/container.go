@@ -73,7 +73,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 		model = r.modelFromEnvForSandbox(sb)
 	}
 
-	spec := r.buildBaseContainerSpec(containerName, model, sb)
+	spec := r.buildBaseContainerSpec(containerName, sb)
 
 	// Label the task so the monitor can correlate the host process to a task.
 	if taskID != "" {
@@ -171,27 +171,15 @@ func buildAgentCmd(prompt, model string) []string {
 	return cmd
 }
 
-// buildBaseContainerSpec creates a ContainerSpec pre-populated with the
-// configuration shared across all sub-agent invocations:
-//   - Runtime, Name, and the unified sandbox-agents image
-//   - EnvFile (when configured)
-//   - WALLFACER_AGENT environment variable (claude or codex) so the image
-//     entrypoint dispatches to the correct CLI
-//   - CLAUDE_CODE_MODEL environment variable (when model is non-empty)
-//   - claude-config named volume for agent configuration persistence
-//   - Codex auth.json bind-mount (when sandbox=="codex" and the file exists)
-//
-// Callers set Labels, additional Volumes (workspace directories, instructions
-// file, board context), WorkDir, and Cmd for their specific needs.
 // resolveEnvFile returns the env-file path to hand the sandbox backend,
 // guarding against a configured path that has vanished by launch time.
 //
 // The configured envFile may be overridden (via ENV_FILE / --env-file) to a
 // transient location — most notably a mktemp path under /var/folders that
 // macOS's periodic tmp-reaper purges after ~3 idle days. A long-idle scheduled
-// task that fires after that window would otherwise hand podman a dead
-// --env-file path and die with an opaque exit 125. When the configured path is
-// missing but the canonical default (<configDir>/.env) exists, fall back to it.
+// task that fires after that window would otherwise fail to read its
+// credentials. When the configured path is missing but the canonical default
+// (<configDir>/.env) exists, fall back to it.
 //
 // The fallback only *redirects* to a known-good default; it never silently
 // suppresses a configured path, so an unrelated missing env file still reaches
@@ -213,15 +201,15 @@ func (r *Runner) resolveEnvFile() string {
 	return r.envFile
 }
 
-func (r *Runner) buildBaseContainerSpec(containerName, model string, sb harness.ID) executor.ContainerSpec {
+// buildBaseContainerSpec creates the launch spec shared by every agent run:
+// its name, the env file and the harness that runs it. Callers set the
+// working directory and argv.
+func (r *Runner) buildBaseContainerSpec(containerName string, sb harness.ID) executor.ContainerSpec {
 	spec := executor.ContainerSpec{Name: containerName}
 	if envFile := r.resolveEnvFile(); envFile != "" {
 		spec.EnvFile = envFile
 	}
 	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
-	if model != "" {
-		spec.Env["CLAUDE_CODE_MODEL"] = model
-	}
 	return spec
 }
 
@@ -390,11 +378,7 @@ func (r *Runner) runContainer(
 		r.liveLogs.Delete(taskID)
 	}()
 
-	// Initial name-only registration so KillContainer can find the
-	// container even before Launch returns a handle; the OnLaunch
-	// callback upgrades to a handle entry.
-	r.taskContainers.Set(taskID, containerName)
-	defer r.taskContainers.Delete(taskID)
+	defer r.taskProcesses.Delete(taskID)
 
 	res, err := r.runAgent(ctx, role, task, prompt, runAgentOpts{
 		ContainerName:     containerName,
@@ -406,11 +390,10 @@ func (r *Runner) runContainer(
 		LiveLogWriter:     ll,
 		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
-		// Upgrade the name-only registration to a handle entry so
-		// KillContainer can actually signal the running agent when the
-		// user cancels the task mid-run.
+		// Register the process so KillContainer can signal the running
+		// agent when the user cancels the task mid-run.
 		OnLaunch: func(_ string, handle executor.Handle) {
-			r.taskContainers.SetHandle(taskID, handle)
+			r.taskProcesses.Store(taskID, handle)
 		},
 		// Heavyweight turn invocations rebind the activity bucket
 		// for each turn's usage ledger — implementation or testing.
@@ -496,7 +479,7 @@ func (r *Runner) runContainerOnSandbox(
 		// Register the fallback launch's handle too, so a cancel during
 		// the codex-fallback turn can still kill the running agent.
 		OnLaunch: func(_ string, handle executor.Handle) {
-			r.taskContainers.SetHandle(taskID, handle)
+			r.taskProcesses.Store(taskID, handle)
 		},
 	})
 	if res == nil {

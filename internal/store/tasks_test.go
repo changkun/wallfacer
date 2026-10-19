@@ -1615,11 +1615,9 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 
 	recorded := time.Date(2026, 3, 9, 12, 0, 0, 0, time.UTC)
 	env := ExecutionEnvironment{
-		ContainerImage:  "wallfacer-sandbox:latest",
-		ContainerDigest: "sha256:abc123def456",
-		ModelName:       "claude-opus-4-6",
-		APIBaseURL:      "https://api.example.com",
-		RecordedAt:      recorded,
+		ModelName:  "claude-opus-4-6",
+		APIBaseURL: "https://api.example.com",
+		RecordedAt: recorded,
 	}
 
 	if err := s.UpdateTaskEnvironment(bg(), task.ID, env); err != nil {
@@ -1633,12 +1631,6 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 
 	if got.Environment == nil {
 		t.Fatal("Environment should not be nil after UpdateTaskEnvironment")
-	}
-	if got.Environment.ContainerImage != env.ContainerImage {
-		t.Errorf("ContainerImage = %q, want %q", got.Environment.ContainerImage, env.ContainerImage)
-	}
-	if got.Environment.ContainerDigest != env.ContainerDigest {
-		t.Errorf("ContainerDigest = %q, want %q", got.Environment.ContainerDigest, env.ContainerDigest)
 	}
 	if got.Environment.ModelName != env.ModelName {
 		t.Errorf("ModelName = %q, want %q", got.Environment.ModelName, env.ModelName)
@@ -1664,9 +1656,8 @@ func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 	}
 
 	env := ExecutionEnvironment{
-		ContainerImage: "wallfacer:test",
-		ModelName:      "claude-sonnet-4",
-		RecordedAt:     time.Now().Truncate(time.Second),
+		ModelName:  "claude-sonnet-4",
+		RecordedAt: time.Now().Truncate(time.Second),
 	}
 	if err := s.UpdateTaskEnvironment(bg(), task.ID, env); err != nil {
 		t.Fatalf("UpdateTaskEnvironment: %v", err)
@@ -1686,9 +1677,6 @@ func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 	}
 	if got.Environment == nil {
 		t.Fatal("Environment should not be nil after reload")
-	}
-	if got.Environment.ContainerImage != env.ContainerImage {
-		t.Errorf("ContainerImage = %q, want %q after reload", got.Environment.ContainerImage, env.ContainerImage)
 	}
 	if got.Environment.ModelName != env.ModelName {
 		t.Errorf("ModelName = %q, want %q after reload", got.Environment.ModelName, env.ModelName)

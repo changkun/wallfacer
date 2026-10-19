@@ -15,12 +15,11 @@ type BackendState int
 
 // Backend lifecycle states.
 const (
-	StateCreating  BackendState = iota // Backend is provisioning the container.
-	StateRunning                       // Container process is alive but has not yet produced output.
-	StateStreaming                     // Reserved: never entered under host execution (transition() is never called with it). Kept as exported API and a valid StateMachine edge.
-	StateStopping                      // Kill() has been called; waiting for exit.
-	StateStopped                       // Container exited (success or non-zero). Terminal.
-	StateFailed                        // Container could not be created or crashed. Terminal.
+	StateCreating BackendState = iota // Backend is provisioning the container.
+	StateRunning                      // Container process is alive but has not yet produced output.
+	StateStopping                     // Kill() has been called; waiting for exit.
+	StateStopped                      // Container exited (success or non-zero). Terminal.
+	StateFailed                       // Container could not be created or crashed. Terminal.
 )
 
 // String returns the human-readable name of the backend state.
@@ -30,8 +29,6 @@ func (s BackendState) String() string {
 		return "creating"
 	case StateRunning:
 		return "running"
-	case StateStreaming:
-		return "streaming"
 	case StateStopping:
 		return "stopping"
 	case StateStopped:
@@ -45,12 +42,11 @@ func (s BackendState) String() string {
 
 // StateMachine defines the valid lifecycle transitions for sandbox containers.
 var StateMachine = statemachine.New(map[BackendState][]BackendState{
-	StateCreating:  {StateRunning, StateFailed},
-	StateRunning:   {StateStreaming, StateStopping, StateStopped, StateFailed},
-	StateStreaming: {StateStopping, StateStopped, StateFailed},
-	StateStopping:  {StateStopped},
-	StateStopped:   {},
-	StateFailed:    {},
+	StateCreating: {StateRunning, StateFailed},
+	StateRunning:  {StateStopping, StateStopped, StateFailed},
+	StateStopping: {StateStopped},
+	StateStopped:  {},
+	StateFailed:   {},
 })
 
 // transition atomically validates and applies a state change using
@@ -95,24 +91,6 @@ type Handle interface {
 	Kill() error
 	// Name returns the container name.
 	Name() string
-}
-
-// WorkerStatsInfo is the legacy worker-stats response shape, retained as
-// the JSON contract for the runtime endpoint. Always zero under the host
-// backend.
-type WorkerStatsInfo struct {
-	Enabled       bool                       `json:"enabled"`
-	ActiveWorkers int                        `json:"active_workers"`
-	Creates       uint64                     `json:"creates"`
-	Execs         uint64                     `json:"execs"`
-	Fallbacks     uint64                     `json:"fallbacks"`
-	ByActivity    map[string]ActivityCounter `json:"by_activity,omitempty"`
-}
-
-// ActivityCounter holds per-activity create/exec counts.
-type ActivityCounter struct {
-	Creates uint64 `json:"creates"`
-	Execs   uint64 `json:"execs"`
 }
 
 // ContainerInfo holds runtime metadata about a container, used by List()

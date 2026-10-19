@@ -33,7 +33,6 @@ func spaMux(t *testing.T) *http.ServeMux {
 	}
 	t.Cleanup(s.Close)
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},

@@ -46,7 +46,6 @@ func TestRunner_BuildsHostBackend(t *testing.T) {
 
 	s := newStoreForTest(t)
 	r := NewRunner(s, RunnerConfig{
-		Command:          "echo",
 		HostClaudeBinary: bin,
 		HostCodexBinary:  bin,
 	})
@@ -66,7 +65,6 @@ func TestRunner_BuildsHostBackend(t *testing.T) {
 func TestNewRunner_UnresolvableClaudeDoesNotExit(t *testing.T) {
 	s := newStoreForTest(t)
 	r := NewRunner(s, RunnerConfig{
-		Command:          "true",
 		HostClaudeBinary: "/no/such/claude/binary",
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -84,7 +82,7 @@ func TestNewRunner_UnresolvableClaudeDoesNotExit(t *testing.T) {
 // env-routed codex choices pass through to the backend's codex launcher.
 func TestSandboxForTaskActivity_PassesCodexThrough(t *testing.T) {
 	s := newStoreForTest(t)
-	r := NewRunner(s, RunnerConfig{Command: "echo"})
+	r := NewRunner(s, RunnerConfig{})
 	t.Cleanup(func() { r.Shutdown() })
 
 	task := &store.Task{Sandbox: "codex"}

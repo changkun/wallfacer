@@ -310,7 +310,6 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	probeRunner := runner.NewRunner(s, runner.RunnerConfig{
-		Command:       h.runner.Command(),
 		EnvFile:       tempEnvFile,
 		Workspaces:    h.currentWorkspaces(),
 		WorktreesDir:  h.runner.WorktreesDir(),

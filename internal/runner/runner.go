@@ -35,27 +35,6 @@ func (r *Runner) ListContainers() ([]executor.ContainerInfo, error) {
 	return r.backend.List(context.Background())
 }
 
-// ContainerName returns the active container name for a task.
-// It first checks the in-memory map populated when a container is launched,
-// then falls back to scanning the container list and matching by task ID label.
-// Returns an empty string if no container is found.
-func (r *Runner) ContainerName(taskID uuid.UUID) string {
-	if name, ok := r.taskContainers.Get(taskID); ok {
-		return name
-	}
-	// Fallback: search all wallfacer containers by label.
-	containers, err := r.ListContainers()
-	if err != nil {
-		return ""
-	}
-	for _, c := range containers {
-		if c.TaskID == taskID.String() {
-			return c.Name
-		}
-	}
-	return ""
-}
-
 // TaskLogReader returns a new liveLogReader for the currently-running turn
 // of the given task. Returns nil when no live log is active (the task is
 // between turns or not running). Each call returns an independent reader
@@ -72,7 +51,6 @@ func (r *Runner) TaskLogReader(taskID uuid.UUID) *livelog.Reader {
 //
 //nolint:revive // name stutters but renaming would be too invasive
 type RunnerConfig struct {
-	Command string
 	EnvFile string
 	// DefaultEnvFile is the canonical config env file (typically
 	// <configDir>/.env). It is used as a fallback when EnvFile is set to an
@@ -104,7 +82,6 @@ type Runner struct {
 	storeMu          sync.RWMutex
 	wsKey            string   // workspace key of the currently viewed group (guarded by storeMu)
 	taskWSKey        sync.Map // uuid.UUID → string: maps task IDs to their workspace group key
-	command          string
 	envFile          string
 	defaultEnvFile   string // fallback env file when envFile goes missing (see RunnerConfig.DefaultEnvFile)
 	workspaces       []string
@@ -112,15 +89,15 @@ type Runner struct {
 	tmpDir           string
 	workspaceManager *workspace.Manager
 	codexAuthPath    string
-	promptsMgr       *prompts.Manager                     // prompt template manager
-	worktreeMu       sync.Mutex                           // serializes all worktree filesystem operations on worktreesDir
-	repoMu           syncmap.Map[string, *sync.Mutex]     // per-repo mutex for serializing rebase+merge
-	taskContainers   *containerRegistry                   // taskID → container name
-	liveLogs         syncmap.Map[uuid.UUID, *livelog.Log] // live log buffers for in-progress turns
-	oversightMu      syncmap.Map[string, *sync.Mutex]     // per-task mutex for serializing oversight generation
-	containerCB      *circuitbreaker.Breaker              // circuit breaker for container launch operations
-	backend          executor.Backend                     // pluggable sandbox backend (local podman/docker, host, future: k8s)
-	backgroundWg     trackedwg.WaitGroup                  // tracks fire-and-forget background goroutines
+	promptsMgr       *prompts.Manager                        // prompt template manager
+	worktreeMu       sync.Mutex                              // serializes all worktree filesystem operations on worktreesDir
+	repoMu           syncmap.Map[string, *sync.Mutex]        // per-repo mutex for serializing rebase+merge
+	taskProcesses    syncmap.Map[uuid.UUID, executor.Handle] // taskID → running agent process
+	liveLogs         syncmap.Map[uuid.UUID, *livelog.Log]    // live log buffers for in-progress turns
+	oversightMu      syncmap.Map[string, *sync.Mutex]        // per-task mutex for serializing oversight generation
+	containerCB      *circuitbreaker.Breaker                 // circuit breaker for container launch operations
+	backend          executor.Backend                        // pluggable sandbox backend (local podman/docker, host, future: k8s)
+	backgroundWg     trackedwg.WaitGroup                     // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
 	agentSession     *agentsession.Runtime // agent session for chat; may be nil
@@ -291,10 +268,6 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 				r.workspaceManager.DecrementAndCleanup(wsKey)
 			}
 		}()
-		// Note: StopTaskWorker is NOT deferred here because title, oversight,
-		// and commit agents run in separate background goroutines after Run()
-		// returns and need the worker container alive. Worker cleanup happens
-		// in CleanupWorktrees (commit pipeline), the cancel path, and Shutdown.
 		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
 	})
 }
@@ -341,7 +314,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	}
 	r := &Runner{
 		store:            s,
-		command:          cfg.Command,
 		envFile:          cfg.EnvFile,
 		defaultEnvFile:   cfg.DefaultEnvFile,
 		workspaces:       cfg.Workspaces,
@@ -350,7 +322,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
 		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
-		taskContainers:   &containerRegistry{},
 		shutdownCh:       make(chan struct{}),
 	}
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
@@ -504,11 +475,6 @@ func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
 	})
 }
 
-// Command returns the container runtime binary path (podman/docker).
-func (r *Runner) Command() string {
-	return r.command
-}
-
 // EnvFile returns the path to the env file used for containers.
 func (r *Runner) EnvFile() string {
 	return r.envFile
@@ -631,21 +597,12 @@ func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
 	return mu
 }
 
-// KillContainer sends a kill signal to the running container for a task.
-// Kill goes through the SandboxHandle when registered; otherwise it is a no-op
-// (container already exited or was never launched).
-// Safe to call when no container is running — errors are silently ignored.
+// KillContainer kills the running agent process for a task. It is a no-op
+// when no process is registered (already exited or never launched).
 func (r *Runner) KillContainer(taskID uuid.UUID) {
-	if h := r.taskContainers.GetHandle(taskID); h != nil {
-		_ = h.Kill()
+	if h, ok := r.taskProcesses.Load(taskID); ok && h != nil {
+		if err := h.Kill(); err != nil {
+			logger.Runner.Warn("kill agent process", "task", taskID, "error", err)
+		}
 	}
 }
-
-// WorkerStats returns zero values. Retained on the interface for downstream
-// callers; the host backend does not manage worker containers.
-func (r *Runner) WorkerStats() executor.WorkerStatsInfo {
-	return executor.WorkerStatsInfo{}
-}
-
-// StopTaskWorker is a no-op under the host backend.
-func (r *Runner) StopTaskWorker(_ uuid.UUID) {}

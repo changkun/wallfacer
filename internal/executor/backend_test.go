@@ -43,7 +43,6 @@ func TestBackendStateString(t *testing.T) {
 	}{
 		{StateCreating, "creating"},
 		{StateRunning, "running"},
-		{StateStreaming, "streaming"},
 		{StateStopping, "stopping"},
 		{StateStopped, "stopped"},
 		{StateFailed, "failed"},

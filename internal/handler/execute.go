@@ -409,7 +409,6 @@ func (h *Handler) cancelTaskInternal(ctx context.Context, task store.Task) error
 	if oldStatus == store.TaskStatusInProgress {
 		h.runner.KillContainer(task.ID)
 	}
-	h.runner.StopTaskWorker(task.ID)
 
 	s, ok := h.currentStore()
 	if !ok {
@@ -497,8 +496,6 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, id := range archived {
-		// Safety net: stop any leaked worker containers.
-		h.runner.StopTaskWorker(id)
 		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange, map[string]string{
 			"to":      "archived",
 			"trigger": string(store.TriggerUser),
@@ -513,10 +510,6 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 // done/cancelled status.
 // Invoked from the PATCH archived path (UpdateTask).
 func (h *Handler) applyArchive(ctx context.Context, task store.Task, archived bool) error {
-	if archived {
-		// Safety net: stop any leaked worker containers.
-		h.runner.StopTaskWorker(task.ID)
-	}
 	s, ok := h.currentStore()
 	if !ok {
 		return nil

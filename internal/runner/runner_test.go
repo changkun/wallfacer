@@ -90,8 +90,7 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 	}
 
 	runner := NewRunner(s, RunnerConfig{
-		AgentNice:        -1,     // fake agents must not depend on OS background scheduling
-		Command:          "echo", // dummy — not used for host-side operations
+		AgentNice:        -1, // fake agents must not depend on OS background scheduling
 		EnvFile:          "",
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
@@ -105,7 +104,6 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	t.Helper()
 	cmd := fakeCmdScript(t, `{"result":"wallfacer: generated commit","session_id":"abc123","stop_reason":"end_turn","is_error":false}`, 0)
-	runner.command = cmd
 	// Host backend resolved Claude/Codex binaries at construction; swap
 	// them to the fake script so commit-message generation does not shell
 	// out to the real CLI.
@@ -124,9 +122,7 @@ func newTestRunner(t *testing.T) *Runner {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	r := NewRunner(s, RunnerConfig{
-		Command: "podman",
-	})
+	r := NewRunner(s, RunnerConfig{})
 	t.Cleanup(func() { r.Shutdown() })
 	return r
 }

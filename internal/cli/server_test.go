@@ -150,7 +150,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	}
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -212,7 +211,6 @@ func TestBuildMux_DocsEndpoints(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -273,7 +271,7 @@ func TestBuildMux_DocsAsset(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command: "true", EnvFile: filepath.Join(workdir, ".env"),
+		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: filepath.Join(workdir, "worktrees"), Workspaces: []string{workdir},
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
@@ -336,7 +334,6 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -366,7 +363,6 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -396,7 +392,6 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -429,7 +424,6 @@ func TestBuildMux_DocsInternals(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -461,7 +455,6 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
@@ -769,7 +762,6 @@ func TestGauge_BackgroundGoroutines(t *testing.T) {
 	}
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: filepath.Join(workdir, "worktrees"),
 		Workspaces:   []string{workdir},
@@ -819,7 +811,6 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	}
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: filepath.Join(workdir, "worktrees"),
 		Workspaces:   []string{workdir},

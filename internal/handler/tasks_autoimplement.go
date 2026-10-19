@@ -1049,8 +1049,7 @@ func (h *Handler) submitAutoSubmitCandidate(ctx context.Context, c autoSubmitCan
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
 		h.runCommitTransition(c.store, t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
 	} else {
-		// No session — skip commit pipeline. Stop the worker directly.
-		h.runner.StopTaskWorker(t.ID)
+		// No session: skip the commit pipeline.
 		if err := c.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
 			logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
 			h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())

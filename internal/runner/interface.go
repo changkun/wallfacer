@@ -30,11 +30,8 @@ type Interface interface {
 
 	// Container management.
 	ListContainers() ([]executor.ContainerInfo, error)
-	ContainerName(taskID uuid.UUID) string
 	TaskLogReader(taskID uuid.UUID) *livelog.Reader
 	KillContainer(taskID uuid.UUID)
-	StopTaskWorker(taskID uuid.UUID)
-	WorkerStats() executor.WorkerStatsInfo
 
 	// Container circuit breaker.
 	ContainerCircuitAllow() bool
@@ -82,7 +79,6 @@ type Interface interface {
 	ShutdownCtx() context.Context
 
 	// Configuration accessors.
-	Command() string
 	SandboxBackend() executor.Backend
 	WorktreesDir() string
 	TmpDir() string

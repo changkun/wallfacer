@@ -52,7 +52,6 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 
 	mock := &runner.MockRunner{
 		EnvFilePath: envPath,
-		Cmd:         "true",
 		WtDir:       filepath.Join(workdir, "wt"),
 	}
 

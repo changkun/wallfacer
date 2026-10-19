@@ -54,8 +54,6 @@ func TestRunDoctor_MissingEnvFile(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	t.Setenv("ENV_FILE", envFile)
-	t.Setenv("CONTAINER_CMD", "printf")
-	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
 		RunDoctor(configDir, nil)
@@ -83,8 +81,6 @@ func TestRunDoctor_WithCredentials(t *testing.T) {
 	}
 
 	t.Setenv("ENV_FILE", envFile)
-	t.Setenv("CONTAINER_CMD", "printf")
-	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
 		RunDoctor(configDir, nil)

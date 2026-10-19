@@ -29,7 +29,6 @@ type MockRunner struct {
 
 	// Configuration fields — set these before calling NewHandler.
 	EnvFilePath string
-	Cmd         string
 	WtDir       string
 	CodexPath   string
 
@@ -49,7 +48,6 @@ type MockRunner struct {
 	// Optional override for ContainerName return value.
 	// When nil the method returns "" (no container active), matching the default
 	// behavior expected by most tests.
-	ContainerNameFn func(taskID uuid.UUID) string
 
 	// GenerateCommitMessageFn lets tests stub the task-free commit-message
 	// generator. When nil the method returns an empty string and a nil
@@ -129,14 +127,6 @@ func (m *MockRunner) PruneUnknownWorktrees() {}
 // ListContainers returns an empty list.
 func (m *MockRunner) ListContainers() ([]executor.ContainerInfo, error) { return nil, nil }
 
-// ContainerName returns the container name for a task, using ContainerNameFn if set.
-func (m *MockRunner) ContainerName(taskID uuid.UUID) string {
-	if m.ContainerNameFn != nil {
-		return m.ContainerNameFn(taskID)
-	}
-	return ""
-}
-
 // TaskLogReader returns nil in the mock (no live logs).
 func (m *MockRunner) TaskLogReader(_ uuid.UUID) *livelog.Reader { return nil }
 
@@ -146,12 +136,6 @@ func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 	m.KillContainerCalls = append(m.KillContainerCalls, taskID)
 	m.mu.Unlock()
 }
-
-// StopTaskWorker is a no-op in the mock.
-func (m *MockRunner) StopTaskWorker(_ uuid.UUID) {}
-
-// WorkerStats returns empty stats in the mock.
-func (m *MockRunner) WorkerStats() executor.WorkerStatsInfo { return executor.WorkerStatsInfo{} }
 
 // ContainerCircuitAllow always returns true in the mock.
 func (m *MockRunner) ContainerCircuitAllow() bool { return true }
@@ -194,9 +178,6 @@ func (m *MockRunner) CodexAuthPath() string { return m.CodexPath }
 
 // ShutdownCtx returns a background context in the mock.
 func (m *MockRunner) ShutdownCtx() context.Context { return context.Background() }
-
-// Command returns the configured command.
-func (m *MockRunner) Command() string { return m.Cmd }
 
 // SandboxBackend returns nil (mock does not provide a real backend).
 func (m *MockRunner) SandboxBackend() executor.Backend { return nil }

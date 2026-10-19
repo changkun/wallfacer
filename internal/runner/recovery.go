@@ -5,21 +5,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"latere.ai/x/pkg/gitutil"
 
-	"latere.ai/x/wallfacer/internal/constants"
-	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
-
-// ContainerLister can enumerate currently running containers.
-type ContainerLister interface {
-	ListContainers() ([]executor.ContainerInfo, error)
-}
 
 // missingRecoveryWorktrees returns the repo paths whose worktree directories
 // are either empty strings or missing from the filesystem. Used during startup
@@ -40,7 +31,6 @@ func missingRecoveryWorktrees(t store.Task) []string {
 
 // markTaskFailedForMissingWorktrees transitions a task to failed with a
 // worktree_setup failure category when its worktree directories are missing.
-// Used by both the startup recovery and the container monitor paths.
 func markTaskFailedForMissingWorktrees(ctx context.Context, s *store.Store, task store.Task, from store.TaskStatus, trigger store.Trigger) {
 	message := fmt.Sprintf("task worktree missing for: %s", strings.Join(missingRecoveryWorktrees(task), ", "))
 	logger.Recovery.Warn("task worktree missing during recovery", "task", task.ID, "from", from, "error", message)
@@ -61,36 +51,24 @@ func markTaskFailedForMissingWorktrees(ctx context.Context, s *store.Store, task
 	}
 }
 
-// RecoverOrphanedTasks reconciles in_progress/committing tasks on startup by
-// checking which containers are still running.
+// RecoverOrphanedTasks reconciles in_progress/committing tasks on startup. The
+// server tracks no agent process across a restart, so a task found in
+// progress has no run to follow.
 //
 //   - committing tasks: inspects each worktree's git branch to determine whether
 //     a commit landed after the task's UpdatedAt timestamp. If so, the commit
 //     pipeline completed before the crash and the task is promoted to done.
 //     Otherwise it is moved to failed.
-//   - in_progress tasks whose container is still running are left in_progress; a
-//     background goroutine monitors the container and moves the task to waiting
-//     once it stops.
-//   - in_progress tasks whose container is already gone are moved to waiting so
-//     the user can inspect the partial results and decide what to do next.
-func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerLister) {
+//   - in_progress tasks are moved to waiting so the user can inspect the partial
+//     results and decide what to do next, or to failed when their worktrees
+//     are missing.
+//
+// When r is set, orphaned worktree directories are removed afterwards.
+func RecoverOrphanedTasks(ctx context.Context, s *store.Store, r *Runner) {
 	tasks, err := s.ListTasks(ctx, true)
 	if err != nil {
 		logger.Recovery.Error("list tasks", "error", err)
 		return
-	}
-
-	// Build a set of task IDs whose containers are currently running.
-	runningContainers := map[string]bool{}
-	if containers, listErr := lister.ListContainers(); listErr != nil {
-		logger.Recovery.Warn("could not list containers during recovery; treating all in_progress tasks as stopped",
-			"error", listErr)
-	} else {
-		for _, c := range containers {
-			if c.State == "running" && c.TaskID != "" {
-				runningContainers[c.TaskID] = true
-			}
-		}
 	}
 
 	for _, t := range tasks {
@@ -151,142 +129,35 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 			}
 
 		case store.TaskStatusInProgress:
-			if runningContainers[t.ID.String()] {
-				// Container is still active — leave the task in_progress and
-				// monitor it; move to waiting once the container stops.
-				logger.Recovery.Info("container still running after restart, monitoring",
-					"task", t.ID)
-				_ = s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
-
-					"result": "Server restarted while task was running. Container is still active — monitoring for completion.",
-				})
-				go monitorContainerUntilStopped(ctx, s, lister, t.ID)
-			} else {
-				if len(missingRecoveryWorktrees(t)) > 0 {
-					markTaskFailedForMissingWorktrees(ctx, s, t, store.TaskStatusInProgress, store.TriggerRecovery)
-					continue
-				}
-				// Container is gone — move to waiting so the user can review
-				// partial results and decide whether to continue or finish.
-				//
-				// ForceUpdateTaskStatus is used here because a crash may leave a task in an
-				// unexpected state. Recovery must always complete regardless of the normal
-				// allowed transitions.
-				logger.Recovery.Warn("task container gone after restart, moving to waiting",
-					"task", t.ID)
-				_ = s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusWaiting)
-
-				_ = s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
-
-					"result": "Server restarted while task was running. Container is no longer active — please review the output and decide whether to continue or mark as done.",
-				})
-				_ = s.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
-
-					store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerRecovery, nil))
+			if len(missingRecoveryWorktrees(t)) > 0 {
+				markTaskFailedForMissingWorktrees(ctx, s, t, store.TaskStatusInProgress, store.TriggerRecovery)
+				continue
 			}
+			// ForceUpdateTaskStatus is used here because a crash may leave a task in an
+			// unexpected state. Recovery must always complete regardless of the normal
+			// allowed transitions.
+			logger.Recovery.Warn("task was running at startup, moving to waiting", "task", t.ID)
+			_ = s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusWaiting)
+
+			_ = s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+
+				"result": "Server restarted while task was running. Please review the output and decide whether to continue or mark as done.",
+			})
+			_ = s.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+
+				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerRecovery, nil))
 		}
 	}
 
 	// Startup worktree GC: remove any orphaned worktree directories whose
 	// tasks have reached a terminal state or no longer exist in the store.
-	if gcRunner, ok := lister.(*Runner); ok {
-		orphans, err := gcRunner.ScanOrphanedWorktrees(ctx)
+	if r != nil {
+		orphans, err := r.ScanOrphanedWorktrees(ctx)
 		if err != nil {
 			logger.Recovery.Warn("worktree GC scan failed", "error", err)
 		} else if len(orphans) > 0 {
-			removed := gcRunner.PruneOrphanedWorktrees(ctx, orphans)
+			removed := r.PruneOrphanedWorktrees(ctx, orphans)
 			logger.Recovery.Info("startup worktree GC complete", "scanned", len(orphans), "removed", removed)
-		}
-	}
-}
-
-// monitorContainerUntilStopped polls the container runtime until the container
-// for taskID is no longer running, then transitions the task from in_progress
-// to waiting so the user can decide what to do next.
-//
-// The goroutine exits when ctx is cancelled (e.g. on server shutdown) or after
-// a 4-hour safety timeout to prevent indefinitely-leaked goroutines.
-func monitorContainerUntilStopped(ctx context.Context, s *store.Store, lister ContainerLister, taskID uuid.UUID) {
-	monitorContainerUntilStoppedWithConfig(ctx, s, lister, taskID, constants.ContainerPollInterval, 4*time.Hour)
-}
-
-// monitorContainerUntilStoppedWithConfig is the testable core of
-// monitorContainerUntilStopped. pollInterval controls how often the container
-// runtime is queried; maxWait is the safety deadline after which the function
-// gives up waiting and transitions the task to waiting.
-func monitorContainerUntilStoppedWithConfig(ctx context.Context, s *store.Store, lister ContainerLister, taskID uuid.UUID, pollInterval, maxWait time.Duration) {
-	ctx, cancel := context.WithTimeout(ctx, maxWait)
-	defer cancel()
-
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	// storeCtx is intentionally decoupled from the monitor lifetime so that
-	// store writes always complete even when ctx is cancelled or timed out.
-	// Using context.Background() here prevents a server shutdown from
-	// aborting the final status transition that moves the task to waiting.
-	storeCtx := context.Background()
-
-	transitionToWaiting := func() {
-		cur, getErr := s.GetTask(storeCtx, taskID)
-		if getErr != nil || cur == nil {
-			return
-		}
-		if cur.Status != store.TaskStatusInProgress {
-			// Task was already transitioned by another path (e.g. cancelled).
-			return
-		}
-		if len(missingRecoveryWorktrees(*cur)) > 0 {
-			markTaskFailedForMissingWorktrees(storeCtx, s, *cur, store.TaskStatusInProgress, store.TriggerRecovery)
-			return
-		}
-		// ForceUpdateTaskStatus is used here because a crash may leave a task in an
-		// unexpected state. Recovery must always complete regardless of the normal
-		// allowed transitions.
-		_ = s.ForceUpdateTaskStatus(storeCtx, taskID, store.TaskStatusWaiting)
-
-		_ = s.InsertEvent(storeCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"result": "Container has stopped. Please review the output and decide whether to continue or mark as done.",
-		})
-		_ = s.InsertEvent(storeCtx, taskID, store.EventTypeStateChange,
-
-			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerRecovery, nil))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			if ctx.Err() == context.DeadlineExceeded {
-				logger.Recovery.Warn("monitor: container not seen stopping after safety timeout, giving up", "task", taskID)
-				transitionToWaiting()
-			}
-			// If cancelled (server shutdown), exit silently.
-			return
-
-		case <-ticker.C:
-			containers, err := lister.ListContainers()
-			if err != nil {
-				logger.Recovery.Warn("monitor: list containers error", "task", taskID, "error", err)
-				continue
-			}
-			running := false
-			for _, c := range containers {
-				// Match by task ID (from label) so this works regardless of
-				// the container name format (slug-based or legacy UUID-based).
-				if c.TaskID == taskID.String() && c.State == "running" {
-					running = true
-					break
-				}
-			}
-			if running {
-				continue
-			}
-
-			// Container stopped — move the task to waiting if it is still in_progress.
-			logger.Recovery.Info("monitored container stopped, moving task to waiting", "task", taskID)
-			transitionToWaiting()
-			return
 		}
 	}
 }

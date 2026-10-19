@@ -7,20 +7,6 @@ interface ContainerCircuit {
   failures: number;
 }
 
-interface ActivityStats {
-  execs?: number;
-  creates?: number;
-}
-
-interface WorkerStats {
-  enabled?: boolean;
-  active_workers?: number;
-  creates?: number;
-  execs?: number;
-  fallbacks?: number;
-  by_activity?: Record<string, ActivityStats>;
-}
-
 interface TaskStates {
   in_progress?: number;
   waiting?: number;
@@ -34,7 +20,6 @@ interface RuntimeStatus {
   go_heap_alloc_bytes?: number;
   active_containers?: number;
   container_circuit?: ContainerCircuit;
-  worker_stats?: WorkerStats;
   task_states?: TaskStates;
 }
 
@@ -53,35 +38,6 @@ function formatBytes(bytes: number): string {
 // The breaker's state as a pill: closed is the healthy state.
 function circuitPill(state: string): string {
   return state === 'closed' ? 'pill-ok' : 'pill-warn';
-}
-
-function reuseRatio(ws: WorkerStats): number {
-  const execs = ws.execs || 0;
-  const fallbacks = ws.fallbacks || 0;
-  const total = execs + fallbacks;
-  return total > 0 ? Math.round((execs / total) * 100) : 0;
-}
-
-function showWorkerExtras(ws: WorkerStats): boolean {
-  return (ws.creates || 0) > 0 || (ws.execs || 0) > 0;
-}
-
-function activityBreakdown(ws: WorkerStats): string {
-  if (!ws.by_activity) return '';
-  const parts: string[] = [];
-  for (const act in ws.by_activity) {
-    const a = ws.by_activity[act];
-    let label = act + ': ' + (a.execs || 0) + ' exec';
-    if ((a.creates || 0) > 0) {
-      label += ' (' + a.creates + ' triggered worker)';
-    }
-    parts.push(label);
-  }
-  return parts.join(' · ');
-}
-
-function hasActivityBreakdown(ws: WorkerStats): boolean {
-  return !!ws.by_activity && Object.keys(ws.by_activity).length > 0;
 }
 
 function taskStatesText(ts: TaskStates): string {
@@ -156,21 +112,6 @@ onMounted(async () => {
           <span v-if="status.container_circuit.failures > 0" class="set-row__help">{{ status.container_circuit.failures }} failures</span>
         </div>
       </div>
-      <template v-if="status.worker_stats">
-        <div class="set-row">
-          <div class="set-row__main">
-            <span class="set-row__label">Task workers</span>
-            <span v-if="showWorkerExtras(status.worker_stats)" class="set-row__help mono">
-              creates {{ status.worker_stats.creates || 0 }} · execs {{ status.worker_stats.execs || 0 }}<template v-if="(status.worker_stats.fallbacks || 0) > 0"> · fallbacks {{ status.worker_stats.fallbacks }}</template> · reuse {{ reuseRatio(status.worker_stats) }}%
-            </span>
-            <span v-if="hasActivityBreakdown(status.worker_stats)" class="set-row__help mono">{{ activityBreakdown(status.worker_stats) }}</span>
-          </div>
-          <div class="set-row__end">
-            <span class="pill" :class="status.worker_stats.enabled ? 'pill-ok' : 'pill-neutral'">{{ status.worker_stats.enabled ? 'enabled' : 'disabled' }}</span>
-            <span class="mono set-row__help">{{ status.worker_stats.active_workers || 0 }} active</span>
-          </div>
-        </div>
-      </template>
       <div v-if="hasTaskStates(status.task_states)" class="set-row">
         <div class="set-row__main"><span class="set-row__label">Tasks</span></div>
         <div class="set-row__end"><span class="mono set-row__help">{{ taskStatesText(status.task_states!) }}</span></div>

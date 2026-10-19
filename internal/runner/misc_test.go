@@ -24,14 +24,6 @@ import (
 // Runner getters
 // ---------------------------------------------------------------------------
 
-// TestRunnerCommand verifies that Command() returns the configured binary path.
-func TestRunnerCommand(t *testing.T) {
-	r := newTestRunner(t)
-	if r.Command() != "podman" {
-		t.Fatalf("expected command 'podman', got %q", r.Command())
-	}
-}
-
 // TestWorkspacesEmpty verifies that Workspaces() returns nil when no
 // workspaces are configured.
 func TestWorkspacesEmpty(t *testing.T) {
@@ -41,7 +33,7 @@ func TestWorkspacesEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	r := NewRunner(s, RunnerConfig{Command: "echo"})
+	r := NewRunner(s, RunnerConfig{})
 	t.Cleanup(func() { r.Shutdown() })
 	if r.Workspaces() != nil {
 		t.Fatal("expected nil when workspaces is empty")
@@ -58,7 +50,6 @@ func TestWorkspacesMultiple(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
-		Command:    "echo",
 		Workspaces: []string{"/a", "/b", "/c"},
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -82,7 +73,6 @@ func TestWorkspacesMethod_PathsWithSpaces(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	pathWithSpaces := "/home/user/My Project/repo"
 	r := NewRunner(s, RunnerConfig{
-		Command:    "echo",
 		Workspaces: []string{pathWithSpaces, "/normal/path"},
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -583,10 +573,12 @@ func TestRunContainerRegistersHandleForKill(t *testing.T) {
 		done <- err
 	}()
 
-	// OnLaunch fires after the process starts and upgrades the name-only entry
-	// to a handle entry. Before the fix GetHandle stays nil forever.
+	// OnLaunch fires after the process starts and registers its handle.
 	deadline := time.Now().Add(3 * time.Second)
-	for r.taskContainers.GetHandle(taskID) == nil {
+	for {
+		if h, ok := r.taskProcesses.Load(taskID); ok && h != nil {
+			break
+		}
 		if time.Now().After(deadline) {
 			t.Fatal("launch handle was never registered; KillContainer would be a no-op")
 		}
@@ -993,7 +985,7 @@ func TestRunnerEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	r := NewRunner(s, RunnerConfig{Command: "echo", EnvFile: envFile})
+	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
 	t.Cleanup(func() { r.Shutdown() })
 	if r.EnvFile() != envFile {
 		t.Errorf("EnvFile() = %q, want %q", r.EnvFile(), envFile)
@@ -1009,7 +1001,7 @@ func TestRunnerWorktreesDir(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	wtDir := filepath.Join(t.TempDir(), "worktrees")
-	r := NewRunner(s, RunnerConfig{Command: "echo", WorktreesDir: wtDir})
+	r := NewRunner(s, RunnerConfig{WorktreesDir: wtDir})
 	t.Cleanup(func() { r.Shutdown() })
 	if r.WorktreesDir() != wtDir {
 		t.Errorf("WorktreesDir() = %q, want %q", r.WorktreesDir(), wtDir)
@@ -1147,7 +1139,6 @@ func TestModelFromEnv_WithEnvFile(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
-		Command: "echo",
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -1168,7 +1159,6 @@ func TestModelFromEnv_BadEnvFile(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
-		Command: "echo",
 		EnvFile: "/nonexistent/path/.env",
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -1203,7 +1193,6 @@ func TestTitleModelFromEnv_WithTitleModel(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
-		Command: "echo",
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
@@ -1227,7 +1216,6 @@ func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
-		Command: "echo",
 		EnvFile: envFile,
 	})
 	t.Cleanup(func() { r.Shutdown() })
