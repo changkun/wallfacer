@@ -32,15 +32,9 @@ func folderPickerArgs(goos, prompt string) (name string, args []string, ok bool)
 // PickFolder opens the host's native folder chooser and returns the picked
 // absolute path: {"path": "/abs"} on success, {"cancelled": true} when the user
 // dismisses the dialog, or 501 when no native picker is available (unknown
-// platform, the picker binary is missing, or this is a cloud deployment) so the
-// frontend can fall back to the in-app directory browser.
+// platform or the picker binary is missing) so the frontend can fall back to
+// the in-app directory browser.
 func (h *Handler) PickFolder(w http.ResponseWriter, r *http.Request) {
-	// Never shell out to a GUI on a shared/cloud host: it would open a dialog on
-	// the server (or hang). The native picker is a local-machine convenience.
-	if h.cloudMode {
-		http.Error(w, "native folder picker is unavailable in cloud mode", http.StatusNotImplemented)
-		return
-	}
 	name, args, ok := folderPickerArgs(runtime.GOOS, "Select a folder for this workspace")
 	if !ok {
 		http.Error(w, "native folder picker not available on this platform", http.StatusNotImplemented)

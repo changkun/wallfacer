@@ -13,13 +13,8 @@ import (
 	"latere.ai/x/pkg/pagination"
 )
 
-// InsertEvent appends a new event to the task's audit trail. When ctx
-// carries a *Principal (via WithActorPrincipal), the resulting event
-// is stamped with the caller's ActorSub and ActorType so downstream
-// consumers (the task event trace, the audit-log spec) can attribute
-// mutations. An empty context produces an event with both fields
-// empty, which matches pre-Phase-2 records.
-func (s *Store) InsertEvent(ctx context.Context, taskID uuid.UUID, eventType EventType, data any) error {
+// InsertEvent appends a new event to the task's audit trail.
+func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType EventType, data any) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -32,8 +27,6 @@ func (s *Store) InsertEvent(ctx context.Context, taskID uuid.UUID, eventType Eve
 		return fmt.Errorf("task not found: %s", taskID)
 	}
 
-	actorSub, actorType := actorFromContext(ctx)
-
 	s.ensureEventsLoadedLocked(taskID)
 	seq := s.nextSeq[taskID]
 	event := TaskEvent{
@@ -42,8 +35,6 @@ func (s *Store) InsertEvent(ctx context.Context, taskID uuid.UUID, eventType Eve
 		EventType: eventType,
 		Data:      jsonData,
 		CreatedAt: time.Now(),
-		ActorSub:  actorSub,
-		ActorType: actorType,
 	}
 
 	if err := s.backend.SaveEvent(taskID, seq, event); err != nil {

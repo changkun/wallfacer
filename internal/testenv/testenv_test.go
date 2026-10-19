@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"latere.ai/x/pkg/authkit/cli"
 )
 
 // restoreEnvAfter records every variable runIsolated may change so the test
@@ -31,16 +29,12 @@ func TestRunIsolatedPointsPerUserLocationsIntoATempDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve the starting home: %v", err)
 	}
-	var home, tokenPath string
+	var home string
 	var stderr bytes.Buffer
 	code := runIsolated(func() int {
 		var err error
 		if home, err = os.UserHomeDir(); err != nil {
 			t.Errorf("resolve the isolated home: %v", err)
-			return 0
-		}
-		if tokenPath, err = cli.DefaultFileTokenStorePath(); err != nil {
-			t.Errorf("resolve the token path: %v", err)
 			return 0
 		}
 		for _, resolve := range []func() (string, error){os.UserConfigDir, os.UserCacheDir} {
@@ -57,9 +51,6 @@ func TestRunIsolatedPointsPerUserLocationsIntoATempDir(t *testing.T) {
 	}
 	if home == startHome {
 		t.Errorf("home stayed at %s inside the run", home)
-	}
-	if !Within(tokenPath, home) || filepath.Base(tokenPath) != "token.json" {
-		t.Errorf("token path %s is not a token.json inside the isolated home %s", tokenPath, home)
 	}
 	if _, err := os.Stat(home); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("isolated home %s still exists after the run: %v", home, err)

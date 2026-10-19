@@ -21,7 +21,7 @@ import (
 // changes that bypass the spec-dispatch and chat-edit flows (manual edits,
 // refactors). Nothing is mutated; the response is advisory.
 func (h *Handler) StaleCandidates(w http.ResponseWriter, r *http.Request) {
-	workspaces := h.visibleWorkspaces(r.Context())
+	workspaces := h.currentWorkspaces()
 	candidates := []spec.StaleCandidate{}
 	for _, ws := range workspaces {
 		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
@@ -37,9 +37,6 @@ func (h *Handler) StaleCandidates(w http.ResponseWriter, r *http.Request) {
 // candidate, in one commit per workspace — the bulk "I reviewed these, the
 // designs still hold" action. Status is never changed. Returns the count.
 func (h *Handler) DismissAllStaleCandidates(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	workspaces := h.currentWorkspaces()
 	if len(workspaces) == 0 {
 		http.Error(w, "no workspaces configured", http.StatusInternalServerError)

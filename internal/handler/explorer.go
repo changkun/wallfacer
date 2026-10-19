@@ -190,12 +190,9 @@ func (h *Handler) ExplorerStream(w http.ResponseWriter, r *http.Request) {
 	expandedRaw := r.URL.Query().Get("paths")
 
 	// targets returns the dirs to fingerprint this tick: the visible workspace
-	// roots plus the client's validated expanded dirs. visibleWorkspaces (not
-	// currentWorkspaces) and per-tick re-validation ensure a session that cannot
-	// see the active org-scoped group never receives refresh events naming those
-	// paths, matching GitStatusStream and the other explorer handlers' gate.
+	// roots plus the client's validated expanded dirs, re-validated every tick.
 	targets := func() []string {
-		dirs := h.visibleWorkspaces(r.Context())
+		dirs := h.currentWorkspaces()
 		return append(dirs, h.validatedExpandedDirs(r.Context(), expandedRaw)...)
 	}
 
@@ -257,7 +254,7 @@ func (h *Handler) validatedExpandedDirs(ctx context.Context, raw string) []strin
 	if raw == "" {
 		return nil
 	}
-	workspaces := h.visibleWorkspaces(ctx)
+	workspaces := h.currentWorkspaces()
 	seen := make(map[string]bool)
 	var out []string
 	for p := range strings.SplitSeq(raw, ",") {

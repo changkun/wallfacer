@@ -10,7 +10,6 @@ import (
 	"latere.ai/x/pkg/httpjson"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
@@ -92,55 +91,6 @@ func defaultSandbox(cfg envconfig.Config) harness.ID {
 	return harness.Claude
 }
 
-// workspaceVisible reports whether the active workspace set (by its group key)
-// is present in the principal-visible group list. Used to drop a cross-org
-// active workspace from the config so an org switch doesn't carry the previous
-// org's board over.
-func workspaceVisible(groups []workspace.Workspace, workspaces []string) bool {
-	key := workspace.GroupKey(workspaces)
-	for _, g := range groups {
-		if workspace.GroupKey(g.Folders) == key {
-			return true
-		}
-	}
-	return false
-}
-
-// workspaceVisibleTo reports whether the active workspace set is visible to the
-// request's principal. Local mode (no principal) always passes. Mirrors the
-// org/personal isolation buildConfigResponse applies, so every browser-facing
-// surface agrees on whether a workspace is active for this caller.
-func (h *Handler) workspaceVisibleTo(ctx context.Context, workspaces []string) bool {
-	if len(workspaces) == 0 {
-		return false
-	}
-	// Isolation is by principal presence, not deployment mode: an anonymous
-	// caller (no session — the local default, and cloud logged-out) sees every
-	// workspace; a signed-in caller sees only their personal/org scope. This
-	// matches the task filter (store.TasksForPrincipal), so a signed-in local
-	// run isolates projects the same way tasks are isolated.
-	c, ok := auth.PrincipalFromContext(ctx)
-	if !ok || c == nil {
-		return true
-	}
-	groups, _ := workspace.LoadGroups(h.configDir)
-	groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
-	return workspaceVisible(groups, workspaces)
-}
-
-// visibleWorkspaces returns the active workspaces, or nil when the active
-// workspace group is hidden from the request's principal. Browser-facing
-// read handlers (files, specs, plan, terminal) use this instead of
-// currentWorkspaces() so an org-scoped workspace does not leak into a
-// session that config.go reports as having "no workspace".
-func (h *Handler) visibleWorkspaces(ctx context.Context) []string {
-	workspaces := h.currentWorkspaces()
-	if h.workspaceVisibleTo(ctx, workspaces) {
-		return workspaces
-	}
-	return nil
-}
-
 // activeGroupInfo describes a workspace group with open stores,
 // including per-status task counts for the frontend to display.
 type activeGroupInfo struct {
@@ -183,21 +133,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	workspaces := h.currentWorkspaces()
 
 	groups, _ := workspace.LoadGroups(h.configDir)
-	// Org / personal filtering by principal presence (local and cloud alike):
-	// a signed-in caller sees only groups their principal is allowed to see; an
-	// anonymous caller (no session) sees every group. We resolve the principal
-	// directly from ctx since buildConfigResponse doesn't take *Request.
-	if c, ok := auth.PrincipalFromContext(ctx); ok && c != nil {
-		groups = workspace.WorkspacesForPrincipal(groups, &workspace.Principal{Sub: c.Sub, OrgID: c.OrgID})
-		// The active workspace is global server state. After an org switch it
-		// may still point at the previous org's group; if this principal can't
-		// see that group, don't present it as active. They get their org's
-		// groups (or the picker), a clean per-org view rather than the prior
-		// org's board carried across the switch.
-		if len(workspaces) > 0 && !workspaceVisible(groups, workspaces) {
-			workspaces = nil
-		}
-	}
 
 	workspaceBrowserPath := ""
 	if len(workspaces) > 0 {
@@ -302,16 +237,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"active_groups":             h.activeGroupInfos(ctx),
 		"terminal_enabled":          true,
 		"agent_session_window_days": 30,
-		"auth_enabled":              h.auth != nil,
-		"auth_redirect_enabled":     h.auth != nil && !h.redirectSignInOff,
-	}
-	if h.authURL != "" {
-		resp["auth_url"] = h.authURL
-	}
-	// HandleTerminalWS refuses on a cloud-mode deployment whatever the env
-	// setting says, so the terminal is reported off there.
-	if h.cloudMode {
-		resp["terminal_enabled"] = false
 	}
 	if cfg == nil {
 		return resp
@@ -340,7 +265,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["sandbox_reasons"] = sandboxReasons
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
-	resp["terminal_enabled"] = cfg.TerminalEnabled && !h.cloudMode
+	resp["terminal_enabled"] = cfg.TerminalEnabled
 	resp["agent_session_window_days"] = cfg.AgentSessionWindowDays
 	return resp
 }

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 112,
+  "route_count": 96,
   "routes": [
     {
       "method": "GET",
@@ -210,52 +210,6 @@
       "description": "Spec lifecycle transition. Body {action, ...}: dispatch/undispatch take paths[] (and run for dispatch) and return per-spec arrays; archive/unarchive/validate/stale/dismiss-stale/force-complete take a single path and return {path, status}.",
       "tags": [
         "specs"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/spec-comments",
-      "name": "ListSpecComments",
-      "description": "List cloud-resident spec comment threads for the visible repos, each repositioned against the current spec body (orphaned flag set when the anchor is lost).",
-      "tags": [
-        "spec-comments"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/spec-comments",
-      "name": "SubmitSpecComment",
-      "description": "Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection. The coordinator is authoritative and echoes the result back over the SSE stream.",
-      "tags": [
-        "spec-comments"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/spec-comments/stream",
-      "name": "StreamSpecComments",
-      "description": "SSE stream of spec-comment events relayed from the coordinator (create/reply/resolve/reopen/sync).",
-      "tags": [
-        "spec-comments",
-        "sse"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/coordination/status",
-      "name": "GetCoordinationStatus",
-      "description": "Report whether the coordination opt-in is enabled (and available).",
-      "tags": [
-        "spec-comments"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/coordination/opt-in",
-      "name": "SetCoordinationOptIn",
-      "description": "Flip the coordination opt-in (the data-boundary gate). Body {enabled}.",
-      "tags": [
-        "spec-comments"
       ]
     },
     {
@@ -919,105 +873,6 @@
       "description": "Cancel an in-progress OAuth flow for the given provider.",
       "tags": [
         "auth"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/login",
-      "name": "Login",
-      "description": "Redirect to the latere.ai auth service to begin sign-in.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/callback",
-      "name": "Callback",
-      "description": "OAuth2 authorization-code callback; sets the session cookie.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/logout",
-      "name": "Logout",
-      "description": "Clear the local session and redirect to the auth service logout.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/logout/notify",
-      "name": "LogoutNotify",
-      "description": "Front-channel logout target: clear the local cookie when the user signs out centrally.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/me",
-      "name": "AuthMe",
-      "description": "Return the current signed-in user, or 204 when unauthenticated.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/auth/orgs",
-      "name": "AuthOrgs",
-      "description": "List the signed-in user's organizations; 204 when single-org or unauthenticated.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "PATCH",
-      "pattern": "/api/auth/me",
-      "name": "PatchAuthMe",
-      "description": "Mutate the signed-in principal — currently only org_id (active organization). Clears session and returns a redirect to /login?org_id=\u003ctarget\u003e.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/me/switch-org",
-      "name": "SwitchOrg",
-      "description": "Switch the active organization (latere-ui session convention). Validates membership, clears the session, and returns {redirect} to /login?org_id=\u003ctarget\u003e.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/auth/device/start",
-      "name": "AuthDeviceStart",
-      "description": "Local-mode RFC 8628 device-code: start a sign-in flow and return the user code + verification URI.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/auth/device/poll",
-      "name": "AuthDevicePoll",
-      "description": "Poll the in-flight local-mode device-code flow; returns {status: idle|pending|done|denied|expired}.",
-      "tags": [
-        "login"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/auth/device/cancel",
-      "name": "AuthDeviceCancel",
-      "description": "Cancel the in-flight local-mode device-code flow.",
-      "tags": [
-        "login"
       ]
     }
   ]

@@ -10,7 +10,6 @@ import (
 	"latere.ai/x/pkg/bearer"
 	"latere.ai/x/pkg/httpjson"
 
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 )
 
@@ -88,26 +87,8 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 // SSE and WebSocket paths use a ?token= query parameter instead of the
 // Authorization header because EventSource and WebSocket APIs do not support
 // custom request headers. UI shell routes and embedded assets are public so
-// the browser can load before it reads the injected local API key. The
-// redirect sign-in passes without the key for a peer on this machine (see
-// signInRoute).
-//
-// A request that already carries an identity from the session cookie or a
-// bearer JWT (populated upstream by auth.CookieAuth and auth.OptionalAuth)
-// passes without the key in two cases only:
-//
-//   - cloudMode is set. Sign-in is forced there and data is scoped per
-//     principal, so the identity is the credential and the key stays an
-//     optional credential for scripts.
-//   - The TCP peer is loopback. The index page already hands such a peer the
-//     key (see indexKeyAllowed in internal/cli), so the identity grants it
-//     nothing it could not present anyway.
-//
-// On an instance that is not in cloud mode, a peer on another host therefore
-// needs the server key whatever identity it presents: an identity says who
-// the caller is, not that the operator admitted them, and a local instance
-// does not scope its data to the principal.
-func BearerAuthMiddleware(apiKey string, cloudMode bool) func(http.Handler) http.Handler {
+// the browser can load before it reads the injected local API key.
+func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
 		// No API key configured — authentication is disabled.
@@ -130,16 +111,6 @@ func BearerAuthMiddleware(apiKey string, cloudMode bool) func(http.Handler) http
 				next.ServeHTTP(w, r)
 				return
 			}
-			if signInRoute(r) && IsLoopbackPeer(r.RemoteAddr) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			// An identity stands in for the key in cloud mode and for a
-			// peer on this machine; see the function comment.
-			if _, ok := auth.PrincipalFromContext(r.Context()); ok && (cloudMode || IsLoopbackPeer(r.RemoteAddr)) {
-				next.ServeHTTP(w, r)
-				return
-			}
 			// Constant-time compares: a plain == returns on the first differing
 			// byte and leaks how much of the key a probe got right.
 			if isSSEPath(r.URL.Path) {
@@ -150,7 +121,7 @@ func BearerAuthMiddleware(apiKey string, cloudMode bool) func(http.Handler) http
 				next.ServeHTTP(w, r)
 				return
 			}
-			got, ok := auth.BearerToken(r.Header.Get("Authorization"))
+			got, ok := bearer.FromRequest(r)
 			if !ok || !bearer.Equal(got, key) {
 				httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
@@ -158,26 +129,6 @@ func BearerAuthMiddleware(apiKey string, cloudMode bool) func(http.Handler) http
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// signInRoute reports whether r is one of the two requests of the redirect
-// sign-in: GET /login, which sends the browser to the issuer, and GET
-// /callback, which the issuer sends it back to. Both are browser navigations,
-// which cannot carry an Authorization header, and a signed-out browser has no
-// session to pass the key check with either.
-//
-// The middleware admits them only from a peer on this machine. A session
-// passes the key check, so a peer on another host that could reach both
-// routes would sign in with an account of its own and hold a session the key
-// no longer stops. A loopback peer is handed the key with the index page, so
-// admitting it grants nothing it could not already present.
-//
-// /logout and /logout/notify are not listed: besides expiring the caller's
-// cookie they clear the token store shared with the CLI, which signs the
-// whole machine out, and a signed-in browser reaches /logout through its
-// session.
-func signInRoute(r *http.Request) bool {
-	return r.Method == http.MethodGet && (r.URL.Path == "/login" || r.URL.Path == "/callback")
 }
 
 // IsLoopbackPeer reports whether remoteAddr, a host:port TCP peer address as
@@ -198,7 +149,7 @@ func IsLoopbackPeer(remoteAddr string) bool {
 func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
-	case "/", "/favicon.ico", "/install", "/dashboard",
+	case "/", "/favicon.ico",
 		"/analytics", "/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs":
 		return true
 	}

@@ -127,18 +127,6 @@ type Handler struct {
 	startTime     time.Time
 	reg           *metrics.Registry
 
-	// commentRelay is the instance side of the spec-comment relay (cache + SSE
-	// fan-out + forward-up). Nil until SetCommentRelay; the comment endpoints
-	// then report coordination unavailable. Guarded by snapshotMu.
-	commentRelay *CommentRelay
-	// coordToggle is the coordination opt-in gate. Nil until SetCoordinationToggle.
-	// Guarded by snapshotMu.
-	coordToggle CoordinationToggle
-	// coordLogout clears the coordination token on sign-out so the connector
-	// stops dialing and drops its live connection (nothing pulled while signed
-	// out). Nil until SetCoordinationLogout. Guarded by snapshotMu.
-	coordLogout func()
-
 	autoimplement atomic.Bool
 	autotest      atomic.Bool
 	autosubmit    atomic.Bool
@@ -163,32 +151,6 @@ type Handler struct {
 	breakers map[string]*watcherBreaker
 
 	oauthManager *oauth.Manager
-
-	// auth provides latere.ai OIDC sign-in. The CLI boot path wires it via
-	// SetAuth on every run, local and cloud alike. Nil (untyped) means auth
-	// is not configured, which only a Handler built without SetAuth sees;
-	// handlers short-circuit to 503 or 204 accordingly.
-	auth AuthProvider
-	// cloudMode is true for a multi-tenant cloud deployment (WALLFACER_CLOUD).
-	// It gates forced login and workspace data-path scoping — NOT project/task
-	// visibility, which is gated on principal presence (a signed-in caller is
-	// isolated to their personal/org scope; anonymous sees everything) in both
-	// local and cloud runs. Wired via SetCloudMode from the CLI.
-	cloudMode bool
-	// authURL caches the auth service base URL for /api/config responses so
-	// handlers don't call back into AuthProvider for every config request.
-	authURL string
-	// deviceAuth, when non-nil, drives the local-mode RFC 8628 device-code
-	// sign-in via /api/auth/device/{start,poll,cancel}. Wired via
-	// SetDeviceAuth in local-mode wiring; nil for cloud-mode deployments
-	// (cloud mode uses /login + the OAuth code flow instead).
-	deviceAuth *DeviceAuth
-	// redirectSignInOff is true when the authorization-code sign-in behind
-	// /login cannot complete on this instance; redirectSignInDetails is the
-	// developer detail its error envelope carries. Wired via
-	// SetRedirectSignInOff from the CLI once the listener is bound.
-	redirectSignInOff     bool
-	redirectSignInDetails map[string]any
 
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache
@@ -614,39 +576,6 @@ func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !h.hasStore() {
 			httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// The error RequirePrincipalMiddleware answers with: one code and the one user
-// sentence for it.
-const (
-	codeSignInRequired    = "sign_in_required"
-	messageSignInRequired = "This action needs a signed-in account. Sign in and try again."
-)
-
-// RequirePrincipalMiddleware rejects a request that carries no authenticated
-// browser principal with 401 sign_in_required. It is the data-layer gate for
-// the routes requiresPrincipal (internal/cli/server.go) selects, which decides
-// per route and per mode where it applies: the spec-comment surface in every
-// mode, because the comment endpoints serve the coordination relay from the
-// connector's token independent of the browser session, and feedback in cloud
-// mode only. The gate lives here, not in the SPA, because the SPA only hides
-// the surface. The middleware itself applies in local and cloud mode alike.
-//
-// It passes every request through when no sign-in provider is wired (HasAuth
-// false): there is no session to require. Every run wires one, so that branch
-// is reached only by a Handler built without SetAuth.
-func (h *Handler) RequirePrincipalMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if h.HasAuth() && principalFromRequest(r) == nil {
-			httpjson.WriteError(w, http.StatusUnauthorized, httpjson.Error{
-				Code:    codeSignInRequired,
-				Message: messageSignInRequired,
-				Details: map[string]any{"path": r.URL.Path},
-			})
 			return
 		}
 		next.ServeHTTP(w, r)

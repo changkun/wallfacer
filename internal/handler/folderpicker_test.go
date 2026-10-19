@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -35,17 +33,4 @@ func TestFolderPickerArgs(t *testing.T) {
 			}
 		}
 	})
-}
-
-// TestPickFolder_CloudModeUnavailable ensures the endpoint never shells out to a
-// GUI on a shared host: cloud mode returns 501 so the frontend falls back to the
-// in-app directory browser.
-func TestPickFolder_CloudModeUnavailable(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	h.SetCloudMode(true)
-	w := httptest.NewRecorder()
-	h.PickFolder(w, httptest.NewRequest(http.MethodPost, "/api/workspaces/pick-folder", nil))
-	if w.Code != http.StatusNotImplemented {
-		t.Fatalf("cloud mode: got %d, want 501", w.Code)
-	}
 }

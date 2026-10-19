@@ -14,9 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"latere.ai/x/pkg/authkit"
-
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/runner"
@@ -24,35 +21,6 @@ import (
 	"latere.ai/x/wallfacer/internal/store/storetest"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
-
-// TestBuildConfigResponse_HidesCrossOrgWorkspace guards the per-org active
-// workspace: the active set is global server state, so after an org switch it
-// can still point at the previous org's group. A principal that can't see that
-// group must not get it back as the active workspace (it would carry the prior
-// org's board across the switch).
-func TestBuildConfigResponse_HidesCrossOrgWorkspace(t *testing.T) {
-	h, ws := newTestHandlerWithWorkspaces(t)
-	h.SetCloudMode(true) // org isolation only applies to cloud deployments
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{Folders: []string{ws}, OrgID: "org-a"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Same org: the active workspace is presented.
-	ctxA := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-a"})
-	respA := h.buildConfigResponse(ctxA, nil)
-	if got, _ := respA["workspaces"].([]string); len(got) != 1 || got[0] != ws {
-		t.Errorf("org-a workspaces = %v, want [%s]", respA["workspaces"], ws)
-	}
-
-	// Different org: the cross-org active workspace is hidden.
-	ctxB := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-b"})
-	respB := h.buildConfigResponse(ctxB, nil)
-	if got, _ := respB["workspaces"].([]string); len(got) != 0 {
-		t.Errorf("org-b workspaces = %v, want empty (cross-org hidden)", respB["workspaces"])
-	}
-}
 
 // workspacesBody returns a JSON body for POST /api/workspaces containing the
 // provided paths. It uses json.Marshal so that path separators are escaped
@@ -339,95 +307,6 @@ func TestUpdateWorkspaces_RoundTripsToConfig(t *testing.T) {
 	}
 }
 
-// TestUpdateWorkspaces_RoundTripsForOrgPrincipal pins the real create+activate
-// flow (what WorkspacePicker uses) for an org caller: creating a workspace
-// stamps it for the caller's org (ownerPrincipal), so activating it and the
-// very next GET /api/config keep it visible rather than dropping the board to
-// "Pick a workspace". Ownership is claimed at create, not activate — a raw
-// path-switch to an unowned folder is intentionally out-of-scope under strict
-// isolation.
-func TestUpdateWorkspaces_RoundTripsForOrgPrincipal(t *testing.T) {
-	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
-	pick := t.TempDir()
-	id := &authkit.Identity{Sub: "user-1", OrgID: "org-a"}
-	ctx := auth.WithIdentity(context.Background(), id)
-
-	// Create (stamps CreatedBy=user-1, OrgID=org-a).
-	createBody, _ := json.Marshal(map[string]any{"name": "w", "folders": []string{pick}})
-	createReq := httptest.NewRequest(http.MethodPost, "/api/workspaces", bytes.NewReader(createBody)).WithContext(ctx)
-	createW := httptest.NewRecorder()
-	h.CreateWorkspace(createW, createReq)
-	if createW.Code != http.StatusCreated {
-		t.Fatalf("create: %d %s", createW.Code, createW.Body.String())
-	}
-	var created struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(createW.Body.Bytes(), &created); err != nil || created.ID == "" {
-		t.Fatalf("decode create: %v (%s)", err, createW.Body.String())
-	}
-
-	// Activate by id.
-	actReq := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+created.ID+"/activate", nil).WithContext(ctx)
-	actReq.SetPathValue("id", created.ID)
-	actW := httptest.NewRecorder()
-	h.ActivateWorkspace(actW, actReq)
-	if actW.Code != http.StatusOK {
-		t.Fatalf("activate: %d %s", actW.Code, actW.Body.String())
-	}
-
-	// GET /api/config as the org principal: the activated org-owned workspace stays visible.
-	cfgReq := httptest.NewRequest(http.MethodGet, "/api/config", nil).WithContext(ctx)
-	cfgW := httptest.NewRecorder()
-	h.GetConfig(cfgW, cfgReq)
-	var resp map[string]any
-	if err := json.NewDecoder(cfgW.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	workspaces, ok := resp["workspaces"].([]any)
-	if !ok || len(workspaces) == 0 {
-		t.Fatalf("expected activated org-owned workspace visible to org principal, got %#v", resp["workspaces"])
-	}
-	if workspaces[0].(string) != pick {
-		t.Errorf("expected workspace %q, got %q", pick, workspaces[0])
-	}
-}
-
-// TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal is the
-// regression guard for the isolation leak: when the active workspace group is
-// stamped to org A, a personal (or org-B) caller must see no active workspace,
-// matching what buildConfigResponse already reports. Local callers (no
-// principal) and the owning org still see it.
-func TestVisibleWorkspaces_HidesOrgWorkspaceFromMismatchedPrincipal(t *testing.T) {
-	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	h.SetCloudMode(true) // org isolation only applies to cloud deployments
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Local mode (no principal): visible.
-	if got := h.visibleWorkspaces(context.Background()); len(got) != 1 || got[0] != ws {
-		t.Errorf("local visibleWorkspaces = %v, want [%s]", got, ws)
-	}
-	// Owning org: visible.
-	ctxA := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-a"})
-	if got := h.visibleWorkspaces(ctxA); len(got) != 1 || got[0] != ws {
-		t.Errorf("org-a visibleWorkspaces = %v, want [%s]", got, ws)
-	}
-	// Personal caller: hidden (org group not in personal view).
-	ctxPersonal := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""})
-	if got := h.visibleWorkspaces(ctxPersonal); len(got) != 0 {
-		t.Errorf("personal visibleWorkspaces = %v, want empty", got)
-	}
-	// Different org: hidden.
-	ctxB := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-b"})
-	if got := h.visibleWorkspaces(ctxB); len(got) != 0 {
-		t.Errorf("org-b visibleWorkspaces = %v, want empty", got)
-	}
-}
-
 // configActiveWorkspaces GETs /api/config as ctx and returns the reported
 // active workspace folders.
 func configActiveWorkspaces(t *testing.T, ctx context.Context, h *Handler) []string { //nolint:revive // testing.T conventionally precedes context in test helpers
@@ -445,62 +324,6 @@ func configActiveWorkspaces(t *testing.T, ctx context.Context, h *Handler) []str
 		out = append(out, v.(string))
 	}
 	return out
-}
-
-// TestConfig_OrgViewDropsLegacyActiveWorkspace is the reproducer for "can still
-// see the active workspace after switch": a legacy (unowned) active workspace —
-// the state of every project before per-account isolation — stays visible in
-// personal view but must NOT carry across into an org view. Switching to an org
-// gives a clean slate, not the previous personal board.
-func TestConfig_OrgViewDropsLegacyActiveWorkspace(t *testing.T) {
-	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	// Active workspace is legacy: no CreatedBy, no OrgID.
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{Folders: []string{ws}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	personal := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""})
-	if got := configActiveWorkspaces(t, personal, h); len(got) != 1 || got[0] != ws {
-		t.Errorf("personal view: active workspaces = %v, want [%s]", got, ws)
-	}
-
-	org := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: "org-a"})
-	if got := configActiveWorkspaces(t, org, h); len(got) != 0 {
-		t.Errorf("org view after switch: active workspaces = %v, want [] (clean slate)", got)
-	}
-}
-
-// TestGetSpecTree_HiddenForMismatchedPrincipal proves the leak fix reaches a
-// browser-facing read surface: the Plan spec tree must be empty for a caller
-// who cannot see the org-stamped active workspace, even though the workspace
-// has specs on disk.
-func TestGetSpecTree_HiddenForMismatchedPrincipal(t *testing.T) {
-	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	h.SetCloudMode(true) // org isolation only applies to cloud deployments
-	specsDir := filepath.Join(ws, "specs")
-	if err := os.MkdirAll(specsDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(specsDir, "README.md"), []byte("# Specs\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Local caller sees the roadmap index.
-	if tree := h.collectSpecTree(context.Background()); tree.Index == nil {
-		t.Fatal("expected roadmap index for local caller, got nil")
-	}
-	// Personal caller (cannot see org workspace) gets an empty tree.
-	ctxPersonal := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""})
-	if tree := h.collectSpecTree(ctxPersonal); tree.Index != nil || len(tree.Nodes) != 0 {
-		t.Errorf("expected empty spec tree for mismatched principal, got index=%v nodes=%d", tree.Index, len(tree.Nodes))
-	}
 }
 
 func TestGetConfig_AutoimplementFalseByDefault(t *testing.T) {
@@ -2240,31 +2063,4 @@ func TestApplyBoolToggle(t *testing.T) {
 			t.Fatal("set invoked for nil reqVal")
 		}
 	})
-}
-
-// TestGetConfig_TerminalDisabledInCloudMode asserts the config response
-// reports the terminal off on a cloud-mode deployment, which refuses it, and
-// leaves a local instance's setting as configured.
-func TestGetConfig_TerminalDisabledInCloudMode(t *testing.T) {
-	withEnv, _ := newTestHandlerWithEnv(t)
-	for name, h := range map[string]*Handler{"env file": withEnv, "no env file": newTestHandler(t)} {
-		t.Run(name, func(t *testing.T) {
-			terminal := func() any {
-				w := httptest.NewRecorder()
-				h.GetConfig(w, httptest.NewRequest(http.MethodGet, "/api/config", nil))
-				var resp map[string]any
-				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-					t.Fatalf("decode: %v", err)
-				}
-				return resp["terminal_enabled"]
-			}
-			if got := terminal(); got != true {
-				t.Fatalf("local terminal_enabled = %v, want true", got)
-			}
-			h.SetCloudMode(true)
-			if got := terminal(); got != false {
-				t.Errorf("cloud terminal_enabled = %v, want false", got)
-			}
-		})
-	}
 }

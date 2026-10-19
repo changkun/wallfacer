@@ -41,7 +41,7 @@ func TestUpdateFolders_PreservesIdentityAndHistory(t *testing.T) {
 	m, configDir, opens := newCountingManager(t)
 	dirA, dirB := t.TempDir(), t.TempDir()
 
-	ws, err := m.Create("proj", []string{dirA}, nil)
+	ws, err := m.Create("proj", []string{dirA})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestCreate_RandomKeyStartsEmpty(t *testing.T) {
 	m, configDir, _ := newCountingManager(t)
 	dirA := t.TempDir()
 
-	ws1, err := m.Create("first", []string{dirA}, nil)
+	ws1, err := m.Create("first", []string{dirA})
 	if err != nil {
 		t.Fatalf("Create ws1: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestCreate_RandomKeyStartsEmpty(t *testing.T) {
 		t.Fatalf("seed usage: %v", err)
 	}
 
-	ws2, err := m.Create("second", []string{dirA}, nil)
+	ws2, err := m.Create("second", []string{dirA})
 	if err != nil {
 		t.Fatalf("Create ws2: %v", err)
 	}
@@ -138,16 +138,16 @@ func TestSameFolderWorkspacesCoexist(t *testing.T) {
 	m, _, _ := newCountingManager(t)
 	dirA := t.TempDir()
 
-	ws1, err := m.Create("one", []string{dirA}, nil)
+	ws1, err := m.Create("one", []string{dirA})
 	if err != nil {
 		t.Fatalf("Create ws1: %v", err)
 	}
-	ws2, err := m.Create("two", []string{dirA}, nil)
+	ws2, err := m.Create("two", []string{dirA})
 	if err != nil {
 		t.Fatalf("Create ws2: %v", err)
 	}
 
-	got, err := m.ListWorkspaces(nil)
+	got, err := m.ListWorkspaces()
 	if err != nil {
 		t.Fatalf("ListWorkspaces: %v", err)
 	}
@@ -174,11 +174,11 @@ func TestSameFolderWorkspacesCoexist(t *testing.T) {
 func TestDelete_WipesDataAndAutoSwitches(t *testing.T) {
 	m, configDir, _ := newCountingManager(t)
 	dirA, dirB := t.TempDir(), t.TempDir()
-	a, err := m.Create("A", []string{dirA}, nil)
+	a, err := m.Create("A", []string{dirA})
 	if err != nil {
 		t.Fatalf("Create A: %v", err)
 	}
-	b, err := m.Create("B", []string{dirB}, nil)
+	b, err := m.Create("B", []string{dirB})
 	if err != nil {
 		t.Fatalf("Create B: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestDelete_WipesDataAndAutoSwitches(t *testing.T) {
 	if snap2.WorkspaceID != "" || len(snap2.Workspaces) != 0 {
 		t.Fatalf("expected no active workspace after deleting the last, got id=%q ws=%v", snap2.WorkspaceID, snap2.Workspaces)
 	}
-	if list, _ := m.ListWorkspaces(nil); len(list) != 0 {
+	if list, _ := m.ListWorkspaces(); len(list) != 0 {
 		t.Fatalf("expected empty registry, got %d", len(list))
 	}
 
@@ -239,7 +239,7 @@ func TestDelete_WipesDataAndAutoSwitches(t *testing.T) {
 // TestRename updates the display name without disturbing identity.
 func TestRename(t *testing.T) {
 	m, _, _ := newCountingManager(t)
-	ws, err := m.Create("old", []string{t.TempDir()}, nil)
+	ws, err := m.Create("old", []string{t.TempDir()})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -249,18 +249,5 @@ func TestRename(t *testing.T) {
 	}
 	if renamed.Name != "new" || renamed.ID != ws.ID || renamed.DataKey != ws.DataKey {
 		t.Fatalf("rename altered identity: %+v", renamed)
-	}
-}
-
-// TestCreate_StampsOwner verifies a signed-in principal is recorded at creation,
-// replacing the lazy ClaimGroup-on-switch path.
-func TestCreate_StampsOwner(t *testing.T) {
-	m, _, _ := newCountingManager(t)
-	ws, err := m.Create("p", []string{t.TempDir()}, &Principal{Sub: "alice", OrgID: "org-a"})
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	if ws.CreatedBy != "alice" || ws.OrgID != "org-a" {
-		t.Fatalf("owner not stamped at creation: %+v", ws)
 	}
 }

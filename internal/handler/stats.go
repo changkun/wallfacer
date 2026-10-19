@@ -344,7 +344,7 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 			since = time.Now().UTC().AddDate(0, 0, -n)
 		}
 	}
-	vis := h.visibleWorkspaces(r.Context())
+	vis := h.currentWorkspaces()
 	activeKey := ""
 	if len(vis) > 0 {
 		activeKey = h.activeDataKey()

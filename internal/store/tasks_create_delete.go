@@ -51,11 +51,6 @@ type TaskCreateOptions struct {
 	ModelOverride      string
 	CustomPassPatterns []string
 	CustomFailPatterns []string
-
-	// Principal / org attribution. Empty on anonymous / local calls;
-	// populated at the handler boundary from auth.PrincipalFromContext.
-	CreatedBy string
-	OrgID     string
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
@@ -145,11 +140,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	if len(opts.CustomFailPatterns) > 0 {
 		task.CustomFailPatterns = append([]string(nil), opts.CustomFailPatterns...)
 	}
-
-	// Principal / org attribution. Copied as-is; zero values (empty
-	// strings) remain empty and JSON round-trips via omitempty.
-	task.CreatedBy = opts.CreatedBy
-	task.OrgID = opts.OrgID
 
 	// Build the search index entry before acquiring the lock.  Position is not
 	// a search-indexed field, so the entry is fully accurate even though

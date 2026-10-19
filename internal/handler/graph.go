@@ -25,7 +25,11 @@ func (h *Handler) GetGraph(w http.ResponseWriter, r *http.Request) {
 	includeArchived := archived == "1" || archived == "true"
 
 	tree := h.collectSpecTree(r.Context())
-	tasks := s.TasksForPrincipal(r.Context(), principalFromRequest(r), includeArchived)
+	tasks, err := s.ListTasks(r.Context(), includeArchived)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	g := graph.Build(tree.Nodes, tasks, includeArchived)
 	httpjson.Write(w, http.StatusOK, g)

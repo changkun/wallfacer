@@ -47,7 +47,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 
 	// BuildMux panics if any route in the contract lacks a handler entry, so
 	// getting past this call already validates the handlers map is complete.
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	// Substitute path parameters with concrete values so the mux can match the
 	// pattern. We only need the matched pattern string — we do not execute handlers.
@@ -103,7 +103,7 @@ func TestIdeateRoutesRemoved(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	retiredRoutes := []struct {
 		method string
@@ -152,7 +152,7 @@ func TestRefineRoutesRemoved(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	dummyID := uuid.New().String()
 	retiredRoutes := []struct {
@@ -206,7 +206,7 @@ func TestFleetRoutesRemoved(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	var removed []struct{ method, path string }
 	for _, base := range []string{"/api/agents", "/api/flows"} {
@@ -263,7 +263,7 @@ func TestGitHubRoutesRemoved(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	const githubBase = "/api/github"
 	taskBase := "/api/tasks/" + uuid.New().String()

@@ -157,7 +157,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), stubVueFS(t), false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), stubVueFS(t))
 
 	paths := []struct {
 		method string
@@ -219,7 +219,7 @@ func TestBuildMux_DocsEndpoints(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	// GET /api/docs should return a JSON array.
 	rr := httptest.NewRecorder()
@@ -284,7 +284,7 @@ func TestBuildMux_DocsAsset(t *testing.T) {
 		"docs/guide/images/board.png": {Data: pngBytes},
 		"docs/guide/board.md":         {Data: []byte("# Board\n")},
 	}
-	mux := BuildMux(h, reg, IndexViewData{}, docsFS, nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, docsFS, nil)
 
 	// The path goes in the URL so the mux populates {path...} itself (a
 	// pre-set PathValue would be overwritten during routing).
@@ -343,7 +343,7 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
@@ -373,7 +373,7 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
@@ -403,7 +403,7 @@ func TestBuildMux_MetricsEndpoint(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -436,7 +436,7 @@ func TestBuildMux_DocsInternals(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil, false)
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
 
 	// GET /api/docs/internals/internals should return the internals index.
 	rr := httptest.NewRecorder()
@@ -468,7 +468,7 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), stubVueFS(t), false)
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), stubVueFS(t))
 
 	// "/" serves the injected SPA index. The key is released to a loopback
 	// peer (httptest's default RemoteAddr is not loopback).
@@ -631,29 +631,6 @@ func TestRequiresStore(t *testing.T) {
 	for _, name := range storeRequired {
 		if !requiresStore(name) {
 			t.Errorf("requiresStore(%q) = false, want true", name)
-		}
-	}
-}
-
-// TestRequiresPrincipal verifies which routes are gated behind an authenticated
-// browser principal in each mode. The spec-comment surface requires one in
-// every mode; SubmitFeedback (the inline diff-review batch lands on the
-// feedback route) requires one in cloud mode only; ordinary task routes never
-// do.
-func TestRequiresPrincipal(t *testing.T) {
-	for _, cloud := range []bool{false, true} {
-		for _, name := range []string{"ListSpecComments", "SubmitSpecComment", "StreamSpecComments"} {
-			if !requiresPrincipal(name, cloud) {
-				t.Errorf("requiresPrincipal(%q, cloud=%v) = false, want true", name, cloud)
-			}
-		}
-		if got := requiresPrincipal("SubmitFeedback", cloud); got != cloud {
-			t.Errorf("requiresPrincipal(%q, cloud=%v) = %v, want %v", "SubmitFeedback", cloud, got, cloud)
-		}
-		for _, name := range []string{"ListTasks", "CreateTask", "GetEvents", "CompleteTask", "ResumeTask", "GetConfig"} {
-			if requiresPrincipal(name, cloud) {
-				t.Errorf("requiresPrincipal(%q, cloud=%v) = true, want false", name, cloud)
-			}
 		}
 	}
 }
@@ -882,9 +859,8 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 // TestMountVueSPA_NoLandingFlashOnDeepRoutes pins the SSG-strip behavior that
 // keeps a logged-in user from seeing the ProductPage landing flash before Vue
 // swaps in the real route on a deep-link refresh. The prerendered index.html
-// bakes in the "/" route (ProductPage in cloud); serving it verbatim for any
-// other path paints the landing markup for a frame. Only cloud "/" keeps the
-// prerender; every other path mounts from a blank #app.
+// bakes in the "/" route; serving it verbatim paints that markup for a frame,
+// so every path mounts from a blank #app.
 func TestMountVueSPA_NoLandingFlashOnDeepRoutes(t *testing.T) {
 	const indexHTML = `<html><head></head><body>` +
 		`<div id="app" data-server-rendered="true"><section class="product-hero">landing</section></div>` +
@@ -893,36 +869,21 @@ func TestMountVueSPA_NoLandingFlashOnDeepRoutes(t *testing.T) {
 		"frontend/dist/index.html": {Data: []byte(indexHTML)},
 	}
 
-	get := func(cloudMode bool, path string) string {
-		mux := http.NewServeMux()
-		mountVueSPA(mux, dist, "k", cloudMode)
+	mux := http.NewServeMux()
+	mountVueSPA(mux, dist, "k")
+	const cleared = `e.textContent=""` // stripSSGContent's clear script
+
+	// Every route strips the prerender, including "/", and mounts from a
+	// blank #app.
+	for _, path := range []string{"/", "/plan"} {
 		rr := httptest.NewRecorder()
 		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
 		if rr.Code != http.StatusOK {
-			t.Fatalf("GET %s (cloud=%v): status %d, want 200", path, cloudMode, rr.Code)
+			t.Fatalf("GET %s: status %d, want 200", path, rr.Code)
 		}
-		return rr.Body.String()
-	}
-
-	const cleared = `e.textContent=""` // stripSSGContent's clear script
-
-	// Cloud "/" keeps the prerender: ProductPage hydration legitimately matches.
-	if body := get(true, "/"); !strings.Contains(body, "data-server-rendered") ||
-		!strings.Contains(body, "product-hero") || strings.Contains(body, cleared) {
-		t.Errorf("cloud /: want intact SSG ProductPage, got %q", body)
-	}
-
-	// Cloud deep route (e.g. /dashboard) must NOT serve the landing markup as
-	// server-rendered content, or it flashes. #app is cleared before mount.
-	if body := get(true, "/dashboard"); strings.Contains(body, "data-server-rendered") ||
-		!strings.Contains(body, cleared) {
-		t.Errorf("cloud /dashboard: want stripped shell (no flash), got %q", body)
-	}
-
-	// Local mode strips for every route, including "/", since local routes are
-	// not prerendered (the SSG index.html is the cloud ProductPage).
-	if body := get(false, "/"); strings.Contains(body, "data-server-rendered") ||
-		!strings.Contains(body, cleared) || !strings.Contains(body, `mode:"local"`) {
-		t.Errorf("local /: want stripped shell, got %q", body)
+		if body := rr.Body.String(); strings.Contains(body, "data-server-rendered") ||
+			!strings.Contains(body, cleared) || !strings.Contains(body, `mode:"local"`) {
+			t.Errorf("GET %s: want stripped shell, got %q", path, body)
+		}
 	}
 }

@@ -3,10 +3,10 @@
 // tests never touch the user's real sign-in or configuration and never launch
 // a real agent.
 //
-// Code under test resolves per-user locations from the environment: the latere
-// sign-in token at <os.UserConfigDir>/latere/token.json, which is shared with
-// the latere command line; ~/.wallfacer, where the runner keeps user-authored
-// agents and flows; and whatever the shells a test spawns write under HOME. On
+// Code under test resolves per-user locations from the environment: the
+// per-user config directory (os.UserConfigDir); ~/.wallfacer, where the board
+// keeps its configuration and data; and whatever the shells a test spawns
+// write under HOME. On
 // macOS os.UserConfigDir ignores XDG_CONFIG_HOME and resolves under HOME, so
 // overriding a single variable inside one test is not enough. RunIsolated
 // overrides all of them once per test process, before any test runs, and every

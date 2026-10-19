@@ -11,7 +11,6 @@ import (
 
 	"latere.ai/x/pkg/bearer"
 
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/handler"
 )
 
@@ -74,7 +73,7 @@ func indexKeyAllowed(r *http.Request, key string) bool {
 	if key == "" {
 		return false
 	}
-	if tok, ok := auth.BearerToken(r.Header.Get("Authorization")); ok && bearer.Equal(tok, key) {
+	if tok, ok := bearer.FromRequest(r); ok && bearer.Equal(tok, key) {
 		return true
 	}
 	if tok := r.URL.Query().Get("token"); tok != "" && bearer.Equal(tok, key) {

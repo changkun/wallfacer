@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,15 +19,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/authkit/jwt"
-	"latere.ai/x/pkg/authkit/oidc"
 	"latere.ai/x/pkg/httpjson"
 	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/otel"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
 	"latere.ai/x/wallfacer/internal/apicontract"
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/executor"
@@ -214,7 +210,11 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	}
 
 	envCfg := envconfig.Config{}
-	if parsed, err := envconfig.Parse(cfg.EnvFile); err == nil {
+	parsed, err := envconfig.Parse(cfg.EnvFile)
+	switch {
+	case errors.Is(err, envconfig.ErrSecretStore):
+		logger.Fatal("read provider credentials", "error", err)
+	case err == nil:
 		envCfg = parsed
 	}
 
@@ -266,23 +266,12 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	// config dir are not read; the files themselves stay where they are.
 	warnRetiredFleetDirs(configDir, logger.Main)
 
-	// Cloud mode: wire latere.ai sign-in. Both the WALLFACER_CLOUD flag
-	// and the AUTH_* vars resolve from shell env first, .env file
-	// second — users can drop everything in ~/.wallfacer/.env or export
-	// them on the command line. Shell wins so `AUTH_CLIENT_ID=other
-	// wallfacer run` is a clean override without editing the file.
-	envFileKV, envReadErr := envconfig.ReadRaw(cfg.EnvFile)
-	if errors.Is(envReadErr, envconfig.ErrSecretStore) {
-		logger.Fatal("read provider credentials", "error", envReadErr)
-	}
-	cloudMode := envconfig.ParseBoolFlag(envconfig.Lookup(envFileKV, "WALLFACER_CLOUD"))
 	// A local instance is never open: without WALLFACER_SERVER_API_KEY the
 	// API would accept any request from any host the listener is reachable
 	// from, so generate a per-instance key and persist it for same-machine
 	// clients. The browser receives it through index.html on a loopback
-	// request (see indexKeyAllowed). Cloud mode gates on the session cookie
-	// and JWT instead and keeps the static key optional.
-	if !cloudMode && envCfg.ServerAPIKey == "" {
+	// request (see indexKeyAllowed).
+	if envCfg.ServerAPIKey == "" {
 		keyPath := filepath.Join(configDir, serverAPIKeyFile)
 		_, statErr := os.Stat(keyPath)
 		key, kerr := loadOrCreateServerAPIKey(configDir)
@@ -296,116 +285,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 			logger.Main.Info("server api key: none configured; using the generated one", "path", keyPath)
 		}
 	}
-	var (
-		jwtValidator *jwt.Validator
-		authClient   *oidc.Client
-	)
-	// Sign-in is wired by default using the public (secret-less) "wallfacer"
-	// client, so a plain `wallfacer run` presents a login button with no
-	// env-var setup. Any AUTH_* value (shell or .env) overrides the defaults,
-	// and a confidential client (AUTH_CLIENT_SECRET set) works unchanged.
-	// WALLFACER_CLOUD only controls whether sign-in is *forced* (see ForceLogin),
-	// not whether it is available.
-	authCfg := oidc.Config{
-		AuthURL:      envconfig.Lookup(envFileKV, "AUTH_URL"),
-		ClientID:     envconfig.Lookup(envFileKV, "AUTH_CLIENT_ID"),
-		ClientSecret: envconfig.Lookup(envFileKV, "AUTH_CLIENT_SECRET"),
-		RedirectURL:  envconfig.Lookup(envFileKV, "AUTH_REDIRECT_URL"),
-		CookieKey:    envconfig.Lookup(envFileKV, "AUTH_COOKIE_KEY"),
-	}
-	// An operator-set redirect URL names the address the deployment is reached
-	// on; only a default derived from the listen address is tied to the port.
-	redirectFromAddr := authCfg.RedirectURL == ""
-	authCfg, err = resolveAuthConfig(authCfg, cfg.Addr, configDir)
-	if err != nil {
-		logger.Fatal("auth: resolve configuration", "error", err)
-	}
-	authClient = oidc.New(authCfg)
-	if authClient == nil {
-		logger.Fatal("auth: client construction failed; check AUTH_* configuration")
-	}
-	h.SetAuth(authClient)
-	// Only multi-tenant cloud deployments isolate workspaces per org/principal;
-	// a local single-user run keeps every workspace visible regardless of the
-	// session's org label.
-	h.SetCloudMode(cloudMode)
-
-	// JWT validator for API requests that carry Authorization: Bearer
-	// <jwt>. Issuer and JWKS URL fall back to AuthURL derivatives when
-	// the deployment doesn't override them; the only accepted audience
-	// is this service's, AUTH_AUDIENCE (default: the OAuth client id), so
-	// a login token and a token minted for another service are rejected.
-	// A local instance reaches this API with an actor token minted for
-	// that audience from its own session.
-	apiAudience := cmp.Or(envconfig.Lookup(envFileKV, "AUTH_AUDIENCE"), authCfg.ClientID)
-	jwtValidator = auth.BuildValidator(
-		authCfg,
-		envconfig.Lookup(envFileKV, "AUTH_JWKS_URL"),
-		envconfig.Lookup(envFileKV, "AUTH_ISSUER"),
-		apiAudience,
-	)
-
-	// Coordination plane (dial side): hold one outbound WebSocket to the cloud
-	// coordinator while signed in and opted in, for cross-machine spec-comment
-	// collaboration. The connector self-gates (off by default), so nothing dials
-	// until both the token and the opt-in are present.
-	//
-	// The relay is installed in every mode. Only the connector feeds it, so
-	// without one it stays empty: the comment list is empty, a submitted
-	// comment answers 503 coordination unavailable, and the browser's comment
-	// stream connects and idles rather than retrying a refused request.
-	commentRelay := handler.NewCommentRelay()
-	h.SetCommentRelay(commentRelay)
-	// The connector reads its token from this store, the host's shared identity
-	// token store (also read and written by `wallfacer auth login`, the device
-	// sign-in and the `latere` command).
-	coordTokenStore := newCoordinationTokenStore()
-	// coordBridge copies a signed-in browser's session token into that store.
-	// It stays nil in cloud mode, where wrap passes requests through untouched.
-	var coordBridge *sessionTokenBridge
-	if cloudMode {
-		// A cloud-mode deployment serves many principals, while the connector
-		// and the store each hold one person's sign-in. So on a cloud-mode
-		// deployment no browser's session reaches the host's shared token
-		// store, the connector does not run, the coordination status reports
-		// it unavailable, and a browser's sign-out leaves the store alone.
-		logger.Main.Info("coordination: connector off in cloud mode; spec comments are not synced through this server")
-	} else {
-		// On a local single-user instance the board's sign-in is the user's
-		// sign-in: the bridge writes the UI cookie login's token into the
-		// store, so signing in via the board enables coordination without a
-		// separate `wallfacer auth login`.
-		coordBridge = newSessionTokenBridge(authClient, coordTokenStore)
-		coordGate := startCoordinationClient(ctx, configDir, wsMgr, commentRelay, coordTokenStore,
-			authConfigForRefresh{AuthURL: authCfg.AuthURL, ClientID: authCfg.ClientID, Audience: apiAudience},
-			logger.Main)
-		h.SetCoordinationToggle(coordGate)
-		// Signing out clears the coordination token: the connector's gate then
-		// drops the live WebSocket and stops re-dialing, so nothing is pulled
-		// while signed out. The token store is shared with `wallfacer auth
-		// login`, so this also ends a CLI session on this machine.
-		if coordTokenStore != nil {
-			h.SetCoordinationLogout(func() {
-				if err := coordTokenStore.Clear(); err != nil {
-					logger.Main.Warn("coordination: clear token on logout failed", "err", err)
-				}
-			})
-		}
-	}
-
-	// Wire the RFC 8628 device-code sign-in driver behind /api/auth/device/*.
-	// It reuses authClient (same OIDC client, so the session cookie it mints on
-	// completion is encrypted with the same key the browser /callback uses) and
-	// the shared file token store (so a device login also lights up the
-	// coordination connector and carries over to the `latere` CLI). Local mode
-	// only: cloud deployments force the /login browser flow (ForceLogin) and
-	// have no writable per-user token store, so the endpoints stay 503 there,
-	// which is also the signal the SPA uses to fall back to the /login redirect
-	// instead of showing the device modal.
-	if !cloudMode && authClient != nil && coordTokenStore != nil {
-		h.SetDeviceAuth(&handler.DeviceAuth{OIDC: authClient, Store: coordTokenStore})
-	}
-
 	// When a dispatched task completes, update the source spec to "complete".
 	if s != nil {
 		// Drift pipeline: the agent-backed tester is wired, but gated behind
@@ -566,49 +445,11 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	// The default redirect URL names the requested port. On any other port the
-	// issuer would return the browser, with the authorization code, to whatever
-	// holds the requested one (typically another wallfacer instance), so the
-	// redirect sign-in is switched off for this instance. The device-code flow
-	// needs no redirect and stays as wired above.
-	if redirectFromAddr {
-		if reason := redirectPortMismatch(authCfg.RedirectURL, actualPort); reason != "" {
-			logger.Main.Warn("auth: redirect sign-in is off for this instance: the default redirect URL does not lead to the bound port",
-				"reason", reason, "redirect_url", authCfg.RedirectURL, "requested_addr", cfg.Addr, "bound_addr", ln.Addr().String())
-			h.SetRedirectSignInOff(map[string]any{
-				"reason":       reason,
-				"redirect_url": authCfg.RedirectURL,
-				"bound_port":   actualPort,
-			})
-		}
-	}
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist)
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, docsFS, vueDist, cloudMode)
-
-	// Middleware stack (outermost first): logging → CSRF → CookieAuth
-	//   → JWT OptionalAuth → bearer auth → mux.
-	// Both identity paths converge on the same *Identity context key: JWT wins
-	// when a Bearer header is present (OptionalAuth runs first, downstream
-	// from the cookie path), CookieAuth fills in when no Bearer was sent.
-	// BearerAuth downstream accepts that identity in place of the static key
-	// in cloud mode, so a cookie-only browser request succeeds in a deployment
-	// that also sets WALLFACER_SERVER_API_KEY for scripts. Outside cloud mode it
-	// accepts the identity only from a loopback peer: a peer on another host
-	// needs the server key whatever identity it presents.
-	// Sign-in is always available (the login button), but only *forced* in
-	// cloud/hosted mode. A local `wallfacer run` leaves the board reachable
-	// anonymously; the user signs in only if they choose to.
-	var srvHandler http.Handler = mux
-	if cloudMode {
-		srvHandler = h.ForceLogin(mux)
-	}
-	srvHandler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey, cloudMode)(srvHandler)
-	srvHandler = auth.OptionalAuth(jwtValidator, srvHandler)
-	srvHandler = auth.CookieAuth(authClient, srvHandler)
-	// Mirror the UI cookie login's token into the connector's store so signing in
-	// via the board enables the outbound coordination connection automatically.
-	// coordBridge is nil in cloud mode, and wrap then returns the handler as is.
-	srvHandler = coordBridge.wrap(srvHandler)
+	// Middleware stack (outermost first): otel → logging → CSRF → server key
+	// → mux.
+	var srvHandler http.Handler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 	srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
 	// otel.Handler is the outermost wrapper: it starts the server span, sets the
 	// X-Trace-Id response header, and records http.route from the matched
@@ -633,84 +474,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 		TelemetryShutdown: telShutdown,
 	}
-}
-
-// resolveAuthConfig fills the AUTH_* config with public-client defaults so a
-// plain `wallfacer run` signs in through the browser with no env setup. Any
-// field already set (shell env or .env) is preserved. The default is the
-// secret-less "wallfacer" public client; its session-cookie key is generated
-// once and persisted under configDir. A loopback HTTP callback serves cookies
-// insecurely (pkg/oidc then drops the __Host- prefix) since browsers reject
-// Secure cookies over plain HTTP.
-func resolveAuthConfig(cfg oidc.Config, addr, configDir string) (oidc.Config, error) {
-	if cfg.AuthURL == "" {
-		cfg.AuthURL = "https://auth.latere.ai"
-	}
-	if cfg.ClientID == "" {
-		cfg.ClientID = "wallfacer"
-	}
-	// No audience is requested at login: the session token is the issuer's,
-	// and the API is reached with an actor token minted for this service.
-	cfg.Audience = ""
-	if cfg.RedirectURL == "" {
-		cfg.RedirectURL = defaultRedirectURL(addr)
-	}
-	if len(cfg.Scopes) == 0 {
-		cfg.Scopes = []string{"openid", "email", "profile", "offline_access"}
-	}
-	// A public client has no secret to derive the cookie key from, so generate
-	// and persist a local one. An explicit AUTH_COOKIE_KEY or AUTH_CLIENT_SECRET
-	// (confidential client) takes precedence and skips this.
-	if cfg.ClientSecret == "" && cfg.CookieKey == "" {
-		key, err := loadOrCreateCookieKey(configDir)
-		if err != nil {
-			return cfg, fmt.Errorf("cookie key: %w", err)
-		}
-		cfg.CookieKey = key
-	}
-	if strings.HasPrefix(cfg.RedirectURL, "http://") {
-		cfg.InsecureCookies = true
-	}
-	return cfg, nil
-}
-
-// defaultRedirectURL derives the OAuth callback URL from the listen address.
-// A loopback or empty host yields http://localhost:<port>/callback (matching
-// the redirect registered for the seeded "wallfacer" public client); any other
-// host is assumed to terminate TLS and uses https.
-func defaultRedirectURL(addr string) string {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		host, port = "localhost", "8080"
-	}
-	switch host {
-	case "", "0.0.0.0", "::", "[::]", "127.0.0.1", "::1", "localhost":
-		return fmt.Sprintf("http://localhost:%s/callback", port)
-	default:
-		return fmt.Sprintf("https://%s:%s/callback", host, port)
-	}
-}
-
-// redirectPortMismatch reports why redirectURL cannot receive the OAuth
-// callback on a listener bound to boundPort, or "" when it names that port.
-// The ports differ when the requested port was taken and the listener fell
-// back to a free one, and when port 0 was requested.
-func redirectPortMismatch(redirectURL string, boundPort int) string {
-	u, err := url.Parse(redirectURL)
-	if err != nil {
-		return fmt.Sprintf("redirect URL does not parse: %v", err)
-	}
-	if u.Port() != strconv.Itoa(boundPort) {
-		return fmt.Sprintf("redirect URL names port %q, the listener is bound to port %d", u.Port(), boundPort)
-	}
-	return ""
-}
-
-// loadOrCreateCookieKey returns a stable hex-encoded 32-byte key for encrypting
-// the session cookie of a public (secret-less) client, persisted at
-// <configDir>/cookie-key so sessions survive a restart. Generated on first use.
-func loadOrCreateCookieKey(configDir string) (string, error) {
-	return loadOrCreateSecret(filepath.Join(configDir, "cookie-key"), "cookie key")
 }
 
 // requireClaudeOrExit fails fast when the claude CLI cannot be resolved, so
@@ -822,7 +585,7 @@ func stripSSGContent(html string) string {
 // shell; an unmatched /api path gets a JSON 404 (or 405 when a route serves the
 // path under other methods), never the shell. See webserver.MountCatchAll for
 // why the catch-alls are method-agnostic.
-func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMode bool) {
+func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string) {
 	dist, err := fs.Sub(vueDist, "frontend/dist")
 	if err != nil {
 		logger.Main.Warn("vue-ui: no frontend/dist embedded", "error", err)
@@ -834,9 +597,6 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 	}
 
 	mode := "local"
-	if cloudMode {
-		mode = "cloud"
-	}
 	version := Version
 
 	rawHTML, err := fs.ReadFile(dist, "index.html")
@@ -845,37 +605,28 @@ func mountVueSPA(mux *http.ServeMux, vueDist fs.FS, serverAPIKey string, cloudMo
 		return
 	}
 	// render bakes the runtime config into the shell. The SSG-prerendered
-	// index.html bakes in the "/" route (ProductPage in cloud). Serving it
-	// verbatim for any other path flashes the landing page before Vue swaps
-	// in the real route, so the stripped variant drops the stale markup.
-	// Only cloud "/" keeps the prerender intact, where ProductPage hydration
-	// legitimately matches; everything else (local routes, cloud deep links
-	// like /dashboard) mounts from a blank #app.
-	render := func(apiKey string) (full, stripped string) {
+	// index.html bakes in the "/" route; every route mounts from a blank #app,
+	// so the prerendered markup is dropped.
+	render := func(apiKey string) string {
 		inject := fmt.Sprintf(
 			`<script>window.__WALLFACER__={mode:%q,serverApiKey:%q,version:%q};</script>`,
 			mode, apiKey, version,
 		)
-		full = strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1)
-		return full, stripSSGContent(full)
+		return stripSSGContent(strings.Replace(string(rawHTML), "</head>", inject+"</head>", 1))
 	}
 	// Two variants: the key is released only to callers indexKeyAllowed
 	// admits; everyone else gets the shell with an empty serverApiKey.
-	keyedHTML, keyedStripped := render(serverAPIKey)
-	anonHTML, anonStripped := render("")
+	keyedHTML := render(serverAPIKey)
+	anonHTML := render("")
 
 	serveVueIndex := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		full, stripped := anonHTML, anonStripped
+		page := anonHTML
 		if indexKeyAllowed(r, serverAPIKey) {
-			full, stripped = keyedHTML, keyedStripped
+			page = keyedHTML
 		}
-		if cloudMode && r.URL.Path == "/" {
-			_, _ = w.Write([]byte(full))
-			return
-		}
-		_, _ = w.Write([]byte(stripped))
+		_, _ = w.Write([]byte(page))
 	}
 
 	files := http.FS(dist)
@@ -953,11 +704,11 @@ func docAssetContentType(p string) string {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, docsFS, vueDist fs.FS, cloudMode bool) *http.ServeMux {
+func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, docsFS, vueDist fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	if vueDist != nil {
-		mountVueSPA(mux, vueDist, indexData.ServerAPIKey, cloudMode)
+		mountVueSPA(mux, vueDist, indexData.ServerAPIKey)
 	}
 
 	// Docs API — list and serve embedded documentation.
@@ -1192,24 +943,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// handlers maps each Route.Name from apicontract.Routes to its handler.
 	// All per-route middleware (UUID parsing, extra path values) is applied here
 	// so the registration loop below stays trivial.
-	//
-	// adminOnly wraps a handler so cloud deployments require the
-	// platform-admin role; on a local instance it is identity. The decision
-	// keys on cloudMode, not on whether an OIDC client is wired: every run
-	// wires one so sign-in is available, and a local instance that nobody
-	// signed in to has no identity to carry the role. There the server key
-	// gate upstream of the mux protects admin routes like every other API.
-	adminOnly := func(next http.HandlerFunc) http.HandlerFunc {
-		if !cloudMode {
-			return next
-		}
-		wrapped := auth.RequireSuperadmin(next)
-		return wrapped.ServeHTTP
-	}
 
 	handlers := map[string]http.HandlerFunc{
 		// Admin operations.
-		"RebuildIndex": adminOnly(h.RebuildIndex),
+		"RebuildIndex": h.RebuildIndex,
 
 		// Debug & monitoring.
 		"Health":            h.Health,
@@ -1241,12 +978,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SpecTransition":            h.SpecTransition,
 		"StaleCandidates":           h.StaleCandidates,
 		"DismissAllStaleCandidates": h.DismissAllStaleCandidates,
-
-		"ListSpecComments":      h.ListSpecComments,
-		"SubmitSpecComment":     h.SubmitSpecComment,
-		"StreamSpecComments":    h.StreamSpecComments,
-		"GetCoordinationStatus": h.GetCoordinationStatus,
-		"SetCoordinationOptIn":  h.SetCoordinationOptIn,
 
 		// Agent session.
 		"GetAgentSessionStatus": h.GetAgentSessionStatus,
@@ -1353,27 +1084,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"StartOAuth":  http.HandlerFunc(h.StartOAuth),
 		"OAuthStatus": http.HandlerFunc(h.OAuthStatus),
 		"CancelOAuth": http.HandlerFunc(h.CancelOAuth),
-
-		// Latere.ai sign-in (cloud mode). Always mounted; handlers self-gate
-		// to 503/204 when the auth provider is not configured.
-		"Login":        http.HandlerFunc(h.Login),
-		"Callback":     http.HandlerFunc(h.Callback),
-		"Logout":       http.HandlerFunc(h.Logout),
-		"LogoutNotify": http.HandlerFunc(h.LogoutNotify),
-		"AuthMe":       http.HandlerFunc(h.AuthMe),
-		"AuthOrgs":     http.HandlerFunc(h.AuthOrgs),
-		"PatchAuthMe":  http.HandlerFunc(h.PatchAuthMe),
-		"SwitchOrg":    http.HandlerFunc(h.SwitchOrg),
-
-		// Local-mode RFC 8628 device-code sign-in. The local SPA's prompt
-		// drives the flow over these three routes; the resulting token is
-		// stored at <UserConfigDir>/latere/token.json so it is shared with
-		// the `latere` CLI and the `wallfacer auth login` terminal command.
-		// Nil-safe: each proxy answers 503 when device auth is unconfigured,
-		// so the SPA sees "not available" rather than a 404.
-		"AuthDeviceStart":  http.HandlerFunc(h.AuthDeviceStart),
-		"AuthDevicePoll":   http.HandlerFunc(h.AuthDevicePoll),
-		"AuthDeviceCancel": http.HandlerFunc(h.AuthDeviceCancel),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
@@ -1384,9 +1094,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Spec tree.
 		"SpecTransition": handler.BodyLimitDefault,
-
-		// Spec comments.
-		"SubmitSpecComment": handler.BodyLimitDefault,
 
 		// Agent session.
 		"StartAgentSession":     handler.BodyLimitDefault,
@@ -1452,9 +1159,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		}
 		if requiresStore(route.Name) {
 			registered = h.RequireStoreMiddleware(registered)
-		}
-		if requiresPrincipal(route.Name, cloudMode) {
-			registered = h.RequirePrincipalMiddleware(registered)
 		}
 		mux.Handle(route.FullPattern(), registered)
 	}
@@ -1590,32 +1294,5 @@ func requiresStore(name string) bool {
 		return false
 	default:
 		return true
-	}
-}
-
-// requiresPrincipal reports whether the route needs an authenticated browser
-// principal (RequirePrincipalMiddleware) in the given mode.
-//
-// The spec-comment surface needs one in every mode. It reads and writes the
-// coordination relay, which serves the connector's cached threads from the
-// token store regardless of the browser session; that store is the local
-// file the CLI and a board sign-in share, so a logged-out browser on a local
-// instance must be rejected at the data layer, not just hidden in the SPA.
-// The spec-comment layer reads that 401 as its signal to show nothing.
-//
-// SubmitFeedback needs one in cloud mode only. On a hosted deployment the
-// inline diff-review surface (gutter comments batched into one feedback
-// message) is restricted to signed-in users, and since feedback is one message
-// string whether composed inline or in the Overview textarea, gating the one
-// route covers both paths. A local instance's credential is the server key, so
-// a local user who never signs in still submits feedback.
-func requiresPrincipal(name string, cloudMode bool) bool {
-	switch name {
-	case "ListSpecComments", "SubmitSpecComment", "StreamSpecComments":
-		return true
-	case "SubmitFeedback":
-		return cloudMode
-	default:
-		return false
 	}
 }

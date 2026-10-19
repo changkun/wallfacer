@@ -43,7 +43,7 @@ func spaMux(t *testing.T) *http.ServeMux {
 		"frontend/dist/index.html":         {Data: []byte(`<!doctype html><head></head><body><div id="app"></div></body>`)},
 		"frontend/dist/assets/app-1a2b.js": {Data: []byte(`console.log("app")`)},
 	}
-	return BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), dist, false)
+	return BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), dist)
 }
 
 // TestBuildMux_UnknownAPIPathAnswers404JSON asserts an API path no route

@@ -63,46 +63,17 @@ func (h *Handler) activeWorkspaceID() string {
 	return h.workspace.Snapshot().WorkspaceID
 }
 
-// visibilityPrincipal returns the principal used to scope which workspaces a
-// caller may see. Scoping is by principal presence, not deployment mode: an
-// anonymous caller (no session) returns nil and sees everything; a signed-in
-// caller (local or cloud) is scoped to their personal/org view, matching the
-// task filter.
-func (h *Handler) visibilityPrincipal(r *http.Request) *workspace.Principal {
-	if p := principalFromRequest(r); p != nil {
-		return &workspace.Principal{Sub: p.Sub, OrgID: p.OrgID}
-	}
-	return nil
-}
-
-// ownerPrincipal returns the principal to stamp as a new workspace's owner, or
-// nil when the request is unauthenticated.
-func (h *Handler) ownerPrincipal(r *http.Request) *workspace.Principal {
-	if p := principalFromRequest(r); p != nil {
-		return &workspace.Principal{Sub: p.Sub, OrgID: p.OrgID}
-	}
-	return nil
-}
-
-// workspaceVisibleByID reports whether the workspace with the given id is
-// visible to the request's principal. A missing or out-of-scope workspace is
-// reported as not visible so callers return 404 without leaking existence.
-func (h *Handler) workspaceVisibleByID(r *http.Request, id string) bool {
-	ws, found, err := h.workspace.WorkspaceByID(id)
-	if err != nil || !found {
-		return false
-	}
-	p := h.visibilityPrincipal(r)
-	if p == nil {
-		return true
-	}
-	return len(workspace.WorkspacesForPrincipal([]workspace.Workspace{ws}, p)) == 1
+// workspaceExists reports whether a workspace with the given id is saved, so
+// the id-addressed handlers answer 404 for an unknown one.
+func (h *Handler) workspaceExists(id string) bool {
+	_, found, err := h.workspace.WorkspaceByID(id)
+	return err == nil && found
 }
 
 // ListWorkspaces returns the workspaces visible to the request's principal,
 // each flagged with whether it is the active one.
 func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
-	list, err := h.workspace.ListWorkspaces(h.visibilityPrincipal(r))
+	list, err := h.workspace.ListWorkspaces()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -127,7 +98,7 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ws, err := h.workspace.Create(req.Name, req.Folders, h.ownerPrincipal(r))
+	ws, err := h.workspace.Create(req.Name, req.Folders)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -140,7 +111,7 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 // preserved. When it is the active workspace, the live view updates in place.
 func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !h.workspaceVisibleByID(r, id) {
+	if !h.workspaceExists(id) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
@@ -211,7 +182,7 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 // caller can refresh the sidebar and active board in one round-trip.
 func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !h.workspaceVisibleByID(r, id) {
+	if !h.workspaceExists(id) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
@@ -230,7 +201,7 @@ func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 // config payload (mirroring the legacy path-based switch).
 func (h *Handler) ActivateWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !h.workspaceVisibleByID(r, id) {
+	if !h.workspaceExists(id) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}

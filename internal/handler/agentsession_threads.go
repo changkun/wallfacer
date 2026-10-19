@@ -151,9 +151,7 @@ func writeThreadErr(w http.ResponseWriter, err error) {
 // archived threads in the result.
 func (h *Handler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
 	tm := h.threadsManager()
-	// Hidden workspace (org-scoped, not visible to this principal): present no
-	// threads, matching /api/config's "no workspace" state.
-	if tm == nil || h.workspaceHiddenFromRequest(r) {
+	if tm == nil {
 		httpjson.Write(w, http.StatusOK, map[string]any{"threads": []threadSummary{}, "active_id": ""})
 		return
 	}
@@ -180,9 +178,6 @@ func (h *Handler) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
 // optional; when `name` is empty, a default "Chat N" name is used.
 // When `focused_task` is set, the thread is pinned to task-mode immediately.
 func (h *Handler) CreateAgentSession(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	tm := h.threadsManager()
 	if tm == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
@@ -242,9 +237,6 @@ func (h *Handler) CreateAgentSession(w http.ResponseWriter, r *http.Request) {
 //
 // All variants return the refreshed threadSummary.
 func (h *Handler) PatchAgentSession(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	tm := h.threadsManager()
 	if tm == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
@@ -287,9 +279,6 @@ func (h *Handler) PatchAgentSession(w http.ResponseWriter, r *http.Request) {
 // conversation. A visible thread must be archived first (409), and a thread
 // with an in-flight turn cannot be deleted (409).
 func (h *Handler) DeleteAgentSession(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	tm := h.threadsManager()
 	if tm == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)

@@ -46,15 +46,6 @@ type Workspace struct {
 	Autosubmit    *bool `json:"autosubmit,omitempty"`
 	Autosync      *bool `json:"autosync,omitempty"`
 
-	// CreatedBy records the principal sub of the user who first owned
-	// this workspace in cloud mode. Empty on workspaces created pre-cloud or in
-	// local mode. Mirrors store.Task.CreatedBy semantics.
-	CreatedBy string `json:"created_by,omitempty"`
-	// OrgID records the org context the workspace is scoped to. Empty when
-	// the workspace is personal (CreatedBy!="") or legacy (CreatedBy==""
-	// and OrgID==""). Mirrors store.Task.OrgID semantics.
-	OrgID string `json:"org_id,omitempty"`
-
 	// Dormant marks a workspace recovered from orphaned task history during
 	// migration: its DataKey addresses real history but its Folders may be
 	// empty or only best-effort recovered. The owner re-points it later.
@@ -165,14 +156,6 @@ func NormalizeGroups(groups []Workspace) []Workspace {
 	return out
 }
 
-// Principal is the minimal identity surface for workspace visibility.
-// Matches store.Principal in shape but kept local so the workspace
-// package doesn't import the store layer.
-type Principal struct {
-	Sub   string
-	OrgID string
-}
-
 // findByID returns the index of the workspace with the given id, or -1.
 func findByID(groups []Workspace, id string) int {
 	if id == "" {
@@ -184,44 +167,6 @@ func findByID(groups []Workspace, id string) int {
 		}
 	}
 	return -1
-}
-
-// WorkspacesForPrincipal returns the subset of `groups` that `p` can
-// see. Mirrors store.TasksForPrincipal's strict isolation:
-//
-//	┌─────────────────────────────┬──────────────────────────────────┐
-//	│ Caller view                 │ Sees                             │
-//	├─────────────────────────────┼──────────────────────────────────┤
-//	│ local (nil principal)       │ every workspace                  │
-//	│ personal (OrgID == "")      │ own personal + legacy no-owner   │
-//	│ org X (OrgID == "X")        │ only OrgID=="X" workspaces        │
-//	└─────────────────────────────┴──────────────────────────────────┘
-//
-// The org view does NOT include personal or legacy workspaces — those
-// belong to the user's personal account, not the org. Switching
-// into an org should feel like a clean slate, not a merged
-// view of private + org data.
-func WorkspacesForPrincipal(groups []Workspace, p *Principal) []Workspace {
-	if p == nil {
-		return groups
-	}
-	out := make([]Workspace, 0, len(groups))
-	for _, g := range groups {
-		if p.OrgID != "" {
-			if g.OrgID == p.OrgID {
-				out = append(out, g)
-			}
-			continue
-		}
-		// Personal view.
-		if g.OrgID != "" {
-			continue
-		}
-		if g.CreatedBy == "" || g.CreatedBy == p.Sub {
-			out = append(out, g)
-		}
-	}
-	return out
 }
 
 // sanitizeLimit drops negative override values so downstream callers only

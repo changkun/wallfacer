@@ -6,11 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"latere.ai/x/pkg/authkit"
-
-	"latere.ai/x/wallfacer/internal/auth"
-	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestWorkspaceCRUDLifecycle exercises create -> list -> activate -> edit
@@ -145,40 +140,5 @@ func TestWorkspaceUpdate_Limits(t *testing.T) {
 	d = put(`{"max_parallel":null}`)
 	if d.MaxParallel != nil || d.MaxTestParallel == nil || *d.MaxTestParallel != 1 {
 		t.Fatalf("null should clear only max_parallel: %+v", d)
-	}
-}
-
-// TestWorkspaceUpdate_VisibilityIsolation verifies that in cloud mode a caller
-// who cannot see an org-stamped workspace gets 404 (not found, no leak) on a
-// mutation, while the owning org caller passes the guard.
-func TestWorkspaceUpdate_VisibilityIsolation(t *testing.T) {
-	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	h.SetCloudMode(true)
-	const id = "ws-fixed-1"
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{ID: id, Folders: []string{ws}, DataKey: "deadbeefdeadbeef", CreatedBy: "owner", OrgID: "org-a"},
-	}); err != nil {
-		t.Fatalf("seed workspace: %v", err)
-	}
-	rename, _ := json.Marshal(map[string]any{"name": "x"})
-
-	// Personal caller (different principal) cannot see it: 404.
-	preq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+id, bytes.NewReader(rename))
-	preq = preq.WithContext(auth.WithIdentity(preq.Context(), &authkit.Identity{Sub: "u", OrgID: ""}))
-	preq.SetPathValue("id", id)
-	prec := httptest.NewRecorder()
-	h.UpdateWorkspace(prec, preq)
-	if prec.Code != http.StatusNotFound {
-		t.Fatalf("personal caller: got %d, want 404", prec.Code)
-	}
-
-	// Owning org caller passes the guard.
-	oreq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+id, bytes.NewReader(rename))
-	oreq = oreq.WithContext(auth.WithIdentity(oreq.Context(), &authkit.Identity{Sub: "owner", OrgID: "org-a"}))
-	oreq.SetPathValue("id", id)
-	orec := httptest.NewRecorder()
-	h.UpdateWorkspace(orec, oreq)
-	if orec.Code != http.StatusOK {
-		t.Fatalf("owner caller: got %d, want 200: %s", orec.Code, orec.Body.String())
 	}
 }

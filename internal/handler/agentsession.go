@@ -222,9 +222,6 @@ func (h *Handler) GetAgentSessionStatus(w http.ResponseWriter, _ *http.Request) 
 // StartAgentSession starts the agent session container.
 // If already running, returns 200 with running=true (idempotent).
 func (h *Handler) StartAgentSession(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	if h.agentSession == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
@@ -253,11 +250,6 @@ func (h *Handler) StopAgentSession(w http.ResponseWriter, _ *http.Request) {
 // query parameter selects which thread's history is returned; when
 // omitted, the currently active thread is used.
 func (h *Handler) GetAgentMessages(w http.ResponseWriter, r *http.Request) {
-	// Hidden workspace: present an empty history, matching /api/config.
-	if h.workspaceHiddenFromRequest(r) {
-		httpjson.Write(w, http.StatusOK, []any{})
-		return
-	}
 	cs := h.lookupThreadStore(h.threadIDFromRequest(r))
 	if cs == nil {
 		httpjson.Write(w, http.StatusOK, []any{})
@@ -302,9 +294,6 @@ const agentStderrLogRunes = 2000
 // parameter (or body field) selects which thread receives the message;
 // when omitted, the active thread is used.
 func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	if h.agentSession == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return
@@ -798,8 +787,7 @@ func (h *Handler) maybeAutoTitleThread(tm *agentsession.Manager, threadID, first
 // Returns 204 No Content if no exec is in flight, or if the `?thread=<id>`
 // query parameter does not match the thread that owns the exec.
 func (h *Handler) StreamAgentMessages(w http.ResponseWriter, r *http.Request) {
-	// Hidden workspace: nothing to stream, matching /api/config.
-	if h.agentSession == nil || h.workspaceHiddenFromRequest(r) {
+	if h.agentSession == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -849,9 +837,6 @@ func (h *Handler) StreamAgentMessages(w http.ResponseWriter, r *http.Request) {
 // session. The `?thread=<id>` query parameter selects which thread;
 // when omitted the active thread is used.
 func (h *Handler) ClearAgentMessages(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	cs := h.lookupThreadStore(h.threadIDFromRequest(r))
 	if cs == nil {
 		httpjson.Write(w, http.StatusOK, map[string]any{"status": "cleared"})
@@ -869,9 +854,6 @@ func (h *Handler) ClearAgentMessages(w http.ResponseWriter, r *http.Request) {
 // otherwise the request is rejected (409). Returns 409 if no exec is
 // in flight.
 func (h *Handler) InterruptAgentMessage(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	if h.agentSession == nil {
 		http.Error(w, "agent session not configured", http.StatusServiceUnavailable)
 		return

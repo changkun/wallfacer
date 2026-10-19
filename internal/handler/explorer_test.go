@@ -18,12 +18,8 @@ import (
 	"latere.ai/x/pkg/wait"
 	"latere.ai/x/pkg/wait/waittest"
 
-	"latere.ai/x/pkg/authkit"
-
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/store"
-	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 func TestExplorerTree_Basic(t *testing.T) {
@@ -791,56 +787,6 @@ func TestExplorerStream_DetectsDeepChangeInExpandedDir(t *testing.T) {
 	}
 	cancel()
 	<-done
-}
-
-// TestExplorerStream_HiddenWorkspaceNoLeak verifies that in cloud mode a session
-// whose principal cannot see the active org-stamped workspace receives no refresh
-// events naming that workspace. ExplorerStream must fingerprint visibleWorkspaces,
-// not currentWorkspaces; before the fix the hidden workspace was fingerprinted and
-// its changes leaked via "refresh" events.
-func TestExplorerStream_HiddenWorkspaceNoLeak(t *testing.T) {
-	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	h.SetCloudMode(true)
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Personal caller (OrgID "") cannot see the org-a workspace.
-	ctx, cancel := context.WithCancel(auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""}))
-	req := httptest.NewRequest(http.MethodGet, "/api/explorer/stream", nil).WithContext(ctx)
-	w := newSyncResponseWriter()
-
-	done := make(chan struct{})
-	go func() { defer close(done); h.ExplorerStream(w, req) }()
-
-	// Wait for the connected event.
-	deadline := time.After(5 * time.Second)
-	for !strings.Contains(w.bodyString(), "event: connected") {
-		select {
-		case <-deadline:
-			cancel()
-			<-done
-			t.Fatal("timed out waiting for connected event")
-		default:
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Mutate the hidden workspace, then wait past the 3s poll interval.
-	if err := os.WriteFile(filepath.Join(ws, "leak.txt"), []byte("secret"), 0644); err != nil {
-		cancel()
-		<-done
-		t.Fatal(err)
-	}
-	time.Sleep(4 * time.Second)
-	cancel()
-	<-done
-
-	if strings.Contains(w.bodyString(), "event: refresh") {
-		t.Errorf("hidden workspace leaked a refresh event:\n%s", w.bodyString())
-	}
 }
 
 func TestExplorerStream_NoRefreshWhenUnchanged(t *testing.T) {

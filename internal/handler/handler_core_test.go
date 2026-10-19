@@ -9,10 +9,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/authkit"
 	"latere.ai/x/pkg/httpjson"
 
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/store"
@@ -463,104 +461,6 @@ func TestRequireStoreMiddleware_WithoutStore(t *testing.T) {
 		if resp["error"] == "" {
 			t.Error("expected non-empty error in response body")
 		}
-	}
-}
-
-// TestRequirePrincipalMiddleware_AuthConfigured verifies that with a sign-in
-// provider wired the middleware rejects an anonymous request (no principal)
-// with 401 in the error envelope and admits a request carrying an
-// authenticated principal, in local and cloud mode alike: requiresPrincipal,
-// not the middleware, decides per mode which routes it wraps. On the
-// spec-comment routes this is the data-layer gate that keeps a logged-out
-// browser from reading or writing comments even though the instance still
-// holds a coordination token.
-func TestRequirePrincipalMiddleware_AuthConfigured(t *testing.T) {
-	for _, cloud := range []bool{false, true} {
-		h := &Handler{}
-		h.SetAuth(fakeAuthProvider{})
-		h.SetCloudMode(cloud)
-
-		called := false
-		next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			called = true
-			w.WriteHeader(http.StatusOK)
-		})
-		mw := h.RequirePrincipalMiddleware(next)
-
-		// Anonymous: no principal in context -> 401, next not called.
-		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/spec-comments", nil)
-		w := httptest.NewRecorder()
-		mw.ServeHTTP(w, req)
-		if called {
-			t.Errorf("cloud=%v: expected next NOT called for an anonymous request", cloud)
-		}
-		if w.Code != http.StatusUnauthorized {
-			t.Errorf("cloud=%v: anonymous: status = %d, want 401", cloud, w.Code)
-		}
-		var env httpjson.ErrorEnvelope
-		if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
-			t.Fatalf("cloud=%v: anonymous: decode envelope: %v (%q)", cloud, err, w.Body.String())
-		}
-		if env.Error.Code != codeSignInRequired || env.Error.Message != messageSignInRequired {
-			t.Errorf("cloud=%v: anonymous: envelope = %+v, want code %q with its message", cloud, env.Error, codeSignInRequired)
-		}
-
-		// Authenticated: principal injected -> next called, 200.
-		called = false
-		ctx := auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "user-123"})
-		req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/api/spec-comments", nil)
-		w2 := httptest.NewRecorder()
-		mw.ServeHTTP(w2, req2)
-		if !called {
-			t.Errorf("cloud=%v: expected next called for an authenticated request", cloud)
-		}
-		if w2.Code != http.StatusOK {
-			t.Errorf("cloud=%v: authenticated: status = %d, want 200", cloud, w2.Code)
-		}
-	}
-}
-
-// TestRequirePrincipalMiddleware_NoSignInProvider verifies that a Handler
-// with no sign-in provider wired passes an anonymous request through: there
-// is no session to require. Every run wires a provider, so only a Handler
-// built without SetAuth reaches this branch.
-func TestRequirePrincipalMiddleware_NoSignInProvider(t *testing.T) {
-	h := &Handler{} // no SetAuth -> HasAuth() == false
-	called := false
-	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	})
-	mw := h.RequirePrincipalMiddleware(next)
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/spec-comments", nil)
-	w := httptest.NewRecorder()
-	mw.ServeHTTP(w, req)
-	if !called {
-		t.Error("expected next called with no sign-in provider wired")
-	}
-	if w.Code != http.StatusOK {
-		t.Errorf("no provider: status = %d, want 200", w.Code)
-	}
-}
-
-// TestLogout_ClearsCoordinationToken verifies that both Logout and LogoutNotify
-// invoke the coordination sign-out hook, so signing out stops the connector
-// (nothing pulled while signed out), not just the browser cookie.
-func TestLogout_ClearsCoordinationToken(t *testing.T) {
-	h := &Handler{} // auth nil: exercises the bare cookie-clear path
-	called := 0
-	h.SetCoordinationLogout(func() { called++ })
-
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/auth/logout", nil)
-	h.Logout(httptest.NewRecorder(), req)
-	if called != 1 {
-		t.Fatalf("Logout: hook called %d times, want 1", called)
-	}
-
-	req2, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/auth/logout-notify", nil)
-	h.LogoutNotify(httptest.NewRecorder(), req2)
-	if called != 2 {
-		t.Fatalf("LogoutNotify: hook called %d times, want 2", called)
 	}
 }
 

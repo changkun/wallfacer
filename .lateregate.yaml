@@ -9,14 +9,10 @@ cover:
     x/wallfacer: >-
       main() wires the embedded SPA and docs into internal/cli and dispatches;
       the dispatch table is tested through internal/cli directly
-    internal/store/postgres: >-
-      the migration runner needs a Postgres beside the suite; the store logic
-      it drives is covered in internal/store against the in-memory backend
 
 hermetic:
-  # git for the tests that read the tree, and bash/curl/grep for the smoke
-  # script test in release_evidence_test.go, which skips without them but
-  # then proves nothing.
+  # git for the tests that read the tree, and bash for the release workflow
+  # test in release_publish_test.go, which runs the publish step's script.
   allow: [/usr/bin, /bin]
 
 golangci:
@@ -25,10 +21,7 @@ golangci:
     # stamps TraceId/SpanId onto exported records. CLI-mode packages keep
     # plain calls: they have no request trace to correlate.
     context: scope
-    request_paths: internal/(auth|coordinator|webserver)/
-    exempt:
-      # The coordinator client is the CLI-side dialer, not the request path.
-      - internal/coordinator/client/
+    request_paths: internal/webserver/
   extra:
     linters:
       enable:
@@ -45,7 +38,7 @@ waive:
       the shared config holds linters this tree never ran: contextcheck (62
       findings), errorlint (20), nilerr (15), noctx (10), errchkjson (7),
       revive (6), errcheck (4), bodyclose, copyloopvar and govet (1 each);
-      each is a code change in handler, runner or coordinator rather than a
+      each is a code change in handler or runner rather than a
       rule to turn off, and the goimports grouping it also wanted is applied
     until: 2026-10-31
   race:
@@ -87,21 +80,6 @@ waive:
 
 # The identity shape of the family: specs/infrastructure/identity.md in latere-ai/specs
 identity:
-  role: service
-  audience: wallfacer
-  # The module is wallfacer and the deployment runs
-  # ghcr.io/changkun/wallfacerd, built from the package main at the
-  # module root. The name the image was built under is neither a
-  # directory under cmd/ nor the module's last segment, so the audience
-  # and bearers rules are told it.
-  image: wallfacerd
-  roles_only: true
-
-# The database shape: which endpoint the serving path connects on.
-postgres:
-  # Serving traffic opens the pooled endpoint and falls back to the direct one;
-  # the golang-migrate runner keeps the direct endpoint.
-  role: pooled
-  # The Secret carries WALLFACER_DATABASE_URL and WALLFACER_DATABASE_POOL_URL,
-  # so the names the checks look for carry the prefix.
-  prefix: WALLFACER
+  # Wallfacer is a local tool: it verifies no tokens and serves no other
+  # service, and its only credential is the per-instance server key.
+  role: none

@@ -135,10 +135,11 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		httpjson.Write(w, http.StatusOK, resp)
 		return
 	}
-	// GET /api/tasks applies org-scoped filtering in cloud mode when the
-	// request carried JWT claims; local-mode callers (principal == nil)
-	// get the unfiltered list identical to today's behavior.
-	tasks := s.TasksForPrincipal(r.Context(), principalFromRequest(r), includeArchived)
+	tasks, err := s.ListTasks(r.Context(), includeArchived)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if tasks == nil {
 		tasks = []store.Task{}
 	}
@@ -249,10 +250,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	var opts store.TaskCreateOptions
 	req.apply(&opts)
-	if p := principalFromRequest(r); p != nil {
-		opts.CreatedBy = p.Sub
-		opts.OrgID = p.OrgID
-	}
 	task, err := s.CreateTaskWithOptions(r.Context(), opts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -543,10 +540,6 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			SpecSourcePath: t.SpecSourcePath,
 		}
 		t.apply(&batchOpts)
-		if p := principalFromRequest(r); p != nil {
-			batchOpts.CreatedBy = p.Sub
-			batchOpts.OrgID = p.OrgID
-		}
 		task, err := s.CreateTaskWithOptions(r.Context(), batchOpts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

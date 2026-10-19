@@ -96,12 +96,11 @@ func (m *Manager) resolveWorkspaceForPaths(validated []string) (Workspace, error
 	return ws, nil
 }
 
-// Create mints a brand-new workspace with a RANDOM DataKey, owned by p (if
-// signed in). Because the key is independent of the folder set, a new workspace
+// Create mints a brand-new workspace with a RANDOM DataKey. Because the key is independent of the folder set, a new workspace
 // pointing at the same folders as an existing one starts with empty history —
 // identity-first, the core property of the redesign. The new workspace is
 // prepended (MRU) and persisted but not activated; call SwitchByID to activate.
-func (m *Manager) Create(name string, folders []string, p *Principal) (Workspace, error) {
+func (m *Manager) Create(name string, folders []string) (Workspace, error) {
 	validated, err := validate(folders)
 	if err != nil {
 		return Workspace{}, err
@@ -117,10 +116,6 @@ func (m *Manager) Create(name string, folders []string, p *Principal) (Workspace
 		DataKey:   prompts.NewDataKey(),
 		CreatedAt: now,
 		UpdatedAt: now,
-	}
-	if p != nil {
-		ws.CreatedBy = p.Sub
-		ws.OrgID = p.OrgID
 	}
 	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
 		return append([]Workspace{ws}, groups...), nil
@@ -365,13 +360,9 @@ func (m *Manager) wipeWorkspaceData(dataKey string) {
 	}
 }
 
-// ListWorkspaces returns the workspaces visible to p (nil = local, sees all).
-func (m *Manager) ListWorkspaces(p *Principal) ([]Workspace, error) {
-	groups, err := LoadGroups(m.configDir)
-	if err != nil {
-		return nil, err
-	}
-	return WorkspacesForPrincipal(groups, p), nil
+// ListWorkspaces returns every saved workspace.
+func (m *Manager) ListWorkspaces() ([]Workspace, error) {
+	return LoadGroups(m.configDir)
 }
 
 // WorkspaceByID returns the workspace with the given id, if present.

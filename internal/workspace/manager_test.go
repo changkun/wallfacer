@@ -30,7 +30,7 @@ func TestManager_ConcurrentCreate_NoLostRecords(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range n {
 		wg.Go(func() {
-			_, errs[i] = m.Create(fmt.Sprintf("ws-%d", i), []string{dirs[i]}, nil)
+			_, errs[i] = m.Create(fmt.Sprintf("ws-%d", i), []string{dirs[i]})
 		})
 	}
 	wg.Wait()
@@ -39,7 +39,7 @@ func TestManager_ConcurrentCreate_NoLostRecords(t *testing.T) {
 			t.Fatalf("Create %d: %v", i, err)
 		}
 	}
-	got, err := m.ListWorkspaces(nil)
+	got, err := m.ListWorkspaces()
 	if err != nil {
 		t.Fatalf("ListWorkspaces: %v", err)
 	}

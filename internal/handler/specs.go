@@ -33,7 +33,7 @@ import (
 // from the first workspace that has one). Shared by GetSpecTree and
 // the SSE SpecTreeStream so both surfaces emit the same shape.
 func (h *Handler) collectSpecTree(ctx context.Context) spec.TreeResponse {
-	workspaces := h.visibleWorkspaces(ctx)
+	workspaces := h.currentWorkspaces()
 
 	var allNodes []spec.NodeResponse
 	allProgress := make(map[string]spec.Progress)
@@ -84,7 +84,7 @@ type groupedTreeResponse struct {
 // included when it has either spec nodes or a roadmap README. Shared by
 // GetSpecTree and SpecTreeStream.
 func (h *Handler) collectGroupedSpecTree(ctx context.Context) groupedTreeResponse {
-	workspaces := h.visibleWorkspaces(ctx)
+	workspaces := h.currentWorkspaces()
 	groups := make([]specGroup, 0, len(workspaces))
 	for _, ws := range workspaces {
 		tree, err := spec.BuildTree(filepath.Join(ws, "specs"))
@@ -260,9 +260,6 @@ func findWorkspaceRoot(workspaces []string, absPath string) string {
 // descendants so the subtree moves as a unit. All status changes land in a
 // single commit; unarchive reverses the cascade by reverting that commit.
 func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -368,9 +365,6 @@ func (h *Handler) ArchiveSpec(w http.ResponseWriter, r *http.Request) {
 // back to a single-spec `archived → drafted` transition when no matching archive
 // commit can be found (spec was archived by hand, outside the UI).
 func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -457,9 +451,6 @@ func (h *Handler) UnarchiveSpec(w http.ResponseWriter, r *http.Request) {
 // is an intent signal, not a process. The state machine rejects every source
 // status but drafted and stale (complete/archived/vague → 422).
 func (h *Handler) ValidateSpecTransition(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -514,9 +505,6 @@ func (h *Handler) ValidateSpecTransition(w http.ResponseWriter, r *http.Request)
 // testing → complete, clears the testing markers, and records the override in
 // the Outcome section so history shows the skipped check.
 func (h *Handler) ForceCompleteSpec(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -576,9 +564,6 @@ func (h *Handler) ForceCompleteSpec(w http.ResponseWriter, r *http.Request) {
 // stale (e.g. complete → stale) so the explorer surfaces it for re-refinement.
 // The state machine rejects illegal sources (vague, archived) with 422.
 func (h *Handler) MarkStaleTransition(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -632,9 +617,6 @@ func (h *Handler) MarkStaleTransition(w http.ResponseWriter, r *http.Request) {
 // for rework" action. The state machine allows stale → drafted; all other
 // source statuses are rejected with 422.
 func (h *Handler) UnstaleSpec(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -688,9 +670,6 @@ func (h *Handler) UnstaleSpec(w http.ResponseWriter, r *http.Request) {
 // status — the "I looked, it's fine" action for a stale candidate. The next
 // scan ignores commits older than the new timestamp.
 func (h *Handler) DismissStaleCandidate(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return
@@ -740,9 +719,6 @@ func (h *Handler) DismissStaleCandidate(w http.ResponseWriter, r *http.Request) 
 // change is committed like other spec mutations. Rejects files that already
 // carry frontmatter (nothing to migrate).
 func (h *Handler) MigrateSpec(w http.ResponseWriter, r *http.Request) {
-	if !h.requireVisibleWorkspace(w, r) {
-		return
-	}
 	req, ok := httpjson.DecodeBody[specTransitionRequest](w, r)
 	if !ok {
 		return

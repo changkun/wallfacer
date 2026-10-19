@@ -65,12 +65,6 @@ type Config struct {
 	TerminalEnabled    bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
-
-	// Cloud marks a hosted deployment: sign-in is forced on every route
-	// and the SPA boots in cloud mode, which turns on its cloud-only
-	// surfaces. Sourced from WALLFACER_CLOUD; parsed here so the CLI
-	// entry point reads a single config surface.
-	Cloud bool // WALLFACER_CLOUD ("true"/"1"/"yes", case-insensitive)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -116,7 +110,6 @@ var knownKeys = []string{
 	"WALLFACER_HOST_PI_BINARY",
 	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
-	"WALLFACER_CLOUD",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -247,8 +240,6 @@ func Parse(path string) (Config, error) {
 			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
-		case "WALLFACER_CLOUD":
-			cfg.Cloud = ParseBoolFlag(v)
 		}
 	}
 	cfg.OAuthToken = values["CLAUDE_CODE_OAUTH_TOKEN"]
@@ -262,40 +253,12 @@ func Parse(path string) (Config, error) {
 
 // ReadRaw returns the full set of key-value pairs declared in an env file,
 // without applying the type-aware decoding that Parse does. Unknown keys
-// are preserved, so callers that need values not yet modeled in Config
-// (e.g. OIDC AUTH_* vars handled by an external package) can read them
-// without round-tripping through a separate parser. Lines that don't
+// are preserved, so callers that need values not modeled in Config can read
+// them without round-tripping through a separate parser. Lines that don't
 // match KEY=VALUE are skipped silently, matching Parse's semantics.
 func ReadRaw(path string) (map[string]string, error) {
 	_, values, err := readConfigFile(path)
 	return values, err
-}
-
-// Lookup returns the value for key from shell env (os.Getenv) when set,
-// otherwise the value from the .env file map. Used at server boot to
-// honor a user's expectation that `WALLFACER_CLOUD=foo wallfacer run`
-// takes precedence over the same key in ~/.wallfacer/.env while also
-// letting users drop the key in the file and leave the shell clean.
-func Lookup(envFile map[string]string, key string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return envFile[key]
-}
-
-// ParseBoolFlag accepts the common truthy spellings used in environment
-// variables: "true", "1", and "yes" (all case-insensitive). Everything
-// else — including empty, "false", "0", "no" — parses as false. Used by
-// flags that are explicitly documented as accepting "true/1/yes", not
-// the older WALLFACER_* flags that use `v == "true"` or `v != "false"`.
-// Exported so callers can apply the same semantics to shell-env
-// overrides (e.g. `WALLFACER_CLOUD=true wallfacer run`).
-func ParseBoolFlag(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "true", "1", "yes":
-		return true
-	}
-	return false
 }
 
 // ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted

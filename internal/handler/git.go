@@ -136,7 +136,7 @@ func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *htt
 
 // GitStatus returns git status for every workspace visible to the caller.
 func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
-	httpjson.Write(w, http.StatusOK, collectWorkspaceStatuses(h.visibleWorkspaces(r.Context())))
+	httpjson.Write(w, http.StatusOK, collectWorkspaceStatuses(h.currentWorkspaces()))
 }
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
@@ -147,7 +147,7 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	collect := func() []gitutil.WorkspaceGitStatus {
-		return collectWorkspaceStatuses(h.visibleWorkspaces(r.Context()))
+		return collectWorkspaceStatuses(h.currentWorkspaces())
 	}
 
 	send := func(statuses []gitutil.WorkspaceGitStatus) bool {
@@ -722,5 +722,5 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 // check keeps an org-scoped workspace from being read or mutated through a
 // session that config.go reports as having "no workspace".
 func (h *Handler) isAllowedWorkspace(ctx context.Context, ws string) bool {
-	return slices.Contains(h.visibleWorkspaces(ctx), ws)
+	return slices.Contains(h.currentWorkspaces(), ws)
 }

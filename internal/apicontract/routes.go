@@ -156,33 +156,6 @@ var Routes = []Route{
 		Tags:        []string{"specs"},
 	},
 
-	// --- Spec comments (coordination plane) ---
-	{
-		Method: http.MethodGet, Pattern: "/api/spec-comments", Name: "ListSpecComments",
-		Description: "List cloud-resident spec comment threads for the visible repos, each repositioned against the current spec body (orphaned flag set when the anchor is lost).",
-		Tags:        []string{"spec-comments"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/spec-comments", Name: "SubmitSpecComment",
-		Description: "Forward a spec-comment op (create/reply/resolve/reopen) up the coordination connection. The coordinator is authoritative and echoes the result back over the SSE stream.",
-		Tags:        []string{"spec-comments"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/spec-comments/stream", Name: "StreamSpecComments",
-		Description: "SSE stream of spec-comment events relayed from the coordinator (create/reply/resolve/reopen/sync).",
-		Tags:        []string{"spec-comments", "sse"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/coordination/status", Name: "GetCoordinationStatus",
-		Description: "Report whether the coordination opt-in is enabled (and available).",
-		Tags:        []string{"spec-comments"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/coordination/opt-in", Name: "SetCoordinationOptIn",
-		Description: "Flip the coordination opt-in (the data-boundary gate). Body {enabled}.",
-		Tags:        []string{"spec-comments"},
-	},
-
 	// --- Agent session ---
 
 	{
@@ -585,63 +558,5 @@ var Routes = []Route{
 		Method: http.MethodPost, Pattern: "/api/auth/{provider}/cancel", Name: "CancelOAuth",
 		Description: "Cancel an in-progress OAuth flow for the given provider.",
 		Tags:        []string{"auth"},
-	},
-
-	// --- Latere.ai sign-in (mounted on every run; WALLFACER_CLOUD only forces it) ---
-
-	{
-		Method: http.MethodGet, Pattern: "/login", Name: "Login",
-		Description: "Redirect to the latere.ai auth service to begin sign-in.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/callback", Name: "Callback",
-		Description: "OAuth2 authorization-code callback; sets the session cookie.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/logout", Name: "Logout",
-		Description: "Clear the local session and redirect to the auth service logout.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/logout/notify", Name: "LogoutNotify",
-		Description: "Front-channel logout target: clear the local cookie when the user signs out centrally.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/me", Name: "AuthMe",
-		Description: "Return the current signed-in user, or 204 when unauthenticated.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/auth/orgs", Name: "AuthOrgs",
-		Description: "List the signed-in user's organizations; 204 when single-org or unauthenticated.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodPatch, Pattern: "/api/auth/me", Name: "PatchAuthMe",
-		Description: "Mutate the signed-in principal — currently only org_id (active organization). Clears session and returns a redirect to /login?org_id=<target>.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/me/switch-org", Name: "SwitchOrg",
-		Description: "Switch the active organization (latere-ui session convention). Validates membership, clears the session, and returns {redirect} to /login?org_id=<target>.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/auth/device/start", Name: "AuthDeviceStart",
-		Description: "Local-mode RFC 8628 device-code: start a sign-in flow and return the user code + verification URI.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/auth/device/poll", Name: "AuthDevicePoll",
-		Description: "Poll the in-flight local-mode device-code flow; returns {status: idle|pending|done|denied|expired}.",
-		Tags:        []string{"login"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/auth/device/cancel", Name: "AuthDeviceCancel",
-		Description: "Cancel the in-flight local-mode device-code flow.",
-		Tags:        []string{"login"},
 	},
 }

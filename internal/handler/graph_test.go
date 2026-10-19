@@ -9,12 +9,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/authkit"
 
-	"latere.ai/x/wallfacer/internal/auth"
 	"latere.ai/x/wallfacer/internal/graph"
 	"latere.ai/x/wallfacer/internal/store"
-	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 func getGraph(t *testing.T, h *Handler, req *http.Request) graph.Graph {
@@ -107,36 +104,6 @@ func TestGetGraph_SpecDepEdgeFromRealTree(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("spec_dep edge missing; edges=%+v", g.Edges)
-	}
-}
-
-// TestGetGraph_HiddenForMismatchedPrincipal mirrors the spec-tree leak guard
-// (config_test.go:332): a caller who cannot see the org-stamped workspace gets
-// no spec nodes, even though specs exist on disk.
-func TestGetGraph_HiddenForMismatchedPrincipal(t *testing.T) {
-	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
-	h.SetCloudMode(true)
-	writeTestSpec(t, ws, "specs/local/secret.md", testSpecValidated)
-	if err := workspace.SaveGroups(h.configDir, []workspace.Workspace{
-		{Folders: []string{ws}, CreatedBy: "owner", OrgID: "org-a"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Local caller (no claims) sees the spec node.
-	local := getGraph(t, h, httptest.NewRequest(http.MethodGet, "/api/graph", nil))
-	if !nodeID(local, graph.SpecID("specs/local/secret.md")) {
-		t.Fatalf("local caller should see spec node; nodes=%+v", local.Nodes)
-	}
-
-	// Personal caller (mismatched org) sees an empty graph.
-	req := httptest.NewRequest(http.MethodGet, "/api/graph", nil)
-	req = req.WithContext(auth.WithIdentity(context.Background(), &authkit.Identity{Sub: "u", OrgID: ""}))
-	personal := getGraph(t, h, req)
-	for _, n := range personal.Nodes {
-		if n.Kind == graph.NodeSpec {
-			t.Errorf("mismatched principal should see no spec nodes, got %s", n.ID)
-		}
 	}
 }
 
