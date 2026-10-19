@@ -142,7 +142,24 @@ committed: the commit log already holds that.
   Logs still go to the terminal in the format `-log-format` (or `LOG_FORMAT`)
   selects.
 
+- Workspaces with several folders: a workspace is one folder, and
+  `POST /api/workspaces` and `PUT /api/workspaces/{id}` refuse more than one
+  with 400. A workspace saved with several folders keeps its name and history
+  and shows in the picker as needing a folder; it opens once it is pointed at
+  one, and its tasks come back. A task stored with worktrees in several
+  folders still commits into each, and its timeline names the folder the agent
+  works in. Agents no longer see other tasks' worktrees:
+  `WALLFACER_SIBLING_WORKTREES_JSON`, the `mount_worktrees` task field (now
+  refused with 400) and the `worktree_path` of board entries are gone.
+  `WALLFACER_WORKSPACES`, which the server wrote and never read, is ignored,
+  and `wallfacer run` refuses folder arguments, which it used to ignore.
+
 ### Fixed
+
+- A task resumed after its workspace was pointed at another folder runs in
+  its own worktree, where it ran in the workspace's folder itself, and a
+  rebase conflict in a task's second repository is resolved in that
+  repository's worktree.
 
 - A chat round is recorded in the usage log under the harness that ran it, not
   always under Claude; rounds on a harness other than Claude are recorded with
