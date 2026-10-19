@@ -8,8 +8,8 @@
 #   SKIP_BUILD=1 ./frontend/scripts/ui-shots/ui-test.sh   # reuse an existing ./wallfacer + dist
 #   PW_WITH_DEPS=1 make ui-test                         # CI: also install Chromium's system libs
 #
-# Playwright lives in a throwaway /tmp sandbox (never under frontend/, which
-# would break the vite-ssg build), mirroring regen.sh.
+# Playwright lives in a throwaway /tmp sandbox (never under frontend/, where
+# an npm install breaks the build), mirroring regen.sh.
 set -euo pipefail
 
 cd "$(dirname "$0")/../../.."   # repo root
