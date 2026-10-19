@@ -3,7 +3,7 @@ import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import { specStatusPill } from '../../lib/specStatus';
 import { storeToRefs } from 'pinia';
 import { api, authHeaders, withAuthToken } from '../../api/client';
-import { renderMarkdown, renderMarkdownWithSourceLines } from '../../lib/markdown';
+import { renderMarkdown } from '../../lib/markdown';
 import { enhanceMermaid } from '../../lib/mermaidRender';
 import { parseSpecFrontmatter } from '../../lib/specFrontmatter';
 import { useRouter } from 'vue-router';
@@ -12,7 +12,6 @@ import { useTaskStore } from '../../stores/tasks';
 import { useToastStore } from '../../stores/toast';
 import { useDialogStore } from '../../stores/dialog';
 import FloatingToc from './FloatingToc.vue';
-import SpecCommentsLayer from './SpecCommentsLayer.vue';
 
 withDefaults(defineProps<{ chatVisible: boolean; chatEnabled?: boolean }>(), {
   chatEnabled: true,
@@ -199,10 +198,7 @@ const metaParts = computed(() => {
 
 const renderedBody = computed(() => {
   if (!parsed.value.body) return '';
-  // Source-line stamping so the spec-comments layer can map a selection (and a
-  // server-resolved thread line) onto rendered DOM. Other bodies (task prompt,
-  // docs) keep the unstamped render.
-  let html = renderMarkdownWithSourceLines(parsed.value.body);
+  let html = renderMarkdown(parsed.value.body);
   // Strip the leading <h1> and <hr> so they don't duplicate the title bar.
   html = html.replace(/^\s*<h1\b[^>]*>[\s\S]*?<\/h1>\s*/, '');
   html = html.replace(/^\s*<hr\s*\/?>\s*/, '');
@@ -688,19 +684,13 @@ defineExpose({ dispatchFocused, breakdownFocused });
           class="sf-frontmatter-warning"
           role="alert"
         >⚠ {{ parsed.warning }}</div>
-        <div v-if="renderedBody" class="sf-comment-host">
-          <div
-            ref="bodyRef"
-            class="sf-content sf-content--spec prose-content"
-            v-html="renderedBody"
-            @click="onBodyClick"
-          />
-          <SpecCommentsLayer
-            :body-el="bodyRef"
-            :content-key="renderedBody"
-            :spec-path="focusedSpecPath || ''"
-          />
-        </div>
+        <div
+          v-if="renderedBody"
+          ref="bodyRef"
+          class="sf-content sf-content--spec prose-content"
+          v-html="renderedBody"
+          @click="onBodyClick"
+        />
         <div v-else-if="!loading && !parsed.warning" class="sf-loading">Select a spec from the tree.</div>
       </template>
       <FloatingToc
@@ -909,16 +899,6 @@ defineExpose({ dispatchFocused, breakdownFocused });
   }
 }
 
-/* Positioning context for the spec-comments marker overlay, which absolutely
-   positions gutter markers against the body content's top-left. Flex column so
-   the comments header strip (order:-1) can sit above the prose; the rail and
-   markers offset themselves by the content's top to stay line-aligned. */
-.sf-comment-host {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-}
-
 .sf-content--spec {
   max-width: 76ch;
   font-size: var(--fs-md);
@@ -1023,25 +1003,6 @@ defineExpose({ dispatchFocused, breakdownFocused });
   color: var(--ink-3);
 }
 
-/* Inline spec-comment highlight: the anchored text is marked in place (the
-   SpecCommentsLayer wraps it in <mark class="sc-mark">), so a comment is visible
-   on the prose it annotates, not only as a gutter badge. Tinted background plus
-   an accent underline; the open thread reads brighter; resolved is muted. */
-.sf-content :deep(mark.sc-mark) {
-  background: var(--accent-soft);
-  border-bottom: 1px solid var(--accent-line);
-  color: inherit;
-  cursor: pointer;
-  transition: background var(--dur-hover);
-}
-.sf-content :deep(mark.sc-mark:hover),
-.sf-content :deep(mark.sc-mark.sc-mark--open) {
-  background: var(--accent-ring);
-}
-.sf-content :deep(mark.sc-mark.sc-mark--resolved) {
-  background: var(--tint-neutral);
-  border-bottom-color: var(--rule-2);
-}
 .sf-content :deep(table) {
   border-collapse: collapse;
   margin: 1em 0;

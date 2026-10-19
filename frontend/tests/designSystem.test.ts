@@ -187,7 +187,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue',
     'src/views/ChatPage.vue', 'src/components/plan/SessionList.vue', 'src/components/plan/SpecChatPopup.vue', 'src/components/plan/ChatModelBadge.vue',
     'src/components/plan/ChatMessageList.css', 'src/components/plan/ChatComposer.css', 'src/components/plan/AgentChatPanel.css', 'src/styles/multi-turn.css',
-    'src/views/PlanPage.vue', 'src/components/plan/SpecTreePanel.vue', 'src/components/plan/SpecFocusedView.vue', 'src/components/plan/SpecCommentsLayer.vue',
+    'src/views/PlanPage.vue', 'src/components/plan/SpecTreePanel.vue', 'src/components/plan/SpecFocusedView.vue',
     'src/components/plan/FloatingToc.vue', 'src/styles/spec-mode/prose-toc.css',
     'src/styles/settings-page.css', 'src/views/SettingsPage.vue', 'src/components/settings/SettingsTabExecution.vue', 'src/components/settings/SettingsTabAppearance.vue',
     'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabAbout.vue',

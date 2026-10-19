@@ -28,7 +28,6 @@ vi.mock('../../lib/mermaidRender', () => ({
   enhanceMermaid,
   watchThemeReinit: vi.fn(),
 }));
-vi.mock('./SpecCommentsLayer.vue', () => ({ default: { template: '<div />' } }));
 
 const PROMPT = 'Intro paragraph.\n\n```mermaid\ngraph TD; A-->B;\n```\n';
 

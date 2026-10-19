@@ -50,10 +50,7 @@ export function parseSpecFrontmatter(text: string): ParsedSpec {
     }
   }
   // Strip leading newlines after the closing fence so the body's line 1 is the
-  // first content line. This MUST match the backend's spec.ParseBytes, which
-  // does strings.TrimLeft(body, "\n"): spec-comment anchoring maps a selection
-  // to a 1-based source line via data-source-line stamped on this body, and the
-  // backend computes the anchor against its body, so an extra leading blank line
-  // here would offset every comment by one line.
+  // first content line, matching the backend's spec.ParseBytes, which does
+  // strings.TrimLeft(body, "\n").
   return { frontmatter: fm, body: match[2].replace(/^\n+/, '') };
 }
