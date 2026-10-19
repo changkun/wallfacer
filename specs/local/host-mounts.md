@@ -13,7 +13,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-03-25
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
@@ -40,7 +40,7 @@ Two consequences shape this feature:
 
 2. **Read-only is no longer enforced by the runtime.** With a container boundary gone, there is no `ro` mount option and no sandbox to confine the agent. "Read-only" can only be advisory (a hint in the prompt stanza). The sensitive-path blocklist (`/etc`, `~/.ssh`, ...) no longer *blocks* the agent from reading those paths; it only governs what wallfacer is willing to advertise as a registered reference. This feature is prompt-context ergonomics, not an isolation boundary. See Open Questions.
 
-`internal/runner/container_host_mode_test.go` (the existing host-mode tests) is the reference for how WorkDir, board context, and sibling worktrees are surfaced today: via `WALLFACER_*` env vars and turn-1 prompt text, not volumes.
+`internal/runner/container_host_mode_test.go` (the existing host-mode tests) is the reference for how WorkDir and board context are surfaced today: via `WALLFACER_*` env vars and turn-1 prompt text, not volumes.
 
 ---
 
@@ -121,10 +121,6 @@ The request body gains an optional `host_mounts` field:
 When `label` is omitted, it defaults to the basename of `host_path`.
 
 Validation is applied before saving (see Path Validation below). Invalid entries are rejected with `400 Bad Request` and an error message identifying the offending path.
-
-### `POST /api/tasks/batch` (batch creation)
-
-Each task object in the batch array gains the same `host_mounts` field. Validation is applied per-task. If any task in the batch fails validation, the entire batch is rejected (atomic).
 
 ### `PATCH /api/tasks/{id}` (task update)
 
@@ -226,9 +222,8 @@ When viewing a task with host path references:
 | **Path disappears between creation and launch** | Reference omitted from the turn-1 prompt stanza; system event logged. Task runs normally with the remaining references. |
 | **Path is a symlink** | Validate the resolved target (absolute, not sensitive, regular file/dir), not the symlink itself. The agent reads through the symlink at the original path. |
 | **Path is a block device or socket** | `os.Stat` succeeds but `ModeType` is not regular file or directory. Reject with "host_path must be a regular file or directory". |
-| **Workspace set changes after task creation** | Validation only runs at creation/update time. A reference that was valid when created but now overlaps with a newly-added workspace is still surfaced at launch. Re-saving via PATCH triggers re-validation. |
+| **Workspace folder changes after task creation** | Validation only runs at creation/update time. A reference that was valid when created but now overlaps with the workspace's new folder is still surfaced at launch. Re-saving via PATCH triggers re-validation. |
 | **Task retry** | References are preserved on retry (same task data). Existence is re-checked at launch, and a path that no longer exists is omitted from the stanza. |
-| **Batch creation with shared references** | Each task in the batch independently stores its own `host_mounts` slice. No sharing or deduplication across tasks. |
 
 ---
 
@@ -266,7 +261,7 @@ This spec does **NOT** include:
 |------|-------------|
 | `internal/store/models.go` | Add `HostMount` struct, `HostMounts` field on `Task` |
 | `internal/runner/execute.go` | Turn-1 prompt augmentation for host path references; stat-and-omit missing paths |
-| `internal/handler/tasks.go` | Validate `host_mounts` in create/batch/update handlers |
+| `internal/handler/tasks.go` | Validate `host_mounts` in the create and update handlers |
 | `internal/handler/workspace.go` | `include_files` query param and `is_file` field in `BrowseWorkspaces` |
 | `internal/apicontract/routes.go` | Document `include_files` param on browse route |
 | `frontend/src/components/TaskComposer.vue` | Host Paths section in the task creation form: input, browse, chips, include in create/update payload |

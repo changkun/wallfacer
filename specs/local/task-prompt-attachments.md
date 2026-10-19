@@ -16,7 +16,7 @@ affects:
   - frontend/src/components/TaskDetail.vue
 effort: medium
 created: 2026-06-14
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
@@ -35,7 +35,7 @@ Let users drag-and-drop or click-select files and images onto the task composer 
 
 ## Current State
 
-- **Composer**: `frontend/src/components/TaskComposer.vue` holds the prompt textarea, flow/tags/timeout options, mentions, batch and schedule toggles, and `submit()` which calls `store.createTask` / `store.batchCreateTasks`. No file input.
+- **Composer**: `frontend/src/components/TaskComposer.vue` holds the prompt textarea, tags/timeout options, mentions, and `submit()` which calls `store.createTask`. No file input.
 - **Task detail**: `frontend/src/components/TaskDetail.vue` renders a task; no attachment surface.
 - **Task model**: `internal/store/models.go`, `Task` struct (line 262). Every optional field uses `omitempty`, so adding a slice field needs no migration.
 - **Per-task blob storage**: the store backend already persists named per-task byte payloads. `Store.ReadBlob(taskID, key)` and `Store.ListBlobs(taskID, prefix)` (`internal/store/store.go`) read them; `backend.SaveBlob(taskID, key, data)` writes them (used by `internal/store/io.go` `SaveTurnOutput` for `outputs/turn-NNNN.json`, and by `oversight.json`, `summary.json`, `tombstone.json`). Keys are slash-namespaced paths under the task data dir.
