@@ -171,7 +171,6 @@ func taskReachable(taskList []store.Task, start, target uuid.UUID) bool {
 
 // taskReachableInAdj reports whether target is reachable from start by following
 // edges in the provided adjacency map (task → its dependencies).
-// Used by BatchCreateTasks for full-graph cycle detection.
 func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) bool {
 	visited := make(map[uuid.UUID]bool)
 	var dfs func(uuid.UUID) bool

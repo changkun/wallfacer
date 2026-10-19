@@ -358,7 +358,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 |---|---|---|
 | `handler.go` | Core `Handler` struct, constructor, autoimplement toggle state, JSON helpers, workspace snapshot subscription |, (shared infrastructure) |
 | `middleware.go` | Request middleware: `CSRFMiddleware`, `BearerAuthMiddleware`, `MaxBytesMiddleware` |, (middleware, not endpoints) |
-| `tasks.go` | Task CRUD, batch create, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
+| `tasks.go` | Task CRUD, status transitions. Cancel/archive/unarchive/restore fold into `PATCH /api/tasks/{id}`; resume/sync/test/done stay dedicated side-effect endpoints | `POST /api/tasks`, `PATCH /api/tasks/{id}`, `POST /api/tasks/{id}/resume`, etc. |
 | `tasks_events.go` | Task event timeline, per-turn output serving, turn usage | `GET /api/tasks/{id}/events`, `GET /api/tasks/{id}/outputs/{filename}`, `GET /api/tasks/{id}/turn-usage` |
 | `tasks_autoimplement.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-review, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, `StartAutoReview()`, etc. |
 | `stream.go` | SSE streaming for live task updates and agent logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |

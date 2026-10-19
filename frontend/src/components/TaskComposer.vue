@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
-import { splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
 import HarnessSelect from './HarnessSelect.vue';
@@ -85,7 +84,6 @@ const harnessOptions = computed<string[]>(() =>
 function onHarnessChange(v: string): void {
   sandbox.value = v as typeof sandbox.value;
 }
-const batchMode = ref(false);
 
 // Candidate dependencies: existing non-archived tasks (most recent first).
 const depCandidates = computed(() =>
@@ -93,8 +91,6 @@ const depCandidates = computed(() =>
     .filter((t) => !t.archived)
     .map((t) => ({ id: t.id, label: (t.title || t.prompt || t.id).slice(0, 60) })),
 );
-
-const batchCount = computed(() => (batchMode.value ? splitBatch(prompt.value).length : 0));
 
 // Inserts an "@" at the cursor (with a leading space if needed) and opens the
 // mention autocomplete, matching the legacy board-composer "@" action button.
@@ -141,7 +137,6 @@ function collapse() {
   maxInputTokens.value = null;
   dependsOn.value = [];
   sandbox.value = '';
-  batchMode.value = false;
 }
 
 async function submit() {
@@ -164,31 +159,15 @@ async function submit() {
       maxInputTokens: maxInputTokens.value ?? undefined,
     } as const;
 
-    if (batchMode.value) {
-      const prompts = splitBatch(text);
-      if (prompts.length === 0) return;
-      const res = await store.batchCreateTasks(prompts, sharedOpts);
-      const created = res?.tasks ?? [];
-      // Apply per-task sandbox / shared dependsOn via follow-up PATCH.
-      if (sandbox.value || dependsOn.value.length) {
-        const patch: Record<string, unknown> = {};
-        if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
-        if (sandbox.value) patch.sandbox = sandbox.value;
-        await Promise.all(
-          created.filter((t) => t.id).map((t) => store.patchTask(t.id, { ...patch })),
-        );
-      }
-    } else {
-      const created = await store.createTask(text, sharedOpts);
-      if (created?.id) {
-        const patch: Record<string, unknown> = {};
-        if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
-        // POST /api/tasks rejects sandbox; the server-side path for per-task
-        // sandbox overrides is a follow-up PATCH (see docs/internals/api-and-transport.md).
-        if (sandbox.value) patch.sandbox = sandbox.value;
-        if (Object.keys(patch).length) {
-          await store.patchTask(created.id, patch);
-        }
+    const created = await store.createTask(text, sharedOpts);
+    if (created?.id) {
+      const patch: Record<string, unknown> = {};
+      if (dependsOn.value.length) patch.depends_on = [...dependsOn.value];
+      // POST /api/tasks rejects sandbox; the server-side path for per-task
+      // sandbox overrides is a follow-up PATCH (see docs/internals/api-and-transport.md).
+      if (sandbox.value) patch.sandbox = sandbox.value;
+      if (Object.keys(patch).length) {
+        await store.patchTask(created.id, patch);
       }
     }
 
@@ -201,8 +180,7 @@ async function submit() {
     maxInputTokens.value = null;
     dependsOn.value = [];
     sandbox.value = '';
-    batchMode.value = false;
-    expanded.value = false;
+      expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
     // Re-persist the draft so a failed create doesn't lose the user's text.
@@ -343,14 +321,6 @@ function onInput(e: Event) {
       </div>
     </div>
     <div class="composer__actions">
-      <label class="composer__toggle">
-        <input v-model="batchMode" type="checkbox" />
-        Batch mode
-        <span v-if="batchMode" class="composer__toggle-hint">
-          blank-line separated · {{ batchCount }} task{{ batchCount === 1 ? '' : 's' }}
-        </span>
-      </label>
-      <span class="composer__spacer" />
       <div class="composer__btn-group">
         <button
           type="button"
@@ -362,19 +332,9 @@ function onInput(e: Event) {
         <button
           type="submit"
           class="btn sm"
-          :disabled="
-            !prompt.trim() ||
-            submitting ||
-            (batchMode && batchCount === 0)
-          "
+          :disabled="!prompt.trim() || submitting"
         >
-          {{
-            submitting
-              ? 'Saving…'
-              : batchMode
-                ? `Save ${batchCount}`
-                : 'Save'
-          }}
+          {{ submitting ? 'Saving…' : 'Save' }}
         </button>
       </div>
     </div>
@@ -542,19 +502,6 @@ function onInput(e: Event) {
   padding-top: 8px;
   border-top: 1px solid var(--rule);
 }
-.composer__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-10);
-  color: var(--ink-3);
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.composer__toggle input { margin: 0; accent-color: var(--accent); }
-.composer__toggle-hint { color: var(--ink-4); font-family: var(--font-mono); font-size: var(--fs-9); }
-.composer__spacer { flex: 1 1 auto; }
 /* Cancel + Save move as a unit so a wrap never strands one on another line. */
 .composer__btn-group { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
 </style>

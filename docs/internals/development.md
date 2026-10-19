@@ -60,7 +60,7 @@ Some packages skip silently when their dependency is absent, so a green
 | Tests | Skipped unless | Effect |
 |---|---|---|
 | Harness integration tests in `internal/harness` and `internal/executor` | `cursor-agent`, `opencode`, or `pi` is on `PATH` (and authenticated) | Real subprocess launches for those harnesses are not covered |
-| `make e2e-lifecycle`, `make e2e-dependency-dag`, `make ui-test` | Run explicitly; they are not part of `make check` | End-to-end task execution and browser invariants are not covered |
+| `make e2e-lifecycle`, `make ui-test` | Run explicitly; they are not part of `make check` | End-to-end task execution and browser invariants are not covered |
 
 ## Make Targets
 
@@ -77,7 +77,6 @@ Some packages skip silently when their dependency is absent, so a green
 | `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
 | `make api-contract` | Regenerate API route artifacts from `internal/apicontract/routes.go` |
 | `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
-| `make e2e-dependency-dag WORKSPACE=/path/to/repo` | E2E dependency DAG with conflict resolution |
 | `make ui-test` | Boot against seeded demo data and assert UI invariants in a real browser (`SKIP_BUILD=1` reuses `./wallfacer`) |
 | `make hooks` | Install the git hooks via `core.hooksPath`; the pre-commit runs `lateregate hook` (gofmt and the modernizers over the staged files) |
 

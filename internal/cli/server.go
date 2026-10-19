@@ -1023,7 +1023,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"ListTasks":                h.ListTasks,
 		"StreamTasks":              h.StreamTasks,
 		"CreateTask":               h.CreateTask,
-		"BatchCreateTasks":         h.BatchCreateTasks,
 		"GenerateMissingTitles":    h.GenerateMissingTitles,
 		"GenerateMissingOversight": h.GenerateMissingOversight,
 		"SearchTasks":              h.SearchTasks,
@@ -1111,7 +1110,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Task collection.
 		"CreateTask":               handler.BodyLimitDefault,
-		"BatchCreateTasks":         handler.BodyLimitDefault,
 		"GenerateMissingTitles":    handler.BodyLimitDefault,
 		"GenerateMissingOversight": handler.BodyLimitDefault,
 		"ArchiveAllDone":           handler.BodyLimitDefault,

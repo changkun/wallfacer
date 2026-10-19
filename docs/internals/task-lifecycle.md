@@ -272,57 +272,6 @@ See [Data & Storage](data-and-storage.md).
 
 Tasks can declare dependencies on other tasks via `DependsOn []string` (a list of task UUID strings). A task with unsatisfied dependencies is not eligible for auto-promotion, even when capacity is available.
 
-### DAG Validation in Batch Create
-
-`POST /api/tasks/batch` (`Handler.BatchCreateTasks` in `internal/handler/tasks.go`) performs comprehensive DAG validation before creating any tasks. The entire validation phase has zero side effects, if any check fails, no tasks are created.
-
-#### Step-by-Step Validation
-
-1. **Ref uniqueness**: Each task in the batch can have a symbolic `ref` string. Duplicate refs are rejected.
-
-2. **Prompt and pattern validation**: Every task must have a non-empty prompt, and every entry of its `custom_pass_patterns` and `custom_fail_patterns` must compile as a regular expression.
-
-3. **Field validation**: The request body is decoded strictly, so an unknown field (including the `flow` field earlier releases accepted) is rejected with a 400. The `sandbox` and `sandbox_by_activity` fields are rejected outright with a 400 that names `PATCH /api/tasks/{id}`, where a task's harness is set after creation.
-
-4. **Dependency reference resolution**: Each `depends_on_refs` entry must be either a known batch ref or a syntactically valid UUID.
-
-5. **Batch-internal cycle detection (Kahn's algorithm)**: The batch-internal dependency edges are extracted into an adjacency list. Kahn's topological sort algorithm processes nodes with in-degree 0 iteratively:
-
-   ```
-   inDegree[i] = number of batch tasks that task i depends on
-   batchAdj[i] = indices of tasks that depend on task i
-
-   queue = all tasks with inDegree == 0
-   while queue is not empty:
-       curr = dequeue
-       topoOrder.append(curr)
-       for each next in batchAdj[curr]:
-           inDegree[next]--
-           if inDegree[next] == 0: enqueue(next)
-
-   if len(topoOrder) != n: cycle detected
-   ```
-
-   When a cycle is detected, the response includes the refs of all tasks involved in the cycle.
-
-6. **UUID pre-assignment**: UUIDs are pre-assigned for all batch tasks so that cross-reference resolution and full-graph cycle detection can reason about the complete post-creation dependency graph.
-
-7. **External dependency existence**: Every UUID-format dependency that is not a batch ref is verified to exist in the store via `GetTask`.
-
-8. **Full combined-graph cycle detection**: A combined adjacency map is built from all existing tasks plus the proposed batch tasks (using pre-assigned UUIDs). For each new task, `taskReachableInAdj` performs a DFS to check whether the task can reach itself through its dependencies:
-
-   ```go
-   func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) bool {
-       // DFS from start; returns true if target is reachable
-   }
-   ```
-
-   This catches cycles that span both existing tasks and new batch tasks.
-
-#### Creation Order
-
-Tasks are created in topological order (from the Kahn's sort output), so each task's dependencies already exist in the store by the time it is created. The response returns tasks in the original input order with a `ref_to_id` mapping.
-
 ### Single-Task Dependency Update
 
 `PATCH /api/tasks/{id}` with a `depends_on` field calls `UpdateTaskDependsOn`, which stores the list via `mutateTask`. No cycle detection is performed on single-task updates, the caller is responsible for ensuring validity.

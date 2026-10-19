@@ -111,7 +111,7 @@ Read more: [Concepts](docs/guide/concepts.md) and [Configuration](docs/guide/con
 
 ### Task board: managed execution
 
-The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, batch-create with dependency wiring, refine prompts before execution, and let autoimplement promote backlog items as capacity opens. Each task runs as a host process in its own git worktree.
+The board (shown above) coordinates many agent tasks at once. Drag cards across the lifecycle, refine prompts before execution, and let autoimplement promote backlog items as capacity opens. Each task runs as a host process in its own git worktree.
 
 ### Plan mode: structured design
 

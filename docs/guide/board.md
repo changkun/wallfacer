@@ -62,8 +62,6 @@ Click **+ New Task** in the Backlog header, or press **n** anywhere on the board
 - **Timeout**: 15 min, 30 min, 1 hour, 2 hours, 5 hours, or a custom value. The default is no timeout.
 - **More** expands: test criteria, a model override, budget limits (max cost in USD and max input tokens), a **Depends on** picker, and a harness override.
 
-**Batch mode** on the action row splits the prompt on blank lines and creates one task per section in a single atomic call. The underlying `POST /api/tasks/batch` endpoint also supports symbolic dependency wiring: each task may carry a `ref` name, and `depends_on_refs` entries name those refs or existing task UUIDs. Cycles are rejected before anything is created.
-
 Every task carries a short **Title** (auto-generated after creation, or set manually) and the full **Prompt**.
 
 ## Starting, resuming, and completing

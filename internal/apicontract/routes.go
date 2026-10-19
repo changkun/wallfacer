@@ -372,11 +372,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/batch", Name: "BatchCreateTasks",
-		Description: "Create multiple tasks atomically with symbolic dependency wiring.",
-		Tags:        []string{"tasks"},
-	},
-	{
 		Method: http.MethodPost, Pattern: "/api/tasks/generate-titles", Name: "GenerateMissingTitles",
 		Description: "Bulk-generate titles for tasks that lack one.",
 		Tags:        []string{"tasks"},

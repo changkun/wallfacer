@@ -32,32 +32,6 @@ describe('tasks store create payloads', () => {
 
     expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks', { prompt: 'ship it', timeout: 45 });
   });
-
-  it('omits timeout for batch tasks when unset', async () => {
-    const store = useTaskStore();
-
-    await store.batchCreateTasks(['one', 'two'], { tags: ['x'] });
-
-    expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks/batch', {
-      tasks: [
-        { prompt: 'one', tags: ['x'] },
-        { prompt: 'two', tags: ['x'] },
-      ],
-    });
-  });
-
-  it('keeps an explicit batch timeout', async () => {
-    const store = useTaskStore();
-
-    await store.batchCreateTasks(['one', 'two'], { timeout: 45 });
-
-    expect(apiMock).toHaveBeenCalledWith('POST', '/api/tasks/batch', {
-      tasks: [
-        { prompt: 'one', timeout: 45 },
-        { prompt: 'two', timeout: 45 },
-      ],
-    });
-  });
 });
 
 describe('tasks store tasksById', () => {

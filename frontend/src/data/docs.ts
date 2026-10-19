@@ -13,7 +13,7 @@ export const docIndex: DocEntry[] = [
   { slug: 'usage', title: "Usage Guide", section: "Get Started", desc: "Reading order and common workflows." },
   { slug: 'getting-started', title: "Getting Started", section: "Get Started", desc: "Installation, credentials, first task end to end." },
   { slug: 'concepts', title: "Concepts", section: "Get Started", desc: "The mental model: workspaces, tasks, specs, agents, and the autonomy spectrum." },
-  { slug: 'board', title: "Board", section: "Use Wallfacer", desc: "The task board: lifecycle, dependencies, batch creation, search, the task detail view." },
+  { slug: 'board', title: "Board", section: "Use Wallfacer", desc: "The task board: lifecycle, dependencies, search, the task detail view." },
   { slug: 'chat', title: "Chat", section: "Use Wallfacer", desc: "The dedicated chat surface: sessions, slash commands, @mentions." },
   { slug: 'plan', title: "Plan", section: "Use Wallfacer", desc: "Spec mode: the spec tree, lifecycle states, dispatch, and planning conversations." },
   { slug: 'whiteboard', title: "Whiteboard", section: "Use Wallfacer", desc: "The free-form drawing canvas." },

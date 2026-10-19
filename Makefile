@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push
+.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend e2e-lifecycle ui-test commit-seq push-once skills-check skills-pull skills-push
 
 # Full build gate: fmt + frontend assets + the shared bar and the repo's own
 # checks + binary.
@@ -88,17 +88,6 @@ test-all: check test-frontend lint-js lint-truncate skills-check
 SANDBOX ?=
 e2e-lifecycle:
 	sh scripts/e2e-lifecycle.sh $(SANDBOX)
-
-# End-to-end: dependency DAG (8 tasks with fan-out/fan-in, conflict resolution, autoimplement).
-# Requires a running wallfacer server. Pass WORKSPACE= pointing at a fresh git repo.
-# Usage:
-#   WORKSPACE=$$(mktemp -d) && git -C $$WORKSPACE init -b main && git -C $$WORKSPACE commit --allow-empty -m init
-#   make e2e-dependency-dag WORKSPACE=$$WORKSPACE
-e2e-dependency-dag:
-ifndef WORKSPACE
-	$(error WORKSPACE is required. Create a fresh git repo and pass its path.)
-endif
-	sh scripts/e2e-dependency-dag.sh $(WORKSPACE)
 
 # UI regression checks: boot wallfacer against seeded demo data and assert UI
 # invariants (render-crash + broken-layout) in a real browser. Catches the class
