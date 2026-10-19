@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -1069,7 +1068,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
-	// not listed here have no MaxBytesReader applied (e.g. GET, SSE, WebSocket).
+	// not listed here have no MaxBytesReader applied (e.g. GET, SSE).
 	bodyLimits := map[string]int64{
 		// Server configuration.
 		"UpdateConfig": handler.BodyLimitDefault,
@@ -1145,10 +1144,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		mux.Handle(route.FullPattern(), registered)
 	}
 
-	// WebSocket endpoint: interactive host terminal. Not in apicontract because
-	// WebSocket upgrades don't follow REST request/response semantics.
-	mux.HandleFunc("GET /api/terminal/ws", h.HandleTerminalWS)
-
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
@@ -1197,15 +1192,6 @@ func (w *statusResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
-}
-
-// Hijack delegates to the wrapped writer's Hijack if it implements http.Hijacker.
-// This is required for WebSocket upgrades through the logging middleware.
-func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if h, ok := w.ResponseWriter.(http.Hijacker); ok {
-		return h.Hijack()
-	}
-	return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
 }
 
 // skipTracing filters requests that must not produce a server span. The

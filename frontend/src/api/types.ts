@@ -226,7 +226,6 @@ export interface ServerConfig {
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
   sandbox_usable?: Record<string, boolean>;
   default_sandbox: string;
-  terminal_enabled: boolean;
   ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }

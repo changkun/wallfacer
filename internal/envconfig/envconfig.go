@@ -62,7 +62,6 @@ type Config struct {
 	HostCursorBinary   string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
 	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
 	HostPiBinary       string // WALLFACER_HOST_PI_BINARY, optional override of $PATH lookup
-	TerminalEnabled    bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
@@ -108,7 +107,6 @@ var knownKeys = []string{
 	"WALLFACER_HOST_CURSOR_BINARY",
 	"WALLFACER_HOST_OPENCODE_BINARY",
 	"WALLFACER_HOST_PI_BINARY",
-	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
 }
 
@@ -119,16 +117,11 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// TerminalEnabled defaults to true; only an explicit "false" value in the
-	// file disables it. This opt-out semantic means a missing key preserves the
-	// safer default (feature enabled).
-	//
 	// AgentSessionWindowDays defaults to 30 so the agent-session cost period
 	// picker opens on a sensible "last month" view when the user hasn't
 	// configured anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
 		SecretStore:            "file",
-		TerminalEnabled:        true,
 		AgentSessionWindowDays: 30,
 	}
 	for line := range strings.SplitSeq(string(raw), "\n") {
@@ -236,8 +229,6 @@ func Parse(path string) (Config, error) {
 			cfg.HostOpenCodeBinary = v
 		case "WALLFACER_HOST_PI_BINARY":
 			cfg.HostPiBinary = v
-		case "WALLFACER_TERMINAL_ENABLED":
-			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}
@@ -414,7 +405,6 @@ type Updates struct {
 	ArchivedTasksPerPage *string
 	AutoPush             *string
 	AutoPushThreshold    *string
-	TerminalEnabled      *string
 	Workspaces           *string
 }
 
@@ -446,7 +436,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               u.AutoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
-		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)

@@ -790,30 +790,6 @@ func TestFormatWorkspaces_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestParseTerminalEnabledDefaultsToTrue verifies that TerminalEnabled is true when the key is absent.
-func TestParseTerminalEnabledDefaultsToTrue(t *testing.T) {
-	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if !cfg.TerminalEnabled {
-		t.Error("TerminalEnabled = false; want true when absent")
-	}
-}
-
-// TestParseTerminalEnabledFalse verifies that TerminalEnabled is false when explicitly set to "false".
-func TestParseTerminalEnabledFalse(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_TERMINAL_ENABLED=false\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if cfg.TerminalEnabled {
-		t.Error("TerminalEnabled = true; want false when explicitly set to false")
-	}
-}
-
 // --- AgentSessionWindowDays ---
 
 func TestParse_AgentSessionWindowDaysDefault(t *testing.T) {

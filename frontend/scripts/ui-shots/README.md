@@ -59,7 +59,7 @@ node snap.mjs --base http://localhost:5173 --only board,palette,settings # subse
 node snap.mjs --list                                                     # surface names
 ```
 
-Surfaces: `board`, `switcher`, `palette`, `picker`, `terminal`, `explorer`,
+Surfaces: `board`, `switcher`, `palette`, `picker`, `explorer`,
 `task-detail`, `settings`, `analytics`, `overview-spec`, `oversight`, `plan`,
 `chat`, `mission`, `whiteboard`, `docs`. Prints JSON `[{name, file, errors}]` so callers can detect page
 errors.
@@ -108,10 +108,9 @@ Scenes, one per console surface, each asserting the geometry its design
 promises (rail and topbar sizes, card radii, column widths, dialog widths,
 reading-column width) and the material (no `backdrop-filter`, meta text
 contrast in both themes): `board`, `shell`, `switcher`, `picker`, `no-glass`,
-`contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `dock`,
-`analytics`, `mission`, `whiteboard`, `docs`. Every
+`contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `analytics`, `mission`, `whiteboard`, `docs`. Every
 scene runs in its own browser context so nothing one scene persists (a route,
-a popup, a dock layout) reaches the next.
+a popup) reaches the next.
 Add a scene by appending to the `SCENES` table in `checks.mjs`. Playwright runs
 from the same throwaway `/tmp` sandbox as `snap.mjs` (never under `frontend/`,
 which would break the vite-ssg build).

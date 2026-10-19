@@ -11,7 +11,6 @@ import './styles/base.css';
 import './styles/animations.css';
 import './styles/rail.css';
 import './styles/topbar.css';
-import './styles/dock.css';
 import './styles/primitives.css';
 import './styles/board.css';
 import './styles/modal.css';

@@ -6,7 +6,7 @@ This document covers the HTTP API surface, request processing pipeline, real-tim
 
 All state changes flow through `handler.go`. The handler never blocks; long-running work is always handed off to a goroutine.
 
-The REST routes are canonically defined in `internal/apicontract/routes.go`. `BuildMux` (`internal/cli/server.go`) registers each one, and `server_routes_test.go` asserts the two agree. A handful of endpoints are registered directly in `BuildMux` and are deliberately not in the contract (WebSocket terminal, docs API, metrics, sandbox trust-plane proxy); they are listed in [Routes outside the contract](#routes-outside-the-contract).
+The REST routes are canonically defined in `internal/apicontract/routes.go`. `BuildMux` (`internal/cli/server.go`) registers each one, and `server_routes_test.go` asserts the two agree. A handful of endpoints are registered directly in `BuildMux` and are deliberately not in the contract (docs API, metrics); they are listed in [Routes outside the contract](#routes-outside-the-contract).
 
 ### Routes
 
@@ -140,7 +140,6 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 
 | Method + Path | Purpose |
 |---|---|
-| `GET /api/terminal/ws` | Interactive host shell over WebSocket (PTY relay). See [WebSocket Terminal](#websocket-terminal). |
 | `GET /api/docs` | List embedded docs (`{slug, title, category, order}`), reading-order sorted |
 | `GET /api/docs/{slug...}` | Serve one embedded doc as `text/markdown` (path-traversal guarded) |
 | `GET /api/docs-asset/{path...}` | Serve embedded doc images; only whitelisted image extensions are served |
@@ -180,7 +179,7 @@ srv := &http.Server{Handler: otel.Handler(loggingMiddleware(srvHandler, reg), ..
 |---|---|---|
 | **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels; unmatched requests (404, empty `r.Pattern`) collapse to a single `route="<unmatched>"` series to bound label cardinality. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | Unconditional. For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`), `GET /metrics`, and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
+| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`), `GET /metrics`, and streaming paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `PickFolder`, `MkdirWorkspace`, `RenameWorkspace`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`, and the workspace CRUD routes (`ListWorkspaces`, `CreateWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`, `ActivateWorkspace`), which must work before any workspace is open. |
 
@@ -288,50 +287,6 @@ Implemented in `Handler.SpecTreeStream()` (`internal/handler/specs.go`). Uses a 
 ### Live Task Logs (`GET /api/tasks/{id}/logs`)
 
 Not SSE in the strict sense; this endpoint streams raw `text/plain` output. Execution is host-process, so there is no container to shell out to. When a turn is running, the handler prefers the in-process live-log reader: `h.runner.TaskLogReader(id)` returns a `*runner.LiveLogReader` (`internal/handler/stream.go:214`), and `streamLiveLog` first writes the completed turns saved on disk (so the client has full history), then relays the current turn's live chunks. When no turn is running, it falls back to the stored turn outputs on disk. A keepalive ticker keeps the connection alive and detects client disconnects.
-
-## WebSocket Terminal
-
-`GET /api/terminal/ws` is the project's only WebSocket endpoint. It provides an interactive host shell via a PTY relay. Unlike the REST routes defined in `internal/apicontract/routes.go`, this endpoint is registered directly in `BuildMux` (`internal/cli/server.go`) because WebSocket upgrades don't follow REST request/response semantics.
-
-The handler (`internal/handler/terminal.go`) manages multiple concurrent shell sessions per WebSocket connection via a `sessionRegistry`. On connect, one session is auto-created. The relay dispatcher routes PTY output from the active session to the client and directs client input to the active session's PTY. Session switching re-resolves the active session without reconnecting.
-
-Every session is a host shell rooted at the workspace directory. (Earlier builds could exec into a sandbox container; the shipping host-process runtime has no container to exec into, so the `create_session` message carries no target and always spawns a host shell.)
-
-The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
-
-### Message Protocol
-
-**Client → Server (JSON text frames):**
-
-| Type | Fields | Description |
-|------|--------|-------------|
-| `input` | `data` (base64) | Terminal input bytes |
-| `resize` | `cols`, `rows` | Resize the active session's PTY |
-| `ping` |, | Keep-alive; server responds with `pong` |
-| `create_session` |, | Spawn a new host shell session |
-| `switch_session` | `session` (ID) | Switch the active session |
-| `close_session` | `session` (ID) | Close and remove a session |
-
-**Server → Client (JSON text frames):**
-
-| Type | Fields | Description |
-|------|--------|-------------|
-| `pong` |, | Keep-alive response |
-| `sessions` | `sessions` (array of `{id, active}`) | Full session list; sent on connect and after any session change |
-| `session_created` | `session` (ID) | New session spawned |
-| `session_switched` | `session` (ID) | Active session changed |
-| `session_closed` | `session` (ID) | Session removed |
-| `session_exited` | `session` (ID) | Session's shell process exited |
-| `error` | `data` (string) | Error message (e.g., invalid session ID) |
-
-**Server → Client (binary frames):** Raw PTY output from the active session.
-
-### Architecture
-
-- **`sessionRegistry`** (`terminal.go`): manages `map[string]*terminalSession`, tracks the active session, and provides `create`, `switchTo`, `remove`, `closeAll`, and `activeSession` methods. A `switchCh` channel signals the relay dispatcher when the active session changes.
-- **Relay goroutines** (started in `HandleTerminalWS`): the PTY→WS goroutine re-resolves the active session on each switch signal. The WS→PTY goroutine resolves `activeSession()` per message.
-- **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
-- **Frontend** (`frontend/src/components/TerminalPanel.vue`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
 
 ## Host Execution
 

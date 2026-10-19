@@ -84,9 +84,8 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 }
 
 // BearerAuthMiddleware enforces bearer-token authentication on non-SSE routes.
-// SSE and WebSocket paths use a ?token= query parameter instead of the
-// Authorization header because EventSource and WebSocket APIs do not support
-// custom request headers. UI shell routes and embedded assets are public so
+// SSE paths use a ?token= query parameter instead of the Authorization
+// header because the EventSource API does not support custom request headers. UI shell routes and embedded assets are public so
 // the browser can load before it reads the injected local API key.
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
@@ -95,7 +94,7 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler { return next }
 	}
 	isSSEPath := func(path string) bool {
-		if path == "/api/tasks/stream" || path == "/api/git/stream" || path == "/api/terminal/ws" ||
+		if path == "/api/tasks/stream" || path == "/api/git/stream" ||
 			path == "/api/explorer/stream" || path == "/api/explorer/file/stream" || path == "/api/specs/stream" {
 			return true
 		}

@@ -5,7 +5,6 @@ go 1.27.0
 toolchain go1.27.2
 
 require (
-	github.com/coder/websocket v1.8.14
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/zalando/go-keyring v0.2.8

@@ -6,8 +6,8 @@ import { createPinia } from 'pinia';
 import Topbar from '../src/components/Topbar.vue';
 import { useUiStore } from '../src/stores/ui';
 
-// The topbar replaced the status bar's Terminal and Shortcuts buttons and
-// carries the crumb (specs/shared/console-redesign/shell.md).
+// The topbar carries the crumb and the page's own actions
+// (specs/shared/console-redesign/shell.md).
 async function mountTopbar(path: string) {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -40,7 +40,7 @@ describe('Topbar', () => {
     app.unmount(); host.remove();
   });
 
-  it('renders the page actions a page registers and toggles the terminal', async () => {
+  it('renders the page actions a page registers', async () => {
     const { host, app, pinia } = await mountTopbar('/');
     const ui = useUiStore(pinia);
     expect(host.querySelector('#topbar-actions')).toBeNull();
@@ -51,10 +51,6 @@ describe('Topbar', () => {
     ui.clearTopbarActions(Actions);
     await nextTick();
     expect(host.querySelector('#topbar-actions')).toBeNull();
-    const before = ui.showTerminal;
-    (host.querySelector('[data-action="terminal"]') as HTMLButtonElement).click();
-    await nextTick();
-    expect(ui.showTerminal).toBe(!before);
     app.unmount(); host.remove();
   });
 

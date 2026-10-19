@@ -3,13 +3,13 @@
 
 export type NavIcon =
   | 'chat' | 'plan' | 'whiteboard' | 'board'
-  | 'map' | 'terminal' | 'analytics' | 'docs' | 'settings';
+  | 'map' | 'analytics' | 'docs' | 'settings';
 
 export interface NavItem {
   id: string;
   label: string;
-  /** Route path; absent for an action row (terminal). */
-  to?: string;
+  /** Route path. */
+  to: string;
   icon: NavIcon;
 }
 
@@ -34,7 +34,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Inspect',
     items: [
-      { id: 'terminal', label: 'Terminal', icon: 'terminal' },
       { id: 'analytics', label: 'Analytics', to: '/analytics', icon: 'analytics' },
     ],
   },

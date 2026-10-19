@@ -185,28 +185,6 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-/* A toggle (the terminal) that is open: the glyph takes the accent and a dot
-   marks the state, but the row stays quiet so only the current page reads as
-   the highlighted entry. */
-.nav-btn.on .nav-ico {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.nav-btn.on::after {
-  content: "";
-  margin-left: auto;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex: none;
-}
-.app-rail--fold .nav-btn.on::after {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  margin: 0;
-}
 .nav-label {
   flex: 1;
   min-width: 0;

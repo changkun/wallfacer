@@ -85,7 +85,7 @@ A sixth, separate toggle enables **Review**, where a second model reviews the ch
 Work flows up and down the spectrum:
 
 - **Up (more autonomy):** a chat conversation produces a spec; the spec is broken into tasks; tasks execute and verify automatically.
-- **Down (more control):** a failing task surfaces a problem; inspect the diff, open the terminal in the worktree, fix the issue by hand, and let the agent continue from the corrected state.
+- **Down (more control):** a failing task surfaces a problem; inspect the diff, fix the issue by hand in the task's worktree, and let the agent continue from the corrected state.
 
 The value of the spectrum is spending attention where it matters and delegating the rest.
 

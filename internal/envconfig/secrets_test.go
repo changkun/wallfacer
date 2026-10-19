@@ -16,7 +16,7 @@ func secretFixture(t *testing.T) string {
 	t.Helper()
 	keyring.MockInit()
 	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte("ANTHROPIC_API_KEY=original-secret\nWALLFACER_TERMINAL_ENABLED=false\n"), 0600); err != nil {
+	if err := os.WriteFile(path, []byte("ANTHROPIC_API_KEY=original-secret\nWALLFACER_HOST_PI_BINARY=/opt/pi\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -40,7 +40,7 @@ func TestKeyringUpdatesAndExplicitFileMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg, err := Parse(path)
-	if err != nil || cfg.APIKey != token || cfg.TerminalEnabled {
+	if err != nil || cfg.APIKey != token || cfg.HostPiBinary != "/opt/pi" {
 		t.Fatalf("update lost settings: %v", err)
 	}
 	mode = "file"

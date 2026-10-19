@@ -179,7 +179,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |
-| `WALLFACER_TERMINAL_ENABLED` | `true` | Integrated host terminal panel; set `false` to disable |
 | `WALLFACER_WORKSPACES` | | Active workspace folders (colon-separated on Unix, semicolon on Windows) |
 
 ### Operational
@@ -223,7 +222,6 @@ Press `?` anywhere to open this reference in the app. Shortcuts without modifier
 |---|---|
 | `Cmd+K` / `Ctrl+K` | Command palette (tasks, specs, docs) |
 | `Cmd+,` / `Ctrl+,` | Open Settings |
-| `` Ctrl+` `` | Toggle the terminal panel (also the terminal button at the right of the top bar) |
 | `/` | Focus search |
 | `?` | Show keyboard shortcuts (also the keyboard button at the right of the top bar) |
 | `n` | New task |

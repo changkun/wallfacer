@@ -5,7 +5,6 @@ export interface KeyboardActions {
   onSearch?: () => void;
   onFocusSearch?: () => void;
   onSettings?: () => void;
-  onTerminal?: () => void;
   onShortcuts?: () => void;
   onExplorer?: () => void;
   onToggleMode?: () => void;
@@ -28,12 +27,6 @@ export function useKeyboard(actions: KeyboardActions) {
       return;
     }
 
-    // Ctrl+` toggles the terminal panel (matches the legacy UI shortcut).
-    if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) {
-      e.preventDefault();
-      actions.onTerminal?.();
-      return;
-    }
 
     if (inInput) return;
 

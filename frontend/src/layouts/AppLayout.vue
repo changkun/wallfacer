@@ -8,7 +8,6 @@ import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import WorkspaceEditModal from '../components/WorkspaceEditModal.vue';
 import SystemPromptsManager from '../components/SystemPromptsManager.vue';
-import DockWorkspace from '../components/DockWorkspace.vue';
 import KeyboardShortcutsModal from '../components/KeyboardShortcutsModal.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import Toaster from '../components/Toaster.vue';
@@ -147,7 +146,6 @@ useKeyboard({
   onFocusSearch: () => document.querySelector<HTMLInputElement>('.task-search-input')?.focus(),
   onNewTask: () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(),
   onSettings: () => { void router.push('/settings'); },
-  onTerminal: () => { ui.toggleTerminal(); },
   onShortcuts: () => { ui.openShortcuts(); },
   onExplorer: () => {
     // The explorer is an in-board panel now; jump to the board first if we're
@@ -181,9 +179,11 @@ useKeyboard({
         <span aria-hidden="true">⚠</span>
         Live updates paused — server unreachable. Reconnecting…
       </div>
-      <DockWorkspace>
-        <slot :connected="connected" :conn-state="connState" />
-      </DockWorkspace>
+      <div class="app-page">
+        <div class="app-page__body">
+          <slot :connected="connected" :conn-state="connState" />
+        </div>
+      </div>
     </div>
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
@@ -241,9 +241,24 @@ useKeyboard({
 }
 /* Everything under the topbar scrolls as one column when a page spills past
  * the viewport; height-constrained pages own their scroll and never overflow. */
-.app-main > :deep(.dock-ws) {
+.app-page {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
   overflow-y: auto;
   overflow-x: hidden;
+}
+/* The page itself: a column that fills the card under the topbar. */
+.app-page__body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .rail-scrim {
   display: none;

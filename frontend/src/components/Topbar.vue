@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // The one bar every page shares: a crumb on the left (workspace › page › leaf)
 // and, on the right, the page's own actions (a component the page registers
-// on the ui store) followed by the two console-wide controls, terminal and
-// keyboard shortcuts. Below the phone breakpoint a menu button opens the rail
+// on the ui store) followed by the console-wide keyboard shortcuts control. Below the phone breakpoint a menu button opens the rail
 // drawer. See specs/shared/console-redesign/shell.md.
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
@@ -52,20 +51,6 @@ const crumb = computed(() => [workspaceName.value, pageName.value, ui.crumbLeaf]
       <div v-if="ui.topbarActions" id="topbar-actions" class="topbar-page-actions">
         <component :is="ui.topbarActions" />
       </div>
-      <button
-        type="button"
-        class="icon-btn"
-        :class="{ on: ui.showTerminal }"
-        title="Toggle terminal (Ctrl+`)"
-        aria-label="Toggle terminal"
-        :aria-pressed="ui.showTerminal"
-        data-action="terminal"
-        @click="ui.toggleTerminal()"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line>
-        </svg>
-      </button>
       <button
         type="button"
         class="icon-btn"
