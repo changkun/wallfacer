@@ -2,7 +2,7 @@
 title: Retire User-Authored Agents and Fleets
 status: archived
 depends_on:
-  - specs/shared/platform-native.md
+  - specs/.archive/shared/platform-native.md
 affects:
   - internal/flow/
   - internal/agents/
@@ -23,7 +23,7 @@ dispatched_task_id: null
 
 # Retire User-Authored Agents and Fleets
 
-Decision 1 of [platform-native](../../../shared/platform-native.md). A removal, not a
+Decision 1 of [platform-native](../platform-native.md). A removal, not a
 rewrite. It follows the shape of the earlier
 [idea-agent removal](../../local/remove-idea-agent-subsystem.md).
 
@@ -39,7 +39,7 @@ two CRUD APIs behind the page are deleted.
 - **The premise moved.** Defining an agent is the platform's job now, and
   arranging agents in advance is the opposite of where the product is going:
   an agent that spawns and forks what it needs at run time
-  ([sessions-that-spawn-and-fork](../../../shared/platform-native/sessions-that-spawn-and-fork.md)).
+  ([sessions-that-spawn-and-fork](sessions-that-spawn-and-fork.md)).
 - **The implementation does not hold.** Four execution paths sit behind one
   page with different guarantees. A fixed-sequence user fleet runs in the
   workspace folder and never commits. A delegating fleet merges with no test
@@ -203,7 +203,7 @@ agent that spawns and forks at run time.
   withdrawn and archived with this spec. Its two findings (a fixed-sequence
   fleet that never commits; copy that misstates what delegating fleets do)
   are closed by the removal.
-- [first-run-onboarding](../../../local/first-run-onboarding.md): its second
+- [first-run-onboarding](../../local/first-run-onboarding.md): its second
   blocking decision resolves the other way. Agents and fleets are not part of
   a first run.
 - `specs/shared/console-redesign/agent-graph.md`: its subject disappears.
@@ -211,7 +211,7 @@ agent that spawns and forks at run time.
   shipped children and one retired.
 - Archived Outcomes of `unified-agent-graph-ui`, `topos-runtime-integration`
   and `agents-and-flows` each get one line pointing here.
-- [hosted executor](../../../cloud/latere-integration/topos-remote-executor.md):
+- [hosted executor](../../cloud/latere-integration/topos-remote-executor.md):
   its sentence that delegating flows stay local becomes moot.
 
 ## Out of scope

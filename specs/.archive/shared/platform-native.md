@@ -1,8 +1,8 @@
 ---
 title: "Platform-Native Wallfacer: One Harness, No Fleets, No GitHub"
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration.md
+  - specs/.archive/cloud/latere-integration.md
 affects:
   - internal/runner/
   - internal/harness/
@@ -15,12 +15,14 @@ affects:
   - docs/
 effort: xlarge
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Platform-Native Wallfacer: One Harness, No Fleets, No GitHub
+
+> **Archived 2026-10-19.** Superseded by [pure-local](../../shared/pure-local.md). Decisions 1, 4, 5 and 6 shipped and stay (no fleets, no GitHub integration, no artifacts gallery, no live serve). Decision 2 is reversed: the Topos harness was removed and wallfacer keeps the five CLI harnesses. Decision 3 has no subject without a hosted board.
 
 Umbrella for six decisions the maintainer made on 2026-10-02, after the spec
 tree was reviewed against the code. Together they change what wallfacer is:
@@ -32,12 +34,12 @@ lets agents organize themselves at run time.
 
 | # | Decision | In the maintainer's words | Spec |
 |---|---|---|---|
-| 1 | **Retire fleets.** No user-authored agents or fleets. | Wallfacer becomes "some sort of application later that can spawn or create agents on the fly, like Claude Code's workflow". | [retire-agent-fleets](../.archive/shared/platform-native/retire-agent-fleets.md) |
+| 1 | **Retire fleets.** No user-authored agents or fleets. | Wallfacer becomes "some sort of application later that can spawn or create agents on the fly, like Claude Code's workflow". | [retire-agent-fleets](platform-native/retire-agent-fleets.md) |
 | 2 | **One harness.** Migrate to the rebuilt Topos harness and make it the only one. | "Clean use of the Latere platform and the Topos harness. No Claude Code, no Codex, but just allow model switches." | [topos-native-harness](topos-native-harness.md) |
 | 3 | **Rethink the board before hosting it.** | A hosted board "is something we need to think about how to make this scale". An execution board "is nice but has some problems such as sharing context, messages, awareness to each other"; in Claude Code "an agent can spawn a subagent, can fork itself to inherit the entire context thread". | [sessions-that-spawn-and-fork](platform-native/sessions-that-spawn-and-fork.md) |
-| 4 | **Remove GitHub.** No GitHub connection in wallfacer for now. | "Once the whole Latere platform is more stable and mature, GitHub connection is more or less just connected by a connector." | [remove-github-integration](../.archive/shared/platform-native/remove-github-integration.md) |
-| 5 | **Retire the artifacts gallery.** Pages are published through the platform's Apps capability. | "Artifacts is also a feature probably don't need at all. We have Apps in latere platform, so we could simply use that." | [retire-artifacts](../.archive/shared/platform-native/retire-artifacts.md) |
-| 6 | **Retire live serve.** Wallfacer does not build and run developed software; a web app is previewed through Apps. Apps hosts static sites only, so a server process is run in the console's terminal. | "Live serve is replaced by latere apps." | [live-serve](../.archive/local/live-serve.md) (unbuilt, archived) |
+| 4 | **Remove GitHub.** No GitHub connection in wallfacer for now. | "Once the whole Latere platform is more stable and mature, GitHub connection is more or less just connected by a connector." | [remove-github-integration](platform-native/remove-github-integration.md) |
+| 5 | **Retire the artifacts gallery.** Pages are published through the platform's Apps capability. | "Artifacts is also a feature probably don't need at all. We have Apps in latere platform, so we could simply use that." | [retire-artifacts](platform-native/retire-artifacts.md) |
+| 6 | **Retire live serve.** Wallfacer does not build and run developed software; a web app is previewed through Apps. Apps hosts static sites only, so a server process is run in the console's terminal. | "Live serve is replaced by latere apps." | [live-serve](../local/live-serve.md) (unbuilt, archived) |
 
 ## Before and after
 
@@ -97,25 +99,25 @@ graph LR
 Recorded so nobody reads the old statements as current.
 
 - **Harness abstraction.** The archived
-  [harness-abstraction](../.archive/shared/harness-abstraction.md) made five
+  [harness-abstraction](harness-abstraction.md) made five
   CLIs selectable behind one interface. After decision 2 the interface has one
   implementation, and the abstraction is removed with the adapters.
 - **"Model agnosticism through harnesses."** Agnosticism moves to the model
   catalog: any model the platform offers, one harness.
 - **CLI credential plumbing.** The browser sign-in for provider credentials
-  ([oauth-token-setup](../.archive/local/oauth-token-setup.md)) and the
+  ([oauth-token-setup](../local/oauth-token-setup.md)) and the
   keyring that holds them
-  ([provider-secret-store](../.archive/local/provider-secret-store.md)) are
+  ([provider-secret-store](../local/provider-secret-store.md)) are
   kept. What goes is handing those credentials to a provider's CLI through
   its environment; they feed the harness's model connection instead.
 - **Third-party remote executors.** The specs for dispatching to another
   vendor's hosted agents
-  ([claude-managed-agents](../.archive/cloud/claude-managed-agents.md),
-  [antigravity](../.archive/cloud/antigravity.md)) are archived as outdated.
-- **The agent-graph design.** [agent-graph-e2e-design](../.archive/local/agent-graph-e2e-design.md)
+  ([claude-managed-agents](../cloud/claude-managed-agents.md),
+  [antigravity](../cloud/antigravity.md)) are archived as outdated.
+- **The agent-graph design.** [agent-graph-e2e-design](../local/agent-graph-e2e-design.md)
   is withdrawn by decision 1.
 - **The Git workflow track's GitHub half.** The
-  [github-integration](../.archive/intent/github-integration.md) umbrella and
+  [github-integration](../intent/github-integration.md) umbrella and
   its children are retired by decision 4. Task revert and commit attribution
   are local git and stay.
 - **The platform integration's first design rule.** It says the default build

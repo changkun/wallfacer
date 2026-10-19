@@ -1,6 +1,6 @@
 ---
 title: First-Run Onboarding & Agent-Graph Discoverability
-status: vague
+status: archived
 depends_on: []
 affects:
   - frontend/src/views/
@@ -11,12 +11,14 @@ affects:
   - docs/guide/getting-started.md
 effort: large
 created: 2026-06-28
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Feature: First-Run Onboarding & Agent-Graph Discoverability
+
+> **Archived 2026-10-19.** The agent-graph half of this stub lost its subject when fleets were retired, and the rest waited on sign-in and a harness migration that the pure-local decision ([pure-local](../../shared/pure-local.md)) dropped. First-run copy is ordinary UI work.
 
 > **Stale as of 2026-10-02:** the text below is the 2026-06-28 stub, unchanged.
 > These statements in it are false today.
@@ -29,7 +31,7 @@ dispatched_task_id: null
 >   Done. One page at `/agent-graph` holds the agent registry and the fleet
 >   editor, and `AgentsPage.vue` and `FlowsPage.vue`, both listed under
 >   `affects`, are deleted (`d1b264f9`, `8a04ce68`). The record is
->   [unified-agent-graph-ui](../.archive/local/unified-agent-graph-ui.md).
+>   [unified-agent-graph-ui](unified-agent-graph-ui.md).
 > - **"Pinned vs dynamic regions, the peer directory."** The page does not
 >   show regions or a peer directory. It shows one coordination choice per
 >   fleet: Fixed sequence, Lead delegates, or Open mesh.
@@ -51,7 +53,7 @@ dispatched_task_id: null
 >
 > Decided 2026-10-02: **agents and fleets are not part of a first run.** The
 > agent-graph page is being removed
-> ([retire-agent-fleets](../.archive/shared/platform-native/retire-agent-fleets.md)),
+> ([retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md)),
 > so the half of this stub about teaching it has no subject. What remains is
 > the first decision above, and it is best taken after the harness migration,
 > when a first run also means signing in and choosing a model.

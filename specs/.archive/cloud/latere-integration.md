@@ -1,6 +1,6 @@
 ---
 title: Latere Platform Integration
-status: drafted
+status: archived
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -11,12 +11,14 @@ affects:
   - internal/coordinator/
 effort: large
 created: 2026-05-30
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Latere Platform Integration
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. This integration umbrella is not pursued. What shipped under it was removed: latere.ai sign-in (browser redirect, device code, `wallfacer auth`), cloud mode, per-principal and org scoping, the coordination plane with spec comments and the Postgres comment store, and the sandbox proxy.
 
 Umbrella for the cloud track. It states what the Latere platform is, which
 parts of it wallfacer calls, and which earlier integration designs are
@@ -104,8 +106,8 @@ parallel executors (a sandbox backend and an agent backend) plus a file
 plane, and is now one executor over `/v1/agents`.
 
 Two specs for dispatching to another vendor's hosted agents
-([claude-managed-agents.md](../.archive/cloud/claude-managed-agents.md),
-[antigravity.md](../.archive/cloud/antigravity.md)) once sat beside Axis B. They are archived
+([claude-managed-agents.md](claude-managed-agents.md),
+[antigravity.md](antigravity.md)) once sat beside Axis B. They are archived
 as outdated; the hosted executor is the only remote executor.
 
 ## What wallfacer owns
@@ -153,7 +155,7 @@ seam is inert and local behavior is byte-identical to a build without it.
 
 | Seam | Platform side | Wallfacer side | Status | Spec |
 |------|---------------|----------------|--------|------|
-| **Identity** | `auth.latere.ai` | `internal/auth` middleware over `authkit/jwt` and `authkit/oidc`; `authkit.Identity{Sub,OrgID}` principal | shipped | [authentication.md](../.archive/identity/authentication.md) |
+| **Identity** | `auth.latere.ai` | `internal/auth` middleware over `authkit/jwt` and `authkit/oidc`; `authkit.Identity{Sub,OrgID}` principal | shipped | [authentication.md](../identity/authentication.md) |
 | **Models for local runs** | `/v1/models` | The harness's base-URL variable and key in the env file; `agentgraph.ModelConfig` in Lux mode, with `gatewayRoot` in `internal/runner/agentic.go` deriving the gateway root from the harness-shaped URL | shipped | none needed |
 | **Remote execution** | `/v1/agents` | One remote executor that runs a task as a session and maps the session's events onto the task timeline | drafted | [topos-remote-executor.md](latere-integration/topos-remote-executor.md) |
 | **Coordination plane** | none; wallfacer's own server role | One outbound connection per signed-in, opted-in instance; a `store.TaskEvent` tap redacted to an allow-list | part shipped | [coordination-plane.md](latere-integration/coordination-plane.md) |
@@ -211,15 +213,15 @@ seam is inert and local behavior is byte-identical to a build without it.
 
 | Retired | Was | Now |
 |---|---|---|
-| [cella-runtime.md](../.archive/cloud/latere-integration/cella-runtime.md) | A `CellaBackend` creating sandboxes at a standalone sandbox host, with secrets through its vault | Not built. The session opens its own workload |
-| [shared-cella-client.md](../.archive/cloud/latere-integration/shared-cella-client.md) | A sandbox wire client shared with the agent runtime | No wallfacer caller remains |
-| [tenant-filesystem.md](../.archive/cloud/tenant-filesystem.md) | Staging worktrees through a file plane's workspace API | The file plane is gone; a session clones and pushes |
-| [tenant-api.md](../.archive/cloud/tenant-api.md) | A wallfacer-issued API key per tenant | One platform key for every capability; wallfacer keeps no key store |
+| [cella-runtime.md](latere-integration/cella-runtime.md) | A `CellaBackend` creating sandboxes at a standalone sandbox host, with secrets through its vault | Not built. The session opens its own workload |
+| [shared-cella-client.md](latere-integration/shared-cella-client.md) | A sandbox wire client shared with the agent runtime | No wallfacer caller remains |
+| [tenant-filesystem.md](tenant-filesystem.md) | Staging worktrees through a file plane's workspace API | The file plane is gone; a session clones and pushes |
+| [tenant-api.md](tenant-api.md) | A wallfacer-issued API key per tenant | One platform key for every capability; wallfacer keeps no key store |
 | Model keys as a future seam | Credential injection into the task environment | Shipped as plain configuration for local runs; a hosted session's model access is the platform's |
 | Tool catalog as a future seam | Resolving approved tools from a registry service | No such service. A hosted agent's tools are part of its configuration |
 
-Earlier retirements ([multi-tenant.md](../.archive/cloud/multi-tenant.md),
-[billing-idempotency.md](../.archive/cloud/billing-idempotency.md)) stand for
+Earlier retirements ([multi-tenant.md](multi-tenant.md),
+[billing-idempotency.md](billing-idempotency.md)) stand for
 the same reason: the concern is the platform's.
 
 ### Shipped code left without a caller
@@ -265,4 +267,4 @@ and tests. It is listed here so the removal is a decision, not an oversight.
    repository on the platform's git host). A repository on another host is
    out of scope until the platform offers a connector for it: wallfacer
    removed its own GitHub integration on 2026-10-02
-   ([remove-github-integration](../.archive/shared/platform-native/remove-github-integration.md)).
+   ([remove-github-integration](../shared/platform-native/remove-github-integration.md)).

@@ -90,7 +90,7 @@ Phase 1 (shipped) ──→ Phase 2 (shipped) ──→ Phase 3 (future)
 |-------|-------|--------|----------|
 | 1 | `WALLFACER_CLOUD` flag, browser login routes, sign-in badge | **Shipped** | Visual cloud/local partition |
 | 2 | JWT on API, principal context, org fields, forced login, authz, org switcher | **Shipped** | Cloud multi-tenant + multi-user collab |
-| 3 | [`third-party-oidc.md`](../../identity/third-party-oidc.md), [`remote-control.md`](../../identity/remote-control.md) | Future (vague) | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
+| 3 | [`third-party-oidc.md`](third-party-oidc.md), [`remote-control.md`](remote-control.md) | Future (vague) | Self-hosted non-latere.ai deployments, latere.ai mobile/web remote control |
 
 The agent-token-exchange spec ([link](agent-token-exchange.md)) is a
 peer, not a phase, it runs on Phase 2's principal context but doesn't
@@ -345,11 +345,11 @@ path still works exactly as before.
 Phase 3 splits into two sibling specs, both currently `vague` and
 unblocked by Phase 2:
 
-- [`identity/third-party-oidc.md`](../../identity/third-party-oidc.md) —
+- [`identity/third-party-oidc.md`](third-party-oidc.md) —
   pluggable OIDC so self-hosted non-latere.ai deployments can log in
   against Keycloak, Entra ID, Okta, etc. Until this ships, those
   deployments keep using `WALLFACER_SERVER_API_KEY`.
-- [`identity/remote-control.md`](../../identity/remote-control.md) —
+- [`identity/remote-control.md`](remote-control.md) —
   wire protocol + latere.ai-side registry that lets the latere.ai web
   UI or a mobile client observe and operate a user's signed-in local
   wallfacer instances. Phase 2 laid down the identity link; Phase 3

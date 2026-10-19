@@ -21,7 +21,7 @@ dispatched_task_id: null
 > **Archived 2026-10-02. Retired as: replaced by the platform's Apps
 > capability.** The maintainer decided that wallfacer does not build and run
 > developed software itself (decision 6 under
-> [platform-native](../../shared/platform-native.md)). A web app an agent
+> [platform-native](../shared/platform-native.md)). A web app an agent
 > builds is pushed to a repository on the Latere platform, and Apps builds a
 > preview of every push at an address of its own.
 >

@@ -1,19 +1,21 @@
 ---
 title: Remote control of signed-in local wallfacer instances
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane.md
+  - specs/.archive/cloud/latere-integration/coordination-plane.md
 affects:
   - internal/auth/
   - internal/handler/
 effort: large
 created: 2026-04-19
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Remote Control
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. Controlling an instance from another machine through a coordinator is not pursued.
 
 ## Problem
 

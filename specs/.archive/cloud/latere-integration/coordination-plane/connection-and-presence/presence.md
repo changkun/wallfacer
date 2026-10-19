@@ -1,20 +1,22 @@
 ---
 title: Coordination Presence
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane/connection-and-presence/connection.md
+  - specs/.archive/cloud/latere-integration/coordination-plane/connection-and-presence/connection.md
 affects:
   - internal/handler/
   - internal/cli/web.go
   - frontend/src/
 effort: large
 created: 2026-06-14
-updated: 2026-07-16
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Coordination Presence
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. Org-wide presence across machines is not pursued; the board's presence lists the agents running on this machine only.
 
 Dispatchable leaf 2 of [connection-and-presence](../connection-and-presence.md),
 built on [connection](connection.md). It delivers **org-wide presence**: teammates

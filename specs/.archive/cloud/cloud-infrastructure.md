@@ -1,21 +1,23 @@
 ---
 title: Hosted Board Deployment
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration.md
-  - specs/cloud/latere-integration/topos-remote-executor.md
+  - specs/.archive/cloud/latere-integration.md
+  - specs/.archive/cloud/latere-integration/topos-remote-executor.md
 affects:
   - deploy/
   - Dockerfile.wallfacerd
   - .github/workflows/release.yml
 effort: medium
 created: 2026-03-28
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Hosted Board Deployment
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. This hosted board deployment is not pursued, and the `wallfacerd` deployment it extended (`wallfacer web`, `deploy/`, `Dockerfile.wallfacerd`, the image and deploy release jobs) was removed.
 
 What it takes to run the task board (`wallfacer run`) as a hosted workload,
 beside the public site and coordinator that are deployed today.
@@ -115,11 +117,11 @@ hosted board at all. See
   platform's.
 - A wallfacer-held model key or provider credential for hosted runs.
 - A per-tenant instance provisioner or router. Archived with
-  [multi-tenant](../.archive/cloud/multi-tenant.md); one board serves every
+  [multi-tenant](multi-tenant.md); one board serves every
   signed-in principal, isolated by the principal and organization scoping
   that already ships.
 - An external API for the board. Archived with
-  [tenant-api](../.archive/cloud/tenant-api.md).
+  [tenant-api](tenant-api.md).
 
 ## Implementation tasks
 

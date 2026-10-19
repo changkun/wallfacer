@@ -1,20 +1,22 @@
 ---
 title: Coordination Connection and Registry
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane/connection-and-presence.md
+  - specs/.archive/cloud/latere-integration/coordination-plane/connection-and-presence.md
 affects:
   - internal/cli/web.go
   - internal/cli/server.go
   - internal/auth/
 effort: large
 created: 2026-06-14
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Coordination Connection and Registry
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. The outbound connector, its opt-in gate and the coordinator registry that shipped under this spec were removed.
 
 Dispatchable leaf 1 (foundation) of [connection-and-presence](../connection-and-presence.md).
 It builds **only** the wire and the registry it feeds: the outbound WSS, the
@@ -233,7 +235,7 @@ authoritative** data does **not** live in Valkey:
 - **Spec comments** are cloud-authoritative (the one relay-not-mirror exception),
   so their system of record is **Postgres** (`latere-pg`), not the cache. The
   `wallfacer` database and `WALLFACER_DATABASE_URL` are provisioned (see
-  [spec-comments](../../../../.archive/cloud/latere-integration/coordination-plane/spec-comments.md)). Connection and presence themselves are
+  [spec-comments](../spec-comments.md)). Connection and presence themselves are
   Valkey-only and need no Postgres.
 - **Metadata projection** live read-model may sit in Valkey (it is a cache of
   record, regenerable by replay); only its long-retention rollups want Postgres

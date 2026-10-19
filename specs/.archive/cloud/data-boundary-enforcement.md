@@ -1,20 +1,22 @@
 ---
 title: Data Boundary Enforcement
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane.md
+  - specs/.archive/cloud/latere-integration/coordination-plane.md
 affects:
   - frontend/src/telemetry.ts
   - frontend/src/main.ts
   - internal/cli/web.go
 effort: medium
 created: 2026-04-12
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Data Boundary Enforcement
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. The channels this spec governed (browser telemetry and the coordination connection) were removed, so nothing it gates leaves the machine any more; server-side OTLP export stays opt-in.
 
 ## Problem
 

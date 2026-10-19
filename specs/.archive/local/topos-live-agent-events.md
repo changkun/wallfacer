@@ -231,4 +231,4 @@ token-level streaming (OQ-1) and a sequence-cursored stream of its own.
 Decision hooks (OQ-2) stayed out of scope.
 
 The same forwarding path is what a hosted run feeds in
-[topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md).
+[topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md).

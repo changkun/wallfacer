@@ -34,7 +34,7 @@ dispatched_task_id: null
 > GitHub.** The maintainer decided to remove the GitHub integration from
 > wallfacer and to reach GitHub later through a platform connector
 > ([remove-github-integration](../../shared/platform-native/remove-github-integration.md),
-> under [platform-native](../../../shared/platform-native.md)). The shipped create, state and comment surface is deleted, and the remaining work this spec lists (pushing the task branch, a generated title and body, merged and closed states) is not built.
+> under [platform-native](../../shared/platform-native.md)). The shipped create, state and comment surface is deleted, and the remaining work this spec lists (pushing the task branch, a generated title and body, merged and closed states) is not built.
 >
 > The text below is kept as written for the record. It was refreshed against
 > the code on the day it was retired, so it is an accurate description of

@@ -2,7 +2,7 @@
 title: Cloud Multi-Tenant
 status: archived
 depends_on:
-  - specs/cloud/cloud-infrastructure.md
+  - specs/.archive/cloud/cloud-infrastructure.md
   - specs/identity/authentication.md
 affects: [internal/handler/, internal/runner/, internal/store/]
 effort: xlarge
@@ -27,12 +27,12 @@ dispatched_task_id: null
 >   [latere-integration/cella-runtime.md](latere-integration/cella-runtime.md).
 > - **Cluster, routing, DNS/TLS, node pools** → owned by **terraform** (DOKS).
 >   Wallfacer needs only a thin deploy module — see
->   [cloud-infrastructure.md](../../cloud/cloud-infrastructure.md).
+>   [cloud-infrastructure.md](cloud-infrastructure.md).
 > - **Identity / org isolation** → already shipped via Identity Phase 2
 >   (`internal/auth`, `store.Principal{Sub,OrgID}`, org-scoped task filtering).
 > - **Org/team scoping within a shared instance** (the part still genuinely
 >   wallfacer's) → tracked under
->   [identity/multi-user-collaboration.md](../../identity/multi-user-collaboration.md),
+>   [identity/multi-user-collaboration.md](../identity/multi-user-collaboration.md),
 >   not here.
 >
 > The Latere product boundary for wallfacer is explicit:
@@ -40,7 +40,7 @@ dispatched_task_id: null
 > **consume** Latere services rather than absorb them; cloud v1 is metadata
 > coordination, not per-tenant instance hosting. The "one wallfacer process per
 > user, provisioned on login" model in this spec is no longer the plan. Retained
-> for historical context. See [latere-integration.md](../../cloud/latere-integration.md) for
+> for historical context. See [latere-integration.md](latere-integration.md) for
 > the current integration approach.
 
 ## Problem

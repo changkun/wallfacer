@@ -1,8 +1,8 @@
 ---
 title: Topos as the Only Harness
-status: drafted
+status: archived
 depends_on:
-  - specs/shared/platform-native.md
+  - specs/.archive/shared/platform-native.md
   - specs/shared/platform-native/retire-agent-fleets.md
 affects:
   - go.mod
@@ -19,12 +19,14 @@ affects:
   - docs/
 effort: xlarge
 created: 2026-06-30
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Topos as the Only Harness
+
+> **Archived 2026-10-19.** Reversed by [pure-local](../../shared/pure-local.md). The in-process Topos harness, the agent-graph seam, the trace view and the `latere.ai/x/topos` dependency were removed, and wallfacer keeps the five CLI harnesses. Phase 1a, review on a second model, shipped and stays.
 
 Decision 2 of [platform-native](platform-native.md), in the maintainer's
 words: "clean use of the Latere platform and the Topos harness. No Claude
@@ -136,7 +138,7 @@ decided:
 
 The browser sign-in module (`internal/oauth`, handlers in
 `internal/handler/auth.go`) and the keyring
-([provider-secret-store](../.archive/local/provider-secret-store.md)) are
+([provider-secret-store](../local/provider-secret-store.md)) are
 kept. What changes is where their credential goes: to the connection above,
 not into a CLI's environment. The module signs in under client ids that
 belong to other tools; settle that with each provider before shipping.
@@ -199,7 +201,7 @@ are done.
 
 | Phase | Content | Why first |
 |---|---|---|
-| 0 (done) | [Retire fleets](../.archive/shared/platform-native/retire-agent-fleets.md) and [remove GitHub](../.archive/shared/platform-native/remove-github-integration.md) | The delegating-fleet engine is written against the old module's API and cannot move; removing it first means the seam carries one path |
+| 0 (done) | [Retire fleets](platform-native/retire-agent-fleets.md) and [remove GitHub](platform-native/remove-github-integration.md) | The delegating-fleet engine is written against the old module's API and cannot move; removing it first means the seam carries one path |
 | 1a (done) | Rebuild the review as two models on the runner's existing role path: a built-in reviewer role on a model different from the task's, its findings fed back to the task through the feedback path, bounded rounds and cost. `internal/adversarial` and its import of the old module's `adversarial` package go | One module path can be pinned at one version only, and the rebuilt module has no `adversarial` package; doing the review first, on the role path, decouples it from the module move |
 | 1b | Move the seam to the rebuilt module: the task's implementation session, events and usage, interrupt, the scripted model in tests, and the in-process roles. The `topos` harness choice now means the rebuilt harness. The credential stays today's static key in this step | The base everything else stands on |
 | 2 | Every other role on the seam: test verification, chat and planning, and the reviewer. The task lifecycle on a session: a stop in `waiting`, feedback as the next message of the same session, approvals, re-attach after a restart. The model switch in the composer and chat. The two credential sources: a Latere model key and a provider sign-in | After this nothing needs a CLI |

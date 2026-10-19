@@ -1,6 +1,6 @@
 ---
 title: Cloud Coordination Plane
-status: drafted
+status: archived
 depends_on:
   - specs/identity/auth-by-default.md
 affects:
@@ -11,12 +11,14 @@ affects:
   - frontend/src/
 effort: xlarge
 created: 2026-06-14
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Cloud Coordination Plane
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. The coordination plane is not pursued. The coordinator role, the outbound connector, spec comments and the Postgres comment store that shipped under it were removed.
 
 Anchor spec for **Cloud v1 (metadata coordination)**, the lead axis of the
 [latere-integration](../latere-integration.md) track. It settles where cloud

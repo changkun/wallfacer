@@ -1,8 +1,8 @@
 ---
 title: Workspace and Repo Identity
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane.md
+  - specs/.archive/cloud/latere-integration/coordination-plane.md
 affects:
   - internal/coordinator/
   - internal/handler/
@@ -10,12 +10,14 @@ affects:
   - frontend/src/
 effort: large
 created: 2026-06-15
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Workspace and Repo Identity
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. Repository identity across instances served the coordination plane and is not pursued.
 
 The data model under the whole coordination plane: how the coordinator knows and
 trusts the repositories an org collaborates on, and what it stores versus what
@@ -126,7 +128,7 @@ dependency.
 ### Upgrade: per-user GitHub OAuth (server-authoritative)
 
 > Struck 2026-10-02. Wallfacer removed its GitHub integration
-> ([remove-github-integration](../../../.archive/shared/platform-native/remove-github-integration.md)),
+> ([remove-github-integration](../../../shared/platform-native/remove-github-integration.md)),
 > so this tier has no token to check with. A server-authoritative check
 > returns when the platform offers a connector for the git host, and is
 > specified then. The two tiers above are the model.
@@ -174,7 +176,7 @@ field never carries a local path, a token, or repo contents (data boundary).
 - Cross-org collaboration. The org boundary is absolute; an external collaborator
   is an Identity/org-membership concern, not this spec.
 - Mirroring repo *contents* to the coordinator. Comments anchor to specs by path
-  and content hash (see [spec-comments](../../../.archive/cloud/latere-integration/coordination-plane/spec-comments.md)); the coordinator never
+  and content hash (see [spec-comments](spec-comments.md)); the coordinator never
   holds source.
 
 ## Open questions

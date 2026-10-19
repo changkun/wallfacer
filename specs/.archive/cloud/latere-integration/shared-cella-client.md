@@ -2,7 +2,7 @@
 title: "Shared Cella Go Client"
 status: archived
 depends_on:
-  - specs/cloud/latere-integration.md
+  - specs/.archive/cloud/latere-integration.md
 affects:
   - internal/sandbox/
 effort: medium

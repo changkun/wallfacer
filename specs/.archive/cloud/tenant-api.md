@@ -2,7 +2,7 @@
 title: Tenant API
 status: archived
 depends_on:
-  - specs/cloud/latere-integration.md
+  - specs/.archive/cloud/latere-integration.md
 affects: [internal/handler/tenantapi/]
 effort: large
 created: 2026-03-28

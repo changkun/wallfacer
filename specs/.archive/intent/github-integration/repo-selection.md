@@ -3,7 +3,7 @@ title: "GitHub Repo Selection"
 status: archived
 depends_on:
   - specs/intent/github-integration/oauth-token-store.md
-  - specs/cloud/latere-integration/coordination-plane/repo-identity.md
+  - specs/.archive/cloud/latere-integration/coordination-plane/repo-identity.md
 affects:
   - internal/github/repos.go
   - internal/handler/github.go
@@ -77,7 +77,7 @@ associates with local workspace state, and how the org boundary is enforced.
 ## Context
 
 - Repo identity is owned by
-  [repo-identity.md](../../../cloud/latere-integration/coordination-plane/repo-identity.md):
+  [repo-identity.md](../../cloud/latere-integration/coordination-plane/repo-identity.md):
   canonical `host/owner/repo` via `NormalizeRemoteURL`
   (`internal/coordinator/identity.go`), durable org->repos registry, org
   boundary as the security perimeter. This child **resolves a selection into**

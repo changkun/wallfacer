@@ -2,7 +2,7 @@
 title: "Cloud Clone and Remote Fix (Gated)"
 status: archived
 depends_on:
-  - specs/cloud/latere-integration/topos-remote-executor.md
+  - specs/.archive/cloud/latere-integration/topos-remote-executor.md
 affects:
   - internal/github/clone.go
   - internal/hostedagents/
@@ -41,7 +41,7 @@ result back as a branch or a pull request.
 
 - Remote execution is **Cloud Axis B**, and it is one executor: a task runs as
   a hosted agent session on the Latere platform
-  ([topos-remote-executor.md](../../../cloud/latere-integration/topos-remote-executor.md)).
+  ([topos-remote-executor.md](../../cloud/latere-integration/topos-remote-executor.md)).
   Wallfacer creates no sandbox and stages no files; the session clones its
   repositories and pushes a branch of its own.
 - A hosted session's workload holds no credential. The platform injects one at
@@ -65,7 +65,7 @@ result returns to GitHub.
 
 | Option | How | Cost |
 |---|---|---|
-| **A. Mirror through the platform's git host** | Wallfacer (or the user) keeps a repository on the platform's git host that mirrors the GitHub one. The session works there. Wallfacer fetches the session's branch and pushes it to GitHub with the user's GitHub token, then opens the pull request through the [pull-request](pull-request.md) write path | Works with the platform as it is. Needs somewhere to run the fetch and push when there is no local checkout, which is the hosted board's repository question ([cloud-infrastructure](../../../cloud/cloud-infrastructure.md)) |
+| **A. Mirror through the platform's git host** | Wallfacer (or the user) keeps a repository on the platform's git host that mirrors the GitHub one. The session works there. Wallfacer fetches the session's branch and pushes it to GitHub with the user's GitHub token, then opens the pull request through the [pull-request](pull-request.md) write path | Works with the platform as it is. Needs somewhere to run the fetch and push when there is no local checkout, which is the hosted board's repository question ([cloud-infrastructure](../../cloud/cloud-infrastructure.md)) |
 | **B. The platform holds the GitHub credential** | The platform learns to inject a GitHub credential at a session's egress, from a connection the user makes once. The session clones from and pushes to GitHub directly | No mirror and no relay. Not a wallfacer change: it is a platform capability that does not exist |
 | **C. Public repositories only, patch back** | The session clones a public GitHub repository without a credential and returns its work as a patch in its final message; wallfacer applies and pushes it | Narrow, and a patch in a message is a poor transport for large changes |
 

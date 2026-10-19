@@ -103,7 +103,7 @@ editing the graph edits the underlying agents/flows YAML registries.
   sub-graph inside the Map's `GraphCanvas` (coordinate with the in-progress map work).
 - **M6: unified Agents/Flows graph UI.** Merge the two pages into the agent-graph
   editor over the same YAML registries. (Pairs with the onboarding spec
-  [first-run-onboarding.md](../../local/first-run-onboarding.md).)
+  [first-run-onboarding.md](first-run-onboarding.md).)
 
 ## Test strategy
 
@@ -163,7 +163,7 @@ What left this spec:
   and the execution paths behind it should become is the open decision in
   [agent-graph-e2e-design](agent-graph-e2e-design.md).
 - **Hosted execution**, listed out of scope here, is specified in
-  [topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md).
+  [topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md).
 
 Not built: bearer-style model credentials (a per-call source; only a static
 key is wired), an adapter from `executor.Backend` to the runtime's sandbox,
@@ -175,4 +175,4 @@ that predates the project's rebuild into a different module shape, with no
 root package. The embed keeps working on the pin. Moving the pin is a
 migration of the seam, not a version bump.
 
-Later, 2026-10-02: the fleet half of this integration (flows flagged `Agentic`, the dynamic and mesh topologies) was retired, and the single-agent half became the base of the harness migration. See [platform-native](../../shared/platform-native.md).
+Later, 2026-10-02: the fleet half of this integration (flows flagged `Agentic`, the dynamic and mesh topologies) was retired, and the single-agent half became the base of the harness migration. See [platform-native](../shared/platform-native.md).

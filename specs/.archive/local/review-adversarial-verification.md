@@ -479,4 +479,4 @@ task header. "Review" button on waiting tasks with session ID. Acceptance: a tas
 ran through review shows the correct badge; clicking "Review" on a waiting task sends
 the POST and the badge updates when the result arrives.
 
-Later, 2026-10-02: the debate engine and its harness rotation are replaced by two models on the one Topos harness, a reviewer session on a model different from the task's. See the review row of [topos-native-harness](../../shared/topos-native-harness.md).
+Later, 2026-10-02: the debate engine and its harness rotation are replaced by two models on the one Topos harness, a reviewer session on a model different from the task's. See the review row of [topos-native-harness](../shared/topos-native-harness.md).

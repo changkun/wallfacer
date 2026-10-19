@@ -24,9 +24,9 @@ dispatched_task_id: null
 > is becoming.** This spec dispatches a task to another vendor's hosted
 > agents. The maintainer decided the same day that wallfacer runs one
 > harness, on the Latere platform for a remote run
-> ([platform-native](../../shared/platform-native.md)), and named this spec as
+> ([platform-native](../shared/platform-native.md)), and named this spec as
 > no longer important. Remote execution is the
-> [hosted executor](../../cloud/latere-integration/topos-remote-executor.md) alone.
+> [hosted executor](latere-integration/topos-remote-executor.md) alone.
 >
 > The text below is kept as written for the record. Its comparison with the
 > Latere executor reflects that spec as it stood on 2026-10-02.
@@ -37,7 +37,7 @@ Anthropic ships a managed agent platform ([platform.claude.com/docs/en/managed-a
 
 ## Shape
 
-Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. The Latere [hosted executor](../../cloud/latere-integration/topos-remote-executor.md) has the same shape: a remote service runs its own agent loop, and wallfacer dispatches a request and follows its events. For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
+Managed Agents is a **self-contained executor**: the harness is the Managed Agents harness itself, not a CLI wallfacer spawns. The Latere [hosted executor](latere-integration/topos-remote-executor.md) has the same shape: a remote service runs its own agent loop, and wallfacer dispatches a request and follows its events. For Managed Agents, the harness is fixed; the model and tool catalog are selectable per agent version.
 
 Implication for [harness-abstraction.md](../shared/harness-abstraction.md): the `Executor` interface must be high-level enough that some executors short-circuit `Harness.BuildArgv` and dispatch a `harness.Request` directly to a remote API instead of running argv. The host executor composes `Executor` with a `Harness`; the Managed Agents executor *is* both. The Latere hosted executor meets the same problem and does not extend `executor.Backend`: it supplies a session-shaped run to the runner's `driveToposRun` seam, which already carries typed events, a final result, and the task state machine. Evaluate that seam for this executor before adding a dispatch method to `Backend`.
 

@@ -315,6 +315,6 @@ the run overlay, delete, and the blank draft.
 saved with the fleet, the link from a task to its fleet) is carried by
 [agent-graph-e2e-design](agent-graph-e2e-design.md). First-run
 guidance for this surface is
-[first-run-onboarding](../../local/first-run-onboarding.md).
+[first-run-onboarding](first-run-onboarding.md).
 
 Later, 2026-10-02: user-authored agents and fleets were retired, and with them the page and engines this spec delivered. See [retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md).

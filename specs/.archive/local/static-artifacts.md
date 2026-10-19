@@ -21,7 +21,7 @@ dispatched_task_id: null
 > **Removed 2026-10-02.** The gallery, its two routes and its rail entry
 > are deleted by
 > [retire-artifacts](../shared/platform-native/retire-artifacts.md), under
-> [platform-native](../../shared/platform-native.md): a page meant to be seen
+> [platform-native](../shared/platform-native.md): a page meant to be seen
 > is pushed to a repository on the Latere platform, whose Apps capability
 > builds and hosts it. The text below describes what shipped before that.
 

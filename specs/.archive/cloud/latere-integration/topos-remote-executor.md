@@ -1,8 +1,8 @@
 ---
 title: Hosted Agents as the Remote Executor
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration.md
+  - specs/.archive/cloud/latere-integration.md
   - specs/local/topos-runtime-integration.md
 affects:
   - internal/hostedagents/
@@ -18,20 +18,22 @@ affects:
   - docs/guide/
 effort: large
 created: 2026-06-01
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Hosted Agents as the Remote Executor
 
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. Hosted execution was never built and is not pursued; the in-process Topos harness it extended was removed as well.
+
 Axis B of the [platform integration](../latere-integration.md): a wallfacer
 task runs as a hosted agent session on the Latere platform instead of as a
 process on the user's machine. This is the only Latere remote executor. It
 replaces three earlier designs: a sandbox backend
-([cella-runtime](../../.archive/cloud/latere-integration/cella-runtime.md)),
+([cella-runtime](cella-runtime.md)),
 a file-plane worktree transport
-([tenant-filesystem](../../.archive/cloud/tenant-filesystem.md)), and the
+([tenant-filesystem](../tenant-filesystem.md)), and the
 first version of this spec, which targeted a run API that no longer exists.
 
 The file keeps its name. Topos is the open-source project behind the
@@ -116,7 +118,7 @@ instance is signed in. A task pinned to a CLI harness has no `hosted` option.
 
 A hosted session is one agent. User-authored fleets, the only other shape a
 task could take, are retired
-([retire-agent-fleets](../../.archive/shared/platform-native/retire-agent-fleets.md)).
+([retire-agent-fleets](../../shared/platform-native/retire-agent-fleets.md)).
 
 Where the selector is drawn and how it reads next to the harness picker
 belongs to [topos-native-harness](../../shared/topos-native-harness.md),

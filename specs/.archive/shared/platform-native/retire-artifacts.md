@@ -2,7 +2,7 @@
 title: Retire the Artifacts Gallery
 status: archived
 depends_on:
-  - specs/shared/platform-native.md
+  - specs/.archive/shared/platform-native.md
 affects:
   - internal/handler/artifacts.go
   - internal/cli/server.go
@@ -22,7 +22,7 @@ dispatched_task_id: null
 # Retire the Artifacts Gallery
 
 A decision of the maintainer on 2026-10-02, recorded under
-[platform-native](../../../shared/platform-native.md): wallfacer does not need its own
+[platform-native](../platform-native.md): wallfacer does not need its own
 artifacts feature, because the Latere platform's Apps capability hosts web
 pages from a repository. A removal, not a rewrite.
 

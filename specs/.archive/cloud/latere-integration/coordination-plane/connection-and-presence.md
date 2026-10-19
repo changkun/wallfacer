@@ -1,8 +1,8 @@
 ---
 title: Coordination Connection and Presence
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane.md
+  - specs/.archive/cloud/latere-integration/coordination-plane.md
 affects:
   - internal/cli/web.go
   - internal/auth/
@@ -10,12 +10,14 @@ affects:
   - frontend/src/
 effort: xlarge
 created: 2026-06-14
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Coordination Connection and Presence
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. The coordination connection and the coordinator registry that shipped under this spec were removed, and presence across machines is not pursued.
 
 Phase 1 (lead child) of the [coordination plane](../coordination-plane.md). It
 builds the **one outbound connection** every coordination capability rides, the

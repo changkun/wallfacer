@@ -2,7 +2,7 @@
 title: Remove the GitHub Integration
 status: archived
 depends_on:
-  - specs/shared/platform-native.md
+  - specs/.archive/shared/platform-native.md
 affects:
   - internal/github/
   - internal/handler/
@@ -19,7 +19,7 @@ dispatched_task_id: null
 
 # Remove the GitHub Integration
 
-Decision 4 of [platform-native](../../../shared/platform-native.md). A removal, not a
+Decision 4 of [platform-native](../platform-native.md). A removal, not a
 rewrite.
 
 ## Goal
@@ -164,12 +164,12 @@ connector exists.
   retired and archived with this spec. The already archived token-store,
   repository-selection and read-surface specs each get one line pointing
   here.
-- [repo-identity](../../../cloud/latere-integration/coordination-plane/repo-identity.md):
+- [repo-identity](../../cloud/latere-integration/coordination-plane/repo-identity.md):
   its upgrade tier (a server-authoritative check through the account's GitHub
   connection) loses its input and is struck. The default tier (proof with the
   user's own git credentials) never depended on it.
-- [platform integration](../../../cloud/latere-integration.md) and the
-  [hosted executor](../../../cloud/latere-integration/topos-remote-executor.md):
+- [platform integration](../../cloud/latere-integration.md) and the
+  [hosted executor](../../cloud/latere-integration/topos-remote-executor.md):
   where they point at cloud-remote-fix for repositories outside the
   platform's git host, they say instead that such repositories are out of
   scope until a platform connector exists.

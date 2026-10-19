@@ -32,7 +32,7 @@ dispatched_task_id: null
 > completes is being removed.** The maintainer decided the same day to retire
 > user-authored agents and fleets
 > ([retire-agent-fleets](../shared/platform-native/retire-agent-fleets.md),
-> under [platform-native](../../shared/platform-native.md)), so the remaining
+> under [platform-native](../shared/platform-native.md)), so the remaining
 > work this spec plans (true labels, a repository contract for fixed-sequence
 > fleets, undo, saved positions, sequence editing, one vocabulary) has no
 > subject.
@@ -158,7 +158,7 @@ agent, `291cc45d` for fleets). The task never rests in `waiting`: the walk to
 and no test step, and store an empty session id. They authenticate with a
 static API key only, and with no key they do not fail: they run the runtime's
 test model and commit its result. Refusing such a run is Remaining item 3 of
-[topos-native-harness](../../shared/topos-native-harness.md).
+[topos-native-harness](../shared/topos-native-harness.md).
 
 In the UI a fleet becomes agentic through the coordination control.
 `setCoordination` (`frontend/src/lib/flowDraft.ts`) sets `agentic` when a
@@ -290,7 +290,7 @@ today:
 The spike's conclusion, that the turn loop stays, still describes the code.
 Its premise, that the embedded runtime cannot produce durable work, does not.
 Closing the two open rows is the work
-[topos-native-harness](../../shared/topos-native-harness.md) tracks as
+[topos-native-harness](../shared/topos-native-harness.md) tracks as
 verification parity; this spec does not duplicate it.
 
 ### Spike E: answered by the model's shape
@@ -400,12 +400,12 @@ Each item ships with a regression test for the behavior it changes.
 
 - Running `implement` on the embedded runtime, and the default-harness
   change that would do it:
-  [topos-native-harness](../../shared/topos-native-harness.md).
+  [topos-native-harness](../shared/topos-native-harness.md).
 - Test, oversight, and review parity for embedded-runtime runs: same spec.
 - Moving the runtime pin past v0.7.0.
 - Per-agent delegation edges.
 - First-run guidance for the surface:
-  [first-run-onboarding](../../local/first-run-onboarding.md).
+  [first-run-onboarding](first-run-onboarding.md).
 
 ## Open questions
 

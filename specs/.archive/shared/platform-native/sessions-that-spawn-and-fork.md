@@ -1,21 +1,23 @@
 ---
 title: Sessions That Spawn and Fork
-status: vague
+status: archived
 depends_on:
-  - specs/shared/platform-native.md
-  - specs/shared/topos-native-harness.md
+  - specs/.archive/shared/platform-native.md
+  - specs/.archive/shared/topos-native-harness.md
 affects:
   - internal/runner/
   - internal/store/
   - frontend/src/
 effort: xlarge
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Sessions That Spawn and Fork
+
+> **Archived 2026-10-19.** Superseded by [pure-local](../../../shared/pure-local.md). This design was about the hosted board and the Topos runtime, and neither exists any more.
 
 Decision 3 of [platform-native](../platform-native.md). A direction and the
 questions it raises, not a design. It is recorded so the board, the hosted

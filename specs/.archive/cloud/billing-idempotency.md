@@ -2,7 +2,7 @@
 title: Billing Idempotency
 status: archived
 depends_on:
-  - specs/cloud/cloud-infrastructure.md
+  - specs/.archive/cloud/cloud-infrastructure.md
   - specs/identity/authentication.md
 affects:
   - internal/billing/

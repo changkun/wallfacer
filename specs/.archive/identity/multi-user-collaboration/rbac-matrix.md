@@ -2,7 +2,7 @@
 title: RBAC Scope Matrix
 status: archived
 depends_on:
-  - specs/identity/multi-user-collaboration.md
+  - specs/.archive/identity/multi-user-collaboration.md
   - specs/identity/authentication.md
 affects:
   - internal/auth/authorize.go
@@ -33,14 +33,14 @@ dispatched_task_id: null
 > `platform_admin`.
 >
 > The need is unchanged and stays with the parent,
-> [multi-user-collaboration](../../../identity/multi-user-collaboration.md): who in an
+> [multi-user-collaboration](../multi-user-collaboration.md): who in an
 > organization may mutate what. When that is picked up, the matrix is written
 > against organization roles, and whether wallfacer defines a viewer below
 > `member` is decided there.
 >
 > The text below is kept as written for the record.
 
-The lead child of [multi-user-collaboration.md](../../../identity/multi-user-collaboration.md). The collaboration parent depends on a working authorization surface before presence, audit, optimistic concurrency, or private threads are meaningful: without role gating, every signed-in org member can mutate every task. This spec defines the canonical permission matrix and wires it onto the routes, on top of the already-shipped primitives.
+The lead child of [multi-user-collaboration.md](../multi-user-collaboration.md). The collaboration parent depends on a working authorization surface before presence, audit, optimistic concurrency, or private threads are meaningful: without role gating, every signed-in org member can mutate every task. This spec defines the canonical permission matrix and wires it onto the routes, on top of the already-shipped primitives.
 
 ## Current State (shipped)
 

@@ -2,7 +2,7 @@
 title: "GitHub Integration: Brokered Connection and Pull Requests on Tasks"
 status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane/repo-identity.md
+  - specs/.archive/cloud/latere-integration/coordination-plane/repo-identity.md
 affects:
   - internal/github/
   - internal/handler/github.go
@@ -28,7 +28,7 @@ dispatched_task_id: null
 > GitHub.** The maintainer decided to remove the GitHub integration from
 > wallfacer and to reach GitHub later through a platform connector
 > ([remove-github-integration](../shared/platform-native/remove-github-integration.md),
-> under [platform-native](../../shared/platform-native.md)). The token layer that shipped, the pull-request surface on tasks, and the Settings tab are deleted by that spec.
+> under [platform-native](../shared/platform-native.md)). The token layer that shipped, the pull-request surface on tasks, and the Settings tab are deleted by that spec.
 >
 > The text below is kept as written for the record. It was refreshed against
 > the code on the day it was retired, so it is an accurate description of
@@ -65,7 +65,7 @@ graph LR
 **Order.** #4 has no unbuilt dependency. Its open question on the merge path
 is a product decision that the work it specifies does not wait for. #5 stays
 `vague` until the hosted executor
-([topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md))
+([topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md))
 exists.
 
 ## Decisions on record
@@ -138,7 +138,7 @@ graph TD
 - **Repository.** No selection exists. `taskRepoRef`
   (`internal/handler/tasks_pr.go`) derives owner and name from the git
   `origin` of the task's repository through `NormalizeRemoteURL`, which is
-  the part of [repo-identity](../../cloud/latere-integration/coordination-plane/repo-identity.md)
+  the part of [repo-identity](../cloud/latere-integration/coordination-plane/repo-identity.md)
   this integration consumes. Only `github.com` origins are accepted.
 - **No runner involvement.** Every call is plain authenticated HTTP from the
   handler. The remaining work in [pull-request](github-integration/pull-request.md)
@@ -190,7 +190,7 @@ Owned by a child:
 - A task on a GitHub repository with no local checkout.
   [cloud-remote-fix](github-integration/cloud-remote-fix.md), blocked on the
   hosted executor
-  ([topos-remote-executor](../../cloud/latere-integration/topos-remote-executor.md)).
+  ([topos-remote-executor](../cloud/latere-integration/topos-remote-executor.md)).
 
 Owned by no spec, recorded here so it is not lost:
 
@@ -202,7 +202,7 @@ Owned by no spec, recorded here so it is not lost:
   `ff4958e7`. `Token` declares `RefreshToken`, `InstallationID`, `Account`
   and `Permissions`, and the live broker sets none of them, so the status
   response's `account` and `permissions` are always empty.
-- **Verification tier.** [repo-identity](../../cloud/latere-integration/coordination-plane/repo-identity.md)
+- **Verification tier.** [repo-identity](../cloud/latere-integration/coordination-plane/repo-identity.md)
   describes an optional tier in which the coordinator verifies repository
   access server-side through the identity service's GitHub login. The
   original umbrella expected the token here to realize that tier. It does
@@ -228,5 +228,5 @@ Owned by no spec, recorded here so it is not lost:
 - Replacing the local git endpoints in `internal/handler/git.go`; push, sync
   and rebase stay git.
 - Redefining repository identity
-  ([repo-identity](../../cloud/latere-integration/coordination-plane/repo-identity.md)
+  ([repo-identity](../cloud/latere-integration/coordination-plane/repo-identity.md)
   owns it).

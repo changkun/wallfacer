@@ -31,7 +31,7 @@ dispatched_task_id: null
 >
 > - **`CellaBackend` and `--executor cella`**: not built, not planned.
 >   Remote execution is one executor over `/v1/agents`, in
->   [topos-remote-executor.md](../../../cloud/latere-integration/topos-remote-executor.md).
+>   [topos-remote-executor.md](topos-remote-executor.md).
 > - **Worktree transport** (FS workspace, git push, durable workspace):
 >   settled as git. A session clones from a git host and pushes a branch
 >   of its own; there is no mount and no staging service.

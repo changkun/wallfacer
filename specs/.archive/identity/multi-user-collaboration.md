@@ -1,6 +1,6 @@
 ---
 title: Multi-User Collaboration (Org-Scoped Board)
-status: stale
+status: archived
 depends_on:
   - specs/foundations/storage-backends.md
 affects:
@@ -16,12 +16,14 @@ affects:
   - docs/guide/
 effort: xlarge
 created: 2026-04-18
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Multi-User Collaboration (Org-Scoped Board)
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. A shared org board is not pursued. The per-principal and org scoping that shipped (owner fields on tasks, events and workspaces, filtered listings) was removed.
 
 > **Stale as of 2026-10-02.** The goal stands: members of one organization
 > working on one board with attribution, permissions and awareness of each
@@ -35,7 +37,7 @@ dispatched_task_id: null
 >   a process that is single-organization. No such layer exists, and one
 >   instance now serves several contexts: a signed-in instance scopes
 >   workspaces and tasks to the active personal account or organization
->   ([local-account-isolation](../.archive/identity/local-account-isolation.md)),
+>   ([local-account-isolation](local-account-isolation.md)),
 >   and browser-facing reads and mutations are gated on workspace visibility.
 >   The hosted board, if it ships, is one board for every principal
 >   ([cloud-infrastructure](../cloud/cloud-infrastructure.md)).
@@ -44,7 +46,7 @@ dispatched_task_id: null
 >   scopes and the wrapper was removed. They carry the caller's organization
 >   roles (`owner`, `admin`, `member`), which the matrix should be rewritten
 >   against. The lead child that held it is archived:
->   [rbac-matrix](../.archive/identity/multi-user-collaboration/rbac-matrix.md).
+>   [rbac-matrix](multi-user-collaboration/rbac-matrix.md).
 > - **Presence.** Sections "Presence", "Activity focus" and the wire protocol
 >   describe process-local presence. Presence moved to the coordination plane
 >   and aggregates across instances

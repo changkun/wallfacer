@@ -1,20 +1,22 @@
 ---
 title: Coordination Metadata Projection
-status: drafted
+status: archived
 depends_on:
-  - specs/cloud/latere-integration/coordination-plane.md
+  - specs/.archive/cloud/latere-integration/coordination-plane.md
 affects:
   - internal/store/
   - internal/cli/web.go
   - frontend/src/
 effort: large
 created: 2026-06-14
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Coordination Metadata Projection
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. A projection of task metadata to a coordinator is not pursued.
 
 Phase 2 of the [coordination plane](../coordination-plane.md). Each signed-in,
 opted-in instance taps its `store.TaskEvent` stream, redacts to an allow-list,
@@ -199,7 +201,7 @@ read-model must be shared, not per-replica:
   buckets and the >90-day history that instances may no longer be able to replay.
   These are durable and want a real query store, not an eviction-unsafe cache. The
   `wallfacer` database and `WALLFACER_DATABASE_URL` are **provisioned** (shared
-  with authoritative spec comments, see [spec-comments](../../../.archive/cloud/latere-integration/coordination-plane/spec-comments.md)); the
+  with authoritative spec comments, see [spec-comments](spec-comments.md)); the
   implementation owns the rollup schema. Live projection stays in Valkey
   (regenerable by replay); only the durable rollups land in Postgres.
 

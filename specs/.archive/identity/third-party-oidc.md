@@ -1,6 +1,6 @@
 ---
 title: Third-party OIDC providers for self-hosted deployments
-status: vague
+status: archived
 depends_on:
   - specs/identity/authentication.md
 affects:
@@ -9,12 +9,14 @@ affects:
   - internal/envconfig/
 effort: large
 created: 2026-04-19
-updated: 2026-10-02
+updated: 2026-10-19
 author: changkun
 dispatched_task_id: null
 ---
 
 # Third-Party OIDC
+
+> **Archived 2026-10-19.** The maintainer made wallfacer a pure local tool (see [pure-local](../../shared/pure-local.md)): it runs on one machine over the CLI harnesses, with no hosted service, sign-in, coordination or remote execution. Wallfacer has no sign-in, so there is no identity provider to make pluggable.
 
 > The bring-your-own-cloud posture for the Latere identity and sandbox
 > services is defined platform-side; align this spec with it when picked up.
