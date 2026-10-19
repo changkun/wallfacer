@@ -245,7 +245,7 @@ screenshots for it.
 | [chat](console-redesign/chat.md) | ChatPage, AgentChatPanel, ChatMessageList, ChatComposer, ChatModelBadge, SpecChatPopup, multi-turn.css | shell |
 | [plan](console-redesign/plan.md) | PlanPage, SpecTreePanel, SpecFocusedView, SpecCommentsLayer, SessionList, FloatingToc | chat |
 | [settings](console-redesign/settings.md) | SettingsPage, five tabs, Appearance picker with the new roster | shell |
-| [agent-graph](../.archive/shared/console-redesign/agent-graph.md) | AgentGraphPage, AgentGraphCanvas, AgentEditor, agents.css | shell |
+| [agent-graph](console-redesign/agent-graph.md) | AgentGraphPage, AgentGraphCanvas, AgentEditor, agents.css | shell |
 | [panels-and-overlays](console-redesign/panels-and-overlays.md) | CommandPalette, WorkspacePicker, WorkspaceEditModal, ConfirmDialog, Toaster, shortcuts, device sign-in, trash, system prompts, DockWorkspace, TerminalPanel, ExplorerPanel, editor tabs | shell |
 | [secondary-screens](console-redesign/secondary-screens.md) | Analytics, Routines, Mission Control, Whiteboard, Artifacts, local docs | shell |
 | [verification-and-docs](console-redesign/verification-and-docs.md) | full screenshot regeneration, checks scenes gate in CI, README and guide images, configuration guide | every surface child |
