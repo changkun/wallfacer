@@ -22,7 +22,6 @@ type Config struct {
 	BaseURL                string // ANTHROPIC_BASE_URL
 	ServerAPIKey           string // WALLFACER_SERVER_API_KEY
 	DefaultModel           string // CLAUDE_DEFAULT_MODEL
-	TitleModel             string // CLAUDE_TITLE_MODEL
 	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
 	MaxTestParallelTasks   int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
 	MaxAgents              int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
@@ -40,7 +39,6 @@ type Config struct {
 	OpenAIAPIKey      string // OPENAI_API_KEY
 	OpenAIBaseURL     string // OPENAI_BASE_URL
 	CodexDefaultModel string // CODEX_DEFAULT_MODEL
-	CodexTitleModel   string // CODEX_TITLE_MODEL
 
 	// Cursor sandbox fields.
 	CursorAPIKey string // CURSOR_API_KEY
@@ -53,7 +51,6 @@ type Config struct {
 	DefaultSandbox        harness.ID // WALLFACER_DEFAULT_SANDBOX
 	ImplementationSandbox harness.ID // WALLFACER_SANDBOX_IMPLEMENTATION
 	TestingSandbox        harness.ID // WALLFACER_SANDBOX_TESTING
-	TitleSandbox          harness.ID // WALLFACER_SANDBOX_TITLE
 	OversightSandbox      harness.ID // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  harness.ID // WALLFACER_SANDBOX_COMMIT_MESSAGE
 
@@ -79,9 +76,7 @@ var knownKeys = []string{
 	"OPENAI_API_KEY",
 	"OPENAI_BASE_URL",
 	"CLAUDE_DEFAULT_MODEL",
-	"CLAUDE_TITLE_MODEL",
 	"CODEX_DEFAULT_MODEL",
-	"CODEX_TITLE_MODEL",
 	"CURSOR_API_KEY",
 	"OPENCODE_SERVER_PASSWORD",
 	"WALLFACER_MAX_PARALLEL",
@@ -100,7 +95,6 @@ var knownKeys = []string{
 	"WALLFACER_DEFAULT_SANDBOX",
 	"WALLFACER_SANDBOX_IMPLEMENTATION",
 	"WALLFACER_SANDBOX_TESTING",
-	"WALLFACER_SANDBOX_TITLE",
 	"WALLFACER_SANDBOX_OVERSIGHT",
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_HOST_CLAUDE_BINARY",
@@ -151,8 +145,6 @@ func Parse(path string) (Config, error) {
 			cfg.ServerAPIKey = v
 		case "CLAUDE_DEFAULT_MODEL":
 			cfg.DefaultModel = v
-		case "CLAUDE_TITLE_MODEL":
-			cfg.TitleModel = v
 		case "WALLFACER_MAX_PARALLEL":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
@@ -208,8 +200,6 @@ func Parse(path string) (Config, error) {
 			cfg.OpenAIBaseURL = v
 		case "CODEX_DEFAULT_MODEL":
 			cfg.CodexDefaultModel = v
-		case "CODEX_TITLE_MODEL":
-			cfg.CodexTitleModel = v
 		case "CURSOR_API_KEY":
 			cfg.CursorAPIKey = v
 		case "OPENCODE_SERVER_PASSWORD":
@@ -220,8 +210,6 @@ func Parse(path string) (Config, error) {
 			cfg.ImplementationSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_TESTING":
 			cfg.TestingSandbox = harness.NormalizeID(v)
-		case "WALLFACER_SANDBOX_TITLE":
-			cfg.TitleSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_OVERSIGHT":
 			cfg.OversightSandbox = harness.NormalizeID(v)
 		case "WALLFACER_SANDBOX_COMMIT_MESSAGE":
@@ -299,9 +287,6 @@ func (c Config) SandboxByActivity() map[store.SandboxActivity]harness.ID {
 	}
 	if c.TestingSandbox != "" {
 		out[store.SandboxActivityTesting] = c.TestingSandbox
-	}
-	if c.TitleSandbox != "" {
-		out[store.SandboxActivityTitle] = c.TitleSandbox
 	}
 	if c.OversightSandbox != "" {
 		out[store.SandboxActivityOversight] = c.OversightSandbox
@@ -400,9 +385,7 @@ type Updates struct {
 	OpenAIBaseURL        *string
 	CursorAPIKey         *string
 	DefaultModel         *string
-	TitleModel           *string
 	CodexDefaultModel    *string
-	CodexTitleModel      *string
 	MaxParallel          *string
 	MaxTestParallel      *string
 	MaxAgents            *string
@@ -432,9 +415,7 @@ func Update(path string, u Updates) error {
 		"OPENAI_BASE_URL":                   u.OpenAIBaseURL,
 		"CURSOR_API_KEY":                    u.CursorAPIKey,
 		"CLAUDE_DEFAULT_MODEL":              u.DefaultModel,
-		"CLAUDE_TITLE_MODEL":                u.TitleModel,
 		"CODEX_DEFAULT_MODEL":               u.CodexDefaultModel,
-		"CODEX_TITLE_MODEL":                 u.CodexTitleModel,
 		"WALLFACER_MAX_PARALLEL":            u.MaxParallel,
 		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
 		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
@@ -454,10 +435,10 @@ func Update(path string, u Updates) error {
 
 // UpdateSandboxSettings merges global sandbox-routing settings into the env file.
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
-// sandboxByActivity supports keys: implementation, testing, title,
-// oversight, commit_message.
+// sandboxByActivity supports keys: implementation, testing, oversight,
+// commit_message.
 func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByActivity map[store.SandboxActivity]harness.ID) error {
-	var impl, test, title, oversight, commit *string
+	var impl, test, oversight, commit *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
 		// Two-phase approach: start with all activity pointers set to empty strings,
@@ -466,9 +447,9 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		// This ensures that omitted activities are actively removed rather than
 		// silently left stale.
 		emptyImpl, emptyTest := "", ""
-		emptyTitle, emptyOversight, emptyCommit := "", "", ""
+		emptyOversight, emptyCommit := "", ""
 		impl, test = &emptyImpl, &emptyTest
-		title, oversight, commit = &emptyTitle, &emptyOversight, &emptyCommit
+		oversight, commit = &emptyOversight, &emptyCommit
 
 		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
 			s := string(harness.NormalizeID(string(v)))
@@ -477,10 +458,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		if v, ok := sandboxByActivity[store.SandboxActivityTesting]; ok {
 			s := string(harness.NormalizeID(string(v)))
 			test = &s
-		}
-		if v, ok := sandboxByActivity[store.SandboxActivityTitle]; ok {
-			s := string(harness.NormalizeID(string(v)))
-			title = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityOversight]; ok {
 			s := string(harness.NormalizeID(string(v)))
@@ -501,7 +478,6 @@ func UpdateSandboxSettings(path string, defaultSandbox *harness.ID, sandboxByAct
 		"WALLFACER_DEFAULT_SANDBOX":        defaultSandboxValue,
 		"WALLFACER_SANDBOX_IMPLEMENTATION": impl,
 		"WALLFACER_SANDBOX_TESTING":        test,
-		"WALLFACER_SANDBOX_TITLE":          title,
 		"WALLFACER_SANDBOX_OVERSIGHT":      oversight,
 		"WALLFACER_SANDBOX_COMMIT_MESSAGE": commit,
 	}

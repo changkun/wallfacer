@@ -24,8 +24,8 @@ Open Settings from the bottom of the sidebar or press `Cmd+,` (or `Ctrl+,`). The
 
 Credentials, models, and routing for the coding CLIs. A warning banner appears on first launch while no credential is configured. Each harness has its own block with a **Test** connectivity button:
 
-- **Claude**: OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`), API key (`ANTHROPIC_API_KEY`), base URL, default and title models, plus a **Sign in with Claude** OAuth button.
-- **Codex**: OpenAI API key, base URL, default and title models, plus a **Sign in with OpenAI** button.
+- **Claude**: OAuth token (`CLAUDE_CODE_OAUTH_TOKEN`), API key (`ANTHROPIC_API_KEY`), base URL, default model, plus a **Sign in with Claude** OAuth button.
+- **Codex**: OpenAI API key, base URL, default model, plus a **Sign in with OpenAI** button.
 - **Cursor**: `CURSOR_API_KEY`, or run `cursor-agent login` once outside Wallfacer.
 - **OpenCode**: no key field; the `opencode` CLI manages provider credentials itself (`opencode auth login`).
 - **Pi**: no key field; the `pi` CLI reads provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the same environment.
@@ -61,11 +61,10 @@ Version information, the project link, license, and a read-only system status bl
 
 ## System prompt templates
 
-Built-in Go templates instruct each agent activity. Nine templates exist:
+Built-in Go templates instruct each agent activity. Eight templates exist:
 
 | Template | Purpose |
 |---|---|
-| `title.tmpl` | Task title generation |
 | `commit.tmpl` | Commit message generation |
 | `test.tmpl` | Test verification agent |
 | `oversight.tmpl` | Oversight summary generation |
@@ -75,7 +74,7 @@ Built-in Go templates instruct each agent activity. Nine templates exist:
 | `spec_system_empty.tmpl` | Plan session system prompt (empty spec tree) |
 | `spec_system_nonempty.tmpl` | Plan session system prompt (existing spec tree) |
 
-Overrides live as files under `~/.wallfacer/prompts/`: creating `~/.wallfacer/prompts/title.tmpl` overrides the title template. The templates manager (`/api/system-prompts`) lists each template, shows whether an override exists, and validates edits as Go templates before saving; invalid templates are rejected with a parse error. Delete an override file (or use the delete endpoint) to restore the embedded default.
+Overrides live as files under `~/.wallfacer/prompts/`: creating `~/.wallfacer/prompts/commit_message.tmpl` overrides the commit message template. The templates manager (`/api/system-prompts`) lists each template, shows whether an override exists, and validates edits as Go templates before saving; invalid templates are rejected with a parse error. Delete an override file (or use the delete endpoint) to restore the embedded default.
 
 ## CLI reference
 
@@ -147,12 +146,10 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `ANTHROPIC_AUTH_TOKEN` | Bearer token for a gateway proxy (read-only, managed externally) |
 | `ANTHROPIC_BASE_URL` | Custom Anthropic-compatible endpoint |
 | `CLAUDE_DEFAULT_MODEL` | Default model for Claude tasks |
-| `CLAUDE_TITLE_MODEL` | Model for title generation; falls back to the default model |
 | `CLAUDE_CODE_MODEL` | Model passed through to the Claude CLI for a specific run |
 | `OPENAI_API_KEY` | OpenAI key for Codex; optional when `~/.codex/auth.json` exists |
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint |
 | `CODEX_DEFAULT_MODEL` | Default model for Codex tasks |
-| `CODEX_TITLE_MODEL` | Codex title model; falls back to `CODEX_DEFAULT_MODEL` |
 | `CURSOR_API_KEY` | Headless credential for `cursor-agent` |
 | `OPENCODE_SERVER_PASSWORD` | Reserved for a future OpenCode server-attach path |
 
@@ -175,7 +172,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |
 | `WALLFACER_SANDBOX_TESTING` | | Harness override for test verification |
-| `WALLFACER_SANDBOX_TITLE` | | Harness override for title generation |
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |

@@ -43,8 +43,7 @@ type Interface interface {
 	PendingGoroutines() []string
 	WaitBackground()
 
-	// Title & oversight generation.
-	GenerateTitleBackground(taskID uuid.UUID, prompt string)
+	// Oversight generation.
 	GenerateOversight(taskID uuid.UUID)
 	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error)
 
@@ -62,10 +61,6 @@ type Interface interface {
 	// *ReviewRefusal, without launching anything, when the reviewer model is
 	// unset or equals the task's model.
 	RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
-
-	// Agent-session title generation (task-free flavor). Names a chat
-	// thread from its opening user message using the lightweight title model.
-	GenerateAgentSessionTitle(ctx context.Context, firstUserMessage string) (string, error)
 
 	// Auto-push for a single workspace (task-free flavor). Used by callers
 	// that do not have a task ID in scope, e.g. the plan commit pipeline.

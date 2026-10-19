@@ -82,8 +82,7 @@ type runAgentOpts struct {
 	// use this for per-task model pinning.
 	ModelOverride string
 	// ModelResolver, when set, provides a per-call model lookup
-	// used when ModelOverride is empty. Title and oversight use this
-	// to route to the small-model env var without mutating the role
+	// used when ModelOverride is empty, without mutating the role
 	// descriptor.
 	ModelResolver func(harness.ID) string
 	// WorktreeOverrides maps workspace host paths to the task's

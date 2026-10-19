@@ -161,30 +161,6 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	return nil
 }
 
-// UpdateTaskTitleGenerating publishes whether a title agent is running.
-func (s *Store) UpdateTaskTitleGenerating(_ context.Context, id uuid.UUID, generating bool) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.TitleGenerating = generating
-		return nil
-	})
-}
-
-// UpdateTaskTitle sets a task's display title.
-func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) error {
-	// Compute the lowercased title before acquiring the lock so that the
-	// strings.ToLower call (potentially non-trivial for long titles) does not
-	// extend the critical section.
-	loweredTitle := strings.ToLower(title)
-	return s.mutateTask(id, func(t *Task) error {
-		t.Title = title
-		if entry, ok := s.searchIndex[id]; ok {
-			entry.title = loweredTitle
-			s.searchIndex[id] = entry
-		}
-		return nil
-	})
-}
-
 // UpdateTaskTurns updates only the turn counter for a task, leaving all other
 // fields (Result, SessionID, StopReason) unchanged. Used during test runs so
 // that the implementation agent's output is not overwritten.

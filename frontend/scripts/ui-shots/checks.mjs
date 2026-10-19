@@ -327,20 +327,6 @@ SCENES['feedback-live'] = async (page) => {
   expect('feedback-live', (await page.locator('[data-main-tab-section="changes"]').textContent()).includes('live change 3'), 'aggregate diff stayed stale');
 };
 
-SCENES['title-progress'] = async (page) => {
-  const response = await (await fixtureRequest(page, 'GET', '/api/tasks')).json();
-  const tasks = Array.isArray(response) ? response : response.tasks;
-  const task = tasks.find((t) => t.status === 'backlog');
-  task.title = '';
-  task.title_generating = true;
-  task.prompt = 'Prompt stays visible during title generation';
-  await page.route(/\/api\/tasks(?:\?.*)?$/, (route) => route.fulfill({ json: tasks }));
-  await page.route('**/api/tasks/stream*', (route) => route.fulfill({ contentType: 'text/event-stream', body: `event: snapshot\ndata: ${JSON.stringify(tasks)}\n\n` }));
-  await page.reload({ waitUntil: 'load' });
-  await page.getByText('Generating title…').waitFor({ state: 'visible' });
-  expect('title-progress', await page.getByText(task.prompt, { exact: true }).isVisible(), 'title progress hid the prompt');
-};
-
 SCENES['onboarding-guidance'] = async (page) => {
   await page.route('**/api/specs/tree*', (route) => route.fulfill({ json: { nodes: [], index: null, groups: [], progress: {} } }));
   await page.goto(base + '/plan', { waitUntil: 'load' });

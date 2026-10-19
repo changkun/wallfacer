@@ -12,10 +12,6 @@ import "time"
 // DefaultTaskTimeout is the default timeout for task execution.
 const DefaultTaskTimeout = 60 * time.Minute
 
-// TitleAgentTimeout bounds the background title-generation agent. Short
-// because the agent is headless and only needs to emit a 2–5 word summary.
-const TitleAgentTimeout = 60 * time.Second
-
 // OversightAgentTimeout bounds the oversight-summary agent. Generous
 // because oversight reads the full task event timeline before summarizing.
 const OversightAgentTimeout = 3 * time.Minute

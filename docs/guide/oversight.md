@@ -94,7 +94,7 @@ Open **Analytics** from the sidebar (or navigate to `/analytics`). The page has 
 
 ### Usage
 
-Token and cost accounting over a selectable period (last 7, 30, or 90 days, or all time): total cost and task count, plus **By Status** and **By Sub-Agent** tables. Sub-agents cover implementation, test, refinement, title generation, oversight, testing oversight, and agent sessions.
+Token and cost accounting over a selectable period (last 7, 30, or 90 days, or all time): total cost and task count, plus **By Status** and **By Sub-Agent** tables. Sub-agents cover implementation, test, refinement, oversight, testing oversight, and agent sessions.
 
 ### Tokens & cost
 

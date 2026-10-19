@@ -17,7 +17,7 @@ type Role struct {
 	Description string
 
 	// PromptTemplateName names the prompts-package API template
-	// this agent renders (e.g. "title", "commit_message"). Empty when
+	// this agent renders (e.g. "oversight", "commit_message"). Empty when
 	// the agent consumes a prompt handed to it by the caller
 	// without a built-in template (implementation, testing).
 	PromptTemplateName string

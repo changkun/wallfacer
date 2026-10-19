@@ -372,11 +372,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/generate-titles", Name: "GenerateMissingTitles",
-		Description: "Bulk-generate titles for tasks that lack one.",
-		Tags:        []string{"tasks"},
-	},
-	{
 		Method: http.MethodPost, Pattern: "/api/tasks/generate-oversight", Name: "GenerateMissingOversight",
 		Description: "Bulk-generate oversight summaries for eligible tasks.",
 		Tags:        []string{"tasks"},

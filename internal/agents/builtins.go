@@ -5,7 +5,6 @@ package agents
 // listed here, and a runner test checks that every role in this table has
 // one.
 var BuiltinAgents = []Role{
-	Title,
 	Oversight,
 	CommitMessage,
 	Implementation,

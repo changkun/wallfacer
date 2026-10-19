@@ -26,6 +26,6 @@
 // # Usage
 //
 //	mgr := prompts.NewManager(userDir)
-//	rendered := mgr.Title(taskPrompt)
-//	content, hasOverride, err := mgr.Content("title")
+//	rendered := mgr.Oversight(activityLog)
+//	content, hasOverride, err := mgr.Content("oversight")
 package prompts

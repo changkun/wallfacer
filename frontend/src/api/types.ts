@@ -47,7 +47,6 @@ export interface TaskUsage {
 export interface Task {
   id: string;
   title: string;
-  title_generating?: boolean;
   prompt: string;
   criteria?: string;
   status: TaskStatus;
@@ -238,9 +237,7 @@ export interface EnvConfig {
   openai_base_url: string;
   cursor_api_key: string;
   default_model: string;
-  title_model: string;
   codex_default_model: string;
-  codex_title_model: string;
   default_sandbox: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks: number;
@@ -266,9 +263,7 @@ export interface EnvUpdatePayload {
   openai_base_url?: string;
   cursor_api_key?: string;
   default_model?: string;
-  title_model?: string;
   codex_default_model?: string;
-  codex_title_model?: string;
   default_sandbox?: string;
   sandbox_by_activity?: Record<string, string>;
   max_parallel_tasks?: number;

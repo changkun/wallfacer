@@ -84,7 +84,7 @@ After a successful swap:
 
 #### Runner task-to-store resolution
 
-Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateTitle()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
+Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateOversight()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
 
 Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner, autoimplement watchers) to react to workspace switches.
 
@@ -127,7 +127,6 @@ Activities consulted by the env-file tier (`Runner.sandboxFromEnvForActivity()`,
 |---|---|---|
 | `implementation` | `WALLFACER_SANDBOX_IMPLEMENTATION` | Main task execution |
 | `testing` | `WALLFACER_SANDBOX_TESTING` | Test verification agent |
-| `title` | `WALLFACER_SANDBOX_TITLE` | Auto title generation |
 | `oversight` | `WALLFACER_SANDBOX_OVERSIGHT` | Oversight summary generation |
 | `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
 
@@ -143,8 +142,10 @@ There is no `--image` flag and no container start. The host backend selects the 
 
 `Runner.modelFromEnvForSandbox()` reads the model from the env file:
 
-- Claude: `CLAUDE_DEFAULT_MODEL` (title generation uses `CLAUDE_TITLE_MODEL` with fallback to the default).
-- Codex: `CODEX_DEFAULT_MODEL` (title generation uses `CODEX_TITLE_MODEL` with fallback to the default).
+- Claude: `CLAUDE_DEFAULT_MODEL`.
+- Codex: `CODEX_DEFAULT_MODEL`.
+
+The oversight and commit-message agents run on the same default model.
 
 ### Credential gate
 
@@ -165,8 +166,8 @@ The `Config` struct covers all known keys. Key categories:
 | Category | Fields |
 |---|---|
 | **Authentication** | `OAuthToken` (`CLAUDE_CODE_OAUTH_TOKEN`), `APIKey` (`ANTHROPIC_API_KEY`), `AuthToken` (`ANTHROPIC_AUTH_TOKEN`), `ServerAPIKey` (`WALLFACER_SERVER_API_KEY`) |
-| **Claude model** | `BaseURL`, `DefaultModel`, `TitleModel` |
-| **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
+| **Claude model** | `BaseURL`, `DefaultModel` |
+| **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel` |
 | **Cursor/OpenCode** | `CursorAPIKey` (`CURSOR_API_KEY`), `OpenCodeServerPassword` (`OPENCODE_SERVER_PASSWORD`) |
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
@@ -204,7 +205,6 @@ Prompt templates are embedded into the binary at compile time via `go:embed *.tm
 
 | Embedded file | API name | Used for |
 |---|---|---|
-| `title.tmpl` | `title` | Auto-generating task titles from prompts |
 | `commit.tmpl` | `commit_message` | Generating commit messages during the commit pipeline |
 | `test.tmpl` | `test_verification` | Test verification agent prompt |
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |

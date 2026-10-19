@@ -297,12 +297,6 @@ func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
 	r.taskBackground("oversight", taskID, func() { r.GenerateOversight(taskID) })
 }
 
-// GenerateTitleBackground launches GenerateTitle in a background goroutine
-// tracked by backgroundWg so that WaitBackground can drain it before cleanup.
-func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
-	r.taskBackground("title", taskID, func() { r.GenerateTitle(taskID, prompt) })
-}
-
 // NewRunner constructs a Runner from the given store and config. The returned
 // Runner is ready for use: it has an initialized circuit breaker, sandbox
 // backend, and a background goroutine watching for store mutations to

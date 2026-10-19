@@ -320,7 +320,6 @@ func (h *Handler) DispatchSpecs(w http.ResponseWriter, r *http.Request) {
 
 		h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
 			store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
-		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 	}
 
 	// Phase 3: Write dispatched_task_id back to spec files.

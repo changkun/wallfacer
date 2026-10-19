@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"latere.ai/x/wallfacer/internal/constants"
+	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 )
 
@@ -192,14 +194,20 @@ func TestFilesystemBackend_LoadAll_LeavesRoutineCardsUnread(t *testing.T) {
 // removedTaskFields are task.json keys that records written by earlier
 // releases may carry but Task no longer declares.
 var removedTaskFields = map[string]string{
-	"depends_on": `["11111111-1111-1111-1111-111111111111"]`,
+	"depends_on":       `["11111111-1111-1111-1111-111111111111"]`,
+	"title_generating": `true`,
 }
 
+// removedActivities are sandbox_by_activity keys that records written by
+// earlier releases may carry but no activity routes by any more.
+var removedActivities = []string{"title"}
+
 // TestFilesystemBackend_LoadAll_DropsRemovedTaskFields writes two records
-// carrying every removed field: one in an older schema, which LoadAll
-// migrates and rewrites, and one in the current schema, which LoadAll leaves
-// on disk until the task's next save. Both load, and neither key survives a
-// save.
+// carrying every removed field and every removed activity: one in an older
+// schema, which LoadAll migrates and rewrites, and one in the current schema,
+// which LoadAll leaves on disk until the task's next save. Both load with the
+// removed activities dropped from their routing, and no removed key survives
+// a save.
 func TestFilesystemBackend_LoadAll_DropsRemovedTaskFields(t *testing.T) {
 	b := newTestBackend(t)
 
@@ -208,7 +216,12 @@ func TestFilesystemBackend_LoadAll_DropsRemovedTaskFields(t *testing.T) {
 		id := uuid.New()
 		raw := `{"id":"` + id.String() + `","prompt":"stored","status":"backlog","timeout":60,` +
 			`"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z",` +
-			`"auto_retry_budget":{"container_crash":2},"schema_version":` + strconv.Itoa(schema)
+			`"auto_retry_budget":{"container_crash":2},"schema_version":` + strconv.Itoa(schema) +
+			`,"sandbox_by_activity":{"implementation":"claude"`
+		for _, a := range removedActivities {
+			raw += `,"` + a + `":"codex"`
+		}
+		raw += "}"
 		for k, v := range removedTaskFields {
 			raw += `,"` + k + `":` + v
 		}
@@ -232,6 +245,10 @@ func TestFilesystemBackend_LoadAll_DropsRemovedTaskFields(t *testing.T) {
 		t.Fatalf("expected both stored tasks to load, got %d", len(tasks))
 	}
 	for _, task := range tasks {
+		want := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
+		if !maps.Equal(task.SandboxByActivity, want) {
+			t.Errorf("task %s sandbox_by_activity = %v, want %v", task.ID, task.SandboxByActivity, want)
+		}
 		if task.ID == current {
 			if err := b.SaveTask(task); err != nil {
 				t.Fatalf("SaveTask: %v", err)

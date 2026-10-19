@@ -257,11 +257,9 @@ func TestUpdateEnvConfig_CodexModelRoundTrip(t *testing.T) {
 
 	body := map[string]string{
 		"default_model":       "claude-opus-4-1",
-		"title_model":         "claude-haiku-4-5",
 		"openai_api_key":      "sk-openai-test",
 		"openai_base_url":     "https://api.openai.com/v1",
 		"codex_default_model": "codex-mini-latest",
-		"codex_title_model":   "codex-title-test",
 	}
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(string(raw)))
@@ -283,14 +281,8 @@ func TestUpdateEnvConfig_CodexModelRoundTrip(t *testing.T) {
 	if resp.DefaultModel != "claude-opus-4-1" {
 		t.Errorf("DefaultModel = %q; want claude-opus-4-1", resp.DefaultModel)
 	}
-	if resp.TitleModel != "claude-haiku-4-5" {
-		t.Errorf("TitleModel = %q; want claude-haiku-4-5", resp.TitleModel)
-	}
 	if resp.CodexDefaultModel != "codex-mini-latest" {
 		t.Errorf("CodexDefaultModel = %q; want codex-mini-latest", resp.CodexDefaultModel)
-	}
-	if resp.CodexTitleModel != "codex-title-test" {
-		t.Errorf("CodexTitleModel = %q; want codex-title-test", resp.CodexTitleModel)
 	}
 	if resp.OpenAIAPIKey != "sk-o...test" {
 		t.Errorf("OpenAIAPIKey = %q; want masked value", resp.OpenAIAPIKey)
@@ -705,26 +697,6 @@ func TestUpdateEnvConfig_OpenAIBaseURLSSRFRejected(t *testing.T) {
 	h.UpdateEnvConfig(w, req)
 	if w.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422 for private openai_base_url, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-// TestUpdateEnvConfig_SetTitleModel verifies that title_model can be set.
-func TestUpdateEnvConfig_SetTitleModel(t *testing.T) {
-	h, envPath := newTestHandlerWithEnv(t)
-	model := "claude-haiku-4-5"
-	body := `{"title_model":"claude-haiku-4-5"}`
-	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateEnvConfig(w, req)
-	if w.Code != http.StatusNoContent {
-		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
-	}
-	cfg, err := envconfig.Parse(envPath)
-	if err != nil {
-		t.Fatalf("parse env: %v", err)
-	}
-	if cfg.TitleModel != model {
-		t.Errorf("TitleModel = %q; want %q", cfg.TitleModel, model)
 	}
 }
 

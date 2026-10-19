@@ -52,7 +52,6 @@ type agentOutput struct {
 const (
 	activityImplementation = store.SandboxActivityImplementation
 	activityTesting        = store.SandboxActivityTesting
-	activityTitle          = store.SandboxActivityTitle
 	activityOversight      = store.SandboxActivityOversight
 	activityCommitMessage  = store.SandboxActivityCommitMessage
 )
@@ -266,10 +265,6 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) harne
 		if cfg.TestingSandbox != "" {
 			return cfg.TestingSandbox
 		}
-	case activityTitle:
-		if cfg.TitleSandbox != "" {
-			return cfg.TitleSandbox
-		}
 	case activityOversight:
 		if cfg.OversightSandbox != "" {
 			return cfg.OversightSandbox
@@ -296,30 +291,6 @@ func (r *Runner) modelFromEnvForSandbox(sb harness.ID) string {
 	case harness.Codex:
 		return cfg.CodexDefaultModel
 	default:
-		return cfg.DefaultModel
-	}
-}
-
-// titleModelFromEnvForSandbox returns the sandbox-specific title model.
-// Supports "claude" and "codex" values.
-func (r *Runner) titleModelFromEnvForSandbox(sb harness.ID) string {
-	if r.envFile == "" {
-		return ""
-	}
-	cfg, err := envconfig.Parse(r.envFile)
-	if err != nil {
-		return ""
-	}
-	switch sb {
-	case harness.Codex:
-		if cfg.CodexTitleModel != "" {
-			return cfg.CodexTitleModel
-		}
-		return cfg.CodexDefaultModel
-	default:
-		if cfg.TitleModel != "" {
-			return cfg.TitleModel
-		}
 		return cfg.DefaultModel
 	}
 }

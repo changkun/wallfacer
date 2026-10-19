@@ -168,6 +168,7 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 // taskCreateFields are the fields of a new task that POST /api/tasks
 // accepts, with their mapping onto the stored task in apply.
 type taskCreateFields struct {
+	Title              string         `json:"title"`
 	Prompt             string         `json:"prompt"`
 	Criteria           string         `json:"criteria"`
 	Timeout            int            `json:"timeout"`
@@ -182,11 +183,12 @@ type taskCreateFields struct {
 	Model              string         `json:"model"`
 }
 
-// apply copies the fields into opts. The store normalizes the model and the
-// budget: a negative limit becomes unlimited and a blank model leaves the
-// global default in effect. The caller validates the prompt and the custom
-// patterns first.
+// apply copies the fields into opts. The store normalizes the title, the
+// model and the budget: a blank title is derived from the prompt, a negative
+// limit becomes unlimited, and a blank model leaves the global default in
+// effect. The caller validates the prompt and the custom patterns first.
 func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
+	opts.Title = f.Title
 	opts.Prompt = f.Prompt
 	opts.Criteria = f.Criteria
 	opts.Timeout = f.Timeout
@@ -252,8 +254,6 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	h.insertEventOrLog(r.Context(), task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
-
-	h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 
 	httpjson.Write(w, http.StatusCreated, task)
 }

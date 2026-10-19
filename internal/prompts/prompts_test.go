@@ -14,14 +14,14 @@ import (
 // userDir is used in place of the embedded default.
 func TestNewManager_OverrideRendered(t *testing.T) {
 	dir := t.TempDir()
-	const override = "Custom title prompt: {{.Prompt}}"
-	if err := os.WriteFile(filepath.Join(dir, "title.tmpl"), []byte(override), 0644); err != nil {
+	const override = "Custom oversight prompt: {{.ActivityLog}}"
+	if err := os.WriteFile(filepath.Join(dir, "oversight.tmpl"), []byte(override), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	mgr := prompts.NewManager(dir)
-	got := mgr.Title("hello world")
-	if got != "Custom title prompt: hello world" {
+	got := mgr.Oversight("hello world")
+	if got != "Custom oversight prompt: hello world" {
 		t.Errorf("expected override content, got: %q", got)
 	}
 }
@@ -32,10 +32,10 @@ func TestNewManager_FallsBackToEmbedded(t *testing.T) {
 	dir := t.TempDir()
 	// No override files written.
 	mgr := prompts.NewManager(dir)
-	// Should produce non-empty output using the embedded title template.
-	got := mgr.Title("my task prompt")
+	// Should produce non-empty output using the embedded oversight template.
+	got := mgr.Oversight("my task prompt")
 	if strings.TrimSpace(got) == "" {
-		t.Error("expected non-empty output from embedded title template, got empty string")
+		t.Error("expected non-empty output from embedded oversight template, got empty string")
 	}
 	// The embedded template must not contain the raw Go template syntax.
 	if strings.Contains(got, "{{") {
@@ -48,13 +48,13 @@ func TestNewManager_FallsBackToEmbedded(t *testing.T) {
 func TestNewManager_InvalidOverrideFallsBack(t *testing.T) {
 	dir := t.TempDir()
 	// Write an invalid template.
-	if err := os.WriteFile(filepath.Join(dir, "title.tmpl"), []byte("{{broken"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "oversight.tmpl"), []byte("{{broken"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	mgr := prompts.NewManager(dir)
 	// Should fall back to the embedded template without panicking.
-	got := mgr.Title("my task")
+	got := mgr.Oversight("my task")
 	if strings.TrimSpace(got) == "" {
 		t.Error("expected non-empty fallback output, got empty string")
 	}
@@ -79,12 +79,12 @@ func TestWriteOverride_Valid(t *testing.T) {
 	dir := t.TempDir()
 	mgr := prompts.NewManager(dir)
 
-	const content = "Override: {{.Prompt}}"
-	if err := mgr.WriteOverride("title", content); err != nil {
+	const content = "Override: {{.ActivityLog}}"
+	if err := mgr.WriteOverride("oversight", content); err != nil {
 		t.Fatalf("WriteOverride: %v", err)
 	}
 
-	got, hasOverride, err := mgr.Content("title")
+	got, hasOverride, err := mgr.Content("oversight")
 	if err != nil {
 		t.Fatalf("Content: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestWriteOverride_Invalid(t *testing.T) {
 	dir := t.TempDir()
 	mgr := prompts.NewManager(dir)
 
-	if err := mgr.WriteOverride("title", "{{broken"); err == nil {
+	if err := mgr.WriteOverride("oversight", "{{broken"); err == nil {
 		t.Error("expected error for invalid template, got nil")
 	}
 
@@ -126,13 +126,13 @@ func TestDeleteOverride_ExistingOverride(t *testing.T) {
 	dir := t.TempDir()
 	mgr := prompts.NewManager(dir)
 
-	if err := mgr.WriteOverride("title", "custom {{.Prompt}}"); err != nil {
+	if err := mgr.WriteOverride("oversight", "custom {{.ActivityLog}}"); err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.DeleteOverride("title"); err != nil {
+	if err := mgr.DeleteOverride("oversight"); err != nil {
 		t.Fatalf("DeleteOverride: %v", err)
 	}
-	_, hasOverride, err := mgr.Content("title")
+	_, hasOverride, err := mgr.Content("oversight")
 	if err != nil {
 		t.Fatalf("Content after delete: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestDeleteOverride_ExistingOverride(t *testing.T) {
 // override exists to delete.
 func TestDeleteOverride_MissingReturnsErrNotExist(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
-	if err := mgr.DeleteOverride("title"); err == nil {
+	if err := mgr.DeleteOverride("oversight"); err == nil {
 		t.Error("expected error when no override exists, got nil")
 	}
 }
@@ -181,9 +181,9 @@ func TestContent_UnknownName(t *testing.T) {
 // TestDefaultManagerRendersEmbedded verifies the package-level Default
 // manager (empty userDir) still renders embedded templates correctly.
 func TestDefaultManagerRendersEmbedded(t *testing.T) {
-	got := prompts.Default.Title("test task")
+	got := prompts.Default.Oversight("test task")
 	if strings.TrimSpace(got) == "" {
-		t.Error("Default.Title returned empty string")
+		t.Error("Default.Oversight returned empty string")
 	}
 }
 

@@ -164,9 +164,9 @@ RetryRecord {
 
 The list is capped at `DefaultRetryHistoryLimit` (10) entries. This allows operators to inspect the history of failed attempts.
 
-## Title Generation
+## Titles
 
-When a task is created, a background goroutine (`runner.GenerateTitle`) runs a lightweight host process to generate a short title from the prompt. Titles are stored on the task and displayed on the board cards instead of the full prompt text. `POST /api/tasks/generate-titles` can retroactively generate titles for older untitled tasks.
+A task's title is set when the task is created and never changes afterwards. A `title` sent with `POST /api/tasks` is kept as given (trimmed). Otherwise `store.DeriveTitle` takes the prompt's first non-blank line, removes a leading Markdown heading marker (one to six `#` and a space), collapses runs of whitespace, and, when the line is longer than `store.TitleMaxRunes` (60) runes, cuts it at the last word boundary that fits and appends an ellipsis. Spec dispatch derives the title the same way from the spec body, so a spec's `# Heading` becomes its task's title. A chat thread still named `Chat N` after its first turn is renamed by the same rule from its opening message. Titles are displayed on the board cards instead of the full prompt text; titles stored by earlier releases are kept as they are.
 
 ## Prompt Refinement
 

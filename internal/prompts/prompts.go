@@ -56,7 +56,6 @@ func templateFuncMap() template.FuncMap {
 // embeddedToAPI maps embedded template file names to user-facing API names.
 var embeddedToAPI = map[string]string{
 	"oversight.tmpl":            "oversight",
-	"title.tmpl":                "title",
 	"commit.tmpl":               "commit_message",
 	"conflict.tmpl":             "conflict_resolution",
 	"test.tmpl":                 "test_verification",
@@ -70,7 +69,6 @@ var embeddedToAPI = map[string]string{
 // apiToEmbedded maps user-facing API names to embedded template file names.
 var apiToEmbedded = map[string]string{
 	"oversight":            "oversight.tmpl",
-	"title":                "title.tmpl",
 	"commit_message":       "commit.tmpl",
 	"conflict_resolution":  "conflict.tmpl",
 	"test_verification":    "test.tmpl",
@@ -85,7 +83,6 @@ var apiToEmbedded = map[string]string{
 var knownNames = []string{
 	"task_prompt_refine",
 	"oversight",
-	"title",
 	"commit_message",
 	"conflict_resolution",
 	"test_verification",
@@ -260,8 +257,6 @@ func mockContextFor(apiName string) (any, bool) {
 		return ReviewData{Prompt: "example prompt", Round: 1, MaxRounds: 3}, true
 	case "oversight":
 		return struct{ ActivityLog string }{ActivityLog: "example activity log"}, true
-	case "title":
-		return struct{ Prompt string }{Prompt: "example task"}, true
 	case "spec":
 		return nil, true
 	case "spec_system_empty", "spec_system_nonempty":
@@ -364,11 +359,6 @@ func (m *Manager) TaskPromptRefine(d RefinementData) string {
 // pre-formatted activity log text.
 func (m *Manager) Oversight(activityLog string) string {
 	return m.render("oversight.tmpl", struct{ ActivityLog string }{activityLog})
-}
-
-// Title renders the title-generation prompt for the given task prompt.
-func (m *Manager) Title(taskPrompt string) string {
-	return m.render("title.tmpl", struct{ Prompt string }{taskPrompt})
 }
 
 // CommitMessage renders the commit message generation prompt.

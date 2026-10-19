@@ -1122,75 +1122,6 @@ func TestServeOutput_JSONFile(t *testing.T) {
 	}
 }
 
-// TestGenerateMissingTitles_NoUntitled verifies response when all tasks have titles.
-func TestGenerateMissingTitles_NoUntitled(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
-	_ = h.store.UpdateTaskTitle(ctx, task.ID, "My Task Title")
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles", nil)
-	w := httptest.NewRecorder()
-	h.GenerateMissingTitles(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	if queued, ok := resp["queued"].(float64); !ok || queued != 0 {
-		t.Errorf("expected queued=0, got %v", resp["queued"])
-	}
-}
-
-// TestGenerateMissingTitles_WithUntitled verifies that untitled tasks are queued.
-func TestGenerateMissingTitles_WithUntitled(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task without title", Timeout: 15})
-
-	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "another without title", Timeout: 15})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles", nil)
-	w := httptest.NewRecorder()
-	h.GenerateMissingTitles(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	if total, ok := resp["total_without_title"].(float64); !ok || total != 2 {
-		t.Errorf("expected total_without_title=2, got %v", resp["total_without_title"])
-	}
-}
-
-// TestGenerateMissingTitles_LimitParam verifies the limit query parameter is respected.
-func TestGenerateMissingTitles_LimitParam(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	for range 5 {
-		_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task without title", Timeout: 15})
-
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles?limit=2", nil)
-	w := httptest.NewRecorder()
-	h.GenerateMissingTitles(w, req)
-
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	if queued, ok := resp["queued"].(float64); !ok || queued != 2 {
-		t.Errorf("expected queued=2, got %v", resp["queued"])
-	}
-	if total, ok := resp["total_without_title"].(float64); !ok || total != 5 {
-		t.Errorf("expected total_without_title=5, got %v", resp["total_without_title"])
-	}
-}
-
 // TestTryAutoPromote_DoesNotCountTestRuns verifies that test-run in_progress
 // tasks (IsTestRun=true) do not count against the regular task concurrency limit,
 // so testing tasks cannot starve regular backlog promotions.
@@ -2933,18 +2864,11 @@ func TestCreateTask_ReturnsSandboxBudgetAndScheduleInBody(t *testing.T) {
 	}
 }
 
-// Creation delta tests isolate the synchronous write from the title worker's
-// intentional start/finish notifications, covered by runner title tests.
-type creationOnlyRunner struct{ runner.Interface }
-
-func (creationOnlyRunner) GenerateTitleBackground(uuid.UUID, string) {}
-
 // TestCreateTask_EmitsOnlyOneDelta verifies that creating a fully configured
 // task (sandbox + budget + schedule) emits exactly one SSE delta, not one per
 // post-create update call.
 func TestCreateTask_EmitsOnlyOneDelta(t *testing.T) {
 	h := newTestHandler(t)
-	h.runner = creationOnlyRunner{h.runner}
 
 	subID, deltaCh := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)

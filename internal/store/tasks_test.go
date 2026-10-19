@@ -496,30 +496,6 @@ func TestForceUpdateTaskStatus_BypassesValidation(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UpdateTaskTitle
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestUpdateTaskTitle(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	if err := s.UpdateTaskTitle(bg(), task.ID, "New Title"); err != nil {
-		t.Fatalf("UpdateTaskTitle: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.Title != "New Title" {
-		t.Errorf("Title = %q, want 'New Title'", got.Title)
-	}
-}
-
-func TestUpdateTaskTitle_NotFound(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.UpdateTaskTitle(bg(), uuid.New(), "t"); err == nil {
-		t.Error("expected error for unknown task")
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // UpdateTaskResult
 // ─────────────────────────────────────────────────────────────────────────────
 

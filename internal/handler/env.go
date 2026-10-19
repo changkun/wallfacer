@@ -106,9 +106,7 @@ type envConfigResponse struct {
 	OpenAIBaseURL        string                               `json:"openai_base_url"`
 	CursorAPIKey         string                               `json:"cursor_api_key"` // masked
 	DefaultModel         string                               `json:"default_model"`
-	TitleModel           string                               `json:"title_model"`
 	CodexDefaultModel    string                               `json:"codex_default_model"`
-	CodexTitleModel      string                               `json:"codex_title_model"`
 	DefaultSandbox       harness.ID                           `json:"default_sandbox"`
 	SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
@@ -149,9 +147,7 @@ type sandboxTestRequest struct {
 	OpenAIBaseURL     *string                              `json:"openai_base_url"`
 	CursorAPIKey      *string                              `json:"cursor_api_key"`
 	DefaultModel      *string                              `json:"default_model"`
-	TitleModel        *string                              `json:"title_model"`
 	CodexDefaultModel *string                              `json:"codex_default_model"`
-	CodexTitleModel   *string                              `json:"codex_title_model"`
 	DefaultSandbox    *harness.ID                          `json:"default_sandbox"`
 	SandboxByActivity map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 }
@@ -202,9 +198,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		OpenAIBaseURL:        cfg.OpenAIBaseURL,
 		CursorAPIKey:         envconfig.MaskToken(cfg.CursorAPIKey),
 		DefaultModel:         cfg.DefaultModel,
-		TitleModel:           cfg.TitleModel,
 		CodexDefaultModel:    cfg.CodexDefaultModel,
-		CodexTitleModel:      cfg.CodexTitleModel,
 		DefaultSandbox:       cfg.DefaultSandbox,
 		SandboxByActivity:    cfg.SandboxByActivity(),
 		MaxParallelTasks:     maxParallel,
@@ -402,9 +396,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		OpenAIBaseURL:     req.OpenAIBaseURL,
 		CursorAPIKey:      req.CursorAPIKey,
 		DefaultModel:      req.DefaultModel,
-		TitleModel:        req.TitleModel,
 		CodexDefaultModel: req.CodexDefaultModel,
-		CodexTitleModel:   req.CodexTitleModel,
 	}); err != nil {
 		return "", err
 	}
@@ -439,9 +431,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OpenAIBaseURL        *string                              `json:"openai_base_url"`
 		CursorAPIKey         *string                              `json:"cursor_api_key"`
 		DefaultModel         *string                              `json:"default_model"`
-		TitleModel           *string                              `json:"title_model"`
 		CodexDefaultModel    *string                              `json:"codex_default_model"`
-		CodexTitleModel      *string                              `json:"codex_title_model"`
 		DefaultSandbox       *harness.ID                          `json:"default_sandbox"`
 		SandboxByActivity    map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
@@ -592,9 +582,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OpenAIBaseURL:        req.OpenAIBaseURL,
 		CursorAPIKey:         req.CursorAPIKey,
 		DefaultModel:         req.DefaultModel,
-		TitleModel:           req.TitleModel,
 		CodexDefaultModel:    req.CodexDefaultModel,
-		CodexTitleModel:      req.CodexTitleModel,
 		MaxParallel:          maxParallel,
 		MaxTestParallel:      maxTestParallel,
 		MaxAgents:            maxAgents,

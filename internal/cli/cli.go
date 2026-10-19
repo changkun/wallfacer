@@ -60,8 +60,6 @@ func initConfigDir(configDir, envFile string) {
 			"# ANTHROPIC_BASE_URL=https://api.anthropic.com\n\n" +
 			"# Optional: default model for Claude tasks.\n" +
 			"# CLAUDE_DEFAULT_MODEL=\n\n" +
-			"# Optional: model for auto-generating task titles (falls back to default model).\n" +
-			"# CLAUDE_TITLE_MODEL=\n\n" +
 			"# =============================================================================\n" +
 			"# OpenAI Codex (set OPENAI_API_KEY to enable Codex-typed tasks).\n" +
 			"# =============================================================================\n\n" +
@@ -70,9 +68,7 @@ func initConfigDir(configDir, envFile string) {
 			"# Optional: custom OpenAI-compatible API base URL.\n" +
 			"# OPENAI_BASE_URL=https://api.openai.com/v1\n\n" +
 			"# Optional: default model for Codex tasks.\n" +
-			"# CODEX_DEFAULT_MODEL=codex-mini-latest\n\n" +
-			"# Optional: model for auto-generating task titles with Codex (falls back to CODEX_DEFAULT_MODEL).\n" +
-			"# CODEX_TITLE_MODEL=codex-mini-latest\n"
+			"# CODEX_DEFAULT_MODEL=codex-mini-latest\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
 			logger.Fatal("create env file", "error", err)
 		}

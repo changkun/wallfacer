@@ -84,7 +84,6 @@ func TestSandboxByActivity(t *testing.T) {
 	cfg := Config{
 		ImplementationSandbox: "claude",
 		TestingSandbox:        "codex",
-		TitleSandbox:          "claude",
 		OversightSandbox:      "codex",
 		CommitMessageSandbox:  "codex",
 	}
@@ -92,7 +91,6 @@ func TestSandboxByActivity(t *testing.T) {
 	want := map[store.SandboxActivity]string{
 		store.SandboxActivityImplementation: "claude",
 		store.SandboxActivityTesting:        "codex",
-		store.SandboxActivityTitle:          "claude",
 		store.SandboxActivityOversight:      "codex",
 		store.SandboxActivityCommitMessage:  "codex",
 	}
@@ -130,7 +128,7 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	defaultSandbox := harness.Codex
 	if err := UpdateSandboxSettings(path, &defaultSandbox, map[store.SandboxActivity]harness.ID{
 		store.SandboxActivityImplementation: harness.Codex,
-		store.SandboxActivityTitle:          harness.Claude,
+		store.SandboxActivityOversight:      harness.Claude,
 		store.SandboxActivityCommitMessage:  "",
 	}); err != nil {
 		t.Fatalf("UpdateSandboxSettings: %v", err)
@@ -153,8 +151,8 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	if cfg.CommitMessageSandbox != "" {
 		t.Errorf("CommitMessageSandbox should be cleared, got %q", cfg.CommitMessageSandbox)
 	}
-	if cfg.TitleSandbox != "claude" {
-		t.Errorf("TitleSandbox = %q, want claude", cfg.TitleSandbox)
+	if cfg.OversightSandbox != "claude" {
+		t.Errorf("OversightSandbox = %q, want claude", cfg.OversightSandbox)
 	}
 
 	raw, err := os.ReadFile(path)

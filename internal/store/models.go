@@ -144,8 +144,6 @@ const (
 	SandboxActivityTesting SandboxActivity = "testing"
 	// SandboxActivityRefinement is the prompt-refinement phase.
 	SandboxActivityRefinement SandboxActivity = "refinement"
-	// SandboxActivityTitle is the background title-generation phase.
-	SandboxActivityTitle SandboxActivity = "title"
 	// SandboxActivityOversight is the oversight summary generation phase.
 	SandboxActivityOversight SandboxActivity = "oversight"
 	// SandboxActivityCommitMessage is the commit-message generation phase.
@@ -170,7 +168,6 @@ var SandboxActivities = []SandboxActivity{
 	SandboxActivityImplementation,
 	SandboxActivityTesting,
 	SandboxActivityRefinement,
-	SandboxActivityTitle,
 	SandboxActivityOversight,
 	SandboxActivityCommitMessage,
 	SandboxActivityAgentSession,
@@ -246,11 +243,10 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion   int       `json:"schema_version"`
-	ID              uuid.UUID `json:"id"`
-	Title           string    `json:"title,omitempty"`
-	TitleGenerating bool      `json:"title_generating,omitempty"`
-	Prompt          string    `json:"prompt"`
+	SchemaVersion int       `json:"schema_version"`
+	ID            uuid.UUID `json:"id"`
+	Title         string    `json:"title,omitempty"`
+	Prompt        string    `json:"prompt"`
 	// Criteria is user-defined free-form acceptance criteria for the test
 	// verification agent (and review critics). When non-empty it renders into the
 	// test prompt's "Acceptance Criteria" section. Interpreted by the agent, not

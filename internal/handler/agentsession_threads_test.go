@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
-	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -19,50 +18,26 @@ func TestMaybeAutoTitleThread(t *testing.T) {
 	tm := h.agentSession.Sessions()
 	id := tm.List(false)[0].ID // default "Chat 1"
 
-	var gotMsg string
-	h.runner = &runner.MockRunner{
-		GenerateAgentSessionTitleFn: func(_ context.Context, msg string) (string, error) {
-			gotMsg = msg
-			return "Auth Refactor", nil
-		},
+	// A still-default thread is named from the first line of its opening
+	// message, with a leading heading marker removed.
+	h.maybeAutoTitleThread(tm, id, "\n# Refactor the auth layer\nso that sessions are read once")
+	if meta, _ := tm.Meta(id); meta.Name != "Refactor the auth layer" {
+		t.Fatalf("name = %q, want %q", meta.Name, "Refactor the auth layer")
 	}
 
-	// A still-default thread is titled from its opening message.
-	h.maybeAutoTitleThread(tm, id, "help me refactor the auth layer")
-	if gotMsg != "help me refactor the auth layer" {
-		t.Errorf("title input = %q", gotMsg)
-	}
-	if meta, _ := tm.Meta(id); meta.Name != "Auth Refactor" {
-		t.Fatalf("name = %q, want Auth Refactor", meta.Name)
-	}
-
-	// A titled thread is left alone (the model is not called again).
-	gotMsg = ""
+	// A titled thread is left alone.
 	h.maybeAutoTitleThread(tm, id, "another message")
-	if gotMsg != "" {
-		t.Error("a non-default thread should not be re-titled")
+	if meta, _ := tm.Meta(id); meta.Name != "Refactor the auth layer" {
+		t.Errorf("a non-default thread was re-titled to %q", meta.Name)
 	}
 }
 
-func TestMaybeAutoTitleThread_Skips(t *testing.T) {
+func TestMaybeAutoTitleThread_BlankMessageKeepsDefault(t *testing.T) {
 	h := newAgentSessionHandlerWithThreads(t)
 	tm := h.agentSession.Sessions()
 	id := tm.List(false)[0].ID
 
-	called := false
-	h.runner = &runner.MockRunner{
-		GenerateAgentSessionTitleFn: func(_ context.Context, _ string) (string, error) {
-			called = true
-			return "", nil // blank model response
-		},
-	}
-	// Blank message: the model is never consulted.
-	h.maybeAutoTitleThread(tm, id, "   ")
-	if called {
-		t.Error("blank message should not call the title model")
-	}
-	// Blank title result: no rename; the default name stays.
-	h.maybeAutoTitleThread(tm, id, "hi")
+	h.maybeAutoTitleThread(tm, id, "  \n\t\n")
 	if meta, _ := tm.Meta(id); !agentsession.IsDefaultThreadName(meta.Name) {
 		t.Errorf("name should remain default, got %q", meta.Name)
 	}

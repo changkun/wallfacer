@@ -121,9 +121,8 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := newTestFileStore(t, dir)
 
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Timeout: 15})
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Title: "Round Trip Title", Timeout: 15})
 	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
-	_ = s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation, TaskUsage{InputTokens: 100, CostUSD: 0.5})
 	_ = s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "task/rt")
 	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
@@ -195,8 +194,7 @@ func transitionToDone(t *testing.T, s *Store, id uuid.UUID) {
 func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary test", Timeout: 10})
-	_ = s.UpdateTaskTitle(bg(), task.ID, "Summary Test")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary test", Title: "Summary Test", Timeout: 10})
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
 	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
@@ -248,8 +246,7 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force done task", Timeout: 10})
-	_ = s.UpdateTaskTitle(bg(), task.ID, "Force Done Task")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force done task", Title: "Force Done Task", Timeout: 10})
 	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 50, OutputTokens: 25, CostUSD: 0.21})
 	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
@@ -501,8 +498,8 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 
 	// After loading, schema version is already migrated to current.
 	// Perform a mutation to confirm the version stays current.
-	if err := s.UpdateTaskTitle(bg(), id, "Updated Title"); err != nil {
-		t.Fatalf("UpdateTaskTitle: %v", err)
+	if err := s.UpdateTaskTags(bg(), id, []string{"updated"}); err != nil {
+		t.Fatalf("UpdateTaskTags: %v", err)
 	}
 
 	raw, err := os.ReadFile(taskFile)
@@ -516,8 +513,8 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 	if persisted.SchemaVersion != constants.CurrentTaskSchemaVersion {
 		t.Errorf("SchemaVersion after mutation = %d, want %d", persisted.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
-	if persisted.Title != "Updated Title" {
-		t.Errorf("Title = %q, want 'Updated Title'", persisted.Title)
+	if len(persisted.Tags) != 1 || persisted.Tags[0] != "updated" {
+		t.Errorf("Tags = %v, want [updated]", persisted.Tags)
 	}
 }
 

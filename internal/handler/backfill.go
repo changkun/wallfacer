@@ -10,9 +10,8 @@ import (
 )
 
 // runBackfillBatch is the shared scaffolding for "scan all tasks, queue
-// background work for those missing X" endpoints (GenerateMissingTitles,
-// GenerateMissingOversight, and any future backfills with the same
-// shape).
+// background work for those missing X" endpoints (GenerateMissingOversight,
+// and any future backfills with the same shape).
 //
 // limit comes from ?limit=N with a default of 10 and 0 meaning "no cap".
 // eligible decides which tasks qualify (consulted after the full task
@@ -20,7 +19,7 @@ import (
 // task — typically a background goroutine that calls the runner.
 //
 // totalKey names the response field that carries the unfiltered eligible
-// count, e.g. "total_without_title" or "total_without_oversight", so the
+// count, e.g. "total_without_oversight", so the
 // JSON envelope stays callable from the existing frontend.
 func (h *Handler) runBackfillBatch(
 	w http.ResponseWriter, r *http.Request,

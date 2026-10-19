@@ -30,7 +30,6 @@ func TestRebuildSearchIndex_RaceWithMutations(t *testing.T) {
 
 	wg.Go(func() {
 		for i := range iters {
-			_ = s.UpdateTaskTitle(ctx, task.ID, "title-"+strconv.Itoa(i))
 			_ = s.UpdateTaskTags(ctx, task.ID, []string{"tag-" + strconv.Itoa(i)})
 		}
 	})

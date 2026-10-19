@@ -486,7 +486,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	go func() {
 		for i := range 20 {
 			time.Sleep(25 * time.Millisecond)
-			_ = h.store.UpdateTaskTitle(ctx, task.ID, fmt.Sprintf("trigger wake %d", i))
+			_ = h.store.UpdateTaskTags(ctx, task.ID, []string{fmt.Sprintf("trigger-wake-%d", i)})
 			wakeCount++
 		}
 	}()
@@ -555,7 +555,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	go func() {
 		for i := range 20 {
 			time.Sleep(25 * time.Millisecond)
-			_ = h.store.UpdateTaskTitle(ctx, task.ID, fmt.Sprintf("trigger wake %d", i))
+			_ = h.store.UpdateTaskTags(ctx, task.ID, []string{fmt.Sprintf("trigger-wake-%d", i)})
 		}
 	}()
 

@@ -13,7 +13,6 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
-	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -153,7 +152,7 @@ func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 
 // oversightIntervalFromEnv reads WALLFACER_OVERSIGHT_INTERVAL from the env file
 // and returns it as a time.Duration. Returns 0 if the file is missing, unset,
-// or set to 0 (disabled). Mirrors the pattern used by titleModelFromEnvForSandbox.
+// or set to 0 (disabled).
 func (r *Runner) oversightIntervalFromEnv() time.Duration {
 	if r.envFile == "" {
 		return 0
@@ -711,9 +710,6 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		TrackUsage:       true,
 		Turn:             1,
 		ActivityOverride: agent,
-		// Oversight historically uses the same "small model" env var
-		// as title so operators can route both to a cheaper model.
-		ModelResolver: func(sb harness.ID) string { return r.titleModelFromEnvForSandbox(sb) },
 	})
 	if err != nil {
 		logger.Runner.Warn("oversight: agent container failed",

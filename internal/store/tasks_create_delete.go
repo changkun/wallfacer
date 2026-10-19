@@ -29,6 +29,9 @@ var defaultAutoRetryBudget = map[FailureCategory]int{
 
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
+	// Title is the task's display title. When blank after trimming, the
+	// title is derived from Prompt by DeriveTitle.
+	Title          string
 	Prompt         string
 	Criteria       string
 	Timeout        int
@@ -66,6 +69,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	task := &Task{
 		SchemaVersion:  constants.CurrentTaskSchemaVersion,
 		ID:             id,
+		Title:          strings.TrimSpace(opts.Title),
 		Prompt:         opts.Prompt,
 		Criteria:       opts.Criteria,
 		Status:         TaskStatusBacklog,
@@ -84,6 +88,10 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 			FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
 			FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
 		},
+	}
+
+	if task.Title == "" {
+		task.Title = DeriveTitle(opts.Prompt)
 	}
 
 	// Tags: deep-copy to protect store state from caller mutation.

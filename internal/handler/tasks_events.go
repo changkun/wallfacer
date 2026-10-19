@@ -180,11 +180,3 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, _ *http.Request, id uuid.UU
 	}
 	_, _ = w.Write(data)
 }
-
-// GenerateMissingTitles triggers background title generation for untitled tasks.
-func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) {
-	h.runBackfillBatch(w, r, "total_without_title",
-		func(t store.Task) bool { return t.Title == "" },
-		func(t store.Task) { h.runner.GenerateTitleBackground(t.ID, t.Prompt) },
-	)
-}

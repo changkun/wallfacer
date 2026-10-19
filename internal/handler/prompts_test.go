@@ -49,8 +49,8 @@ func TestListSystemPrompts_ReturnsAll(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(result) != 10 {
-		t.Errorf("len(result) = %d, want 10", len(result))
+	if len(result) != 9 {
+		t.Errorf("len(result) = %d, want 9", len(result))
 	}
 	for _, item := range result {
 		if item["name"] == "" {
@@ -85,8 +85,8 @@ func TestListSystemPrompts_NoOverrideByDefault(t *testing.T) {
 
 func TestGetSystemPrompt_KnownName(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/system-prompts/title", nil)
-	req.SetPathValue("name", "title")
+	req := httptest.NewRequest(http.MethodGet, "/api/system-prompts/oversight", nil)
+	req.SetPathValue("name", "oversight")
 	w := httptest.NewRecorder()
 	h.GetSystemPrompt(w, req)
 
@@ -96,8 +96,8 @@ func TestGetSystemPrompt_KnownName(t *testing.T) {
 	var result map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&result)
 
-	if result["name"] != "title" {
-		t.Errorf("name = %v, want title", result["name"])
+	if result["name"] != "oversight" {
+		t.Errorf("name = %v, want oversight", result["name"])
 	}
 }
 
@@ -118,10 +118,10 @@ func TestGetSystemPrompt_UnknownName(t *testing.T) {
 func TestUpdateSystemPrompt_ValidTemplate(t *testing.T) {
 	h, mgr := newTestHandlerWithPrompts(t)
 
-	body, _ := json.Marshal(map[string]string{"content": "Custom: {{.Prompt}}"})
-	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/title", bytes.NewReader(body))
+	body, _ := json.Marshal(map[string]string{"content": "Custom: {{.ActivityLog}}"})
+	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/oversight", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("name", "title")
+	req.SetPathValue("name", "oversight")
 	w := httptest.NewRecorder()
 	h.UpdateSystemPrompt(w, req)
 
@@ -130,7 +130,7 @@ func TestUpdateSystemPrompt_ValidTemplate(t *testing.T) {
 	}
 
 	// Confirm the manager uses the override.
-	got := mgr.Title("hello")
+	got := mgr.Oversight("hello")
 	if got != "Custom: hello" {
 		t.Errorf("rendered override = %q, want %q", got, "Custom: hello")
 	}
@@ -142,9 +142,9 @@ func TestUpdateSystemPrompt_InvalidTemplate(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
 
 	body, _ := json.Marshal(map[string]string{"content": "{{broken"})
-	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/title", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/oversight", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("name", "title")
+	req.SetPathValue("name", "oversight")
 	w := httptest.NewRecorder()
 	h.UpdateSystemPrompt(w, req)
 
@@ -198,12 +198,12 @@ func TestDeleteSystemPrompt_ExistingOverride(t *testing.T) {
 	h, mgr := newTestHandlerWithPrompts(t)
 
 	// Create an override first.
-	if err := mgr.WriteOverride("title", "custom {{.Prompt}}"); err != nil {
+	if err := mgr.WriteOverride("oversight", "custom {{.ActivityLog}}"); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/system-prompts/title", nil)
-	req.SetPathValue("name", "title")
+	req := httptest.NewRequest(http.MethodDelete, "/api/system-prompts/oversight", nil)
+	req.SetPathValue("name", "oversight")
 	w := httptest.NewRecorder()
 	h.DeleteSystemPrompt(w, req)
 
@@ -211,7 +211,7 @@ func TestDeleteSystemPrompt_ExistingOverride(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
 	}
 
-	_, hasOverride, _ := mgr.Content("title")
+	_, hasOverride, _ := mgr.Content("oversight")
 	if hasOverride {
 		t.Error("expected has_override=false after delete, got true")
 	}
@@ -220,8 +220,8 @@ func TestDeleteSystemPrompt_ExistingOverride(t *testing.T) {
 func TestDeleteSystemPrompt_MissingOverride(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/system-prompts/title", nil)
-	req.SetPathValue("name", "title")
+	req := httptest.NewRequest(http.MethodDelete, "/api/system-prompts/oversight", nil)
+	req.SetPathValue("name", "oversight")
 	w := httptest.NewRecorder()
 	h.DeleteSystemPrompt(w, req)
 
