@@ -111,23 +111,8 @@ function startSidebarResize(ev: MouseEvent) {
   document.addEventListener('mouseup', onUp);
 }
 
-// ── Hash deep-link redirect ────────────────────────────────────────
-//
-// Old UI used #plan/<path> and #spec/<path> hash anchors to deep-link to
-// a focused spec. The new router uses query-string focusing (`?spec=`),
-// so on first mount we translate any legacy hash into the equivalent
-// query and clear the hash.
-
-function readHashPath(): string {
-  const hash = window.location.hash || '';
-  if (hash.startsWith('#plan/')) return decodeURIComponent(hash.slice('#plan/'.length));
-  if (hash.startsWith('#spec/')) return decodeURIComponent(hash.slice('#spec/'.length));
-  return '';
-}
-
 watch(focusedSpecPath, (path) => {
-  // Keep the URL in sync so refresh preserves focus and shift+click into
-  // the Map view round-trips back to the same spec.
+  // Keep the URL in sync so a refresh preserves focus.
   if (path) {
     void router.replace({ path: '/plan', query: { spec: path } });
   } else if (route.query.spec) {
@@ -172,13 +157,6 @@ onMounted(async () => {
   // itself is gated on tree.length > 0 || treeIndex. Without an
   // unconditional initial fetch the page would deadlock on chat-first.
   void agentStore.fetchTree();
-
-  // Translate legacy hash deep-link.
-  const hashPath = readHashPath();
-  if (hashPath) {
-    history.replaceState(null, '', window.location.pathname);
-    void router.replace({ path: '/plan', query: { spec: hashPath } });
-  }
 
   // Honor ?task=<id>: open task-mode agent session pinned to that task.
   const focusTask = typeof route.query.task === 'string' ? route.query.task : '';
