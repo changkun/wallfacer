@@ -88,8 +88,10 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 
 	wsA := t.TempDir()
 	wsB := t.TempDir()
+	// Most-recently-used first.
 	if err := SaveGroups(configDir, []Workspace{
-		{Folders: []string{wsA, wsB}},
+		{Folders: []string{wsA}},
+		{Folders: []string{wsB}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
 	}
@@ -100,8 +102,8 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 	}
 
 	snap := m.Snapshot()
-	if len(snap.Workspaces) != 2 || snap.Workspaces[0] != wsA || snap.Workspaces[1] != wsB {
-		t.Fatalf("expected saved workspace group to load, got %v", snap.Workspaces)
+	if len(snap.Workspaces) != 1 || snap.Workspaces[0] != wsA {
+		t.Fatalf("expected the most recent saved workspace to load, got %v", snap.Workspaces)
 	}
 	if snap.Store == nil {
 		t.Fatal("expected store for restored workspace group")

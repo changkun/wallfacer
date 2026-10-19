@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func FileExists(path string) bool {
 // Callers receive copies (via cloneSnapshot) so they cannot mutate manager internals.
 type Snapshot struct {
 	WorkspaceID   string       // stable id of the active workspace (empty for ad-hoc/legacy path switches pre-migration)
-	Workspaces    []string     // sorted, deduplicated absolute paths (the active workspace's folders)
+	Workspaces    []string     // the active workspace's folder: empty (no workspace open) or one absolute path
 	Store         *store.Store // scoped task store for this workspace set (may be shared across snapshots)
 	ScopedDataDir string       // per-workspace-key data directory under the global data dir
 	Key           string       // the active workspace's stable DataKey; addresses ScopedDataDir and agent-session storage
@@ -101,31 +102,40 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 		activeGroups: make(map[string]*activeGroup),
 		newStore:     store.NewFileStore,
 	}
-	initial = m.startupWorkspaces(initial)
+	groups, err := LoadGroups(configDir)
+	if err != nil {
+		logger.Main.Warn("read saved workspaces at startup", "error", err)
+	}
+	if n := CountSeveralFolders(groups); n > 0 {
+		logger.Main.Warn("workspaces that name several folders are dormant until each is re-pointed to one folder; their task history is kept",
+			"count", n)
+	}
+	if initial == nil {
+		initial = startupWorkspaces(groups)
+	}
 	if _, err := m.Switch(initial); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-// startupWorkspaces determines the initial workspace set. The nil vs empty-slice
-// distinction is intentional: nil means "restore last session" (load from disk),
-// while an empty slice means "start with no workspaces" (suppress restore).
-func (m *Manager) startupWorkspaces(initial []string) []string {
-	if initial != nil {
-		return initial
-	}
-	groups, err := LoadGroups(m.configDir)
-	if err != nil || len(groups) == 0 {
-		return nil
-	}
+// startupWorkspaces picks the folder to restore when NewManager is given no
+// initial set (nil means "restore last session"; an explicit empty slice means
+// "start with no workspace" and never reaches here). groups is the saved list
+// in most-recently-used order.
+func startupWorkspaces(groups []Workspace) []string {
 	// Restore the most-recent group whose paths still validate. A saved
 	// group can reference a directory that was since deleted or moved (a
 	// /tmp throwaway workspace, an unmounted volume, a renamed repo); such
 	// a stale group must not fatal server startup. Skip invalid groups with
 	// a warning and fall through to the next; if none are valid, start with
-	// no workspace so the picker opens instead of crashing.
+	// no workspace so the picker opens instead of crashing. A dormant
+	// workspace waits for the owner to choose its folder, so it is never
+	// restored on its own.
 	for _, g := range groups {
+		if g.Dormant {
+			continue
+		}
 		if _, verr := validate(g.Folders); verr != nil {
 			logger.Main.Warn("skipping invalid saved workspace at startup",
 				"folders", g.Folders, "error", verr)
@@ -440,15 +450,19 @@ func (m *Manager) publish(snapshot Snapshot) {
 	}
 }
 
-// validate checks that all workspace paths are absolute, existing directories,
-// normalizes each to its lexically clean form, and returns a deduplicated,
-// sorted slice. Returns an error for any invalid path.
+// ErrSeveralFolders reports a request that names more than one folder for a
+// workspace. A workspace is one folder.
+var ErrSeveralFolders = errors.New("a workspace is one folder")
+
+// validate checks a workspace's folder: at most one distinct path, absolute,
+// naming an existing directory. Each path is normalized to its lexically clean
+// form and duplicates collapse, so the same folder named twice (or once with a
+// trailing slash) is still one folder. Returns nil for an empty or blank input
+// (the "no workspace open" state), a one-element slice otherwise, and an error
+// wrapping ErrSeveralFolders when more than one distinct folder is named.
 func validate(paths []string) ([]string, error) {
-	if len(paths) == 0 {
-		return nil, nil
-	}
 	seen := map[string]struct{}{}
-	validated := make([]string, 0, len(paths))
+	var validated []string
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -460,6 +474,16 @@ func validate(paths []string) ([]string, error) {
 		// Normalize to the lexically clean form so callers may pass paths with a
 		// trailing slash or redundant separators (e.g. from a UI folder picker).
 		path = filepath.Clean(path)
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		validated = append(validated, path)
+	}
+	if len(validated) > 1 {
+		return nil, fmt.Errorf("%w, but %d folders were given", ErrSeveralFolders, len(validated))
+	}
+	for _, path := range validated {
 		info, err := os.Stat(path)
 		if err != nil {
 			return nil, fmt.Errorf("workspace path invalid: %w", err)
@@ -467,13 +491,7 @@ func validate(paths []string) ([]string, error) {
 		if !info.IsDir() {
 			return nil, fmt.Errorf("workspace path is not a directory: %s", path)
 		}
-		if _, ok := seen[path]; ok {
-			continue
-		}
-		seen[path] = struct{}{}
-		validated = append(validated, path)
 	}
-	slices.Sort(validated)
 	return validated, nil
 }
 

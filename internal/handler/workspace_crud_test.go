@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -57,8 +58,8 @@ func TestWorkspaceCRUDLifecycle(t *testing.T) {
 		t.Fatalf("config workspace_id = %v, want %q", cfg["workspace_id"], created.ID)
 	}
 
-	// Edit folders (add ws2). Identity preserved, still active.
-	ubody, _ := json.Marshal(map[string]any{"folders": []string{ws, ws2}})
+	// Re-point to ws2. Identity preserved, still active.
+	ubody, _ := json.Marshal(map[string]any{"folders": []string{ws2}})
 	urec := httptest.NewRecorder()
 	ureq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+created.ID, bytes.NewReader(ubody))
 	ureq.SetPathValue("id", created.ID)
@@ -68,7 +69,7 @@ func TestWorkspaceCRUDLifecycle(t *testing.T) {
 	}
 	var updated workspaceDTO
 	_ = json.Unmarshal(urec.Body.Bytes(), &updated)
-	if updated.ID != created.ID || len(updated.Folders) != 2 || !updated.Active {
+	if updated.ID != created.ID || len(updated.Folders) != 1 || updated.Folders[0] != ws2 || !updated.Active {
 		t.Fatalf("update did not preserve identity/activeness: %+v", updated)
 	}
 
@@ -99,6 +100,54 @@ func TestWorkspaceCRUDLifecycle(t *testing.T) {
 		if ws.ID == created.ID {
 			t.Fatal("deleted workspace still listed")
 		}
+	}
+}
+
+// TestWorkspaceCRUD_SeveralFoldersRefused verifies that create and update
+// answer 400 with a message saying a workspace is one folder when the request
+// names more than one, and that a refused update leaves the folder unchanged.
+func TestWorkspaceCRUD_SeveralFoldersRefused(t *testing.T) {
+	h, _, ws := newTestHandlerWithRealWorkspaceManager(t)
+	ws2 := t.TempDir()
+
+	body, _ := json.Marshal(map[string]any{"name": "two", "folders": []string{ws, ws2}})
+	rec := httptest.NewRecorder()
+	h.CreateWorkspace(rec, httptest.NewRequest(http.MethodPost, "/api/workspaces", bytes.NewReader(body)))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("create with two folders: got %d, want 400: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "a workspace is one folder") {
+		t.Fatalf("create with two folders: body %q does not say a workspace is one folder", rec.Body.String())
+	}
+
+	body, _ = json.Marshal(map[string]any{"name": "one", "folders": []string{ws}})
+	rec = httptest.NewRecorder()
+	h.CreateWorkspace(rec, httptest.NewRequest(http.MethodPost, "/api/workspaces", bytes.NewReader(body)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create with one folder: got %d: %s", rec.Code, rec.Body.String())
+	}
+	var created workspaceDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created: %v", err)
+	}
+
+	ubody, _ := json.Marshal(map[string]any{"folders": []string{ws, ws2}})
+	urec := httptest.NewRecorder()
+	ureq := httptest.NewRequest(http.MethodPut, "/api/workspaces/"+created.ID, bytes.NewReader(ubody))
+	ureq.SetPathValue("id", created.ID)
+	h.UpdateWorkspace(urec, ureq)
+	if urec.Code != http.StatusBadRequest {
+		t.Fatalf("update with two folders: got %d, want 400: %s", urec.Code, urec.Body.String())
+	}
+	if !strings.Contains(urec.Body.String(), "a workspace is one folder") {
+		t.Fatalf("update with two folders: body %q does not say a workspace is one folder", urec.Body.String())
+	}
+	got, found, err := h.workspace.WorkspaceByID(created.ID)
+	if err != nil || !found {
+		t.Fatalf("WorkspaceByID: found=%v err=%v", found, err)
+	}
+	if len(got.Folders) != 1 || got.Folders[0] != ws {
+		t.Fatalf("a refused update changed the folder: %v", got.Folders)
 	}
 }
 
