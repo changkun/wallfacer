@@ -129,7 +129,8 @@ func TestCSRFMiddlewareRemoteAccess(t *testing.T) {
 }
 
 // TestBearerAuthMiddleware validates bearer-token auth across public routes,
-// SSE query-token paths, and standard Authorization header paths.
+// stream paths (query token or header), and standard Authorization header
+// paths.
 func TestBearerAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -148,8 +149,11 @@ func TestBearerAuthMiddleware(t *testing.T) {
 		{name: "basic scheme with key", method: http.MethodGet, target: "/api/config", headers: map[string]string{"Authorization": "Basic secret"}, want: http.StatusUnauthorized, wantErr: "unauthorized"},
 		{name: "sse wrong query token", method: http.MethodGet, target: "/api/tasks/stream?token=secre", want: http.StatusUnauthorized, wantErr: "unauthorized"},
 		{name: "sse query token", method: http.MethodGet, target: "/api/tasks/stream?token=secret", want: http.StatusNoContent},
-		{name: "sse wrong header only", method: http.MethodGet, target: "/api/tasks/stream", headers: map[string]string{"Authorization": "Bearer secret"}, want: http.StatusUnauthorized, wantErr: "unauthorized"},
+		{name: "sse header only", method: http.MethodGet, target: "/api/tasks/stream", headers: map[string]string{"Authorization": "Bearer secret"}, want: http.StatusNoContent},
 		{name: "logs sse query token", method: http.MethodGet, target: "/api/tasks/123/logs?token=secret", want: http.StatusNoContent},
+		{name: "logs bearer header", method: http.MethodGet, target: "/api/tasks/123/logs", headers: map[string]string{"Authorization": "Bearer secret"}, want: http.StatusNoContent},
+		{name: "logs no key", method: http.MethodGet, target: "/api/tasks/123/logs", want: http.StatusUnauthorized, wantErr: "unauthorized"},
+		{name: "query token off stream path", method: http.MethodGet, target: "/api/config?token=secret", want: http.StatusUnauthorized, wantErr: "unauthorized"},
 	}
 
 	mw := BearerAuthMiddleware("secret")

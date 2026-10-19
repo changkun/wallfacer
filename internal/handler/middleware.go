@@ -82,10 +82,12 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 	}
 }
 
-// BearerAuthMiddleware enforces bearer-token authentication on non-SSE routes.
-// SSE paths use a ?token= query parameter instead of the Authorization
-// header because the EventSource API does not support custom request headers. UI shell routes and embedded assets are public so
-// the browser can load before it reads the injected local API key.
+// BearerAuthMiddleware enforces bearer-token authentication on API routes.
+// Stream paths also take the key as a ?token= query parameter, because the
+// EventSource API cannot set request headers and a download link cannot
+// either; a fetch that sends the Authorization header works there too. UI
+// shell routes and embedded assets are public so the browser can load before
+// it reads the injected local API key.
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
@@ -108,11 +110,7 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			}
 			// Constant-time compares: a plain == returns on the first differing
 			// byte and leaks how much of the key a probe got right.
-			if isSSEPath(r.URL.Path) {
-				if !bearer.Equal(r.URL.Query().Get("token"), key) {
-					httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-					return
-				}
+			if isSSEPath(r.URL.Path) && bearer.Equal(r.URL.Query().Get("token"), key) {
 				next.ServeHTTP(w, r)
 				return
 			}

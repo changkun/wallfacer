@@ -179,6 +179,12 @@ committed: the commit log already holds that.
 
 ### Fixed
 
+- A task's activity log loads in its detail view, and **Download full log**
+  downloads it: the log stream answered 401 to the console's request, which
+  sent the server key in the `Authorization` header, because the stream took
+  the key only as a `?token=` query parameter, and the download link sent
+  neither. Stream paths now take the key either way.
+
 - A task resumed after its workspace was pointed at another folder runs in
   its own worktree, where it ran in the workspace's folder itself, and a
   rebase conflict in a task's second repository is resolved in that

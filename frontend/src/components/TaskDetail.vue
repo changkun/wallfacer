@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TaskCommitHistory from './TaskCommitHistory.vue';
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
-import { api } from '../api/client';
+import { api, withAuthToken } from '../api/client';
 import { useTaskActivity } from '../composables/useTaskActivity';
 import { parseDiffFiles, type DiffFile } from '../lib/diff';
 import { highlightDiffFile, type HighlightedDiffLine } from '../lib/diffHighlight';
@@ -350,7 +350,8 @@ const activityTruncated = computed(() => {
 // Server-side 8MB turn-output truncation banner: useTaskActivity exposes a
 // sticky truncated flag (set once when the sentinel arrives, see store
 // SaveTurnOutput). Mirrors ui/js/modal-logs.js's server truncation banner.
-const logDownloadUrl = computed(() => `/api/tasks/${props.task.id}/logs`);
+// A link cannot send the Authorization header, so the key rides in the query.
+const logDownloadUrl = computed(() => withAuthToken(`/api/tasks/${props.task.id}/logs`));
 
 interface OversightPhase {
   title: string;
