@@ -64,23 +64,16 @@ function readLocale(): Locale {
 
 function resolveTheme(t: Theme): 'light' | 'dark' {
   if (t !== 'auto') return t;
-  // SSG (vite-ssg) prerenders without `window`. Defaulting to 'dark' here
-  // bakes `<html data-theme="dark">` into the static HTML and forces every
-  // first paint to dark, which then flips on hydration. Default to light
-  // so the prerendered page matches the no-attribute :root tokens.
-  if (typeof window === 'undefined') return 'light';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function applyTheme(t: Theme) {
-  if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', resolveTheme(t));
 }
 
 function applyPalette(p: PaletteName) {
-  if (typeof document === 'undefined') return;
-  // The default palette carries no attribute so the SSG-prerendered page
-  // (no attribute) matches the default first paint exactly.
+  // The default palette carries no attribute, matching the first paint the
+  // inline script in index.html produces.
   if (p === 'clay') document.documentElement.removeAttribute('data-palette');
   else document.documentElement.setAttribute('data-palette', p);
 }

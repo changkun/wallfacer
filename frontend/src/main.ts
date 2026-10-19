@@ -1,4 +1,6 @@
-import { ViteSSG } from 'vite-ssg';
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import { createHead } from '@unhead/vue/client';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import { NOT_FOUND_ROUTE, routes } from './router';
@@ -33,25 +35,27 @@ import './styles/globals.css';
 import './styles/brand-override.css';
 import { vScrollFade } from './directives/scrollFade';
 
-export const createApp = ViteSSG(App, { routes }, ({ app, router, isClient }) => {
-  app.use(createPinia());
-  app.directive('scrollfade', vScrollFade);
+const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes });
+const app = createApp(App);
+app.use(createPinia());
+app.use(router);
+app.use(createHead());
+app.directive('scrollfade', vScrollFade);
 
-  // Remember where the user left off. Persist each navigation, then on a cold
-  // launch that landed on the default board restore the last route. A stale
-  // path degrades gracefully; see lib/lastRoute.ts.
-  if (isClient) {
-    // Capture the stored route before afterEach overwrites it with the initial
-    // landing (which fires for the first navigation too).
-    const previous = storedRoute();
-    router.afterEach((to) => rememberRoute(to.fullPath));
-    void router.isReady().then(() => {
-      const target = routeToRestore(
-        router.currentRoute.value.fullPath,
-        previous,
-        (path) => router.resolve(path).name !== NOT_FOUND_ROUTE,
-      );
-      if (target) void router.replace(target).catch(() => {});
-    });
-  }
+// Remember where the user left off. Persist each navigation, then on a cold
+// launch that landed on the default board restore the last route. A stale path
+// degrades gracefully; see lib/lastRoute.ts. The stored route is captured
+// before afterEach overwrites it with the initial landing (which fires for the
+// first navigation too).
+const previous = storedRoute();
+router.afterEach((to) => rememberRoute(to.fullPath));
+void router.isReady().then(() => {
+  const target = routeToRestore(
+    router.currentRoute.value.fullPath,
+    previous,
+    (path) => router.resolve(path).name !== NOT_FOUND_ROUTE,
+  );
+  if (target) void router.replace(target).catch(() => {});
 });
+
+app.mount('#app');

@@ -8,11 +8,9 @@ import '../styles/whiteboard.css';
 // WhiteboardPage hosts an Excalidraw drawing canvas as a peer view. Excalidraw
 // is a React component with no Vue port, so a single React root is mounted into
 // one container element. React, react-dom, and @excalidraw/excalidraw are
-// imported dynamically inside onMounted (never at module scope) for two reasons:
-//   1. SSG safety — vite-ssg prerenders this route without a DOM; a module-scope
-//      React/Excalidraw import would execute browser-only code server-side.
-//   2. Code splitting — the React + Excalidraw chunk (~1.5MB gzipped) is fetched
-//      only when this route is first opened, keeping the entry bundle React-free.
+// imported dynamically inside onMounted (never at module scope) so the React +
+// Excalidraw chunk (~1.5MB gzipped) is fetched only when this route is first
+// opened, keeping the entry bundle React-free.
 // The scene persists per workspace via GET/PUT /api/whiteboard as opaque JSON.
 
 const SAVE_DEBOUNCE_MS = 1500;
@@ -59,7 +57,6 @@ let onDocEscape: ((e: KeyboardEvent) => void) | null = null;
 // prefs store keeps current (including OS 'auto' resolution). Excalidraw's theme
 // is driven from this so the canvas always matches the rest of the UI.
 function resolvedTheme(): 'light' | 'dark' {
-  if (typeof document === 'undefined') return 'light';
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 

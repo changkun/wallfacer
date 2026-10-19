@@ -1,8 +1,8 @@
-// Safe localStorage access. During vite-ssg prerender the code runs in Node,
-// where `localStorage` may be absent OR present as a partial shim whose
-// methods are undefined — so `typeof localStorage !== 'undefined'` alone is
-// not enough (calling .getItem throws "is not a function"). Every helper
-// here feature-detects the method and swallows quota / privacy-mode errors.
+// Safe localStorage access. `localStorage` may be absent or present as a
+// partial shim whose methods are undefined (the test environment's), so
+// `typeof localStorage !== 'undefined'` alone is not enough (calling .getItem
+// throws "is not a function"). Every helper here feature-detects the method
+// and swallows quota / privacy-mode errors.
 
 function usable(): boolean {
   try {

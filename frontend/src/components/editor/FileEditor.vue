@@ -3,8 +3,7 @@
 // the editorTabs store (the source of truth that survives BoardPage unmount),
 // so this component is a thin view: the store seeds the initial doc, edits flow
 // back via setContent, and async loads / external changes are pushed into the
-// view. CodeMirror is constructed in onMounted only, so vite-ssg's prerender
-// (which has no DOM) never touches it.
+// view. CodeMirror is constructed in onMounted.
 import { onMounted, onBeforeUnmount, ref, shallowRef, computed, watch } from 'vue';
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';

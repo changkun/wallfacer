@@ -5,19 +5,13 @@ const wfProxy = process.env.WF_PROXY || 'http://localhost:8080';
 
 export default defineConfig({
   plugins: [vue()],
-  // latere-ui ships source SFCs; compile them for the SSG build and keep one Vue copy.
+  // Keep one Vue copy across dependencies.
   resolve: { dedupe: ['vue'] },
   // Pre-bundle the Vue ecosystem together so esbuild's lazy __esm init keeps
   // @vue/shared's helpers (isFunction, etc.) initialized before vue-router's
   // top-level defineComponent() calls run. Without this the optimized dev
   // chunks crash with "isFunction is not a function" and the app never mounts.
   optimizeDeps: { include: ['vue', 'pinia'], exclude: ['vue-router'] },
-  ssr: { noExternal: ['latere-ui'] },
-  ssgOptions: {
-    includedRoutes(paths: string[]) {
-      return paths.filter(p => !p.includes(':') && !p.includes('*'));
-    },
-  },
   server: {
     port: 5173,
     fs: { allow: ['..'] },

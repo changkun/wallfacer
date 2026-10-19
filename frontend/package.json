@@ -6,7 +6,7 @@
   "description": "Wallfacer console: the task board, plan, chat and settings served by wallfacer run",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && NODE_OPTIONS=--no-experimental-webstorage vite-ssg build",
+    "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run"
@@ -41,7 +41,6 @@
     "pinia": "^2.2.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "vite-ssg": "^28.3.0",
     "vue": "^3.5.13",
     "vue-router": "^4.4.5",
     "vuedraggable": "^4.1.0"
