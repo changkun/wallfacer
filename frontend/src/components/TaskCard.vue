@@ -9,35 +9,13 @@ import { renderMarkdown } from '../lib/markdown';
 import { highlightMatch } from '../lib/highlight';
 import { orderTags } from '../lib/tagBadge';
 import { cardActionsFor, primaryCardAction, CARD_ACTION_DEFS, type CardAction } from '../lib/cardActions';
-import AppSelect from './AppSelect.vue';
 import HarnessLogo from './HarnessLogo.vue';
 import { dependencyBadge, failureLabel } from '../lib/cardBadges';
 import { useBehindCounts } from '../composables/useBehindCounts';
 import { useNow } from '../composables/useNow';
-import { routineCountdown as routineCountdownFor, routineLastFired as routineLastFiredFor } from '../lib/routineTime';
 import { toRef } from 'vue';
 
 const props = defineProps<{ task: Task; rank?: number }>();
-
-const ROUTINE_INTERVAL_OPTIONS = [1, 5, 15, 30, 60, 180, 360, 720, 1440];
-
-const isRoutine = computed(() => props.task.kind === 'routine');
-
-const routineMinutes = computed(() => {
-  const sec = props.task.routine_interval_seconds || 0;
-  return Math.max(1, Math.round(sec / 60));
-});
-
-const routineEnabled = computed(() => !!props.task.routine_enabled);
-
-const routineIntervalChoices = computed(() => {
-  const set = new Set<number>(ROUTINE_INTERVAL_OPTIONS);
-  if (routineMinutes.value > 0) set.add(routineMinutes.value);
-  return Array.from(set).sort((a, b) => a - b);
-});
-const routineIntervalOptions = computed(() =>
-  routineIntervalChoices.value.map((m) => ({ value: m, label: `${m} min` })),
-);
 
 // Shared 1s clock: one interval across all cards rather than one per card.
 const now = useNow();
@@ -60,36 +38,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (pulseHandle !== null) clearTimeout(pulseHandle);
 });
-
-const routineCountdown = computed(() => routineCountdownFor(props.task, now.value));
-const routineLastFired = computed(() => routineLastFiredFor(props.task, now.value));
-
-async function onRoutineIntervalChange(minutes: number) {
-  if (!Number.isFinite(minutes) || minutes < 1) return;
-  try {
-    await api('PATCH', `/api/routines/${props.task.id}/schedule`, { interval_minutes: minutes });
-  } catch (err) {
-    console.error('Error updating routine interval:', err);
-  }
-}
-
-async function onRoutineEnabledChange(e: Event) {
-  const target = e.target as HTMLInputElement;
-  try {
-    await api('PATCH', `/api/routines/${props.task.id}/schedule`, { enabled: target.checked });
-  } catch (err) {
-    console.error('Error toggling routine:', err);
-  }
-}
-
-async function onRoutineTrigger(e: Event) {
-  e.stopPropagation();
-  try {
-    await api('POST', `/api/routines/${props.task.id}/trigger`);
-  } catch (err) {
-    console.error('Error triggering routine:', err);
-  }
-}
 
 function statusLabel(task: Task): string {
   if (task.archived) return 'archived';
@@ -116,7 +64,6 @@ function cardClasses(task: Task): Record<string, boolean> {
   return {
     'task-card': true,
     [`task-card--${task.archived ? 'archived' : task.status}`]: true,
-    'task-card--routine': task.kind === 'routine',
     'task-card--just-created': justDispatched.value,
   };
 }
@@ -152,9 +99,9 @@ function waitingSnippet(task: Task): string {
 }
 
 // Behind-upstream chip: fetched lazily via the shared composable, only
-// for statuses where falling behind matters. Routine cards opt out.
+// for statuses where falling behind matters.
 const showsBehind = computed(() =>
-  !isRoutine.value && (props.task.status === 'waiting' || props.task.status === 'failed'),
+  props.task.status === 'waiting' || props.task.status === 'failed',
 );
 const behind = useBehindCounts(
   computed(() => (showsBehind.value ? props.task.id : '')),
@@ -185,7 +132,7 @@ const testBadge = computed<{ label: string; cls: string; title: string } | null>
   }
 });
 
-// Tags as one meta line: priority, impact, labels, provenance.
+// Tags as one meta line: priority, impact, labels.
 const tags = computed(() => orderTags(props.task.tags ?? []));
 
 function formatCost(usd: number): string {
@@ -379,10 +326,9 @@ function focusSibling(direction: 'next' | 'prev' | 'left' | 'right') {
 }
 
 function onCardKeydown(e: KeyboardEvent) {
-  // Don't hijack typing inside the routine footer's interval picker + spawn icon.
+  // Don't hijack typing inside a form control on the card.
   const target = e.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
-  if (target.closest('.app-select')) return;
 
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
@@ -449,8 +395,8 @@ function onCardKeydown(e: KeyboardEvent) {
     </div>
     <div v-if="props.task.title" class="task-card__title" :title="props.task.title" v-html="titleHtml"></div>
 
-    <!-- Row 3: the meta line. priority · impact · labels · provenance · the
-         signals that did not fit the first row. A label filters the board. -->
+    <!-- Row 3: the meta line. priority · impact · labels · the signals that
+         did not fit the first row. A label filters the board. -->
     <div v-if="tags.length || extraSignals.length" class="task-card__tags">
       <template v-for="t in tags" :key="t.rawTag">
         <button
@@ -507,40 +453,8 @@ function onCardKeydown(e: KeyboardEvent) {
       <span title="Total cost">{{ formatCost(props.task.usage.cost_usd) }}</span>
     </div>
 
-    <!-- Row 8a: routine footer (replaces action buttons for routine cards) -->
-    <div v-if="isRoutine" class="routine-footer" @click.stop>
-      <div class="routine-footer-row">
-        <span class="pill pill-brand" title="Routine schedule">routine</span>
-        <span class="routine-next-run" title="Next scheduled fire">{{ routineCountdown }}</span>
-      </div>
-      <div class="routine-footer-row">
-        <label class="routine-interval-label">
-          Every
-          <AppSelect
-            class="routine-interval-select"
-            :model-value="routineMinutes"
-            :options="routineIntervalOptions"
-            aria-label="Routine interval"
-            @update:model-value="onRoutineIntervalChange"
-          />
-        </label>
-        <label class="routine-enabled-label">
-          <input
-            type="checkbox"
-            class="routine-enabled-toggle"
-            :checked="routineEnabled"
-            aria-label="Routine enabled"
-            @change="onRoutineEnabledChange"
-          />
-          <span>Enabled</span>
-        </label>
-        <button type="button" class="btn sm ghost routine-trigger-btn" title="Spawn an instance task now" @click="onRoutineTrigger">Run now</button>
-      </div>
-      <div v-if="routineLastFired" class="routine-footer-row routine-last-fired">{{ routineLastFired }}</div>
-    </div>
-
-    <!-- Row 8b: actions. The forward transition is the ink button. -->
-    <div v-else-if="cardActions.length" class="task-card__actions">
+    <!-- Row 8: actions. The forward transition is the ink button. -->
+    <div v-if="cardActions.length" class="task-card__actions">
       <button
         v-for="a in cardActions"
         :key="a.id"

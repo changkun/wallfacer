@@ -12,7 +12,7 @@ describe('nav model', () => {
 
   it('names every routed destination and nothing else', () => {
     expect(navLabel('/')).toBe('Board');
-    expect(navLabel('/routines')).toBe('Routines');
+    expect(navLabel('/analytics')).toBe('Analytics');
     expect(navLabel('/nowhere')).toBe('');
   });
 

@@ -14,7 +14,7 @@ function metaFor(path: string): boolean {
 
 describe('localRoutes workspace gating', () => {
   it('marks every workspace-scoped view as needsWorkspace', () => {
-    for (const path of ['/', '/routines', '/analytics', '/chat', '/plan', '/mission', '/map']) {
+    for (const path of ['/', '/analytics', '/chat', '/plan', '/mission', '/map']) {
       expect(metaFor(path), `${path} should require a workspace`).toBe(true);
     }
   });
@@ -36,7 +36,7 @@ describe('localRoutes not-found fallback', () => {
   });
 
   it('resolves console pages to themselves', () => {
-    for (const path of ['/', '/routines', '/mission', '/docs/guide/usage']) {
+    for (const path of ['/', '/analytics', '/mission', '/docs/guide/usage']) {
       expect(router.resolve(path).name, path).not.toBe(NOT_FOUND_ROUTE);
     }
   });

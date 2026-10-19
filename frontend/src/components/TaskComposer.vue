@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, computed, onMounted, watch } from 'vue';
 import { useTaskStore } from '../stores/tasks';
-import { api } from '../api/client';
 import { splitBatch } from '../lib/composer';
 import { useMentions } from '../composables/useMentions';
 import DependencyPicker from './DependencyPicker.vue';
@@ -87,13 +86,11 @@ function onHarnessChange(v: string): void {
   sandbox.value = v as typeof sandbox.value;
 }
 const batchMode = ref(false);
-const scheduled = ref(false);
-const intervalMinutes = ref<number | null>(null);
 
 // Candidate dependencies: existing non-archived tasks (most recent first).
 const depCandidates = computed(() =>
   store.tasks
-    .filter((t) => !t.archived && t.kind !== 'routine')
+    .filter((t) => !t.archived)
     .map((t) => ({ id: t.id, label: (t.title || t.prompt || t.id).slice(0, 60) })),
 );
 
@@ -145,19 +142,6 @@ function collapse() {
   dependsOn.value = [];
   sandbox.value = '';
   batchMode.value = false;
-  scheduled.value = false;
-  intervalMinutes.value = null;
-}
-
-async function submitRoutine(text: string): Promise<void> {
-  const minutes = intervalMinutes.value;
-  if (!minutes || minutes <= 0) return;
-  await api('POST', '/api/routines', {
-    prompt: text,
-    interval_minutes: minutes,
-    timeout: timeoutMin.value && timeoutMin.value > 0 ? timeoutMin.value : undefined,
-    tags: tags.value.slice(),
-  });
 }
 
 async function submit() {
@@ -171,11 +155,6 @@ async function submit() {
   // failure so a network error doesn't lose the user's text.
   removeStored(DRAFT_KEY);
   try {
-    if (scheduled.value) {
-      await submitRoutine(text);
-      collapse();
-      return;
-    }
     const sharedOpts = {
       criteria: criteria.value.trim() || undefined,
       tags: tags.value.slice(),
@@ -365,24 +344,11 @@ function onInput(e: Event) {
     </div>
     <div class="composer__actions">
       <label class="composer__toggle">
-        <input v-model="batchMode" type="checkbox" :disabled="scheduled" />
+        <input v-model="batchMode" type="checkbox" />
         Batch mode
         <span v-if="batchMode" class="composer__toggle-hint">
           blank-line separated · {{ batchCount }} task{{ batchCount === 1 ? '' : 's' }}
         </span>
-      </label>
-      <label class="composer__toggle">
-        <input v-model="scheduled" type="checkbox" :disabled="batchMode" />
-        Schedule
-        <input
-          v-if="scheduled"
-          v-model.number="intervalMinutes"
-          class="field composer__input composer__input--num"
-          type="number"
-          min="1"
-          placeholder="min"
-          aria-label="Interval minutes"
-        />
       </label>
       <span class="composer__spacer" />
       <div class="composer__btn-group">
@@ -399,18 +365,15 @@ function onInput(e: Event) {
           :disabled="
             !prompt.trim() ||
             submitting ||
-            (batchMode && batchCount === 0) ||
-            (scheduled && (!intervalMinutes || intervalMinutes <= 0))
+            (batchMode && batchCount === 0)
           "
         >
           {{
             submitting
               ? 'Saving…'
-              : scheduled
-                ? 'Schedule'
-                : batchMode
-                  ? `Save ${batchCount}`
-                  : 'Save'
+              : batchMode
+                ? `Save ${batchCount}`
+                : 'Save'
           }}
         </button>
       </div>

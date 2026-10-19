@@ -87,7 +87,6 @@ const ID = {
   failed: '55555555-5555-4555-8555-555555555555',
   back1: '66666666-6666-4666-8666-666666666666',
   back2: '77777777-7777-4777-8777-777777777777',
-  routine: '88888888-8888-4888-8888-888888888888',
 };
 
 // Rich content for the OAuth task — drives the task-detail Prompt tab and the
@@ -350,8 +349,8 @@ const tasks = [
   {
     schema_version: 2,
     id: ID.back2,
-    title: 'Add brainstorm routine for weekly cleanup',
-    prompt: 'Schedule a routine that proposes tech-debt tasks every Monday.',
+    title: 'Propose a tech-debt cleanup pass',
+    prompt: 'Read the oldest packages and propose one tech-debt task per finding.',
     status: 'backlog',
     result: null,
     stop_reason: null,
@@ -363,30 +362,6 @@ const tasks = [
     impact_score: 2,
     position: 1,
     created_at: iso(15),
-    updated_at: iso(15),
-  },
-  // A routine: a scheduled card that spawns a fresh task every hour. Drives
-  // the Routines page row (schedule pill, countdown, switch).
-  {
-    schema_version: 2,
-    id: ID.routine,
-    kind: 'routine',
-    title: 'Nightly dependency audit',
-    prompt: 'Audit go.mod and package.json for outdated or vulnerable dependencies and open one task per fix.',
-    status: 'backlog',
-    result: null,
-    stop_reason: null,
-    turns: 0,
-    timeout: 900,
-    usage: usage(0, 0, 0, 0, 0),
-    sandbox: 'claude',
-    tags: ['chore'],
-    routine_interval_seconds: 3600,
-    routine_enabled: true,
-    routine_next_run: iso(-45),
-    routine_last_fired_at: iso(15),
-    position: 2,
-    created_at: iso(300),
     updated_at: iso(15),
   },
 ];

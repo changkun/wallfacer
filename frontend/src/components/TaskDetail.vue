@@ -306,7 +306,7 @@ async function fetchEvents() {
 
 // systemEventSummary is the row text of a system event: its sentence, which the
 // server writes to `result` (or to `message` on a budget stop), else its
-// machine `kind` (a routine fire carries only that), else the bare type.
+// machine `kind`, else the bare type.
 function systemEventSummary(d: Record<string, unknown>): string {
   if (typeof d.result === 'string' && d.result) return d.result.slice(0, 120);
   if (typeof d.message === 'string' && d.message) return d.message.slice(0, 120);

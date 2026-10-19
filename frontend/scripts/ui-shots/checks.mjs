@@ -414,7 +414,7 @@ SCENES['chat'] = async (page) => {
   expect('chat', entry && entry.width <= 681, `entry column ${entry && Math.round(entry.width)}px, want <= 680`);
   const vw = await page.evaluate(() => window.innerWidth);
   const vh = await page.evaluate(() => window.innerHeight);
-  await page.goto(base + '/routines', { waitUntil: 'load', timeout: 20000 });
+  await page.goto(base + '/analytics', { waitUntil: 'load', timeout: 20000 });
   await page.waitForTimeout(700);
   const launcher = await firstBox(page, '.scp-launcher');
   expect('chat', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
@@ -571,22 +571,6 @@ SCENES['analytics'] = async (page) => {
     await page.click(`.an-tabs [data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(600);
     expect('analytics', !!(await page.$('.an-body')), `${tab} tab rendered no body`);
-  }
-};
-
-// Routines: the create card, then rows with the schedule pill and the switch
-// (or the empty state when the seed has none).
-SCENES['routines'] = async (page) => {
-  await page.goto(base + '/routines', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(900);
-  expect('routines', !!(await page.$('.routine-create.card')), 'create card missing');
-  const rows = await boxes(page, '.routine-row');
-  if (rows.length) {
-    const switches = await page.$$eval('.routine-row [role="switch"]', (els) => els.length);
-    expect('routines', switches === rows.length, 'a routine row has no enabled switch');
-    expect('routines', !!(await page.$('.routine-row .pill')), 'a routine row has no schedule pill');
-  } else {
-    expect('routines', !!(await page.$('.routines-empty')), 'no rows and no empty state');
   }
 };
 

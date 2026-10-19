@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { primaryCardAction, cardActionsFor, commandPaletteActionsFor } from './cardActions';
 
 type T = Parameters<typeof cardActionsFor>[0];
-const task = (over: Partial<T>): T => ({ status: 'backlog', archived: false, kind: 'task', session_id: null, ...over });
+const task = (over: Partial<T>): T => ({ status: 'backlog', archived: false, session_id: null, ...over });
 
 describe('cardActionsFor', () => {
   it('backlog → Plan, Start', () => {
@@ -35,8 +35,7 @@ describe('cardActionsFor', () => {
     expect(cardActionsFor(task({ status: 'committing' }))).toEqual([]);
   });
 
-  it('routine and archived cards have no quick actions', () => {
-    expect(cardActionsFor(task({ status: 'waiting', kind: 'routine', session_id: 's1' }))).toEqual([]);
+  it('archived cards have no quick actions', () => {
     expect(cardActionsFor(task({ status: 'done', archived: true }))).toEqual([]);
   });
 });

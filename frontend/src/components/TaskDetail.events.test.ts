@@ -50,7 +50,7 @@ const EVENTS = [
   { id: 1, event_type: 'system', created_at: '', data: { kind: 'fleet:removed', flow_id: 'reviewers', result: FLEET_SENTENCE } },
   { id: 2, event_type: 'system', created_at: '', data: { result: COMMIT_SENTENCE } },
   { id: 3, event_type: 'system', created_at: '', data: { message: BUDGET_SENTENCE, budget_exceeded: true } },
-  { id: 4, event_type: 'system', created_at: '', data: { kind: 'routine:fired', instance: 'abc' } },
+  { id: 4, event_type: 'system', created_at: '', data: { kind: 'custom:event' } },
 ];
 
 let activePinia: Pinia;
@@ -108,7 +108,7 @@ describe('TaskDetail Events tab', () => {
     expect(rows[0]).not.toBe('fleet:removed');
     expect(rows[1]).toBe(COMMIT_SENTENCE);
     expect(rows[2]).toBe(BUDGET_SENTENCE);
-    expect(rows[3]).toBe('routine:fired');
+    expect(rows[3]).toBe('custom:event');
 
     app.unmount();
   });

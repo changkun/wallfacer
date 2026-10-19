@@ -3,7 +3,7 @@
 
 export type NavIcon =
   | 'chat' | 'plan' | 'whiteboard' | 'board'
-  | 'routines' | 'map' | 'terminal' | 'analytics' | 'docs' | 'settings';
+  | 'map' | 'terminal' | 'analytics' | 'docs' | 'settings';
 
 export interface NavItem {
   id: string;
@@ -28,7 +28,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'plan', label: 'Plan', to: '/plan', icon: 'plan' },
       { id: 'whiteboard', label: 'Whiteboard', to: '/whiteboard', icon: 'whiteboard' },
       { id: 'board', label: 'Board', to: '/', icon: 'board' },
-      { id: 'routines', label: 'Routines', to: '/routines', icon: 'routines' },
       { id: 'map', label: 'Mission Control', to: '/mission', icon: 'map' },
     ],
   },

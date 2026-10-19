@@ -234,9 +234,6 @@
 .task-card--failed {
   border-color: color-mix(in srgb, var(--err) 30%, var(--rule));
 }
-.task-card--routine {
-  border-color: var(--accent-line);
-}
 
 .task-card__row {
   display: flex;
@@ -389,57 +386,6 @@
   gap: 4px;
   flex-wrap: wrap;
   margin-top: 2px;
-}
-
-/* Routine footer: schedule controls in place of the actions. */
-.routine-footer {
-  margin-top: 2px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--rule);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--fs-10);
-  color: var(--ink-3);
-}
-.routine-footer-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.routine-next-run {
-  color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-.routine-interval-label,
-.routine-enabled-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ink-3);
-}
-.routine-interval-select .app-select__trigger {
-  font-size: var(--fs-10);
-  padding: 1px 6px;
-  background: var(--bg-sunk);
-  color: var(--ink);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-}
-.routine-enabled-toggle {
-  width: 12px;
-  height: 12px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.routine-trigger-btn {
-  margin-left: auto;
-}
-.routine-last-fired {
-  color: var(--ink-4);
-  font-size: var(--fs-9);
 }
 
 /* --- Markdown in card previews (compact overrides) --- */

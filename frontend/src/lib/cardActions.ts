@@ -24,10 +24,9 @@ export const CARD_ACTION_DEFS: Record<CardAction, CardActionDef> = {
 };
 
 // Returns the ordered list of quick actions for a task's current status.
-// Routine cards and archived cards have no quick actions (routines get their
-// own footer; archived cards are read-only).
-export function cardActionsFor(task: Pick<Task, 'status' | 'archived' | 'kind' | 'session_id'>): CardAction[] {
-  if (task.archived || task.kind === 'routine') return [];
+// Archived cards have no quick actions; they are read-only.
+export function cardActionsFor(task: Pick<Task, 'status' | 'archived' | 'session_id'>): CardAction[] {
+  if (task.archived) return [];
   switch (task.status) {
     case 'backlog':
       return ['plan', 'start'];
@@ -47,7 +46,7 @@ export function cardActionsFor(task: Pick<Task, 'status' | 'archived' | 'kind' |
 // it as the ink button and everything else as a ghost. Waiting moves forward
 // by Done, failed by Resume when a session exists (Retry otherwise), backlog by
 // Start, and a finished task can only be reopened.
-export function primaryCardAction(task: Pick<Task, 'status' | 'archived' | 'kind' | 'session_id'>): CardAction | null {
+export function primaryCardAction(task: Pick<Task, 'status' | 'archived' | 'session_id'>): CardAction | null {
   const actions = cardActionsFor(task);
   if (actions.length === 0) return null;
   switch (task.status) {
@@ -62,7 +61,7 @@ export function primaryCardAction(task: Pick<Task, 'status' | 'archived' | 'kind
 // action for waiting/failed tasks (the board surfaces sync via the behind
 // chip, so it's palette-only here). Mirrors ui/js/command-palette.js.
 export function commandPaletteActionsFor(
-  task: Pick<Task, 'status' | 'archived' | 'kind' | 'session_id'>,
+  task: Pick<Task, 'status' | 'archived' | 'session_id'>,
 ): CardAction[] {
   const base = cardActionsFor(task);
   if (task.status === 'waiting' || task.status === 'failed') {

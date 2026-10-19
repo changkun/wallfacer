@@ -98,10 +98,6 @@ export interface Task {
   session_id: string | null;
   worktree_paths: Record<string, string>;
   usage_breakdown: Record<string, TaskUsage>;
-  routine_interval_seconds?: number;
-  routine_enabled?: boolean;
-  routine_next_run?: string | null;
-  routine_last_fired_at?: string | null;
   // Budget guardrails — 0 / missing means unlimited.
   max_cost_usd?: number;
   max_input_tokens?: number;
