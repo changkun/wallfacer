@@ -154,7 +154,6 @@ type Handler struct {
 	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache
 	fileIndex          *fileIndex
-	spanCache          spanStatsCache
 
 	// explorerCommitMu serializes explorer auto-commits per workspace so a
 	// burst of rapid saves queues on the git index instead of colliding on

@@ -14,7 +14,6 @@ import './styles/topbar.css';
 import './styles/primitives.css';
 import './styles/board.css';
 import './styles/modal.css';
-import './styles/analytics.css';
 import './styles/settings-page.css';
 import './styles/task-detail.css';
 import './styles/mermaid.css';

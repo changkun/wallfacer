@@ -932,7 +932,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Debug & monitoring.
 		"Health":            h.Health,
-		"GetSpanStats":      h.GetSpanStats,
 		"GetRuntimeStatus":  h.GetRuntimeStatus,
 		"BoardManifest":     h.BoardManifest,
 		"TaskBoardManifest": withID(h.TaskBoardManifest),
@@ -1010,8 +1009,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"OpenFolder":       h.OpenFolder,
 
 		// Usage & statistics.
-		"GetUsageStats": h.GetUsageStats,
-		"GetStats":      h.GetStats,
 
 		// Task collection (no {id}).
 		"ListTasks":                h.ListTasks,
@@ -1052,7 +1049,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			h.ServeOutput(w, r, id, r.PathValue("filename"))
 		},
 
-		// Task span / oversight analytics.
+		// Task spans and oversight.
 		"GetTaskSpans": withID(h.GetTaskSpans),
 		"GetOversight": withID(h.GetOversight),
 

@@ -171,7 +171,7 @@ The `Config` struct covers all known keys. Key categories:
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
 | **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
-| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
+| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold` |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 
 ### Atomic Updates

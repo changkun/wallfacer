@@ -68,11 +68,11 @@ Every assistant response that produced a planning round (spec files created or e
 
 ## Session cost
 
-The conversation header shows a live rollup for the active thread: rounds, input and output tokens, cache-hit rate, and accumulated cost, with a detailed breakdown on hover. Workspace-wide agent-session cost reporting lives on the Analytics page, where the default reporting period is seeded from `WALLFACER_AGENT_SESSION_WINDOW_DAYS` (default 30 days; `0` means all time). See [Oversight](oversight.md) for analytics and [Configuration](configuration.md) for the variable.
+The conversation header shows a live rollup for the active thread: rounds, input and output tokens, cache-hit rate, and accumulated cost, with a detailed breakdown on hover.
 
 ## See also
 
 - [Plan](plan.md): the spec-first surface built on the same engine
 - [Board](board.md): where dispatched specs execute as tasks
-- [Oversight](oversight.md): usage, token, and cost analytics
+- [Oversight](oversight.md): per-task usage, tokens, and cost
 - [Plan Mode internals](../internals/plan-mode.md): session runtime, streaming protocol, and undo plumbing

@@ -15,26 +15,25 @@ import (
 
 // Config holds the known configuration values from the .env file.
 type Config struct {
-	SecretStore            string // WALLFACER_SECRET_STORE (file or keyring)
-	OAuthToken             string // CLAUDE_CODE_OAUTH_TOKEN
-	APIKey                 string // ANTHROPIC_API_KEY
-	AuthToken              string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
-	BaseURL                string // ANTHROPIC_BASE_URL
-	ServerAPIKey           string // WALLFACER_SERVER_API_KEY
-	DefaultModel           string // CLAUDE_DEFAULT_MODEL
-	TitleModel             string // CLAUDE_TITLE_MODEL
-	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
-	MaxTestParallelTasks   int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
-	MaxAgents              int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
-	AgentNice              int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
-	OversightInterval      int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
-	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
-	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
-	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
-	ReviewMaxRounds        int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
-	ReviewCostCap          int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
-	ReviewModel            string // WALLFACER_REVIEW_MODEL: the reviewer's model; empty means the review does not run
-	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
+	SecretStore          string // WALLFACER_SECRET_STORE (file or keyring)
+	OAuthToken           string // CLAUDE_CODE_OAUTH_TOKEN
+	APIKey               string // ANTHROPIC_API_KEY
+	AuthToken            string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
+	BaseURL              string // ANTHROPIC_BASE_URL
+	ServerAPIKey         string // WALLFACER_SERVER_API_KEY
+	DefaultModel         string // CLAUDE_DEFAULT_MODEL
+	TitleModel           string // CLAUDE_TITLE_MODEL
+	MaxParallelTasks     int    // WALLFACER_MAX_PARALLEL (0 means use default)
+	MaxTestParallelTasks int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
+	MaxAgents            int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
+	AgentNice            int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
+	OversightInterval    int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	ArchivedTasksPerPage int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
+	AutoPushEnabled      bool   // WALLFACER_AUTO_PUSH ("true"/"false")
+	AutoPushThreshold    int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
+	ReviewMaxRounds      int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
+	ReviewCostCap        int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
+	ReviewModel          string // WALLFACER_REVIEW_MODEL: the reviewer's model; empty means the review does not run
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -94,8 +93,6 @@ var knownKeys = []string{
 	"WALLFACER_REVIEW_ROUNDS",
 	"WALLFACER_REVIEW_COST_CAP",
 	"WALLFACER_REVIEW_MODEL",
-	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
-	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
 	"WALLFACER_SANDBOX_IMPLEMENTATION",
 	"WALLFACER_SANDBOX_TESTING",
@@ -117,12 +114,8 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// AgentSessionWindowDays defaults to 30 so the agent-session cost period
-	// picker opens on a sensible "last month" view when the user hasn't
-	// configured anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
-		SecretStore:            "file",
-		AgentSessionWindowDays: 30,
+		SecretStore: "file",
 	}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
@@ -188,13 +181,6 @@ func Parse(path string) (Config, error) {
 			}
 		case "WALLFACER_REVIEW_MODEL":
 			cfg.ReviewModel = v
-		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
-			// 0 means "all time"; negative values are rejected silently (keeps
-			// the initialized default of 30). WALLFACER_PLANNING_WINDOW_DAYS is
-			// the deprecated alias; when both appear, file order decides.
-			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-				cfg.AgentSessionWindowDays = n
-			}
 		case "OPENAI_API_KEY":
 			cfg.OpenAIAPIKey = v
 		case "OPENAI_BASE_URL":

@@ -183,10 +183,7 @@ describe('primitives.css defines the shared classes', () => {
     'src/components/CommandPalette.vue', 'src/components/WorkspacePicker.vue', 'src/components/WorkspaceEditModal.vue', 'src/components/FolderBrowser.vue',
     'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue', 'src/components/KeyboardShortcutsModal.vue',
     'src/components/TrashModal.vue',
-    'src/components/ExplorerPanel.vue', 'src/components/editor/EditorTabStrip.vue', 'src/components/editor/FileEditor.vue', 'src/lib/editorTheme.ts',
-    'src/styles/analytics.css', 'src/styles/docs.css',
-    'src/views/AnalyticsPage.vue', 'src/components/analytics/AnalyticsTabCost.vue', 'src/components/analytics/AnalyticsTabTiming.vue',
-    'src/components/analytics/AnalyticsTabUsage.vue',
+    'src/components/ExplorerPanel.vue', 'src/components/editor/EditorTabStrip.vue', 'src/components/editor/FileEditor.vue', 'src/lib/editorTheme.ts', 'src/styles/docs.css',
     'src/views/LocalDocsPage.vue', 'src/lib/mermaidRender.ts', 'src/lib/chartPalette.ts',
   ];
   it.each(tokenOnly)('%s uses tokens only', (file) => {

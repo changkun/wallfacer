@@ -1,21 +1,12 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 92,
+  "route_count": 89,
   "routes": [
     {
       "method": "GET",
       "pattern": "/api/debug/health",
       "name": "Health",
       "description": "Operational health check: goroutine count, task counts, uptime.",
-      "tags": [
-        "debug"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/debug/spans",
-      "name": "GetSpanStats",
-      "description": "Aggregate span timing statistics across all tasks.",
       "tags": [
         "debug"
       ]
@@ -480,24 +471,6 @@
       "description": "Open a workspace directory in the OS file manager.",
       "tags": [
         "git"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/usage",
-      "name": "GetUsageStats",
-      "description": "Aggregated token and cost usage statistics.",
-      "tags": [
-        "stats"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/stats",
-      "name": "GetStats",
-      "description": "Task status and workspace cost statistics. Optional ?workspace=\u003crepo-root-path\u003e restricts aggregation to tasks for that workspace (400 if no tasks match).",
-      "tags": [
-        "stats"
       ]
     },
     {

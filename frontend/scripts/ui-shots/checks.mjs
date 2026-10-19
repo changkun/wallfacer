@@ -413,7 +413,7 @@ SCENES['chat'] = async (page) => {
   expect('chat', entry && entry.width <= 681, `entry column ${entry && Math.round(entry.width)}px, want <= 680`);
   const vw = await page.evaluate(() => window.innerWidth);
   const vh = await page.evaluate(() => window.innerHeight);
-  await page.goto(base + '/analytics', { waitUntil: 'load', timeout: 20000 });
+  await page.goto(base + '/settings', { waitUntil: 'load', timeout: 20000 });
   await page.waitForTimeout(700);
   const launcher = await firstBox(page, '.scp-launcher');
   expect('chat', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
@@ -500,36 +500,6 @@ SCENES['palette'] = async (page) => {
   await page.waitForTimeout(100);
   const moved = await page.$$eval('.command-palette-row.active, .command-palette-action-btn.active', (els) => els.length);
   expect('palette', moved === 1, `${moved} selections after ArrowDown, want 1`);
-};
-
-// Analytics (specs/shared/console-redesign/secondary-screens.md): stat tiles
-// as cards, tables whose numeric columns share one right edge, and every tab
-// without errors.
-SCENES['analytics'] = async (page) => {
-  await page.goto(base + '/analytics', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(900);
-  await page.click('.an-tabs [data-tab="analytics"]', { timeout: 5000 }).catch(() => {});
-  await page.waitForSelector('.an-tile', { timeout: 8000 }).catch(() => {});
-  const tiles = await boxes(page, '.an-tile');
-  expect('analytics', tiles.length >= 2, `${tiles.length} stat tiles, want at least 2`);
-  const cards = await page.$$eval('.an-tile', (els) => els.filter((e) => e.classList.contains('card')).length);
-  expect('analytics', cards === tiles.length, 'a stat tile is not a card');
-  // Numeric cells in one table share the header's right edge.
-  const misaligned = await page.$$eval('.an-table', (tables) => tables.flatMap((t) => {
-    const heads = [...t.querySelectorAll('th.num')].map((th) => th.getBoundingClientRect().right);
-    const rows = [...t.querySelectorAll('tbody tr')];
-    return rows.flatMap((r) => [...r.querySelectorAll('td.num')].map((td, i) => {
-      const cols = [...r.querySelectorAll('td.num')];
-      const head = heads[heads.length - cols.length + i];
-      return head == null ? 0 : Math.abs(td.getBoundingClientRect().right - head);
-    })).filter((d) => d > 1);
-  }));
-  expect('analytics', misaligned.length === 0, `${misaligned.length} numeric cells off their column edge`);
-  for (const tab of ['timing', 'usage']) {
-    await page.click(`.an-tabs [data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(600);
-    expect('analytics', !!(await page.$('.an-body')), `${tab} tab rendered no body`);
-  }
 };
 
 // Docs: the nav is 260 wide on the sunk surface and the reading column is at

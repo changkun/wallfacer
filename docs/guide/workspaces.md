@@ -1,6 +1,6 @@
 # Workspaces and Git
 
-A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board, chat sessions, and analytics are all scoped per workspace. This guide covers the workspace model, day-to-day workspace management, and the git machinery underneath task execution.
+A workspace is the unit of context in Wallfacer: a named identity that points at one or more folders on the host machine. The task board and chat sessions are scoped per workspace. This guide covers the workspace model, day-to-day workspace management, and the git machinery underneath task execution.
 
 ## The workspace model
 

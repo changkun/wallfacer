@@ -20,14 +20,14 @@ describe('lastRoute', () => {
   });
 
   it('honors an explicit URL (does not override a non-/ landing)', () => {
-    expect(routeToRestore('/plan', '/analytics')).toBeNull();
+    expect(routeToRestore('/plan', '/settings')).toBeNull();
     expect(routeToRestore('/?task=t1', '/plan?spec=specs/foo.md')).toBeNull();
   });
 
   it('stays on the board when the stored page no longer exists', () => {
     const routable = (path: string) => path !== '/agent-graph';
     expect(routeToRestore('/', '/agent-graph', routable)).toBeNull();
-    expect(routeToRestore('/', '/analytics', routable)).toBe('/analytics');
+    expect(routeToRestore('/', '/settings', routable)).toBe('/settings');
   });
 
   it('stays on the board when nothing better is stored', () => {

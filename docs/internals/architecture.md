@@ -365,7 +365,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `git.go` | Git workspace operations (status, push, sync, rebase, branches, checkout) | `GET /api/git/status`, `POST /api/git/push`, `POST /api/git/sync`, etc. |
 | `execute.go` | Task execution trigger (delegates to runner) |, (internal, called by task status transitions) |
 | `oversight.go` | Task oversight summary retrieval | `GET /api/tasks/{id}/oversight` (impl + test phases via `?phase=`) |
-| `spans.go` | Span timing statistics (per-task and aggregate) | `GET /api/debug/spans`, `GET /api/tasks/{id}/spans` |
+| `spans.go` | Per-task span timing | `GET /api/tasks/{id}/spans` |
 | `debug.go` | Health check and board manifest | `GET /api/debug/health`, `GET /api/debug/board`, `GET /api/tasks/{id}/board` |
 | `sandbox_gate.go` | Harness usability checks (auth validation before task launch) |, (internal helpers) |
 | `watcher.go` | Shared two-phase watcher helper used by the autoimplement loops in `tasks_autoimplement.go` | `TwoPhaseWatcherConfig`, `runTwoPhase()` |

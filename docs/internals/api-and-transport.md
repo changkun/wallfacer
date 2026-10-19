@@ -14,7 +14,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 |---|---|
 | **Debug & monitoring** | |
 | `GET /api/debug/health` | Operational health check: goroutine count, task counts, uptime |
-| `GET /api/debug/spans` | Aggregate span timing statistics across all tasks |
 | `GET /api/debug/runtime` | Live server internals: pending goroutines, memory, task states, running processes |
 | `GET /api/debug/board` | Board manifest as seen by a hypothetical new task (no self-task, no worktree mounts) |
 | `GET /api/tasks/{id}/board` | Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied) |
@@ -53,8 +52,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/git/create-branch` | Create and check out a new branch in a workspace |
 | `POST /api/git/open-folder` | Open a workspace directory in the OS file manager |
 | **Usage & statistics** | |
-| `GET /api/usage` | Aggregated token and cost usage statistics |
-| `GET /api/stats` | Task status and workspace cost statistics, plus an `agent_sessions` section keyed by workspace group. Optional `?workspace=<path>` restricts task aggregation; optional `?days=N` restricts agent-session aggregation to rounds newer than N days (execution buckets are unchanged by `?days`). |
 | **Task collection (no {id})** | |
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
@@ -361,7 +358,6 @@ The search index is maintained in-memory and updated on task changes. Use `POST 
 Key execution phases are instrumented with `span_start` / `span_end` trace events. Each span carries a `SpanData` payload with a `Phase` (e.g. `worktree_setup`, `agent_turn`, `commit`) and an optional `Label` to differentiate multiple spans of the same phase.
 
 - `GET /api/tasks/{id}/spans` returns all span events for a task, useful for profiling turn latency
-- `GET /api/debug/spans`: aggregate span timing statistics across all tasks
 
 ## Event Pagination
 

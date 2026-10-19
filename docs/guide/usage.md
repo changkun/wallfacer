@@ -26,7 +26,7 @@ Start here for the full reading order.
 ### Operate
 
 - [Automation](automation.md). Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers.
-- [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, cost and usage analytics.
+- [Oversight](oversight.md). Oversight summaries, timelines, logs, diff review, per-task cost and usage.
 - [Workspaces](workspaces.md). Workspace management, git integration, branches.
 - [Configuration](configuration.md). Settings, environment variables, harness selection, CLI reference, keyboard shortcuts.
 

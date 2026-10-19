@@ -165,7 +165,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		{http.MethodGet, "/", http.StatusOK},
 		{http.MethodGet, "/api/config", http.StatusOK},
 		{http.MethodGet, "/api/debug/health", http.StatusOK},
-		{http.MethodGet, "/api/debug/spans", http.StatusOK},
 		{http.MethodGet, "/api/debug/runtime", http.StatusOK},
 		{http.MethodGet, "/api/files", http.StatusOK},
 		{http.MethodGet, "/api/tasks", http.StatusOK},

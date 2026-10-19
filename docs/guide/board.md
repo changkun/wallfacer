@@ -161,7 +161,7 @@ The **Test** action launches a separate verification agent against the task's wo
 
 ### Timeline
 
-The **Timeline** tab renders every recorded span (worktree setup, agent turns, commits) as a Gantt-style flamegraph with idle time compressed, plus a detail table. Aggregated timing lives on the Analytics page; see [Oversight](oversight.md).
+The **Timeline** tab renders every recorded span (worktree setup, agent turns, commits) as a Gantt-style flamegraph with idle time compressed, plus a detail table.
 
 ## Automation menu
 
@@ -192,7 +192,7 @@ Deleting a task is a soft delete: the task becomes a tombstone recoverable for 7
 - [Plan](plan.md): author and dispatch specs that become board tasks
 - [Chat](chat.md): conversational planning with the same agent engine
 - [Automation](automation.md): watchers, retry budgets, and circuit breakers
-- [Oversight](oversight.md): summaries, usage, cost, and timing analytics
+- [Oversight](oversight.md): summaries, usage, cost, and timing
 - [Workspaces](workspaces.md): folders, worktrees, and per-workspace settings
 - [Configuration](configuration.md): environment variables and settings tabs
 - [API & Transport internals](../internals/api-and-transport.md): the HTTP API behind every board action

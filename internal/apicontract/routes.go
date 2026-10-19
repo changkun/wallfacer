@@ -34,11 +34,6 @@ var Routes = []Route{
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/debug/spans", Name: "GetSpanStats",
-		Description: "Aggregate span timing statistics across all tasks.",
-		Tags:        []string{"debug"},
-	},
-	{
 		Method: http.MethodGet, Pattern: "/api/debug/runtime", Name: "GetRuntimeStatus",
 		Description: "Live server internals: pending goroutines, memory, task states, containers.",
 		Tags:        []string{"debug"},
@@ -324,17 +319,6 @@ var Routes = []Route{
 	},
 
 	// --- Usage & statistics ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/usage", Name: "GetUsageStats",
-		Description: "Aggregated token and cost usage statistics.",
-		Tags:        []string{"stats"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/stats", Name: "GetStats",
-		Description: "Task status and workspace cost statistics. Optional ?workspace=<repo-root-path> restricts aggregation to tasks for that workspace (400 if no tasks match).",
-		Tags:        []string{"stats"},
-	},
 
 	// --- Task collection (no {id}) ---
 

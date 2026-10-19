@@ -4334,41 +4334,6 @@ func TestSearchTasks_MatchesPrompt(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GetStats
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestGetStats_EmptyStore verifies that GetStats returns a 200 with stats for an empty store.
-func TestGetStats_EmptyStore(t *testing.T) {
-	h := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/stats", nil)
-	w := httptest.NewRecorder()
-	h.GetStats(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	var stats any
-	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-}
-
-// TestGetStats_UnknownWorkspace verifies that filtering by unknown workspace returns 400.
-func TestGetStats_UnknownWorkspace(t *testing.T) {
-	h := newTestHandler(t)
-	ctx := context.Background()
-	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "some task", Timeout: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/stats?workspace=/nonexistent", nil)
-	w := httptest.NewRecorder()
-	h.GetStats(w, req)
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for unknown workspace, got %d", w.Code)
-	}
-}
-
 // TestUpdateTask_SetTags verifies that tags can be updated via PATCH.
 func TestUpdateTask_SetTags(t *testing.T) {
 	h := newTestHandler(t)

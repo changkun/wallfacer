@@ -47,7 +47,6 @@ const SURFACES = {
     steps: [{ click: '.task-card[aria-label*="OAuth"] .task-card__title' }, { waitFor: '.sheet' }, { wait: 800 }],
   },
   settings: { route: '/settings', steps: [{ wait: 600 }] },
-  analytics: { route: '/analytics', steps: [{ wait: 900 }] },
   // Landing-page surfaces (richer framing than the docs equivalents).
   // overview-spec focuses a real spec so the three-pane Plan view is populated;
   // oversight opens the rich OAuth task on its diff (Changes) tab.

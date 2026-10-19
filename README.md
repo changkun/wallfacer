@@ -125,9 +125,7 @@ Inspect what happened, when, and why before you accept any automated output. Eve
 
 ### Cost and usage visibility
 
-![Usage and cost breakdown](./assets/usage.png)
-
-Track token usage and cost by task, activity, and turn, so operations stay measurable as automation scales. The per-activity breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
+Each task records token usage and cost per turn and per activity (implementation, testing, oversight), shown in its detail view, so you can see where budget goes.
 
 ## Capability Stack
 
@@ -170,7 +168,7 @@ Wallfacer is a local tool: a task board on one machine over the coding-agent CLI
 | Guide | Topics |
 |-------|--------|
 | [Automation](docs/guide/automation.md) | Autoimplement, auto-test, auto-submit, auto-retry, circuit breakers |
-| [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, analytics |
+| [Oversight](docs/guide/oversight.md) | Oversight summaries, timelines, logs, diff review, usage |
 | [Workspaces](docs/guide/workspaces.md) | Workspace management, git integration, branches |
 | [Configuration](docs/guide/configuration.md) | Settings, env vars, harnesses, CLI, shortcuts |
 

@@ -171,7 +171,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_REVIEW_MODEL` | | The model Review runs its reviewer on; must differ from the task's model, or the review does not run |
 | `WALLFACER_REVIEW_ROUNDS` | `3` | Reviewer runs per Review session |
 | `WALLFACER_REVIEW_COST_CAP` | `50000` | Reviewer token budget per Review session, checked between rounds |
-| `WALLFACER_AGENT_SESSION_WINDOW_DAYS` | `30` | Default window for session cost analytics; 0 = all time. `WALLFACER_PLANNING_WINDOW_DAYS` is a deprecated alias |
 | `WALLFACER_DEFAULT_SANDBOX` | `claude` | Default harness for all activities |
 | `WALLFACER_SANDBOX_IMPLEMENTATION` | | Harness override for implementation |
 | `WALLFACER_SANDBOX_TESTING` | | Harness override for test verification |
