@@ -1,0 +1,3 @@
+The Go binary embeds all:frontend/dist. This file is tracked so a clone that
+has not run `make frontend-build` still compiles; everything else in this
+directory is build output and gitignored.
