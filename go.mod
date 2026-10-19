@@ -18,7 +18,6 @@ require (
 	google.golang.org/grpc v1.83.2
 	gopkg.in/yaml.v3 v3.0.1
 	latere.ai/x/pkg v0.90.2
-	latere.ai/x/topos v0.7.0
 )
 
 require (

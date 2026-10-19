@@ -206,17 +206,6 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	})
 }
 
-// UpdateTaskTrace stores the JSON-marshaled topos trace graph produced by a run
-// on the in-process topos harness (see internal/agentgraph). The store keeps it
-// as an opaque string so it never imports the topos package; the trace endpoint
-// unmarshals it.
-func (s *Store) UpdateTaskTrace(_ context.Context, id uuid.UUID, traceJSON string) error {
-	return s.mutateTask(id, func(t *Task) error {
-		t.Trace = &traceJSON
-		return nil
-	})
-}
-
 // UpdateTaskReview persists a finished review session onto a task. unresolved
 // is the number of open findings at the end (0 when the reviewer approved);
 // headline is the most severe open finding's claim. sessionDir is the absolute

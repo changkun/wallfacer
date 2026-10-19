@@ -4,12 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"latere.ai/x/wallfacer/internal/store"
 )
+
+// writeEnvFile writes lines to a fresh .env file and returns its path.
+func writeEnvFile(t *testing.T, lines string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	return path
+}
 
 // TestParseReviewAnswer covers the review binding's parser: answers it accepts
 // (bare, fenced, with prose, severity synonyms) and malformed output, which
@@ -260,33 +272,6 @@ func TestRunReviewer_MalformedAnswer(t *testing.T) {
 	}
 	if bd := got.UsageBreakdown[store.SandboxActivityReview]; bd.InputTokens != 1200 {
 		t.Errorf("review usage breakdown = %+v, want the failed run's usage", bd)
-	}
-}
-
-// TestRunReviewer_InProcessHarness proves a task on the in-process harness is
-// reviewed in-process: the request goes to the scripted model and names the
-// reviewer model, and no subprocess is launched.
-func TestRunReviewer_InProcessHarness(t *testing.T) {
-	mock := &MockSandboxBackend{}
-	s, r := setupRunnerWithMockBackend(t, nil, mock)
-	envFile, requests := scriptedModel(t, `{"verdict":"approve","findings":[]}`)
-	appendEnv(t, envFile, "WALLFACER_REVIEW_MODEL=reviewer-model\n")
-	r.envFile = envFile
-	task := newToposPinnedTask(t, s, "add a health endpoint")
-
-	res, err := r.RunReviewer(context.Background(), task, ReviewerInput{Round: 1, MaxRounds: 3})
-	if err != nil {
-		t.Fatalf("RunReviewer: %v", err)
-	}
-	if res.Answer.Verdict != ReviewApprove {
-		t.Errorf("verdict = %q, want approve", res.Answer.Verdict)
-	}
-	got := requests()
-	if len(got) != 1 || !strings.Contains(got[0], "reviewer-model") {
-		t.Errorf("model requests = %v, want one naming reviewer-model", got)
-	}
-	if n := len(mock.RunArgsCalls()); n != 0 {
-		t.Errorf("subprocess launches = %d, want none", n)
 	}
 }
 

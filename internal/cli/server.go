@@ -1059,7 +1059,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"TestTask":         withID(h.TestTask),
 		"ReviewTask":       withID(h.ReviewTask),
 		"ReviewTranscript": withID(h.ReviewTranscript),
-		"TaskTrace":        withID(h.TaskTrace),
 
 		"TaskCommits":  withID(h.TaskCommits),
 		"TaskDiff":     withID(h.TaskDiff),

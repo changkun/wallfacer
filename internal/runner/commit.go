@@ -591,8 +591,6 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		RecentLog: recentLog,
 	})
 
-	// runAgent runs the role in-process when the task's harness is in-process
-	// (topos), so such a task gets a real message as well.
 	res, err := r.runAgent(ctx, roleCommitMessage, task, commitPrompt, runAgentOpts{
 		EmitSpanEvents: true,
 		TrackUsage:     true,

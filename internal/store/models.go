@@ -203,11 +203,7 @@ const (
 	FailureCategoryContainerCrash FailureCategory = "container_crash"
 	FailureCategoryAgentError     FailureCategory = "agent_error"
 	FailureCategorySyncError      FailureCategory = "sync_error"
-	// FailureCategoryModelCredential marks an in-process run that was refused
-	// because no model credential is configured. Nothing ran, and a retry
-	// cannot succeed until a credential is set, so it has no auto-retry budget.
-	FailureCategoryModelCredential FailureCategory = "model_credential_missing"
-	FailureCategoryUnknown         FailureCategory = "unknown"
+	FailureCategoryUnknown        FailureCategory = "unknown"
 )
 
 // ParseFailureCategory normalizes a string into a known failure category.
@@ -220,7 +216,6 @@ func ParseFailureCategory(raw string) (FailureCategory, bool) {
 		FailureCategoryContainerCrash,
 		FailureCategoryAgentError,
 		FailureCategorySyncError,
-		FailureCategoryModelCredential,
 		FailureCategoryUnknown:
 		return category, true
 	default:
@@ -266,28 +261,14 @@ type Task struct {
 	PromptHistory []string      `json:"prompt_history,omitempty"`
 	RetryHistory  []RetryRecord `json:"retry_history,omitempty"`
 	// ExecutionAttempt survives pruning of older retry records. Zero uses the legacy history length.
-	ExecutionAttempt  int                 `json:"execution_attempt,omitempty"`
-	RefineSessions    []RefinementSession `json:"refine_sessions,omitempty"`
-	CurrentRefinement *RefinementJob      `json:"current_refinement,omitempty"`
-	Status            TaskStatus          `json:"status"`
-	Archived          bool                `json:"archived,omitempty"`
-	SessionID         *string             `json:"session_id"`
-	FreshStart        bool                `json:"fresh_start,omitempty"`
-	Result            *string             `json:"result"`
-	// Trace holds the JSON-marshaled agentgraph.Trace (nodes + edges),
-	// produced by a run on the in-process topos harness through
-	// internal/agentgraph. Nil for every task a subprocess harness ran.
-	// Traces stored by earlier multi-agent runs carry handoff edges and
-	// are served as they are. Persisted as an opaque string so the store
-	// does not depend on the topos package; the trace endpoint unmarshals
-	// it.
-	Trace *string `json:"trace,omitempty"`
-	// Lineage is the pre-schema-3 name of Trace, kept only so a task.json
-	// written before the rename still loads. migrateTaskJSON folds it into
-	// Trace and clears it, so it is always nil on a migrated task.
-	//
-	// Deprecated: use Trace.
-	Lineage           *string                        `json:"lineage,omitempty"`
+	ExecutionAttempt  int                            `json:"execution_attempt,omitempty"`
+	RefineSessions    []RefinementSession            `json:"refine_sessions,omitempty"`
+	CurrentRefinement *RefinementJob                 `json:"current_refinement,omitempty"`
+	Status            TaskStatus                     `json:"status"`
+	Archived          bool                           `json:"archived,omitempty"`
+	SessionID         *string                        `json:"session_id"`
+	FreshStart        bool                           `json:"fresh_start,omitempty"`
+	Result            *string                        `json:"result"`
 	StopReason        *string                        `json:"stop_reason"`
 	Turns             int                            `json:"turns"`
 	Timeout           int                            `json:"timeout"`

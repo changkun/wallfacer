@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/agentgraph"
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/harness"
@@ -141,8 +140,7 @@ type agentResult struct {
 // dispatches on the role's mount mode: mountReadWrite roles get the
 // full heavyweight spec (worktree mounts, board + sibling context,
 // per-task labels), while mountReadOnly and mountNone roles get an
-// inspector spec. A role that resolves to an in-process harness skips
-// the executor and runs through launchInProcess.
+// inspector spec.
 func (r *Runner) runAgent(
 	ctx context.Context,
 	role AgentRole,
@@ -230,11 +228,6 @@ func (r *Runner) runAgent(
 					store.SpanData{Phase: "container_run", Label: string(activity)})
 			}()
 		}
-		// The executor has no in-process harness to launch, so a role that
-		// resolves to one runs through the agent-graph seam instead.
-		if harness.InProcess(sb) {
-			return r.launchInProcess(runCtx, role, binding, containerName, prompt, sb, opts)
-		}
 		return r.launchOne(runCtx, role, binding, containerName, prompt, sb, labels, task, opts)
 	}
 
@@ -309,45 +302,6 @@ func (r *Runner) roleModel(binding agentBinding, sb harness.ID, opts runAgentOpt
 		}
 	}
 	return r.modelFromEnvForSandbox(sb)
-}
-
-// launchInProcess runs one sub-agent invocation on an in-process harness
-// through the agent-graph seam, for a role whose resolved harness the
-// executor cannot launch. Only prompt-only roles (mountNone: title,
-// oversight, commit message) qualify: the run gets no worktree, its
-// result is the run's final text, and the binding's ParseResult reads it
-// like a subprocess result. A role that mounts the workspace is driven
-// by the subprocess turn loop and has no in-process form here, so it is
-// refused. sessionID seeds the run's trace node ids.
-//
-// The in-process run reports no usage to the runner, so the returned
-// output carries zero tokens and cost.
-func (r *Runner) launchInProcess(
-	ctx context.Context,
-	role AgentRole,
-	binding agentBinding,
-	sessionID, prompt string,
-	sb harness.ID,
-	opts runAgentOpts,
-) (*agentResult, error) {
-	if binding.MountMode != mountNone {
-		return nil, fmt.Errorf("%s: harness %q runs in-process and cannot launch a role that mounts the workspace", role.Slug, sb)
-	}
-	cfg, err := r.agenticModelConfig()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", role.Slug, err)
-	}
-	if model := r.roleModel(binding, sb, opts); model != "" {
-		cfg.Model = model
-	}
-	res, err := agentgraph.RunAgent(ctx, sessionID, cfg, role.Slug, "", prompt, "", nil)
-	if err != nil {
-		return nil, fmt.Errorf("%s: in-process run: %w", role.Slug, err)
-	}
-	return &agentResult{
-		Output:      &agentOutput{Result: res.Final, StopReason: "end_turn", ActualSandbox: sb},
-		SandboxUsed: sb,
-	}, nil
 }
 
 // launchOne builds the container spec, invokes backend.Launch, drains

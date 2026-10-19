@@ -43,14 +43,6 @@ func deepCloneTask(t *Task) Task {
 		result := *t.Result
 		cp.Result = &result
 	}
-	if t.Trace != nil {
-		trace := *t.Trace
-		cp.Trace = &trace
-	}
-	if t.Lineage != nil {
-		lineage := *t.Lineage
-		cp.Lineage = &lineage
-	}
 	if t.StopReason != nil {
 		stopReason := *t.StopReason
 		cp.StopReason = &stopReason

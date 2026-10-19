@@ -23,14 +23,6 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// The error a chat turn answers with when its harness has no chat runtime
-// (agentsession.Launchable is false): one code and the one user sentence for
-// it. The harness id and the reason travel in the envelope's details.
-const (
-	codeHarnessUnavailableInChat    = "harness_unavailable_in_chat"
-	messageHarnessUnavailableInChat = "The selected harness cannot run in chat. Choose another harness for this chat."
-)
-
 // The error a chat turn answers with when the thread's saved session state
 // (its resume id and mode pin) cannot be read or written: one code and the
 // one user sentence for it. The thread id, the operation and the underlying
@@ -319,23 +311,8 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "message is required", http.StatusBadRequest)
 		return
 	}
-	// Which harness runs this turn. Empty or unknown falls back to the default;
-	// the frontend only offers the harnesses the config lists in chat_sandboxes.
+	// Which harness runs this turn. Empty or unknown falls back to the default.
 	sb := harness.DefaultFrom(req.Harness)
-	// A harness the runtime cannot launch (an in-process one) is refused here,
-	// before the message is persisted or the runtime marked busy, instead of
-	// failing in the executor after the turn has been accepted.
-	if !agentsession.Launchable(sb) {
-		httpjson.WriteError(w, http.StatusUnprocessableEntity, httpjson.Error{
-			Code:    codeHarnessUnavailableInChat,
-			Message: messageHarnessUnavailableInChat,
-			Details: map[string]any{
-				"harness": string(sb),
-				"reason":  "the harness runs in-process; the chat runtime launches subprocess harnesses only",
-			},
-		})
-		return
-	}
 
 	// Exactly one of focused_spec / focused_task may be set.
 	if req.FocusedSpec != "" && req.FocusedTask != "" {

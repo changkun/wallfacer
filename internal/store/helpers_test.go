@@ -123,8 +123,6 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.Tags = []string{"tag-1"}
 	task.DependsOn = []string{"dep-1"}
 	task.ScheduledAt = &scheduledAt
-	trace := "trace-1"
-	task.Trace = &trace
 	reviewUnresolved := 2
 	task.ReviewUnresolved = &reviewUnresolved
 
@@ -152,7 +150,6 @@ func mutateTaskCloneForIsolation(task *Task) {
 	*task.Result = "mutated-result"
 	*task.StopReason = "mutated-stop"
 	*task.ScheduledAt = time.Unix(1_800_000_000, 0).UTC()
-	*task.Trace = "mutated-trace"
 	*task.ReviewUnresolved = 99
 }
 

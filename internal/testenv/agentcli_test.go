@@ -41,13 +41,10 @@ func presetGoEnv(t *testing.T) {
 	}
 }
 
-func TestAgentCLIsNameEverySubprocessHarness(t *testing.T) {
+func TestAgentCLIsNameEveryHarness(t *testing.T) {
 	for _, id := range harness.All() {
 		_, listed := AgentCLIs[id]
-		switch {
-		case harness.InProcess(id) && listed:
-			t.Errorf("harness %s runs in process and launches no CLI, but AgentCLIs lists it", id)
-		case !harness.InProcess(id) && !listed:
+		if !listed {
 			t.Errorf("harness %s launches a CLI that AgentCLIs does not name, so tests can launch the real one; add the executable name the executor resolves for it", id)
 		}
 	}

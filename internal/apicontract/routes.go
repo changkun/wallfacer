@@ -459,11 +459,6 @@ var Routes = []Route{
 		Description: "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
 		Tags:        []string{"tasks"},
 	},
-	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/trace", Name: "TaskTrace",
-		Description: "Read the trace (nodes + edges) of a run on the in-process topos harness.",
-		Tags:        []string{"tasks"},
-	},
 
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/commits", Name: "TaskCommits",

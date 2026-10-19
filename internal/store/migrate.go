@@ -95,20 +95,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (5) Fold the pre-schema-3 Lineage field into Trace. A task written
-	// before the rename carries the graph under the old key; a task written
-	// after carries it under the new one. Trace wins if somehow both are set,
-	// and the deprecated field is always cleared so it never round-trips back
-	// to disk.
-	if task.Lineage != nil {
-		if task.Trace == nil {
-			task.Trace = task.Lineage
-		}
-		task.Lineage = nil
-		changed = true
-	}
-
-	// (6) Guarantee SchemaVersion is current.
+	// (5) Guarantee SchemaVersion is current.
 	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
 		task.SchemaVersion = constants.CurrentTaskSchemaVersion
 		changed = true
