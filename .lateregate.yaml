@@ -67,7 +67,7 @@ waive:
     until: 2026-11-30
   spec-lint:
     reason: >-
-      the spec tree is nested (specs/{cloud,identity,intent,local,shared} and
+      the spec tree is nested (specs/{intent,local,shared} and
       a nested .archive) and spec-lint reads only specs/*.md today; the gate
       turns on when it reads subdirectories, which is ci-gate work
     until: 2026-10-31

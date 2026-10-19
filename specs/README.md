@@ -16,29 +16,25 @@ wrong against the code, and the spec says where.
 
 ## Status Quo
 
-What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started, ◌ = dormant (partly shipped, remainder gated), ⊘ = archived.
+What has shipped vs what remains. ✅ = complete, ◐ = in progress, ○ = not started, ⊘ = archived.
 
 ```
 Foundations - 7/7 complete (see Archive)
 
-Identity - sign-in and isolation shipped; collaboration waits on a hosted board
-  ✅ Authentication                ✅ Auth by Default + Console
-  ✅ Local Device-Code Sign-In (UI re-home)
-  ✅ Local Per-Account/Org Isolation (signed-in scopes projects/tasks)
-  ※ Multi-User Collaboration (premises overtaken; see the spec)
-  ○ Remote Control (→ cloud plane)  ○ Third-Party OIDC (vague)
-  ⊘ RBAC Matrix (scope mechanism removed)
+Pure-local - the 2026-10-19 cleanup (the active program)
+  ◐ Pure-Local Wallfacer (decision record; container execution removal open)
+  ⊘ removed: artifacts, routines, latere.ai sign-in and cloud mode, the
+    coordination plane and spec comments, the hosted server, the sandbox
+    proxy, the Topos harness
 
 Spec Coordination - complete (its own track; spec tree, planning, dispatch)
   ✅ Document Model                ✅ Spec Archival
   ✅ Planning UX                   ✅ Chat-First Mode
   ✅ Planning Chat Threads         ✅ Spec State Control Plane
 
-Local Product - 30 shipped, 6 designed and unbuilt, 1 vague
-  ⊘ Desktop App (code removed)     ✅ Terminal Sessions
-  ✅ Container Exec                ✅ OAuth Token Setup
-  ✅ Pixel Agent Avatars           ✅ Routine Tasks (removed)
-  ✅ Agents & Flows                ✅ Refinement Into Plan
+Local Product - shipped work in the Archive; five designs unbuilt
+  ✅ Terminal Sessions             ✅ OAuth Token Setup
+  ✅ Pixel Agent Avatars           ✅ Refinement Into Plan
   ✅ Vue Frontend Migration        ✅ Rebrand Module Path
   ✅ Backend Redundancy Cleanup    ✅ Editor Tabs
   ✅ Diff Review Comments          ✅ Excalidraw Whiteboard
@@ -46,140 +42,59 @@ Local Product - 30 shipped, 6 designed and unbuilt, 1 vague
   ✅ Free-Form Specs               ✅ Archive Active Task Guard
   ✅ Unified Transcript Render     ✅ Agent Resource Governance
   ✅ Remove Idea-Agent Subsystem   ✅ Chat Model Transparency
-  ✅ Static Artifacts (removed)    ✅ Dockable Terminal (splits closed)
+  ✅ Dockable Terminal (splits closed)
   ✅ Test Criteria                 ✅ Visual Verification (in CI)
-  ✅ Adversarial Review            ✅ Workspace Model
-
-  Agent graph (retired 2026-10-02, see Platform-native)
-    ✅ Topos Runtime Integration M1-M5  ✅ Topos Live Agent Events
-    ✅ Unified Agent Graph UI (one page; Agents and Flows pages deleted)
-    ⊘ Workflows Graph UX (its page was deleted)
-    ⊘ Agent Graph E2E Design (withdrawn)
-    ○ First-Run Onboarding (vague; one decision left)
+  ✅ Adversarial Review (now review on a second model)
+  ✅ Workspace Model
+  ⊘ removed: Desktop App, Container Exec, Routine Tasks, Static Artifacts,
+    Agents & Flows and the agent graph, Topos runtime and live events,
+    Live Serve (never built), First-Run Onboarding (stub)
 
   Designed, unbuilt, not scheduled
     ○ Task Prompt Attachments      ○ Scoped Command Registry
     ○ Host Path References         ○ Terminal UI (TUI mode)
     ○ Internal Consolidation
-    ⊘ Live Serve (retired 2026-10-02; web apps preview through Apps)
 
-  ⊘ superseded by the Vue/host rewrite: File Attachments,
-    File Panel Viewer, Inline Diff Feedback (old), Spatial Canvas
-
-Shared Design - 9 complete, 1 part shipped, 3 retired
+Shared Design - complete
   ✅ Agent Abstraction             ✅ Host Exec Mode
-  ✅ Host as Only Backend          ✅ Harness Abstraction (all 5 harnesses shipped)
-  ⊘ Token & Cost Optimization      ⊘ Extensible Prompts
-  ✅ Agent Session Vocabulary       ⊘ Overlay Snapshots (obsolete under host exec)
-  ◐ Topos as the Only Harness (opt-in shipped; migration specified)
-  ✅ Visual Identity Rebrand (tokens · animated site · docs rewrite)
-  ✅ Selectable Color Themes (clay default + 4 palettes, Appearance tab)
-  ✅ Spec Workflow Plugin (spec@latere-ai; mirrored here behind a drift gate)
-  ✅ Console Redesign (replichai system: neutral canvas, clay accent, matte; 11 children shipped, agent-graph child retired with its page)
+  ✅ Host as Only Backend          ✅ Harness Abstraction (5 CLI harnesses)
+  ✅ Agent Session Vocabulary      ✅ Visual Identity Rebrand
+  ✅ Selectable Color Themes       ✅ Spec Workflow Plugin
+  ✅ Console Redesign (kept active as the design reference)
+  ⊘ Token & Cost Optimization, Extensible Prompts, Overlay Snapshots,
+    Platform-Native Wallfacer, Topos as the Only Harness
 
-Cloud Platform - two axes over one Latere platform (api.latere.ai)
-  ○ Latere Platform Integration (umbrella; one client of the Agents capability)
-  Axis A: Coordination plane (Cloud v1, lead; local stays source of truth)
-    ◐ Coordination Plane (anchor)  ◐ Connection + Presence
-    ○ Metadata Projection          ✅ Spec Comments
-    ○ Remote Control (re-homed)    ○ Data Boundary (widened)
-  Axis B: Remote execution (Cloud v2+, demand-gated)
-    ○ Hosted Agents Executor (a task runs as a platform agent session)
-    ○ Hosted Board Deployment (blocked on a product decision)
-  archived: Multi-Tenant, Billing Idempotency, Cella Runtime, Shared Cella
-    Client, Tenant Filesystem, Tenant API (the platform owns the concern);
-    Claude Managed Agents, Antigravity (third-party executors, outdated)
+Git Workflow - local git
+  ✅ Intent-Driven Commits         ○ Task Revert (unbuilt)
+  ⊘ GitHub Integration and its children (retired 2026-10-02)
 
-Git Workflow - local git; the GitHub half is retired
-  ✅ Intent-Driven Commits              ○ Task Revert (unbuilt)
-  ⊘ GitHub Integration, Brokered Token, Pull Requests on Tasks,
-    Repo Selection, Read Surface, Cloud Remote Fix (retired 2026-10-02)
-
-Platform-native - six decisions of 2026-10-02 (the active program)
-  ○ Platform-Native Wallfacer (umbrella)
-  ✅ Retire Agent Fleets (done)          ✅ Remove GitHub Integration (done)
-  ✅ Retire the Artifacts Gallery (done; pages go through Apps)
-  ◐ Topos as the Only Harness (phases 0 and 1a done: review on a second model; 1b next)
-  ○ Sessions That Spawn and Fork (vague; decides what a hosted board hosts)
+Archived tracks
+  ⊘ Identity: sign-in, account and org isolation, collaboration
+  ⊘ Cloud Platform: platform integration, coordination plane, hosted
+    execution, hosted board
 ```
 
-Where things stand after the 2026-10-02 review. Every spec in the active tree
-was checked against the code; what shipped moved to the archive with an
-Outcome, what lost its premise moved there with a banner, and what remains is
-either designed and unbuilt (`drafted`) or waiting on a decision.
+Where things stand after the 2026-10-19 cleanup. The maintainer made
+wallfacer a pure local tool: a task board on one machine that drives the
+coding-agent CLIs installed there, with no hosted service, sign-in,
+coordination or remote execution. The decision, in the maintainer's words, and
+what happens to stored data are in [pure-local](shared/pure-local.md).
 
-Four decisions followed the review the same day, recorded in
-[platform-native](shared/platform-native.md), and they are the active program:
-
-1. **Retire fleets.** No user-authored agents or fleets; the page, the two
-   engines only fleets reach, and the two CRUD APIs are removed
-   ([retire-agent-fleets](.archive/shared/platform-native/retire-agent-fleets.md)).
-2. **One harness.** Migrate to the rebuilt Topos module and make it the only
-   harness, with platform models and a model switch; no CLI harnesses
-   ([topos-native-harness](shared/topos-native-harness.md)).
-3. **Rethink the board before hosting it.** Agents that spawn and fork at run
-   time instead of isolated tasks
-   ([sessions-that-spawn-and-fork](shared/platform-native/sessions-that-spawn-and-fork.md), vague).
-4. **Remove GitHub.** No GitHub connection until the platform has a connector
-   ([remove-github-integration](.archive/shared/platform-native/remove-github-integration.md)).
-
-Also decided the same day: a signed-out instance has no platform feature;
-sign-in with a model provider stays as a second source of model credentials
-(with the constraint that a Claude subscription token cannot feed a
-third-party harness, so the Claude path is an API key); and the two
-third-party remote executor specs are archived.
-
-Spec Coordination and Foundations are complete. Cloud Platform is drafted and
-demand-gated, with the coordination connection and spec comments shipped.
+Every active spec was checked against that decision. Specs for removed
+features, superseded designs, stale specs, and designs with no path for a
+local tool moved to the archive with a note saying why. What remains active is
+the decision record, the console redesign tree, five designed and unbuilt
+local specs, and task revert.
 
 ---
 
-## Platform-Native
+## Pure-Local
 
-The active program: six decisions of 2026-10-02 that make wallfacer an application on the Latere platform with one harness. Three are removals of shipped code, one retires an unbuilt design, one is a migration, one is a design question.
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [platform-native.md](shared/platform-native.md) | Drafted | **Umbrella.** The six decisions in the maintainer's words, the before and after, the order of work, what they reverse in older specs, and where a run's model credential comes from (a Latere sign-in or a provider sign-in, and the limits on the provider path), and the open questions (whether the rebuilt harness can use a provider credential directly; the sub-agent roles). |
-| ↳ [retire-agent-fleets.md](.archive/shared/platform-native/retire-agent-fleets.md) | **Complete** | Removed 2026-10-02: the agent-graph page, the flow engine, delegating fleets on the embedded runtime, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline; a stored fleet name gets one timeline notice; leftover definition directories get one startup warning. |
-| ↳ [remove-github-integration.md](.archive/shared/platform-native/remove-github-integration.md) | **Complete** | Removed 2026-10-02: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes and `internal/github`. Plain git push is untouched; the first start after upgrade deletes the cached tokens. |
-| ↳ [retire-artifacts.md](.archive/shared/platform-native/retire-artifacts.md) | **Complete** | Removed 2026-10-02: the artifacts gallery, `GET /api/artifacts`, `GET /artifact/{path...}` and the rail entry. The API path answers 404; the other two get the console's not-found page. Files under `<workspace>/artifacts/` stay untouched; pages are published through the platform's Apps capability. |
-| ↳ [sessions-that-spawn-and-fork.md](shared/platform-native/sessions-that-spawn-and-fork.md) | Vague | Direction: an agent that spawns subagents and forks itself at run time, instead of isolated tasks on a board. Lists the eight questions a design has to answer (task or session as the unit, what a spawn is on the board, fork as a user action, shared context, git, limits, scale, planning). Decides what a hosted board would host. |
-
-The migration itself is [topos-native-harness.md](shared/topos-native-harness.md) in Shared Design.
-
----
-
-## Identity
-
-Everything about principals, sessions, delegation, and what data crosses the machine boundary. Authentication is the anchor; the rest build on the principal context it establishes. The auth-by-default convergence (`wallfacer run` defaulting into the Latere account experience, latere-ui console shell) has shipped and is archived below; remaining work is collaboration and delegation.
+The active program: the 2026-10-19 cleanup that keeps wallfacer's current shape and removes everything that existed for the Latere platform or for features no longer wanted.
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [local-account-isolation.md](.archive/identity/local-account-isolation.md) | **Complete** | Signed-in local `wallfacer run` now scopes projects (workspaces) and tasks to the active personal account / org, reversing the cloud-only-isolation design for signed-in local sessions. Shipped smaller than specced: the Layer-1 (workspace, `config.go`/`workspace_crud.go`) gates were dropped from `cloudMode` onto principal-presence so both layers share one rule (`bccd81bc`), the project list filters strictly while the active workspace drops only on a genuine cross-org carry-over (`6ed87396`), and device sign-in is re-enabled (`85e6ce6e`). The legacy owner-adoption migration and personal-coercion proved unnecessary (personal view already includes legacy no-owner records; a bare local token carries no org claim) and are deferred; multi-account legacy separation and redirect-free org switching remain follow-ups. |
-| [local-device-signin.md](.archive/identity/local-device-signin.md) | **Complete** | Re-homed the built-but-unwired RFC 8628 device-code flow onto the Vue account menu for local `wallfacer run`: `DeviceAuth` wiring, session-cookie mint on the poll `done` branch, and a user-code modal (`useDeviceSignIn` + `DeviceSignInModal`) that falls back to `/login` on 503. The boot wiring was reverted (`794602ef`) while local sign-in lacked per-account isolation; it is re-enabled (`85e6ce6e`) now that [local-account-isolation](.archive/identity/local-account-isolation.md) has shipped that isolation. |
-| [authentication.md](.archive/identity/authentication.md) | **Complete** | OAuth2/OIDC login, session management, user identity. Phase 1: `WALLFACER_CLOUD` flag, `latere.ai/x/pkg/authkit/oidc` integration, cloud-gated `/login`/`/callback`/`/logout`/`/api/auth/me` routes, status-bar sign-in badge. Phase 2: JWT middleware, principal context, `org_id`/`created_by` fields, forced login, superadmin/scope gating, org switching. Follow-up auth-unification (authkit.Identity, HTTP device-code login) shipped and is archived under `identity/authentication/`. |
-| [multi-user-collaboration.md](identity/multi-user-collaboration.md) | Stale | Umbrella: members of one organization on one board with attribution, role-based permissions, an audit log, optimistic concurrency and private threads. Steps 1-2 (actor fields, org scoping) shipped. Its one-instance-per-organization tenant model, its scope-based authorization and its process-local presence are all overtaken, and a refresh waits on whether a hosted board ships. The spec opens with the list of what is false. |
-| ↳ [rbac-matrix.md](.archive/identity/multi-user-collaboration/rbac-matrix.md) | **Archived** | Admin/editor/viewer mapped onto three token scopes and a `RequireScope` wrapper. Archived 2026-10-02: identities carry no scopes and the wrapper was removed; they carry organization roles (`owner`, `admin`, `member`) now, which the parent's matrix is to be rewritten against. |
-| [third-party-oidc.md](identity/third-party-oidc.md) | Vague | Self-hosted non-latere.ai deployments sign in against Keycloak, Entra ID, Okta, Authelia, Dex, etc. by configuring or extending the platform `authkit/oidc` RP rather than forking a local package. Covers sign-in to the instance only: a third-party issuer mints no actor tokens, so the coordination plane and hosted execution stay latere.ai-only. |
-| [remote-control.md](identity/remote-control.md) | Drafted | The command-router capability on the coordination connection: control UI contract, instance picker, offline handling, per-action authorization and audit, and an instance-side opt-out (a setting, not a token scope). Transport lives in [coordination-plane.md](cloud/latere-integration/coordination-plane.md). Unbuilt. |
-| [agent-token-exchange.md](.archive/identity/agent-token-exchange.md) | **Archived** | Per-task agent credentials for calling latere.ai services on behalf of the dispatching user. Archived 2026-09-13: auth removed agent delegation on 2026-07-26, so the agent principal, the delegation row, `/internal/agent-runner-tokens` and the exchange this spec mints from are all gone. The trust plane it needed had already shipped as the `sandbox_proxy.go` server-side proxy and is unaffected. A task that calls a Latere service presents the dispatching user's own token, audienced to that service. |
-
-### Identity dependencies
-
-```mermaid
-graph LR
-  AUTH[Authentication ✅] --> ABD[Auth by Default ✅]
-  AUTH --> TPO[Third-Party OIDC]
-  AUTH --> RC[Remote Control]
-  AUTH --> MUC[Multi-User Collaboration]
-  MUC --> CH[Cloud team hosting]
-
-  style AUTH fill:#d4edda,stroke:#28a745
-  style ABD fill:#d4edda,stroke:#28a745
-```
-
-Auth-by-default has shipped (archived). Agent token exchange is archived: its trust plane shipped as the `sandbox_proxy.go` server-side proxy, and the mint path it was waiting on was removed from auth rather than built. Multi-user collaboration is the gate for cloud *team* hosting (org-scoped shared boards).
+| [pure-local.md](shared/pure-local.md) | Validated | **Decision record.** The maintainer's words, each removal with what happens to stored data and settings (routine cards skipped at load, owner fields dropped on the next save, sign-in and coordination files left on disk unread, a task naming `topos` running on the default harness), what stays, and the open item: container execution. Supersedes [platform-native](.archive/shared/platform-native.md). |
 
 ---
 
@@ -208,7 +123,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [chat-model-transparency.md](.archive/local/chat-model-transparency.md) | **Complete** | The observed harness model in the chat window: a header badge on all three chat surfaces, a per-turn chip on a turn whose model differs from the session's, and task provenance that records the model that actually ran. `harness.Event.Model` (Claude only). |
-| [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts and feedback: per-task blobs, staged into the worktree under `.attachments/` and listed in the first-turn prompt for the agent's file-read tool. Harness-neutral; local execution target only. Unbuilt. |
+| [task-prompt-attachments.md](local/task-prompt-attachments.md) | Drafted | Drag-and-drop file and image attachments for task prompts and feedback: per-task blobs, staged into the worktree under `.attachments/` and listed in the first-turn prompt for the agent's file-read tool. Harness-neutral. Unbuilt. |
 | [inline-file-panel.md](.archive/local/inline-file-panel.md) | Complete | VS Code-style file tabs in the board top bar: `editorTabs` store, `EditorTabStrip`, CodeMirror 6 editor, preview tabs, board task-status indicators; replaces the `ExplorerPanel` preview modal. Multi-modal preview + raw-content endpoint deferred to Future. Supersedes the archived file-panel-viewer. |
 | [inline-diff-feedback.md](.archive/local/inline-diff-feedback.md) | **Complete** | Code-review-style inline comments anchored to Changes-tab diff lines, batched into the existing feedback channel, with the inline surface login-gated server-side like spec comments. Implemented directly (not dispatched); also fixed the `submitFeedback` `feedback`/`message` key bug. |
 | [map-mission-control.md](.archive/local/map-mission-control.md) | **Complete** | Rebuilt the orphaned read-only Map into an actionable mission-control surface: a server-side unified spec+task graph (`GET /api/graph` + pure `internal/graph` builder), a clean hand-rolled-SVG renderer (no new dep; RAF-batched drag, curved edges) replacing the ~4,583-line vendored depgraph, and inline node actions (dispatch a validated spec, start a ready task, jump to Board/Plan) with operational "ready to act" highlighting. |
@@ -216,31 +131,31 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [workspace-model.md](.archive/local/workspace-model.md) | **Complete** | **Foundation redesign.** Decoupled a workspace's identity (stable UUID + `DataKey` storage handle) from its membership (a mutable folder set), owned by a personal user or org. Retired the "identity = hash of sorted paths" model (`InstructionsKey`→`WorkspaceDataKey`) that orphaned scoped data (`data/<key>/`) on any folder edit. `MigrateToWorkspaces` rewrites `workspace-groups.json`→`workspaces.json` moving zero bytes (live groups keep their existing data-dir hash) and adopts orphaned task history as dormant workspaces (dry-run-validated on real data: 9 live + 11 dormant + 6 empty skipped). Manager by-id CRUD + safe `UpdateFolders`; HTTP CRUD + activate-by-id; Vue store/picker/editor. Renamed `Group`→`Workspace` across Go/API/Vue. Cloud workspace objects, multi-repo association, folder sandboxing, and a live-instance round-trip deferred (see Outcome). |
 | [dockable-panel-workspace.md](.archive/local/dockable-panel-workspace.md) | **Complete** | The terminal docks to any edge, maximizes, and is dragged by its header onto a drop zone, with the layout persisted (`DockWorkspace`, dock store, pure reducers). Splits, tab groups and the explorer as a dock panel were not built and are closed with the spec; their unwired reducers were removed. |
 | [test-criteria.md](.archive/local/test-criteria.md) | **Complete** | User-defined free-form test criteria persisted on a task (`Task.Criteria`), settable in the composer, and fed to the manual test trigger, the auto-tester and review. Supersedes the archived validation-barrier. |
-| [static-artifacts.md](.archive/local/static-artifacts.md) | **Archived** | Static serving of self-contained HTML artifacts from `<workspace>/artifacts/` with a gallery at `/artifacts`. Shipped, then removed on 2026-10-02 by [retire-artifacts](.archive/shared/platform-native/retire-artifacts.md); pages are published through the platform's Apps capability. |
+| [static-artifacts.md](.archive/local/static-artifacts.md) | **Archived** | Static serving of self-contained HTML artifacts from `<workspace>/artifacts/` with a gallery at `/artifacts`. Shipped, then removed on 2026-10-02 by [retire-artifacts](.archive/shared/platform-native/retire-artifacts.md). |
 | [review-adversarial-verification.md](.archive/local/review-adversarial-verification.md) | **Complete** | Post-run adversarial multi-agent review: critics over all five harnesses, a session proposer on the fork-session path, and an auto-review step in the autoimplement loop behind a toggle (off by default). Shipped, then revised on 2026-06-26 after a review of v1 found runaway auto-runs; the revision in the spec is the design of record. |
 | [visual-verification.md](.archive/local/visual-verification.md) | **Complete** | Browser-based UI regression checks (`frontend/scripts/ui-shots/checks.mjs`, `make ui-test`) that catch render crashes and broken layout with deterministic geometry assertions, not pixel-diffing. Runs in CI. |
 | [unified-transcript-rendering.md](.archive/local/unified-transcript-rendering.md) | **Complete** | Activity tab gets a `Raw ↔ Rendered` transcript toggle (default Rendered) that works for all five harnesses. Hybrid normalization: Claude keeps the rich FE `prettyNdjson` parser; cursor/opencode/pi render from the backend canonical `harness.Event` via a new `?format=normalized` on the logs stream; codex's `item.*` gets enriched; additive `KindThinking`. Fixes the prose-only raw-JSON dump and renders the answer prose. Review gets only a raw toggle (no refactor). |
 | [internal-consolidation.md](local/internal-consolidation.md) | Drafted | Behavior-preserving refactors surfaced by a codebase audit: a handler mutate-commit helper family, a runner `failTask` terminal-state helper, a shared one-shot LLM-call + NDJSON-parse path, one source of truth for the prompts template-name set, and workspace storage-identity out of the prompts package. Unbuilt; the audit's mechanical cleanups already landed. |
 | [scoped-command-registry.md](local/scoped-command-registry.md) | Drafted | Promote the flat slash-command registry (`internal/agentsession/commands.go`, no scope field today, served at `GET /api/agent/commands`) to a surface-agnostic package with per-scope catalogs (planning, task_create, task_waiting) so the board composer gets its own `/` commands. Unbuilt. |
-| [host-mounts.md](local/host-mounts.md) | Drafted | Per-task host path references surfaced to the agent in the first-turn prompt. Nothing is mounted or copied under host execution; read-only is advisory. Local execution target only. Unbuilt. |
+| [host-mounts.md](local/host-mounts.md) | Drafted | Per-task host path references surfaced to the agent in the first-turn prompt. Nothing is mounted or copied under host execution; read-only is advisory. Unbuilt. |
 | [live-serve.md](.archive/local/live-serve.md) | **Archived** | Build and run developed software from within Wallfacer: serve sessions, build discovery, app secrets, a log panel. Never built; retired on 2026-10-02 because web apps are previewed through the platform's Apps capability. Apps hosts static sites only; a server process runs in the console's terminal. |
 | [agent-resource-governance.md](.archive/local/agent-resource-governance.md) | **Complete** | Stop Test/Review from pegging the machine: host agents run in their own process group throttled to background priority (macOS `PRIO_DARWIN_BG`, Linux nice), a global `WALLFACER_MAX_AGENTS` budget (opt-in), review defaulted to its floor (1 fork / 3 rounds), and forks/rounds/cost-cap/nice/budget surfaced in the Execution settings tab via `/api/env`. OQ-3 (darwin child-backgrounding permission) pending empirical confirmation. |
 | [terminal-ui.md](local/terminal-ui.md) | Drafted | Full TUI mode over the same HTTP API: interactive terminal board, log streaming, task lifecycle via Bubble Tea (`internal/tui/`). Unbuilt. |
 | [archive-active-task-guard.md](.archive/local/archive-active-task-guard.md) | **Complete** | Spec archive guard blocks only when a dispatched task is still active; terminal (done/failed/cancelled) or stale links no longer 409. Fixes a complete tree refusing to archive. |
-| [excalidraw-whiteboard.md](.archive/local/excalidraw-whiteboard.md) | **Complete** | Whiteboard drawing/brainstorm canvas as a peer Vue view, backed by a per-workspace scene file (`GET`/`PUT /api/whiteboard`). Excalidraw runs in a lazily-loaded React island; the app entry chunk stays React-free. Cloud sync for signed-in users is future work. |
+| [excalidraw-whiteboard.md](.archive/local/excalidraw-whiteboard.md) | **Complete** | Whiteboard drawing/brainstorm canvas as a peer Vue view, backed by a per-workspace scene file (`GET`/`PUT /api/whiteboard`). Excalidraw runs in a lazily-loaded React island; the app entry chunk stays React-free. |
 | [free-form-specs.md](.archive/local/free-form-specs.md) | **Complete** | Render frontmatter-less markdown specs read-only in spec mode (previously they silently collapsed the tree to empty), plus a non-blocking, dismissible suggestion to migrate them into wallfacer lifecycle-managed specs via opt-in frontmatter scaffolding. Shipped: `ErrMissingFrontmatter` sentinel + `BuildTree` doc nodes, `InjectFrontmatter`, `migrate` transition action, explorer doc-node rendering + adopt banner. |
 | [refinement-into-plan.md](.archive/local/refinement-into-plan.md) | **Complete** | Retired the bespoke refine pipeline. Plan mode edits task prompts directly via a Task Prompts explorer section and a task-aware `update_task_prompt` tool. Rounds persist as task events; undo is event rewind for task mode, git revert for spec mode. |
 | [backend-redundancy-cleanup.md](.archive/local/backend-redundancy-cleanup.md) | **Complete** | Umbrella for follow-ups to the June 2026 pass-1 cleanup. All children landed or retired: the 6 API-surface leaves collapsed verb-specific routes into PATCH/parameterised endpoints (123 → 113 routes). `ideate` archived; `transitionTask` helper deferred. |
 | [rebrand-module-path.md](.archive/local/rebrand-module-path.md) | **Complete** | Migrated the module path from `changkun.de/x/wallfacer` to `latere.ai/x/wallfacer` (267 files, `ffce4807`). Two follow-ups (wallfacerd image rename, vanityOwners override) deferred, gated on the repo moving into the `latere-ai` GitHub org. |
 | [routine-tasks.md](.archive/local/routine-tasks.md) | **Archived** | Routines as board cards (`Kind=routine`) with a schedule that spawn fresh instance tasks when they fire. Ideation migrated to a `system:ideation`-tagged routine. Shipped, then removed on 2026-10-19; stored routine cards stay on disk unread. |
 | [agents-and-flows.md](.archive/local/agents-and-flows.md) | **Complete** | Agent role + pipeline as first-class user primitives. Sidebar Agents and Flows tabs; the composer simplifies to "pick a Flow, write a prompt". Seeded built-in flows replace the old TaskKind + Agent-overrides surface. |
-| [topos-runtime-integration.md](.archive/local/topos-runtime-integration.md) | **Complete** | The public `latere.ai/x/topos` runtime embedded as an in-process execution path (`agentic` flow kind) behind the `internal/agentgraph` seam and its import guard, with a real model through the gateway and the run's trace served and rendered. M1-M5 shipped; M6 (the unified surface) left for unified-agent-graph-ui. The pin predates the runtime's upstream rebuild; moving it is a migration of the seam. |
-| [topos-live-agent-events.md](.archive/local/topos-live-agent-events.md) | **Complete** | Live agent events for topos runs. topos gained a root `Options.Observer` seam + `EventAssistantMessage` (per-turn text) + the entry session-id↔node-id join fix (topos `d8e51f8`); wallfacer's agentgraph seam forwards the run's events (assistant text, delegations, tool use) onto the task timeline via the existing `/api/tasks/stream` live path — the multi-agent transcript now appears as the run proceeds, no new endpoint or UI. Bespoke SSE + trace-node animation deferred as optional polish. Shipped: topos v0.0.5 tagged + pushed, go.mod bumped, verified building GOWORK=off. |
+| [topos-runtime-integration.md](.archive/local/topos-runtime-integration.md) | **Archived** | Shipped, then removed on 2026-10-19 with the Topos harness ([pure-local](shared/pure-local.md)). The public `latere.ai/x/topos` runtime embedded as an in-process execution path (`agentic` flow kind) behind the `internal/agentgraph` seam and its import guard, with a real model through the gateway and the run's trace served and rendered. M1-M5 shipped; M6 (the unified surface) left for unified-agent-graph-ui. The pin predates the runtime's upstream rebuild; moving it is a migration of the seam. |
+| [topos-live-agent-events.md](.archive/local/topos-live-agent-events.md) | **Archived** | Shipped, then removed on 2026-10-19 with the Topos harness ([pure-local](shared/pure-local.md)). Live agent events for topos runs. topos gained a root `Options.Observer` seam + `EventAssistantMessage` (per-turn text) + the entry session-id↔node-id join fix (topos `d8e51f8`); wallfacer's agentgraph seam forwards the run's events (assistant text, delegations, tool use) onto the task timeline via the existing `/api/tasks/stream` live path — the multi-agent transcript now appears as the run proceeds, no new endpoint or UI. Bespoke SSE + trace-node animation deferred as optional polish. Shipped: topos v0.0.5 tagged + pushed, go.mod bumped, verified building GOWORK=off. |
 | [unified-agent-graph-ui.md](.archive/local/unified-agent-graph-ui.md) | **Complete** | One agent-graph page at `/agent-graph` (agent registry, fleet editor, run overlay) in place of the Agents and Flows pages, which were deleted. The pipeline gestures built along the way were dropped in the fleet rebuild. |
 | [agent-graph-e2e-design.md](.archive/local/agent-graph-e2e-design.md) | **Archived** | Withdrawn 2026-10-02 with the decision to retire fleets. Its body is the accurate record of the four execution paths as they ran and of the two findings that motivated the removal (a fixed-sequence user fleet never commits; delegating fleets merge with no test step, no oversight and no stop in `waiting`). |
 | [workflows-graph-ux.md](.archive/local/workflows-graph-ux.md) | **Archived** | Renamed Flows to Workflows and drew a read-only pipeline (2026-06-15). Retired when the agent-graph page replaced `FlowsPage` two weeks later, before its on-canvas editing was built. |
 | [remove-idea-agent-subsystem.md](.archive/local/remove-idea-agent-subsystem.md) | **Complete** | Full teardown of the idea-agent (brainstorm) auto-ideation engine and the test-only flow: removed across runner/handler/flow/agents/store/envconfig/constants/apicontract/frontend/docs. Accepted feature loss; clears vestigial flow paths ahead of the agent-graph convergence. |
-| [first-run-onboarding.md](local/first-run-onboarding.md) | Vague | Stub for a guided first run. Agents and fleets are out of it (decided 2026-10-02). One decision remains, which first action is the path, best taken after the harness migration, when a first run also means signing in and choosing a model. |
+| [first-run-onboarding.md](.archive/local/first-run-onboarding.md) | **Archived** | Stub for a guided first run. Archived 2026-10-19: its agent-graph half lost its subject with the fleets, and the rest waited on sign-in and a harness migration that were dropped. |
 | [agents-and-flows/refinements.md](.archive/local/agents-and-flows/refinements.md) | **Archived** | Post-ship follow-ups: split-pane UI redesign, token-based CSS restyle, `Role.PromptTmpl` runtime wiring, a dedicated `docs/guide/agent-graph.md` guide (removed with the fleets, 2026-10-02), and a cross-reference repair across 12 docs. |
 
 Archived local specs (superseded or dropped) are listed in the [Archive](#local-archived-superseded-or-dropped) section below.
@@ -281,7 +196,7 @@ graph LR
 
 ## Shared Design
 
-Specs that serve both tracks. These define interfaces and behaviors that local product and cloud platform both depend on.
+Cross-cutting design specs: the interfaces and behaviors the local product is built on.
 
 | Spec | Status | Serves | Delivers |
 |------|--------|--------|----------|
@@ -298,10 +213,9 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 | [extensible-prompts.md](.archive/shared/extensible-prompts.md) | **Archived** | Both | Discoverable, user-creatable prompt system replacing hardcoded `internal/prompts` templates with skill-like files discovered at runtime. Archived: superseded by the Topos agent-document model (the discoverable/composable unit is now the `topos.latere.ai/v1` agent document, with the `harness/skills` layer for capabilities); what remains in `internal/prompts/` is internal harness plumbing that benefits from staying typed and compiled. Was its prompt-provider for the archived `agent-abstraction`. |
 | [agent-session-vocabulary.md](.archive/shared/agent-session-vocabulary.md) | **Complete** | Both | Generalized the "planning" chat machinery (`internal/planner/` -> `internal/agentsession/`, `PlanningThread` -> `AgentSession`, `usePlanningStore` -> `useAgentStore`, `/api/planning/*` -> `/api/agent/*`) onto one `AgentSession` vocabulary. Kept genuine spec-plan code ("Plan" tab, `commitPlanningRound`) and frozen `Plan-Round:` git trailers named "plan". Migrated routes, storage, env, and localStorage with a one-time shim. |
 | [overlay-snapshots.md](.archive/shared/overlay-snapshots.md) | **Archived** | Both | Overlay snapshot + CRIU checkpoint/restore for warm container startup. Archived: the per-task container model it optimized was removed in favor of host execution. No replacement. |
-| [topos-native-harness.md](shared/topos-native-harness.md) | Drafted | Both | **The migration.** Every agent wallfacer runs (implementation, test verification, title, commit message, oversight, chat, planning, review, as two models on one harness) moves onto the rebuilt Topos module, embedded behind one seam, with models from the Latere catalog or a provider sign-in and a model switch; then the five CLI adapters, the subprocess executor and the per-CLI plumbing are removed. Phases 0 to 3. Phases 0 (the fleet and GitHub removals) and 1a are done: the review runs a reviewer on a second model on the role path, and `internal/adversarial` is gone. 1b moves the seam to the rebuilt module. |
 | [visual-identity.md](.archive/shared/visual-identity.md) | **Complete** | Both | Umbrella: replace the Anthropic/Claude-like identity (cream `#f4f1ea`, terracotta `#c45a33`/`#d97757`, Instrument Serif) with an indigo-on-zinc system, rebuild the marketing site with animation/interactive graphics, and tear down + rewrite the drifted docs. Token names stay stable; three children below. |
 | ↳ [visual-identity/design-tokens.md](.archive/shared/visual-identity/design-tokens.md) | **Complete** | Both | New palette + all-sans/mono type system in `tokens.css` (values only, names stable), base.css token-block reconciliation, Space Grotesk + bundled JetBrains Mono, in-repo `.wallfacer-brand` override, retheme of the four `data-theme`-observing components, full ui-shots light+dark sweep. |
-| ↳ [visual-identity/marketing-site.md](.archive/shared/visual-identity/marketing-site.md) | **Complete** | Cloud | Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
+| ↳ [visual-identity/marketing-site.md](.archive/shared/visual-identity/marketing-site.md) | **Archived** | Cloud | Shipped, then removed on 2026-10-19 with the product and install pages ([pure-local](shared/pure-local.md)). Animated marketing site: SVG hero simulation (self-playing board/agent-graph), scroll reveals (`useScrollReveal`), glow/aura helpers, interactive capability demos, animated stats. Hand-rolled, SSG-safe, reduced-motion gated. Depends on design-tokens. |
 | ↳ [visual-identity/theme-system.md](.archive/shared/visual-identity/theme-system.md) | **Complete** | Both | Slack-style user-selectable color themes: clay (the original palette) restored as default, indigo/amber/rose/copper as presets in palettes.css via a data-palette axis, typed PaletteName roster in the prefs store, Settings > Appearance picker, Lato as the UI sans. |
 | ↳ [visual-identity/docs-rewrite.md](.archive/shared/visual-identity/docs-rewrite.md) | **Complete** | Both | Docs teardown + re-architecture from the shipped surface: new 13-guide IA (agent-graph, mission control, whiteboard, GitHub, device sign-in documented; brainstorm/ideation/Agents+Flows drift removed), internals refresh + 2 new files, single-source nav (generator emits `data/docs.ts` from `usage.md` reading order), CLI usage fix, theme-refreshed screenshots. |
 | [spec-workflow-plugin.md](.archive/shared/spec-workflow-plugin.md) | **Complete** | Both | Published the `wf-spec-*` lifecycle skills as the `spec` plugin in the public `latere-ai/claude-plugins` marketplace, installable into any repo. All 14 skills are unprefixed and namespaced (`/spec:create`), with `diff` renamed `drift` and `status` renamed `report` to clear name collisions. Wallfacer mirrors them into `.claude/skills/` for harness reach (`claude -p` does not install plugins, verified) behind a bidirectional `make skills-pull`/`skills-push`/`skills-check` gate; the three server-coupled skills invert to file-first with the transition API as an optional accelerator. |
@@ -320,70 +234,13 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 ### Why these are shared
 
-**Agent abstraction** refactors `internal/runner/`, the execution engine both tracks use. **Harness abstraction** lets both tracks add coding agents (Cursor, OpenCode, Pi, and beyond) behind one interface instead of branching on agent type throughout the runner.
-
----
-
-## Cloud Platform
-
-Integration track. Latere is one platform: one console (`platform.latere.ai`), one API origin (`https://api.latere.ai/v1/<capability>`), one issuer, one credential. Wallfacer is an application on it. In cloud mode it calls the platform's **Agents** capability and nothing beneath it: it creates no sandbox, stages no files, and holds no provider key for a remote run. Every seam is config-gated so local mode is unchanged.
-
-The track has **two axes** (see the umbrella). **Axis A, the coordination plane (Cloud v1, lead)** has signed-in local instances hold one outbound connection to a coordinator role on wallfacerd (wf.latere.ai) for presence, remote control, an allow-listed metadata projection, and spec-comment collaboration; local stays source of truth (relay + projection, never mirror). It is wallfacer's own domain and not a platform capability. **Axis B, remote execution (Cloud v2+, demand-gated)** runs a task as a hosted agent session at `/v1/agents`: the task branch is pushed to the platform's git host, the session works on a branch of its own, and wallfacer fetches it back.
-
-The earlier shape of this track, one thin client per Latere service (a sandbox runtime, a file data plane, a model gateway, a tool registry, each at its own host), was retired on 2026-10-02 when those services became capabilities of the one platform. Its leaf specs are in the [archive](#cloud-archived).
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [latere-integration.md](cloud/latere-integration.md) | Drafted | Umbrella: the one platform and its capabilities, the rule that cloud mode is one client of Agents, the two axes, credentials (one sign-in, an actor token per audience), and the table of retired seams. Read it first. |
-| ↳ [latere-integration/coordination-plane.md](cloud/latere-integration/coordination-plane.md) | Drafted | **Axis A anchor (Cloud v1).** One outbound connection per signed-in instance to a coordinator role on wallfacerd; relay + projection never mirror; git-remote workspace identity; spec comments cloud-now / git-export-later. |
-| ↳↳ [coordination-plane/repo-identity.md](cloud/latere-integration/coordination-plane/repo-identity.md) | Drafted | Foundation (canonical remote form and manifest remote built; verification tiers and the registry not): collaboration unit is the repo (host/owner/repo), not the folder-group. Server stores repo identities (never paths); ephemeral instance->repos in Valkey, durable org->repos + comments in Postgres. Verification layered (local credential proof default, org-registry fallback; the GitHub upgrade tier is struck); org boundary is the perimeter. |
-| ↳↳ [coordination-plane/connection-and-presence.md](cloud/latere-integration/coordination-plane/connection-and-presence.md) | Drafted | Phase 1 lead: the outbound WSS, ephemeral registry, heartbeat, and org-wide presence re-homed from process-local to coordinator-aggregated. Multi-replica via Valkey (Directory seam); single-replica in-memory fallback. The connection is built for one replica; presence is not. |
-| ↳↳↳ [connection-and-presence/connection.md](cloud/latere-integration/coordination-plane/connection-and-presence/connection.md) | Drafted | Leaf 1: the outbound connector and its opt-in gate, JWT-derived principal, manifest, persisted instance id, heartbeat, the registry. Built for one replica (criteria 1-6); the Valkey-backed directory and cross-replica fan-out (criteria 7-8) are not. |
-| ↳↳↳ [connection-and-presence/presence.md](cloud/latere-integration/coordination-plane/connection-and-presence/presence.md) | Drafted | Leaf 2: org-wide presence aggregated by the coordinator across instances, with the avatar stack and focus hints. Unbuilt. |
-| ↳↳ [coordination-plane/metadata-projection.md](cloud/latere-integration/coordination-plane/metadata-projection.md) | Drafted | Phase 2: tap `store.TaskEvent`, redact to an enumerated allow-list, push a derived org read-model for history/usage/team dashboards. |
-| ↳↳ [coordination-plane/spec-comments.md](.archive/cloud/latere-integration/coordination-plane/spec-comments.md) | Complete | Phase 4: cloud-resident inline spec comments relayed in real time, ActorSub attribution, content-hash anchoring, export-friendly schema. Shipped v1; anchored text highlighted inline (`<mark>`). RBAC gate, outdated/re-place triage, comment edit deferred. |
-| ↳↳ [coordination-plane/postgres-store.md](.archive/cloud/latere-integration/coordination-plane/postgres-store.md) | **Complete** | Shared Postgres store owning the pool and embedded versioned migrations; replaced the inline `IF NOT EXISTS` schema string so the next durable consumer adds a numbered migration. One shared pool, one linear sequence. |
-| ↳ [latere-integration/topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md) | Drafted | **Axis B lead.** A task with the native harness and execution target `hosted` runs as an agent session at `https://api.latere.ai/v1/agents`: apply a manifest, start a session, follow its event stream onto the task timeline through the existing `driveToposRun` seam, fetch the session's branch. Per-task opt-in; re-attaches after a restart; personal contexts only until the platform runs an organization's agents. |
-| [claude-managed-agents.md](.archive/cloud/claude-managed-agents.md) | **Archived** | Retired 2026-10-02 as outdated: dispatching a task to Anthropic's Managed Agents API. Wallfacer runs one harness, hosted on the Latere platform for a remote run. |
-| [antigravity.md](.archive/cloud/antigravity.md) | **Archived** | Retired 2026-10-02 as outdated: dispatching a task to Google's Antigravity Interactions API. |
-| [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Drafted | Hosted board deployment: a second workload beside the site and coordinator, running `wallfacer run` in cloud mode with hosted execution only and a volume for the store. **Blocked** on whether a hosted board ships and on how it reaches repositories with no user machine (server-side clones vs the Repos API). |
-| [data-boundary-enforcement.md](cloud/data-boundary-enforcement.md) | Drafted | What may leave the machine: the SPA telemetry scrubber, the coordination-channel egress gate (opt-in, allow-listed), and the rule for hosted runs (per-task choice, named before it leaves). Owns the boundary rule and the gates; per-field allow-lists live in the projection/comments leaves. |
-
-### Cloud platform dependencies
-
-```mermaid
-graph LR
-  AUTH[Identity → Authentication ✅] --> LI[Latere Platform Integration]
-  LI --> CP[Coordination Plane ◐]
-  LI --> HE[Hosted Agents Executor]
-  TRI[Topos Runtime Integration ✅] --> HE
-  AG[Platform Agents API ext] --> HE
-  HE --> HB[Hosted Board Deployment]
-  CP --> DB[Data Boundary]
-  HE --> DB
-
-  style AUTH fill:#d4edda,stroke:#28a745
-  style TRI fill:#d4edda,stroke:#28a745
-  style CP fill:#fff3cd,stroke:#ffc107
-  style AG fill:#e8daef,stroke:#8e44ad
-```
-
-### Deployment modes
-
-Auth is opt-in at every mode (see [auth-by-default.md](.archive/identity/auth-by-default.md)):
-
-1. **Local anonymous (today):** runs on the user's machine, no auth. Filesystem storage, host execution.
-2. **Local authenticated (default-available):** same binary, signed in to latere.ai via the public client. Adds account linkage and (later) cloud metadata coordination; code and execution stay local.
-3. **Hosted execution (Phase 3+, gated by demand):** a task the user sets to `hosted` runs as an agent session on the Latere platform ([topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md)). The repository travels by git; the session's workload, credentials, model access and budget are the platform's.
-4. **Hosted board (undecided):** the board itself running as a hosted workload, with hosted execution only ([cloud-infrastructure.md](cloud/cloud-infrastructure.md)).
-
-Why no wallfacer-owned sandbox or control plane? The platform composes sandbox lifetime, credential injection, repository delivery and budgets into one session. A second composition in wallfacer would need the same guarantees and a second audit trail.
+**Agent abstraction** refactors `internal/runner/`, the execution engine every surface uses. **Harness abstraction** adds coding agents (Cursor, OpenCode, Pi, and beyond) behind one interface instead of branching on agent type throughout the runner.
 
 ---
 
 ## Git Workflow
 
-Git workflow on tasks. It is local git: every surface (tasks, planning rounds, spec transitions, explorer edits) commits with trailers and undoes via `git revert`, and pushing a branch uses the user's own git credentials. The GitHub half of this track (a token borrowed from the signed-in account, a pull request per task) was retired on 2026-10-02; its specs are archived and its code is removed by [remove-github-integration](.archive/shared/platform-native/remove-github-integration.md). GitHub returns through a platform connector, not through wallfacer.
+Git workflow on tasks. It is local git: every surface (tasks, planning rounds, spec transitions, explorer edits) commits with trailers and undoes via `git revert`, and pushing a branch uses the user's own git credentials. The GitHub half of this track (a token borrowed from the signed-in account, a pull request per task) was retired on 2026-10-02; its specs are archived and its code is removed by [remove-github-integration](.archive/shared/platform-native/remove-github-integration.md).
 
 | Spec | Status | Delivers |
 |------|--------|----------|
@@ -403,27 +260,10 @@ Task revert is unbuilt and independent. Intent-commits is fully realized.
 
 ## Ordering Rationale
 
-**Identity / platform convergence:**
-- Auth-by-default and the latere-ui console shell have shipped; [auth-by-default.md](.archive/identity/auth-by-default.md) is archived as the system of record. Further console work lands by bumping the `latere-ui` pin.
-- Multi-user collaboration is stale on purpose: its tenant model, its authorization mechanism and its presence design are all overtaken, and its lead child (rbac-matrix) is archived. It is refreshed when a hosted board is decided, against organization roles.
-- Remote control is designed on the coordination connection and unbuilt; it follows presence and the metadata projection there.
-
-**Within local product:**
+- The pure-local cleanup is the active program ([pure-local](shared/pure-local.md)). Its open item is the removal of container execution.
 - Spec coordination is complete (document model, planning UX, archival, chat-first mode, planning threads, and the state control plane / drift detection all shipped; the drift pipeline's agent-backed tester is wired but gated behind `WALLFACER_DRIFT_TESTER`, off by default).
-- Editor tabs (inline-file-panel), inline-diff-feedback, test-criteria, chat-model-transparency and the dockable terminal shipped. Static-artifacts shipped too and was removed on 2026-10-02.
-- Four feature specs (task-prompt-attachments, scoped-command-registry, host-mounts, terminal-ui) and one refactor spec (internal-consolidation) are designed, checked against the code on 2026-10-02, and unbuilt. None is scheduled; each is dispatchable after validation.
-- The agent graph is retired. The unified page shipped, the audit found that only the built-in turn loop carries the full guarantees, and the maintainer chose removal over completion; it was removed on 2026-10-02.
-
-**Within cloud platform:**
-- [latere-integration.md](cloud/latere-integration.md) is the umbrella; read it first.
-- Axis A continues on the shipped connection: presence, then the metadata projection, then remote control.
-- The hosted executor is the only Latere remote executor. It builds on the shipped `driveToposRun` seam, and its first end-to-end run waits on the issuer letting wallfacer's sign-in client mint a token for `api.latere.ai`.
-- The hosted board waits on a product decision and on the repository question in its spec.
-
-**Cross-track:**
-- Agent and harness abstraction reduce duplication before either track adds new agent roles.
-- Sandbox runtime (scheduling, isolation, hardening) is the Latere platform's Environments capability. Wallfacer does not call it; a hosted agent session opens its own workload.
-- The only hard cross-track dependency: the cloud integration track requires authentication (shipped).
+- Four feature specs (task-prompt-attachments, scoped-command-registry, host-mounts, terminal-ui), one refactor spec (internal-consolidation) and task revert are designed and unbuilt. None is scheduled; each is dispatchable after validation. Internal consolidation fits the cleanup best: it removes duplicated logic instead of adding surface.
+- The console redesign tree stays active with `status: complete` as the design reference the frontend's tests and the screenshot suite cite.
 
 ---
 
@@ -445,11 +285,34 @@ Abstraction interfaces that all tracks build on. All seven are shipped and stabl
 | [host-terminal.md](.archive/foundations/host-terminal.md) | Interactive shell in the web UI (WebSocket + PTY) |
 | [windows-support.md](.archive/foundations/windows-support.md) | Tier 2 Windows host support |
 
-### Identity: completed
+### Platform-native: superseded
 
-| Spec | Delivers |
-|------|----------|
-| [auth-by-default.md](.archive/identity/auth-by-default.md) | Zero-config browser sign-in in `wallfacer run` (secret-less public client via `resolveAuthConfig`, silent-available first run, anonymous still first-class), `authkit.Identity` on the principal path, headless RFC 8628 device-code login, and latere-ui console-shell adoption (`AccountMenu`, org switcher, `Sidebar`) via thin wrappers. Adoption spec; further console work lands by bumping the `latere-ui` pin. |
+The six decisions of 2026-10-02, superseded on 2026-10-19 by [pure-local](shared/pure-local.md). The fleet, GitHub, artifacts and live-serve decisions shipped and stay; the Topos-only harness is reversed.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [platform-native.md](.archive/shared/platform-native.md) | **Archived** | Umbrella for the six decisions, in the maintainer's words. |
+| ↳ [retire-agent-fleets.md](.archive/shared/platform-native/retire-agent-fleets.md) | **Complete** | Removed 2026-10-02: the agent-graph page, the flow engine, delegating fleets, user-authored roles, and the `/api/flows` and `/api/agents` APIs. Every task runs the built-in pipeline. |
+| ↳ [remove-github-integration.md](.archive/shared/platform-native/remove-github-integration.md) | **Complete** | Removed 2026-10-02: the token broker and its cache, the pull-request surface on tasks, the Settings tab, eight routes and `internal/github`. Plain git push is untouched. |
+| ↳ [retire-artifacts.md](.archive/shared/platform-native/retire-artifacts.md) | **Complete** | Removed 2026-10-02: the artifacts gallery and its routes. Files under `<workspace>/artifacts/` stay untouched. |
+| ↳ [sessions-that-spawn-and-fork.md](.archive/shared/platform-native/sessions-that-spawn-and-fork.md) | **Archived** | Vague direction for agents that spawn and fork on a hosted board; neither the hosted board nor the Topos runtime exists. |
+| [topos-native-harness.md](.archive/shared/topos-native-harness.md) | **Archived** | Topos as the only harness. Reversed: the in-process harness and the `latere.ai/x/topos` dependency were removed; phase 1a, review on a second model, shipped and stays. |
+
+### Identity: archived
+
+Sign-in, account and org isolation, and collaboration. All of it was removed on 2026-10-19 ([pure-local](shared/pure-local.md)); the per-machine server key is the board's one credential.
+
+| Spec | Why archived |
+|------|--------------|
+| [authentication.md](.archive/identity/authentication.md) | Shipped OAuth2/OIDC sign-in, sessions and the request principal; removed 2026-10-19. |
+| [auth-by-default.md](.archive/identity/auth-by-default.md) | Shipped zero-config browser sign-in, device-code login and the latere-ui console shell; removed 2026-10-19. |
+| [local-account-isolation.md](.archive/identity/local-account-isolation.md) | Shipped per-account and per-org scoping of workspaces and tasks; removed 2026-10-19. |
+| [local-device-signin.md](.archive/identity/local-device-signin.md) | Shipped the in-console device-code sign-in; removed 2026-10-19. |
+| [multi-user-collaboration.md](.archive/identity/multi-user-collaboration.md) | Stale umbrella for a shared org board. Not pursued; the actor fields and org scoping it shipped were removed 2026-10-19. |
+| ↳ [rbac-matrix.md](.archive/identity/multi-user-collaboration/rbac-matrix.md) | Archived 2026-10-02: identities carry no scopes. |
+| [remote-control.md](.archive/identity/remote-control.md) | Controlling an instance from another machine through a coordinator; not pursued. |
+| [third-party-oidc.md](.archive/identity/third-party-oidc.md) | Pluggable identity providers; wallfacer has no sign-in left to extend. |
+| [agent-token-exchange.md](.archive/identity/agent-token-exchange.md) | Archived 2026-09-13: auth removed agent delegation. |
 
 ### Local: completed
 
@@ -477,14 +340,28 @@ Specs that were never implemented and whose designs target architecture since re
 
 ### Cloud: archived
 
-Wallfacer build/deploy and infrastructure specs that are no longer active. Most propose infrastructure or a per-service integration that the Latere platform now owns (replaced by the integration track, [latere-integration.md](cloud/latere-integration.md)); one is a dropped deploy migration. Retained for context.
+The cloud track: the Latere platform integration, the coordination plane, hosted execution and the hosted board. Wallfacer became a pure local tool on 2026-10-19 ([pure-local](shared/pure-local.md)); nothing here is pursued, and what shipped was removed. The older rows record infrastructure the platform took over.
 
 | Spec | Why archived |
 |------|--------------|
-| [multi-tenant.md](.archive/cloud/multi-tenant.md) | Control plane, per-user instance provisioning, routing, and hibernation are the Latere platform's (sandbox runtime and infrastructure); org/team scoping is Identity's. Wallfacer builds none of it. |
-| [billing-idempotency.md](.archive/cloud/billing-idempotency.md) | Charge mechanics and idempotency are the Latere platform's billing. Closed 2026-10-02: wallfacer has no billing surface, planned or optional; the read-only subscription view this row once held open is dropped. Wallfacer shows cost as a figure on a task and nothing else. |
-| [cella-runtime.md](.archive/cloud/latere-integration/cella-runtime.md) | Archived 2026-10-02. A `CellaBackend` creating sandboxes at a standalone sandbox host (`--executor cella`). In cloud mode wallfacer is a client of the platform's Agents capability only; the session opens its own workload. Replaced by [topos-remote-executor.md](cloud/latere-integration/topos-remote-executor.md). |
-| [shared-cella-client.md](.archive/cloud/latere-integration/shared-cella-client.md) | Archived 2026-10-02. A sandbox wire client shared by `CellaBackend` and the agent runtime. No wallfacer caller remains; the sandbox project publishes its own Go client. |
-| [tenant-filesystem.md](.archive/cloud/tenant-filesystem.md) | Archived 2026-10-02. Worktree staging through `fs.latere.ai`'s Workspace API. The file plane was withdrawn; a hosted session clones and pushes with git, so nothing is staged. |
-| [tenant-api.md](.archive/cloud/tenant-api.md) | Archived 2026-10-02. A versioned external API with a wallfacer-issued key per tenant. The platform has one key for every capability and wallfacer keeps no key store; starting and following work from a script is the Agents API. Its keep-or-archive question stayed open from June. |
-| [local-build-deploy.md](.archive/cloud/local-build-deploy.md) | Local `make release` / `make deploy` for the wallfacerd server image. Implemented then deliberately reverted in favor of GitHub Actions (`0ba7b225`). |
+| [latere-integration.md](.archive/cloud/latere-integration.md) | Umbrella for wallfacer as an application on the Latere platform. Sign-in, cloud mode, the coordination plane and the sandbox proxy that shipped under it were removed 2026-10-19. |
+| ↳ [coordination-plane.md](.archive/cloud/latere-integration/coordination-plane.md) | The coordinator role, the outbound connector, spec comments and the Postgres comment store were removed 2026-10-19. |
+| ↳↳ [repo-identity.md](.archive/cloud/latere-integration/coordination-plane/repo-identity.md) | Repository identity across instances; not pursued. |
+| ↳↳ [connection-and-presence.md](.archive/cloud/latere-integration/coordination-plane/connection-and-presence.md) | The connection and registry that shipped were removed; presence across machines is not pursued. |
+| ↳↳↳ [connection.md](.archive/cloud/latere-integration/coordination-plane/connection-and-presence/connection.md) | The connector, its opt-in gate and the registry were removed 2026-10-19. |
+| ↳↳↳ [presence.md](.archive/cloud/latere-integration/coordination-plane/connection-and-presence/presence.md) | Org-wide presence; not pursued. |
+| ↳↳ [metadata-projection.md](.archive/cloud/latere-integration/coordination-plane/metadata-projection.md) | A metadata projection to a coordinator; not pursued. |
+| ↳↳ [spec-comments.md](.archive/cloud/latere-integration/coordination-plane/spec-comments.md) | Shipped inline spec comments; removed 2026-10-19. |
+| ↳↳ [postgres-store.md](.archive/cloud/latere-integration/coordination-plane/postgres-store.md) | Shipped the Postgres comment store; removed 2026-10-19. |
+| ↳ [topos-remote-executor.md](.archive/cloud/latere-integration/topos-remote-executor.md) | Hosted execution as a platform agent session; never built, not pursued. |
+| ↳ [cella-runtime.md](.archive/cloud/latere-integration/cella-runtime.md) | Archived 2026-10-02: a sandbox backend at a standalone sandbox host. |
+| ↳ [shared-cella-client.md](.archive/cloud/latere-integration/shared-cella-client.md) | Archived 2026-10-02: no wallfacer caller remained. |
+| [cloud-infrastructure.md](.archive/cloud/cloud-infrastructure.md) | Hosted board deployment; not pursued. The wallfacerd deployment it extended was removed 2026-10-19. |
+| [data-boundary-enforcement.md](.archive/cloud/data-boundary-enforcement.md) | What may leave the machine; the browser telemetry and coordination channels it governed were removed. |
+| [claude-managed-agents.md](.archive/cloud/claude-managed-agents.md) | Retired 2026-10-02 as outdated: dispatching a task to Anthropic's Managed Agents API. |
+| [antigravity.md](.archive/cloud/antigravity.md) | Retired 2026-10-02 as outdated: dispatching a task to Google's Antigravity Interactions API. |
+| [multi-tenant.md](.archive/cloud/multi-tenant.md) | Control plane, per-user instance provisioning, routing, and hibernation were the Latere platform's; wallfacer builds none of it. |
+| [billing-idempotency.md](.archive/cloud/billing-idempotency.md) | Charge mechanics belong to the platform's billing; wallfacer has no billing surface and shows cost as a figure on a task. |
+| [tenant-filesystem.md](.archive/cloud/tenant-filesystem.md) | Archived 2026-10-02: worktree staging through a file plane that was withdrawn. |
+| [tenant-api.md](.archive/cloud/tenant-api.md) | Archived 2026-10-02: a versioned external API with a wallfacer-issued key per tenant. |
+| [local-build-deploy.md](.archive/cloud/local-build-deploy.md) | Local `make release` / `make deploy` for the wallfacerd server image. Implemented then reverted in favor of GitHub Actions (`0ba7b225`). |

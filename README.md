@@ -138,13 +138,13 @@ Track token usage and cost by task, activity, and turn, so operations stay measu
 
 ## Roadmap
 
-Development is organized into a product track and cross-track design work on shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
+Wallfacer is a local tool: a task board on one machine over the coding-agent CLIs installed there. The current program is a cleanup that keeps that shape and removes what it no longer needs ([`specs/shared/pure-local.md`](specs/shared/pure-local.md)). See [`specs/README.md`](specs/README.md) for the full spec index.
 
 **Foundations** (complete): Execution backend interface, storage backend interface, file explorer, host terminal, multi-workspace groups, Windows support.
 
-**Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection), file and image attachments, host mounts, oversight risk scoring, visual verification.
+**Local Product**: Developer workflow. Spec coordination (document model, planning UX, drift detection) is complete. Designed and unbuilt: file and image attachments on task prompts, host path references, scoped slash commands, a terminal UI, internal consolidation, and task revert.
 
-**Shared Design**: Cross-track specs. Authentication, agent abstraction, native sandboxes (Linux, macOS, Windows), overlay snapshots.
+**Shared Design** (complete): Agent and harness abstraction, host execution, the agent-session vocabulary, the visual identity and the console redesign.
 
 ## Documentation
 
