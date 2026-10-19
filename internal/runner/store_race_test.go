@@ -54,7 +54,7 @@ func TestStoreAccessorsRaceWithSnapshot(t *testing.T) {
 		for range iters {
 			_, _ = runner.ScanOrphanedWorktrees(ctx)
 			runner.PruneUnknownWorktrees()
-			_, _, _ = runner.generateBoardContextAndMounts(uuid.New(), false)
+			_, _ = runner.generateBoardContext(uuid.New())
 		}
 	})
 

@@ -1,12 +1,12 @@
 # Concepts
 
-Most AI coding tools pin work to one interaction mode: a chatbot that needs constant steering, or a fire-and-forget agent that surfaces hours later with unpredictable results. Wallfacer offers a spectrum between those extremes. Work happens at four levels, and moving between them is free in both directions.
+Most AI coding tools pin work to one interaction mode: a chatbot that needs constant steering, or a fire-and-forget agent that surfaces hours later with unpredictable results. Wallfacer offers a spectrum between those extremes. Work happens at three levels, and moving between them is free in both directions.
 
-## The four working levels
+## The three working levels
 
 ### Chat: conversational exploration
 
-The [Chat](chat.md) page runs a persistent agent session against the active workspace. Describe a problem, explore trade-offs, and let the agent read code and answer questions before anything is committed to a plan. Sessions stream live, survive reloads, and can be reattached or retried. This is the entry point when the shape of the work is still unknown.
+The chat runs a persistent agent session against the active workspace, from the chat popup on any page or from [Plan](plan.md), which opens as a full chat when the workspace has no specs yet. Describe a problem, explore trade-offs, and let the agent read code and answer questions before anything is committed to a plan. Sessions stream live, survive reloads, and can be reattached or retried. This is the entry point when the shape of the work is still unknown.
 
 ### Plan: structured design
 
@@ -16,17 +16,13 @@ On the [Plan](plan.md) page, ideas crystallize into specs: structured markdown d
 
 The [Board](board.md) is where most day-to-day work happens. Each card is a concrete, trackable task. Starting a task runs the built-in Implement pipeline in an isolated worktree; results wait for review before landing. Diff comments and reviews attach to the card.
 
-### Autopilot: automation
-
-With the [automation toggles](automation.md) enabled, the board runs itself: backlog tasks promote as capacity opens, finished work is tested automatically, passing work is submitted, and commits are pushed. Attention shifts from managing tasks to monitoring outcomes through [oversight and analytics](oversight.md) and [Mission Control](mission-control.md).
-
-The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing automated task can be pulled down to manual review, debugged in the built-in terminal, and resumed with feedback.
+The levels are access points, not a pipeline. Start a task directly when the fix is obvious; start in chat when it is not. A failing task can be inspected and resumed with feedback.
 
 ## The primitives
 
 ### Workspace
 
-A workspace is a named set of project folders with a stable identity. The identity survives renames and folder changes, so task history stays attached when the folder set evolves. Each workspace can carry its own parallelism cap. Workspaces are created, switched, and edited from the sidebar switcher; see [Workspaces](workspaces.md).
+A workspace is a named project folder with a stable identity. The identity survives renames and re-pointing to another folder, so task history stays attached when the folder changes. Work across several repositories uses one workspace per repository. Each workspace can carry its own parallelism cap. Workspaces are created, switched, and edited from the sidebar switcher; see [Workspaces](workspaces.md).
 
 ### Task
 
@@ -42,7 +38,7 @@ A task is a card on the board: a prompt, an optional title, and a harness select
 | `failed` | Stopped with a failure category (timeout, agent error, worktree setup, and others) |
 | `cancelled` | Abandoned; can be revived to backlog |
 
-Transitions are enforced by a state machine: backlog starts into in progress; in progress can pause back to backlog, finish into waiting, fail, or be cancelled; waiting resumes, commits, or cancels; committing lands in done or failed; failed retries to backlog. Failed tasks carry a category that automation uses to decide retry eligibility.
+Transitions are enforced by a state machine: backlog starts into in progress; in progress can pause back to backlog, finish into waiting, fail, or be cancelled; waiting resumes, commits, or cancels; committing lands in done or failed; failed retries to backlog. Failed tasks carry a category that names why they stopped.
 
 ### Spec
 
@@ -57,7 +53,7 @@ Four built-in agent roles cover the task pipeline:
 - **Commit message**: writes the final commit.
 - **Review**: checks the change on a second model when Review is on.
 
-Every task runs the same built-in pipeline: implementation, then a finishing step (oversight, commit message). A task's title is the first line of its prompt. The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
+Every task runs the same built-in pipeline: implementation, then a parallel finishing step (commit message, oversight). A task's title is the first line of its prompt. The roles are fixed; a task's instructions come from the repository's instruction files and the task prompt. Each role's harness can be chosen through the per-activity settings described under [Harness](#harness).
 
 ### Harness
 
@@ -67,30 +63,18 @@ A harness is the coding CLI that executes an agent turn. Five harnesses are supp
 
 Every task runs in its own git worktree under `~/.wallfacer/worktrees`, on a branch named `task/<id>` (the first eight characters of the task id). The worktree is what contains the work: an agent can edit freely without touching the main checkout, and the diff stays reviewable until accepted. Worktrees are garbage collected after tasks finish, and a health watcher prunes orphans. Non-git folders fall back to snapshot-based diffs without branch isolation.
 
-## The autonomy dial
-
-Automation is not a single switch but a set of composable toggles, reachable from the board header and **Settings > Execution**:
-
-- **Autoimplement** promotes backlog tasks as capacity opens, respecting schedules.
-- **Autosubmit** accepts finished work.
-- **Autosync** rebases waiting tasks onto the default branch as it moves.
-- **Autopush** pushes accepted commits to the remote.
-
-A fifth, separate toggle enables **Review**, where a second model reviews the change and sends its findings back to the task before the change is accepted; with Review on, autosubmit accepts only approved work. Enable any subset: everything on means the board runs itself. Details and guard rails (retry budgets, circuit breakers, parallelism caps) are in [Automation](automation.md).
-
 ## Moving between levels
 
 Work flows up and down the spectrum:
 
-- **Up (more autonomy):** a chat conversation produces a spec; the spec is broken into tasks; tasks execute and are reviewed automatically.
-- **Down (more control):** a failing task surfaces a problem; inspect the diff, open the terminal in the worktree, fix the issue by hand, and let the agent continue from the corrected state.
+- **Up (more autonomy):** a chat conversation produces a spec; the spec is broken into tasks; tasks execute in their own worktrees.
+- **Down (more control):** a failing task surfaces a problem; inspect the diff, fix the issue by hand in the task's worktree, and let the agent continue from the corrected state.
 
 The value of the spectrum is spending attention where it matters and delegating the rest.
 
 ## See also
 
 - [Getting Started](getting-started.md): installation and the first task
-- [Board](board.md), [Chat](chat.md), [Plan](plan.md): the three main working surfaces
-- [Automation](automation.md): the autopilot level
-- [Configuration](configuration.md): settings, environment variables, shortcuts
+- [Board](board.md) and [Plan](plan.md): the two main working surfaces
+- [Configuration](configuration.md): settings and environment variables
 - [Architecture](../internals/architecture.md): how the pieces fit together internally

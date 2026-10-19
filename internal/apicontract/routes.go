@@ -34,11 +34,6 @@ var Routes = []Route{
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: http.MethodGet, Pattern: "/api/debug/spans", Name: "GetSpanStats",
-		Description: "Aggregate span timing statistics across all tasks.",
-		Tags:        []string{"debug"},
-	},
-	{
 		Method: http.MethodGet, Pattern: "/api/debug/runtime", Name: "GetRuntimeStatus",
 		Description: "Live server internals: pending goroutines, memory, task states, containers.",
 		Tags:        []string{"debug"},
@@ -50,7 +45,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/board", Name: "TaskBoardManifest",
-		Description: "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+		Description: "Board manifest as it appeared to a specific task (is_self=true for that task).",
 		Tags:        []string{"tasks", "debug"},
 	},
 
@@ -66,12 +61,12 @@ var Routes = []Route{
 
 	{
 		Method: http.MethodGet, Pattern: "/api/config", Name: "GetConfig",
-		Description: "Get server configuration (workspaces, autoimplement flags, sandbox list).",
+		Description: "Get server configuration (workspaces, workspace groups, sandbox list).",
 		Tags:        []string{"config"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/config", Name: "UpdateConfig",
-		Description: "Update server configuration (autoimplement, autosubmit, sandbox assignments).",
+		Description: "Update server configuration (workspace groups and their parallel limits).",
 		Tags:        []string{"config"},
 	},
 
@@ -99,27 +94,27 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/workspaces", Name: "ListWorkspaces",
-		Description: "List workspaces visible to the caller, each flagged active or dormant.",
+		Description: "List workspaces, each flagged active or dormant (a dormant one waits to be re-pointed to one folder).",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces", Name: "CreateWorkspace",
-		Description: "Create a workspace (stable id, random storage key) from a name and folder set.",
+		Description: "Create a workspace (stable id, random storage key) from a name and one folder; 400 when more than one folder is given.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/workspaces/{id}", Name: "UpdateWorkspace",
-		Description: "Rename a workspace and/or replace its folder set without re-keying its history.",
+		Description: "Rename a workspace and/or re-point it to one folder without re-keying its history; re-pointing clears dormant. 400 when more than one folder is given.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/workspaces/{id}", Name: "DeleteWorkspace",
-		Description: "Delete a workspace record (its data directory is left on disk).",
+		Description: "Delete a workspace and wipe its task history and session data; folders on disk are not touched. Returns the resulting config.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/{id}/activate", Name: "ActivateWorkspace",
-		Description: "Activate a workspace by id and switch the scoped task board.",
+		Description: "Activate a workspace by id and switch the scoped task board; 400 for a dormant workspace that still names several folders.",
 		Tags:        []string{"workspaces"},
 	},
 
@@ -134,11 +129,6 @@ var Routes = []Route{
 		Method: http.MethodGet, Pattern: "/api/specs/stream", Name: "SpecTreeStream",
 		Description: "SSE stream of spec tree change notifications.",
 		Tags:        []string{"specs", "sse"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/graph", Name: "GetGraph",
-		Description: "Get the unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for the Map.",
-		Tags:        []string{"specs", "tasks"},
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/specs/stale-candidates", Name: "StaleCandidates",
@@ -257,41 +247,6 @@ var Routes = []Route{
 		Description: "Test sandbox configuration by running a lightweight probe task.",
 		Tags:        []string{"env"},
 	},
-	// --- System prompt templates (user-overridable built-in prompts) ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
-		Description: "List all built-in system prompt templates with override status and content.",
-		Tags:        []string{"system-prompts"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/system-prompts/{name}", Name: "GetSystemPrompt",
-		Description: "Get a single built-in system prompt template by name.",
-		Tags:        []string{"system-prompts"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/system-prompts/{name}", Name: "UpdateSystemPrompt",
-		Description: "Write a user override for a built-in system prompt template; validates the template before writing.",
-		Tags:        []string{"system-prompts"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/system-prompts/{name}", Name: "DeleteSystemPrompt",
-		Description: "Remove the user override for a built-in system prompt template, restoring the embedded default.",
-		Tags:        []string{"system-prompts"},
-	},
-
-	// --- Whiteboard ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/whiteboard", Name: "GetWhiteboard",
-		Description: "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
-		Tags:        []string{"whiteboard"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/whiteboard", Name: "PutWhiteboard",
-		Description: "Save the active workspace's whiteboard scene JSON.",
-		Tags:        []string{"whiteboard"},
-	},
 
 	// --- Git workspace operations ---
 
@@ -342,17 +297,6 @@ var Routes = []Route{
 	},
 
 	// --- Usage & statistics ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/usage", Name: "GetUsageStats",
-		Description: "Aggregated token and cost usage statistics.",
-		Tags:        []string{"stats"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/stats", Name: "GetStats",
-		Description: "Task status and workspace cost statistics. Optional ?workspace=<repo-root-path> restricts aggregation to tasks for that workspace (400 if no tasks match).",
-		Tags:        []string{"stats"},
-	},
 
 	// --- Task collection (no {id}) ---
 
@@ -435,17 +379,6 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/review", Name: "ReviewTask",
-		Description: "Run one review round for a waiting task on the reviewer model.",
-		Tags:        []string{"tasks"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/tasks/{id}/review/transcript", Name: "ReviewTranscript",
-		Description: "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
-		Tags:        []string{"tasks"},
-	},
-
-	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/commits", Name: "TaskCommits",
 		Description: "Read preserved task commits and patches across feedback turns and retries.",
 		Tags:        []string{"tasks"},
@@ -520,23 +453,5 @@ var Routes = []Route{
 		Method: http.MethodGet, Pattern: "/api/explorer/task-prompts", Name: "ExplorerTaskPrompts",
 		Description: "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
 		Tags:        []string{"explorer"},
-	},
-
-	// --- OAuth authentication ---
-
-	{
-		Method: http.MethodPost, Pattern: "/api/auth/{provider}/start", Name: "StartOAuth",
-		Description: "Start an OAuth authorization flow for the given provider (claude or codex).",
-		Tags:        []string{"auth"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/auth/{provider}/status", Name: "OAuthStatus",
-		Description: "Poll the current status of an OAuth flow for the given provider.",
-		Tags:        []string{"auth"},
-	},
-	{
-		Method: http.MethodPost, Pattern: "/api/auth/{provider}/cancel", Name: "CancelOAuth",
-		Description: "Cancel an in-progress OAuth flow for the given provider.",
-		Tags:        []string{"auth"},
 	},
 }

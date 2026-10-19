@@ -113,20 +113,6 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 	}
 }
 
-// newTestRunner creates a Runner backed by a fresh temporary file store.
-func newTestRunner(t *testing.T) *Runner {
-	t.Helper()
-	dataDir := t.TempDir()
-	s, err := storetest.NewFileStore(t, dataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	r := NewRunner(s, RunnerConfig{})
-	t.Cleanup(func() { r.Shutdown() })
-	return r
-}
-
 // containsConsecutive returns true if slice contains needle1 immediately
 // followed by needle2.
 func containsConsecutive(slice []string, needle1, needle2 string) bool {
@@ -655,20 +641,20 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	}
 }
 
-// TestParallelTasksTwoRepos verifies that two tasks working on different
-// repos (mounted as separate workspaces) each get independent worktrees
-// and commits merge into their respective repos.
+// TestParallelTasksTwoRepos verifies that a task stored with worktrees in two
+// repos (from before a workspace became one folder) still commits: each repo's
+// worktree merges into that repo, though the workspace now names one folder.
 func TestParallelTasksTwoRepos(t *testing.T) {
 	repoX := setupTestRepo(t)
 	repoY := setupTestRepo(t)
-	s, runner := setupTestRunner(t, []string{repoX, repoY})
+	s, runner := setupTestRunner(t, []string{repoX})
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Change both repos", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wtPaths, brName, err := runner.setupWorktrees(task.ID)
+	wtPaths, brName, err := runner.EnsureTaskWorktrees(task.ID, map[string]string{repoX: "", repoY: ""}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"latere.ai/x/pkg/metrics"
-
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
@@ -32,7 +30,7 @@ func newWorkspaceTestServer(t *testing.T) (*httptest.Server, *workspace.Manager,
 		t.Fatalf("write env file: %v", err)
 	}
 
-	mgr, err := workspace.NewManager(configDir, dataDir, envPath, []string{})
+	mgr, err := workspace.NewManager(configDir, dataDir, []string{})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -42,8 +40,8 @@ func newWorkspaceTestServer(t *testing.T) (*httptest.Server, *workspace.Manager,
 		WtDir:        filepath.Join(configDir, "wt"),
 		WorkspaceMgr: mgr,
 	}
-	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), nil)
+	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces)
+	mux := BuildMux(h, IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv, mgr, configDir
@@ -142,24 +140,32 @@ func TestWorkspaceLifecycleE2E(t *testing.T) {
 		t.Fatalf("expected 1 task in A, got %d", n)
 	}
 
-	// Edit A's folders (add dirB). The task must survive.
-	editResp := wsReq(t, http.MethodPut, srv.URL+"/api/workspaces/"+idA,
+	// A workspace is one folder: an edit naming two is refused.
+	twoResp := wsReq(t, http.MethodPut, srv.URL+"/api/workspaces/"+idA,
 		mustJSON(t, map[string]any{"folders": []string{dirA, dirB}}))
+	_ = twoResp.Body.Close()
+	if twoResp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("edit to two folders: status %d, want 400", twoResp.StatusCode)
+	}
+
+	// Re-point A to dirB. The task must survive.
+	editResp := wsReq(t, http.MethodPut, srv.URL+"/api/workspaces/"+idA,
+		mustJSON(t, map[string]any{"folders": []string{dirB}}))
 	if editResp.StatusCode != http.StatusOK {
-		t.Fatalf("edit folders: status %d", editResp.StatusCode)
+		t.Fatalf("edit folder: status %d", editResp.StatusCode)
 	}
 	_ = editResp.Body.Close()
 	if n := countTasks(t, srv.URL); n != 1 {
 		t.Fatalf("task lost after folder edit: got %d tasks, want 1 (history orphaned)", n)
 	}
 
-	// Config reflects the new folder set, same workspace id.
+	// Config reflects the new folder, same workspace id.
 	cfg2 := decodeWS(t, wsReq(t, http.MethodGet, srv.URL+"/api/config", ""))
 	if cfg2["workspace_id"] != idA {
 		t.Fatalf("workspace id changed after edit: %v", cfg2["workspace_id"])
 	}
-	if ws, ok := cfg2["workspaces"].([]any); !ok || len(ws) != 2 {
-		t.Fatalf("config folders not updated: %v", cfg2["workspaces"])
+	if ws, ok := cfg2["workspaces"].([]any); !ok || len(ws) != 1 || ws[0] != dirB {
+		t.Fatalf("config folder not updated: %v", cfg2["workspaces"])
 	}
 
 	// Create workspace B over the SAME folder; activate it; its board is empty.
@@ -225,14 +231,14 @@ func TestWorkspaceMigrationE2E(t *testing.T) {
 		t.Fatalf("migration: migrated=%v err=%v", migrated, err)
 	}
 
-	mgr, err := workspace.NewManager(configDir, dataDir, envPath, []string{})
+	mgr, err := workspace.NewManager(configDir, dataDir, []string{})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
 	snap := mgr.Snapshot()
 	mock := &runner.MockRunner{EnvFilePath: envPath, WtDir: filepath.Join(configDir, "wt"), WorkspaceMgr: mgr}
-	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces, metrics.NewRegistry())
-	mux := BuildMux(h, metrics.NewRegistry(), IndexViewData{}, testFS(t), nil)
+	h := handler.NewHandler(snap.Store, mock, configDir, snap.Workspaces)
+	mux := BuildMux(h, IndexViewData{}, nil)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 

@@ -70,6 +70,29 @@ func TestMockRunner_MultipleCalls(t *testing.T) {
 	}
 }
 
+// TestMockRunner_EnsureTaskWorktrees_PropagatesExisting verifies that
+// EnsureTaskWorktrees returns the provided existing map and branch as-is.
+func TestMockRunner_EnsureTaskWorktrees_PropagatesExisting(t *testing.T) {
+	m := &MockRunner{}
+	id := uuid.New()
+	existing := map[string]string{"/ws/repo": "/wt/branch"}
+	paths, branch, err := m.EnsureTaskWorktrees(id, existing, "feat/my-branch")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if branch != "feat/my-branch" {
+		t.Errorf("branch = %q, want %q", branch, "feat/my-branch")
+	}
+	if len(paths) != len(existing) {
+		t.Errorf("paths len = %d, want %d", len(paths), len(existing))
+	}
+	for k, v := range existing {
+		if paths[k] != v {
+			t.Errorf("paths[%q] = %q, want %q", k, paths[k], v)
+		}
+	}
+}
+
 // TestMockRunner_NoOpMethods verifies all no-op methods don't panic and return
 // safe zero values.
 func TestMockRunner_NoOpMethods(t *testing.T) {
@@ -106,18 +129,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 		t.Errorf("ListContainers returned non-nil: %v", containers)
 	}
 
-	if got := m.ContainerCircuitAllow(); !got {
-		t.Errorf("ContainerCircuitAllow = false, want true")
-	}
-	if got := m.ContainerCircuitState(); got != "closed" {
-		t.Errorf("ContainerCircuitState = %q, want %q", got, "closed")
-	}
-	if got := m.ContainerCircuitFailures(); got != 0 {
-		t.Errorf("ContainerCircuitFailures = %d, want 0", got)
-	}
-
-	m.RecordContainerFailure()
-
 	if got := m.PendingGoroutines(); got != nil {
 		t.Errorf("PendingGoroutines = %v, want nil", got)
 	}
@@ -125,7 +136,7 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 	m.WaitBackground()
 	m.GenerateOversight(id)
 
-	manifest, mErr := m.GenerateBoardManifest(ctx, id, false)
+	manifest, mErr := m.GenerateBoardManifest(ctx, id)
 	if mErr != nil {
 		t.Errorf("GenerateBoardManifest returned unexpected error: %v", mErr)
 	}
@@ -154,35 +165,7 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 		t.Errorf("EnvFile = %q, want %q", got, m.EnvFilePath)
 	}
 
-	// Prompts returns a non-nil default manager so callers that chain
-	// .PromptsDir() don't panic in tests.
-	if got := m.Prompts(); got == nil {
-		t.Errorf("Prompts = nil, want non-nil default manager")
-	}
 	if got := m.WorkspaceManager(); got != nil {
 		t.Errorf("WorkspaceManager = %v, want nil", got)
-	}
-}
-
-// TestMockRunner_EnsureTaskWorktrees_PropagatesExisting verifies that
-// EnsureTaskWorktrees returns the provided existing map and branch as-is.
-func TestMockRunner_EnsureTaskWorktrees_PropagatesExisting(t *testing.T) {
-	m := &MockRunner{}
-	id := uuid.New()
-	existing := map[string]string{"/ws/repo": "/wt/branch"}
-	paths, branch, err := m.EnsureTaskWorktrees(id, existing, "feat/my-branch")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if branch != "feat/my-branch" {
-		t.Errorf("branch = %q, want %q", branch, "feat/my-branch")
-	}
-	if len(paths) != len(existing) {
-		t.Errorf("paths len = %d, want %d", len(paths), len(existing))
-	}
-	for k, v := range existing {
-		if paths[k] != v {
-			t.Errorf("paths[%q] = %q, want %q", k, paths[k], v)
-		}
 	}
 }

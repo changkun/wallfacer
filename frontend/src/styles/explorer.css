@@ -2,7 +2,7 @@
    A docked file tree beside the board on the sunk surface: an eyebrow head,
    an optional Task prompts group, then tree rows built to the plan tree's
    geometry (34px, 12px radius, the active row lifted onto the card surface).
-   See specs/shared/console-redesign/panels-and-overlays.md. */
+   See specs/.archive/shared/console-redesign/panels-and-overlays.md. */
 
 /* Flex wrapper: explorer panel + board grid side by side */
 .board-with-explorer {
@@ -37,8 +37,7 @@
 
 .board-with-explorer > .board-grid,
 .board-with-explorer > .spec-mode-container,
-.board-with-explorer > .depgraph-mode-container,
-.board-with-explorer > .docs-mode-container {
+.board-with-explorer > .depgraph-mode-container {
   flex: 1;
   min-width: 0;
 }

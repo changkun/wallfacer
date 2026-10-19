@@ -1,7 +1,7 @@
 // The confirm dialog is the 440px dialog shape: the forward button is the ink
 // button, or the danger ghost when the action destroys something, and a
 // prompt request adds a field. Pins the variant classes the design system
-// relies on (specs/shared/console-redesign/panels-and-overlays.md).
+// relies on (specs/.archive/shared/console-redesign/panels-and-overlays.md).
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createApp, nextTick, type App } from 'vue';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';

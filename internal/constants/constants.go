@@ -20,29 +20,9 @@ const OversightAgentTimeout = 3 * time.Minute
 // oversight because the input (diff stat + recent log) is small.
 const CommitMessageAgentTimeout = 90 * time.Second
 
-// ReviewAgentTimeout bounds one reviewer run. The reviewer reads the task's
-// prompt, criteria and diff (capped at MaxDiffBytes) and answers once, so a
-// run longer than this is a stuck harness rather than a long review.
-const ReviewAgentTimeout = 5 * time.Minute
-
 // ---------------------------------------------------------------------------
-// Polling / watcher intervals
+// Polling intervals
 // ---------------------------------------------------------------------------
-
-// AutoPromoteInterval is the periodic ticker interval for the auto-promoter.
-const AutoPromoteInterval = 60 * time.Second
-
-// WaitingSyncInterval is the polling interval for syncing waiting tasks.
-const WaitingSyncInterval = 30 * time.Second
-
-// AutoReviewInterval is the polling interval for the auto-review watcher.
-const AutoReviewInterval = 30 * time.Second
-
-// AutoSubmitInterval is the polling interval for the auto-submit watcher.
-const AutoSubmitInterval = 30 * time.Second
-
-// FetchErrorGracePeriod is how long after a fetch error before retrying.
-const FetchErrorGracePeriod = 5 * time.Minute
 
 // DefaultWorktreeHealthInterval is the interval between worktree health checks.
 const DefaultWorktreeHealthInterval = 2 * time.Minute
@@ -54,10 +34,6 @@ const DefaultWorktreeGCInterval = 24 * time.Hour
 // to prevent proxy and OS-level TCP idle timeouts from silently closing the
 // connection. Tests can lower this for faster verification.
 var SSEKeepaliveInterval = 15 * time.Second
-
-// WatcherSettleDelay is the pause after receiving a wake signal before
-// calling the action. Tests can lower this for faster verification.
-var WatcherSettleDelay = 1500 * time.Millisecond
 
 // RefinementRecentCompleteWindow is the grace window for clearing a refinement
 // job that has just finished, allowing async startup/failure races to settle.
@@ -73,26 +49,15 @@ const FileIndexTTL = 30 * time.Second
 // DiffCacheTTL is the time-to-live for cached diff entries for non-terminal tasks.
 const DiffCacheTTL = 10 * time.Second
 
-// CommitsBehindCacheTTL is the time-to-live for cached CommitsBehind results.
-const CommitsBehindCacheTTL = 20 * time.Second
-
 // ---------------------------------------------------------------------------
 // Retry / concurrency limits
 // ---------------------------------------------------------------------------
-
-// MaxAutoRetries is the global cap on automatic retries per task across all
-// failure categories and retry paths (runner and handler).
-const MaxAutoRetries = 3
 
 // MaxRebaseRetries is the maximum number of rebase attempts before giving up.
 const MaxRebaseRetries = 3
 
 // DefaultMaxConcurrentTasks is the default parallel task limit.
 const DefaultMaxConcurrentTasks = 5
-
-// DefaultCBThreshold is the number of consecutive container launch failures
-// required to open the circuit breaker.
-const DefaultCBThreshold = 5
 
 // ---------------------------------------------------------------------------
 // Size limits
@@ -102,12 +67,6 @@ const DefaultCBThreshold = 5
 const (
 	BodyLimitDefault  int64 = 1 << 20   // 1 MiB
 	BodyLimitFeedback int64 = 512 << 10 // 512 KiB
-	// BodyLimitWhiteboard caps the whiteboard scene PUT. Excalidraw scenes are
-	// typically well under 1 MiB, but embedding images inlines them as base64
-	// data URLs in the scene's files map, which can push a single save to many
-	// megabytes. The whiteboard is a local single-user feature, so a generous
-	// cap is acceptable.
-	BodyLimitWhiteboard int64 = 32 << 20 // 32 MiB
 )
 
 // ExplorerMaxFileSize is the maximum file size the explorer will read (2 MiB).
@@ -116,10 +75,6 @@ const ExplorerMaxFileSize int64 = 2 * 1024 * 1024
 // DefaultMaxTurnOutputBytes is the default per-turn stdout/stderr output size
 // budget. Outputs exceeding this limit are truncated server-side.
 const DefaultMaxTurnOutputBytes = 8 * 1024 * 1024 // 8 MB
-
-// MaxDiffBytes is the maximum number of bytes to include from the git diff in
-// the review prompt.
-const MaxDiffBytes = 16000
 
 // MaxOversightLogBytes caps the total log size to avoid exceeding prompt limits.
 const MaxOversightLogBytes = 40000

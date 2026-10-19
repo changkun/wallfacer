@@ -5,7 +5,6 @@ package envconfig
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -15,24 +14,18 @@ import (
 
 // Config holds the known configuration values from the .env file.
 type Config struct {
-	SecretStore            string // WALLFACER_SECRET_STORE (file or keyring)
-	OAuthToken             string // CLAUDE_CODE_OAUTH_TOKEN
-	APIKey                 string // ANTHROPIC_API_KEY
-	AuthToken              string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
-	BaseURL                string // ANTHROPIC_BASE_URL
-	ServerAPIKey           string // WALLFACER_SERVER_API_KEY
-	DefaultModel           string // CLAUDE_DEFAULT_MODEL
-	MaxParallelTasks       int    // WALLFACER_MAX_PARALLEL (0 means use default)
-	MaxAgents              int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
-	AgentNice              int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
-	OversightInterval      int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
-	ArchivedTasksPerPage   int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
-	AutoPushEnabled        bool   // WALLFACER_AUTO_PUSH ("true"/"false")
-	AutoPushThreshold      int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
-	ReviewMaxRounds        int    // WALLFACER_REVIEW_ROUNDS (0 means use default)
-	ReviewCostCap          int    // WALLFACER_REVIEW_COST_CAP in tokens (0 means use default)
-	ReviewModel            string // WALLFACER_REVIEW_MODEL: the reviewer's model; empty means the review does not run
-	AgentSessionWindowDays int    // WALLFACER_AGENT_SESSION_WINDOW_DAYS (deprecated alias: WALLFACER_PLANNING_WINDOW_DAYS) — default agent-session cost window (days); 0 = all time
+	SecretStore          string // WALLFACER_SECRET_STORE (file or keyring)
+	OAuthToken           string // CLAUDE_CODE_OAUTH_TOKEN
+	APIKey               string // ANTHROPIC_API_KEY
+	AuthToken            string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
+	BaseURL              string // ANTHROPIC_BASE_URL
+	ServerAPIKey         string // WALLFACER_SERVER_API_KEY
+	DefaultModel         string // CLAUDE_DEFAULT_MODEL
+	MaxParallelTasks     int    // WALLFACER_MAX_PARALLEL (0 means use default)
+	MaxAgents            int    // WALLFACER_MAX_AGENTS global agent-process budget (0 means unlimited)
+	AgentNice            int    // WALLFACER_AGENT_NICE niceness for agent processes (0 means default, negative disables)
+	OversightInterval    int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	ArchivedTasksPerPage int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -57,9 +50,6 @@ type Config struct {
 	HostCursorBinary   string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
 	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
 	HostPiBinary       string // WALLFACER_HOST_PI_BINARY, optional override of $PATH lookup
-	TerminalEnabled    bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
-
-	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -82,13 +72,6 @@ var knownKeys = []string{
 	"WALLFACER_AGENT_NICE",
 	"WALLFACER_OVERSIGHT_INTERVAL",
 	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
-	"WALLFACER_AUTO_PUSH",
-	"WALLFACER_AUTO_PUSH_THRESHOLD",
-	"WALLFACER_REVIEW_ROUNDS",
-	"WALLFACER_REVIEW_COST_CAP",
-	"WALLFACER_REVIEW_MODEL",
-	"WALLFACER_AGENT_SESSION_WINDOW_DAYS",
-	"WALLFACER_PLANNING_WINDOW_DAYS",
 	"WALLFACER_DEFAULT_SANDBOX",
 	"WALLFACER_SANDBOX_IMPLEMENTATION",
 	"WALLFACER_SANDBOX_OVERSIGHT",
@@ -98,8 +81,6 @@ var knownKeys = []string{
 	"WALLFACER_HOST_CURSOR_BINARY",
 	"WALLFACER_HOST_OPENCODE_BINARY",
 	"WALLFACER_HOST_PI_BINARY",
-	"WALLFACER_TERMINAL_ENABLED",
-	"WALLFACER_WORKSPACES",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -109,17 +90,8 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// TerminalEnabled defaults to true; only an explicit "false" value in the
-	// file disables it. This opt-out semantic means a missing key preserves the
-	// safer default (feature enabled).
-	//
-	// AgentSessionWindowDays defaults to 30 so the agent-session cost period
-	// picker opens on a sensible "last month" view when the user hasn't
-	// configured anything. An explicit 0 in the file still means "all time".
 	cfg := Config{
-		SecretStore:            "file",
-		TerminalEnabled:        true,
-		AgentSessionWindowDays: 30,
+		SecretStore: "file",
 	}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
@@ -163,29 +135,6 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.ArchivedTasksPerPage = n
 			}
-		case "WALLFACER_AUTO_PUSH":
-			cfg.AutoPushEnabled = v == "true"
-		case "WALLFACER_AUTO_PUSH_THRESHOLD":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.AutoPushThreshold = n
-			}
-		case "WALLFACER_REVIEW_ROUNDS":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.ReviewMaxRounds = n
-			}
-		case "WALLFACER_REVIEW_COST_CAP":
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.ReviewCostCap = n
-			}
-		case "WALLFACER_REVIEW_MODEL":
-			cfg.ReviewModel = v
-		case "WALLFACER_AGENT_SESSION_WINDOW_DAYS", "WALLFACER_PLANNING_WINDOW_DAYS":
-			// 0 means "all time"; negative values are rejected silently (keeps
-			// the initialized default of 30). WALLFACER_PLANNING_WINDOW_DAYS is
-			// the deprecated alias; when both appear, file order decides.
-			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-				cfg.AgentSessionWindowDays = n
-			}
 		case "OPENAI_API_KEY":
 			cfg.OpenAIAPIKey = v
 		case "OPENAI_BASE_URL":
@@ -214,10 +163,6 @@ func Parse(path string) (Config, error) {
 			cfg.HostOpenCodeBinary = v
 		case "WALLFACER_HOST_PI_BINARY":
 			cfg.HostPiBinary = v
-		case "WALLFACER_TERMINAL_ENABLED":
-			cfg.TerminalEnabled = v != "false"
-		case "WALLFACER_WORKSPACES":
-			cfg.Workspaces = ParseWorkspaces(v)
 		}
 	}
 	cfg.OAuthToken = values["CLAUDE_CODE_OAUTH_TOKEN"]
@@ -237,36 +182,6 @@ func Parse(path string) (Config, error) {
 func ReadRaw(path string) (map[string]string, error) {
 	_, values, err := readConfigFile(path)
 	return values, err
-}
-
-// ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted
-// string (':' on Unix, ';' on Windows), trimming empty entries.
-func ParseWorkspaces(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	parts := filepath.SplitList(raw)
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		out = append(out, part)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-// FormatWorkspaces encodes workspaces for WALLFACER_WORKSPACES using the OS
-// path-list separator.
-func FormatWorkspaces(workspaces []string) string {
-	if len(workspaces) == 0 {
-		return ""
-	}
-	return strings.Join(workspaces, string(os.PathListSeparator))
 }
 
 // SandboxByActivity returns the per-activity sandbox type overrides derived from config.
@@ -376,15 +291,8 @@ type Updates struct {
 	MaxParallel          *string
 	MaxAgents            *string
 	AgentNice            *string
-	ReviewRounds         *string
-	ReviewCostCap        *string
-	ReviewModel          *string
 	OversightInterval    *string
 	ArchivedTasksPerPage *string
-	AutoPush             *string
-	AutoPushThreshold    *string
-	TerminalEnabled      *string
-	Workspaces           *string
 }
 
 // Update merges changes into the env file at path.
@@ -405,15 +313,8 @@ func Update(path string, u Updates) error {
 		"WALLFACER_MAX_PARALLEL":            u.MaxParallel,
 		"WALLFACER_MAX_AGENTS":              u.MaxAgents,
 		"WALLFACER_AGENT_NICE":              u.AgentNice,
-		"WALLFACER_REVIEW_ROUNDS":           u.ReviewRounds,
-		"WALLFACER_REVIEW_COST_CAP":         u.ReviewCostCap,
-		"WALLFACER_REVIEW_MODEL":            u.ReviewModel,
 		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
-		"WALLFACER_AUTO_PUSH":               u.AutoPush,
-		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
-		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
-		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)
 }

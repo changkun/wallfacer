@@ -29,7 +29,6 @@ var (
 	Git      *slog.Logger
 	Handler  *slog.Logger
 	Recovery *slog.Logger
-	Prompts  *slog.Logger
 )
 
 // init sets up default text-format loggers so that any package importing logger
@@ -46,10 +45,7 @@ func Init(format string) {
 
 // NewFormatHandler returns the local slog handler for a log format: a colored,
 // human-friendly handler for "text" and a structured JSON handler for "json".
-// It is the handler Init builds, exposed so a process can hand the same local
-// formatting to otel.Bootstrap as Config.Stdout. Bootstrap then tees records to
-// both this handler and the OTLP log bridge, which is what puts wallfacer's
-// terminal output on the same pipe as its traces.
+// It is the handler Init builds.
 func NewFormatHandler(format string) slog.Handler {
 	opts := &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true}
 	if format == "json" {
@@ -59,9 +55,7 @@ func NewFormatHandler(format string) slog.Handler {
 }
 
 // Adopt rebuilds every named logger on top of base, tagging each with its
-// component attribute. Call it right after otel.Bootstrap so the package-level
-// loggers the whole server tree writes through reach the OTLP bridge instead of
-// only the local handler. Adopt writes package state and is not safe to call
+// component attribute. Adopt writes package state and is not safe to call
 // once server goroutines are running.
 func Adopt(base *slog.Logger) {
 	Main = base.With("component", "main")
@@ -70,7 +64,6 @@ func Adopt(base *slog.Logger) {
 	Git = base.With("component", "git")
 	Handler = base.With("component", "handler")
 	Recovery = base.With("component", "recovery")
-	Prompts = base.With("component", "prompts")
 }
 
 // Fatal prints a user-friendly error to stderr and exits with code 1.

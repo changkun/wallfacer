@@ -17,11 +17,7 @@ func newCountingManager(t *testing.T) (m *Manager, configDir string, opens *int)
 	t.Helper()
 	configDir = t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-	mgr, err := NewManager(configDir, dataDir, envFile, []string{}) // empty: no restore
+	mgr, err := NewManager(configDir, dataDir, []string{}) // empty: no restore
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -34,9 +30,9 @@ func newCountingManager(t *testing.T) (m *Manager, configDir string, opens *int)
 }
 
 // TestUpdateFolders_PreservesIdentityAndHistory is the keystone test of the
-// redesign: editing a workspace's folder set must NOT re-key its storage. The
-// store pointer, DataKey, and agent-session history must all survive, while the
-// snapshot's folder paths update.
+// redesign: re-pointing a workspace to another folder must NOT re-key its
+// storage. The store pointer, DataKey, and agent-session history must all
+// survive, while the snapshot's folder path updates.
 func TestUpdateFolders_PreservesIdentityAndHistory(t *testing.T) {
 	m, configDir, opens := newCountingManager(t)
 	dirA, dirB := t.TempDir(), t.TempDir()
@@ -59,8 +55,8 @@ func TestUpdateFolders_PreservesIdentityAndHistory(t *testing.T) {
 		t.Fatalf("seed agent-session usage: %v", err)
 	}
 
-	// The membership edit: add a folder.
-	if _, err := m.UpdateFolders(ws.ID, []string{dirA, dirB}); err != nil {
+	// The edit: re-point the workspace to another folder.
+	if _, err := m.UpdateFolders(ws.ID, []string{dirB}); err != nil {
 		t.Fatalf("UpdateFolders: %v", err)
 	}
 	snap2 := m.Snapshot()
@@ -77,8 +73,8 @@ func TestUpdateFolders_PreservesIdentityAndHistory(t *testing.T) {
 	if snap2.Store != snap1.Store {
 		t.Error("store pointer changed on folder edit; history would be orphaned")
 	}
-	if len(snap2.Workspaces) != 2 || snap2.Workspaces[0] != min(dirA, dirB) {
-		t.Errorf("folders not updated: got %v", snap2.Workspaces)
+	if len(snap2.Workspaces) != 1 || snap2.Workspaces[0] != dirB {
+		t.Errorf("folder not updated: got %v", snap2.Workspaces)
 	}
 	recs, err := store.ReadAgentSessionUsage(configDir, snap2.Key, time.Time{})
 	if err != nil {

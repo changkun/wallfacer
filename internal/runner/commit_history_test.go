@@ -74,13 +74,15 @@ func TestCommitPipelinePersistsCommitHistoryBeforeCleanup(t *testing.T) {
 
 func TestTaskCommitsAmendRetryAndMultipleRepositories(t *testing.T) {
 	a, b := setupTestRepo(t), setupTestRepo(t)
-	s, r := setupTestRunner(t, []string{a, b})
+	s, r := setupTestRunner(t, []string{a})
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "history"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths, branch, err := r.setupWorktrees(task.ID)
+	// A task stored with worktrees in two folders, from before a workspace
+	// became one folder.
+	paths, branch, err := r.EnsureTaskWorktrees(task.ID, map[string]string{a: "", b: ""}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

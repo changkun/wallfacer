@@ -11,7 +11,7 @@
    five-state semantic ramp. Tint pairs, column chips, shadows, terminal and
    glass tokens all derive from those in tokens.css and are never repeated
    here; the design-system test fails a palette that sets one.
-   See specs/shared/console-redesign.md.
+   See specs/.archive/shared/console-redesign.md.
    ======================================================================= */
 
 /* ---------------- paper — the original paper-ink canvas ---------------- */

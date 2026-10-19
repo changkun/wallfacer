@@ -5,7 +5,7 @@ import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import TaskDetail from './TaskDetail.vue';
 import type { Task } from '../api/types';
 
-// The sheet (specs/shared/console-redesign/task-detail.md): one ink action
+// The sheet (specs/.archive/shared/console-redesign/task-detail.md): one ink action
 // per status, ghosts for the rest, Delete in the card foot, and one visible
 // tab section at a time.
 function makeTask(over: Partial<Task> = {}): Task {
@@ -48,7 +48,7 @@ const ghosts = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButto
 describe('TaskDetail sheet', () => {
   it.each([
     ['backlog', {}, ['start'], ['edit']],
-    ['waiting', { session_id: 's', worktree_paths: { '/repo': '/wt/repo' } }, ['done'], ['review', 'sync', 'cancel']],
+    ['waiting', { session_id: 's', worktree_paths: { '/repo': '/wt/repo' } }, ['done'], ['sync', 'cancel']],
     ['failed', { session_id: 's' }, ['resume'], ['sync', 'retry']],
     ['done', {}, [], ['archive']],
   ] as const)('%s: one ink action, the rest ghosts', async (status, over, wantInk, wantGhost) => {

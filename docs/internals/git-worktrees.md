@@ -2,7 +2,7 @@
 
 ## Core Principle
 
-Every task gets its own isolated copy of each workspace. Git repositories use git worktrees; non-git directories use snapshot copies. The agent operates in an isolated copy of each repository on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
+Every task gets its own isolated copy of the workspace folder. A git repository uses a git worktree; a non-git directory uses a snapshot copy. The agent operates in that isolated copy on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
 
 ```mermaid
 graph LR
@@ -19,7 +19,7 @@ graph LR
 
 Called by `setupWorktrees()` in `internal/runner/worktree.go` when a task enters `in_progress`. Internally delegates to `ensureTaskWorktrees()` which is idempotent: if the worktree directory already exists and is a valid git repo, it is reused unchanged (e.g. when resuming a `waiting` task).
 
-For each configured workspace:
+For the workspace's folder:
 
 ```mermaid
 flowchart TD
@@ -29,14 +29,15 @@ flowchart TD
 
 Branch naming uses the first 8 characters of the task UUID: `task/a1b2c3d4`.
 
-Multiple workspaces produce multiple worktrees, all grouped under `~/.wallfacer/worktrees/<task-uuid>/`:
+The worktree lives under `~/.wallfacer/worktrees/<task-uuid>/`, and the task records it in `Task.WorktreePaths`, a map from host folder to worktree path:
 
 ```
 ~/.wallfacer/worktrees/
 └── <task-uuid>/
-    ├── myapp/       # worktree for ~/projects/myapp
-    └── mylib/       # worktree for ~/projects/mylib
+    └── myapp/       # worktree for ~/projects/myapp
 ```
+
+A workspace is one folder, so a new task's map has one entry. The map type stays because a task stored when a workspace could span several folders has one entry per folder. Reattaching (`ensureTaskWorktrees` with the stored map) recreates each of them, and the commit, sync, and cleanup steps iterate the map, so such a task still commits into every folder it touched.
 
 ### Non-Git Workspaces
 
@@ -60,10 +61,11 @@ When `ensureTaskWorktrees()` finds a directory that exists but is not a valid gi
 
 The agent runs as a host process with the task's git worktree as its working directory. There are no bind-mounts and no path translation: the agent reads and writes the worktree files directly on the host filesystem. Every edit lands on `task/<uuid8>` and never touches `main`.
 
+`agentWorkDir()` (`internal/runner/container.go`) picks the working directory from the task's worktree map, never from the live workspace folder while the task has a worktree: the worktree for the workspace folder when the map has one, otherwise the first worktree in sorted folder order (a task resumed after its workspace was re-pointed, or a stored task with worktrees in several folders), and the workspace folder itself only when the task has no worktree. The conflict resolver passes a one-entry map for the conflicted repository, so it works in that worktree.
+
 Supporting context is surfaced to the host process via environment variables rather than mounts:
 
-- `WALLFACER_BOARD_JSON` points at the host path of the board manifest.
-- `WALLFACER_SIBLING_WORKTREES_JSON` points at the sibling worktree manifest (see [Sibling Worktree Access](#sibling-worktree-access)).
+- `WALLFACER_BOARD_JSON` points at the host path of the board manifest. It lists the other tasks' prompts, status, and branches but no path into their worktrees.
 - The `.env` file is passed to the backend as an env-file path.
 
 ### Git Directory
@@ -125,47 +127,6 @@ Cleanup is idempotent and safe to call multiple times (errors are logged, not fa
 > **Workspace management** has moved. See [Workspaces & Configuration](workspaces-and-config.md) for workspace management.
 
 > **AGENTS.md lifecycle** has moved. See [Workspaces & Configuration](workspaces-and-config.md) for AGENTS.md lifecycle.
-
-## Sibling Worktree Access
-
-Tasks can optionally see the host worktree paths of other active tasks, surfaced as a read-only JSON manifest.
-
-### MountWorktrees Flag
-
-The `MountWorktrees` boolean field on the `Task` model controls whether sibling worktrees are exposed to this task. It is set at task creation time (via `TaskCreateOptions.MountWorktrees`) and can be toggled on backlog tasks via `PATCH /api/tasks/{id}`.
-
-### Eligibility
-
-`canMountWorktree()` (`internal/runner/board.go`) determines which sibling tasks are eligible to expose:
-
-| Sibling status | Eligible? | Reason |
-|---|---|---|
-| `waiting` | Yes | Worktree exists, not actively being modified |
-| `failed` | Yes | Worktree exists, not actively being modified |
-| `done` | Only if worktree directory still exists on disk | Worktrees may have been cleaned up already |
-| `in_progress` | No | Actively being modified by another agent |
-| `backlog` | No | No worktree exists yet |
-| `cancelled` / `archived` | No | Worktrees have been cleaned up |
-
-Additionally, siblings must share at least one workspace with the requesting task (checked by `sharesWorkspace()`).
-
-### Sibling Manifest
-
-`generateBoardContextAndMounts()` (`internal/runner/board.go`) produces both the `board.json` content and the sibling map in a single `ListTasks` call. For each eligible sibling, it records that sibling's host `WorktreePaths` keyed by short ID (first 8 chars of UUID). Results are cached by `(boardChangeSeq, selfTaskID)` to avoid redundant computation across turns.
-
-`writeSiblingManifest()` (`internal/runner/container.go`) serializes that map to `sibling_worktrees.json` in the board directory and the host process receives its path via `WALLFACER_SIBLING_WORKTREES_JSON`. The manifest maps each sibling's short ID to a `{repoPath: hostWorktreePath}` object, so the agent reads the sibling's files directly on the host filesystem:
-
-```json
-{
-  "abcd1234": {
-    "/Users/me/projects/myapp": "/Users/me/.wallfacer/worktrees/<uuid>/myapp",
-    "/Users/me/projects/mylib": "/Users/me/.wallfacer/worktrees/<uuid>/mylib"
-  },
-  "ef567890": {
-    "/Users/me/projects/myapp": "/Users/me/.wallfacer/worktrees/<uuid2>/myapp"
-  }
-}
-```
 
 ## Branch Management Internals
 
@@ -253,7 +214,6 @@ Iterates over tasks in `in_progress`, `waiting`, and `committing` states. For ea
 For each flagged task (skipping those with an empty `BranchName`):
 1. Calls `ensureTaskWorktrees()` to recreate the worktree from the existing branch
 2. Inserts a `system` event: "worktree restored by health watcher"
-3. Increments the `wallfacer_worktree_restorations_total` Prometheus counter
 
 ### Timing
 

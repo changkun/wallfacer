@@ -14,13 +14,13 @@ function metaFor(path: string): boolean {
 
 describe('routes workspace gating', () => {
   it('marks every workspace-scoped view as needsWorkspace', () => {
-    for (const path of ['/', '/analytics', '/chat', '/plan', '/mission', '/map']) {
+    for (const path of ['/', '/plan']) {
       expect(metaFor(path), `${path} should require a workspace`).toBe(true);
     }
   });
 
   it('leaves workspace-independent views ungated', () => {
-    for (const path of ['/settings', '/docs', '/docs/:slug(.*)', '/:pathMatch(.*)*']) {
+    for (const path of ['/settings', '/:pathMatch(.*)*']) {
       expect(metaFor(path), `${path} should not require a workspace`).toBe(false);
     }
   });
@@ -34,7 +34,7 @@ describe('routes not-found fallback', () => {
   });
 
   it('resolves console pages to themselves', () => {
-    for (const path of ['/', '/analytics', '/mission', '/docs/guide/usage']) {
+    for (const path of ['/', '/plan', '/settings']) {
       expect(router.resolve(path).name, path).not.toBe(NOT_FOUND_ROUTE);
     }
   });

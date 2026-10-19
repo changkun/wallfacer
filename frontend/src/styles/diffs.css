@@ -1,6 +1,6 @@
 /* --- Diffs on the semantic ramp ---
    Added lines wash in ok, removed in err, hunk headers in run; file heads
-   are card heads. See specs/shared/console-redesign/task-detail.md. */
+   are card heads. See specs/.archive/shared/console-redesign/task-detail.md. */
 
 /* Behind-branch warning */
 .diff-behind-warning {

@@ -2,9 +2,10 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -61,7 +62,6 @@ func (r *Runner) buildContainerSpecForSandbox(
 	containerName, taskID, prompt, sessionID string,
 	worktreeOverrides map[string]string,
 	boardDir string,
-	siblingMounts map[string]map[string]string,
 	modelOverride string,
 	sb harness.ID,
 ) executor.ContainerSpec {
@@ -81,54 +81,25 @@ func (r *Runner) buildContainerSpecForSandbox(
 		}
 	}
 
-	return r.buildHostSpec(spec, prompt, model, sessionID, sb, worktreeOverrides, boardDir, siblingMounts)
+	return r.buildHostSpec(spec, prompt, model, sessionID, sb, worktreeOverrides, boardDir)
 }
 
 // buildHostSpec fills in the fields of a base launch spec for host-mode
-// execution. The composed workspace instructions, the board manifest, and
-// the sibling-worktree table are surfaced to the agent via WALLFACER_*
-// environment variables the HostBackend and agents can consult.
-//
-// CWD:
-//   - Single workspace: CWD is the host path of that workspace (worktree
-//     override applied when available).
-//   - Multi-workspace: pick the first; the agent can reach the others via
-//     the manifest file referenced by WALLFACER_SIBLING_WORKTREES_JSON.
+// execution: the agent's working directory (see agentWorkDir), the board
+// manifest through WALLFACER_BOARD_JSON, and the agent command.
 func (r *Runner) buildHostSpec(
 	spec executor.ContainerSpec,
 	prompt, model, sessionID string,
 	_ harness.ID,
 	worktreeOverrides map[string]string,
 	boardDir string,
-	siblingMounts map[string]map[string]string,
 ) executor.ContainerSpec {
-	// Resolve CWD from the workspace list, preferring the worktree override.
-	workspaces := r.currentWorkspaces()
-	workDir := ""
-	for _, ws := range workspaces {
-		ws = strings.TrimSpace(ws)
-		if ws == "" {
-			continue
-		}
-		if wt, ok := worktreeOverrides[ws]; ok {
-			workDir = wt
-		} else {
-			workDir = ws
-		}
-		break
-	}
-	spec.WorkDir = workDir
+	spec.WorkDir = r.agentWorkDir(worktreeOverrides)
 
-	// Surface board / siblings via env vars.
 	if boardDir != "" {
 		boardPath := filepath.Join(boardDir, "board.json")
 		if _, err := os.Stat(boardPath); err == nil {
 			spec.Env["WALLFACER_BOARD_JSON"] = boardPath
-		}
-		if manifestPath, err := writeSiblingManifest(boardDir, siblingMounts); err == nil && manifestPath != "" {
-			spec.Env["WALLFACER_SIBLING_WORKTREES_JSON"] = manifestPath
-		} else if err != nil {
-			logger.Runner.Warn("host mode: write sibling manifest", "error", err)
 		}
 	}
 
@@ -139,22 +110,45 @@ func (r *Runner) buildHostSpec(
 	return spec
 }
 
-// writeSiblingManifest serializes the siblingMounts map to
-// boardDir/sibling_worktrees.json. Returns the absolute path and nil on
-// success, or "" and nil when the map is empty (nothing to write).
-func writeSiblingManifest(boardDir string, siblingMounts map[string]map[string]string) (string, error) {
-	if len(siblingMounts) == 0 {
-		return "", nil
+// agentWorkDir returns the directory an agent works in, given the task's
+// worktrees (host folder → worktree path). When the task has a worktree the
+// agent always works there, never in the live workspace folder, even after
+// the workspace was re-pointed to a folder the task has no worktree for:
+//  1. the worktree for the current workspace folder, when the task has one;
+//  2. otherwise the worktree of the first folder in sorted order (a task
+//     created before a re-point, or a stored task with worktrees in several
+//     folders from before a workspace became one folder);
+//  3. the current workspace folder only when the task has no worktree.
+func (r *Runner) agentWorkDir(worktrees map[string]string) string {
+	if folder := r.agentWorktreeFolder(worktrees); folder != "" {
+		return worktrees[folder]
 	}
-	path := filepath.Join(boardDir, "sibling_worktrees.json")
-	data, err := json.MarshalIndent(siblingMounts, "", "  ")
-	if err != nil {
-		return "", err
+	return r.currentFolder()
+}
+
+// agentWorktreeFolder returns the host folder whose worktree the agent works
+// in (rules 1 and 2 of agentWorkDir), or "" when the task has no worktree.
+func (r *Runner) agentWorktreeFolder(worktrees map[string]string) string {
+	if folder := r.currentFolder(); folder != "" {
+		if _, ok := worktrees[folder]; ok {
+			return folder
+		}
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return "", err
+	if len(worktrees) == 0 {
+		return ""
 	}
-	return path, nil
+	return slices.Sorted(maps.Keys(worktrees))[0]
+}
+
+// currentFolder returns the active workspace's folder, or "" when no
+// workspace is open.
+func (r *Runner) currentFolder() string {
+	for _, ws := range r.currentWorkspaces() {
+		if ws = strings.TrimSpace(ws); ws != "" {
+			return ws
+		}
+	}
+	return ""
 }
 
 // buildAgentCmd returns the standard agent Cmd slice for the given prompt and
@@ -174,9 +168,8 @@ func buildAgentCmd(prompt, model string) []string {
 //
 // The configured envFile may be overridden (via ENV_FILE / --env-file) to a
 // transient location — most notably a mktemp path under /var/folders that
-// macOS's periodic tmp-reaper purges after ~3 idle days. A long-idle scheduled
-// task that fires after that window would otherwise fail to read its
-// credentials. When the configured path is missing but the canonical default
+// macOS's periodic tmp-reaper purges after ~3 idle days. A task started
+// after that window would otherwise fail to read its credentials. When the configured path is missing but the canonical default
 // (<configDir>/.env) exists, fall back to it.
 //
 // The fallback only *redirects* to a known-good default; it never silently
@@ -209,12 +202,6 @@ func (r *Runner) buildBaseContainerSpec(containerName string, sb harness.ID) exe
 	}
 	spec.Env = map[string]string{"WALLFACER_AGENT": string(sb)}
 	return spec
-}
-
-// sandboxForTask returns the resolved sandbox type for the task's implementation activity.
-// Shorthand for sandboxForTaskActivity(task, activityImplementation).
-func (r *Runner) sandboxForTask(task *store.Task) harness.ID {
-	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
 // sandboxForTaskActivity resolves the sandbox type for a given task and activity.
@@ -303,8 +290,7 @@ var roleImplementation = agents.Implementation
 // runContainer executes an agent container and parses its NDJSON output.
 // Returns (output, rawStdout, rawStderr, error). Wraps runAgent with the
 // heavyweight-specific concerns: slugged container name, live-log tee,
-// container-runtime circuit breaker, and the per-activity descriptor
-// dispatch. The outer turn loop in execute.go owns session handling
+// and the per-activity descriptor dispatch. The outer turn loop in execute.go owns session handling
 // and retry policy beyond the Claude→Codex token-limit fallback.
 func (r *Runner) runContainer(
 	ctx context.Context,
@@ -312,7 +298,6 @@ func (r *Runner) runContainer(
 	prompt, sessionID string,
 	worktreeOverrides map[string]string,
 	boardDir string,
-	siblingMounts map[string]map[string]string,
 	modelOverride string,
 	activity store.SandboxActivity,
 ) (*agentOutput, []byte, []byte, error) {
@@ -344,9 +329,7 @@ func (r *Runner) runContainer(
 		ModelOverride:     modelOverride,
 		WorktreeOverrides: worktreeOverrides,
 		BoardDir:          boardDir,
-		SiblingMounts:     siblingMounts,
 		LiveLogWriter:     ll,
-		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
 		// Register the process so KillContainer can signal the running
 		// agent when the user cancels the task mid-run.
@@ -380,7 +363,7 @@ func (r *Runner) runContainer(
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
 			return r.runContainerOnSandbox(ctx, role, taskID, task, containerName, prompt, sessionID,
-				modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, harness.Codex)
+				modelOverride, worktreeOverrides, boardDir, ll, harness.Codex)
 		}
 		return nil, rawStdout, rawStderr, err
 	}
@@ -392,7 +375,7 @@ func (r *Runner) runContainer(
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
 		return r.runContainerOnSandbox(ctx, role, taskID, task, containerName, prompt, sessionID,
-			modelOverride, worktreeOverrides, boardDir, siblingMounts, ll, harness.Codex)
+			modelOverride, worktreeOverrides, boardDir, ll, harness.Codex)
 	}
 
 	return output, rawStdout, rawStderr, nil
@@ -410,7 +393,6 @@ func (r *Runner) runContainerOnSandbox(
 	containerName, prompt, sessionID, modelOverride string,
 	worktreeOverrides map[string]string,
 	boardDir string,
-	siblingMounts map[string]map[string]string,
 	ll *livelog.Log,
 	sb harness.ID,
 ) (*agentOutput, []byte, []byte, error) {
@@ -430,9 +412,7 @@ func (r *Runner) runContainerOnSandbox(
 		ModelOverride:     modelOverride,
 		WorktreeOverrides: worktreeOverrides,
 		BoardDir:          boardDir,
-		SiblingMounts:     siblingMounts,
 		LiveLogWriter:     ll,
-		CircuitBreaker:    r.containerCB,
 		EmitSpanEvents:    true,
 		// Register the fallback launch's handle too, so a cancel during
 		// the codex-fallback turn can still kill the running agent.

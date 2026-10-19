@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,8 +19,8 @@ import (
 )
 
 // BoardManifest is the JSON structure written to board.json for each task
-// run, giving the agent visibility into sibling tasks on the board. The agent
-// finds the file through WALLFACER_BOARD_JSON.
+// run, giving the agent visibility into the other tasks on the board. The
+// agent finds the file through WALLFACER_BOARD_JSON.
 type BoardManifest struct {
 	GeneratedAt time.Time   `json:"generated_at"`
 	SelfTaskID  string      `json:"self_task_id"`
@@ -31,20 +30,19 @@ type BoardManifest struct {
 // BoardTask is a sanitized view of a single task exposed in board.json.
 // SessionID is deliberately absent to prevent session hijacking.
 type BoardTask struct {
-	ID           string           `json:"id"`
-	ShortID      string           `json:"short_id"`
-	Title        string           `json:"title,omitempty"`
-	Prompt       string           `json:"prompt"`
-	Status       store.TaskStatus `json:"status"`
-	IsSelf       bool             `json:"is_self"`
-	Turns        int              `json:"turns"`
-	Result       *string          `json:"result"`
-	StopReason   *string          `json:"stop_reason"`
-	Usage        store.TaskUsage  `json:"usage"`
-	BranchName   string           `json:"branch_name,omitempty"`
-	WorktreePath *string          `json:"worktree_path"`
-	CreatedAt    time.Time        `json:"created_at"`
-	UpdatedAt    time.Time        `json:"updated_at"`
+	ID         string           `json:"id"`
+	ShortID    string           `json:"short_id"`
+	Title      string           `json:"title,omitempty"`
+	Prompt     string           `json:"prompt"`
+	Status     store.TaskStatus `json:"status"`
+	IsSelf     bool             `json:"is_self"`
+	Turns      int              `json:"turns"`
+	Result     *string          `json:"result"`
+	StopReason *string          `json:"stop_reason"`
+	Usage      store.TaskUsage  `json:"usage"`
+	BranchName string           `json:"branch_name,omitempty"`
+	CreatedAt  time.Time        `json:"created_at"`
+	UpdatedAt  time.Time        `json:"updated_at"`
 }
 
 // sharesWorkspace reports whether a task's worktree paths overlap with any of
@@ -62,37 +60,15 @@ func sharesWorkspace(worktreePaths map[string]string, selfWorkspaces map[string]
 	return false
 }
 
-// canMountWorktree reports whether a sibling task's worktrees are eligible
-// for read-only mounting based on its status.
-func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) bool {
-	switch status {
-	case store.TaskStatusWaiting, store.TaskStatusFailed:
-		return true
-	case store.TaskStatusDone:
-		// Only if at least one worktree directory still exists on disk.
-		for _, wt := range worktreePaths {
-			if info, err := os.Stat(wt); err == nil && info.IsDir() {
-				return true
-			}
-		}
-		return false
-	default:
-		// backlog (no worktree), in_progress (actively modified),
-		// cancelled/archived (worktrees cleaned up).
-		return false
-	}
-}
-
-// generateBoardContextAndMounts is the fused board-context generator.
-// It produces both the board.json bytes and the sibling-mount map in a single
+// generateBoardContext builds the board.json bytes for selfTaskID from one
 // store.ListTasks call. Results are cached by (boardChangeSeq, selfTaskID) so
 // that per-turn calls cost nearly nothing when no task has changed.
 //
 // Size-limiting design:
 //   - The self-task entry receives its full Prompt and Result.
-//   - Sibling task entries have Prompt truncated to 500 chars and Result to 1000.
+//   - Other task entries have Prompt truncated to 500 chars and Result to 1000.
 //   - After marshaling, if the manifest exceeds 64 KB a warning is logged.
-func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, map[string]map[string]string, error) {
+func (r *Runner) generateBoardContext(selfTaskID uuid.UUID) ([]byte, error) {
 	// Cache check: if no store mutation has occurred since we last generated
 	// the board context for this task, return the cached result.
 	currentSeq := r.boardChangeSeq.Load()
@@ -101,23 +77,22 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		r.boardCache.seq == currentSeq &&
 		r.boardCache.selfTaskID == selfTaskID {
 		jsonCopy := slices.Clone(r.boardCache.json)
-		mountsCopy := deepCopyMounts(r.boardCache.mounts)
 		r.boardCache.mu.Unlock()
-		return jsonCopy, mountsCopy, nil
+		return jsonCopy, nil
 	}
 	r.boardCache.mu.Unlock()
 
 	s := r.currentStore()
 	if s == nil {
-		return nil, nil, nil
+		return nil, nil
 	}
 	tasks, err := s.ListTasks(r.shutdownCtx, false)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Build the set of workspace repo paths the self task is operating on.
-	// Siblings are only visible if they share at least one workspace.
+	// Other tasks are only visible if they share at least one workspace.
 	selfWorkspaces := map[string]struct{}{}
 	for _, t := range tasks {
 		if t.ID == selfTaskID {
@@ -140,26 +115,13 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 	}
 
 	boardTasks := make([]BoardTask, 0, len(tasks))
-	mounts := make(map[string]map[string]string)
 	for _, t := range tasks {
 		isSelf := t.ID == selfTaskID
 		shortID := t.ID.String()[:8]
 
-		// Skip siblings that do not share any workspace with the self task.
+		// Skip tasks that do not share any workspace with the self task.
 		if !isSelf && len(selfWorkspaces) > 0 && !sharesWorkspace(t.WorktreePaths, selfWorkspaces) {
 			continue
-		}
-
-		var worktreePath *string
-		if mountWorktrees && !isSelf && canMountWorktree(t.Status, t.WorktreePaths) && len(t.WorktreePaths) > 0 {
-			// Name the sibling's worktree for its first workspace, in sorted
-			// order so the manifest is stable; the sibling manifest lists every
-			// workspace's worktree.
-			first := slices.Sorted(maps.Keys(t.WorktreePaths))[0]
-			p := t.WorktreePaths[first]
-			worktreePath = &p
-			mounts[shortID] = make(map[string]string, len(t.WorktreePaths))
-			maps.Copy(mounts[shortID], t.WorktreePaths)
 		}
 
 		prompt := t.Prompt
@@ -167,37 +129,32 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		turns := t.Turns
 
 		if !isSelf {
-			// Limit sibling task text fields to keep board.json compact.
+			// Limit other tasks' text fields to keep board.json compact.
 			prompt = truncate(t.Prompt, 500)
 			if result != nil {
 				s := truncate(*result, 1000)
 				result = &s
 			}
-			// Sibling turn counts are not useful for cross-task awareness;
-			// omit them to reduce noise.
+			// Other tasks' turn counts are not useful for cross-task
+			// awareness; omit them to reduce noise.
 			turns = 0
 		}
 
 		boardTasks = append(boardTasks, BoardTask{
-			ID:           t.ID.String(),
-			ShortID:      shortID,
-			Title:        t.Title,
-			Prompt:       prompt,
-			Status:       t.Status,
-			IsSelf:       isSelf,
-			Turns:        turns,
-			Result:       result,
-			StopReason:   t.StopReason,
-			Usage:        t.Usage,
-			BranchName:   t.BranchName,
-			WorktreePath: worktreePath,
-			CreatedAt:    t.CreatedAt,
-			UpdatedAt:    t.UpdatedAt,
+			ID:         t.ID.String(),
+			ShortID:    shortID,
+			Title:      t.Title,
+			Prompt:     prompt,
+			Status:     t.Status,
+			IsSelf:     isSelf,
+			Turns:      turns,
+			Result:     result,
+			StopReason: t.StopReason,
+			Usage:      t.Usage,
+			BranchName: t.BranchName,
+			CreatedAt:  t.CreatedAt,
+			UpdatedAt:  t.UpdatedAt,
 		})
-	}
-
-	if len(mounts) == 0 {
-		mounts = nil
 	}
 
 	manifest := BoardManifest{
@@ -208,7 +165,7 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 
 	jsonBytes, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Manifest size guard: warn when the file would exceed 64 KB so that
@@ -229,38 +186,22 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		logBoardManifestSizeWarning(sizes, len(jsonBytes))
 	}
 
-	// Store in cache (caller gets a deep copy of mounts).
+	// Store in cache.
 	r.boardCache.mu.Lock()
 	r.boardCache.seq = currentSeq
 	r.boardCache.selfTaskID = selfTaskID
 	r.boardCache.json = jsonBytes
-	r.boardCache.mounts = mounts
 	r.boardCache.mu.Unlock()
 
-	return jsonBytes, deepCopyMounts(mounts), nil
-}
-
-// deepCopyMounts returns a deep copy of a shortID → (repoPath → worktreePath) map.
-func deepCopyMounts(m map[string]map[string]string) map[string]map[string]string {
-	if m == nil {
-		return nil
-	}
-	out := make(map[string]map[string]string, len(m))
-	for k, v := range m {
-		inner := make(map[string]string, len(v))
-		maps.Copy(inner, v)
-		out[k] = inner
-	}
-	return out
+	return jsonBytes, nil
 }
 
 // GenerateBoardManifest builds the board manifest for selfTaskID.
 // Pass uuid.Nil when there is no self-task (e.g. the debug endpoint).
-// Pass mountWorktrees=false when worktree paths are not needed.
-// Benefits from the same cache as generateBoardContextAndMounts.
-func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error) {
-	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
-	jsonBytes, _, err := r.generateBoardContextAndMounts(selfTaskID, mountWorktrees)
+// Benefits from the same cache as generateBoardContext.
+func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID) (*BoardManifest, error) {
+	_ = ctx // context not forwarded; generateBoardContext uses the runner's shutdown context
+	jsonBytes, err := r.generateBoardContext(selfTaskID)
 	if err != nil {
 		return nil, err
 	}

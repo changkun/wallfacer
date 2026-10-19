@@ -37,7 +37,6 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Printf("Config directory:  %s\n", configDir)
 	fmt.Printf("Data directory:    %s\n", cmp.Or(os.Getenv("DATA_DIR"), filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
-	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
 	fmt.Println()
 
 	// --- Config directory ---
@@ -102,7 +101,7 @@ func RunDoctor(configDir string, args []string) {
 	fmt.Println()
 	if gitPath, err := exec.LookPath("git"); err != nil {
 		fmt.Printf("[!] Git not found\n")
-		fmt.Printf("    Git is needed for worktrees, diffs, and auto-push.\n")
+		fmt.Printf("    Git is needed for worktrees, diffs, and commits.\n")
 		issues++
 	} else {
 		out, _ := cmdexec.New(gitPath, "--version").Output()

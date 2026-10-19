@@ -1,7 +1,7 @@
 /* =======================================================================
    Wallfacer — Primitives
    The shared classes every surface is composed from. Styled through tokens
-   only; the geometry table lives in specs/shared/console-redesign.md. Class
+   only; the geometry table lives in specs/.archive/shared/console-redesign.md. Class
    names follow replichai so a reader can move between the two codebases.
 
    The compatibility block at the end maps the class names older templates
@@ -453,21 +453,6 @@ textarea.field {
 }
 .field-wrap > .field {
   padding-left: 30px;
-}
-.field-wrap > kbd {
-  position: absolute;
-  right: 8px;
-}
-kbd.key {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 5px;
-  border: 1px solid var(--rule-2);
-  background: var(--bg-card);
-  color: var(--ink-3);
-  font: 500 var(--fs-9) / 1 var(--font-mono);
 }
 
 /* ---- underline tabs ---- */

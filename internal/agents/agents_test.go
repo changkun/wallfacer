@@ -15,7 +15,7 @@ func TestBuiltinAgents_AllHaveRequiredDescriptorFields(t *testing.T) {
 
 // TestBuiltinAgents_NoIdeateAgent guards against reintroduction of the
 // retired brainstorm/ideate built-in agent (see
-// specs/local/remove-idea-agent-subsystem.md). The ideate role was
+// specs/.archive/local/remove-idea-agent-subsystem.md). The ideate role was
 // removed with the idea-agent subsystem.
 func TestBuiltinAgents_NoIdeateAgent(t *testing.T) {
 	for _, role := range BuiltinAgents {
@@ -35,11 +35,11 @@ func TestBuiltinAgents_SlugsAreUnique(t *testing.T) {
 	}
 }
 
-// TestBuiltinAgents_AreTheFourRoles pins the table to the four roles the
+// TestBuiltinAgents_AreTheThreeRoles pins the table to the three roles the
 // built-in pipeline runs, and checks none carries a harness pin: a pin is set
 // per call on a copy, never on the shared descriptor.
-func TestBuiltinAgents_AreTheFourRoles(t *testing.T) {
-	want := []string{"oversight", "commit-msg", "impl", "review"}
+func TestBuiltinAgents_AreTheThreeRoles(t *testing.T) {
+	want := []string{"oversight", "commit-msg", "impl"}
 	if len(BuiltinAgents) != len(want) {
 		t.Fatalf("BuiltinAgents has %d roles, want %d", len(BuiltinAgents), len(want))
 	}

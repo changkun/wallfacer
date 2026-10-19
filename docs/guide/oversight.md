@@ -1,6 +1,6 @@
-# Oversight and Analytics
+# Oversight
 
-Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and workspace-level cost and timing analytics. This guide covers each surface, from a single task's oversight summary to the Prometheus endpoint for external monitoring.
+Wallfacer records what agents do while they work: structured summaries of each task, an event-sourced audit trail, live transcripts, reviewable diffs, and per-task cost and timing. This guide covers each surface, from a single task's oversight summary to its per-turn usage records.
 
 ## Oversight summaries
 
@@ -37,20 +37,13 @@ POST /api/tasks/generate-oversight?limit=10
 
 Eligible tasks are those in a terminal or waiting state with at least one turn and no ready summary. The response reports how many tasks were queued (`queued`), their ids (`task_ids`), and the total count still without oversight (`total_without_oversight`).
 
-### Customizing the prompt
-
-The oversight agent's system prompt can be overridden by writing
-`~/.wallfacer/prompts/oversight.tmpl`, or through `PUT /api/system-prompts/oversight`.
-Delete the file, or send `DELETE /api/system-prompts/oversight`, to restore the
-built-in template.
-
 ## Task timeline
 
 Every task keeps an event-sourced audit trail. Events are appended, never rewritten, so the timeline is a faithful record of what happened and why.
 
 Event types: `state_change`, `output`, `feedback`, `error`, `system`, `span_start`, `span_end`, `prompt_round`, and `prompt_round_revert`.
 
-Each state change records a trigger explaining what caused it: `user`, `auto_promote`, `auto_retry`, `auto_test`, `auto_submit`, `feedback`, `sync`, `recovery`, or `system`.
+Each state change records a trigger explaining what caused it: `user`, `feedback`, `recovery`, or `system`.
 
 View the trail in the **Events** tab of the task detail modal, which also surfaces usage, retry history, and prompt history. The same data is available at `GET /api/tasks/{id}/events`, with optional cursor pagination (`after`, `limit`, `types`).
 
@@ -81,59 +74,25 @@ A filter box above the rows narrows the transcript to matching entries. The brow
 
 The **Changes** tab shows the task's diff against the default branch. While a task is waiting for review, the diff supports an inline comment flow:
 
-1. Click the gutter button on a line to open a comment box anchored beneath it. Press Cmd/Ctrl+Enter to save, Escape to cancel.
+1. Click the gutter button on a line to open a comment box anchored beneath it, then **Save** or **Cancel**.
 2. Add as many comments as needed, across any number of files. Lines with comments show a filled gutter marker.
 3. The **Review comments** panel collects all comments grouped by file, each editable and deletable, alongside an optional general feedback field. Click a line reference to scroll back to the anchored diff line.
 4. Click **Submit** to send everything as one batched feedback message. Comments are serialized with their file and line anchors so the agent can locate each one, and the task resumes with the feedback.
 
-## Analytics
+## Usage records
 
-Open **Analytics** from the sidebar (or navigate to `/analytics`). The page has three tabs; the active tab is kept in the URL, so views can be bookmarked.
-
-![Analytics page with cost tiles, daily spend chart, and per-activity tables](images/analytics.png)
-
-### Usage
-
-Token and cost accounting over a selectable period (last 7, 30, or 90 days, or all time): total cost and task count, plus **By Status** and **By Sub-Agent** tables. Sub-agents cover implementation, refinement, oversight, commit messages, review, and agent sessions.
-
-### Tokens & cost
-
-The cost dashboard: summary tiles for total cost, input, output, and cache tokens; a daily spend chart over the last 30 days; tables by status, by activity, and by workspace; agent-session usage with a trend sparkline; and the top 10 tasks by cost, each clickable to open the task.
-
-Numbers for completed tasks come from immutable task summaries: snapshots written exactly once when a task reaches done, covering final cost, per-activity usage, duration, and turn count. The summaries are also served directly for external dashboards:
+Numbers for completed tasks come from immutable task summaries: snapshots written exactly once when a task reaches done, covering final cost, per-activity usage, duration, and turn count. The summaries are served for external dashboards:
 
 ```
 GET /api/tasks/summaries
 ```
 
-### Execution timing
-
-Per-phase latency aggregated across all tasks: completed and failed counts, success rate, median and P95 execution time, a daily-completions chart, and a per-phase table (worktree setup, agent turn, harness run, commit pipeline) with min, median, mean, P95, P99, and max durations. Duration cells are color-coded: green under 5 seconds, amber between 5 and 30 seconds, red over 30 seconds.
-
-### Per-turn usage
-
-For granular analysis, each task exposes one usage record per turn, including token counts, cost, stop reason, harness, and sub-agent:
+Each task also exposes one usage record per turn, including token counts, cost, stop reason, harness, and sub-agent:
 
 ```
 GET /api/tasks/{id}/turn-usage
 ```
 
-## Prometheus metrics
-
-The server exposes `GET /metrics` in Prometheus text format for external monitoring:
-
-| Metric | Type | Labels |
-|---|---|---|
-| `wallfacer_tasks_total` | gauge | `status`, `archived` |
-| `wallfacer_running_containers` | gauge | |
-| `wallfacer_background_goroutines` | gauge | |
-| `wallfacer_store_subscribers` | gauge | |
-| `wallfacer_failed_tasks_by_category` | gauge | `category` |
-| `wallfacer_circuit_breaker_open` | gauge | |
-| `wallfacer_autoimplement_actions_total` | counter | `watcher`, `outcome` |
-| `wallfacer_http_requests_total` | counter | `method`, `route`, `status` |
-| `wallfacer_http_request_duration_seconds` | histogram | `method`, `route` |
-
 ## See also
 
-[Board](board.md) for the task lifecycle and detail modal, [Automation](automation.md) for the watchers whose triggers appear in the timeline, [Configuration](configuration.md) for the environment variable reference, and [API & Transport](../internals/api-and-transport.md) for the full HTTP API.
+[Board](board.md) for the task lifecycle and detail modal, [Configuration](configuration.md) for the environment variable reference, and [API & Transport](../internals/api-and-transport.md) for the full HTTP API.

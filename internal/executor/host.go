@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -61,7 +62,7 @@ type HostBackendConfig struct {
 	// a negative value disables throttling. See applyAgentPriority.
 	AgentNice int
 	// MaxAgents caps the number of agent processes that may run concurrently
-	// across all callers (regular tasks, test runs, review). 0 ⇒ unlimited. This is
+	// across all callers. 0 ⇒ unlimited. This is
 	// the hard ceiling beneath the per-kind admission gates: Launch blocks until a
 	// slot frees (honoring the caller's context).
 	MaxAgents int
@@ -386,16 +387,27 @@ func (b *HostBackend) launchPlainHostAgent(ctx context.Context, spec ContainerSp
 	return h, nil
 }
 
+// serverSettingPrefix marks Wallfacer's own settings. They configure the
+// server, and one of them is the key to its API, so an agent inherits none of
+// them; the runner passes the few an agent needs through spec.Env.
+const serverSettingPrefix = "WALLFACER_"
+
 // buildChildEnv returns os.Environ() with spec.EnvFile values merged in
-// and spec.Env overlaid on top. spec.Env wins on collision.
+// and spec.Env overlaid on top, leaving out Wallfacer's own settings from
+// the first two. spec.Env wins on collision.
 func (b *HostBackend) buildChildEnv(spec ContainerSpec) ([]string, error) {
-	env := os.Environ()
+	env := slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		return strings.HasPrefix(kv, serverSettingPrefix)
+	})
 	if spec.EnvFile != "" {
 		fromFile, err := envconfig.ReadRaw(spec.EnvFile)
 		if err != nil {
 			return nil, fmt.Errorf("host backend: read credentials: %w", err)
 		}
 		for k, v := range fromFile {
+			if strings.HasPrefix(k, serverSettingPrefix) {
+				continue
+			}
 			env = setEnv(env, k, v)
 		}
 	}

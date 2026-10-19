@@ -33,19 +33,13 @@ type Interface interface {
 	TaskLogReader(taskID uuid.UUID) *livelog.Reader
 	KillContainer(taskID uuid.UUID)
 
-	// Container circuit breaker.
-	ContainerCircuitAllow() bool
-	ContainerCircuitState() string
-	ContainerCircuitFailures() int
-	RecordContainerFailure()
-
 	// Background goroutine tracking.
 	PendingGoroutines() []string
 	WaitBackground()
 
 	// Oversight generation.
 	GenerateOversight(taskID uuid.UUID)
-	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error)
+	GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID) (*BoardManifest, error)
 
 	// Commit-message generation (task-free flavor). Used by callers that do
 	// not have a task ID in scope, e.g. the plan commit pipeline.
@@ -55,16 +49,6 @@ type Interface interface {
 	// spec against a task's actual changes; the drift pipeline consumes the
 	// verdict. Gated behind WALLFACER_DRIFT_TESTER at the call site.
 	AssessDrift(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
-
-	// RunReviewer runs the review role for a task on the reviewer model and
-	// returns its parsed findings and verdict. It refuses with a
-	// *ReviewRefusal, without launching anything, when the reviewer model is
-	// unset or equals the task's model.
-	RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
-
-	// Auto-push for a single workspace (task-free flavor). Used by callers
-	// that do not have a task ID in scope, e.g. the plan commit pipeline.
-	MaybeAutoPushWorkspace(ctx context.Context, ws string)
 
 	// Host Codex auth.
 	HostCodexAuthStatus(now time.Time) (bool, string)
@@ -78,7 +62,6 @@ type Interface interface {
 	WorktreesDir() string
 	TmpDir() string
 	EnvFile() string
-	Prompts() *prompts.Manager
 	WorkspaceManager() *workspace.Manager
 }
 

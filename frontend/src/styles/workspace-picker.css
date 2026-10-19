@@ -4,7 +4,7 @@
    card of rows for name and limits plus a folders card. The folder browser
    (FolderBrowser.vue) is shared: a path field, a breadcrumb, a toolbar and
    entry rows on the sunk surface.
-   See specs/shared/console-redesign/panels-and-overlays.md. */
+   See specs/.archive/shared/console-redesign/panels-and-overlays.md. */
 
 /* The list body and each wizard step share one height so the dialog does not
    jump between views. */
@@ -127,6 +127,20 @@
 .ws-picker__browser {
   flex: 1;
   min-height: 0;
+}
+
+/* Re-pointing a workspace saved with several folders: the note, then one
+   Keep button per folder it named. */
+.ws-picker__former {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+.ws-picker__former-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* --- Step 2: name and the reviewed selection --- */
@@ -293,7 +307,7 @@
 .fb__row:hover {
   background: var(--bg-card);
 }
-.fb__row--added {
+.fb__row--chosen {
   color: var(--ink-3);
 }
 .fb__row--parent {
@@ -359,10 +373,10 @@
 .fb__rename:focus-visible {
   opacity: 1;
 }
-.fb__add {
+.fb__choose {
   flex: none;
 }
-.fb__added {
+.fb__chosen {
   flex: none;
   padding: 0 10px;
   font: 600 var(--fs-9) / 1 var(--font-mono);

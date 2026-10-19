@@ -14,6 +14,7 @@ import (
 	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
 
@@ -632,7 +633,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, activities []turnActivity) 
 		log = strings.ToValidUTF8(log[:constants.MaxOversightLogBytes], "") + "\n[...truncated...]"
 	}
 
-	prompt := r.promptsMgr.Oversight(log)
+	prompt := prompts.Oversight(log)
 
 	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {

@@ -166,7 +166,7 @@ func TestInitServerWarnsAboutRetiredFlowsDir(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	sc.Shutdown()
 
 	captured, err := os.ReadFile(out.Name())

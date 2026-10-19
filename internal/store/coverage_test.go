@@ -74,20 +74,6 @@ func TestNewStateChangeData_Basic(t *testing.T) {
 	}
 }
 
-func TestNewStateChangeData_WithExtra(t *testing.T) {
-	extra := map[string]string{"reason": "manual", "note": "test"}
-	data := NewStateChangeData(TaskStatusFailed, TaskStatusBacklog, TriggerAutoRetry, extra)
-	if data["from"] != "failed" {
-		t.Errorf("from = %q, want failed", data["from"])
-	}
-	if data["reason"] != "manual" {
-		t.Errorf("reason = %q, want manual", data["reason"])
-	}
-	if data["note"] != "test" {
-		t.Errorf("note = %q, want test", data["note"])
-	}
-}
-
 func TestStore_DataDir(t *testing.T) {
 	dir := t.TempDir()
 	s, err := newTestFileStore(t, dir)
@@ -427,142 +413,6 @@ func TestArchiveAllDone_SkipsAlreadyArchived(t *testing.T) {
 	}
 }
 
-func TestIncrementAutoRetryCount_BasicIncrement(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryCount != 1 {
-		t.Errorf("AutoRetryCount = %d, want 1", got.AutoRetryCount)
-	}
-}
-
-func TestIncrementAutoRetryCount_DecrementsBudget(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	s.mu.Lock()
-	s.tasks[task.ID].AutoRetryBudget = map[FailureCategory]int{
-		FailureCategoryTimeout: 3,
-	}
-	s.mu.Unlock()
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryCount != 1 {
-		t.Errorf("AutoRetryCount = %d, want 1", got.AutoRetryCount)
-	}
-	if got.AutoRetryBudget[FailureCategoryTimeout] != 2 {
-		t.Errorf("AutoRetryBudget[timeout] = %d, want 2", got.AutoRetryBudget[FailureCategoryTimeout])
-	}
-}
-
-func TestIncrementAutoRetryCount_BudgetFloorAtZero(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	s.mu.Lock()
-	s.tasks[task.ID].AutoRetryBudget = map[FailureCategory]int{
-		FailureCategoryTimeout: 0,
-	}
-	s.mu.Unlock()
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryBudget[FailureCategoryTimeout] != 0 {
-		t.Errorf("AutoRetryBudget[timeout] = %d, want 0", got.AutoRetryBudget[FailureCategoryTimeout])
-	}
-}
-
-func TestIncrementAutoRetryCount_InitializesNilBudget(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
-
-	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryAgentError); err != nil {
-		t.Fatalf("IncrementAutoRetryCount: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.AutoRetryBudget == nil {
-		t.Error("expected AutoRetryBudget to be initialized")
-	}
-}
-
-func TestIncrementAutoRetryCount_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.IncrementAutoRetryCount(bg(), uuid.New(), FailureCategoryTimeout); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-// --- IsAutoRetryEligible ---
-
-func TestIsAutoRetryEligible_Eligible(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 2},
-		AutoRetryCount:  0,
-	}
-	if !IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected eligible with budget>0 and count<max")
-	}
-}
-
-func TestIsAutoRetryEligible_BudgetZero(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 0},
-		AutoRetryCount:  0,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible with zero budget")
-	}
-}
-
-func TestIsAutoRetryEligible_BudgetMissing(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{},
-		AutoRetryCount:  0,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible with missing category in budget")
-	}
-}
-
-func TestIsAutoRetryEligible_NilBudget(t *testing.T) {
-	task := Task{AutoRetryCount: 0}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible with nil budget")
-	}
-}
-
-func TestIsAutoRetryEligible_CountAtMax(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 5},
-		AutoRetryCount:  constants.MaxAutoRetries,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible when count has reached max")
-	}
-}
-
-func TestIsAutoRetryEligible_CountAboveMax(t *testing.T) {
-	task := Task{
-		AutoRetryBudget: map[FailureCategory]int{FailureCategoryTimeout: 5},
-		AutoRetryCount:  constants.MaxAutoRetries + 1,
-	}
-	if IsAutoRetryEligible(task, FailureCategoryTimeout) {
-		t.Error("expected ineligible when count exceeds max")
-	}
-}
-
 // --- Store.ReadBlob / ListBlobs ---
 
 func TestStore_ReadBlob(t *testing.T) {
@@ -629,11 +479,10 @@ func TestStore_ListBlobs_NoDir(t *testing.T) {
 func TestCreateTask_DeprecatedWrapper(t *testing.T) {
 	s := newTestStore(t)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:         "test prompt",
-		Timeout:        10,
-		MountWorktrees: true,
-		Kind:           TaskKindTask,
-		Tags:           []string{"tag1"},
+		Prompt:  "test prompt",
+		Timeout: 10,
+		Kind:    TaskKindTask,
+		Tags:    []string{"tag1"},
 	})
 	if err != nil {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
@@ -643,9 +492,6 @@ func TestCreateTask_DeprecatedWrapper(t *testing.T) {
 	}
 	if task.Timeout != 10 {
 		t.Errorf("Timeout = %d, want 10", task.Timeout)
-	}
-	if !task.MountWorktrees {
-		t.Error("expected MountWorktrees=true")
 	}
 	if len(task.Tags) != 1 || task.Tags[0] != "tag1" {
 		t.Errorf("Tags = %v, want [tag1]", task.Tags)
@@ -676,69 +522,6 @@ func TestCancelTask_UnknownID(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.CancelTask(bg(), uuid.New()); err == nil {
 		t.Error("expected error for unknown task ID")
-	}
-}
-
-// --- IncrementTestFailCount / ResetTestFailCount ---
-
-// --- RecordFetchFailure / ClearFetchFailure ---
-
-func TestRecordFetchFailure(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "fetch fail", Timeout: 5})
-
-	if err := s.RecordFetchFailure(bg(), task.ID, "connection refused"); err != nil {
-		t.Fatalf("RecordFetchFailure: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.LastFetchError != "connection refused" {
-		t.Errorf("LastFetchError = %q, want %q", got.LastFetchError, "connection refused")
-	}
-	if got.LastFetchErrorAt == nil {
-		t.Error("LastFetchErrorAt should be set")
-	}
-}
-
-func TestRecordFetchFailure_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	if err := s.RecordFetchFailure(bg(), uuid.New(), "err"); err == nil {
-		t.Error("expected error for unknown task ID")
-	}
-}
-
-func TestClearFetchFailure(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "fetch fail", Timeout: 5})
-
-	s.RecordFetchFailure(bg(), task.ID, "error") //nolint:errcheck
-
-	if err := s.ClearFetchFailure(bg(), task.ID); err != nil {
-		t.Fatalf("ClearFetchFailure: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.LastFetchError != "" {
-		t.Errorf("LastFetchError = %q, want empty", got.LastFetchError)
-	}
-	if got.LastFetchErrorAt != nil {
-		t.Error("LastFetchErrorAt should be nil after clear")
-	}
-}
-
-func TestClearFetchFailure_NoopWhenNoFailure(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no fail", Timeout: 5})
-
-	// Should be a no-op (fast path, no write).
-	if err := s.ClearFetchFailure(bg(), task.ID); err != nil {
-		t.Fatalf("ClearFetchFailure: %v", err)
-	}
-}
-
-func TestClearFetchFailure_UnknownID(t *testing.T) {
-	s := newTestStore(t)
-	// Unknown ID with no task in s.tasks → early return (no error, no write).
-	if err := s.ClearFetchFailure(bg(), uuid.New()); err != nil {
-		t.Fatalf("ClearFetchFailure for unknown ID should silently return nil, got: %v", err)
 	}
 }
 
@@ -827,36 +610,6 @@ func TestCreateTaskWithOptions_NegativeBudgets(t *testing.T) {
 	}
 	if task.MaxInputTokens != 0 {
 		t.Errorf("MaxInputTokens = %d, want 0", task.MaxInputTokens)
-	}
-}
-
-func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
-	s := newTestStore(t)
-	scheduled := time.Now().Add(time.Hour)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:            "full opts",
-		Timeout:           30,
-		MountWorktrees:    true,
-		Kind:              TaskKindPlanning,
-		Tags:              []string{"tag1", "tag2"},
-		Sandbox:           harness.Claude,
-		SandboxByActivity: map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
-		MaxCostUSD:        10.0,
-		MaxInputTokens:    50000,
-		ScheduledAt:       &scheduled,
-		ModelOverride:     "  claude-opus-4-5  ",
-	})
-	if err != nil {
-		t.Fatalf("CreateTaskWithOptions: %v", err)
-	}
-	if task.Kind != TaskKindPlanning {
-		t.Errorf("Kind = %q, want planning", task.Kind)
-	}
-	if task.ModelOverride == nil || *task.ModelOverride != "claude-opus-4-5" {
-		t.Errorf("ModelOverride = %v, want claude-opus-4-5", task.ModelOverride)
-	}
-	if task.ScheduledAt == nil {
-		t.Error("ScheduledAt should be set")
 	}
 }
 
@@ -1129,7 +882,7 @@ func TestUpdateTaskBacklog_PartialUpdate(t *testing.T) {
 
 	newPrompt := "updated prompt"
 	newTimeout := 30
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newTimeout, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newTimeout, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1146,7 +899,7 @@ func TestUpdateTaskBacklog_SandboxByActivity(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "sandbox", Timeout: 5})
 
 	sba := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &sba, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &sba, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1161,7 +914,7 @@ func TestUpdateTaskBacklog_BudgetClamp(t *testing.T) {
 
 	negCost := -1.0
 	negTokens := -100
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, &negCost, &negTokens); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &negCost, &negTokens); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1173,21 +926,17 @@ func TestUpdateTaskBacklog_BudgetClamp(t *testing.T) {
 	}
 }
 
-func TestUpdateTaskBacklog_FreshStartAndMount(t *testing.T) {
+func TestUpdateTaskBacklog_FreshStart(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "flags", Timeout: 5})
 
 	fs := true
-	mw := true
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fs, &mw, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fs, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
 		t.Error("FreshStart should be true")
-	}
-	if !got.MountWorktrees {
-		t.Error("MountWorktrees should be true")
 	}
 }
 
@@ -1665,5 +1414,43 @@ func TestResetTaskForRetry_TruncationPreservesUTF8(t *testing.T) {
 	}
 	if want := strings.Repeat("汉", 2000) + "…"; result != want {
 		t.Errorf("result not rune-truncated: %d runes", len([]rune(result)))
+	}
+}
+
+func TestNewStateChangeData_WithExtra(t *testing.T) {
+	extra := map[string]string{"reason": "manual", "note": "test"}
+	data := NewStateChangeData(TaskStatusFailed, TaskStatusBacklog, TriggerUser, extra)
+	if data["from"] != "failed" {
+		t.Errorf("from = %q, want failed", data["from"])
+	}
+	if data["reason"] != "manual" {
+		t.Errorf("reason = %q, want manual", data["reason"])
+	}
+	if data["note"] != "test" {
+		t.Errorf("note = %q, want test", data["note"])
+	}
+}
+
+func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
+		Prompt:            "full opts",
+		Timeout:           30,
+		Kind:              TaskKindPlanning,
+		Tags:              []string{"tag1", "tag2"},
+		Sandbox:           harness.Claude,
+		SandboxByActivity: map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude},
+		MaxCostUSD:        10.0,
+		MaxInputTokens:    50000,
+		ModelOverride:     "  claude-opus-4-5  ",
+	})
+	if err != nil {
+		t.Fatalf("CreateTaskWithOptions: %v", err)
+	}
+	if task.Kind != TaskKindPlanning {
+		t.Errorf("Kind = %q, want planning", task.Kind)
+	}
+	if task.ModelOverride == nil || *task.ModelOverride != "claude-opus-4-5" {
+		t.Errorf("ModelOverride = %v, want claude-opus-4-5", task.ModelOverride)
 	}
 }

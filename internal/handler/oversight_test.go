@@ -92,8 +92,6 @@ func TestGetOversight_ReturnsStoredOversight(t *testing.T) {
 	}
 }
 
-// --- GetOversight ?phase=test ---
-
 // --- GenerateMissingOversight ---
 
 func TestGenerateMissingOversight_NoEligible(t *testing.T) {

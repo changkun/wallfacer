@@ -36,11 +36,10 @@ const SURFACES = {
   // Workspace switcher open — guards the sidebar-popover anchoring against
   // chrome changes (e.g. backdrop-filter establishing a new containing block).
   switcher: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 400 }] },
-  palette: { route: '/', steps: [{ key: 'Meta+k' }, { wait: 700 }] },
+  palette: { route: '/', steps: [{ click: '.rail-search' }, { wait: 700 }] },
   // The workspace picker list, opened from the rail's workspace popover.
   picker: { route: '/', steps: [{ click: '.sb-ws-switch' }, { wait: 300 }, { click: '.sb-ws-popover__add' }, { waitFor: '.ws-picker' }, { wait: 400 }] },
-  // Docked panels: the terminal in the bottom region, the explorer beside the board.
-  terminal: { route: '/', steps: [{ click: '.topbar [data-action="terminal"]' }, { waitFor: '.dock-region--bottom' }, { wait: 900 }] },
+  // The explorer panel beside the board.
   explorer: { route: '/', steps: [{ click: '.explorer-rail' }, { waitFor: '.explorer-panel' }, { wait: 900 }] },
   'task-detail': {
     route: '/',
@@ -48,12 +47,11 @@ const SURFACES = {
     steps: [{ click: '.task-card[aria-label*="OAuth"] .task-card__title' }, { waitFor: '.sheet' }, { wait: 800 }],
   },
   settings: { route: '/settings', steps: [{ wait: 600 }] },
-  analytics: { route: '/analytics', steps: [{ wait: 900 }] },
-  // Landing-page surfaces (richer framing than the docs equivalents).
+  // Landing-page surfaces (richer framing than the guide equivalents).
   // overview-spec focuses a real spec so the three-pane Plan view is populated;
   // oversight opens the rich OAuth task on its diff (Changes) tab.
   'overview-spec': {
-    route: '/plan?spec=specs/shared/console-redesign.md',
+    route: '/plan?spec=specs/.archive/shared/console-redesign.md',
     steps: [{ waitFor: '.sf-content--spec' }, { wait: 1200 }],
   },
   oversight: {
@@ -66,11 +64,7 @@ const SURFACES = {
     ],
   },
   // The plan with a spec focused, so the three panes carry content.
-  plan: { route: '/plan?spec=specs/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
-  chat: { route: '/chat', steps: [{ wait: 900 }] },
-  mission: { route: '/mission', steps: [{ wait: 1200 }] },
-  whiteboard: { route: '/whiteboard', steps: [{ wait: 2000 }] },
-  docs: { route: '/docs', steps: [{ wait: 800 }] },
+  plan: { route: '/plan?spec=specs/.archive/shared/console-redesign.md', steps: [{ waitFor: '.sf-content--spec' }, { wait: 800 }] },
 };
 
 const base = arg('base', 'http://localhost:8099');

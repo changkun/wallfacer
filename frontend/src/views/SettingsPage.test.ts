@@ -8,7 +8,7 @@ vi.mock('../api/client', () => ({ api: vi.fn(async () => ({})), ApiError: class 
 import SettingsPage from './SettingsPage.vue';
 
 // The settings page is one underline tab strip and one tab body at a time,
-// with the tab in the route query (specs/shared/console-redesign/settings.md).
+// with the tab in the route query (specs/.archive/shared/console-redesign/settings.md).
 async function mount(query = '') {
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/settings', component: SettingsPage }] });
   await router.push('/settings' + query); await router.isReady();

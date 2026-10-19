@@ -49,7 +49,7 @@ done
 # Every surface the docs, the landing page, or the README embed. The seed
 # gives each one content (tasks in every state, the repo's own spec tree), so
 # one run refreshes the whole set.
-DOC_SURFACES="board,task-detail,plan,mission,whiteboard,analytics"
+DOC_SURFACES="board,task-detail,plan"
 SURFACES="$DOC_SURFACES,overview-spec,oversight"
 snap() { node "$PW/snap.mjs" --base "$BASE" --out "$OUT" --only "$SURFACES" "$@"; }
 
@@ -75,13 +75,10 @@ cp "$OUT/overview-spec.png"      frontend/public/static/overview-spec.png
 cp "$OUT/overview-spec-dark.png" frontend/public/static/overview-spec-dark.png
 cp "$OUT/oversight.png"          frontend/public/static/oversight1.png
 cp "$OUT/oversight-dark.png"     frontend/public/static/oversight1-dark.png
-cp "$OUT/analytics.png"          frontend/public/static/usage.png
-cp "$OUT/analytics-dark.png"     frontend/public/static/usage-dark.png
 
 # README (assets) — GitHub renders light, so only the light variant.
 cp "$OUT/board.png"         assets/overview-board.png
 cp "$OUT/overview-spec.png" assets/overview-spec.png
 cp "$OUT/oversight.png"     assets/oversight1.png
-cp "$OUT/analytics.png"     assets/usage.png
 
 echo "==> Done. Review with: git status --short docs/guide/images frontend/public/static assets"

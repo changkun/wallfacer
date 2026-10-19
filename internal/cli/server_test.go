@@ -1,11 +1,8 @@
 package cli
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,15 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"testing/fstest"
 
-	"latere.ai/x/pkg/metrics"
-
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
+	"latere.ai/x/wallfacer/internal/workspace"
 )
 
 // TestInitServer verifies that initServer returns valid components with a
@@ -38,7 +32,7 @@ func TestInitServer(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
@@ -78,10 +72,9 @@ func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {
 // TestLoggingMiddleware_LogsForApiAndUiRoutes verifies that the logging
 // middleware preserves the status code for both API and UI routes.
 func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
-	reg := metrics.NewRegistry()
 	apiHandler := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-	}), reg)
+	}))
 	apiRR := httptest.NewRecorder()
 	apiReq := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	apiHandler.ServeHTTP(apiRR, apiReq)
@@ -93,39 +86,9 @@ func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
 	uiReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
-	}), reg).ServeHTTP(uiRR, uiReq)
+	})).ServeHTTP(uiRR, uiReq)
 	if uiRR.Code != http.StatusOK {
 		t.Fatalf("expected UI middleware to preserve default status, got %d", uiRR.Code)
-	}
-}
-
-// TestLoggingMiddleware_UnmatchedRoutesCollapseToSentinel verifies that
-// requests with no matched mux pattern (r.Pattern empty, e.g. 404s) are
-// recorded under a single "<unmatched>" route label rather than their raw URL
-// path, which would give unbounded Prometheus label cardinality on path scans.
-func TestLoggingMiddleware_UnmatchedRoutesCollapseToSentinel(t *testing.T) {
-	reg := metrics.NewRegistry()
-	h := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}), reg)
-
-	for _, p := range []string{"/api/does-not-exist", "/another/unknown/path", "/random"} {
-		rr := httptest.NewRecorder()
-		// A bare handler never sets r.Pattern, mirroring an unmatched mux route.
-		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, p, nil))
-	}
-
-	var buf bytes.Buffer
-	reg.WritePrometheus(&buf)
-	out := buf.String()
-
-	if got := strings.Count(out, `route="<unmatched>"`); got == 0 {
-		t.Fatalf("expected an <unmatched> route series, got none:\n%s", out)
-	}
-	for _, p := range []string{"/api/does-not-exist", "/another/unknown/path", "/random"} {
-		if strings.Contains(out, `route="`+p+`"`) {
-			t.Fatalf("raw path %q must not appear as a metric label:\n%s", p, out)
-		}
 	}
 }
 
@@ -154,9 +117,8 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), stubVueFS(t))
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, stubVueFS(t))
 
 	paths := []struct {
 		method string
@@ -166,7 +128,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		{http.MethodGet, "/", http.StatusOK},
 		{http.MethodGet, "/api/config", http.StatusOK},
 		{http.MethodGet, "/api/debug/health", http.StatusOK},
-		{http.MethodGet, "/api/debug/spans", http.StatusOK},
 		{http.MethodGet, "/api/debug/runtime", http.StatusOK},
 		{http.MethodGet, "/api/files", http.StatusOK},
 		{http.MethodGet, "/api/tasks", http.StatusOK},
@@ -198,129 +159,6 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	}
 }
 
-// TestBuildMux_DocsEndpoints verifies the docs API returns proper responses
-// for listing docs and reading individual doc files.
-func TestBuildMux_DocsEndpoints(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
-
-	// GET /api/docs should return a JSON array.
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/docs", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/docs: status %d, want 200", rr.Code)
-	}
-	if ct := rr.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
-		t.Fatalf("expected JSON content type, got %q", ct)
-	}
-
-	// GET /api/docs/guide/usage should return markdown.
-	rr2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodGet, "/api/docs/guide/usage", nil)
-	mux.ServeHTTP(rr2, req2)
-	if rr2.Code != http.StatusOK {
-		t.Fatalf("GET /api/docs/guide/usage: status %d, want 200", rr2.Code)
-	}
-
-	// GET /api/docs/nonexistent should return 404.
-	rr3 := httptest.NewRecorder()
-	req3 := httptest.NewRequest(http.MethodGet, "/api/docs/nonexistent", nil)
-	mux.ServeHTTP(rr3, req3)
-	if rr3.Code != http.StatusNotFound {
-		t.Fatalf("GET /api/docs/nonexistent: status %d, want 404", rr3.Code)
-	}
-
-	// GET /api/docs/../etc/passwd should be rejected.
-	rr4 := httptest.NewRecorder()
-	req4 := httptest.NewRequest(http.MethodGet, "/api/docs/..%2F..%2Fetc%2Fpasswd", nil)
-	// Manually set the path value to bypass URL canonicalization.
-	req4.SetPathValue("slug", "../../etc/passwd")
-	mux.ServeHTTP(rr4, req4)
-	if rr4.Code != http.StatusBadRequest && rr4.Code != http.StatusNotFound {
-		t.Fatalf("path traversal: status %d, want 400 or 404", rr4.Code)
-	}
-}
-
-// TestBuildMux_DocsAsset verifies the docs-asset route serves embedded images
-// with the right content type, and rejects non-image extensions, traversal,
-// and missing files — so doc screenshots referenced from guide markdown render
-// in-app without leaking other embedded files.
-func TestBuildMux_DocsAsset(t *testing.T) {
-	workdir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(workdir, "worktrees"), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"), Workspaces: []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-
-	pngBytes := []byte("\x89PNG\r\n\x1a\nfake-png-bytes")
-	docsFS := fstest.MapFS{
-		"docs/guide/images/board.png": {Data: pngBytes},
-		"docs/guide/board.md":         {Data: []byte("# Board\n")},
-	}
-	mux := BuildMux(h, reg, IndexViewData{}, docsFS, nil)
-
-	// The path goes in the URL so the mux populates {path...} itself (a
-	// pre-set PathValue would be overwritten during routing).
-	get := func(urlPath string) *httptest.ResponseRecorder {
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/docs-asset/"+urlPath, nil)
-		mux.ServeHTTP(rr, req)
-		return rr
-	}
-
-	// A real image is served with the image content type and exact bytes.
-	rr := get("guide/images/board.png")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("asset: status %d, want 200", rr.Code)
-	}
-	if ct := rr.Header().Get("Content-Type"); ct != "image/png" {
-		t.Fatalf("content type %q, want image/png", ct)
-	}
-	if rr.Body.String() != string(pngBytes) {
-		t.Fatalf("asset bytes mismatch")
-	}
-
-	// Non-image extensions (e.g. markdown) are rejected, so the route cannot
-	// be used to read arbitrary embedded docs.
-	if rr := get("guide/board.md"); rr.Code != http.StatusBadRequest {
-		t.Fatalf("markdown via asset route: status %d, want 400", rr.Code)
-	}
-	// Path traversal is rejected (%2F keeps the ".." in the captured value
-	// instead of being cleaned away by the router).
-	if rr := get("..%2F..%2Fetc%2Fpasswd.png"); rr.Code != http.StatusBadRequest {
-		t.Fatalf("traversal: status %d, want 400", rr.Code)
-	}
-	// Missing image is a 404.
-	if rr := get("guide/images/missing.png"); rr.Code != http.StatusNotFound {
-		t.Fatalf("missing asset: status %d, want 404", rr.Code)
-	}
-}
-
 // TestBuildMux_WithIDInvalidUUID verifies that routes using withID return 400
 // when the UUID is malformed.
 func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
@@ -338,9 +176,8 @@ func TestBuildMux_WithIDInvalidUUID(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/not-a-uuid/events", nil)
@@ -367,77 +204,14 @@ func TestBuildMux_ServeOutputInvalidUUID(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{}, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/bad-uuid/outputs/file.txt", nil)
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid UUID in output, got %d", rr.Code)
-	}
-}
-
-// TestBuildMux_MetricsEndpoint verifies that the /metrics endpoint returns
-// Prometheus-format text.
-func TestBuildMux_MetricsEndpoint(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
-
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /metrics: status %d, want 200", rr.Code)
-	}
-	ct := rr.Header().Get("Content-Type")
-	if !strings.Contains(ct, "text/plain") {
-		t.Fatalf("expected text/plain content type, got %q", ct)
-	}
-}
-
-// TestBuildMux_DocsInternals verifies that the internals docs are served.
-func TestBuildMux_DocsInternals(t *testing.T) {
-	workdir := t.TempDir()
-	worktrees := filepath.Join(workdir, "worktrees")
-	if err := os.MkdirAll(worktrees, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: worktrees,
-		Workspaces:   []string{workdir},
-	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), nil)
-
-	// GET /api/docs/internals/internals should return the internals index.
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/docs/internals/internals", nil)
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/docs/internals/internals: status %d, want 200", rr.Code)
 	}
 }
 
@@ -459,9 +233,8 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   []string{workdir},
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
-	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: "test-key"}, testFS(t), stubVueFS(t))
+	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	mux := BuildMux(h, IndexViewData{ServerAPIKey: "test-key"}, stubVueFS(t))
 
 	// "/" serves the injected SPA index. The key is released to a loopback
 	// peer (httptest's default RemoteAddr is not loopback).
@@ -513,49 +286,6 @@ func TestBuildMux_ServesVueSPA(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?token=test-key", nil))
 	if !strings.Contains(rr.Body.String(), `"test-key"`) {
 		t.Fatalf("GET /?token=<key> (remote peer): expected injected key, got %q", rr.Body.String())
-	}
-}
-
-// TestStatusResponseWriter_HijackNotSupported verifies that Hijack returns an
-// error when the underlying writer doesn't implement http.Hijacker.
-func TestStatusResponseWriter_HijackNotSupported(t *testing.T) {
-	rr := httptest.NewRecorder()
-	sw := &statusResponseWriter{ResponseWriter: rr, status: http.StatusOK}
-
-	// httptest.ResponseRecorder does not implement Hijacker, so this should
-	// return an error about the underlying writer.
-	_, _, err := sw.Hijack()
-	if err == nil {
-		t.Fatal("expected error from Hijack on non-Hijacker writer")
-	}
-	if !strings.Contains(err.Error(), "does not implement http.Hijacker") {
-		t.Fatalf("unexpected error message: %v", err)
-	}
-}
-
-// fakeHijackWriter implements http.ResponseWriter and http.Hijacker for testing.
-type fakeHijackWriter struct {
-	http.ResponseWriter
-}
-
-func (f *fakeHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return nil, nil, nil
-}
-
-// TestStatusResponseWriter_HijackSupported verifies that Hijack delegates to
-// the underlying writer when it implements http.Hijacker.
-func TestStatusResponseWriter_HijackSupported(t *testing.T) {
-	rr := httptest.NewRecorder()
-	hw := &fakeHijackWriter{ResponseWriter: rr}
-	sw := &statusResponseWriter{ResponseWriter: hw, status: http.StatusOK}
-
-	conn, rw, err := sw.Hijack()
-	if err != nil {
-		t.Fatalf("expected no error from Hijack, got: %v", err)
-	}
-	// The fake returns nil for both.
-	if conn != nil || rw != nil {
-		t.Fatalf("expected nil conn and rw from fake hijacker")
 	}
 }
 
@@ -628,57 +358,17 @@ func TestRequiresStore(t *testing.T) {
 	}
 }
 
-// TestInitServer_MetricsScrapesGauges verifies that the Prometheus metrics
-// endpoint triggers the gauge callbacks registered during initServer.
-func TestInitServer_MetricsScrapesGauges(t *testing.T) {
-	configDir := t.TempDir()
-	envFile := filepath.Join(configDir, ".env")
-	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	sc := initServer(configDir, ServerConfig{
-		LogFormat: "text",
-		Addr:      ":0",
-		DataDir:   filepath.Join(configDir, "data"),
-		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
-	defer sc.Shutdown()
-
-	// Start the server in the background.
-	go func() { _ = sc.Srv.Serve(sc.Ln) }()
-
-	// Scrape /metrics to trigger gauge callbacks.
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", sc.ActualPort))
-	if err != nil {
-		t.Fatalf("GET /metrics: %v", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /metrics: status %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	metricsText := string(body)
-
-	// Verify gauge metrics appear.
-	for _, want := range []string{
-		"wallfacer_circuit_breaker_open",
-		"wallfacer_background_goroutines",
-	} {
-		if !strings.Contains(metricsText, want) {
-			t.Errorf("expected %q in metrics output", want)
-		}
-	}
-}
-
 // TestInitServer_WithExistingStore verifies that initServer handles an existing
 // store with tasks, covering the recovery and workspace instructions paths.
 func TestInitServer_WithExistingStore(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	wsDir := t.TempDir()
-	envContent := "# test\nWALLFACER_WORKSPACES=" + wsDir + "\n"
-	if err := os.WriteFile(envFile, []byte(envContent), 0600); err != nil {
+	// Startup restores the most recently used workspace from workspaces.json.
+	if err := workspace.SaveGroups(configDir, []workspace.Workspace{{Folders: []string{wsDir}}}); err != nil {
+		t.Fatalf("save workspaces: %v", err)
+	}
+	if err := os.WriteFile(envFile, []byte("# test\n"), 0600); err != nil {
 		t.Fatalf("write env file: %v", err)
 	}
 
@@ -687,7 +377,7 @@ func TestInitServer_WithExistingStore(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	if sc.ActualPort == 0 {
@@ -718,7 +408,7 @@ func TestInitServer_PortFallback(t *testing.T) {
 		Addr:      fmt.Sprintf(":%d", occupiedPort),
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	// It should have found a different port.
@@ -745,104 +435,10 @@ func TestInitServer_TombstoneRetentionDays(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	defer sc.Shutdown()
 
 	if sc.Srv == nil {
 		t.Fatal("expected non-nil server")
-	}
-}
-
-// TestGauge_BackgroundGoroutines validates the pending goroutines gauge.
-func TestGauge_BackgroundGoroutines(t *testing.T) {
-	workdir := t.TempDir()
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-
-	collector := func() []metrics.LabeledValue {
-		return []metrics.LabeledValue{{Value: float64(len(r.PendingGoroutines()))}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(vals))
-	}
-	if vals[0].Value != 0 {
-		t.Errorf("expected 0 pending goroutines, got %v", vals[0].Value)
-	}
-}
-
-// TestGauge_StoreSubscribers validates the store subscribers gauge.
-func TestGauge_StoreSubscribers(t *testing.T) {
-	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := storetest.NewFileStore(t, dataDir)
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	collector := func() []metrics.LabeledValue {
-		return []metrics.LabeledValue{{Value: float64(s.SubscriberCount())}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(vals))
-	}
-	if vals[0].Value != 0 {
-		t.Errorf("expected 0 subscribers initially, got %v", vals[0].Value)
-	}
-}
-
-// TestGauge_CircuitBreakerOpen validates the circuit-breaker gauge: starts at
-// 0 (closed), then flips to 1 (open) after exceeding the failure threshold.
-func TestGauge_CircuitBreakerOpen(t *testing.T) {
-	workdir := t.TempDir()
-	s, err := storetest.NewFileStore(t, filepath.Join(workdir, "data"))
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:      filepath.Join(workdir, ".env"),
-		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   []string{workdir},
-	})
-
-	// Circuit should be closed initially.
-	collector := func() []metrics.LabeledValue {
-		v := 0.0
-		if r.ContainerCircuitOpen() {
-			v = 1.0
-		}
-		return []metrics.LabeledValue{{Value: v}}
-	}
-
-	vals := collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Value != 0.0 {
-		t.Errorf("circuit breaker open = %v, want 0 (closed)", vals[0].Value)
-	}
-
-	// Trip the circuit breaker by recording failures above the threshold.
-	for range constants.DefaultCBThreshold + 1 {
-		r.RecordContainerFailure()
-	}
-
-	vals = collector()
-	if len(vals) != 1 {
-		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
-	}
-	if vals[0].Value != 1.0 {
-		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
 	}
 }

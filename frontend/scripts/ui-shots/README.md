@@ -59,9 +59,9 @@ node snap.mjs --base http://localhost:5173 --only board,palette,settings # subse
 node snap.mjs --list                                                     # surface names
 ```
 
-Surfaces: `board`, `switcher`, `palette`, `picker`, `terminal`, `explorer`,
-`task-detail`, `settings`, `analytics`, `overview-spec`, `oversight`, `plan`,
-`chat`, `mission`, `whiteboard`, `docs`. Prints JSON `[{name, file, errors}]` so callers can detect page
+Surfaces: `board`, `switcher`, `palette`, `picker`, `explorer`,
+`task-detail`, `settings`, `overview-spec`, `oversight`, `plan`.
+Prints JSON `[{name, file, errors}]` so callers can detect page
 errors.
 
 Works against any console origin: the embedded SPA on the booted server
@@ -108,10 +108,9 @@ Scenes, one per console surface, each asserting the geometry its design
 promises (rail and topbar sizes, card radii, column widths, dialog widths,
 reading-column width) and the material (no `backdrop-filter`, meta text
 contrast in both themes): `board`, `shell`, `switcher`, `picker`, `no-glass`,
-`contrast`, `task-detail`, `chat`, `plan`, `settings`, `palette`, `dock`,
-`analytics`, `mission`, `whiteboard`, `docs`. Every
+`contrast`, `task-detail`, `chat-popup`, `plan`, `settings`, `palette`. Every
 scene runs in its own browser context so nothing one scene persists (a route,
-a popup, a dock layout) reaches the next.
+a popup) reaches the next.
 Add a scene by appending to the `SCENES` table in `checks.mjs`. Playwright runs
 from the same throwaway `/tmp` sandbox as `snap.mjs` (never under `frontend/`,
 which would break the vite-ssg build).
@@ -123,8 +122,6 @@ The gate runs in CI as the `ui-test` job of `.github/workflows/frontend.yml`
 
 Guide images live in `docs/guide/images/` as a `foo.png` (light) + `foo-dark.png`
 (dark) pair. Reference only the light name in markdown: `![alt](images/foo.png)`.
-The docs renderer (`frontend/src/lib/markdown.ts`) emits both variants toggled by
-`[data-theme]`, served via the `/api/docs-asset/<category>/<path>` route.
 
 One command regenerates every committed screenshot (the guide pairs, the
 landing-page pairs under `frontend/public/static/`, and the README images under

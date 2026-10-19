@@ -942,7 +942,6 @@ func TestUpdateTaskPromptTool_ResumeHintOnWaiting(t *testing.T) {
 }
 
 func TestTaskPromptRefine_TemplateFieldsPopulated(t *testing.T) {
-	mgr := prompts.NewManager(t.TempDir())
 	d := prompts.RefinementData{
 		CreatedAt: "2026-01-01 00:00:00",
 		Today:     "2026-04-19",
@@ -950,7 +949,7 @@ func TestTaskPromptRefine_TemplateFieldsPopulated(t *testing.T) {
 		Status:    "backlog",
 		Prompt:    "implement feature X",
 	}
-	out := mgr.TaskPromptRefine(d)
+	out := prompts.TaskPromptRefine(d)
 	if out == "" {
 		t.Fatal("TaskPromptRefine returned empty string")
 	}

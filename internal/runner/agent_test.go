@@ -10,7 +10,6 @@ import (
 
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/store/storetest"
 )
@@ -43,7 +42,6 @@ func newAgentTestRunner(t *testing.T) (*Runner, *MockSandboxBackend, *store.Stor
 	r := &Runner{
 		store:       s,
 		backend:     backend,
-		promptsMgr:  prompts.Default,
 		shutdownCtx: shutdownCtx,
 	}
 	return r, backend, s

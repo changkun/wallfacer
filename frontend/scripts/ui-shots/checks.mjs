@@ -52,6 +52,19 @@ async function firstBox(page, sel) {
   return els[0] ?? null;
 }
 
+// openPopupThread opens the chat popup (if closed) and switches it to the
+// conversation named name through its session switcher.
+async function openPopupThread(page, name) {
+  if (!(await page.locator('.scp-window').isVisible())) {
+    await page.click('.scp-launcher', { timeout: 5000 });
+  }
+  await page.waitForSelector('.scp-window', { state: 'visible', timeout: 5000 });
+  if ((await page.locator('.scp-session-name').textContent()) !== name) {
+    await page.click('.scp-session-switch', { timeout: 5000 });
+    await page.click(`.scp-session-item:has-text("${name}")`, { timeout: 5000 });
+  }
+}
+
 // ---- the failure collector ------------------------------------------------
 const failures = [];
 const notes = [];
@@ -61,7 +74,7 @@ function fail(scene, msg) { failures.push(`[${scene}] ${msg}`); }
 // exceptions) are always treated as failures — they are the "a region
 // vanished" class. Console errors are reported but not fatal (app noise).
 // Every scene gets its own browser context so nothing one scene persists
-// (the last route, an open popup, a dock layout) leaks into the next.
+// (the last route, an open popup) leaks into the next.
 async function scene(browser, name, fn) {
   const pageErrors = [];
   const consoleErrors = [];
@@ -99,7 +112,7 @@ const SCENES = {
     const main = await firstBox(page, '.app-main');
     expect('board', main && main.width > 0, 'app-main not rendered');
 
-    // The board geometry (specs/shared/console-redesign/board.md): four equal
+    // The board geometry (specs/.archive/shared/console-redesign/board.md): four equal
     // columns, 14px cards, at most two pills on a card's first row, no card
     // wider than its column, and a composer that expands on click.
     const cols = await boxes(page, '.board-grid > .col');
@@ -121,7 +134,7 @@ const SCENES = {
     expect('board', focused === true, 'composer did not expand with the prompt focused');
   },
 
-  // The shell geometry (specs/shared/console-redesign/shell.md): rail 236 open
+  // The shell geometry (specs/.archive/shared/console-redesign/shell.md): rail 236 open
   // and 64 folded on the deep ground, the main card inset 8px on three sides
   // starting at the rail's edge, a 52px topbar, and no status bar anywhere.
   shell: async (page) => {
@@ -239,10 +252,10 @@ SCENES['contrast'] = async (page) => {
   }
 };
 
-// The task sheet (specs/shared/console-redesign/task-detail.md): open the
+// The task sheet (specs/.archive/shared/console-redesign/task-detail.md): open the
 // first card, the sheet fits the viewport, the aside is 340 wide, the tabs
 // row is present, the Actions card carries one ink button, and the Changes
-// and Verification tabs switch without page errors.
+// and Events tabs switch without page errors.
 SCENES['task-detail'] = async (page) => {
   await page.click('.board-grid .task-card .task-card__title', { timeout: 5000 }).catch(() => {});
   await page.waitForSelector('.sheet', { state: 'visible', timeout: 8000 }).catch(() => {});
@@ -260,7 +273,7 @@ SCENES['task-detail'] = async (page) => {
   const mainBox = await firstBox(page, '.sheet-main');
   const overflow = await page.$eval('.sheet-main', (el) => el.scrollWidth > el.clientWidth + 1);
   expect('task-detail', mainBox && !overflow, 'sheet main column overflows horizontally');
-  for (const tab of ['changes', 'verification', 'events']) {
+  for (const tab of ['changes', 'events']) {
     await page.click(`[data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(250);
   }
@@ -295,7 +308,7 @@ SCENES['feedback-live'] = async (page) => {
   await page.setViewportSize({ width: 1280, height: 760 });
   await page.goto(`${base}/?task=${task.id}&tab=spec`, { waitUntil: 'load' });
   await page.waitForSelector('.task-response textarea', { timeout: 8000 });
-  for (const tab of ['spec', 'activity', 'changes', 'verification', 'events', 'timeline']) {
+  for (const tab of ['spec', 'activity', 'changes', 'events', 'timeline']) {
     await page.click(`.sheet [data-tab="${tab}"]`);
     await page.waitForTimeout(120);
     const visible = await page.$eval('.task-response textarea', (el) => {
@@ -336,9 +349,9 @@ SCENES['onboarding-guidance'] = async (page) => {
   await page.click('.sb-ws-switch');
   await page.click('.sb-ws-popover__add');
   await page.getByRole('button', { name: '+ New workspace' }).click();
-  expect('onboarding-guidance', (await page.locator('.dialog-sub').textContent()).includes('Agents read and edit these folders'), 'folder chooser omits workspace purpose');
+  expect('onboarding-guidance', (await page.locator('.dialog-sub').textContent()).includes('Agents read and edit this folder'), 'folder chooser omits workspace purpose');
   const next = page.getByRole('button', { name: 'Next: Name' });
-  expect('onboarding-guidance', await next.isDisabled(), 'empty folder selection can be saved');
+  expect('onboarding-guidance', await next.isDisabled(), 'an unchosen folder can be saved');
 };
 
 SCENES['credential-storage'] = async (page) => {
@@ -372,11 +385,13 @@ SCENES['chat-error'] = async (page) => {
     // after the message is accepted.
     const sent = await fixtureRequest(page, 'POST', '/api/agent/messages', { thread: thread.id, message: 'Exercise a failed host launch', harness: 'pi' });
     expect('chat-error', sent.status() === 202, 'test message was not accepted');
-    await page.goto(base + '/chat', { waitUntil: 'load' });
-    await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });
+    await page.goto(base + '/settings', { waitUntil: 'load' });
+    await openPopupThread(page, 'Failure surface regression');
+    await page.waitForSelector('.scp-window .pcp-bubble-error', { timeout: 8000 });
     expect('chat-error', (await page.locator('.pcp-bubble-error').textContent()).includes('could not start'), 'launch failure is not visible in chat');
     await page.reload({ waitUntil: 'load' });
-    await page.waitForSelector('.pcp-bubble-error', { timeout: 8000 });
+    await openPopupThread(page, 'Failure surface regression');
+    await page.waitForSelector('.scp-window .pcp-bubble-error', { timeout: 8000 });
     expect('chat-error', (await page.locator('.pcp-bubble-error').textContent()).includes('Settings'), 'reload lost the actionable error');
   } finally {
     await fixtureRequest(page, 'PATCH', '/api/agent/sessions/' + thread.id, { state: 'archived' });
@@ -385,31 +400,24 @@ SCENES['chat-error'] = async (page) => {
   }
 };
 
-// The chat surface (specs/shared/console-redesign/chat.md): the session list
-// and the hero composer render on /chat, the entry column stays narrow, and
-// the floating popup on another route opens inside the viewport.
-SCENES['chat'] = async (page) => {
-  await page.goto(base + '/chat', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(900);
-  const sessions = await firstBox(page, '.chat-sessions');
-  expect('chat', !!sessions, 'session list did not render');
-  const composer = await firstBox(page, '.pcp-composer');
-  expect('chat', !!composer, 'composer did not render');
-  const entry = await firstBox(page, '.chat-entry-inner');
-  expect('chat', entry && entry.width <= 681, `entry column ${entry && Math.round(entry.width)}px, want <= 680`);
+// The chat popup (specs/.archive/shared/console-redesign/chat.md): on a page that does
+// not own the chat, the launcher sits inside the viewport and opens a window
+// that stays inside it, with the composer ready.
+SCENES['chat-popup'] = async (page) => {
+  await page.goto(base + '/settings', { waitUntil: 'load', timeout: 20000 });
+  await page.waitForTimeout(700);
   const vw = await page.evaluate(() => window.innerWidth);
   const vh = await page.evaluate(() => window.innerHeight);
-  await page.goto(base + '/analytics', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(700);
   const launcher = await firstBox(page, '.scp-launcher');
-  expect('chat', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
+  expect('chat-popup', launcher && launcher.right <= vw && launcher.bottom <= vh, 'chat launcher outside the viewport');
   await page.click('.scp-launcher', { timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(400);
   const win = await firstBox(page, '.scp-window');
-  expect('chat', win && win.left >= 0 && win.top >= 0 && win.right <= vw + 1 && win.bottom <= vh + 1, 'chat popup outside the viewport');
+  expect('chat-popup', win && win.left >= 0 && win.top >= 0 && win.right <= vw + 1 && win.bottom <= vh + 1, 'chat popup outside the viewport');
+  expect('chat-popup', !!(await firstBox(page, '.scp-window .pcp-composer')), 'composer did not render in the popup');
 };
 
-// The plan surface (specs/shared/console-redesign/plan.md): tree rows on the
+// The plan surface (specs/.archive/shared/console-redesign/plan.md): tree rows on the
 // nav-row geometry, a reading column no wider than 76ch, the tree folds to a
 // 28px strip, and the focused view's status is a pill.
 SCENES['plan'] = async (page) => {
@@ -437,7 +445,7 @@ SCENES['plan'] = async (page) => {
 
 // Lightweight smoke for the remaining routed surfaces: they must render a
 // non-empty app-main with no uncaught error.
-// Settings (specs/shared/console-redesign/settings.md): a column no wider
+// Settings (specs/.archive/shared/console-redesign/settings.md): a column no wider
 // than 760, an underline tab strip, right-aligned controls, every tab without
 // page errors, and six swatches on Appearance.
 SCENES['settings'] = async (page) => {
@@ -462,11 +470,12 @@ SCENES['settings'] = async (page) => {
   }
 };
 
-// The command palette (specs/shared/console-redesign/panels-and-overlays.md):
-// ⌘K opens a 640px popover near the top of the viewport, inside it, with the
+// The command palette (specs/.archive/shared/console-redesign/panels-and-overlays.md):
+// the rail's search button opens a 640px popover near the top of the viewport,
+// inside it, with the
 // first row selected and no blur anywhere on the page.
 SCENES['palette'] = async (page) => {
-  await page.keyboard.press('Meta+k');
+  await page.click('.rail-search', { timeout: 5000 });
   await page.waitForSelector('.command-palette-panel', { state: 'visible', timeout: 5000 }).catch(() => {});
   const panel = await firstBox(page, '.command-palette-panel');
   expect('palette', !!panel, 'command palette did not open on Meta+k');
@@ -486,131 +495,6 @@ SCENES['palette'] = async (page) => {
   await page.waitForTimeout(100);
   const moved = await page.$$eval('.command-palette-row.active, .command-palette-action-btn.active', (els) => els.length);
   expect('palette', moved === 1, `${moved} selections after ArrowDown, want 1`);
-};
-
-// The dock (specs/shared/console-redesign/panels-and-overlays.md): the
-// terminal toggles into the bottom region flush with the main card's bottom
-// edge, the gutter drag changes its height, and maximize fills the workspace.
-SCENES['dock'] = async (page) => {
-  await page.click('.topbar [data-action="terminal"]', { timeout: 5000 }).catch(() => {});
-  await page.waitForSelector('.dock-region--bottom', { state: 'visible', timeout: 5000 }).catch(() => {});
-  const region = await firstBox(page, '.dock-region--bottom');
-  const ws = await firstBox(page, '.dock-ws');
-  const main = await firstBox(page, '.app-main');
-  expect('dock', !!region, 'terminal did not dock into the bottom region');
-  if (!region || !ws || !main) return;
-  expect('dock', Math.abs(region.bottom - main.bottom) <= 2, `region bottom ${Math.round(region.bottom)} != main card bottom ${Math.round(main.bottom)}`);
-  expect('dock', Math.abs(region.left - ws.left) <= 1 && Math.abs(region.right - ws.right) <= 1, 'bottom region does not span the workspace');
-  const bar = await firstBox(page, '.terminal-tab-bar');
-  expect('dock', bar && Math.abs(bar.height - 36) <= 1, `terminal tab bar height ${bar && bar.height}, want 36`);
-  // Drag the gutter up 80px: the region grows by about that much.
-  const gutter = await firstBox(page, '.dock-gutter--h');
-  expect('dock', !!gutter, 'no horizontal gutter above the bottom region');
-  if (gutter) {
-    const x = gutter.left + gutter.width / 2;
-    const y = gutter.top + gutter.height / 2;
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x, y - 40);
-    await page.mouse.move(x, y - 80);
-    await page.mouse.up();
-    await page.waitForTimeout(150);
-    const grown = await firstBox(page, '.dock-region--bottom');
-    expect('dock', grown && grown.height > region.height + 60, `region height ${Math.round(grown ? grown.height : 0)} after an 80px drag from ${Math.round(region.height)}`);
-  }
-  await page.click('.dock-panel__btn[aria-label="Maximize terminal"]', { timeout: 5000 }).catch(() => {});
-  // The panel teleports into the overlay on the next tick; wait for it there.
-  await page.waitForSelector('.dock-max .terminal-panel', { state: 'attached', timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(150);
-  const max = await firstBox(page, '.dock-max');
-  const ws2 = await firstBox(page, '.dock-ws');
-  expect('dock', max && ws2 && Math.abs(max.width - ws2.width) <= 1 && Math.abs(max.height - ws2.height) <= 1, 'maximized terminal does not fill the workspace');
-  expect('dock', !!(await page.$('.dock-max .terminal-panel')), 'terminal did not move into the maximized overlay');
-  await page.click('.dock-panel__btn[aria-label="Restore terminal"]', { timeout: 5000 }).catch(() => {});
-};
-
-// Analytics (specs/shared/console-redesign/secondary-screens.md): stat tiles
-// as cards, tables whose numeric columns share one right edge, and every tab
-// without errors.
-SCENES['analytics'] = async (page) => {
-  await page.goto(base + '/analytics', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForTimeout(900);
-  await page.click('.an-tabs [data-tab="analytics"]', { timeout: 5000 }).catch(() => {});
-  await page.waitForSelector('.an-tile', { timeout: 8000 }).catch(() => {});
-  const tiles = await boxes(page, '.an-tile');
-  expect('analytics', tiles.length >= 2, `${tiles.length} stat tiles, want at least 2`);
-  const cards = await page.$$eval('.an-tile', (els) => els.filter((e) => e.classList.contains('card')).length);
-  expect('analytics', cards === tiles.length, 'a stat tile is not a card');
-  // Numeric cells in one table share the header's right edge.
-  const misaligned = await page.$$eval('.an-table', (tables) => tables.flatMap((t) => {
-    const heads = [...t.querySelectorAll('th.num')].map((th) => th.getBoundingClientRect().right);
-    const rows = [...t.querySelectorAll('tbody tr')];
-    return rows.flatMap((r) => [...r.querySelectorAll('td.num')].map((td, i) => {
-      const cols = [...r.querySelectorAll('td.num')];
-      const head = heads[heads.length - cols.length + i];
-      return head == null ? 0 : Math.abs(td.getBoundingClientRect().right - head);
-    })).filter((d) => d > 1);
-  }));
-  expect('analytics', misaligned.length === 0, `${misaligned.length} numeric cells off their column edge`);
-  for (const tab of ['timing', 'usage']) {
-    await page.click(`.an-tabs [data-tab="${tab}"]`, { timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(600);
-    expect('analytics', !!(await page.$('.an-body')), `${tab} tab rendered no body`);
-  }
-};
-
-// Mission Control: the canvas draws nodes on the ramp, the inspector is 300
-// wide, and a spec node opens its popover inside the viewport.
-SCENES['mission'] = async (page) => {
-  await page.goto(base + '/mission', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForSelector('.gc-node', { timeout: 10000 }).catch(() => {});
-  const nodes = await boxes(page, '.gc-node');
-  expect('mission', nodes.length > 0, 'canvas rendered no nodes');
-  const insp = await firstBox(page, '.mission__inspector');
-  expect('mission', insp && Math.abs(insp.width - 300) <= 1, `inspector width ${insp && insp.width}, want 300`);
-  const fills = await page.$$eval('.gc-dot', (els) => els.map((e) => e.style.fill));
-  expect('mission', fills.length > 0 && fills.every((f) => /var\(|color-mix\(/.test(f)), 'a node fill is not a token expression');
-  const spec = await page.$('.gc-node--spec');
-  if (spec) {
-    await spec.dblclick();
-    await page.waitForSelector('.map-popup', { timeout: 5000 }).catch(() => {});
-    const pop = await firstBox(page, '.map-popup');
-    const vw = await page.evaluate(() => window.innerWidth);
-    const vh = await page.evaluate(() => window.innerHeight);
-    expect('mission', pop && pop.left >= 0 && pop.top >= 0 && pop.right <= vw + 1 && pop.bottom <= vh + 1, 'spec popover outside the viewport');
-    expect('mission', !!(await page.$('.map-popup.pop')), 'spec popover is not the pop shape');
-  }
-};
-
-// Whiteboard: Excalidraw mounts on the console theme.
-SCENES['whiteboard'] = async (page) => {
-  await page.goto(base + '/whiteboard', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForSelector('.excalidraw', { timeout: 15000 }).catch(() => {});
-  expect('whiteboard', !!(await page.$('.excalidraw')), 'Excalidraw did not mount');
-};
-
-// Docs: the nav is 260 wide on the sunk surface and the reading column is at
-// most 76ch.
-SCENES['docs'] = async (page) => {
-  await page.goto(base + '/docs', { waitUntil: 'load', timeout: 20000 });
-  await page.waitForSelector('.local-docs-body', { timeout: 10000 }).catch(() => {});
-  const nav = await firstBox(page, '.local-docs-nav');
-  expect('docs', nav && Math.abs(nav.width - 260) <= 1, `docs nav width ${nav && nav.width}, want 260`);
-  const wrap = await firstBox(page, '.local-docs-wrap');
-  const chPx = await page.evaluate(() => {
-    const el = document.querySelector('.local-docs-wrap');
-    if (!el) return 0;
-    const probe = document.createElement('span');
-    probe.textContent = '0';
-    probe.style.font = getComputedStyle(el).font;
-    probe.style.position = 'absolute';
-    document.body.appendChild(probe);
-    const w = probe.getBoundingClientRect().width;
-    probe.remove();
-    return w;
-  });
-  expect('docs', wrap && chPx > 0 && wrap.width <= 76 * chPx + 2, `reading column ${wrap && Math.round(wrap.width)}px exceeds 76ch (${Math.round(76 * chPx)}px)`);
-  expect('docs', !!(await page.$('.local-docs-link.is-active')), 'no active doc row');
 };
 
 if (arg('list', false) === true) {

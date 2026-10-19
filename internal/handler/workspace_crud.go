@@ -27,6 +27,10 @@ func parseLimit(raw json.RawMessage) *int {
 }
 
 // workspaceDTO is the JSON shape of a workspace returned by the CRUD endpoints.
+// Folders holds the workspace's one folder. It stays a list because a dormant
+// workspace may hold none (recovered history) or several (saved before a
+// workspace became one folder), and the picker shows those so the owner can
+// choose the one folder to re-point it to.
 type workspaceDTO struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -86,8 +90,9 @@ func (h *Handler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CreateWorkspace creates a new workspace owned by the request's principal. It
-// does not activate it; the caller activates via POST /api/workspaces/{id}/activate.
+// CreateWorkspace creates a new workspace on one folder. A request naming more
+// than one folder is refused with 400. It does not activate the workspace; the
+// caller activates via POST /api/workspaces/{id}/activate.
 func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
 		Name    string   `json:"name"`
@@ -104,9 +109,12 @@ func (h *Handler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusCreated, h.workspaceDTO(ws))
 }
 
-// UpdateWorkspace renames a workspace and/or replaces its folder set. Replacing
-// folders is the membership edit: the workspace's identity and history are
-// preserved. When it is the active workspace, the live view updates in place.
+// UpdateWorkspace renames a workspace and/or re-points it to one folder.
+// Re-pointing keeps the workspace's identity and history, and a dormant
+// workspace (one that named several folders, or recovered history) leaves the
+// dormant state, so its tasks reappear. A request naming more than one folder
+// is refused with 400. When it is the active workspace, the live view updates
+// in place.
 func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !h.workspaceExists(id) {
@@ -143,6 +151,12 @@ func (h *Handler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 		updated = true
 	}
 	if req.MaxParallel != nil {
+		// A present (incl. null) field is applied; an absent one leaves the
+		// override unchanged.
+		if !h.workspaceExists(id) {
+			http.Error(w, "workspace not found", http.StatusNotFound)
+			return
+		}
 		if ws, err = h.workspace.SetLimits(id, parseLimit(req.MaxParallel)); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

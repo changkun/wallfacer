@@ -29,7 +29,7 @@ func (r *Runner) AssessDrift(ctx context.Context, specBody string, affects, chan
 	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	prompt := r.promptsMgr.DriftAssessment(prompts.DriftData{
+	prompt := prompts.DriftAssessment(prompts.DriftData{
 		SpecBody:     specBody,
 		Affects:      strings.Join(affects, "\n"),
 		ChangedFiles: strings.Join(changedFiles, "\n"),

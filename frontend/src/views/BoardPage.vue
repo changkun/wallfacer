@@ -43,7 +43,6 @@ const editorTabs = useEditorTabsStore();
 const route = useRoute();
 const router = useRouter();
 
-// Board automation popover (restores the legacy on-board toggle menu).
 // Track the open task by id, not by a held object reference. A `task-updated`
 // SSE delta replaces the task object in the store (stores/tasks.ts updateTask),
 // so a captured reference goes stale and the detail panel would keep rendering
@@ -250,7 +249,7 @@ async function onInProgressAdd(evt: { added?: { element: Task } }) {
       v-else-if="hasWorkspace"
       type="button"
       class="explorer-rail"
-      title="Open Explorer (e)"
+      title="Open Explorer"
       aria-label="Open Explorer"
       @click="ui.openExplorer()"
     >

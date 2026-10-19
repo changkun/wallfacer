@@ -2,8 +2,7 @@
 // ChatComposer — the message input. Self-contained: owns its draft text,
 // send-mode preference, and slash/mention autocomplete. Emits `send(text)` and
 // `interrupt()` so it stays decoupled from where it's mounted. The `variant`
-// prop sizes it for the entry-screen hero, the docked conversation, the legacy
-// panel, or the compact spec popup.
+// prop sizes it for the Plan chat panel or the compact chat popup.
 import { ref, computed, watch, watchEffect } from 'vue';
 import { useAgentAutocomplete } from '../../composables/useAgentAutocomplete';
 import { useTaskStore } from '../../stores/tasks';
@@ -12,7 +11,7 @@ import HarnessSelect from '../HarnessSelect.vue';
 
 withDefaults(defineProps<{
   streaming: boolean;
-  variant?: 'panel' | 'hero' | 'docked' | 'compact';
+  variant?: 'panel' | 'compact';
   placeholder?: string;
 }>(), {
   variant: 'panel',
@@ -50,24 +49,6 @@ watch(harness, (v) => {
 const inputEl = ref<HTMLTextAreaElement | null>(null);
 const inputText = ref<string>('');
 
-const SEND_MODE_KEY = 'wallfacer-chat-send-mode';
-const sendMode = ref<'enter' | 'cmd-enter'>(
-  ((typeof localStorage !== 'undefined' && localStorage.getItem(SEND_MODE_KEY)) as 'enter' | 'cmd-enter') || 'enter',
-);
-
-const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
-const sendHint = computed(() => {
-  const mod = isMac ? '⌘' : 'Ctrl';
-  return sendMode.value === 'cmd-enter' ? `${mod}+Return to send` : 'Shift+Return for new line';
-});
-
-function toggleSendMode() {
-  sendMode.value = sendMode.value === 'enter' ? 'cmd-enter' : 'enter';
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(SEND_MODE_KEY, sendMode.value);
-  }
-}
-
 const autocomplete = useAgentAutocomplete({ inputEl, inputText });
 const {
   slashOpen, slashFiltered, slashIndex,
@@ -89,17 +70,10 @@ function doSend() {
 function onKeydown(ev: KeyboardEvent) {
   if (autocomplete.handleKeydown(ev)) return;
 
-  if (ev.key === 'Enter') {
-    let shouldSend = false;
-    if (sendMode.value === 'cmd-enter') {
-      shouldSend = ev.metaKey || ev.ctrlKey;
-    } else {
-      shouldSend = !ev.shiftKey || ev.metaKey || ev.ctrlKey;
-    }
-    if (shouldSend) {
-      ev.preventDefault();
-      doSend();
-    }
+  // Enter sends; Shift+Enter inserts a newline.
+  if (ev.key === 'Enter' && !ev.shiftKey) {
+    ev.preventDefault();
+    doSend();
   }
 }
 
@@ -182,7 +156,6 @@ defineExpose({
              streaming it must always be reachable regardless of draft text. -->
         <Transition name="pcp-send-pop">
           <div v-if="streaming || inputText.trim()" class="pcp-send-wrap">
-            <span class="pcp-send-hint">{{ sendHint }}</span>
             <div class="pcp-send-group">
               <button
                 v-if="streaming"
@@ -201,14 +174,6 @@ defineExpose({
                 @click="doSend"
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="6 11 12 5 18 11"></polyline></svg>
-              </button>
-              <button
-                type="button"
-                class="pcp-send-toggle"
-                title="Toggle send shortcut"
-                @click="toggleSendMode"
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button>
             </div>
           </div>

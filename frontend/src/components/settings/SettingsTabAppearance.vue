@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Appearance settings: the light/dark/auto mode and the color palette axis
 // (Slack-style named presets). Both apply instantly via the prefs store and
-// persist to localStorage; see specs/shared/visual-identity/theme-system.md.
+// persist to localStorage; see specs/.archive/shared/visual-identity/theme-system.md.
 import { storeToRefs } from 'pinia';
 import { usePrefsStore, PALETTES, type Theme } from '../../stores/prefs';
 

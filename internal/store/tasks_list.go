@@ -177,29 +177,6 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 	return page, total, hasMoreBefore, hasMoreAfter, nil
 }
 
-// ListWaitingTasksForReview returns the waiting tasks a review can run on and
-// that have no review verdict yet (ReviewUnresolved == nil): those with at
-// least one worktree, whose diff is the change under review. Used by
-// tryAutoReview to find the tasks due a review round.
-func (s *Store) ListWaitingTasksForReview(_ context.Context) []Task {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	var result []Task
-	for id := range s.tasksByStatus[TaskStatusWaiting] {
-		t := s.tasks[id]
-		if t == nil || len(t.WorktreePaths) == 0 {
-			continue
-		}
-		if t.ReviewUnresolved != nil {
-			continue
-		}
-		result = append(result, cloneTask(t))
-	}
-	slices.SortFunc(result, cmpTaskPositionCreatedAt)
-	return result
-}
-
 // cloneTask returns a deep copy of t so that callers cannot accidentally
 // mutate store-owned state through shared slice/map/pointer fields.
 // It is the canonical outward-facing wrapper for deepCloneTask; all read

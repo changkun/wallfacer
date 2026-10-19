@@ -70,7 +70,7 @@ async function settle() {
 }
 
 describe('TaskDetail feedback submit', () => {
-  it.each(['spec', 'activity', 'changes', 'verification', 'events', 'timeline'])('keeps the latest reply and feedback reachable from %s', async (initialTab) => {
+  it.each(['spec', 'activity', 'changes', 'events', 'timeline'])('keeps the latest reply and feedback reachable from %s', async (initialTab) => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }],

@@ -8,34 +8,43 @@ The workspace manager (`internal/workspace/manager.go`) coordinates workspace sw
 
 ### Data Model
 
-A workspace is an owned, stably-identified set of folder paths (`internal/workspace/groups.go`). Its identity (`ID`) and its storage handle (`DataKey`) are independent of its membership (`Folders`), so the owner may change folders without orphaning history:
+A workspace is an owned, stably-identified host folder (`internal/workspace/groups.go`). Its identity (`ID`) and its storage handle (`DataKey`) are independent of the folder it points at, so the owner may re-point it without orphaning history:
 
 ```go
 type Workspace struct {
     ID      string   // stable UUIDv4, assigned once at creation/migration
     Name    string   // optional human label
-    Folders []string // mutable; absolute, clean, sorted, deduped
+    Folders []string // the one folder (absolute, clean); a list only so older records load whole
     DataKey string   // stable storage handle under data/<DataKey>
 
-    MaxParallel     *int  // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit)
-    Autoimplement   *bool // per-workspace automation toggles (autopush stays global)
-    Autosubmit      *bool
-    Autosync        *bool
+    MaxParallel *int // per-workspace override of WALLFACER_MAX_PARALLEL (nil = inherit, 0 = unlimited)
 
-    Dormant bool // history recovered by migration; folders await re-pointing
+    Dormant bool // history kept, folder not chosen yet: recovered by migration, or saved with several folders
 }
 ```
 
-The manager's `Snapshot` (`internal/workspace/manager.go`) captures the active workspace at a point in time: `WorkspaceID` (empty for ad-hoc/legacy path switches pre-migration), `Workspaces` (the active folder set), `Store`, `ScopedDataDir`, `Key` (the active workspace's `DataKey`), and a monotonically increasing `Generation`.
+A workspace is one folder. `validate` (`internal/workspace/manager.go`) normalizes and deduplicates the requested paths and refuses more than one distinct folder with an error wrapping `ErrSeveralFolders` ("a workspace is one folder, but N folders were given"). It guards every writer: `Manager.Create`, `Manager.UpdateFolders`, and `Manager.Switch`, so `POST /api/workspaces` and `PUT /api/workspaces/{id}` answer 400 for a request naming several folders. `Folders` stays a list on disk and on the wire (`folders` in the workspace DTO) only so a record saved with several folders loads and displays whole; see below.
+
+The manager's `Snapshot` (`internal/workspace/manager.go`) captures the active workspace at a point in time: `WorkspaceID` (empty for ad-hoc/legacy path switches pre-migration), `Workspaces` (the active folder: empty, or one path), `Store`, `ScopedDataDir`, `Key` (the active workspace's `DataKey`), and a monotonically increasing `Generation`.
 
 ### DataKey: identity decoupled from paths
 
-The workspace's identity is its `ID`; its data directory is `data/<DataKey>/`. Neither is a function of the folder set. Two key sources exist:
+The workspace's identity is its `ID`; its data directory is `data/<DataKey>/`. Neither is a function of the folder. Two key sources exist:
 
-- **Explicit creation** (`Manager.Create`, `POST /api/workspaces`): a random key from `prompts.NewDataKey()`. A new workspace pointing at the same folders as an existing one starts with empty history, the core property of the redesign.
+- **Explicit creation** (`Manager.Create`, `POST /api/workspaces`): a random key from `prompts.NewDataKey()`. A new workspace pointing at the same folder as an existing one starts with empty history, the core property of the redesign.
 - **Path-seeded** (`prompts.WorkspaceDataKey(folders)`, `internal/prompts/instructions.go`): a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This hash survives only as the initial `DataKey` of records migrated from the legacy path-keyed model, and for transitional workspaces minted by plain path switches (`resolveWorkspaceForPaths`), where reusing the hash means the existing `data/<hash>/` directory keeps its history.
 
-`Manager.UpdateFolders` replaces a workspace's folder set without touching `ID` or `DataKey`, so its task store, agent-session transcripts, planning state, and whiteboard stay attached. When the workspace is active, the live snapshot's paths are refreshed in place without reopening the store.
+`Manager.UpdateFolders` re-points a workspace to one folder without touching `ID` or `DataKey`, so its task store, agent-session transcripts and planning state stay attached, and clears `Dormant`. When the workspace is active, the live snapshot's path is refreshed in place without reopening the store.
+
+### Records saved with several folders
+
+Earlier versions allowed several folders per workspace. `LoadGroups` loads such a record with its `ID`, `Name`, `DataKey` and every folder intact and sets `Dormant`, so no folder is picked on the owner's behalf; the next write of `workspaces.json` persists the mark. Its history stays under `data/<DataKey>/`, unopened:
+
+- `startupWorkspaces` never restores a dormant record, even the most recently used one; startup falls through to the next valid workspace or to the empty state.
+- `Manager.SwitchByID` refuses a record with several folders (`ErrSeveralFolders`), so `POST /api/workspaces/{id}/activate` answers 400.
+- `Manager.UpdateFolders(id, [one])` re-points it, clears `Dormant`, and the next activation opens the store under the kept `DataKey`, so its tasks reappear.
+
+`NewManager` logs one warning at startup with the count of such records (`CountSeveralFolders`). The legacy migration (`MigrateToWorkspaces`) treats a legacy group with several folders the same way: it keeps the path-seeded `DataKey` of its existing data directory and writes it dormant.
 
 ### Persistence and migration
 
@@ -43,7 +52,7 @@ Workspace records are persisted in `~/.wallfacer/workspaces.json` as a JSON arra
 
 `MigrateToWorkspaces` (`internal/workspace/migrate.go`) performs the one-time migration from the legacy path-keyed model. It is idempotent: once `workspaces.json` exists it is a no-op. Live groups become workspaces with `DataKey = WorkspaceDataKey(folders)`, the very hash that already names their data directory, so no data moves. Each `data/<hash>/` directory that holds task history but matches no live group is adopted as a **dormant** workspace (folders best-effort recovered from contained `task.json` worktree paths), so stranded history stays reachable until the owner re-points it.
 
-On startup, `Manager.startupWorkspaces()` restores the most-recent workspace whose folder paths still validate, skipping stale records with a warning; if none are valid it starts with no active workspace so the picker opens instead of crashing.
+On startup, `startupWorkspaces()` restores the most recently used non-dormant workspace whose folder still validates, skipping stale records with a warning; if none are valid it starts with no active workspace so the picker opens instead of crashing. `workspaces.json` is the only record of the active workspace across restarts; nothing is mirrored into the env file.
 
 ### Workspace Scoping
 
@@ -51,21 +60,20 @@ The store is scoped by `DataKey`. Each workspace gets its own data directory at 
 
 ### Activation and hot-swap
 
-The SPA manages workspaces through the CRUD endpoints (`GET/POST /api/workspaces`, `PUT/DELETE /api/workspaces/{id}`) and switches boards via `POST /api/workspaces/{id}/activate`. Activation resolves the record by ID (`Manager.SwitchByID`) and runs `Manager.activate(ws)`, which opens or reuses the store keyed by `ws.DataKey` (not by the folder paths). `Manager.Switch(paths)` remains for path-based switches (startup, `WALLFACER_WORKSPACES`); it resolves or transitionally creates the workspace record backing those folders before delegating to the same activation path:
+The SPA manages workspaces through the CRUD endpoints (`GET/POST /api/workspaces`, `PUT/DELETE /api/workspaces/{id}`) and switches boards via `POST /api/workspaces/{id}/activate`. Activation resolves the record by ID (`Manager.SwitchByID`) and runs `Manager.activate(ws)`, which opens or reuses the store keyed by `ws.DataKey` (not by the folder paths). `Manager.Switch(paths)` remains for path-based switches (startup restore); it resolves or transitionally creates the workspace record backing that folder before delegating to the same activation path:
 
 ```mermaid
 flowchart TD
-    Validate["Validate & normalize paths<br/>(absolute, clean, exist, deduplicated, sorted)"] --> Same{"Same set as<br/>current?"}
+    Validate["Validate & normalize the path<br/>(absolute, clean, exists, at most one folder)"] --> Same{"Same folder as<br/>current?"}
     Same -->|yes| NoOp["Return current snapshot"]
     Same -->|no| Resolve["Resolve or create the Workspace record<br/>(stable ID + DataKey; workspaces.json, MRU)"]
     Resolve --> OpenStore["Open or reuse scoped store<br/>(data/&lt;DataKey&gt;/)"]
-    OpenStore --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
-    Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
+    OpenStore --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
     Swap --> Publish["Notify subscribers via channels"]
     Publish --> Close["Close previous store<br/>(unless it still has active tasks)"]
 ```
 
-All external side effects (store creation, workspace record upsert, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate. Deleting the active workspace returns 409.
+The workspace record and the store are resolved before the atomic swap, so a failure leaves the manager unchanged. Deleting the active workspace is allowed: the board switches to the next usable workspace, or to the empty state.
 
 #### Multi-store lifecycle
 
@@ -84,7 +92,7 @@ After a successful swap:
 
 Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateOversight()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
 
-Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner, autoimplement watchers) to react to workspace switches.
+Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams and the runner) to react to workspace switches.
 
 ## Repository Instructions
 
@@ -166,10 +174,10 @@ The `Config` struct covers all known keys. Key categories:
 | **Claude model** | `BaseURL`, `DefaultModel` |
 | **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel` |
 | **Cursor/OpenCode** | `CursorAPIKey` (`CURSOR_API_KEY`), `OpenCodeServerPassword` (`OPENCODE_SERVER_PASSWORD`) |
-| **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
+| **Parallelism** | `MaxParallelTasks` |
 | **Harness routing** | `DefaultSandbox`, `ImplementationSandbox`, `OversightSandbox`, `CommitMessageSandbox` (all typed `harness.ID`) |
 | **Host backend** | `HostClaudeBinary`, `HostCodexBinary`, `HostCursorBinary`, `HostOpenCodeBinary`, `HostPiBinary` (`WALLFACER_HOST_{CLAUDE,CODEX,CURSOR,OPENCODE,PI}_BINARY`), optional explicit CLI paths; empty resolves via `$PATH` |
-| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold`, `AgentSessionWindowDays` (`WALLFACER_AGENT_SESSION_WINDOW_DAYS`, deprecated alias `WALLFACER_PLANNING_WINDOW_DAYS`), `TerminalEnabled` (`WALLFACER_TERMINAL_ENABLED`, default `true`) |
+| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage` |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 
 ### Atomic Updates
@@ -190,74 +198,35 @@ This design means that `PUT /api/env` can safely omit token fields, they are pre
 
 The env file is re-read on every agent process launch (`r.modelFromEnvForSandbox`, etc.), so changes made via the UI take effect immediately for new tasks without a server restart. Already-running tasks are unaffected, they received their environment when the process was spawned.
 
-The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps long-idle scheduled tasks from dying with an opaque `--env-file ... no such file` launch error (a failure mode inherited from the container-era backend). The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. The host backend is independently resilient, `HostBackend.buildChildEnv` merely warns and continues when the env file cannot be read.
+An agent process gets the server's own environment with the env file's values merged in, but none of Wallfacer's `WALLFACER_*` settings from either source: they configure the server, and `WALLFACER_SERVER_API_KEY` among them unlocks its API. The runner passes the variables an agent needs, such as `WALLFACER_AGENT` and `WALLFACER_BOARD_JSON`, explicitly (`HostBackend.buildChildEnv`).
 
-Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env file changes. They read configuration values from in-memory state on the `Handler` or `Runner` structs, which are populated from the env file at startup. Some values (like `MaxParallelTasks`) are re-read from the env file whenever they are needed by the promoter logic.
+The path handed to `--env-file` is resolved per-launch by `Runner.resolveEnvFile()`. When the configured env file (which may be overridden via `ENV_FILE` / `--env-file` to a transient location, e.g. a `mktemp` path under `/var/folders` that macOS's tmp-reaper purges after a few idle days) is missing at launch time, it falls back to the canonical default `~/.wallfacer/.env`. This keeps a task started after a long idle period from losing its credentials. The fallback only redirects to a known-good default; an unrelated missing path is passed through unchanged so the backend still surfaces its own diagnostic. When the resolved env file still cannot be read, `HostBackend.buildChildEnv` returns the error and the launch fails.
+
+Nothing subscribes to env file changes. `MaxParallelTasks` is read once into a cache on the `Handler` (`cachedMaxParallel`) and reloaded after `PUT /api/env` invalidates it, so a limit changed in Settings applies to the next start, while a hand edit of the file applies after a restart.
 
 ## System Prompt Templates
 
-### Embedded Templates
+Prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`) and rendered as shipped. Each template has a rendering function that executes it against its data type:
 
-Prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`):
-
-| Embedded file | API name | Used for |
+| Embedded file | Function | Used for |
 |---|---|---|
-| `commit.tmpl` | `commit_message` | Generating commit messages during the commit pipeline |
-| `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
-| `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
-| `task_prompt_refine.tmpl` | `task_prompt_refine` | Task prompt refinement in Plan mode |
-| `spec.tmpl` | `spec` | Spec authoring |
-| `spec_system_empty.tmpl` | `spec_system_empty` | Plan session system prompt, empty spec tree |
-| `spec_system_nonempty.tmpl` | `spec_system_nonempty` | Plan session system prompt, existing spec tree |
+| `commit.tmpl` | `CommitMessage` | Generating commit messages during the commit pipeline |
+| `oversight.tmpl` | `Oversight` | Oversight summarization of task activity |
+| `conflict.tmpl` | `ConflictResolution` | Rebase conflict resolution agent |
+| `task_prompt_refine.tmpl` | `TaskPromptRefine` | Task prompt refinement in Plan mode |
+| `spec.tmpl` | `Spec` | Spec authoring |
+| `spec_system_empty.tmpl` | `SpecSystemEmpty` | Plan session system prompt, empty spec tree |
+| `spec_system_nonempty.tmpl` | `SpecSystemNonempty` | Plan session system prompt, existing spec tree |
 
-### Override Storage
-
-User overrides are stored at `~/.wallfacer/prompts/<apiName>.tmpl`. The `Manager` checks this directory on every render call, no caching, so edits take effect immediately.
-
-### Render Pipeline
-
-```mermaid
-flowchart TD
-    Render["Manager.render(embeddedName, data)"] --> CheckDir{"userDir set?"}
-    CheckDir -->|no| Embedded["Execute embedded template"]
-    CheckDir -->|yes| ReadOverride["os.ReadFile(userDir/&lt;apiName&gt;.tmpl)"]
-    ReadOverride --> Found{"File exists?"}
-    Found -->|no| Embedded
-    Found -->|yes| ParseOverride["template.New().Funcs(funcMap).Parse(content)"]
-    ParseOverride --> ExecOverride["Execute override template with data"]
-    ExecOverride --> ExecOK{"Execution<br/>succeeded?"}
-    ExecOK -->|yes| Return["Return override result"]
-    ExecOK -->|no| LogWarn["Log warning"]
-    LogWarn --> Embedded
-    Embedded --> Return2["Return embedded result"]
-```
-
-Key design: a broken override never crashes the server. Parse or execution errors are logged as warnings and the embedded default is used instead.
+The templates and their data types ship together, so a template that fails to execute is a defect in the build: the rendering function panics rather than handing an agent a partial prompt.
 
 ### Template Function Map
 
-All templates (embedded and override) share a single `FuncMap`:
+All templates share a single `FuncMap`:
 
 - `add(a, b int) int`, integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
 - `mul(a, b float64) float64`, floating-point multiplication.
 - `sub(a, b float64) float64`, floating-point subtraction.
-
-### Validation
-
-`Manager.Validate(apiName, content)` performs a two-phase check:
-1. **Parse**: verifies template syntax.
-2. **Dry-run execute**: runs the template against a mock context struct (`mockContextFor()`) specific to each API name. This catches field-access errors (e.g., referencing `.NonExistentField`) at write time rather than at runtime.
-
-`PUT /api/system-prompts/{name}` calls `Validate` before writing the override file.
-
-### API Endpoints
-
-| Method | Path | Behavior |
-|---|---|---|
-| `GET /api/system-prompts` | Lists all nine templates with their content and override status |
-| `GET /api/system-prompts/{name}` | Returns a single template by API name |
-| `PUT /api/system-prompts/{name}` | Validates and writes override to `~/.wallfacer/prompts/<name>.tmpl` |
-| `DELETE /api/system-prompts/{name}` | Deletes the override file, restoring the embedded default |
 
 ## See Also
 

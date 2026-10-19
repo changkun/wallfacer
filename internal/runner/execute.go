@@ -52,39 +52,6 @@ func classifyFailure(err error, isError bool, result string) store.FailureCatego
 	return store.FailureCategoryUnknown
 }
 
-// tryAutoRetry checks whether the task should be automatically retried given
-// the failure category. It returns true and resets the task to backlog when:
-//   - the per-category budget is > 0, AND
-//   - the total auto-retry count is < constants.MaxAutoRetries.
-//
-// The caller must set statusSet=true before calling and return immediately
-// when tryAutoRetry returns true, so the deferred guard does not overwrite
-// the backlog status.
-func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category store.FailureCategory) bool {
-	t, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
-	if err != nil {
-		return false
-	}
-	if !store.IsAutoRetryEligible(*t, category) {
-		return false
-	}
-	if err := r.taskStore(taskID).IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
-		logger.Runner.Warn("tryAutoRetry: IncrementAutoRetryCount failed", "task", taskID, "category", category, "error", err)
-		return false
-	}
-	// Re-read to get the updated count for the event message.
-	if updated, err := r.taskStore(taskID).GetTask(bgCtx, taskID); err == nil {
-		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-
-			"message": fmt.Sprintf("auto-retry %d/%d after %s",
-				updated.AutoRetryCount, constants.MaxAutoRetries, category),
-		})
-	}
-	_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
-
-	return true
-}
-
 // Run is the main task execution loop. It sets up worktrees, runs the agent
 // in a container, handles auto-continue turns, and transitions the task to the
 // appropriate terminal state (done/waiting/failed).
@@ -111,9 +78,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			category := store.FailureCategoryUnknown
 			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -145,6 +109,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// existed may still name one in FlowID; the field is not read for
 	// dispatch, and the task's timeline says once that the fleet is gone.
 	r.noteRemovedFleet(bgCtx, task)
+	r.noteSeveralWorktrees(bgCtx, task)
 
 	// Extract per-task model override (empty string means use global default).
 	modelOverride := task.EffectiveModel()
@@ -229,11 +194,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Each container invocation's values represent only that invocation's
 	// consumption, so we accumulate them directly without delta subtraction.
 
-	// Prepare board context and sibling mounts in a single fused call.
-	var siblingMounts map[string]map[string]string
+	// Prepare board context.
 	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: "board_context"})
 
-	boardJSON, siblingMounts, boardErr := r.generateBoardContextAndMounts(taskID, task.MountWorktrees)
+	boardJSON, boardErr := r.generateBoardContext(taskID)
 	if boardErr != nil {
 		logger.Runner.Warn("board context failed", "task", taskID, "error", boardErr)
 	}
@@ -257,15 +221,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		turns++
 		logger.Runner.Info("turn", "task", taskID, "turn", turns, "session", sessionID, "timeout", timeout)
 
-		// Refresh board.json and sibling mounts before each turn so they reflect latest state.
+		// Refresh board.json before each turn so it reflects the latest state.
 		if boardDir != "" {
 			boardRefreshLabel := fmt.Sprintf("board_context_%d", turns)
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 
-			if data, mounts, err := r.generateBoardContextAndMounts(taskID, task.MountWorktrees); err == nil {
+			if data, err := r.generateBoardContext(taskID); err == nil {
 				_ = os.WriteFile(filepath.Join(boardDir, "board.json"), data, 0644)
-
-				siblingMounts = mounts
 			}
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 
@@ -274,7 +236,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		turnLabel := fmt.Sprintf("implementation_%d", turns)
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
-		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, modelOverride, activityImplementation)
+		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, modelOverride, activityImplementation)
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
 		if saveErr := r.taskStore(taskID).SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
@@ -330,9 +292,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 
 			statusSet = true
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -443,9 +402,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
 			statusSet = true
-			if r.tryAutoRetry(bgCtx, taskID, category) {
-				return
-			}
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -461,8 +417,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		switch output.StopReason {
 		case "end_turn":
 			statusSet = true
-			// Move to waiting for human review. Auto-submit (if enabled)
-			// will pick up the task and run the commit pipeline.
+			// Move to waiting for human review; Done runs the commit pipeline.
 			r.GenerateOversightBackground(taskID)
 			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
@@ -478,9 +433,6 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			return
 
 		case "max_tokens", "pause_turn":
-			if output.StopReason == "max_tokens" {
-				r.notifyStopReason(taskID, output.StopReason)
-			}
 			logger.Runner.Info("auto-continuing", "task", taskID, "stop_reason", output.StopReason)
 			prompt = ""
 			continue

@@ -17,26 +17,15 @@ import (
 	"latere.ai/x/wallfacer/internal/logger"
 )
 
-// defaultAutoRetryBudget defines the per-category retry allowances granted to
-// every newly created task. ResetTaskForRetry uses this same map so that a
-// manual retry after a budget-exhausted auto-retry cycle restores the full
-// budget, allowing the auto-retrier to act again on the next failure.
-var defaultAutoRetryBudget = map[FailureCategory]int{
-	FailureCategoryContainerCrash: 2,
-	FailureCategorySyncError:      2,
-	FailureCategoryWorktree:       1,
-}
-
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
 	// Title is the task's display title. When blank after trimming, the
 	// title is derived from Prompt by DeriveTitle.
-	Title          string
-	Prompt         string
-	Criteria       string
-	Timeout        int
-	MountWorktrees bool
-	Kind           TaskKind
+	Title    string
+	Prompt   string
+	Criteria string
+	Timeout  int
+	Kind     TaskKind
 	// FlowID sets Task.FlowID, a record field the runner does not read for
 	// dispatch (see Task.FlowID). No handler sets it; it lets a caller build
 	// a record that carries the field, as a stored task may.
@@ -46,14 +35,13 @@ type TaskCreateOptions struct {
 	SandboxByActivity map[SandboxActivity]harness.ID
 	MaxCostUSD        float64
 	MaxInputTokens    int
-	ScheduledAt       *time.Time
 	SpecSourcePath    string
 	ModelOverride     string
 }
 
 // CreateTaskWithOptions creates a new backlog task in a single atomic write.
 // All fields in opts are normalized (sandbox maps, budget clamps) and persisted
-// together, so no watcher or SSE subscriber can observe a partially-initialized
+// together, so no SSE subscriber can observe a partially-initialized
 // task.  notify is called exactly once.
 func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions) (*Task, error) {
 	// Build the task struct from opts outside the lock.  Position is the only
@@ -65,27 +53,19 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	now := time.Now()
 
 	task := &Task{
-		SchemaVersion:  constants.CurrentTaskSchemaVersion,
-		ID:             id,
-		Title:          strings.TrimSpace(opts.Title),
-		Prompt:         opts.Prompt,
-		Criteria:       opts.Criteria,
-		Status:         TaskStatusBacklog,
-		Turns:          0,
-		Timeout:        clampTimeout(opts.Timeout),
-		MountWorktrees: opts.MountWorktrees,
-		Kind:           opts.Kind,
-		FlowID:         opts.FlowID,
+		SchemaVersion: constants.CurrentTaskSchemaVersion,
+		ID:            id,
+		Title:         strings.TrimSpace(opts.Title),
+		Prompt:        opts.Prompt,
+		Criteria:      opts.Criteria,
+		Status:        TaskStatusBacklog,
+		Turns:         0,
+		Timeout:       clampTimeout(opts.Timeout),
+		Kind:          opts.Kind,
+		FlowID:        opts.FlowID,
 		// Position is set under the lock after scanning existing backlog tasks.
 		CreatedAt: now,
 		UpdatedAt: now,
-		// AutoRetryBudget provides per-category retry allowances for transient
-		// failures. Budget is only granted for categories where retrying is safe.
-		AutoRetryBudget: map[FailureCategory]int{
-			FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
-			FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
-			FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
-		},
 	}
 
 	if task.Title == "" {
@@ -116,12 +96,6 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		task.MaxCostUSD = opts.MaxCostUSD
 	}
 	task.MaxInputTokens = max(opts.MaxInputTokens, 0)
-
-	// ScheduledAt: copy to avoid aliasing the caller's pointer.
-	if opts.ScheduledAt != nil {
-		ts := *opts.ScheduledAt
-		task.ScheduledAt = &ts
-	}
 
 	// ModelOverride: nil when empty so omitempty keeps JSON clean.
 	if model := strings.TrimSpace(opts.ModelOverride); model != "" {

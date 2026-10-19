@@ -12,19 +12,14 @@ import (
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/authkit/jwt"
-	"latere.ai/x/pkg/circuitbreaker"
-	"latere.ai/x/pkg/envutil"
-	"latere.ai/x/pkg/metrics"
 	"latere.ai/x/pkg/pubsub"
 	"latere.ai/x/pkg/syncmap"
 	"latere.ai/x/pkg/trackedwg"
 
 	"latere.ai/x/wallfacer/internal/agentsession"
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -56,23 +51,21 @@ type RunnerConfig struct {
 	// <configDir>/.env). It is used as a fallback when EnvFile is set to an
 	// override path that has gone missing at container-launch time — e.g. a
 	// mktemp path under /var/folders that macOS's tmp-reaper purges after a few
-	// idle days, which otherwise kills long-idle scheduled tasks with an opaque
-	// podman "--env-file ... no such file" exit 125. Empty disables the fallback.
+	// idle days, which otherwise leaves a task started after that window
+	// without its credentials. Empty disables the fallback.
 	DefaultEnvFile     string
 	Workspaces         []string // workspace directory paths
 	WorktreesDir       string
-	CodexAuthPath      string           // host path to codex auth cache directory (default: ~/.codex)
-	HostClaudeBinary   string           // optional override for the `claude` binary path
-	HostCodexBinary    string           // optional override for the `codex` binary path
-	HostCursorBinary   string           // optional override for the `cursor-agent` binary path
-	HostOpenCodeBinary string           // optional override for the `opencode` binary path
-	HostPiBinary       string           // optional override for the `pi` binary path
-	AgentNice          int              // niceness for agent processes (0 ⇒ default, negative disables)
-	MaxAgents          int              // global concurrent agent-process budget (0 ⇒ unlimited)
-	TmpDir             string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
-	Prompts            *prompts.Manager // prompt template manager; nil = use prompts.Default
+	CodexAuthPath      string // host path to codex auth cache directory (default: ~/.codex)
+	HostClaudeBinary   string // optional override for the `claude` binary path
+	HostCodexBinary    string // optional override for the `codex` binary path
+	HostCursorBinary   string // optional override for the `cursor-agent` binary path
+	HostOpenCodeBinary string // optional override for the `opencode` binary path
+	HostPiBinary       string // optional override for the `pi` binary path
+	AgentNice          int    // niceness for agent processes (0 ⇒ default, negative disables)
+	MaxAgents          int    // global concurrent agent-process budget (0 ⇒ unlimited)
+	TmpDir             string // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	WorkspaceManager   *workspace.Manager
-	Reg                *metrics.Registry // optional metrics registry; nil disables metric collection
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -89,30 +82,25 @@ type Runner struct {
 	tmpDir           string
 	workspaceManager *workspace.Manager
 	codexAuthPath    string
-	promptsMgr       *prompts.Manager                        // prompt template manager
 	worktreeMu       sync.Mutex                              // serializes all worktree filesystem operations on worktreesDir
 	repoMu           syncmap.Map[string, *sync.Mutex]        // per-repo mutex for serializing rebase+merge
 	taskProcesses    syncmap.Map[uuid.UUID, executor.Handle] // taskID → running agent process
 	liveLogs         syncmap.Map[uuid.UUID, *livelog.Log]    // live log buffers for in-progress turns
 	oversightMu      syncmap.Map[string, *sync.Mutex]        // per-task mutex for serializing oversight generation
-	containerCB      *circuitbreaker.Breaker                 // circuit breaker for container launch operations
 	backend          executor.Backend                        // pluggable sandbox backend (local podman/docker, host, future: k8s)
 	backgroundWg     trackedwg.WaitGroup                     // tracks fire-and-forget background goroutines
-	stopReasonMu     sync.RWMutex
-	onStopReason     func(taskID uuid.UUID, stopReason string)
-	agentSession     *agentsession.Runtime // agent session for chat; may be nil
+	agentSession     *agentsession.Runtime                   // agent session for chat; may be nil
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation. Keyed by
 	// (boardChangeSeq, selfTaskID): a cache hit means no store mutation
 	// occurred and the requesting task hasn't changed, so the serialized
-	// board.json and sibling mount map can be reused as-is.
+	// board.json can be reused as-is.
 	boardCache struct {
 		mu         sync.Mutex
-		seq        uint64                       // snapshot of boardChangeSeq at generation time
-		selfTaskID uuid.UUID                    // which task the cached result was built for
-		json       []byte                       // serialized board.json
-		mounts     map[string]map[string]string // shortID → (repoPath → worktreePath)
+		seq        uint64    // snapshot of boardChangeSeq at generation time
+		selfTaskID uuid.UUID // which task the cached result was built for
+		json       []byte    // serialized board.json
 	}
 	boardChangeSeq      atomic.Uint64  // incremented on every store notification
 	shutdownCh          chan struct{}  // closed by Shutdown to stop the subscription goroutine
@@ -120,7 +108,6 @@ type Runner struct {
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx         context.Context
 	shutdownCancel      context.CancelFunc
-	reg                 *metrics.Registry // optional; nil disables metric collection
 }
 
 // ShutdownCtx returns the runner's shutdown context. It is cancelled when
@@ -128,42 +115,6 @@ type Runner struct {
 // to be cancelled on graceful shutdown.
 func (r *Runner) ShutdownCtx() context.Context {
 	return r.shutdownCtx
-}
-
-// ContainerCircuitAllow returns true when the container circuit breaker
-// permits a new launch. Use this in handlers before promoting a task to
-// in-progress to avoid firing launches that would immediately fail.
-func (r *Runner) ContainerCircuitAllow() bool {
-	return r.containerCB.Allow()
-}
-
-// ContainerCircuitOpen reports whether the container launch circuit breaker
-// is currently open (runtime considered unavailable). It reads the breaker
-// state WITHOUT side effects — unlike ContainerCircuitAllow, it never consumes
-// the half-open probe or restarts the open window. Read-only callers such as
-// the Prometheus gauge (scraped on a fixed interval) must use this; calling the
-// mutating ContainerCircuitAllow on every scrape would steal the recovery probe
-// from a real launch and make the gauge flap.
-func (r *Runner) ContainerCircuitOpen() bool {
-	return r.containerCB.State() != circuitbreaker.Closed
-}
-
-// RecordContainerFailure records a single container launch failure against
-// the circuit breaker. Exposed primarily for testing.
-func (r *Runner) RecordContainerFailure() {
-	r.containerCB.RecordFailure()
-}
-
-// ContainerCircuitState returns the human-readable state of the container
-// circuit breaker ("closed", "open", or "half-open").
-func (r *Runner) ContainerCircuitState() string {
-	return r.containerCB.State().String()
-}
-
-// ContainerCircuitFailures returns the current consecutive failure count of
-// the container circuit breaker.
-func (r *Runner) ContainerCircuitFailures() int {
-	return r.containerCB.Failures()
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -180,25 +131,6 @@ func (r *Runner) PendingGoroutines() []string {
 	return r.backgroundWg.Pending()
 }
 
-// SetStopReasonHandler registers a callback that is notified when a non-terminal
-// stop_reason is encountered (for example max_tokens).
-func (r *Runner) SetStopReasonHandler(fn func(taskID uuid.UUID, stopReason string)) {
-	r.stopReasonMu.Lock()
-	r.onStopReason = fn
-	r.stopReasonMu.Unlock()
-}
-
-// notifyStopReason invokes the registered stop-reason callback (if any) under
-// a read lock. Used to inform handlers when max_tokens triggers auto-continue.
-func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
-	r.stopReasonMu.RLock()
-	fn := r.onStopReason
-	r.stopReasonMu.RUnlock()
-	if fn != nil {
-		fn(taskID, stopReason)
-	}
-}
-
 // SetAgentSession registers the agent session so that chat runs through
 // the long-lived agent-session worker container instead of ephemeral containers.
 func (r *Runner) SetAgentSession(p *agentsession.Runtime) {
@@ -207,8 +139,8 @@ func (r *Runner) SetAgentSession(p *agentsession.Runtime) {
 
 // Shutdown waits for all tracked background goroutines to complete before
 // returning. Call this after the HTTP server has stopped accepting new requests
-// to ensure that oversight generation, title generation, and other
-// fire-and-forget work finishes before the process exits.
+// to ensure that oversight generation and other fire-and-forget work
+// finishes before the process exits.
 // In-progress task containers are intentionally left running; they continue
 // to completion independently and will be recovered on the next server start.
 // must be called at most once.
@@ -241,7 +173,7 @@ func (r *Runner) Shutdown() {
 }
 
 // RunBackground launches Run in a background goroutine tracked by backgroundWg.
-// Callers (handlers, autoimplement) should use this instead of a bare "go r.Run(...)"
+// Callers should use this instead of a bare "go r.Run(...)"
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
@@ -298,14 +230,10 @@ func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
 }
 
 // NewRunner constructs a Runner from the given store and config. The returned
-// Runner is ready for use: it has an initialized circuit breaker, sandbox
-// backend, and a background goroutine watching for store mutations to
+// Runner is ready for use: it has a sandbox backend and a background
+// goroutine watching for store mutations to
 // invalidate the board context cache. Call Shutdown() to drain background work.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
-	mgr := cfg.Prompts
-	if mgr == nil {
-		mgr = prompts.Default
-	}
 	r := &Runner{
 		store:            s,
 		envFile:          cfg.EnvFile,
@@ -314,19 +242,11 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		worktreesDir:     cfg.WorktreesDir,
 		tmpDir:           cfg.TmpDir,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
-		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
 		shutdownCh:       make(chan struct{}),
 	}
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
 
-	// Initialize container circuit breaker.
-	// Defaults: 5 consecutive failures trip the breaker; it stays open for
-	// 30 s before allowing a single probe (half-open).
-	// Both values can be overridden via environment variables.
-	cbThreshold := envutil.IntMin("WALLFACER_CONTAINER_CB_THRESHOLD", constants.DefaultCBThreshold, 1)
-	cbOpenSec := envutil.IntMin("WALLFACER_CONTAINER_CB_OPEN_SECONDS", 30, 1)
-	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	// Best-effort construction: an unresolved agent binary yields a backend
 	// whose Launch returns a clear error, rather than crashing the process.
 	// The run command fails fast separately via executor.RequireClaude, so the
@@ -341,7 +261,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		MaxAgents:      cfg.MaxAgents,
 	})
 	r.backend = hb
-	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {
 		snap := r.workspaceManager.Snapshot()
@@ -482,11 +401,6 @@ func (r *Runner) WorktreesDir() string {
 // TmpDir returns the base directory for ephemeral files bind-mounted into containers.
 func (r *Runner) TmpDir() string {
 	return r.tmpDir
-}
-
-// Prompts returns the prompt template Manager used by this runner.
-func (r *Runner) Prompts() *prompts.Manager {
-	return r.promptsMgr
 }
 
 // SandboxBackend returns the sandbox backend used for container operations.

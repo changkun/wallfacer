@@ -10,11 +10,10 @@ import (
 )
 
 // insertEventOrLog calls InsertEvent and logs any error via the structured
-// logger and the autoimplement error counter. It is a convenience wrapper for
-// call sites that cannot meaningfully recover from an event-write failure (e.g.
-// the task was deleted between a status update and the subsequent event write,
-// or the underlying trace file hit a disk error). Using this helper prevents
-// silent state/event-log divergence while keeping autoimplement code paths clean.
+// logger. It is a convenience wrapper for call sites that cannot meaningfully
+// recover from an event-write failure (e.g. the task was deleted between a
+// status update and the subsequent event write, or the underlying trace file
+// hit a disk error).
 func (h *Handler) insertEventOrLog(ctx context.Context, taskID uuid.UUID, eventType store.EventType, data any) {
 	s, _ := h.currentStore()
 	h.insertEventOrLogTo(ctx, s, taskID, eventType, data)
@@ -29,12 +28,10 @@ func (h *Handler) insertEventOrLogTo(ctx context.Context, s *store.Store, taskID
 	if s == nil {
 		logger.Handler.Error("InsertEvent skipped: no store",
 			"task", taskID, "event_type", eventType)
-		h.incAutoimplementAction("event_write", "error")
 		return
 	}
 	if err := s.InsertEvent(ctx, taskID, eventType, data); err != nil {
 		logger.Handler.Error("InsertEvent failed",
 			"task", taskID, "event_type", eventType, "error", err)
-		h.incAutoimplementAction("event_write", "error")
 	}
 }

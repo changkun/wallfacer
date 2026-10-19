@@ -493,6 +493,50 @@ func TestBuildChildEnv_ParsesEnvFile(t *testing.T) {
 	}
 }
 
+// TestBuildChildEnv_LeavesOutServerSettings verifies that an agent inherits
+// no WALLFACER_* setting from the server's environment or the env file, the
+// server API key among them, while provider credentials and the variables the
+// runner passes through spec.Env reach it.
+func TestBuildChildEnv_LeavesOutServerSettings(t *testing.T) {
+	t.Setenv("WALLFACER_SERVER_API_KEY", "from-process")
+	t.Setenv("WALLFACER_PLAIN_SETTING", "from-process")
+	path := filepath.Join(t.TempDir(), ".env")
+	content := "" +
+		"WALLFACER_SERVER_API_KEY=from-file\n" +
+		"WALLFACER_HOST_CLAUDE_BINARY=/opt/claude\n" +
+		"ANTHROPIC_API_KEY=sk-test\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	b := &HostBackend{}
+	env, err := b.buildChildEnv(ContainerSpec{
+		EnvFile: path,
+		Env:     map[string]string{"WALLFACER_AGENT": "claude"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			got[k] = v
+		}
+	}
+
+	for _, k := range []string{"WALLFACER_SERVER_API_KEY", "WALLFACER_PLAIN_SETTING", "WALLFACER_HOST_CLAUDE_BINARY"} {
+		if v, ok := got[k]; ok {
+			t.Errorf("%s = %q reached the agent; want it left out", k, v)
+		}
+	}
+	if got["ANTHROPIC_API_KEY"] != "sk-test" {
+		t.Errorf("ANTHROPIC_API_KEY = %q; want the env file's value", got["ANTHROPIC_API_KEY"])
+	}
+	if got["WALLFACER_AGENT"] != "claude" {
+		t.Errorf("WALLFACER_AGENT = %q; want the spec's value", got["WALLFACER_AGENT"])
+	}
+}
+
 func TestSetEnv(t *testing.T) {
 	env := []string{"A=1", "B=2", "C=3"}
 	env = setEnv(env, "B", "two")

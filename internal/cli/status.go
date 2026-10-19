@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"latere.ai/x/pkg/otel"
 	"latere.ai/x/pkg/sanitize"
 )
 
@@ -106,8 +105,13 @@ func apiGet(addr, path, key string) (*http.Response, error) {
 	if key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
-	return otel.HTTPClient().Do(req)
+	return statusClient.Do(req)
 }
+
+// statusClient carries the status command's requests to the local server.
+// Wallfacer exports no traces, so the default transport is set explicitly
+// rather than a tracing one.
+var statusClient = &http.Client{Transport: http.DefaultTransport}
 
 // fetchTasks calls GET /api/tasks and returns the decoded slice.
 func fetchTasks(addr, key string) ([]taskSummary, error) {

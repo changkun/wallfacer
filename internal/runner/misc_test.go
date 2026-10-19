@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"latere.ai/x/pkg/circuitbreaker"
 	"latere.ai/x/pkg/cmdexec"
 	"latere.ai/x/pkg/gitutil"
 
@@ -468,7 +467,7 @@ func TestRunContainerSuccess(t *testing.T) {
 	cmd := fakeCmdScript(t, endTurnOutput, 0)
 	r := runnerWithCmd(t, cmd)
 
-	out, stdout, stderr, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	out, stdout, stderr, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -485,7 +484,7 @@ func TestRunContainerNonZeroExitWithValidOutput(t *testing.T) {
 	cmd := fakeCmdScript(t, endTurnOutput, 1)
 	r := runnerWithCmd(t, cmd)
 
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected no error for non-zero exit with valid output, got: %v", err)
 	}
@@ -500,7 +499,7 @@ func TestRunContainerEmptyOutputNonZeroExit(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for empty container output with non-zero exit")
 	}
@@ -512,7 +511,7 @@ func TestRunContainerEmptyOutputZeroExit(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 0)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for empty container output with exit 0")
 	}
@@ -528,7 +527,7 @@ func TestRunContainerWithSessionID(t *testing.T) {
 	r := runnerWithCmd(t, cmd)
 
 	// Should succeed; session ID is passed to args (verified via args tests).
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "sess-xyz", nil, "", nil, "", "")
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "sess-xyz", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -545,7 +544,7 @@ func TestRunContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 	cmd := fakeStatefulCmd(t, []string{tokenLimit, endTurnOutput})
 	r := runnerWithCmd(t, cmd)
 
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("expected fallback success, got error: %v", err)
 	}
@@ -569,7 +568,7 @@ func TestRunContainerRegistersHandleForKill(t *testing.T) {
 	taskID := uuid.New()
 	done := make(chan error, 1)
 	go func() {
-		_, _, _, err := r.runContainer(context.Background(), taskID, "prompt", "", nil, "", nil, "", "")
+		_, _, _, err := r.runContainer(context.Background(), taskID, "prompt", "", nil, "", "", "")
 		done <- err
 	}()
 
@@ -606,7 +605,7 @@ func TestRunContainerParseErrorExitZero(t *testing.T) {
 	cmd := fakeCmdScript(t, "this is not valid json output at all", 0)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for non-JSON output")
 	}
@@ -622,7 +621,7 @@ func TestRunContainerParseErrorWithExitCode(t *testing.T) {
 	cmd := fakeCmdScript(t, "not valid json", 1)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for invalid JSON with exit code 1")
 	}
@@ -641,7 +640,7 @@ func TestRunContainerContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	_, _, _, err := r.runContainer(ctx, uuid.New(), "prompt", "", nil, "", nil, "", "")
+	_, _, _, err := r.runContainer(ctx, uuid.New(), "prompt", "", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error when context is cancelled")
 	}
@@ -760,86 +759,30 @@ func TestRunnerPendingGoroutines(t *testing.T) {
 	}
 }
 
-// TestContainerCircuitBreaker verifies that the container circuit breaker
-// accessors work correctly: Allow/Open/State/Failures/RecordContainerFailure.
-func TestContainerCircuitBreaker(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-
-	// Initially circuit should be closed (Allow=true, Open=false).
-	if !r.ContainerCircuitAllow() {
-		t.Error("expected ContainerCircuitAllow=true initially")
-	}
-	if r.ContainerCircuitOpen() {
-		t.Error("expected ContainerCircuitOpen=false initially")
-	}
-	if r.ContainerCircuitFailures() != 0 {
-		t.Errorf("expected 0 failures initially, got %d", r.ContainerCircuitFailures())
-	}
-	if r.ContainerCircuitState() == "" {
-		t.Error("expected non-empty circuit state")
-	}
-
-	// Record a failure.
-	r.RecordContainerFailure()
-	if r.ContainerCircuitFailures() != 1 {
-		t.Errorf("expected 1 failure after RecordContainerFailure, got %d", r.ContainerCircuitFailures())
-	}
-}
-
-// TestContainerCircuitOpen_DoesNotConsumeProbe verifies that the read-only
-// ContainerCircuitOpen accessor (used by the Prometheus gauge on every scrape)
-// does not steal the half-open recovery probe. Before the fix it delegated to
-// the mutating Allow(), so a scrape on an elapsed-open breaker performed the
-// open->half-open transition itself, consuming the probe meant for a real
-// launch and making the gauge flap.
-func TestContainerCircuitOpen_DoesNotConsumeProbe(t *testing.T) {
-	_, r := setupTestRunner(t, nil)
-	// Trip the breaker after one failure with a short open window so a probe
-	// becomes available quickly.
-	r.containerCB = circuitbreaker.New(1, 10*time.Millisecond)
-	r.RecordContainerFailure()
-
-	// Wait past the open window so the half-open probe is available.
-	time.Sleep(25 * time.Millisecond)
-
-	// Repeated metrics scrapes must keep reading "open" and must NOT consume
-	// the probe.
-	for i := range 5 {
-		if !r.ContainerCircuitOpen() {
-			t.Fatalf("scrape %d: expected circuit to read open", i)
-		}
-	}
-
-	// The real launch decision must still get the half-open probe.
-	if !r.ContainerCircuitAllow() {
-		t.Fatal("recovery probe was stolen by read-only scrapes; real launch blocked")
-	}
-}
-
 // ---------------------------------------------------------------------------
-// sandboxForTask / modelFromEnvForSandbox
+// sandboxForTaskActivity / modelFromEnvForSandbox
 // ---------------------------------------------------------------------------
 
 // TestSandboxForTask_NilTask_DefaultsToDefaultHarness verifies that
-// sandboxForTask with a nil task falls back to the configured default harness.
+// sandboxForTaskActivity with a nil task falls back to the configured default harness.
 // Pinning the assertion to harness.Default() (not a literal "claude") keeps the
 // decoupling contract: when the native default changes, the resolver follows.
 func TestSandboxForTask_NilTask_DefaultsToDefaultHarness(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
-	result := r.sandboxForTask(nil)
+	result := r.sandboxForTaskActivity(nil, activityImplementation)
 	if result != harness.Default() {
-		t.Errorf("sandboxForTask(nil) = %q, want %q", result, harness.Default())
+		t.Errorf("sandboxForTaskActivity(nil) = %q, want %q", result, harness.Default())
 	}
 }
 
-// TestSandboxForTask_TaskWithSandbox verifies that sandboxForTask returns the
+// TestSandboxForTask_TaskWithSandbox verifies that sandboxForTaskActivity returns the
 // sandbox set on the task.
 func TestSandboxForTask_TaskWithSandbox(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	task := &store.Task{Sandbox: "codex"}
-	result := r.sandboxForTask(task)
+	result := r.sandboxForTaskActivity(task, activityImplementation)
 	if result != "codex" {
-		t.Errorf("sandboxForTask(task{Sandbox:codex}) = %q, want %q", result, "codex")
+		t.Errorf("sandboxForTaskActivity(task{Sandbox:codex}) = %q, want %q", result, "codex")
 	}
 }
 
@@ -850,9 +793,9 @@ func TestSandboxForTask_TaskWithSandbox(t *testing.T) {
 func TestSandboxForTask_EmptyTask_DefaultsToDefaultHarness(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	task := &store.Task{}
-	result := r.sandboxForTask(task)
+	result := r.sandboxForTaskActivity(task, activityImplementation)
 	if result != harness.Default() {
-		t.Errorf("sandboxForTask(empty task) = %q, want %q", result, harness.Default())
+		t.Errorf("sandboxForTaskActivity(empty task) = %q, want %q", result, harness.Default())
 	}
 }
 

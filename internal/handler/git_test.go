@@ -115,7 +115,7 @@ func newTestHandler(t *testing.T) *Handler {
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 
-	return NewHandler(s, r, t.TempDir(), nil, nil)
+	return NewHandler(s, r, t.TempDir(), nil)
 }
 
 func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
@@ -145,7 +145,7 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 
-	return NewHandler(s, r, t.TempDir(), workspaces, nil)
+	return NewHandler(s, r, t.TempDir(), workspaces)
 
 }
 

@@ -60,7 +60,7 @@ Some packages skip silently when their dependency is absent, so a green
 | Tests | Skipped unless | Effect |
 |---|---|---|
 | Harness integration tests in `internal/harness` and `internal/executor` | `cursor-agent`, `opencode`, or `pi` is on `PATH` (and authenticated) | Real subprocess launches for those harnesses are not covered |
-| `make e2e-lifecycle`, `make ui-test` | Run explicitly; they are not part of `make check` | End-to-end task execution and browser invariants are not covered |
+| `make ui-test` | Run explicitly; it is not part of `make check` | Browser invariants are not covered |
 
 ## Make Targets
 
@@ -76,7 +76,6 @@ Some packages skip silently when their dependency is absent, so a green
 | `make test-all` | Everything CI runs: `check`, the frontend suite and typecheck, the skills mirror, the truncation guardrail |
 | `make frontend-build` | Build the Vue SPA into `frontend/dist/` for embedding |
 | `make api-contract` | Regenerate API route artifacts from `internal/apicontract/routes.go` |
-| `make e2e-lifecycle` | E2E task-lifecycle test (supports `SANDBOX=claude\|codex`) |
 | `make ui-test` | Boot against seeded demo data and assert UI invariants in a real browser (`SKIP_BUILD=1` reuses `./wallfacer`) |
 | `make hooks` | Install the git hooks via `core.hooksPath`; the pre-commit runs `lateregate hook` (gofmt and the modernizers over the staged files) |
 
@@ -140,4 +139,4 @@ stamping the version for `wallfacer doctor` and usage output.
 **Release notes.** The release body is the tag's section of `CHANGELOG.md`,
 read by `go tool lateregate release-notes`. A tag without a section fails the
 workflow before anything is published, and the pre-push hook refuses it.
-Notes written before this rule stay under `docs/releases/` as history.
+Releases before that rule have their notes on GitHub.

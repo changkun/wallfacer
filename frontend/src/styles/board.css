@@ -1,43 +1,7 @@
-/* Automation button: an accent dot marks that at least one watcher is armed. */
-.automation-btn {
-  position: relative;
-}
-.automation-btn--on::after {
-  content: "";
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 2px var(--bg);
-}
-
-/* The automation menu anchors under its topbar button. */
-.automation-menu {
-  position: fixed;
-  min-width: 240px;
-  max-width: 320px;
-  padding: 10px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-lg);
-  background: var(--bg-card);
-  box-shadow: var(--sh-pop);
-  z-index: 30;
-}
-.automation-menu__header {
-  font: 600 var(--fs-9) / 1 var(--font-mono);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--ink-3);
-  padding: 0 4px 8px;
-}
-
 /* --- Columns ---
    Four equal columns; each header is an eyebrow with the column's state dot,
    its count, and quiet controls. The column body is a soft tray on the sunk
-   surface; cards float on it. See specs/shared/console-redesign/board.md. */
+   surface; cards float on it. See specs/.archive/shared/console-redesign/board.md. */
 .board-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

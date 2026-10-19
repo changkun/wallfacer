@@ -22,7 +22,6 @@ const mentions = useMentions({ setValue: (v) => { prompt.value = v; }, priorityP
 const submitting = ref(false);
 const expanded = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const modKey = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
 // Advanced fields.
 // Tag chips: committed tags + a pending draft. comma/Enter commit the draft;
@@ -63,7 +62,7 @@ const timeoutMin = computed<number | null>(() => {
   return Number(timeoutPreset.value);
 });
 
-const promptPlaceholder = `Describe the task… (Markdown, @ to mention files, ${modKey}↵ to save)`;
+const promptPlaceholder = 'Describe the task… (Markdown, @ to mention files)';
 // Optional overrides (behind a "More" toggle).
 const showMore = ref(false);
 const model = ref('');
@@ -164,7 +163,7 @@ async function submit() {
     maxCostUsd.value = null;
     maxInputTokens.value = null;
     sandbox.value = '';
-      expanded.value = false;
+    expanded.value = false;
   } catch (e) {
     console.error('create task:', e);
     // Re-persist the draft so a failed create doesn't lose the user's text.

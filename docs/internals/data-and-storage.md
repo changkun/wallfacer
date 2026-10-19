@@ -6,7 +6,7 @@ The store implementation lives in `internal/store/`.
 
 ## Directory Layout
 
-Task data is scoped by workspace. Each workspace record in `~/.wallfacer/workspaces.json` carries a stable `DataKey` (a 16-hex-character storage handle, decoupled from the folder set), and the data root is `~/.wallfacer/data/<data-key>/`. Workspaces migrated from the legacy `workspace-groups.json` keep the SHA-256 path-set hash that already named their directory as their initial `DataKey`; workspaces created explicitly get a random key. Editing a workspace's folders does not change its `DataKey`, so task history stays attached. See [Workspaces & Configuration](workspaces-and-config.md).
+Task data is scoped by workspace. Each workspace record in `~/.wallfacer/workspaces.json` carries a stable `DataKey` (a 16-hex-character storage handle, decoupled from the folder), and the data root is `~/.wallfacer/data/<data-key>/`. Workspaces migrated from the legacy `workspace-groups.json` keep the SHA-256 path-set hash that already named their directory as their initial `DataKey`; workspaces created explicitly get a random key. Re-pointing a workspace to another folder does not change its `DataKey`, so task history stays attached. See [Workspaces & Configuration](workspaces-and-config.md).
 
 Within the scoped data directory, each task gets its own UUID-named directory:
 
@@ -58,7 +58,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `CreatedAt` | `time.Time` | `created_at` | Task creation timestamp |
 | `StartedAt` | `*time.Time` | `started_at` | First transition to `in_progress` |
 | `UpdatedAt` | `time.Time` | `updated_at` | Last mutation timestamp |
-| `ScheduledAt` | `*time.Time` | `scheduled_at` | Optional future time before auto-promotion |
 
 `TaskStatus` values: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
 
@@ -93,8 +92,6 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `MaxCostUSD` | `float64` | `max_cost_usd` | Cost ceiling (0 = unlimited) |
 | `MaxInputTokens` | `int` | `max_input_tokens` | Input token ceiling (0 = unlimited) |
 | `FailureCategory` | `FailureCategory` | `failure_category` | Root cause of last failure |
-| `AutoRetryBudget` | `map[FailureCategory]int` | `auto_retry_budget` | Per-category retry allowances |
-| `AutoRetryCount` | `int` | `auto_retry_count` | Total auto-retries consumed (capped at 3) |
 | `RetryHistory` | `[]RetryRecord` | `retry_history` | Past execution snapshots (pruned to last 10) |
 
 ### Usage
@@ -109,13 +106,12 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 
 | Field | Type | JSON Key | Description |
 |---|---|---|---|
-| `WorktreePaths` | `map[string]string` | `worktree_paths` | Host repo path to worktree path |
+| `WorktreePaths` | `map[string]string` | `worktree_paths` | Host repo path to worktree path. One entry for a new task; a task stored when a workspace could span several folders has one per folder |
 | `BranchName` | `string` | `branch_name` | Task branch (`task/<uuid8>`) |
 | `CommitHashes` | `map[string]string` | `commit_hashes` | Post-merge commit hash per repo |
 | `BaseCommitHashes` | `map[string]string` | `base_commit_hashes` | Default branch HEAD before merge |
 | `SnapshotDiffs` | `map[string]string` | `snapshot_diffs` | Pre-computed diffs for non-git workspaces (repoPath → diff text) |
 | `CommitMessage` | `string` | `commit_message` | Generated commit message from commit pipeline |
-| `MountWorktrees` | `bool` | `mount_worktrees` | Legacy flag retained for back-compat; execution is host-process with the worktree as CWD |
 
 ## Supporting Data Models
 
@@ -314,7 +310,6 @@ Identifies which phase of a task a host-process run belongs to. It drives **usag
 | `SandboxActivityRefinement` | `"refinement"` | Prompt refinement (routing + attribution) |
 | `SandboxActivityOversight` | `"oversight"` | Oversight generation (routing + attribution) |
 | `SandboxActivityCommitMessage` | `"commit_message"` | Commit message generation (routing + attribution) |
-
 
 ### FailureCategory
 
@@ -557,16 +552,14 @@ Turn output files are also subject to a per-turn size budget (`WALLFACER_MAX_TUR
 
 The store uses a forward-only migration system in `internal/store/migrate.go`. Every `task.json` is passed through `migrateTaskJSON()` on load, which applies migration steps in order:
 
-1. Default missing values: `Status` to `"backlog"`, `Timeout` to `60`, `CreatedAt`/`UpdatedAt` from file mod time.
-2. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
-3. Backfill `AutoRetryBudget` for tasks created before schema version 2.
+1. Move the deprecated `Model` field to `ModelOverride` when `ModelOverride` is unset, then clear `Model`.
+2. Default missing values: `Status` to `"backlog"`, `Timeout` to `60`, `CreatedAt`/`UpdatedAt` from file mod time.
+3. Normalize `Sandbox` and `SandboxByActivity` via validation helpers.
 4. Stamp `SchemaVersion = constants.CurrentTaskSchemaVersion`.
 
 Keys a stored record carries that `Task` does not declare, such as an older record's `depends_on`, `title_generating`, `is_test_run`, `last_test_result` or `custom_pass_patterns`, are dropped on load and disappear on the record's next save. A `sandbox_by_activity` entry for an activity that no longer routes (`testing`, `title`) is dropped by the same normalization.
 
-If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `2`) and is incremented whenever a new migration step is added.
-
-Migration also handles the deprecated `Model` field by moving its value to `ModelOverride`.
+If any migration step modifies the task, the migrated version is persisted back to disk so future loads skip migration. The `CurrentTaskSchemaVersion` constant lives in `internal/constants` (currently `3`) and is incremented whenever a new migration step is added.
 
 ## Spec Document Model
 

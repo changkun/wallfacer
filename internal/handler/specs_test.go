@@ -600,7 +600,7 @@ func newHandlerForFolders(t *testing.T, folders ...string) *Handler {
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, Workspaces: folders})
 	t.Cleanup(r.WaitBackground)
-	return NewHandler(s, r, configDir, folders, nil)
+	return NewHandler(s, r, configDir, folders)
 }
 
 // TestGetSpecTree_GroupsByFolder is the per-folder navigation guard: two

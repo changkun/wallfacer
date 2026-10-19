@@ -2,7 +2,7 @@
    The console rail sits on the deep ground with no border; the main card
    beside it carries the depth. Rows are the nav-row primitive (34px, radius
    12): the current destination is the one sheet of paper in the rail, the
-   same material the content is. See specs/shared/console-redesign/shell.md. */
+   same material the content is. See specs/.archive/shared/console-redesign/shell.md. */
 .app-rail {
   position: relative;
   z-index: 30;
@@ -65,7 +65,6 @@
 }
 .app-rail--fold .rail-name,
 .app-rail--fold .rail-search-label,
-.app-rail--fold .rail-search-hint,
 .app-rail--fold .rail-eyebrow,
 .app-rail--fold .nav-label,
 .app-rail--fold .nav-count,
@@ -184,28 +183,6 @@
 .nav-btn.active .nav-ico {
   background: var(--accent-soft);
   color: var(--accent);
-}
-/* A toggle (the terminal) that is open: the glyph takes the accent and a dot
-   marks the state, but the row stays quiet so only the current page reads as
-   the highlighted entry. */
-.nav-btn.on .nav-ico {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.nav-btn.on::after {
-  content: "";
-  margin-left: auto;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex: none;
-}
-.app-rail--fold .nav-btn.on::after {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  margin: 0;
 }
 .nav-label {
   flex: 1;
@@ -574,8 +551,7 @@
   }
   .app-rail--fold .rail-name,
   .app-rail--fold .rail-search-label,
-  .app-rail--fold .rail-search-hint,
-  .app-rail--fold .rail-eyebrow,
+    .app-rail--fold .rail-eyebrow,
   .app-rail--fold .nav-label,
   .app-rail--fold .nav-count,
   .app-rail--fold .rail-presence {

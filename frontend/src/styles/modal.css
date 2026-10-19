@@ -4,7 +4,7 @@
    centered dialog (.dialog) at 440 or 720 wide, and the task sheet, the wide
    dialog variant with a header row, an underline tab strip, a scrolling main
    column and a 340px aside of cards. See
-   specs/shared/console-redesign/panels-and-overlays.md and task-detail.md. */
+   specs/.archive/shared/console-redesign/panels-and-overlays.md and task-detail.md. */
 .modal-overlay {
   background: var(--glass-dim);
   animation: om-fade-in 0.16s var(--ease-fluid) both;
@@ -202,7 +202,6 @@
 .sheet[data-main-tab="spec"] [data-main-tab-section]:not([data-main-tab-section~="spec"]),
 .sheet[data-main-tab="activity"] [data-main-tab-section]:not([data-main-tab-section~="activity"]),
 .sheet[data-main-tab="changes"] [data-main-tab-section]:not([data-main-tab-section~="changes"]),
-.sheet[data-main-tab="verification"] [data-main-tab-section]:not([data-main-tab-section~="verification"]),
 .sheet[data-main-tab="timeline"] [data-main-tab-section]:not([data-main-tab-section~="timeline"]),
 .sheet[data-main-tab="events"] [data-main-tab-section]:not([data-main-tab-section~="events"]) {
   display: none !important;

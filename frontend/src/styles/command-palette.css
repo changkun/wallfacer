@@ -2,7 +2,7 @@
    A popover pinned near the top of the viewport: a borderless search field in
    the head, grouped rows below, the selected row on the sunk surface, task
    actions as small ghost buttons under their task. The palette never blurs.
-   See specs/shared/console-redesign/panels-and-overlays.md. */
+   See specs/.archive/shared/console-redesign/panels-and-overlays.md. */
 .command-palette {
   position: fixed;
   inset: 0;
@@ -122,8 +122,7 @@
   color: var(--accent);
   background: var(--accent-soft);
 }
-.command-palette-task-snippet,
-.command-palette-doc-snippet {
+.command-palette-task-snippet {
   font-size: 12px;
   line-height: 1.45;
   color: var(--ink-3);
@@ -143,21 +142,6 @@
   padding: 10px 10px 12px;
   font-size: 12px;
   color: var(--ink-4);
-}
-.command-palette-foot {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--rule);
-  font-size: var(--fs-10);
-  color: var(--ink-4);
-  flex: none;
-}
-.command-palette-foot span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 
 @media (max-width: 900px) {

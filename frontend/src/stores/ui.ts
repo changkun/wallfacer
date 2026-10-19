@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, shallowRef, type Component } from 'vue';
-import { useDockStore } from './dock';
+import { ref, shallowRef, type Component } from 'vue';
 
 const SHOW_ARCHIVED_KEY = 'wallfacer-show-archived';
 
@@ -18,13 +17,8 @@ export const useUiStore = defineStore('ui', () => {
   // Edit. A single app-level modal reads this so any surface can raise it.
   const editWorkspaceId = ref<string | null>(null);
   const showPalette = ref(false);
-  const showSystemPrompts = ref(false);
-  // Terminal visibility now lives in the dock store (the terminal is a dockable
-  // panel). These delegate so existing callers keep working unchanged.
-  const showTerminal = computed(() => useDockStore().terminalOpen);
   const showExplorer = ref(false);
   const showTrash = ref(false);
-  const showShortcuts = ref(false);
   const showArchived = ref(readShowArchived());
 
   // True while a workspace switch is in flight. AppLayout renders a full-UI
@@ -82,19 +76,14 @@ export const useUiStore = defineStore('ui', () => {
   function closeWorkspaceEdit() { editWorkspaceId.value = null; }
   const paletteSeed = ref('');
   function openPaletteWith(seed: string) { paletteSeed.value = seed; showPalette.value = true; }
-  function openTerminal() { useDockStore().openTerminal(); }
-  function closeTerminal() { useDockStore().closeTerminal(); }
-  function toggleTerminal() { useDockStore().toggleTerminal(); }
   function openExplorer() { showExplorer.value = true; }
   function closeExplorer() { showExplorer.value = false; }
   function toggleExplorer() { showExplorer.value = !showExplorer.value; }
   function openTrash() { showTrash.value = true; }
-  function openShortcuts() { showShortcuts.value = true; }
 
   return {
     showWorkspaces, editWorkspaceId, showPalette,
-    showSystemPrompts, showTerminal,
-    showExplorer, showTrash, showShortcuts, showArchived, setShowArchived,
+    showExplorer, showTrash, showArchived, setShowArchived,
     switchingWorkspace,
     crumbLeaf, setCrumbLeaf, clearCrumbLeaf,
     topbarActions, setTopbarActions, clearTopbarActions,
@@ -104,9 +93,7 @@ export const useUiStore = defineStore('ui', () => {
     openWorkspaces,
     openWorkspaceEdit, closeWorkspaceEdit,
     openPaletteWith,
-    openTerminal, closeTerminal, toggleTerminal,
     openExplorer, closeExplorer, toggleExplorer,
     openTrash,
-    openShortcuts,
   };
 });

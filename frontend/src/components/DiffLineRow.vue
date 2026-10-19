@@ -90,7 +90,7 @@ function cancel() {
     v-model="draft"
     class="dc-editor-input"
     rows="2"
-    placeholder="Leave a comment on this line… (⌘/Ctrl+Enter to save)"
+    placeholder="Leave a comment on this line…"
     @keydown.meta.enter="save"
     @keydown.ctrl.enter="save"
     @keydown.esc="cancel"

@@ -24,7 +24,7 @@ Data models (Task, TaskEvent, TaskUsage, TaskSummary), per-task directory persis
 
 [Task Lifecycle](task-lifecycle.md)
 
-The task state machine, turn loop, auto-retry, failure categorization, and board context manifests.
+The task state machine, turn loop, failure categorization, and board context manifests.
 
 ### 4. Git Operations & Worktree Lifecycle
 
@@ -36,13 +36,13 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 [API & Transport](api-and-transport.md)
 
-Full HTTP route reference, SSE streaming, WebSocket terminal, Prometheus metrics, and middleware. Covers task, git, config, agent session, spec tree, explorer, image, and OAuth endpoints.
+Full HTTP route reference, SSE streaming, and middleware. Covers task, git, config, agent session, spec tree, explorer, and image endpoints.
 
-### 6. Automation
+### 6. Background Work and Recovery
 
-[Automation](automation.md)
+[Background Work and Recovery](background-work.md)
 
-Background watchers, the autoimplement promotion loop, auto-review, auto-submit, auto-retry, circuit breakers, and startup sequence.
+The goroutine model, the startup recovery pass, worktree maintenance goroutines, oversight generation, and how records from removed features load.
 
 ### 7. Plan Mode
 

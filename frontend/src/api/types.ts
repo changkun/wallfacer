@@ -1,41 +1,5 @@
 export type TaskStatus = 'backlog' | 'in_progress' | 'waiting' | 'committing' | 'done' | 'failed' | 'cancelled';
 
-// --- Unified spec+task graph (GET /api/graph) ---
-// Mirrors internal/graph.Graph. The Map renders and drives this.
-
-export type GraphNodeKind = 'spec' | 'task';
-export type GraphEdgeKind = 'containment' | 'dispatch' | 'spec_dep';
-export type GraphAction =
-  | 'dispatch'
-  | 'undispatch'
-  | 'validate'
-  | 'force-complete'
-  | 'unstale'
-  | 'unarchive'
-  | 'start';
-
-export interface GraphNode {
-  id: string; // "spec:<path>" or "task:<uuid>"
-  kind: GraphNodeKind;
-  label: string;
-  status: string; // spec lifecycle or task status
-  ref: string; // spec path or task id, for deep-jumps + actions
-  depth: number;
-  available_actions?: GraphAction[];
-}
-
-export interface GraphEdge {
-  from: string;
-  to: string;
-  kind: GraphEdgeKind;
-}
-
-export interface Graph {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  critical_path: string[];
-}
-
 export interface TaskUsage {
   input_tokens: number;
   output_tokens: number;
@@ -74,81 +38,11 @@ export interface Task {
   // Budget guardrails — 0 / missing means unlimited.
   max_cost_usd?: number;
   max_input_tokens?: number;
-  scheduled_at?: string | null;
   prompt_history?: string[];
   retry_history?: RetryRecord[];
   parent_task_id?: string | null;
   spec_source_path?: string;
   environment?: ExecutionEnvironment | null;
-  // Review verdict: open findings when the last review session ended (0 =
-  // approved). Absent = no review has finished since the task's last turn.
-  review_unresolved?: number;
-  review_headline?: string;
-}
-
-// Review transcript (GET /api/tasks/{id}/review/transcript): the task's newest
-// review session, round by round.
-export interface ReviewFinding {
-  severity: 'high' | 'medium' | 'low' | string;
-  claim: string;
-  location?: string;
-}
-export interface ReviewerAnswer {
-  verdict: 'approve' | 'changes_requested' | string;
-  findings: ReviewFinding[];
-  summary?: string;
-  model?: string;
-  harness?: string;
-  tokens?: number;
-  ts: string;
-}
-export interface ReviewFailedAttempt {
-  code: string;
-  message: string;
-  // The reviewer's output when it answered in a form that could not be read.
-  raw?: string;
-  ts: string;
-}
-export interface ReviewRound {
-  round: number;
-  reviewer?: ReviewerAnswer;
-  failed_attempts?: ReviewFailedAttempt[];
-  // The message the findings were sent to the task in.
-  feedback?: string;
-  // The task's reply after the turn the feedback started.
-  reply?: string;
-}
-export interface ReviewRunConfig {
-  max_rounds: number;
-  cost_cap: number;
-  // Empty when WALLFACER_REVIEW_MODEL is not set.
-  reviewer_model: string;
-}
-export interface ReviewSkip {
-  code: string;
-  message: string;
-  detail?: string;
-}
-export interface ReviewOutcome {
-  termination: 'approved' | 'max_rounds' | 'cost_cap' | 'skipped' | 'superseded' | 'unreadable' | string;
-  rounds: number;
-  unresolved: number;
-  headline?: string;
-  tokens: number;
-  usd: number;
-  skip?: ReviewSkip;
-}
-export interface ReviewTranscript {
-  session_id: string;
-  running: boolean;
-  // Recorded by an earlier version of the review; its rounds are not shown.
-  legacy?: boolean;
-  config?: ReviewRunConfig;
-  outcome?: ReviewOutcome;
-  rounds: ReviewRound[];
-  // Set when the server could not read the transcript to its end; rounds then
-  // holds only the rounds before that point.
-  truncated?: boolean;
 }
 
 // Runtime environment captured at the start of a task run (reproducibility
@@ -172,18 +66,18 @@ export interface RetryRecord {
 }
 
 // --- Workspace registry (GET/POST/PUT/DELETE /api/workspaces) ---
-// A workspace is a first-class object with a stable id, owned by a user/org,
-// holding a mutable set of folder paths. Identity is decoupled from membership:
-// editing folders never loses history. `dormant` marks a workspace recovered
-// from history whose folders may need re-pointing; `active` marks the one whose
-// board is currently shown.
+// A workspace is a first-class object with a stable id and one folder.
+// Identity is decoupled from the folder: re-pointing never loses history.
+// `folders` holds that one folder; `dormant` marks a workspace whose folder is
+// still to be chosen, holding none (recovered history) or several (saved before
+// a workspace became one folder). `active` marks the one whose board is shown.
 export interface Workspace {
   id: string;
   name: string;
   folders: string[];
   dormant: boolean;
   active: boolean;
-  // Per-workspace parallelism override. null/absent means "use the global
+  // Per-workspace parallel task limit. null/absent means "use the global
   // default". Surfaced as the registry editor's Max parallel input.
   max_parallel?: number | null;
 }
@@ -206,18 +100,11 @@ export interface ServerConfig {
   workspace_id?: string;
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
-  prompts_dir?: string;
-  autoimplement: boolean;
-  autosubmit: boolean;
-  autosync: boolean;
-  autopush: boolean;
   max_parallel: number;
   sandboxes: string[];
   // Per-harness usability: id -> installed & activated. Absent = treat as usable.
   sandbox_usable?: Record<string, boolean>;
   default_sandbox: string;
-  terminal_enabled: boolean;
-  ideation_categories?: string[];
   active_groups?: { key: string; in_progress: number; waiting: number }[];
 }
 
@@ -236,14 +123,8 @@ export interface EnvConfig {
   max_parallel_tasks: number;
   max_agents: number;
   agent_nice: number;
-  review_rounds: number;
-  review_cost_cap: number;
-  // The reviewer's model (WALLFACER_REVIEW_MODEL); empty when unset.
-  review_model: string;
   oversight_interval: number;
   archived_tasks_per_page: number;
-  auto_push_enabled: boolean;
-  auto_push_threshold: number;
 }
 
 export interface EnvUpdatePayload {
@@ -261,19 +142,8 @@ export interface EnvUpdatePayload {
   max_parallel_tasks?: number;
   max_agents?: number;
   agent_nice?: number;
-  review_rounds?: number;
-  review_cost_cap?: number;
-  review_model?: string;
   oversight_interval?: number;
   archived_tasks_per_page?: number;
-  auto_push_enabled?: boolean;
-  auto_push_threshold?: number;
-}
-
-export interface SystemPromptTemplate {
-  name: string;
-  has_override: boolean;
-  content: string;
 }
 
 export interface SandboxTestResponse {
@@ -283,7 +153,6 @@ export interface SandboxTestResponse {
   passed: boolean;
   result?: string;
   stop_reason?: string;
-  reauth_available?: boolean;
 }
 
 export interface TaskCommit {

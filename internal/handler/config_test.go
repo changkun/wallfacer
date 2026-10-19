@@ -93,7 +93,7 @@ func newTestHandlerWithWorkspaces(t *testing.T) (*Handler, string) {
 		Workspaces: []string{ws},
 	})
 	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, configDir, []string{ws}, nil)
+	h := NewHandler(s, r, configDir, []string{ws})
 	return h, ws
 }
 
@@ -307,38 +307,6 @@ func TestUpdateWorkspaces_RoundTripsToConfig(t *testing.T) {
 	}
 }
 
-// configActiveWorkspaces GETs /api/config as ctx and returns the reported
-// active workspace folders.
-func configActiveWorkspaces(t *testing.T, ctx context.Context, h *Handler) []string { //nolint:revive // testing.T conventionally precedes context in test helpers
-	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil).WithContext(ctx)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode /api/config: %v", err)
-	}
-	raw, _ := resp["workspaces"].([]any)
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		out = append(out, v.(string))
-	}
-	return out
-}
-
-func TestGetConfig_AutoimplementFalseByDefault(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-	if autoimplement, ok := resp["autoimplement"].(bool); !ok || autoimplement {
-		t.Errorf("expected autoimplement=false by default, got %v", resp["autoimplement"])
-	}
-}
-
 func TestGetConfig_OmitsRetiredIdeationSchedulerFields(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
@@ -351,25 +319,6 @@ func TestGetConfig_OmitsRetiredIdeationSchedulerFields(t *testing.T) {
 	for _, key := range []string{"ideation", "ideation_running", "ideation_interval", "ideation_next_run"} {
 		if _, ok := resp[key]; ok {
 			t.Fatalf("config response included retired key %q", key)
-		}
-	}
-}
-
-func TestUpdateConfig_AcceptsRetiredIdeationSchedulerFields(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	body := strings.NewReader(`{"ideation": true, "ideation_interval": 15}`)
-	req := httptest.NewRequest(http.MethodPut, "/api/config", body)
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-	for _, key := range []string{"ideation", "ideation_running", "ideation_interval", "ideation_next_run"} {
-		if _, ok := resp[key]; ok {
-			t.Fatalf("update response included retired key %q", key)
 		}
 	}
 }
@@ -671,67 +620,6 @@ func TestUpdateConfig_InvalidJSON(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestUpdateConfig_EnableAutoimplement(t *testing.T) {
-	h := newTestHandler(t)
-	if h.AutoimplementEnabled() {
-		t.Fatal("autoimplement should be off initially")
-	}
-
-	body := `{"autoimplement": true}`
-	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-
-	if enabled, ok := resp["autoimplement"].(bool); !ok || !enabled {
-		t.Errorf("expected autoimplement=true in response, got %v", resp["autoimplement"])
-	}
-	if !h.AutoimplementEnabled() {
-		t.Error("expected autoimplement to be enabled after update")
-	}
-}
-
-func TestUpdateConfig_DisableAutoimplement(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-
-	body := `{"autoimplement": false}`
-	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if h.AutoimplementEnabled() {
-		t.Error("expected autoimplement to be disabled")
-	}
-}
-
-func TestUpdateConfig_NoFieldChangesNothing(t *testing.T) {
-	h := newTestHandler(t)
-	h.SetAutoimplement(true)
-
-	// Empty body — should not change autoimplement.
-	body := `{}`
-	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if !h.AutoimplementEnabled() {
-		t.Error("expected autoimplement to remain enabled when not specified in request")
 	}
 }
 
@@ -1155,7 +1043,7 @@ func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, 
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{Workspaces: []string{repo}})
 	t.Cleanup(r.WaitBackground)
-	return NewHandler(s, r, configDir, []string{repo}, nil), repo
+	return NewHandler(s, r, configDir, []string{repo}), repo
 }
 
 // --- UpdateWorkspaces ---
@@ -1185,7 +1073,7 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	}
 
 	ws := t.TempDir()
-	wsMgr, err := workspace.NewManager(configDir, dataDir, envFile, []string{ws})
+	wsMgr, err := workspace.NewManager(configDir, dataDir, []string{ws})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -1197,7 +1085,7 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 
-	h := NewHandler(s, r, configDir, []string{ws}, nil)
+	h := NewHandler(s, r, configDir, []string{ws})
 	return h, wsMgr, ws
 }
 
@@ -1357,123 +1245,6 @@ func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
 	}
 }
 
-// TestForCurrentStore_ScopesToViewedGroup verifies that automation actions
-// (auto-promote, auto-retry, auto-test, auto-submit, auto-sync)
-// see only the currently viewed workspace group's store, even when other
-// groups have active stores holding backlog tasks. Pinned against regressing
-// to the global behavior where automation fanned out across every active
-// group.
-func TestForCurrentStore_ScopesToViewedGroup(t *testing.T) {
-	h, wsMgr, _ := newTestHandlerWithRealWorkspaceManager(t)
-	ctx := context.Background()
-
-	// Create a backlog task in the initial group (A).
-	sA, ok := h.currentStore()
-	if !ok || sA == nil {
-		t.Fatal("expected initial store")
-	}
-	taskA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task in group A", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask A: %v", err)
-	}
-	// Keep the store alive across the switch by pinning an in-progress task.
-	if err := sA.UpdateTaskStatus(ctx, taskA.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus A: %v", err)
-	}
-
-	// Switch to a second workspace group (B).
-	newWS := t.TempDir()
-	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
-	w := httptest.NewRecorder()
-	switchWorkspacesViaConfig(h, w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("switch group: expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Wait for the subscription goroutine to propagate the snapshot.
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if s, _ := h.currentStore(); s != nil && s != sA {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	sB, ok := h.currentStore()
-	if !ok || sB == nil || sB == sA {
-		t.Fatalf("expected new store for group B; got sA=%p sB=%p", sA, sB)
-	}
-	if _, err := sB.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task in group B", Timeout: 15}); err != nil {
-		t.Fatalf("CreateTask B: %v", err)
-	}
-
-	// Workspace A stays active while it has an in-progress task pinning it.
-	if snaps := wsMgr.AllActiveSnapshots(); len(snaps) < 2 {
-		t.Fatalf("both groups should stay active while A has in-progress work; saw %d", len(snaps))
-	}
-
-	// forCurrentStore must visit only the viewed group (B). Workspace A, though
-	// still active, is out of scope for automation.
-	var seenByCurrent []*store.Store
-	h.forCurrentStore(func(s *store.Store, _ []string) {
-		seenByCurrent = append(seenByCurrent, s)
-	})
-	if len(seenByCurrent) != 1 {
-		t.Fatalf("forCurrentStore should visit exactly 1 store (the viewed group); got %d", len(seenByCurrent))
-	}
-	if seenByCurrent[0] != sB {
-		t.Errorf("forCurrentStore should visit group B's store; got a different store")
-	}
-	if seenByCurrent[0] == sA {
-		t.Error("forCurrentStore leaked group A's store into scope")
-	}
-}
-
-// TestCountInProgress_ScopedToViewedGroup pins that parallel budgets
-// (WALLFACER_MAX_PARALLEL / WALLFACER_MAX_TEST_PARALLEL) are per-group:
-// tasks in-flight in other groups do not consume the viewed group's
-// concurrency budget.
-func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
-	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
-	ctx := context.Background()
-
-	sA, _ := h.currentStore()
-	// Create one in-progress task in A.
-	tA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular A", Timeout: 15})
-	if err != nil {
-		t.Fatalf("CreateTask regular A: %v", err)
-	}
-	if err := sA.UpdateTaskStatus(ctx, tA.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatalf("UpdateTaskStatus regular A: %v", err)
-	}
-
-	// Sanity: viewed group is A; counts reflect A.
-	if got := h.countGlobalInProgress(); got != 1 {
-		t.Fatalf("viewing A: countGlobalInProgress = %d, want 1", got)
-	}
-
-	// Switch to group B (A stays active via its in-progress tasks).
-	newWS := t.TempDir()
-	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
-	w := httptest.NewRecorder()
-	switchWorkspacesViaConfig(h, w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("switch group: %d: %s", w.Code, w.Body.String())
-	}
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if s, _ := h.currentStore(); s != nil && s != sA {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-
-	// Workspace B is empty; its concurrency budget must be fresh (0), even
-	// though group A still has a task running.
-	if got := h.countGlobalInProgress(); got != 0 {
-		t.Errorf("viewing empty B: countGlobalInProgress = %d, want 0 (A's in-flight must not consume B's budget)", got)
-	}
-}
-
 // TestMaxConcurrentTasks_PerGroupOverride pins that setting a per-group
 // limit via workspace_groups in PUT /api/config overrides
 // WALLFACER_MAX_PARALLEL only for the viewed group, and that a stored
@@ -1534,90 +1305,12 @@ func TestMaxConcurrentTasks_PerGroupOverride(t *testing.T) {
 	}
 }
 
-// TestAutomationToggles_ScopedPerWorkspaceGroup pins that automation
-// toggles (autoimplement, autotest, etc.) are stored per workspace group:
-// toggling autoimplement on in group A and switching to group B (which has
-// never been toggled) must leave autoimplement off in B. Switching back to
-// A must restore it. Autopush stays global and is deliberately excluded.
-func TestAutomationToggles_ScopedPerWorkspaceGroup(t *testing.T) {
-	h, wsMgr, wsA := newTestHandlerWithRealWorkspaceManager(t)
-
-	// Enable autoimplement and autosubmit in group A via the HTTP handler so
-	// the persistence side-effect matches production.
-	pilot := true
-	tst := true
-	b, _ := json.Marshal(struct {
-		Autoimplement *bool `json:"autoimplement"`
-		Autosubmit    *bool `json:"autosubmit"`
-	}{&pilot, &tst})
-	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(string(b)))
-	w := httptest.NewRecorder()
-	h.UpdateConfig(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("enable in A: %d: %s", w.Code, w.Body.String())
-	}
-	if !h.AutoimplementEnabled() || !h.AutosubmitEnabled() {
-		t.Fatalf("toggles should be on in A")
-	}
-
-	// Switch to a fresh group B.
-	wsB := t.TempDir()
-	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, wsB))
-	w = httptest.NewRecorder()
-	switchWorkspacesViaConfig(h, w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("switch to B: %d: %s", w.Code, w.Body.String())
-	}
-	// Poll until the subscription goroutine has applied the B snapshot
-	// and cleared the toggles. The HTTP PUT completes before
-	// applySnapshot runs on the manager's subscription goroutine.
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if !h.AutoimplementEnabled() && !h.AutosubmitEnabled() {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-
-	// Workspace B has never seen a toggle before — every automation must be
-	// off regardless of what A had on.
-	if h.AutoimplementEnabled() {
-		t.Errorf("autoimplement leaked into fresh group B")
-	}
-	if h.AutosubmitEnabled() {
-		t.Errorf("autosubmit leaked into fresh group B")
-	}
-
-	// Switch back to A and the toggles must return to their saved state.
-	req = httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, wsA))
-	w = httptest.NewRecorder()
-	switchWorkspacesViaConfig(h, w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("switch back to A: %d: %s", w.Code, w.Body.String())
-	}
-	// Poll until the subscription goroutine has reapplied the A snapshot
-	// and the toggles have been restored — the workspace update returns
-	// before applySnapshot runs on the subscription goroutine.
-	deadline = time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if h.AutoimplementEnabled() && h.AutosubmitEnabled() {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if !h.AutoimplementEnabled() || !h.AutosubmitEnabled() {
-		t.Errorf("toggles should be restored in A after round-trip (autoimplement=%v autosubmit=%v)",
-			h.AutoimplementEnabled(), h.AutosubmitEnabled())
-	}
-	_ = wsMgr
-}
-
 // --- strict JSON decoding ---
 
 // TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.
 func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	body := `{"autoimplement": true, "unknown_field": "surprise"}`
+	body := `{"workspace_groups": [], "unknown_field": "surprise"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -1631,7 +1324,7 @@ func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
 // the JSON object returns 400.
 func TestUpdateConfig_RejectsTrailingContent(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
-	body := `{"autoimplement": true} trailing`
+	body := `{"workspace_groups": []} trailing`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -1890,141 +1583,48 @@ func TestActiveGroupInfosNilManager(t *testing.T) {
 	}
 }
 
-func TestGetConfig_IncludesTerminalEnabled(t *testing.T) {
-	h, _ := newTestHandlerWithWorkspaces(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
+// TestCountInProgress_ScopedToViewedGroup pins that the parallel budget
+// (WALLFACER_MAX_PARALLEL) is per-group:
+// tasks in-flight in other groups do not consume the viewed group's
+// concurrency budget.
+func TestCountInProgress_ScopedToViewedGroup(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+	ctx := context.Background()
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	te, ok := resp["terminal_enabled"]
-	if !ok {
-		t.Fatal("terminal_enabled key missing from config response")
-	}
-	if te.(bool) != true {
-		t.Errorf("terminal_enabled = %v; want true by default", te)
-	}
-}
-
-func TestConfigResponse_IncludesAgentSessionWindowDays(t *testing.T) {
-	ws := t.TempDir()
-	configDir := t.TempDir()
-
-	s, err := storetest.NewFileStore(t, t.TempDir())
+	sA, _ := h.currentStore()
+	// Create one in-progress task in A.
+	tA, err := sA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular A", Timeout: 15})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("CreateTask regular A: %v", err)
+	}
+	if err := sA.UpdateTaskStatus(ctx, tA.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus regular A: %v", err)
 	}
 
-	// Seed the env file with an explicit override so we can verify that
-	// /api/config surfaces the parsed value (not just the default).
-	envPath := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envPath, []byte("WALLFACER_PLANNING_WINDOW_DAYS=14\n"), 0600); err != nil {
-		t.Fatalf("write env: %v", err)
+	// Sanity: viewed group is A; counts reflect A.
+	if got := h.countGlobalInProgress(); got != 1 {
+		t.Fatalf("viewing A: countGlobalInProgress = %d, want 1", got)
 	}
 
-	r := runner.NewRunner(s, runner.RunnerConfig{
-		EnvFile:    envPath,
-		Workspaces: []string{ws},
-	})
-	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, configDir, []string{ws}, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	// Switch to group B (A stays active via its in-progress tasks).
+	newWS := t.TempDir()
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", workspacesBody(t, newWS))
 	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-
+	switchWorkspacesViaConfig(h, w, req)
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+		t.Fatalf("switch group: %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-
-	got, ok := resp["agent_session_window_days"]
-	if !ok {
-		t.Fatal("agent_session_window_days missing from config response")
-	}
-	// JSON numbers decode into float64 when the target is map[string]any.
-	if n, _ := got.(float64); int(n) != 14 {
-		t.Errorf("agent_session_window_days = %v, want 14", got)
-	}
-}
-
-func TestConfigResponse_AgentSessionWindowDaysDefault(t *testing.T) {
-	// With no env file configured (h.envFile == ""), the handler must still
-	// return a sensible default so the UI always has a value to start with.
-	h, _ := newTestHandlerWithWorkspacesFromRepo(t, t.TempDir())
-
-	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-	w := httptest.NewRecorder()
-	h.GetConfig(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
-	}
-	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	got, ok := resp["agent_session_window_days"]
-	if !ok {
-		t.Fatal("agent_session_window_days missing from config response")
-	}
-	if n, _ := got.(float64); int(n) != 30 {
-		t.Errorf("agent_session_window_days = %v, want 30 (default)", got)
-	}
-}
-
-// TestApplyBoolToggle verifies the toggle helper: it invokes onEnable with the
-// caller-supplied (detached) context when the feature becomes enabled, forwards
-// that context unchanged, skips onEnable when disabled, and is a no-op for a nil
-// request value. The detached context must outlive the request, so a context
-// the caller later cancels (as the HTTP server cancels r.Context()) must not be
-// what onEnable receives.
-func TestApplyBoolToggle(t *testing.T) {
-	t.Run("enabled forwards detached context", func(t *testing.T) {
-		enable := true
-		got := make(chan context.Context, 1)
-		applyBoolToggle(context.Background(), &enable,
-			func(bool) {}, func() bool { return true },
-			func(c context.Context) { got <- c })
-		select {
-		case c := <-got:
-			if c.Err() != nil {
-				t.Fatalf("onEnable received a cancelled context: %v", c.Err())
-			}
-		case <-time.After(2 * time.Second):
-			t.Fatal("onEnable was not invoked when enabled")
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if s, _ := h.currentStore(); s != nil && s != sA {
+			break
 		}
-	})
+		time.Sleep(5 * time.Millisecond)
+	}
 
-	t.Run("disabled does not invoke onEnable", func(t *testing.T) {
-		enable := false
-		called := make(chan struct{}, 1)
-		applyBoolToggle(context.Background(), &enable,
-			func(bool) {}, func() bool { return false },
-			func(context.Context) { called <- struct{}{} })
-		select {
-		case <-called:
-			t.Fatal("onEnable was invoked while disabled")
-		case <-time.After(200 * time.Millisecond):
-		}
-	})
-
-	t.Run("nil request value is a no-op", func(t *testing.T) {
-		setCalled := false
-		applyBoolToggle(context.Background(), nil,
-			func(bool) { setCalled = true }, func() bool { return true },
-			func(context.Context) { t.Fatal("onEnable invoked for nil reqVal") })
-		if setCalled {
-			t.Fatal("set invoked for nil reqVal")
-		}
-	})
+	// Workspace B is empty; its concurrency budget must be fresh (0), even
+	// though group A still has tasks running.
+	if got := h.countGlobalInProgress(); got != 0 {
+		t.Errorf("viewing empty B: countGlobalInProgress = %d, want 0 (A's in-flight must not consume B's budget)", got)
+	}
 }

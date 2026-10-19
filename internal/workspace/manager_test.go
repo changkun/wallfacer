@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -20,7 +19,7 @@ import (
 // survive; an unserialized LoadGroups->SaveGroups cycle would lose all but the
 // last writer.
 func TestManager_ConcurrentCreate_NoLostRecords(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	const n = 20
 	dirs := make([]string, n)
 	for i := range n {
@@ -53,12 +52,8 @@ func TestManager_ConcurrentCreate_NoLostRecords(t *testing.T) {
 func TestNewManagerWithoutWorkspacesCreatesScopedStore(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := t.TempDir() + "/.env"
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
-	m, err := NewManager(configDir, dataDir, envFile, nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -81,27 +76,25 @@ func TestNewManagerWithoutWorkspacesCreatesScopedStore(t *testing.T) {
 func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
 	wsA := t.TempDir()
 	wsB := t.TempDir()
+	// Most-recently-used first.
 	if err := SaveGroups(configDir, []Workspace{
-		{Folders: []string{wsA, wsB}},
+		{Folders: []string{wsA}},
+		{Folders: []string{wsB}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
 	}
 
-	m, err := NewManager(configDir, dataDir, envFile, nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
 
 	snap := m.Snapshot()
-	if len(snap.Workspaces) != 2 || snap.Workspaces[0] != wsA || snap.Workspaces[1] != wsB {
-		t.Fatalf("expected saved workspace group to load, got %v", snap.Workspaces)
+	if len(snap.Workspaces) != 1 || snap.Workspaces[0] != wsA {
+		t.Fatalf("expected the most recent saved workspace to load, got %v", snap.Workspaces)
 	}
 	if snap.Store == nil {
 		t.Fatal("expected store for restored workspace group")
@@ -115,10 +108,6 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 func TestNewManagerSkipsStaleSavedGroupAtStartup(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
 	stale := filepath.Join(t.TempDir(), "deleted-workspace") // never created
 	valid := t.TempDir()
@@ -130,7 +119,7 @@ func TestNewManagerSkipsStaleSavedGroupAtStartup(t *testing.T) {
 		t.Fatalf("save workspace groups: %v", err)
 	}
 
-	m, err := NewManager(configDir, dataDir, envFile, nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager should tolerate a stale saved group, got: %v", err)
 	}
@@ -146,10 +135,6 @@ func TestNewManagerSkipsStaleSavedGroupAtStartup(t *testing.T) {
 func TestNewManagerAllSavedGroupsStaleStartsEmpty(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
 	if err := SaveGroups(configDir, []Workspace{
 		{Folders: []string{filepath.Join(t.TempDir(), "gone-a")}},
@@ -158,7 +143,7 @@ func TestNewManagerAllSavedGroupsStaleStartsEmpty(t *testing.T) {
 		t.Fatalf("save workspace groups: %v", err)
 	}
 
-	m, err := NewManager(configDir, dataDir, envFile, nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager should not fatal when all saved groups are stale, got: %v", err)
 	}
@@ -173,10 +158,6 @@ func TestNewManagerAllSavedGroupsStaleStartsEmpty(t *testing.T) {
 func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
 	ws := t.TempDir()
 	if err := SaveGroups(configDir, []Workspace{
@@ -185,7 +166,7 @@ func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T)
 		t.Fatalf("save workspace groups: %v", err)
 	}
 
-	m, err := NewManager(configDir, dataDir, envFile, []string{})
+	m, err := NewManager(configDir, dataDir, []string{})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -199,21 +180,17 @@ func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T)
 	}
 }
 
-// newTestManager is a helper that creates a Manager with a writable env file
-// and returns the manager plus the env file path.
-func newTestManager(t *testing.T) (*Manager, string) {
+// newTestManager is a helper that creates a Manager over empty config and
+// data directories.
+func newTestManager(t *testing.T) *Manager {
 	t.Helper()
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-	m, err := NewManager(configDir, dataDir, envFile, nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
-	return m, envFile
+	return m
 }
 
 // --- Switch tests ---
@@ -221,7 +198,7 @@ func newTestManager(t *testing.T) (*Manager, string) {
 // TestSwitch_ToValidWorkspace verifies that switching to a valid directory
 // creates a store and populates the snapshot.
 func TestSwitch_ToValidWorkspace(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	ws := t.TempDir()
 
 	snap, err := m.Switch([]string{ws})
@@ -239,7 +216,7 @@ func TestSwitch_ToValidWorkspace(t *testing.T) {
 // TestSwitch_ToEmptyWorkspaces verifies that switching to an empty set clears
 // workspaces while still maintaining a store.
 func TestSwitch_ToEmptyWorkspaces(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	ws := t.TempDir()
 	if _, err := m.Switch([]string{ws}); err != nil {
 		t.Fatalf("first Switch: %v", err)
@@ -256,7 +233,7 @@ func TestSwitch_ToEmptyWorkspaces(t *testing.T) {
 
 // TestSwitch_InvalidPath_NonAbsolute verifies that relative paths are rejected.
 func TestSwitch_InvalidPath_NonAbsolute(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	_, err := m.Switch([]string{"relative/path"})
 	if err == nil {
 		t.Fatal("expected error for non-absolute path")
@@ -265,7 +242,7 @@ func TestSwitch_InvalidPath_NonAbsolute(t *testing.T) {
 
 // TestSwitch_InvalidPath_NonExistent verifies that non-existent paths are rejected.
 func TestSwitch_InvalidPath_NonExistent(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	_, err := m.Switch([]string{"/nonexistent/workspace/path"})
 	if err == nil {
 		t.Fatal("expected error for non-existent path")
@@ -274,7 +251,7 @@ func TestSwitch_InvalidPath_NonExistent(t *testing.T) {
 
 // TestSwitch_DeduplicatesPaths verifies that duplicate paths are collapsed.
 func TestSwitch_DeduplicatesPaths(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	ws := t.TempDir()
 
 	snap, err := m.Switch([]string{ws, ws})
@@ -288,7 +265,7 @@ func TestSwitch_DeduplicatesPaths(t *testing.T) {
 
 // TestSwitch_IncrementsGeneration verifies the generation counter advances on switch.
 func TestSwitch_IncrementsGeneration(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	initial := m.Snapshot()
 
 	ws := t.TempDir()
@@ -304,7 +281,7 @@ func TestSwitch_IncrementsGeneration(t *testing.T) {
 // --- Store tests ---
 
 func TestStore_ReturnsCurrentStore(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 
 	s, ok := m.Store()
 	if !ok {
@@ -318,14 +295,14 @@ func TestStore_ReturnsCurrentStore(t *testing.T) {
 // --- Workspaces tests ---
 
 func TestWorkspaces_EmptyInitially(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	if ws := m.Workspaces(); len(ws) != 0 {
 		t.Fatalf("expected no workspaces, got %v", ws)
 	}
 }
 
 func TestWorkspaces_ReturnsCurrentAfterSwitch(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	ws := t.TempDir()
 	if _, err := m.Switch([]string{ws}); err != nil {
 		t.Fatalf("Switch: %v", err)
@@ -339,7 +316,7 @@ func TestWorkspaces_ReturnsCurrentAfterSwitch(t *testing.T) {
 // --- Subscribe / Unsubscribe tests ---
 
 func TestSubscribe_ReceivesSnapshotOnSwitch(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	ws := t.TempDir()
 
 	id, ch := m.Subscribe()
@@ -360,7 +337,7 @@ func TestSubscribe_ReceivesSnapshotOnSwitch(t *testing.T) {
 }
 
 func TestUnsubscribe_ClosesChannel(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	id, ch := m.Subscribe()
 	m.Unsubscribe(id)
 
@@ -376,7 +353,7 @@ func TestUnsubscribe_ClosesChannel(t *testing.T) {
 }
 
 func TestSubscribe_MultipleSubscribersAllReceive(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	ws := t.TempDir()
 
 	id1, ch1 := m.Subscribe()
@@ -428,13 +405,9 @@ func TestNewStatic_SnapshotReflectsInputs(t *testing.T) {
 func TestSwitch_NoOpWhenWorkspacesMatch(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
 	ws := t.TempDir()
-	m, err := NewManager(configDir, dataDir, envFile, []string{ws})
+	m, err := NewManager(configDir, dataDir, []string{ws})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -475,57 +448,10 @@ func TestSwitch_NoOpWhenWorkspacesMatch(t *testing.T) {
 	}
 }
 
-// TestSwitch_FailedEnvPersistenceRollsBack verifies that when the env-file
-// update fails the manager's current snapshot is not replaced.
-func TestSwitch_FailedEnvPersistenceRollsBack(t *testing.T) {
-	configDir := t.TempDir()
-	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	// Start with a real workspace so there's something to roll back to.
-	wsA := t.TempDir()
-	m, err := NewManager(configDir, dataDir, envFile, []string{wsA})
-	if err != nil {
-		t.Fatalf("NewManager: %v", err)
-	}
-	previousSnap := m.Snapshot()
-
-	// Replace envFile with a directory so envconfig.Update fails at read time.
-	if err := os.Remove(envFile); err != nil {
-		t.Fatalf("remove env file: %v", err)
-	}
-	if err := os.Mkdir(envFile, 0o755); err != nil {
-		t.Fatalf("mkdir at env file path: %v", err)
-	}
-
-	wsB := t.TempDir()
-	_, err = m.Switch([]string{wsB})
-	if err == nil {
-		t.Fatal("expected Switch to fail when env file is unwritable")
-	}
-
-	// The snapshot must be identical to what it was before the failed switch.
-	snap := m.Snapshot()
-	if snap.Generation != previousSnap.Generation {
-		t.Errorf("generation changed after failed env update: before=%d after=%d",
-			previousSnap.Generation, snap.Generation)
-	}
-	if !slices.Equal(snap.Workspaces, previousSnap.Workspaces) {
-		t.Errorf("workspaces changed after failed env update: before=%v after=%v",
-			previousSnap.Workspaces, snap.Workspaces)
-	}
-	if snap.Store != previousSnap.Store {
-		t.Error("store pointer changed after failed env update")
-	}
-}
-
 // TestSwitch_SuccessClosesPreviousStore verifies that after a successful
 // workspace switch the store from the previous snapshot is closed.
 func TestSwitch_SuccessClosesPreviousStore(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 
 	// Capture the initial store before switching.
 	initialStore := m.Snapshot().Store
@@ -571,7 +497,7 @@ func activeKeys(m *Manager) []string {
 // TestActiveGroupsInitialization verifies that after NewManager, activeGroups
 // has exactly one entry matching the initial snapshot.
 func TestActiveGroupsInitialization(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	keys := activeKeys(m)
 	if len(keys) != 1 {
 		t.Fatalf("expected 1 active group, got %d", len(keys))
@@ -608,7 +534,7 @@ func TestActiveGroupsInitializationStatic(t *testing.T) {
 // task counts works, and that a non-viewed group is cleaned up when its count
 // reaches zero.
 func TestIncrementDecrementTaskCount(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 
 	// Insert a second active group to simulate a background group.
 	bgStoreDir := t.TempDir()
@@ -652,7 +578,7 @@ func TestIncrementDecrementTaskCount(t *testing.T) {
 // TestDecrementViewedGroupNotRemoved verifies that the currently viewed group
 // is not removed from activeGroups even when its task count reaches zero.
 func TestDecrementViewedGroupNotRemoved(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	snap := m.Snapshot()
 
 	// Increment and decrement on the viewed group.
@@ -670,7 +596,7 @@ func TestDecrementViewedGroupNotRemoved(t *testing.T) {
 
 // TestAllActiveSnapshots verifies that AllActiveSnapshots returns all groups.
 func TestAllActiveSnapshots(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 
 	// Insert a second active group.
 	bgStoreDir := t.TempDir()
@@ -709,7 +635,7 @@ func TestAllActiveSnapshots(t *testing.T) {
 
 // TestStoreForKey verifies correct store lookup and false for unknown keys.
 func TestStoreForKey(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	snap := m.Snapshot()
 
 	// Known key returns the correct store.
@@ -731,7 +657,7 @@ func TestStoreForKey(t *testing.T) {
 // TestIncrementUnknownKeyIsNoOp verifies that incrementing an unknown key
 // does not panic or create an entry.
 func TestIncrementUnknownKeyIsNoOp(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	m.IncrementTaskCount("nonexistent")
 	// Should not panic or add an entry.
 	if len(activeKeys(m)) != 1 {
@@ -742,7 +668,7 @@ func TestIncrementUnknownKeyIsNoOp(t *testing.T) {
 // TestDecrementUnknownKeyIsNoOp verifies that decrementing an unknown key
 // does not panic.
 func TestDecrementUnknownKeyIsNoOp(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	m.DecrementAndCleanup("nonexistent")
 	// Should not panic.
 }
@@ -752,7 +678,7 @@ func TestDecrementUnknownKeyIsNoOp(t *testing.T) {
 // TestSwitchKeepsStoreForRunningTasks verifies that switching away from a group
 // with running tasks keeps its store open and in activeGroups.
 func TestSwitchKeepsStoreForRunningTasks(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	wsA := t.TempDir()
 	snapA, err := m.Switch([]string{wsA})
 	if err != nil {
@@ -787,7 +713,7 @@ func TestSwitchKeepsStoreForRunningTasks(t *testing.T) {
 // TestSwitchClosesIdleGroup verifies that switching away from a group with
 // no running tasks closes its store and removes it from activeGroups.
 func TestSwitchClosesIdleGroup(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	wsA := t.TempDir()
 	snapA, err := m.Switch([]string{wsA})
 	if err != nil {
@@ -820,7 +746,7 @@ func TestSwitchClosesIdleGroup(t *testing.T) {
 // TestSwitchBackReusesStore verifies that switching A→B→A reuses A's store
 // if it is still in activeGroups (because of running tasks).
 func TestSwitchBackReusesStore(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	wsA := t.TempDir()
 	snapA, err := m.Switch([]string{wsA})
 	if err != nil {
@@ -857,12 +783,8 @@ func TestSwitchBackReusesStore(t *testing.T) {
 func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 	ws := t.TempDir()
-	m, err := NewManager(configDir, dataDir, envFile, []string{ws})
+	m, err := NewManager(configDir, dataDir, []string{ws})
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -888,9 +810,9 @@ func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
 }
 
 // TestSwitchKeepsStoreForWaitingTasks verifies that switching away from a group
-// with waiting tasks keeps its store open so watchers can still process them.
+// with waiting tasks keeps its store open while those tasks are live.
 func TestSwitchKeepsStoreForWaitingTasks(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	wsA := t.TempDir()
 	snapA, err := m.Switch([]string{wsA})
 	if err != nil {
@@ -932,7 +854,7 @@ func TestSwitchKeepsStoreForWaitingTasks(t *testing.T) {
 // group with in-progress tasks (detected by storeHasActiveTasks) keeps its
 // store open even when taskCount is 0.
 func TestSwitchKeepsStoreForInProgressTasks(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	wsA := t.TempDir()
 	snapA, err := m.Switch([]string{wsA})
 	if err != nil {
@@ -967,7 +889,7 @@ func TestSwitchKeepsStoreForInProgressTasks(t *testing.T) {
 // TestSwitchKeepsStoreForCommittingTasks verifies that storeHasActiveTasks
 // detects committing tasks.
 func TestSwitchKeepsStoreForCommittingTasks(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	wsA := t.TempDir()
 	snapA, err := m.Switch([]string{wsA})
 	if err != nil {
@@ -1053,11 +975,7 @@ func TestValidate_FileNotDir(t *testing.T) {
 func TestNewManager_SwitchError(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-	_, err := NewManager(configDir, dataDir, envFile, []string{"/nonexistent/path"})
+	_, err := NewManager(configDir, dataDir, []string{"/nonexistent/path"})
 	if err == nil {
 		t.Fatal("expected NewManager to fail with invalid initial workspace")
 	}
@@ -1079,7 +997,7 @@ func TestValidate_WhitespaceOnlyPathSkipped(t *testing.T) {
 // TestSwitch_NilNewStoreFallback verifies that Switch falls back to
 // store.NewFileStore when the newStore field is nil.
 func TestSwitch_NilNewStoreFallback(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	m.newStore = nil // clear the factory
 
 	ws := t.TempDir()
@@ -1098,12 +1016,8 @@ func TestSwitch_NilNewStoreFallback(t *testing.T) {
 func TestSwitch_LoadGroupsError(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
-	envFile := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
 
-	m, err := NewManager(configDir, dataDir, envFile, nil)
+	m, err := NewManager(configDir, dataDir, nil)
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
@@ -1130,7 +1044,7 @@ func TestSwitch_LoadGroupsError(t *testing.T) {
 // TestSwitch_StoreCreationError verifies that Switch returns an error and
 // does not mutate the manager when the store factory fails.
 func TestSwitch_StoreCreationError(t *testing.T) {
-	m, _ := newTestManager(t)
+	m := newTestManager(t)
 	origSnap := m.Snapshot()
 
 	m.newStore = func(_ string) (*store.Store, error) {

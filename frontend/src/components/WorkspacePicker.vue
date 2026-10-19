@@ -9,7 +9,7 @@ import { useToastStore } from '../stores/toast';
 import { useFocusTrap } from '../composables/useFocusTrap';
 import { useFolderBrowser } from '../composables/useFolderBrowser';
 import FolderBrowser from './FolderBrowser.vue';
-import { workspaceLabel } from '../lib/workspaceLabel';
+import { basename, workspaceLabel } from '../lib/workspaceLabel';
 import type { Workspace } from '../api/types';
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -46,17 +46,21 @@ const view = ref<'list' | 'wizard'>('wizard');
 // brand new workspace on confirm.
 const editingId = ref<string | null>(null);
 const wsName = ref('');
+// formerFolders lists the folders a dormant workspace named before a workspace
+// became one folder, shown while re-pointing it so the owner chooses knowingly.
+const formerFolders = ref<string[]>([]);
 
-const folders = ref<string[]>([]);
+// A workspace is one folder; '' means none chosen yet.
+const folder = ref('');
 const browser = useFolderBrowser();
 const { browsePath, pathInput, browseError, filter, browse, shortenPath } = browser;
 const saving = ref(false);
 const applyStatus = ref('');
 const activatingId = ref<string | null>(null);
 
-// Two step wizard: 1 = choose folders, 2 = name, review and activate.
+// Two step wizard: 1 = choose the folder, 2 = name, review and activate.
 const step = ref(1);
-const canProceed = computed(() => folders.value.length > 0);
+const canProceed = computed(() => folder.value !== '');
 
 function goNext() {
   if (!canProceed.value) return;
@@ -69,15 +73,9 @@ function goBack() {
 
 const existing = computed<Workspace[]>(() => wsStore.workspaces);
 
-// Folder basenames make a readable fallback label for unnamed workspaces.
-function basenames(paths: string[]): string {
-  return paths
-    .map(p => {
-      const clean = String(p || '').replace(/[\\/]+$/, '');
-      const parts = clean.split(/[\\/]/);
-      return parts[parts.length - 1] || clean;
-    })
-    .join(', ');
+// The folder basename makes a readable fallback label for an unnamed workspace.
+function folderName(path: string): string {
+  return path ? basename(path) : '';
 }
 
 // Enter the wizard to create a new workspace from scratch. Returns the browse
@@ -85,29 +83,33 @@ function basenames(paths: string[]): string {
 function enterNewWorkspace(): Promise<void> {
   editingId.value = null;
   wsName.value = '';
-  folders.value = [];
+  folder.value = '';
+  formerFolders.value = [];
   step.value = 1;
   view.value = 'wizard';
   return browse('');
 }
 
-// Enter the wizard to re-point an existing workspace's folders (used for
-// dormant workspaces recovered without folders, and the generic edit path).
-function enterEdit(ws: Workspace) {
+// Enter the wizard to re-point a dormant workspace to one folder. A workspace
+// that named several folders starts with none chosen, so the owner picks the
+// one to keep rather than having one picked for them.
+function enterRepoint(ws: Workspace) {
   editingId.value = ws.id;
   wsName.value = ws.name ?? '';
-  folders.value = [...ws.folders];
+  folder.value = ws.folders.length === 1 ? ws.folders[0] : '';
+  formerFolders.value = ws.folders.length > 1 ? [...ws.folders] : [];
   step.value = 1;
   view.value = 'wizard';
   browse('');
 }
 
-// Activate an existing workspace and close. Dormant workspaces missing folders
-// cannot run a board, so route the user into editing folders first.
+// Activate an existing workspace and close. A dormant workspace has no folder
+// chosen yet (recovered history, or several folders from before a workspace
+// became one folder), so route the owner into choosing its folder first.
 async function activateExisting(ws: Workspace) {
   if (activatingId.value) return;
-  if (ws.dormant && ws.folders.length === 0) {
-    enterEdit(ws);
+  if (ws.dormant) {
+    enterRepoint(ws);
     return;
   }
   activatingId.value = ws.id;
@@ -133,7 +135,8 @@ watch(
     applyStatus.value = '';
     editingId.value = null;
     wsName.value = '';
-    folders.value = [];
+    folder.value = '';
+    formerFolders.value = [];
     step.value = 1;
     // Default to the create wizard and kick off the first directory listing
     // immediately; the registry load runs concurrently and promotes the modal
@@ -161,51 +164,41 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey);
 });
 
-function addFolder(path: string) {
-  if (!folders.value.includes(path)) {
-    folders.value.push(path);
-  }
+// chooseFolder makes path the workspace's folder, replacing any earlier choice.
+function chooseFolder(path: string) {
+  folder.value = path;
 }
 
-// Open the host OS native folder chooser and add the picked folder to the list.
+// Open the host OS native folder chooser and choose the picked folder.
 // When no native picker is available (501: headless or unknown platform) we
 // fall back to the in-app directory browser shown below.
 async function pickFolderNative() {
   try {
     const res = await api<{ path?: string; cancelled?: boolean }>('POST', '/api/workspaces/pick-folder');
-    if (res.path) addFolder(res.path);
+    if (res.path) chooseFolder(res.path);
   } catch {
     toast.push('Native folder picker unavailable here — browse below instead.', { kind: 'info' });
   }
 }
 
-function removeFolder(index: number) {
-  folders.value.splice(index, 1);
-}
-
-function clearSelection() {
-  folders.value = [];
-}
-
-// Effective workspace name: the typed name, or a basename fallback so the
+// Effective workspace name: the typed name, or the folder basename so the
 // created workspace is never blank.
 function effectiveName(): string {
-  return wsName.value.trim() || basenames(folders.value);
+  return wsName.value.trim() || folderName(folder.value);
 }
 
 // Confirm the wizard: create a new workspace (or re-point the one being
-// edited), then activate it so the board switches immediately. Replaces the
-// legacy path-based PUT /api/workspaces switch.
+// edited), then activate it so the board switches immediately.
 async function confirm() {
-  if (!folders.value.length) return;
+  if (!folder.value) return;
   saving.value = true;
   applyStatus.value = 'Applying...';
   try {
     let id = editingId.value;
     if (id) {
-      await wsStore.update(id, { name: effectiveName(), folders: [...folders.value] });
+      await wsStore.update(id, { name: effectiveName(), folder: folder.value });
     } else {
-      const created = await wsStore.create(effectiveName(), [...folders.value]);
+      const created = await wsStore.create(effectiveName(), folder.value);
       id = created.id;
     }
     await wsStore.activate(id);
@@ -256,9 +249,9 @@ function onKey(e: KeyboardEvent) {
             {{ view === 'list' ? 'Select workspace' : editingId ? 'Edit workspace' : 'New workspace' }}
           </h3>
           <p class="dialog-sub">
-            <template v-if="view === 'list'">Click a workspace to switch the board to it. Editing folders never loses history.</template>
-            <template v-else-if="step === 1">A workspace groups project folders on one task board. Agents read and edit these folders when tasks run. Choose a folder, then name and activate the workspace to open its board.</template>
-            <template v-else>Name this workspace and review its folders. The name is stable across folder edits.</template>
+            <template v-if="view === 'list'">Click a workspace to switch the board to it. Changing a workspace's folder never loses its history.</template>
+            <template v-else-if="step === 1">A workspace is one project folder with its own task board. Agents read and edit this folder when tasks run. Choose the folder, then name and activate the workspace to open its board.</template>
+            <template v-else>Name this workspace and review its folder. The name stays when the folder changes.</template>
           </p>
         </div>
         <button
@@ -287,22 +280,25 @@ function onKey(e: KeyboardEvent) {
                   type="button"
                   class="row-main ws-list__main"
                   :disabled="activatingId !== null"
+                  :title="ws.dormant ? 'Choose this workspace\'s folder to open its board' : undefined"
                   @click="activateExisting(ws)"
                 >
                   <span class="row-title ws-list__name">
                     {{ workspaceLabel(ws.name, ws.folders) }}
                     <span v-if="wsStore.isActive(ws.id)" class="pill pill-brand ws-list__badge ws-list__badge--active">active</span>
-                    <span v-if="ws.dormant" class="pill pill-warn ws-list__badge ws-list__badge--dormant">recovered</span>
+                    <span v-if="ws.dormant" class="pill pill-warn ws-list__badge ws-list__badge--dormant">{{ ws.folders.length > 1 ? 'several folders' : 'recovered' }}</span>
                   </span>
                   <span class="row-meta ws-list__paths" :title="ws.folders.join('\n')">
-                    {{ ws.folders.length ? ws.folders.map(shortenPath).join('  ·  ') : 'No folders. Re-point to use.' }}
+                    <template v-if="ws.dormant && ws.folders.length > 1">Choose one of {{ ws.folders.map(shortenPath).join(', ') }}</template>
+                    <template v-else-if="ws.folders.length">{{ shortenPath(ws.folders[0]) }}</template>
+                    <template v-else>No folder. Choose one to use it.</template>
                   </span>
                 </button>
                 <div class="row-end">
                   <button
                     type="button"
                     class="btn sm ghost ws-list__edit"
-                    title="Edit name, folders, and limits"
+                    title="Edit name, folder, and limits"
                     @click="close(); ui.openWorkspaceEdit(ws.id)"
                   >Edit</button>
                 </div>
@@ -327,7 +323,7 @@ function onKey(e: KeyboardEvent) {
             @click="goBack"
           >
             <span class="ws-step__circle">1</span>
-            <span class="ws-step__label">Choose folders</span>
+            <span class="ws-step__label">Choose folder</span>
           </button>
           <span class="ws-step__connector" :class="{ 'ws-step__connector--done': step > 1 }"></span>
           <button
@@ -343,6 +339,20 @@ function onKey(e: KeyboardEvent) {
         </div>
 
         <div v-show="step === 1" class="dialog-body ws-picker__body ws-picker__body--step">
+          <div v-if="formerFolders.length" class="dialog-note ws-picker__former" role="note">
+            <span>This workspace was saved with several folders. A workspace is one folder, so choose the one to keep; its task history stays with the workspace.</span>
+            <span class="ws-picker__former-list">
+              <button
+                v-for="f in formerFolders"
+                :key="f"
+                type="button"
+                class="btn sm ghost ws-picker__former-choose"
+                :aria-pressed="folder === f"
+                :title="f"
+                @click="chooseFolder(f)"
+              >{{ folder === f ? 'Keeping ' : 'Keep ' }}{{ shortenPath(f) }}</button>
+            </span>
+          </div>
           <div class="ws-picker__pick-row">
             <button type="button" class="btn ws-picker__pick-btn" @click="pickFolderNative">
               Choose folder…
@@ -352,9 +362,9 @@ function onKey(e: KeyboardEvent) {
           <FolderBrowser
             class="ws-picker__browser"
             :browser="browser"
-            :added="folders"
+            :selected="folder"
             renamable
-            @add="addFolder"
+            @choose="chooseFolder"
             @rename="renameEntry"
           />
         </div>
@@ -367,8 +377,8 @@ function onKey(e: KeyboardEvent) {
           >
             &larr; Back to list
           </button>
-          <span class="dialog-foot__status ws-step__count">
-            {{ folders.length }} {{ folders.length === 1 ? 'folder' : 'folders' }} added
+          <span class="dialog-foot__status ws-step__count" :title="folder || undefined">
+            {{ folder ? shortenPath(folder) : 'No folder chosen' }}
           </span>
           <button
             type="button"
@@ -388,40 +398,27 @@ function onKey(e: KeyboardEvent) {
               v-model="wsName"
               class="field ws-picker__name-input"
               type="text"
-              :placeholder="basenames(folders) || 'My workspace'"
+              :placeholder="folderName(folder) || 'My workspace'"
               autocomplete="off"
             />
           </div>
           <div class="ws-picker__selection ws-picker__selection--review">
             <div class="ws-picker__selection-header">
-              <span class="eyebrow ws-picker__selection-label">Folders</span>
+              <span class="eyebrow ws-picker__selection-label">Folder</span>
               <button
                 type="button"
-                class="btn sm ghost ws-picker__clear-btn"
-                :disabled="folders.length === 0"
-                @click="clearSelection"
+                class="btn sm ghost ws-picker__change-btn"
+                @click="goBack"
               >
-                Clear all
+                Change
               </button>
             </div>
             <div class="ws-picker__selection-list">
-              <div v-if="folders.length === 0" class="ws-picker__empty">
-                No folders selected. Go back to step 1 to add some.
+              <div v-if="!folder" class="ws-picker__empty">
+                No folder chosen. Go back to step 1 to choose one.
               </div>
-              <div
-                v-for="(f, i) in folders"
-                :key="f"
-                class="ws-selected-item"
-              >
-                <span class="ws-selected-item__path" :title="f">{{ shortenPath(f) }}</span>
-                <button
-                  type="button"
-                  class="icon-btn sm ws-selected-item__remove"
-                  aria-label="Remove folder"
-                  @click="removeFolder(i)"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
-                </button>
+              <div v-else class="ws-selected-item">
+                <span class="ws-selected-item__path" :title="folder">{{ shortenPath(folder) }}</span>
               </div>
             </div>
           </div>
@@ -434,7 +431,7 @@ function onKey(e: KeyboardEvent) {
           <button
             type="button"
             class="btn"
-            :disabled="saving || folders.length === 0"
+            :disabled="saving || !folder"
             @click="confirm"
           >
             {{ saving ? 'Applying...' : 'Activate' }}

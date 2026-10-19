@@ -4,8 +4,8 @@
 // between chat, specs, a task board, and code. Tasks run as host processes in
 // per-task git worktrees, and their results are inspected on the board.
 //
-// This package embeds the frontend UI assets and documentation filesystem into
-// the binary via go:embed, then dispatches to CLI subcommands implemented in
+// This package embeds the frontend UI assets into the binary via go:embed,
+// then dispatches to CLI subcommands implemented in
 // [latere.ai/x/wallfacer/internal/cli].
 //
 // # Connected packages

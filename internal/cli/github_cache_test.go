@@ -88,7 +88,7 @@ func TestInitServerRemovesGitHubTokenCache(t *testing.T) {
 		Addr:      ":0",
 		DataDir:   filepath.Join(configDir, "data"),
 		EnvFile:   envFile,
-	}, testFS(t), testFS(t))
+	}, testFS(t))
 	t.Cleanup(sc.Shutdown)
 
 	if _, err := os.Lstat(cache); !os.IsNotExist(err) {

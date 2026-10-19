@@ -151,27 +151,6 @@ func TestGetTask_ReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestGetTask_ReturnsDeepCloneForNestedFields(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
-
-	s.mu.Lock()
-	want := setTaskCloneFixture(t, s.tasks[task.ID])
-	s.mu.Unlock()
-
-	got, err := s.GetTask(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("GetTask: %v", err)
-	}
-	mutateTaskCloneForIsolation(got)
-
-	got2, err := s.GetTask(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("GetTask after mutation: %v", err)
-	}
-	assertTaskMatchesSnapshot(t, got2, want)
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ListTasks
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,89 +210,6 @@ func TestListTasks_IncludesArchivedWhenRequested(t *testing.T) {
 	if len(all) != 1 {
 		t.Errorf("expected 1 archived task, got %d", len(all))
 	}
-}
-
-func TestListTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "listed", Timeout: 5})
-
-	s.mu.Lock()
-	want := setTaskCloneFixture(t, s.tasks[task.ID])
-	s.mu.Unlock()
-
-	tasks, err := s.ListTasks(bg(), false)
-	if err != nil {
-		t.Fatalf("ListTasks: %v", err)
-	}
-	if len(tasks) != 1 {
-		t.Fatalf("expected 1 task, got %d", len(tasks))
-	}
-	mutateTaskCloneForIsolation(&tasks[0])
-
-	got, err := s.GetTask(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("GetTask after ListTasks mutation: %v", err)
-	}
-	assertTaskMatchesSnapshot(t, got, want)
-}
-
-func TestListTasksAndSeq_ReturnsDeepCloneForNestedFields(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "listed", Timeout: 5})
-
-	s.mu.Lock()
-	want := setTaskCloneFixture(t, s.tasks[task.ID])
-	s.mu.Unlock()
-
-	tasks, _, err := s.ListTasksAndSeq(bg(), false)
-	if err != nil {
-		t.Fatalf("ListTasksAndSeq: %v", err)
-	}
-	if len(tasks) != 1 {
-		t.Fatalf("expected 1 task, got %d", len(tasks))
-	}
-	mutateTaskCloneForIsolation(&tasks[0])
-
-	got, err := s.GetTask(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("GetTask after list mutation: %v", err)
-	}
-	assertTaskMatchesSnapshot(t, got, want)
-}
-
-func TestListDeletedTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "deleted", Timeout: 5})
-
-	s.mu.Lock()
-	_ = setTaskCloneFixture(t, s.tasks[task.ID])
-	s.mu.Unlock()
-
-	if err := s.DeleteTask(bg(), task.ID, "test"); err != nil {
-		t.Fatalf("DeleteTask: %v", err)
-	}
-
-	s.mu.RLock()
-	want := deepCloneTask(s.deleted[task.ID])
-	s.mu.RUnlock()
-
-	deleted, err := s.ListDeletedTasks(bg())
-	if err != nil {
-		t.Fatalf("ListDeletedTasks: %v", err)
-	}
-	if len(deleted) != 1 {
-		t.Fatalf("expected 1 deleted task, got %d", len(deleted))
-	}
-	mutateTaskCloneForIsolation(&deleted[0])
-
-	deleted2, err := s.ListDeletedTasks(bg())
-	if err != nil {
-		t.Fatalf("ListDeletedTasks after mutation: %v", err)
-	}
-	if len(deleted2) != 1 {
-		t.Fatalf("expected 1 deleted task on reread, got %d", len(deleted2))
-	}
-	assertTaskMatchesSnapshot(t, &deleted2[0], want)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -710,7 +606,7 @@ func TestUpdateTaskBacklog_UpdatesPrompt(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 	newPrompt := "updated prompt"
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -724,7 +620,7 @@ func TestUpdateTaskBacklog_UpdatesTimeout(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	newTimeout := 30
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 30 {
@@ -737,7 +633,7 @@ func TestUpdateTaskBacklog_ClampsTimeout(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	big := 9999
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 1440 {
@@ -750,7 +646,7 @@ func TestUpdateTaskBacklog_UpdatesFreshStart(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	fresh := true
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
@@ -762,7 +658,7 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog with all nils: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -773,66 +669,8 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 
 func TestUpdateTaskBacklog_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil, nil); err == nil {
+	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil); err == nil {
 		t.Error("expected error for unknown task")
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MountWorktrees
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCreateTask_MountWorktrees(t *testing.T) {
-	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mount test", Timeout: 5, MountWorktrees: true})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if !task.MountWorktrees {
-		t.Error("expected MountWorktrees=true")
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.MountWorktrees {
-		t.Error("MountWorktrees should persist after reload")
-	}
-}
-
-func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	// Enable mount_worktrees.
-	enable := true
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil, nil, nil)
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.MountWorktrees {
-		t.Error("expected MountWorktrees=true after update")
-	}
-
-	// Disable mount_worktrees.
-	disable := false
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil, nil, nil)
-
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.MountWorktrees {
-		t.Error("expected MountWorktrees=false after toggle off")
-	}
-}
-
-func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mount retry", Timeout: 5, MountWorktrees: true})
-	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
-
-	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
-		t.Fatalf("ResetTaskForRetry: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.MountWorktrees {
-		t.Error("MountWorktrees should be preserved across retry")
 	}
 }
 
@@ -1264,68 +1102,6 @@ func TestConcurrentUpdateStatus(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UpdateTaskScheduledAt
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestUpdateTaskScheduledAt_SetAndClear(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	future := time.Now().Add(2 * time.Hour)
-	if err := s.UpdateTaskScheduledAt(bg(), task.ID, &future); err != nil {
-		t.Fatalf("UpdateTaskScheduledAt set: %v", err)
-	}
-	got, _ := s.GetTask(bg(), task.ID)
-	if got.ScheduledAt == nil {
-		t.Fatal("expected ScheduledAt to be set, got nil")
-	}
-	if !got.ScheduledAt.Equal(future) {
-		t.Errorf("ScheduledAt = %v, want %v", got.ScheduledAt, future)
-	}
-
-	// Clear it.
-	if err := s.UpdateTaskScheduledAt(bg(), task.ID, nil); err != nil {
-		t.Fatalf("UpdateTaskScheduledAt clear: %v", err)
-	}
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.ScheduledAt != nil {
-		t.Errorf("expected ScheduledAt to be nil after clear, got %v", got.ScheduledAt)
-	}
-}
-
-func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := newTestFileStore(t, dir)
-
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist-scheduled", Timeout: 5})
-	future := time.Now().Add(3 * time.Hour).Truncate(time.Second)
-	if err := s.UpdateTaskScheduledAt(bg(), task.ID, &future); err != nil {
-		t.Fatalf("UpdateTaskScheduledAt: %v", err)
-	}
-
-	// Reload from disk.
-	s2, _ := newTestFileStore(t, dir)
-	got, err := s2.GetTask(bg(), task.ID)
-	if err != nil {
-		t.Fatalf("GetTask after reload: %v", err)
-	}
-	if got.ScheduledAt == nil {
-		t.Fatal("expected ScheduledAt to survive disk round-trip, got nil")
-	}
-	if !got.ScheduledAt.Equal(future) {
-		t.Errorf("ScheduledAt after reload = %v, want %v", got.ScheduledAt, future)
-	}
-}
-
-func TestUpdateTaskScheduledAt_NotFound(t *testing.T) {
-	s := newTestStore(t)
-	future := time.Now().Add(time.Hour)
-	if err := s.UpdateTaskScheduledAt(bg(), uuid.New(), &future); err == nil {
-		t.Error("expected error for unknown task")
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Soft-delete / restore / purge
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1706,4 +1482,108 @@ func TestTaskFlowID_OmittedFromJSONWhenEmpty(t *testing.T) {
 	if strings.Contains(string(data), "flow_id") {
 		t.Error("flow_id should be omitted from JSON when empty")
 	}
+}
+
+func TestGetTask_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	mutateTaskCloneForIsolation(got)
+
+	got2, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got2, want)
+}
+
+func TestListTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "listed", Timeout: 5})
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	tasks, err := s.ListTasks(bg(), false)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	mutateTaskCloneForIsolation(&tasks[0])
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after ListTasks mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got, want)
+}
+
+func TestListTasksAndSeq_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "listed", Timeout: 5})
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	tasks, _, err := s.ListTasksAndSeq(bg(), false)
+	if err != nil {
+		t.Fatalf("ListTasksAndSeq: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	mutateTaskCloneForIsolation(&tasks[0])
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after list mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got, want)
+}
+
+func TestListDeletedTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "deleted", Timeout: 5})
+
+	s.mu.Lock()
+	_ = setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	if err := s.DeleteTask(bg(), task.ID, "test"); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+
+	s.mu.RLock()
+	want := deepCloneTask(s.deleted[task.ID])
+	s.mu.RUnlock()
+
+	deleted, err := s.ListDeletedTasks(bg())
+	if err != nil {
+		t.Fatalf("ListDeletedTasks: %v", err)
+	}
+	if len(deleted) != 1 {
+		t.Fatalf("expected 1 deleted task, got %d", len(deleted))
+	}
+	mutateTaskCloneForIsolation(&deleted[0])
+
+	deleted2, err := s.ListDeletedTasks(bg())
+	if err != nil {
+		t.Fatalf("ListDeletedTasks after mutation: %v", err)
+	}
+	if len(deleted2) != 1 {
+		t.Fatalf("expected 1 deleted task on reread, got %d", len(deleted2))
+	}
+	assertTaskMatchesSnapshot(t, &deleted2[0], want)
 }

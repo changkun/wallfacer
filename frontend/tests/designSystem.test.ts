@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 // Regression guard for the console design system
-// (specs/shared/console-redesign.md). Four contracts:
+// (specs/.archive/shared/console-redesign.md). Four contracts:
 //   1. The material is matte: no backdrop-filter anywhere in src/styles, and
 //      (as surface specs land) in any component style block. `none` is allowed:
 //      it switches a filter off.
@@ -169,26 +169,21 @@ describe('primitives.css defines the shared classes', () => {
     'src/styles/board.css', 'src/styles/search.css', 'src/styles/rail.css', 'src/styles/topbar.css',
     'src/styles/modal.css', 'src/styles/task-detail.css', 'src/styles/diffs.css', 'src/styles/syntax.css', 'src/styles/mermaid.css',
     'src/components/TaskDetail.vue',
-    'src/components/ReviewVerification.vue', 'src/components/SpanFlamegraph.vue', 'src/components/TaskCard.vue',
-    'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue',
-    'src/views/ChatPage.vue', 'src/components/plan/SessionList.vue', 'src/components/plan/SpecChatPopup.vue', 'src/components/plan/ChatModelBadge.vue',
+    'src/components/SpanFlamegraph.vue', 'src/components/TaskCard.vue',
+    'src/components/TaskComposer.vue', 'src/components/AppRail.vue', 'src/components/Topbar.vue', 'src/components/WorkspaceChip.vue', 'src/components/plan/SpecChatPopup.vue', 'src/components/plan/ChatModelBadge.vue',
     'src/components/plan/ChatMessageList.css', 'src/components/plan/ChatComposer.css', 'src/components/plan/AgentChatPanel.css', 'src/styles/multi-turn.css',
     'src/views/PlanPage.vue', 'src/components/plan/SpecTreePanel.vue', 'src/components/plan/SpecFocusedView.vue',
     'src/components/plan/FloatingToc.vue', 'src/styles/spec-mode/prose-toc.css',
     'src/styles/settings-page.css', 'src/views/SettingsPage.vue', 'src/components/settings/SettingsTabExecution.vue', 'src/components/settings/SettingsTabAppearance.vue',
     'src/components/settings/SettingsTabSandbox.vue', 'src/components/settings/SettingsTabAbout.vue',
     'src/components/settings/SettingToggle.vue', 'src/components/AppSelect.vue', 'src/components/HarnessSelect.vue',
-    'src/components/SystemPromptsManager.vue', 'src/views/LocalNotFoundPage.vue',
-    'src/styles/command-palette.css', 'src/styles/workspace-picker.css', 'src/styles/explorer.css', 'src/styles/dock.css',
+    'src/views/LocalNotFoundPage.vue',
+    'src/styles/command-palette.css', 'src/styles/workspace-picker.css', 'src/styles/explorer.css',
     'src/components/CommandPalette.vue', 'src/components/WorkspacePicker.vue', 'src/components/WorkspaceEditModal.vue', 'src/components/FolderBrowser.vue',
-    'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue', 'src/components/KeyboardShortcutsModal.vue',
-    'src/components/TrashModal.vue', 'src/components/DockWorkspace.vue', 'src/components/TerminalPanel.vue',
+    'src/components/WorkspaceRequired.vue', 'src/components/ConfirmDialog.vue', 'src/components/Toaster.vue',
+    'src/components/TrashModal.vue',
     'src/components/ExplorerPanel.vue', 'src/components/editor/EditorTabStrip.vue', 'src/components/editor/FileEditor.vue', 'src/lib/editorTheme.ts',
-    'src/styles/analytics.css', 'src/styles/mission.css', 'src/styles/docs.css', 'src/styles/whiteboard.css',
-    'src/views/AnalyticsPage.vue', 'src/components/analytics/AnalyticsTabCost.vue', 'src/components/analytics/AnalyticsTabTiming.vue',
-    'src/components/analytics/AnalyticsTabUsage.vue', 'src/views/MapPage.vue', 'src/components/map/GraphCanvas.vue',
-    'src/components/map/MapNodePopup.vue', 'src/components/map/nodeColors.ts', 'src/views/WhiteboardPage.vue',
-    'src/views/LocalDocsPage.vue', 'src/lib/mermaidRender.ts', 'src/lib/chartPalette.ts',
+    'src/lib/mermaidRender.ts', 'src/lib/chartPalette.ts',
   ];
   it.each(tokenOnly)('%s uses tokens only', (file) => {
     const whole = read(file);

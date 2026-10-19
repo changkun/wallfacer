@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 )
@@ -96,17 +95,19 @@ func (m *Manager) resolveWorkspaceForPaths(validated []string) (Workspace, error
 	return ws, nil
 }
 
-// Create mints a brand-new workspace with a RANDOM DataKey. Because the key is independent of the folder set, a new workspace
-// pointing at the same folders as an existing one starts with empty history —
-// identity-first, the core property of the redesign. The new workspace is
-// prepended (MRU) and persisted but not activated; call SwitchByID to activate.
+// Create mints a brand-new workspace on one folder with a RANDOM DataKey.
+// Because the key is independent of the folder, a new workspace pointing at the
+// same folder as an existing one starts with empty history: identity-first, the
+// core property of the redesign. The new workspace is prepended (MRU) and
+// persisted but not activated; call SwitchByID to activate. folders must name
+// exactly one folder; more than one returns an error wrapping ErrSeveralFolders.
 func (m *Manager) Create(name string, folders []string) (Workspace, error) {
 	validated, err := validate(folders)
 	if err != nil {
 		return Workspace{}, err
 	}
 	if len(validated) == 0 {
-		return Workspace{}, fmt.Errorf("workspace requires at least one folder")
+		return Workspace{}, fmt.Errorf("workspace requires a folder")
 	}
 	now := nowStamp()
 	ws := Workspace{
@@ -125,18 +126,22 @@ func (m *Manager) Create(name string, folders []string) (Workspace, error) {
 	return ws, nil
 }
 
-// UpdateFolders replaces a workspace's folder set. This is the membership edit
-// the redesign makes safe: the workspace's id and DataKey are unchanged, so its
-// task store, agent-session transcripts, planning state, and whiteboard stay
-// attached. When the workspace is the active one, the live snapshot's paths are
+// UpdateFolders re-points a workspace to one folder. This is the edit the
+// redesign makes safe: the workspace's id and DataKey are unchanged, so its
+// task store, agent-session transcripts and planning state stay attached.
+// Re-pointing a dormant workspace (recovered history, or a record that named
+// several folders) clears Dormant, which is how its tasks reappear.
+// When the workspace is the active one, the live snapshot's paths are
 // refreshed in place WITHOUT reopening the store, and the change is published.
+// folders must name exactly one folder; more than one returns an error
+// wrapping ErrSeveralFolders.
 func (m *Manager) UpdateFolders(id string, folders []string) (Workspace, error) {
 	validated, err := validate(folders)
 	if err != nil {
 		return Workspace{}, err
 	}
 	if len(validated) == 0 {
-		return Workspace{}, fmt.Errorf("workspace requires at least one folder; delete it instead")
+		return Workspace{}, fmt.Errorf("workspace requires a folder; delete it instead")
 	}
 	var ws Workspace
 	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
@@ -173,19 +178,13 @@ func (m *Manager) UpdateFolders(id string, folders []string) (Workspace, error) 
 	snap := cloneSnapshot(m.current)
 	m.mu.Unlock()
 
-	if m.envFile != "" {
-		encoded := envconfig.FormatWorkspaces(validated)
-		if err := envconfig.Update(m.envFile, envconfig.Updates{Workspaces: &encoded}); err != nil {
-			return Workspace{}, fmt.Errorf("persist active folders: %w", err)
-		}
-	}
 	m.publish(snap)
 	return ws, nil
 }
 
 // SwitchByID activates the workspace with the given id, opening or reusing the
 // store keyed by its stable DataKey. Unlike Switch (which resolves by paths),
-// this disambiguates workspaces that share a folder set. The short-circuit is
+// this disambiguates workspaces that share a folder. The short-circuit is
 // id-aware so switching between two same-folder workspaces is never a silent
 // no-op.
 func (m *Manager) SwitchByID(id string) (Snapshot, error) {
@@ -205,7 +204,13 @@ func (m *Manager) SwitchByID(id string) (Snapshot, error) {
 			return nil, fmt.Errorf("workspace not found: %s", id)
 		}
 		ws = groups[i]
-		// A non-dormant workspace must point at valid folders; a dormant one may
+		// A record that names several folders cannot open a board: the owner
+		// re-points it to one folder first (UpdateFolders), so no folder is
+		// picked on their behalf.
+		if len(ws.Folders) > 1 {
+			return nil, fmt.Errorf("%w: choose one of this workspace's %d folders before opening it", ErrSeveralFolders, len(ws.Folders))
+		}
+		// A non-dormant workspace must point at a valid folder; a dormant one may
 		// have none yet (recovered history awaiting re-point) and activates empty.
 		if len(ws.Folders) > 0 {
 			validated, verr := validate(ws.Folders)
@@ -247,9 +252,9 @@ func (m *Manager) Rename(id, name string) (Workspace, error) {
 	return out, nil
 }
 
-// SetLimits sets (or clears) a workspace's concurrency override.
-// A nil value clears the override so the workspace inherits the global default;
-// a non-negative value caps it (0 meaning unlimited, per Group semantics).
+// SetLimits sets (or clears) a workspace's parallel task limit. A nil value
+// clears the override so the workspace inherits the global default; a
+// non-negative value caps it (0 meaning unlimited, per Group semantics).
 func (m *Manager) SetLimits(id string, maxParallel *int) (Workspace, error) {
 	var out Workspace
 	if err := m.mutateGroups(func(groups []Workspace) ([]Workspace, error) {
@@ -268,7 +273,7 @@ func (m *Manager) SetLimits(id string, maxParallel *int) (Workspace, error) {
 }
 
 // Delete removes a workspace and permanently wipes its scoped data — the task
-// store, transcripts, planning state, whiteboard, and agent-session history.
+// store, transcripts, planning state and agent-session history.
 // The active workspace may be deleted: the board auto-switches to the next
 // usable workspace (MRU order), or to the empty "no workspace" state when none
 // remain (which prompts the picker). Idempotent for an unknown id. Returns the

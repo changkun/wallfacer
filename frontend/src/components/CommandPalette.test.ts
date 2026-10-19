@@ -1,7 +1,7 @@
-// The command palette is a popover of grouped rows: tasks first, then specs
-// and docs. Arrow keys move the selected row and Enter opens it. Pins the row
+// The command palette is a popover of grouped rows: tasks first, then specs.
+// Arrow keys move the selected row and Enter opens it. Pins the row
 // vocabulary and the keyboard contract
-// (specs/shared/console-redesign/panels-and-overlays.md).
+// (specs/.archive/shared/console-redesign/panels-and-overlays.md).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, h, nextTick, type App } from 'vue';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
@@ -31,7 +31,6 @@ async function mount(): Promise<void> {
     routes: [
       { path: '/', component: { template: '<div />' } },
       { path: '/plan', component: { template: '<div />' } },
-      { path: '/docs/:slug', component: { template: '<div />' } },
     ],
   });
   await router.push('/plan');
@@ -64,7 +63,7 @@ describe('CommandPalette', () => {
     await mount();
     expect(document.querySelector('.command-palette-panel')?.classList.contains('pop')).toBe(true);
     const titles = Array.from(document.querySelectorAll('.command-palette-section-title')).map((e) => e.textContent?.trim());
-    expect(titles).toEqual(['Tasks', 'Plan', 'Docs']);
+    expect(titles).toEqual(['Tasks', 'Plan']);
     const rows = taskRows();
     expect(rows.length).toBeGreaterThanOrEqual(3);
     expect(rows[0].textContent).toContain('Fix the rail fold');
@@ -86,9 +85,9 @@ describe('CommandPalette', () => {
     expect(taskRows()[0].classList.contains('active')).toBe(true);
     key('ArrowUp');
     await nextTick();
-    // Wrapped to the last row: a doc, at the bottom of the list.
+    // Wrapped to the last row: a spec, at the bottom of the list.
     const last = activeRows()[0];
-    expect(last.closest('.command-palette-section')?.querySelector('.command-palette-section-title')?.textContent?.trim()).toBe('Docs');
+    expect(last.closest('.command-palette-section')?.querySelector('.command-palette-section-title')?.textContent?.trim()).toBe('Plan');
   });
 
   it('opens the selected task on Enter', async () => {

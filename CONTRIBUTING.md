@@ -19,7 +19,7 @@ you only want to *use* Wallfacer, start with the [User Manual](docs/guide/usage.
 The Go gates (gofmt, the modernizers, golangci-lint, vet, the suite, the race
 detector, coverage, govulncheck and more) live in `latere-ai/ci-gate`, pinned in
 `go.mod`; `make check` runs all of them. The `vue-tsc` typecheck and the repo's
-otel/truncation guardrails are this repository's own targets. Raw `go build`
+truncation guardrail are this repository's own targets. Raw `go build`
 skips all of it and can land code that fails CI, so prefer the targets.
 
 ```bash

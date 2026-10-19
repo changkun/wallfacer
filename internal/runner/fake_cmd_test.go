@@ -11,15 +11,15 @@ import (
 )
 
 // runFakeCmd handles the re-exec mode where the test binary acts as a fake
-// agent command. Called from TestMain when WALLFACER_FAKE_MODE is set.
+// agent command. Called from TestMain when FAKE_AGENT_MODE is set.
 //
 // Supported modes:
-//   - "simple": write WALLFACER_FAKE_DIR/output.txt to stdout, exit with WALLFACER_FAKE_EXIT
+//   - "simple": write FAKE_AGENT_DIR/output.txt to stdout, exit with FAKE_AGENT_EXIT
 //   - "stateful": counter-based; output out<N>.txt (or last.txt), increment counter
 //   - "stderr": like simple but also writes stderr.txt to stderr
 func runFakeCmd(mode string) {
-	dir := os.Getenv("WALLFACER_FAKE_DIR")
-	exitCode, _ := strconv.Atoi(os.Getenv("WALLFACER_FAKE_EXIT"))
+	dir := os.Getenv("FAKE_AGENT_DIR")
+	exitCode, _ := strconv.Atoi(os.Getenv("FAKE_AGENT_EXIT"))
 
 	switch mode {
 	case "simple":
@@ -69,9 +69,9 @@ func fakeCmdScript(t *testing.T, output string, exitCode int) string {
 		t.Fatal(err)
 	}
 
-	t.Setenv("WALLFACER_FAKE_MODE", "simple")
-	t.Setenv("WALLFACER_FAKE_DIR", dir)
-	t.Setenv("WALLFACER_FAKE_EXIT", strconv.Itoa(exitCode))
+	t.Setenv("FAKE_AGENT_MODE", "simple")
+	t.Setenv("FAKE_AGENT_DIR", dir)
+	t.Setenv("FAKE_AGENT_EXIT", strconv.Itoa(exitCode))
 	return testBinary()
 }
 
@@ -98,9 +98,9 @@ func fakeStatefulCmd(t *testing.T, outputs []string) string {
 		t.Fatal(err)
 	}
 
-	t.Setenv("WALLFACER_FAKE_MODE", "stateful")
-	t.Setenv("WALLFACER_FAKE_DIR", dir)
-	t.Setenv("WALLFACER_FAKE_EXIT", "0")
+	t.Setenv("FAKE_AGENT_MODE", "stateful")
+	t.Setenv("FAKE_AGENT_DIR", dir)
+	t.Setenv("FAKE_AGENT_EXIT", "0")
 	return testBinary()
 }
 
@@ -117,9 +117,9 @@ func fakeCmdScriptWithStderr(t *testing.T, stdout, stderr string, exitCode int) 
 		t.Fatal(err)
 	}
 
-	t.Setenv("WALLFACER_FAKE_MODE", "stderr")
-	t.Setenv("WALLFACER_FAKE_DIR", dir)
-	t.Setenv("WALLFACER_FAKE_EXIT", strconv.Itoa(exitCode))
+	t.Setenv("FAKE_AGENT_MODE", "stderr")
+	t.Setenv("FAKE_AGENT_DIR", dir)
+	t.Setenv("FAKE_AGENT_EXIT", strconv.Itoa(exitCode))
 	return testBinary()
 }
 
@@ -127,8 +127,8 @@ func fakeCmdScriptWithStderr(t *testing.T, stdout, stderr string, exitCode int) 
 // (until killed via context cancellation). Lifecycle calls are skipped.
 func fakeBlockingCmd(t *testing.T) string {
 	t.Helper()
-	t.Setenv("WALLFACER_FAKE_MODE", "blocking")
-	t.Setenv("WALLFACER_FAKE_DIR", t.TempDir())
-	t.Setenv("WALLFACER_FAKE_EXIT", "0")
+	t.Setenv("FAKE_AGENT_MODE", "blocking")
+	t.Setenv("FAKE_AGENT_DIR", t.TempDir())
+	t.Setenv("FAKE_AGENT_EXIT", "0")
 	return testBinary()
 }

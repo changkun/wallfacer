@@ -8,7 +8,7 @@ Tasks progress through a well-defined set of states. Every transition is recorde
 stateDiagram-v2
     [*] --> backlog
 
-    backlog --> in_progress : drag / autoimplement
+    backlog --> in_progress : start
 
     in_progress --> in_progress : auto-continue
     in_progress --> waiting : end_turn
@@ -19,11 +19,11 @@ stateDiagram-v2
     committing --> done : commit ok
     committing --> failed : commit fail
 
-    waiting --> in_progress : feedback / test
+    waiting --> in_progress : feedback
     waiting --> committing : mark done
     waiting --> cancelled : cancel
 
-    failed --> backlog : retry / auto_retry
+    failed --> backlog : retry
     failed --> cancelled : cancel
 
     done --> cancelled : cancel
@@ -47,13 +47,13 @@ Transition labels are shortened for legibility. In full:
 
 | Transition | Trigger |
 |---|---|
-| `backlog` to `in_progress` | User drag, or autoimplement promoting a backlog card |
+| `backlog` to `in_progress` | User drag or **Start task**, refused with 409 at the parallel limit |
 | `in_progress` to `in_progress` | `stop_reason` of `max_tokens` or `pause_turn`, auto-continued in the same session |
 | `in_progress` to `waiting` | `stop_reason` of `end_turn`, or an empty/unknown `stop_reason` |
 | `in_progress` to `failed` | Process error, agent error, timeout, or a budget limit exceeded |
-| `waiting` to `in_progress` | User feedback, or review feedback |
+| `waiting` to `in_progress` | User feedback |
 | `committing` to `done` / `failed` | Commit pipeline success or failure |
-| `failed` to `backlog` | Manual retry or auto-retry |
+| `failed` to `backlog` | Retry |
 
 ## States
 
@@ -80,7 +80,7 @@ Each pass through the loop in `runner.go` `Run()`:
 
 | `stop_reason` | `is_error` | Result |
 |---|---|---|
-| `end_turn` | false | Exit loop → `waiting` (awaiting review; auto-submit or user marks done to trigger commit pipeline) |
+| `end_turn` | false | Exit loop → `waiting` (awaiting review; the user marks done to trigger the commit pipeline) |
 | `max_tokens` | false | Auto-continue (next iteration, same session) |
 | `pause_turn` | false | Auto-continue (next iteration, same session) |
 | empty / unknown | false | Set `waiting`; block until user provides feedback |
@@ -88,6 +88,8 @@ Each pass through the loop in `runner.go` `Run()`:
 
 5. Accumulate token usage (`input_tokens`, `output_tokens`, cache tokens, `cost_usd`)
 6. Record per-turn usage as `TurnUsageRecord`
+
+The CWD comes from the task's worktree map (`agentWorkDir`, `internal/runner/container.go`): the worktree for the workspace folder when the task has one, else the first worktree in sorted folder order, and the live workspace folder only when the task has no worktree. A task created in one folder and resumed after the workspace was re-pointed therefore keeps working in its own worktree. A task stored with worktrees in several folders (from before a workspace became one folder) runs the same way; before its first turn `noteSeveralWorktrees` writes one system event on its timeline naming the folder the agent works in, and the commit pipeline still visits every folder's worktree.
 7. Check budget limits (`MaxCostUSD`, `MaxInputTokens`); if exceeded → `failed` with `FailureCategory = budget_exceeded`
 
 ## Session Continuity
@@ -134,20 +136,9 @@ When a task transitions to `failed`, the runner classifies the failure into one 
 
 The category is stored in `Task.FailureCategory` and included in `RetryRecord` when the task is reset for retry.
 
-## Auto-Retry
-
-Tasks can have an `AutoRetryBudget map[FailureCategory]int` that specifies how many automatic retries are allowed for each failure category. When a task fails:
-
-1. The failure is classified into a `FailureCategory`
-2. If the budget for that category has remaining retries, the count is decremented
-3. The task is automatically reset to `backlog` for a fresh run
-4. `AutoRetryCount` tracks the total number of auto-retries consumed
-
-A global cap (`constants.MaxAutoRetries`, currently 3) prevents infinite retry loops regardless of per-category budgets.
-
 ## Retry History
 
-Each time a task is reset for retry (manual or automatic), a `RetryRecord` is appended to `Task.RetryHistory`:
+Each time a task is reset for retry, a `RetryRecord` is appended to `Task.RetryHistory`:
 
 ```
 RetryRecord {
@@ -172,19 +163,9 @@ A task's title is set when the task is created and never changes afterwards. A `
 
 Prompt refinement is the Plan task-mode chat. There are no dedicated refine routes or background refinement jobs. The agent session converses with the user about the task, and when both agree on an improved prompt the agent calls the `update_task_prompt` tool, which the console forwards as `POST /api/agent/tool/update_task_prompt` (`internal/handler/agentsession_tool.go`). The handler moves the prior prompt into history and sets the task's prompt to the new text. See [Plan Mode](plan-mode.md) for the task-mode chat flow.
 
-## Review
-
-When the `review` runtime toggle is on and the task has at least one worktree (`reviewGatesSubmit`, `internal/handler/tasks_autoimplement.go`), whatever its harness, the auto-submitter gates on a review approval (`ReviewUnresolved == 0`) instead of natural completion. Tasks without a worktree fall back to the completion gate. See [Automation](automation.md#auto-review).
-
-## Autoimplement
-
-Five background watchers drive the autonomous pipeline: auto-promoter, auto-retrier, waiting-sync, auto-submitter, and auto-review. Auto-push is applied inside the commit pipeline, not by a watcher. See [Automation](automation.md).
-
 ## Board Context
 
-Before each turn the runner writes a `board.json` manifest of all non-archived tasks to a host directory (the BoardDir) and passes its path to the agent via the `WALLFACER_BOARD_JSON` environment variable (`internal/runner/{container.go,execute.go}` `writeBoardDir`). The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn.
-
-When `MountWorktrees` is enabled on a task, eligible sibling worktree paths are written to a sibling manifest in the same BoardDir and surfaced to the agent via `WALLFACER_SIBLING_WORKTREES_JSON`.
+Before each turn the runner writes a `board.json` manifest of all non-archived tasks to a host directory (the BoardDir) and passes its path to the agent via the `WALLFACER_BOARD_JSON` environment variable (`internal/runner/{container.go,execute.go}` `writeBoardDir`). The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn. It names no other task's worktree: an agent sees the other tasks' prompts, status and branches, and works only in its own worktree.
 
 ## Data Models
 
@@ -196,25 +177,21 @@ See [Data & Storage](data-and-storage.md).
 
 ## Crash Recovery
 
-On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It first calls the backend's `ListContainers` through the `ContainerLister` interface to determine which task processes are still running (for HostBackend this enumerates host processes, not `podman/docker ps`), then handles each interrupted task as follows:
+On startup, `RecoverOrphanedTasks` in `runner/recovery.go` reconciles tasks that were interrupted by a server restart. It does not look for agent processes from the previous server; it decides from the stored status and the worktrees on disk:
 
-| Previous status | Process state | Recovery action |
-|---|---|---|
-| `committing` | any | Inspect worktree: if commit landed after `UpdatedAt` → `done`; otherwise → `failed` |
-| `in_progress` | still running | Stay `in_progress`; a monitor goroutine watches the process and transitions to `waiting` once it stops |
-| `in_progress` | already stopped | → `waiting`, user can review partial output, provide feedback, or mark as done |
+| Previous status | Recovery action |
+|---|---|
+| `committing` | Inspect each worktree's branch tip: if a commit landed after `UpdatedAt` → `done`; otherwise → `failed` |
+| `in_progress` | → `waiting`, so the user can review partial output, provide feedback, or mark the task done |
 
-If worktrees are missing during recovery, the task is marked `failed` with `FailureCategory = worktree_setup`.
+If a worktree is missing during recovery, the task is marked `failed` with `FailureCategory = worktree_setup`.
 
-**Why `waiting` instead of `failed` for stopped processes?**
+**Why `waiting` instead of `failed` for interrupted tasks?**
 The task may have produced useful partial output. Moving to `waiting` lets the user inspect results and choose the next action (resume with feedback, mark as done, or cancel) rather than forcing a retry from scratch.
-
-**Monitor goroutine** (`monitorContainerUntilStopped`):
-When a task process is found still running after a restart, a background goroutine polls the backend's `ListContainers` (host-process enumeration under HostBackend) every 5 seconds. Once the process stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.
 
 ## Oversight Generation
 
-See [Automation](automation.md).
+See [Background Work and Recovery](background-work.md#oversight-generation).
 
 ## Output Truncation
 
@@ -271,34 +248,24 @@ Each `BoardTask` entry includes:
 | `stop_reason` | Last stop reason |
 | `usage` | Token/cost usage |
 | `branch_name` | Git branch name |
-| `worktree_mount` | Sibling worktree path exposed to the agent (if eligible) |
 | `created_at` / `updated_at` | Timestamps |
 
 `SessionID` is deliberately excluded from `BoardTask` to prevent session hijacking between tasks.
 
 ### How Board Context Is Assembled
 
-`generateBoardContextAndMounts` in `internal/runner/board.go` produces both the `board.json` bytes and the sibling worktree mount map:
+`generateBoardContext` in `internal/runner/board.go` produces the `board.json` bytes:
 
 1. Lists all non-archived tasks via `store.ListTasks`.
-2. Builds the set of workspace repo paths the self task operates on.
-3. Filters siblings to only those sharing at least one workspace.
+2. Builds the set of workspace repo paths the self task operates on (the keys of its worktree map, or the workspace folder when it has no worktree yet).
+3. Filters siblings to only those sharing that folder, so tasks from before the workspace was re-pointed drop out.
 4. For the self task: includes full `Prompt`, `Result`, and `Turns`.
 5. For siblings: truncates `Prompt` to 500 chars, `Result` to 1000 chars, zeros `Turns`.
-6. Determines eligible sibling worktree mounts (tasks in `waiting`, `failed`, or `done` with extant worktree directories).
-7. Marshals to JSON with indent; logs a warning if the manifest exceeds 64 KB.
+6. Marshals to JSON with indent; logs a warning if the manifest exceeds 64 KB.
 
 ### Caching
 
 Results are cached by `(boardChangeSeq, selfTaskID)`. The cache is invalidated when any store mutation increments the change sequence. Per-turn calls cost nearly nothing when no task has changed since the last generation.
-
-### Worktree Mounts
-
-When `MountWorktrees` is enabled, eligible sibling worktree paths are written to a sibling manifest in the BoardDir and surfaced to the agent via `WALLFACER_SIBLING_WORKTREES_JSON`. Eligibility is determined by `canMountWorktree`:
-
-- `waiting` or `failed` tasks: always eligible.
-- `done` tasks: eligible only if at least one worktree directory still exists on disk.
-- `backlog`, `in_progress`, `cancelled`: not eligible (no worktree, actively modified, or cleaned up).
 
 ### API Endpoints
 
@@ -318,6 +285,6 @@ See [Data & Storage](data-and-storage.md).
 - [Internals Index](internals.md), Overview and reading order for all internals docs
 - [Architecture](architecture.md), System design, component overview, and design decisions
 - [Data & Storage](data-and-storage.md), Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
-- [Automation](automation.md), Autoimplement, oversight generation
+- [Background Work and Recovery](background-work.md), startup recovery, oversight generation
 - [Git Worktrees](git-worktrees.md), Worktree lifecycle, branch naming, cleanup
 - [API & Transport](api-and-transport.md), HTTP routes, SSE, metrics, middleware

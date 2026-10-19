@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Per-workspace settings popup. Edits one workspace's name, folder set, and
+// Per-workspace settings popup. Edits one workspace's name, folder, and
 // parallel caps, and offers deletion — the single place workspace settings are
 // managed now that the Settings → Workspace tab is gone. Opened from the sidebar
 // switcher and the picker's per-row Edit via ui.openWorkspaceEdit(id).
@@ -35,7 +35,7 @@ const busy = ref(false);
 const status = ref('');
 
 // Name is a local draft so a half-typed rename isn't clobbered by a DTO refresh;
-// it's persisted on blur/Enter. Caps and folders persist immediately on change.
+// it's persisted on blur/Enter. Caps and the folder persist immediately on change.
 const nameDraft = ref(ws.value?.name ?? '');
 watch(() => ui.editWorkspaceId, () => { nameDraft.value = ws.value?.name ?? ''; showBrowser.value = false; });
 // If the workspace vanishes (deleted elsewhere) while open, close cleanly.
@@ -73,7 +73,7 @@ async function saveName() {
 }
 
 // Parallel cap: a number sets the cap, an empty input clears it (null) so the
-// global default applies again. Writes through PUT /api/workspaces/{id}.
+// global default applies again. It writes through PUT /api/workspaces/{id}.
 async function saveCap(field: 'max_parallel', e: Event) {
   const w = ws.value;
   if (!w || busy.value) return;
@@ -100,30 +100,21 @@ function toggleBrowser() {
   }
 }
 
-async function addFolder(path: string) {
-  const w = ws.value;
-  if (!w || busy.value || w.folders.includes(path)) return;
-  busy.value = true;
-  status.value = '';
-  try {
-    await wsStore.update(w.id, { folders: [...w.folders, path] });
-    setStatus('Saved.');
-  } catch (e) {
-    setStatus('Error: ' + (e instanceof Error ? e.message : String(e)));
-  } finally {
-    busy.value = false;
-  }
-}
+// The workspace's one folder, or '' while a dormant workspace has none chosen
+// (recovered history, or several folders saved before a workspace became one
+// folder).
+const currentFolder = computed(() => (ws.value && ws.value.folders.length === 1 ? ws.value.folders[0] : ''));
 
-// The server rejects an empty folder set (400), so the last folder cannot be
-// removed here; the button is disabled when only one remains.
-async function removeFolder(path: string) {
+// chooseFolder re-points the workspace to path. History stays attached, and a
+// dormant workspace leaves the dormant state, so its tasks come back.
+async function chooseFolder(path: string) {
   const w = ws.value;
-  if (!w || busy.value || w.folders.length <= 1) return;
+  if (!w || busy.value || path === currentFolder.value) return;
   busy.value = true;
   status.value = '';
   try {
-    await wsStore.update(w.id, { folders: w.folders.filter(f => f !== path) });
+    await wsStore.update(w.id, { folder: path });
+    showBrowser.value = false;
     setStatus('Saved.');
   } catch (e) {
     setStatus('Error: ' + (e instanceof Error ? e.message : String(e)));
@@ -238,17 +229,22 @@ function onBackdrop(e: MouseEvent) {
           </div>
         </div>
 
-        <!-- Folders: the list with remove, and a reveal-on-demand browser. -->
+        <!-- Folder: the one folder, a reveal-on-demand browser to change it,
+             and for a workspace saved with several folders a Keep button per
+             folder so the owner chooses the one it keeps. -->
         <div class="card compact ws-edit__folders">
           <div class="card-head">
-            <span class="eyebrow">Folders</span>
+            <span class="eyebrow">Folder</span>
             <button
               type="button"
-              class="btn sm ghost ws-picker__add-folder-btn"
+              class="btn sm ghost ws-edit__change-folder"
               @click="toggleBrowser"
-            >{{ showBrowser ? 'Done adding' : '+ Add folder' }}</button>
+            >{{ showBrowser ? 'Cancel' : currentFolder ? 'Change folder' : 'Choose folder' }}</button>
           </div>
           <div class="card-pad ws-edit__folder-list">
+            <p v-if="ws.folders.length > 1" class="dialog-note ws-edit__several">
+              This workspace was saved with several folders. A workspace is one folder, so choose the one to keep; its task history stays with the workspace.
+            </p>
             <div
               v-for="path in ws.folders"
               :key="path"
@@ -256,24 +252,21 @@ function onBackdrop(e: MouseEvent) {
             >
               <span class="ws-selected-item__path" :title="path">{{ shortenPath(path) }}</span>
               <button
+                v-if="ws.folders.length > 1"
                 type="button"
-                class="icon-btn sm ws-selected-item__remove"
-                :disabled="ws.folders.length <= 1 || busy"
-                :title="ws.folders.length <= 1 ? 'A workspace needs at least one folder' : 'Remove folder'"
-                aria-label="Remove folder"
-                @click="removeFolder(path)"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
-              </button>
+                class="btn sm ghost ws-selected-item__keep"
+                :disabled="busy"
+                @click="chooseFolder(path)"
+              >Keep this one</button>
             </div>
-            <div v-if="ws.folders.length === 0" class="ws-picker__empty">No folders. Add one below.</div>
+            <div v-if="ws.folders.length === 0" class="ws-picker__empty">No folder yet. Choose one to use this workspace.</div>
             <FolderBrowser
               v-if="showBrowser"
               class="ws-edit__browser"
               :browser="browser"
-              :added="ws.folders"
+              :selected="currentFolder"
               :busy="busy"
-              @add="addFolder"
+              @choose="chooseFolder"
             />
           </div>
         </div>

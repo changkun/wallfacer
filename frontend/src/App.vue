@@ -1,25 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { RouterView, useRouter } from 'vue-router';
+import { RouterView } from 'vue-router';
 import AppLayout from './layouts/AppLayout.vue';
 import WorkspaceRequired from './components/WorkspaceRequired.vue';
-import { hashToRoute } from './lib/hashRoute';
 import { useWorkspaceGate } from './composables/useWorkspaceGate';
-
-const router = useRouter();
 
 // Workspace-scoped routes fall back to the WorkspaceRequired prompt when no
 // workspace is visible to this session, matching the board's empty state.
 const blockForWorkspace = useWorkspaceGate();
-
-// Migrate legacy hash-mode bookmarks (#<uuid>, #plan/<path>) to history routes.
-onMounted(() => {
-  if (typeof window === 'undefined' || !window.location.hash) return;
-  const target = hashToRoute(window.location.hash);
-  if (!target) return;
-  history.replaceState(null, '', window.location.pathname + window.location.search);
-  void router.replace(target);
-});
 </script>
 
 <template>

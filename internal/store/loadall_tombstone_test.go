@@ -9,7 +9,7 @@ import (
 // whose tombstone.json is present but unparseable stays soft-deleted across a
 // restart. Before the fix, loadAll only routed the task to s.deleted when the
 // tombstone parsed; a corrupt marker fell through and the task was loaded as a
-// live task (visible on the board, eligible for the auto-promoter).
+// live task (visible on the board and startable).
 func TestLoadAll_CorruptTombstoneKeepsTaskDeleted(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()

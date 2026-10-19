@@ -6,7 +6,7 @@ This document covers the HTTP API surface, request processing pipeline, real-tim
 
 All state changes flow through `handler.go`. The handler never blocks; long-running work is always handed off to a goroutine.
 
-The REST routes are canonically defined in `internal/apicontract/routes.go`. `BuildMux` (`internal/cli/server.go`) registers each one, and `server_routes_test.go` asserts the two agree. A handful of endpoints are registered directly in `BuildMux` and are deliberately not in the contract (WebSocket terminal, docs API, metrics, sandbox trust-plane proxy); they are listed in [Routes outside the contract](#routes-outside-the-contract).
+The REST routes are canonically defined in `internal/apicontract/routes.go`. `BuildMux` (`internal/cli/server.go`) registers each one, and `server_routes_test.go` asserts the two agree. A handful of endpoints are registered directly in `BuildMux` and are deliberately not in the contract (docs API, metrics); they are listed in [Routes outside the contract](#routes-outside-the-contract).
 
 ### Routes
 
@@ -14,34 +14,28 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 |---|---|
 | **Debug & monitoring** | |
 | `GET /api/debug/health` | Operational health check: goroutine count, task counts, uptime |
-| `GET /api/debug/spans` | Aggregate span timing statistics across all tasks |
 | `GET /api/debug/runtime` | Live server internals: pending goroutines, memory, task states, running processes |
-| `GET /api/debug/board` | Board manifest as seen by a hypothetical new task (no self-task, no worktree mounts) |
-| `GET /api/tasks/{id}/board` | Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied) |
+| `GET /api/debug/board` | Board manifest as seen by a hypothetical new task (no self-task) |
+| `GET /api/tasks/{id}/board` | Board manifest as it appeared to a specific task (is_self=true for that task) |
 | **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
-| `GET /api/config` | Get server configuration (workspaces, autoimplement flags, harness list, payload limits). |
-| `PUT /api/config` | Update server configuration (autoimplement, autosubmit, harness assignments) |
+| `GET /api/config` | Get server configuration (workspaces, workspace groups, harness list, payload limits). |
+| `PUT /api/config` | Update server configuration (workspace groups and their parallel limits) |
 | **Workspace management** | |
 | `GET /api/workspaces/browse` | List child directories for an absolute host path |
 | `POST /api/workspaces/pick-folder` | Open the native OS folder picker and return the chosen path |
 | `POST /api/workspaces/mkdir` | Create a new directory under an absolute host path |
 | `POST /api/workspaces/rename` | Rename a file or directory at an absolute host path |
 | `GET /api/workspaces` | List workspace records (stable ID, name, folders, dormant flag, per-workspace limits) |
-| `POST /api/workspaces` | Create a workspace (random DataKey; not activated) |
-| `PUT /api/workspaces/{id}` | Update a workspace's name, folders, or per-workspace settings; identity and DataKey unchanged |
-| `DELETE /api/workspaces/{id}` | Delete a workspace record; 409 for the active workspace |
-| `POST /api/workspaces/{id}/activate` | Switch the scoped task board to this workspace |
+| `POST /api/workspaces` | Create a workspace on one folder (random DataKey; not activated); 400 for more than one folder |
+| `PUT /api/workspaces/{id}` | Update a workspace's name, its one folder (400 for more than one; re-pointing clears dormant), or per-workspace settings; identity and DataKey unchanged |
+| `DELETE /api/workspaces/{id}` | Delete a workspace and wipe its data; deleting the active one switches the board to the next usable workspace |
+| `POST /api/workspaces/{id}/activate` | Switch the scoped task board to this workspace; 400 for a dormant workspace that still names several folders |
 | **Environment configuration** | |
 | `GET /api/env` | Get environment configuration (tokens masked) |
 | `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |
 | `POST /api/env/test` | Test harness configuration by running a lightweight probe task |
-| **System prompt templates** | |
-| `GET /api/system-prompts` | List all built-in system prompt templates with override status and content |
-| `GET /api/system-prompts/{name}` | Get a single built-in system prompt template by name |
-| `PUT /api/system-prompts/{name}` | Write a user override for a built-in system prompt template; validates before writing |
-| `DELETE /api/system-prompts/{name}` | Remove user override, restoring the embedded default |
 | **Git workspace operations** | |
 | `GET /api/git/status` | Git status for all mounted workspaces |
 | `GET /api/git/stream` | SSE stream of git status updates for all workspaces |
@@ -53,8 +47,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/git/create-branch` | Create and check out a new branch in a workspace |
 | `POST /api/git/open-folder` | Open a workspace directory in the OS file manager |
 | **Usage & statistics** | |
-| `GET /api/usage` | Aggregated token and cost usage statistics |
-| `GET /api/stats` | Task status and workspace cost statistics, plus an `agent_sessions` section keyed by workspace group. Optional `?workspace=<path>` restricts task aggregation; optional `?days=N` restricts agent-session aggregation to rounds newer than N days (execution buckets are unchanged by `?days`). |
 | **Task collection (no {id})** | |
 | `GET /api/tasks` | List all tasks (optionally including archived) |
 | `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
@@ -78,8 +70,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a task |
-| `POST /api/tasks/{id}/review` | Run one review round for a waiting task, whatever the review toggle says; 400 with code `review_no_worktree` for a task without a worktree, 409 while a round is in flight |
-| `GET /api/tasks/{id}/review/transcript` | The task's newest review session: `rounds` (each with the reviewer's answer, failed attempts, the feedback sent and the task's reply), `outcome` once the session ended (termination, open findings, headline, tokens, skip reason), the current `config`, and `running` from the in-flight set. `legacy: true` with empty `rounds` for a session the earlier debate engine recorded. `truncated: true` when the transcript could not be read to its end (an I/O error, or a record over the line cap in `internal/review/record.go`); `rounds` then holds the rounds before that point, and the server logs the error |
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/stream` | SSE stream of file tree change notifications |
@@ -87,22 +77,14 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `PUT /api/explorer/file` | Write file contents to a workspace |
 | `GET /api/explorer/file/stream` | SSE stream of change notifications for a single file |
 | `GET /api/explorer/task-prompts` | List backlog (and optionally waiting) tasks as virtual entries for the explorer Task Prompts section |
-| **OAuth authentication** (agent CLI sign-in) | |
-| `POST /api/auth/{provider}/start` | Start OAuth flow; returns `{authorize_url}` |
-| `GET /api/auth/{provider}/status` | Poll flow status; returns `{state, error?}` |
-| `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
 | **Spec tree & graph** | |
 | `GET /api/specs/tree` | Full spec tree with metadata, progress, and dependency edges |
 | `GET /api/specs/stream` | SSE: spec tree change notifications |
-| `GET /api/graph` | Unified spec+task graph (nodes, typed edges, critical path) for Mission Control |
 | `GET /api/specs/stale-candidates` | List specs flagged as potentially stale by the drift pipeline |
 | `POST /api/specs/dismiss-stale-candidates` | Dismiss all pending stale-candidate flags |
 | `POST /api/specs/transition` | Spec lifecycle transition. Body `{action, ...}`: dispatch/undispatch take `paths[]` (and `run` for dispatch) and return per-spec arrays; archive/unarchive take a single path and return `{path, status}` |
-| **Whiteboard** | |
-| `GET /api/whiteboard` | Read the per-workspace whiteboard document |
-| `PUT /api/whiteboard` | Write the per-workspace whiteboard document (dedicated body limit) |
 | **Agent session** | |
 | `GET /api/agent` | Agent session status (running or not) |
 | `POST /api/agent` | Start the agent session (idempotent) |
@@ -137,12 +119,6 @@ A few endpoints are registered directly in `BuildMux` and are intentionally abse
 
 | Method + Path | Purpose |
 |---|---|
-| `GET /api/terminal/ws` | Interactive host shell over WebSocket (PTY relay). See [WebSocket Terminal](#websocket-terminal). |
-| `GET /api/docs` | List embedded docs (`{slug, title, category, order}`), reading-order sorted |
-| `GET /api/docs/{slug...}` | Serve one embedded doc as `text/markdown` (path-traversal guarded) |
-| `GET /api/docs-asset/{path...}` | Serve embedded doc images; only whitelisted image extensions are served |
-| `GET /api/docs-search` | Full-text search over embedded doc bodies (not just titles), capped at 20 hits; backs the command palette |
-| `GET /metrics` | Prometheus text exposition (see [Metrics Reference](#metrics-reference)) |
 | `/` | Serves the embedded SPA index on `GET` and `HEAD` for every path no other route matches outside `/api`, so client-side routes survive a hard load. Other methods answer 405 with an `Allow` header. Method-agnostic because ServeMux would treat `GET /` and the `/api/` catch-all as conflicting patterns |
 | `/api/`, `/api` | Every path under `/api` that no route serves answers in the error envelope, for any method: 405 `method_not_allowed` with an `Allow` header when a route serves the path under other methods, else 404 `not_found`. Never the SPA shell (`internal/webserver/catchall.go`) |
 | `GET /assets/`, `GET /fonts/` | Embedded SPA assets with long-lived `Cache-Control` |
@@ -164,20 +140,20 @@ flowchart TD
     StoreGuard --> Handler["Handler method"]
 ```
 
-The chain is assembled in `internal/cli/server.go` (outermost first: otel, logging, CSRF, BearerAuth, mux). `CSRFMiddleware` is unconditional:
+The chain is assembled in `internal/cli/server.go` (outermost first: logging, CSRF, BearerAuth, mux). `CSRFMiddleware` is unconditional:
 ```go
 var srvHandler http.Handler = handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
-srv := &http.Server{Handler: otel.Handler(loggingMiddleware(srvHandler, reg), ...), ...}
+srv := &http.Server{Handler: loggingMiddleware(srvHandler), ...}
 ```
 
 ### What each middleware does
 
 | Layer | Location | Behavior |
 |---|---|---|
-| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels; unmatched requests (404, empty `r.Pattern`) collapse to a single `route="<unmatched>"` series to bound label cardinality. |
+| **Logging** | `cli/server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration at info level, and every other request (the SPA shell and its assets) at debug. |
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | Unconditional. For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`), `GET /metrics`, and streaming/WebSocket paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`, `/api/terminal/ws`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
+| **BearerAuth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the SPA shell routes and embedded assets (`GET`/`HEAD`, see `publicUIPath`) and streaming paths (`/api/tasks/stream`, `/api/git/stream`, `/api/explorer/stream`, `/api/specs/stream`, `*/logs`) which accept `?token=<key>` as a query parameter instead. `wallfacer run` generates and persists a key when none is configured, so the API is never open; the browser receives it in `index.html` on a loopback request. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
 | **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `PickFolder`, `MkdirWorkspace`, `RenameWorkspace`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`, and the workspace CRUD routes (`ListWorkspaces`, `CreateWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`, `ActivateWorkspace`), which must work before any workspace is open. |
 
@@ -262,10 +238,6 @@ preventing data races.
 
 When the client disconnects, `r.Context().Done()` fires in the SSE loop. The deferred `store.Unsubscribe(subID)` removes the channel from the subscribers map and drains any buffered deltas to free memory. The channel is **not** closed; `StreamTasks` is always the caller of `Unsubscribe`, so there is no blocked receiver to wake.
 
-### Wake-Only Subscribers
-
-In addition to the full-delta channel, the store provides a lightweight `SubscribeWake()` mechanism: a `chan struct{}` with capacity 1. Rapid bursts of notifications coalesce; once the channel is full, subsequent sends are no-ops. This is used by watchers (auto-promoter, auto-retrier, etc.) that only need a "something changed" signal, not the full delta payload.
-
 ### Git Status Stream (`GET /api/git/stream`)
 
 Implemented in `Handler.GitStatusStream()` (`internal/handler/git.go`). Unlike the task stream, git status uses a **polling ticker** (every 5 seconds) rather than store-driven pub/sub. On each tick, the handler collects `git status` for all workspaces, JSON-marshals the result, compares it byte-for-byte with the previous emission, and only sends an SSE frame if the data has changed.
@@ -286,50 +258,6 @@ Implemented in `Handler.SpecTreeStream()` (`internal/handler/specs.go`). Uses a 
 
 Not SSE in the strict sense; this endpoint streams raw `text/plain` output. Execution is host-process, so there is no container to shell out to. When a turn is running, the handler prefers the in-process live-log reader: `h.runner.TaskLogReader(id)` returns a `*runner.LiveLogReader` (`internal/handler/stream.go:214`), and `streamLiveLog` first writes the completed turns saved on disk (so the client has full history), then relays the current turn's live chunks. When no turn is running, it falls back to the stored turn outputs on disk. A keepalive ticker keeps the connection alive and detects client disconnects.
 
-## WebSocket Terminal
-
-`GET /api/terminal/ws` is the project's only WebSocket endpoint. It provides an interactive host shell via a PTY relay. Unlike the REST routes defined in `internal/apicontract/routes.go`, this endpoint is registered directly in `BuildMux` (`internal/cli/server.go`) because WebSocket upgrades don't follow REST request/response semantics.
-
-The handler (`internal/handler/terminal.go`) manages multiple concurrent shell sessions per WebSocket connection via a `sessionRegistry`. On connect, one session is auto-created. The relay dispatcher routes PTY output from the active session to the client and directs client input to the active session's PTY. Session switching re-resolves the active session without reconnecting.
-
-Every session is a host shell rooted at the workspace directory. (Earlier builds could exec into a sandbox container; the shipping host-process runtime has no container to exec into, so the `create_session` message carries no target and always spawns a host shell.)
-
-The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers. The upgrade also enforces a same-host `Origin` check: the origin must match the request `Host`, or both must be loopback aliases (`localhost`, `127.0.0.1`, `::1`) on the same port. A foreign origin gets 403, so a web page open in the same browser cannot dial the local shell. Requests without an `Origin` header (non-browser clients) pass.
-
-### Message Protocol
-
-**Client → Server (JSON text frames):**
-
-| Type | Fields | Description |
-|------|--------|-------------|
-| `input` | `data` (base64) | Terminal input bytes |
-| `resize` | `cols`, `rows` | Resize the active session's PTY |
-| `ping` |, | Keep-alive; server responds with `pong` |
-| `create_session` |, | Spawn a new host shell session |
-| `switch_session` | `session` (ID) | Switch the active session |
-| `close_session` | `session` (ID) | Close and remove a session |
-
-**Server → Client (JSON text frames):**
-
-| Type | Fields | Description |
-|------|--------|-------------|
-| `pong` |, | Keep-alive response |
-| `sessions` | `sessions` (array of `{id, active}`) | Full session list; sent on connect and after any session change |
-| `session_created` | `session` (ID) | New session spawned |
-| `session_switched` | `session` (ID) | Active session changed |
-| `session_closed` | `session` (ID) | Session removed |
-| `session_exited` | `session` (ID) | Session's shell process exited |
-| `error` | `data` (string) | Error message (e.g., invalid session ID) |
-
-**Server → Client (binary frames):** Raw PTY output from the active session.
-
-### Architecture
-
-- **`sessionRegistry`** (`terminal.go`): manages `map[string]*terminalSession`, tracks the active session, and provides `create`, `switchTo`, `remove`, `closeAll`, and `activeSession` methods. A `switchCh` channel signals the relay dispatcher when the active session changes.
-- **Relay goroutines** (started in `HandleTerminalWS`): the PTY→WS goroutine re-resolves the active session on each switch signal. The WS→PTY goroutine resolves `activeSession()` per message.
-- **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
-- **Frontend** (`frontend/src/components/TerminalPanel.vue`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
-
 ## Host Execution
 
 Each task runs as a host process: the runner builds a launch spec and the host backend (`internal/executor`) execs the selected agent CLI (`claude`, `codex`, `cursor-agent`, `opencode`, or `pi`, chosen by the task's resolved harness) directly, with the task's git worktree as the working directory. There is no container daemon, image pull, or bind-mount; cancellation is `SIGTERM` then `SIGKILL` on the host process.
@@ -344,36 +272,6 @@ wallfacer.task.prompt=<first 80 chars>
 ```
 
 These labels are set by the runner (`internal/runner/container.go`). The host backend records them per running process and surfaces them via `ContainerInfo.TaskID` on `List()`; `ListContainers()` uses this to correlate running processes to tasks. (The `Container*` Go names are legacy vocabulary; the behavior is host-process tracking, not container runtime.)
-
-## Metrics Reference
-
-All metrics are served at `GET /metrics` in Prometheus text exposition format via `metrics.Registry.WritePrometheus()`.
-
-### Counters
-
-| Metric | Labels | Description |
-|---|---|---|
-| `wallfacer_http_requests_total` | `method`, `route`, `status` | Total HTTP requests. Route uses `r.Pattern` (Go 1.22+) to collapse parameterised paths. |
-| `wallfacer_autoimplement_actions_total` | `watcher`, `outcome` | Autonomous actions taken by autoimplement watchers (e.g. promote, retry, test, submit). |
-
-### Histograms
-
-| Metric | Labels | Buckets | Description |
-|---|---|---|---|
-| `wallfacer_http_request_duration_seconds` | `method`, `route` | 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s | HTTP request latency distribution. |
-
-### Gauges (scrape-time)
-
-These are computed on each `/metrics` scrape via registered collector functions:
-
-| Metric | Labels | Description |
-|---|---|---|
-| `wallfacer_tasks_total` | `status`, `archived` | Number of tasks grouped by status and archived flag. |
-| `wallfacer_running_containers` |, | Number of running task processes currently tracked (legacy metric name; the value counts host processes). |
-| `wallfacer_background_goroutines` |, | Number of outstanding background goroutines tracked by the runner's `trackedwg.WaitGroup`. |
-| `wallfacer_store_subscribers` |, | Number of active SSE subscribers listening for task state changes. |
-| `wallfacer_failed_tasks_by_category` | `category` | Number of currently-failed (non-archived) tasks grouped by failure category. |
-| `wallfacer_circuit_breaker_open` |, | 1 when the launch circuit breaker is open (executor unavailable), 0 when closed. |
 
 ## Token Tracking & Cost
 
@@ -393,7 +291,7 @@ Usage is displayed on task cards and aggregated in the Done column header. It pe
 
 In addition to the aggregate `TaskUsage`, each task records:
 
-- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `oversight`, `commit_message`, `review`. Tasks stored by earlier releases may also carry `test`, `oversight-test` and `title` keys. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `oversight`, `commit_message`. Tasks stored by earlier releases may also carry `test`, `oversight-test`, `title` and `review` keys. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
 - Per-turn `TurnUsageRecord` entries accessible via `GET /api/tasks/{id}/turn-usage`, providing detailed per-turn token consumption, stop reasons, and sub-agent labels.
 
 ## Task Search
@@ -407,7 +305,6 @@ The search index is maintained in-memory and updated on task changes. Use `POST 
 Key execution phases are instrumented with `span_start` / `span_end` trace events. Each span carries a `SpanData` payload with a `Phase` (e.g. `worktree_setup`, `agent_turn`, `commit`) and an optional `Label` to differentiate multiple spans of the same phase.
 
 - `GET /api/tasks/{id}/spans` returns all span events for a task, useful for profiling turn latency
-- `GET /api/debug/spans`: aggregate span timing statistics across all tasks
 
 ## Event Pagination
 
@@ -486,13 +383,11 @@ sequenceDiagram
     participant OS as OS Signal
     participant Ctx as signal.NotifyContext
     participant Srv as http.Server
-    participant Watchers as Automation Watchers
     participant Runner as Runner
 
     OS->>Ctx: SIGTERM / SIGINT
     Ctx->>Ctx: cancel context
     Note over Ctx: All SSE handlers exit<br/>(request contexts derived from base)
-    Note over Ctx: All automation watchers exit<br/>(select on ctx.Done())
 
     Ctx->>Srv: srv.Shutdown(5s timeout)
     Note over Srv: Stop accepting new connections<br/>Wait up to 5s for in-flight requests
@@ -505,7 +400,7 @@ sequenceDiagram
 
 ### Shutdown sequence in detail
 
-1. **Signal received**. `signal.NotifyContext` cancels the base context. All SSE handlers and automation watchers detect `ctx.Done()` and exit their loops.
+1. **Signal received**. `signal.NotifyContext` cancels the base context. All SSE handlers and the worktree maintenance goroutines detect `ctx.Done()` and exit their loops.
 
 2. **HTTP server shutdown**. `srv.Shutdown()` is called with a 5-second timeout. This stops accepting new connections and waits for in-flight requests to complete. SSE handlers exit promptly because their request contexts (derived from `BaseContext`) are already cancelled.
 
@@ -515,11 +410,11 @@ sequenceDiagram
    - Waits for the board subscription goroutine via `boardSubscriptionWg.Wait()`.
    - Waits for all tracked background goroutines via `backgroundWg.Wait()`, logging pending labels every 3 seconds so operators can see what is still running.
 
-4. **In-progress tasks survive**. Running task processes are intentionally left alive. They continue to completion independently and will be recovered on the next server start via `RecoverOrphanedTasks`.
+4. **In-progress tasks are recovered on the next start**. Running agent processes are not waited for. On the next start, `RecoverOrphanedTasks` moves their tasks to `waiting` (see [Background Work and Recovery](background-work.md#recoverorphanedtasks)).
 
 ## See Also
 
 - [Architecture](architecture.md): System overview, design decisions, component responsibilities, concurrency model
-- [Automation](automation.md): Autoimplement watchers, auto-retry, circuit breakers, oversight
+- [Background Work and Recovery](background-work.md): goroutine model, startup recovery, oversight generation
 - [Task Lifecycle](task-lifecycle.md): State machine, turn loop, data models
 - [Git Worktrees](git-worktrees.md): Per-task worktree isolation and commit pipeline

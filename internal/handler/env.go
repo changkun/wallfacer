@@ -112,26 +112,20 @@ type envConfigResponse struct {
 	MaxParallelTasks     int                                  `json:"max_parallel_tasks"`
 	MaxAgents            int                                  `json:"max_agents"`
 	AgentNice            int                                  `json:"agent_nice"`
-	ReviewRounds         int                                  `json:"review_rounds"`
-	ReviewCostCap        int                                  `json:"review_cost_cap"`
-	ReviewModel          string                               `json:"review_model"`
 	OversightInterval    int                                  `json:"oversight_interval"`
 	ArchivedTasksPerPage int                                  `json:"archived_tasks_per_page"`
-	AutoPushEnabled      bool                                 `json:"auto_push_enabled"`
-	AutoPushThreshold    int                                  `json:"auto_push_threshold"`
 }
 
 // sandboxTestResponse is the JSON body returned after running a sandbox
 // smoke-check via POST /api/env/test. Passed is true when the probe run
 // ended with the harness's answer rather than an error.
 type sandboxTestResponse struct {
-	TaskID          string     `json:"task_id"`
-	Sandbox         harness.ID `json:"sandbox"`
-	Status          string     `json:"status"`
-	Passed          bool       `json:"passed"`
-	Result          string     `json:"result,omitempty"`
-	StopReason      string     `json:"stop_reason,omitempty"`
-	ReauthAvailable bool       `json:"reauth_available,omitempty"`
+	TaskID     string     `json:"task_id"`
+	Sandbox    harness.ID `json:"sandbox"`
+	Status     string     `json:"status"`
+	Passed     bool       `json:"passed"`
+	Result     string     `json:"result,omitempty"`
+	StopReason string     `json:"stop_reason,omitempty"`
 }
 
 // sandboxTestRequest is the JSON body accepted by POST /api/env/test.
@@ -163,25 +157,12 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	if maxParallel <= 0 {
 		maxParallel = constants.DefaultMaxConcurrentTasks
 	}
-	autoPushThreshold := cfg.AutoPushThreshold
-	if autoPushThreshold <= 0 {
-		autoPushThreshold = 1
-	}
 	archivedTasksPerPage := cfg.ArchivedTasksPerPage
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = constants.DefaultArchivedTasksPerPage
 	}
-	// Review bounds: report the effective value (env override, else the
-	// defaults). agentNice 0 reports the backend default; negative means
-	// throttling is disabled. maxAgents 0 means unlimited.
-	reviewRounds := cfg.ReviewMaxRounds
-	if reviewRounds <= 0 {
-		reviewRounds = reviewMaxRounds
-	}
-	reviewCap := cfg.ReviewCostCap
-	if reviewCap <= 0 {
-		reviewCap = reviewCostCap
-	}
+	// agentNice 0 reports the backend default; negative means throttling is
+	// disabled. maxAgents 0 means unlimited.
 	agentNice := cfg.AgentNice
 	if agentNice == 0 {
 		agentNice = executor.DefaultAgentNice
@@ -200,13 +181,8 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		MaxParallelTasks:     maxParallel,
 		MaxAgents:            cfg.MaxAgents,
 		AgentNice:            agentNice,
-		ReviewRounds:         reviewRounds,
-		ReviewCostCap:        reviewCap,
-		ReviewModel:          cfg.ReviewModel,
 		OversightInterval:    cfg.OversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
-		AutoPushEnabled:      cfg.AutoPushEnabled,
-		AutoPushThreshold:    autoPushThreshold,
 	})
 }
 
@@ -352,12 +328,6 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	h.setSandboxTestPassed(sb, passed)
 
-	// Detect auth errors and offer re-auth when OAuth is available.
-	if !passed {
-		resp.ReauthAvailable = isAuthError(resp.Result, resp.StopReason) &&
-			isOAuthAvailable(sb, h.envFile)
-	}
-
 	httpjson.Write(w, http.StatusOK, resp)
 }
 
@@ -431,14 +401,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		MaxParallelTasks     *int                                 `json:"max_parallel_tasks"`
 		MaxAgents            *int                                 `json:"max_agents"`
 		AgentNice            *int                                 `json:"agent_nice"`
-		ReviewRounds         *int                                 `json:"review_rounds"`
-		ReviewCostCap        *int                                 `json:"review_cost_cap"`
-		ReviewModel          *string                              `json:"review_model"`
 		OversightInterval    *int                                 `json:"oversight_interval"`
 		ArchivedTasksPerPage *int                                 `json:"archived_tasks_per_page"`
-		AutoPushEnabled      *bool                                `json:"auto_push_enabled"`
-		AutoPushThreshold    *int                                 `json:"auto_push_threshold"`
-		TerminalEnabled      *bool                                `json:"terminal_enabled"`
 	}](w, r)
 	if !ok {
 		return
@@ -482,21 +446,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		agentNice = &s
 	}
 
-	// Convert review rounds and cost cap, each clamped to [1, ∞). They apply
-	// live: reviewTuning re-reads them on each round.
-	var reviewRounds *string
-	if req.ReviewRounds != nil {
-		v := max(*req.ReviewRounds, 1)
-		s := fmt.Sprintf("%d", v)
-		reviewRounds = &s
-	}
-	var reviewCostCap *string
-	if req.ReviewCostCap != nil {
-		v := max(*req.ReviewCostCap, 1)
-		s := fmt.Sprintf("%d", v)
-		reviewCostCap = &s
-	}
-
 	// Convert oversight_interval int to string for the env file.
 	// Clamp to [0, 120]: 0 = disabled; 120 minutes = max.
 	var oversightInterval *string
@@ -510,34 +459,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		v := min(max(*req.ArchivedTasksPerPage, 1), 200)
 		s := fmt.Sprintf("%d", v)
 		archivedTasksPerPage = &s
-	}
-
-	// Convert auto_push_enabled bool to string for the env file.
-	var autoPush *string
-	if req.AutoPushEnabled != nil {
-		v := "false"
-		if *req.AutoPushEnabled {
-			v = "true"
-		}
-		autoPush = &v
-	}
-
-	// Convert auto_push_threshold int to string for the env file.
-	// Clamp to [1, ∞): minimum threshold is 1 commit ahead.
-	var autoPushThreshold *string
-	if req.AutoPushThreshold != nil {
-		v := max(*req.AutoPushThreshold, 1)
-		s := fmt.Sprintf("%d", v)
-		autoPushThreshold = &s
-	}
-
-	var terminalEnabled *string
-	if req.TerminalEnabled != nil {
-		v := "false"
-		if *req.TerminalEnabled {
-			v = "true"
-		}
-		terminalEnabled = &v
 	}
 
 	// Validate the base URL if provided to prevent SSRF.
@@ -571,14 +492,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		MaxParallel:          maxParallel,
 		MaxAgents:            maxAgents,
 		AgentNice:            agentNice,
-		ReviewRounds:         reviewRounds,
-		ReviewCostCap:        reviewCostCap,
-		ReviewModel:          req.ReviewModel,
 		OversightInterval:    oversightInterval,
 		ArchivedTasksPerPage: archivedTasksPerPage,
-		AutoPush:             autoPush,
-		AutoPushThreshold:    autoPushThreshold,
-		TerminalEnabled:      terminalEnabled,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -598,49 +513,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Invalidate the cached parallel-limit value so the next call to
-	// maxConcurrentTasks re-reads from the env file.
+	// Invalidate the cached parallel limit so the next call to
+	// maxConcurrentTasks re-reads it from the env file.
 	h.cachedMaxParallel.Invalidate()
 
-	// When the parallel task limit changes, re-evaluate immediately so new
-	// capacity is filled without waiting for the next store event.
-	if req.MaxParallelTasks != nil {
-		go h.tryAutoPromote(h.runner.ShutdownCtx())
-	}
-
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// isAuthError checks if the probe's result or stop reason contains
-// authentication error indicators.
-func isAuthError(result, stopReason string) bool {
-	combined := strings.ToLower(result + " " + stopReason)
-	for _, pattern := range []string{
-		"unauthorized", "401", "403",
-		"invalid token", "invalid_token", "invalid api key", "invalid_api_key",
-		"expired token", "expired_token",
-		"authentication", "permission denied",
-	} {
-		if strings.Contains(combined, pattern) {
-			return true
-		}
-	}
-	return false
-}
-
-// isOAuthAvailable returns true if the sandbox type supports OAuth sign-in
-// and no custom base URL is configured (custom endpoints won't use standard OAuth).
-func isOAuthAvailable(sb harness.ID, envFile string) bool {
-	cfg, err := envconfig.Parse(envFile)
-	if err != nil {
-		return false
-	}
-	switch sb {
-	case harness.Claude:
-		return cfg.BaseURL == ""
-	case harness.Codex:
-		return cfg.OpenAIBaseURL == ""
-	default:
-		return false
-	}
 }

@@ -10,13 +10,6 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// containerCircuitStatus is the JSON shape for the container circuit breaker
-// snapshot inside runtimeStatusResponse.
-type containerCircuitStatus struct {
-	State    string `json:"state"`
-	Failures int    `json:"failures"`
-}
-
 // runtimeStatusResponse is the JSON shape returned by GET /api/debug/runtime.
 type runtimeStatusResponse struct {
 	Goroutines       []string                 `json:"goroutines"`
@@ -24,7 +17,6 @@ type runtimeStatusResponse struct {
 	GoHeapAllocBytes uint64                   `json:"go_heap_alloc_bytes"`
 	TaskStates       map[store.TaskStatus]int `json:"task_states"`
 	ActiveContainers int                      `json:"active_containers"`
-	ContainerCircuit containerCircuitStatus   `json:"container_circuit"`
 	Timestamp        time.Time                `json:"timestamp"`
 }
 
@@ -76,10 +68,6 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 		GoHeapAllocBytes: m.HeapAlloc,
 		TaskStates:       taskStates,
 		ActiveContainers: activeContainers,
-		ContainerCircuit: containerCircuitStatus{
-			State:    h.runner.ContainerCircuitState(),
-			Failures: h.runner.ContainerCircuitFailures(),
-		},
-		Timestamp: time.Now().UTC(),
+		Timestamp:        time.Now().UTC(),
 	})
 }

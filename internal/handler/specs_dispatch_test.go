@@ -788,7 +788,7 @@ func TestDispatchSpecs_RunStatusWriteFailureSkipsRunner(t *testing.T) {
 	}
 
 	mock := &runner.MockRunner{}
-	h := NewHandler(s, mock, configDir, []string{ws}, nil)
+	h := NewHandler(s, mock, configDir, []string{ws})
 
 	writeTestSpec(t, ws, "specs/local/test.md", testSpecValidated)
 
@@ -832,7 +832,7 @@ func TestUndispatchSpecs_KeepsLinkageWhenCancelFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
-	h := NewHandler(s, &runner.MockRunner{}, t.TempDir(), []string{ws}, nil)
+	h := NewHandler(s, &runner.MockRunner{}, t.TempDir(), []string{ws})
 
 	writeTestSpec(t, ws, "specs/local/cancel.md", testSpecValidated)
 	dw, dresp := doDispatch(t, h, []string{"specs/local/cancel.md"}, false)

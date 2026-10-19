@@ -11,7 +11,6 @@ import (
 
 	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/harness"
-	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
@@ -114,7 +113,6 @@ func (h *Handler) activeGroupInfos(ctx context.Context) []activeGroupInfo {
 // GET /api/config and reused by UpdateWorkspaces after a workspace switch.
 // When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
-	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()
 
 	groups, _ := workspace.LoadGroups(h.configDir)
@@ -187,37 +185,20 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		})
 	}
 
-	watcherNames := []string{"auto-promote", "auto-retry", "auto-submit", "auto-sync", "auto-review"}
-	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
-	for _, name := range watcherNames {
-		if wb, ok := h.breakers[name]; ok {
-			watcherHealth = append(watcherHealth, wb.healthEntry(name))
-		}
-	}
-
 	resp := map[string]any{
-		"workspaces":                workspaces,
-		"workspace_id":              h.activeWorkspaceID(),
-		"workspace_browser_path":    workspaceBrowserPath,
-		"workspace_groups":          keyedGroups,
-		"prompts_dir":               promptsDir,
-		"sandbox_activities":        store.SandboxActivities,
-		"sandboxes":                 harness.All(),
-		"default_sandbox":           harness.Claude,
-		"sandbox_usable":            allSandboxesUsable(),
-		"sandbox_reasons":           map[string]string{},
-		"activity_sandboxes":        map[string]string{},
-		"autoimplement":             h.AutoimplementEnabled(),
-		"autosubmit":                h.AutosubmitEnabled(),
-		"autosync":                  h.AutosyncEnabled(),
-		"autopush":                  h.AutopushEnabled(),
-		"review":                    h.ReviewEnabled(),
-		"default_model":             "",
-		"payload_limits":            payloadLimits,
-		"watcher_health":            watcherHealth,
-		"active_groups":             h.activeGroupInfos(ctx),
-		"terminal_enabled":          true,
-		"agent_session_window_days": 30,
+		"workspaces":             workspaces,
+		"workspace_id":           h.activeWorkspaceID(),
+		"workspace_browser_path": workspaceBrowserPath,
+		"workspace_groups":       keyedGroups,
+		"sandbox_activities":     store.SandboxActivities,
+		"sandboxes":              harness.All(),
+		"default_sandbox":        harness.Claude,
+		"sandbox_usable":         allSandboxesUsable(),
+		"sandbox_reasons":        map[string]string{},
+		"activity_sandboxes":     map[string]string{},
+		"default_model":          "",
+		"payload_limits":         payloadLimits,
+		"active_groups":          h.activeGroupInfos(ctx),
 	}
 	if cfg == nil {
 		return resp
@@ -245,8 +226,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["sandbox_reasons"] = sandboxReasons
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
-	resp["terminal_enabled"] = cfg.TerminalEnabled
-	resp["agent_session_window_days"] = cfg.AgentSessionWindowDays
 	return resp
 }
 
@@ -261,17 +240,11 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
 }
 
-// UpdateConfig handles PUT /api/config to update server-level settings.
+// UpdateConfig handles PUT /api/config: it saves the workspace groups (with
+// their per-group parallel limits) and answers with the updated config.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	req, ok := httpjson.DecodeBody[struct {
-		Autoimplement    *bool                 `json:"autoimplement"`
-		Autosubmit       *bool                 `json:"autosubmit"`
-		Autosync         *bool                 `json:"autosync"`
-		Autopush         *bool                 `json:"autopush"`
-		Review           *bool                 `json:"review"`
-		Ideation         *bool                 `json:"ideation"`          // retired; accepted for old clients but ignored
-		IdeationInterval *int                  `json:"ideation_interval"` // retired; accepted for old clients but ignored
-		WorkspaceGroups  []workspace.Workspace `json:"workspace_groups"`
+		WorkspaceGroups []workspace.Workspace `json:"workspace_groups"`
 	}](w, r)
 	if !ok {
 		return
@@ -283,55 +256,5 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		h.reloadGroupLimits()
 	}
-	// Background passes outlive the HTTP request, so they must run on a
-	// detached context: r.Context() is cancelled the moment UpdateConfig
-	// returns (mirrors the agent exec goroutine).
-	applyBoolToggle(context.Background(), req.Autoimplement, h.SetAutoimplement, h.AutoimplementEnabled, h.tryAutoPromote)
-	applyBoolToggle(context.Background(), req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
-	applyBoolToggle(context.Background(), req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
-	applyBoolToggle(context.Background(), req.Review, h.SetReview, h.ReviewEnabled, h.tryAutoReview)
-	// Persist any toggle changes to the viewed group so switching away
-	// and back does not reset the user's automation choices, and a
-	// different group on this server stays manual unless the user turns
-	// automation on for it explicitly.
-	if req.Autoimplement != nil || req.Autosubmit != nil || req.Autosync != nil {
-		h.persistCurrentGroupToggles()
-	}
-	// Auto-push: update both the in-memory toggle and the .env file so the
-	// runner (which reads .env on every commit) picks it up immediately.
-	if req.Autopush != nil {
-		h.SetAutopush(*req.Autopush)
-		if h.envFile != "" {
-			v := "false"
-			if *req.Autopush {
-				v = "true"
-			}
-			if err := envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v}); err != nil {
-				logger.Handler.Warn("config: failed to persist autopush setting to .env", "error", err)
-			}
-		}
-	}
-	resp := map[string]any{
-		"autoimplement": h.AutoimplementEnabled(),
-		"autosubmit":    h.AutosubmitEnabled(),
-		"autosync":      h.AutosyncEnabled(),
-		"autopush":      h.AutopushEnabled(),
-		"review":        h.ReviewEnabled(),
-	}
-	httpjson.Write(w, http.StatusOK, resp)
-}
-
-// applyBoolToggle applies a tri-state bool field from a config update: when
-// reqVal is non-nil it stores the value, and if the feature is then enabled it
-// kicks an immediate background pass via onEnable. ctx must be detached from
-// the HTTP request because the pass outlives the request; callers pass
-// context.Background().
-func applyBoolToggle(ctx context.Context, reqVal *bool, set func(bool), enabled func() bool, onEnable func(context.Context)) {
-	if reqVal == nil {
-		return
-	}
-	set(*reqVal)
-	if enabled() {
-		go onEnable(ctx)
-	}
+	h.GetConfig(w, r)
 }

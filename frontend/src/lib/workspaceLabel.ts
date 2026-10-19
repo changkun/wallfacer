@@ -21,9 +21,9 @@ export function groupLabel(g: { name?: string; workspaces: string[] }): string {
 }
 
 /** Display label for a first-class workspace: the trimmed name, else the folder
- * basenames joined with " + " (matching the sidebar/group convention), else a
- * never-blank placeholder. Used everywhere a workspace is shown so an unnamed
- * workspace never renders empty. */
+ * basename (basenames joined with " + " for a dormant workspace saved with
+ * several folders), else a never-blank placeholder. Used everywhere a workspace
+ * is shown so an unnamed workspace never renders empty. */
 export function workspaceLabel(name: string | undefined, folders: string[]): string {
   const trimmed = name?.trim();
   if (trimmed) return trimmed;

@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend e2e-lifecycle ui-test commit-seq push-once skills-check skills-pull skills-push
+.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend ui-test commit-seq push-once skills-check skills-pull skills-push
 
 # Full build gate: fmt + frontend assets + the shared bar and the repo's own
 # checks + binary.
@@ -79,15 +79,6 @@ lint-all: check lint-js lint-truncate
 # Everything CI runs: the whole shared bar, the frontend suite and typecheck,
 # and the repo-specific guardrails.
 test-all: check test-frontend lint-js lint-truncate skills-check
-
-# End-to-end: task lifecycle (create, run, archive) for both Claude and Codex.
-# Requires a running wallfacer server with valid credentials.
-# Usage:
-#   make e2e-lifecycle                  # both agents
-#   make e2e-lifecycle SANDBOX=claude   # claude only
-SANDBOX ?=
-e2e-lifecycle:
-	sh scripts/e2e-lifecycle.sh $(SANDBOX)
 
 # UI regression checks: boot wallfacer against seeded demo data and assert UI
 # invariants (render-crash + broken-layout) in a real browser. Catches the class

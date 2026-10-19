@@ -95,31 +95,6 @@ func TestMigrateTaskJSON_SandboxNormalized(t *testing.T) {
 	}
 }
 
-func TestMigrateTaskJSON_AutoRetryBudgetBackfilled(t *testing.T) {
-	// Task with no auto_retry_budget should get defaults.
-	raw := buildMinimalTaskJSON(t, nil)
-
-	task, changed, err := migrateTaskJSON(raw, time.Now())
-	if err != nil {
-		t.Fatalf("migrateTaskJSON: %v", err)
-	}
-	if !changed {
-		t.Error("expected changed=true when auto_retry_budget was nil")
-	}
-	if task.AutoRetryBudget == nil {
-		t.Fatal("expected non-nil AutoRetryBudget after migration")
-	}
-	if task.AutoRetryBudget[FailureCategoryContainerCrash] != 2 {
-		t.Errorf("ContainerCrash budget = %d, want 2", task.AutoRetryBudget[FailureCategoryContainerCrash])
-	}
-	if task.AutoRetryBudget[FailureCategorySyncError] != 2 {
-		t.Errorf("SyncError budget = %d, want 2", task.AutoRetryBudget[FailureCategorySyncError])
-	}
-	if task.AutoRetryBudget[FailureCategoryWorktree] != 1 {
-		t.Errorf("Worktree budget = %d, want 1", task.AutoRetryBudget[FailureCategoryWorktree])
-	}
-}
-
 func TestMigrateTaskJSON_SchemaVersionStamped(t *testing.T) {
 	raw := buildMinimalTaskJSON(t, nil)
 

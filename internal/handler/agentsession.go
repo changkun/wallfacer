@@ -700,11 +700,6 @@ func (h *Handler) SendAgentMessage(w http.ResponseWriter, r *http.Request) {
 						continue
 					}
 					planRound = max(planRound, n)
-					// Auto-push after a successful planning commit, mirroring the
-					// behavior of the task "mark as done" flow.
-					if n > 0 && h.runner != nil {
-						h.runner.MaybeAutoPushWorkspace(commitCtx, ws)
-					}
 				}
 			}
 			if resultText != "" {

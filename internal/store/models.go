@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/statemachine"
 
-	"latere.ai/x/wallfacer/internal/constants"
 	"latere.ai/x/wallfacer/internal/harness"
 )
 
@@ -27,8 +26,7 @@ type TaskUsage struct {
 
 // Add accumulates every field of other into u. Centralized so callers
 // can't accidentally drop one of the cache-token fields when summing
-// usage across tasks (a bug the per-bucket aggregations in
-// /api/stats used to have).
+// usage across tasks.
 func (u *TaskUsage) Add(other TaskUsage) {
 	u.InputTokens += other.InputTokens
 	u.OutputTokens += other.OutputTokens
@@ -149,13 +147,6 @@ const (
 	SandboxActivityCommitMessage SandboxActivity = "commit_message"
 	// SandboxActivityAgentSession is the interactive agent-session (chat) phase.
 	SandboxActivityAgentSession SandboxActivity = "agent-session"
-
-	// SandboxActivityReview is the review role's activity: the reviewer's usage
-	// is attributed to it in the task's usage breakdown, and the reviewer's
-	// harness resolves through it like any other role's. It is not offered for
-	// per-task routing (SandboxActivities), so by default the reviewer runs on
-	// the task's harness with the reviewer model.
-	SandboxActivityReview SandboxActivity = "review"
 )
 
 // SandboxActivities lists activities that support per-activity sandbox routing.
@@ -281,9 +272,8 @@ type Task struct {
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 	SnapshotDiffs    map[string]string `json:"snapshot_diffs,omitempty"`     // repoPath → diff text (non-git workspaces only)
 	CommitMessage    string            `json:"commit_message,omitempty"`     // generated commit message from the commit pipeline
-	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
-	Model            string            `json:"model,omitempty"`          // deprecated: retained for migration compatibility
-	ModelOverride    *string           `json:"model_override,omitempty"` // per-task model override; nil means use global default
+	Model            string            `json:"model,omitempty"`              // deprecated: retained for migration compatibility
+	ModelOverride    *string           `json:"model_override,omitempty"`     // per-task model override; nil means use global default
 
 	// Kind identifies the execution mode (e.g. TaskKindTask, TaskKindPlanning).
 	// Empty string and "task" are equivalent: a standard implementation task.
@@ -306,11 +296,6 @@ type Task struct {
 	// directly on the board. Enables reverse navigation from task → spec.
 	SpecSourcePath string `json:"spec_source_path,omitempty"`
 
-	// ScheduledAt is an optional future time before which the task will not
-	// be auto-promoted from backlog. Nil means "run as soon as there is
-	// capacity" (the existing default behavior).
-	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
-
 	// FailureCategory records the machine-readable root cause of the last
 	// failure transition. Set automatically by the runner at every
 	// TaskStatusFailed transition. Empty when the task has not failed.
@@ -320,40 +305,6 @@ type Task struct {
 	// by the server-side WALLFACER_MAX_TURN_OUTPUT_BYTES budget. Set
 	// automatically by SaveTurnOutput when truncation occurs.
 	TruncatedTurns []int `json:"truncated_turns,omitempty"`
-
-	// AutoRetryBudget maps each FailureCategory to the number of automatic
-	// retries remaining for that category. Decremented by IncrementAutoRetryCount.
-	// Nil or missing key means zero budget (no auto-retry for that category).
-	AutoRetryBudget map[FailureCategory]int `json:"auto_retry_budget,omitempty"`
-
-	// AutoRetryCount is the total number of auto-retries consumed across all
-	// categories. Capped at MaxAutoRetries.
-	AutoRetryCount int `json:"auto_retry_count,omitempty"`
-
-	// LastFetchError is the most recent git fetch error message, cleared on success.
-	LastFetchError string `json:"last_fetch_error,omitempty"`
-	// LastFetchErrorAt is when the last fetch failure was recorded.
-	LastFetchErrorAt *time.Time `json:"last_fetch_error_at,omitempty"`
-
-	// Review verdict fields, set when a review session finishes (auto-review
-	// or the manual /api/tasks/{id}/review trigger) and cleared on resume.
-	// nil ReviewUnresolved means no review has finished since the last turn.
-	// 0 means the reviewer approved.
-	// >0 is the number of open findings; ReviewHeadline holds the most severe
-	// one's claim. ReviewSessionDir is the session's record directory.
-	ReviewUnresolved *int   `json:"review_unresolved,omitempty"`
-	ReviewHeadline   string `json:"review_headline,omitempty"`
-	ReviewSessionDir string `json:"review_session_dir,omitempty"`
-}
-
-// IsAutoRetryEligible reports whether task t is eligible for an automatic retry
-// given the failure category that caused it to fail. It returns false when:
-//   - the per-category budget in AutoRetryBudget is zero or missing
-//   - the total AutoRetryCount has reached constants.MaxAutoRetries
-//
-// This is the single authoritative check used by both the runner and handler.
-func IsAutoRetryEligible(t Task, category FailureCategory) bool {
-	return t.AutoRetryBudget[category] > 0 && t.AutoRetryCount < constants.MaxAutoRetries
 }
 
 // EffectiveModel returns the per-task model pin, or "" when the task uses the
@@ -393,7 +344,7 @@ type Tombstone struct {
 
 // TaskSummary is an immutable snapshot written exactly once when a task
 // transitions to TaskStatusDone. It captures the final cost, usage breakdown,
-// and key metadata so that analytics endpoints can avoid re-reading the full
+// and key metadata so that summary readers can avoid re-reading the full
 // task.json for completed tasks.
 type TaskSummary struct {
 	TaskID                   uuid.UUID                     `json:"task_id"`
@@ -469,15 +420,10 @@ type Trigger string
 
 // Trigger constants.
 const (
-	TriggerUser        Trigger = "user"         // explicit user action (UI button, API call)
-	TriggerAutoPromote Trigger = "auto_promote" // auto-promoter moved task from backlog
-	TriggerAutoRetry   Trigger = "auto_retry"   // auto-retrier re-queued a failed task
-	TriggerAutoSubmit  Trigger = "auto_submit"  // auto-submitter marked a waiting task as done
-	TriggerFeedback    Trigger = "feedback"     // user feedback resumed a waiting task
-	TriggerAutoReview  Trigger = "auto_review"  // the review sent its findings to a waiting task as feedback
-	TriggerSync        Trigger = "sync"         // worktree sync/rebase operation
-	TriggerRecovery    Trigger = "recovery"     // server startup recovery of orphaned tasks
-	TriggerSystem      Trigger = "system"       // internal system action
+	TriggerUser     Trigger = "user"     // explicit user action (UI button, API call)
+	TriggerFeedback Trigger = "feedback" // user feedback resumed a waiting task
+	TriggerRecovery Trigger = "recovery" // server startup recovery of orphaned tasks
+	TriggerSystem   Trigger = "system"   // internal system action
 )
 
 // NewStateChangeData builds the canonical payload for a state_change event.

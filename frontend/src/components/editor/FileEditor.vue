@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
         type="button"
         class="btn sm file-editor__save"
         :disabled="tab.saving || !dirty"
-        :title="dirty ? 'Save (Cmd/Ctrl+S)' : 'No unsaved changes'"
+        :title="dirty ? 'Save' : 'No unsaved changes'"
         @click="onSave"
       >{{ tab.saving ? 'Saving…' : 'Save' }}</button>
     </div>

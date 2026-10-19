@@ -4,13 +4,13 @@ Wallfacer started as a practical response to a repeated workflow: write a task p
 
 The first version was a Go server with a minimal web UI. Tasks moved from backlog to in progress, executed in isolated git worktrees as host processes, and landed in done when complete. Each task got its own worktree, so many tasks could run in parallel on the same repository without colliding.
 
-Then the system kept growing into its own gaps. The execution engine gained process reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handles implementation, testing, auto-retry, and autoimplement promotion. An oversight layer (live logs, timelines, traces, diffs, and per-turn cost breakdown) ensures every agent decision is auditable before results are accepted.
+Then the system kept growing into its own gaps. The execution engine gained process reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handled implementation, testing, auto-retry, and autoimplement promotion. An oversight layer (live logs, timelines, traces, diffs, and per-turn cost breakdown) ensures every agent decision is auditable before results are accepted.
 
 Work is no longer one monolithic prompt per task. A dispatch layer composes specialized built-in agents (title, oversight, commit message, implementation, testing) into flows, so a single run can implement, test, then write a commit message, title, and oversight summary in one pass.
 
 As the projects grew in complexity, raw task prompts became insufficient. Design specs emerged as the thinking layer between ideas and executable tasks: structured documents with lifecycle states, dependency graphs, and recursive progress tracking. An agent chat made specs conversational: explore an idea in chat, iterate on the design, break it into tasks, dispatch to the board. The same chat handles prompt refinement, editing a task's instructions in place rather than through a separate flow.
 
-The integrated development environment now includes a file explorer with editor, an interactive host terminal, system prompt customization, and prompt templates, all accessible from the browser.
+The integrated development environment now includes a file explorer with an editor, accessible from the browser.
 
 The latest evolution narrows it back to a local tool: Wallfacer runs on one machine, drives the coding-agent CLIs installed there, and has no hosted service, sign-in or cloud mode behind it.
 

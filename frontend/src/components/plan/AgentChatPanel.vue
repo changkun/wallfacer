@@ -41,7 +41,7 @@ defineExpose({
         <button
           type="button"
           class="pcp-fold"
-          title="Hide chat (C)"
+          title="Hide chat"
           @click="emit('toggle')"
         >✕</button>
       </div>

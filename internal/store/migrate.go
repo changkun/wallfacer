@@ -21,8 +21,7 @@ import (
 //     clampTimeout, missing CreatedAt/UpdatedAt from file mod time.
 //  3. Normalize Sandbox (trim) and SandboxByActivity via
 //     normalizeSandboxByActivity.
-//  4. Backfill AutoRetryBudget for tasks created before schema version 2.
-//  5. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
+//  4. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
 //
 // Keys a stored record carries that Task does not declare, such as an older
 // record's depends_on list, are dropped by json.Unmarshal and disappear on
@@ -67,18 +66,6 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	}
 	if normalSBA := normalizeSandboxByActivity(task.SandboxByActivity); !maps.Equal(normalSBA, task.SandboxByActivity) {
 		task.SandboxByActivity = normalSBA
-		changed = true
-	}
-
-	// (3) Backfill AutoRetryBudget for tasks created before schema version 2.
-	// Only transient/infrastructure failures get a budget; agent_error and
-	// timeout are not retried automatically because they are likely to recur.
-	if task.AutoRetryBudget == nil {
-		task.AutoRetryBudget = map[FailureCategory]int{
-			FailureCategoryContainerCrash: 2,
-			FailureCategorySyncError:      2,
-			FailureCategoryWorktree:       1,
-		}
 		changed = true
 	}
 

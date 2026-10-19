@@ -2,12 +2,10 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"latere.ai/x/pkg/httpjson"
@@ -43,7 +41,7 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 
 // ListSummaries returns all immutable task summaries (one per completed task).
 // Unlike ListTasks, it reads summary.json files directly without loading the
-// full task.json, making it efficient for cost dashboards and analytics.
+// full task.json, making it efficient for external cost dashboards.
 // Tasks that completed before summary.json was introduced are omitted.
 func (h *Handler) ListSummaries(w http.ResponseWriter, _ *http.Request) {
 	s, ok := h.requireStore(w)
@@ -170,10 +168,8 @@ type taskCreateFields struct {
 	Prompt         string         `json:"prompt"`
 	Criteria       string         `json:"criteria"`
 	Timeout        int            `json:"timeout"`
-	MountWorktrees bool           `json:"mount_worktrees"`
 	Kind           store.TaskKind `json:"kind"`
 	Tags           []string       `json:"tags"`
-	ScheduledAt    *time.Time     `json:"scheduled_at,omitempty"`
 	MaxCostUSD     float64        `json:"max_cost_usd"`
 	MaxInputTokens int            `json:"max_input_tokens"`
 	Model          string         `json:"model"`
@@ -188,10 +184,8 @@ func (f taskCreateFields) apply(opts *store.TaskCreateOptions) {
 	opts.Prompt = f.Prompt
 	opts.Criteria = f.Criteria
 	opts.Timeout = f.Timeout
-	opts.MountWorktrees = f.MountWorktrees
 	opts.Kind = f.Kind
 	opts.Tags = f.Tags
-	opts.ScheduledAt = f.ScheduledAt
 	opts.MaxCostUSD = f.MaxCostUSD
 	opts.MaxInputTokens = f.MaxInputTokens
 	opts.ModelOverride = f.Model
@@ -257,7 +251,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Criteria          *string                               `json:"criteria"`
 		Timeout           *int                                  `json:"timeout"`
 		FreshStart        *bool                                 `json:"fresh_start"`
-		MountWorktrees    *bool                                 `json:"mount_worktrees"`
 		Sandbox           *harness.ID                           `json:"sandbox"`
 		SandboxByActivity *map[store.SandboxActivity]harness.ID `json:"sandbox_by_activity"`
 		Tags              *[]string                             `json:"tags"`
@@ -270,9 +263,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		MaxInputTokens *int     `json:"max_input_tokens"`
 		// Model sets the per-task model override; empty string clears it.
 		Model *string `json:"model"`
-		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)
-		// from explicitly-sent "null" (clear the schedule) or a valid time (set it).
-		ScheduledAt json.RawMessage `json:"scheduled_at"`
 	}](w, r)
 	if !ok {
 		return
@@ -330,8 +320,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, criteria, timeout, fresh_start, mount_worktrees, sandbox, model, and budget for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
+	// Allow editing prompt, criteria, timeout, fresh_start, sandbox, model, and budget for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Criteria != nil || req.Timeout != nil || req.FreshStart != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -344,7 +334,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
+		if err := s.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -365,28 +355,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-		}
-	}
-
-	// Allow setting/clearing scheduled_at for backlog tasks.
-	// req.ScheduledAt is nil when the field was absent from the JSON body (no-op).
-	// When present it is either "null" (clear) or an ISO 8601 timestamp (set).
-	if task.Status == store.TaskStatusBacklog && len(req.ScheduledAt) > 0 {
-		var scheduledAt *time.Time
-		// "null" clears the schedule; any other value is parsed as a time.
-		if string(req.ScheduledAt) != "null" {
-			var t time.Time
-			if err := json.Unmarshal(req.ScheduledAt, &t); err != nil {
-				http.Error(w, "invalid scheduled_at: "+err.Error(), http.StatusBadRequest)
-				return
-			}
-			if !t.IsZero() {
-				scheduledAt = &t
-			}
-		}
-		if err := s.UpdateTaskScheduledAt(r.Context(), id, scheduledAt); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
 	}
 

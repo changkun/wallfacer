@@ -38,11 +38,10 @@ type MockRunner struct {
 	WorkspaceMgr *workspace.Manager
 
 	// Recorded call arguments (mutex-protected for race-safety).
-	RunBackgroundCalls          []uuid.UUID
-	KillContainerCalls          []uuid.UUID
-	CleanupWorktreesCalls       []uuid.UUID
-	MaybeAutoPushWorkspaceCalls []string
-	CommitCalls                 []uuid.UUID
+	RunBackgroundCalls    []uuid.UUID
+	KillContainerCalls    []uuid.UUID
+	CleanupWorktreesCalls []uuid.UUID
+	CommitCalls           []uuid.UUID
 
 	// Optional override for ContainerName return value.
 	// When nil the method returns "" (no container active), matching the default
@@ -55,10 +54,6 @@ type MockRunner struct {
 
 	// AssessDriftFn lets tests stub the drift-assessment agent call.
 	AssessDriftFn func(ctx context.Context, specBody string, affects, changedFiles []string, diff string) (spec.DriftVerdict, error)
-
-	// RunReviewerFn lets tests stub the reviewer. When nil, RunReviewer
-	// returns an approve verdict with no findings.
-	RunReviewerFn func(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error)
 }
 
 // compile-time assertion.
@@ -132,18 +127,6 @@ func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 	m.mu.Unlock()
 }
 
-// ContainerCircuitAllow always returns true in the mock.
-func (m *MockRunner) ContainerCircuitAllow() bool { return true }
-
-// ContainerCircuitState returns the circuit breaker state.
-func (m *MockRunner) ContainerCircuitState() string { return "closed" }
-
-// ContainerCircuitFailures returns the failure count.
-func (m *MockRunner) ContainerCircuitFailures() int { return 0 }
-
-// RecordContainerFailure is a no-op in the mock.
-func (m *MockRunner) RecordContainerFailure() {}
-
 // PendingGoroutines returns nil in the mock.
 func (m *MockRunner) PendingGoroutines() []string { return nil }
 
@@ -154,7 +137,7 @@ func (m *MockRunner) WaitBackground() {}
 func (m *MockRunner) GenerateOversight(_ uuid.UUID) {}
 
 // GenerateBoardManifest returns an empty manifest in the mock.
-func (m *MockRunner) GenerateBoardManifest(_ context.Context, _ uuid.UUID, _ bool) (*BoardManifest, error) {
+func (m *MockRunner) GenerateBoardManifest(_ context.Context, _ uuid.UUID) (*BoardManifest, error) {
 	return &BoardManifest{}, nil
 }
 
@@ -179,12 +162,6 @@ func (m *MockRunner) TmpDir() string { return "" }
 // EnvFile returns the configured env file path.
 func (m *MockRunner) EnvFile() string { return m.EnvFilePath }
 
-// Prompts returns a default prompts manager (empty overrides dir) so tests
-// that construct a Handler with a MockRunner don't panic calling
-// h.runner.Prompts().PromptsDir(). Override via m.PromptsFn if a test needs
-// a specific manager.
-func (m *MockRunner) Prompts() *prompts.Manager { return prompts.NewManager("") }
-
 // GenerateCommitMessage delegates to GenerateCommitMessageFn when set; the
 // default returns ("", nil) so callers hit their deterministic fallback
 // path without signaling an error.
@@ -202,29 +179,6 @@ func (m *MockRunner) AssessDrift(ctx context.Context, specBody string, affects, 
 		return m.AssessDriftFn(ctx, specBody, affects, changedFiles, diff)
 	}
 	return spec.DriftVerdict{}, nil
-}
-
-// RunReviewer delegates to RunReviewerFn when set; otherwise it returns an
-// approve verdict with no findings.
-func (m *MockRunner) RunReviewer(ctx context.Context, task *store.Task, in ReviewerInput) (*ReviewerResult, error) {
-	if m.RunReviewerFn != nil {
-		return m.RunReviewerFn(ctx, task, in)
-	}
-	return &ReviewerResult{Answer: ReviewAnswer{Verdict: ReviewApprove}}, nil
-}
-
-// MaybeAutoPushWorkspace records the workspace path for later inspection by tests.
-func (m *MockRunner) MaybeAutoPushWorkspace(_ context.Context, ws string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.MaybeAutoPushWorkspaceCalls = append(m.MaybeAutoPushWorkspaceCalls, ws)
-}
-
-// AutoPushWorkspaceCalls returns a race-safe snapshot of the workspaces passed to MaybeAutoPushWorkspace.
-func (m *MockRunner) AutoPushWorkspaceCalls() []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Clone(m.MaybeAutoPushWorkspaceCalls)
 }
 
 // WorkspaceManager returns the injected manager (or nil, the default, which

@@ -1,3 +1,4 @@
-The Go binary embeds all:frontend/dist. This file is tracked so a clone that
-has not run `make frontend-build` still compiles; everything else in this
-directory is build output and gitignored.
+The Go binary embeds all:frontend/dist. Vite copies this file there on every
+build, and a tracked copy in frontend/dist lets a clone that has not run
+`make frontend-build` still compile; everything else in frontend/dist is
+build output and gitignored.

@@ -88,35 +88,15 @@ type runAgentOpts struct {
 	// place of the raw workspaces so commits land on the task's
 	// branch.
 	WorktreeOverrides map[string]string
-	// BoardDir is the host directory holding board.json and the sibling
-	// worktree manifest, surfaced to the agent through environment
-	// variables. Only honored for mountReadWrite roles.
+	// BoardDir is the host directory holding board.json, surfaced to the
+	// agent through WALLFACER_BOARD_JSON. Only honored for mountReadWrite
+	// roles.
 	BoardDir string
-	// SiblingMounts maps shortID → (repoPath → worktreePath) for
-	// read-only mounts of other in-progress task worktrees, so the
-	// agent can reference sibling work without modifying it.
-	SiblingMounts map[string]map[string]string
 	// LiveLogWriter, when set, is tee'd alongside stdout and stderr
 	// during the container run so callers can stream output while the
 	// container is still alive. Heavyweight roles wire this to their
 	// liveLogs registry.
 	LiveLogWriter io.Writer
-	// CircuitBreaker, when set, is consulted before every launch
-	// attempt (Allow returning false short-circuits to an error) and
-	// notified of failures (RecordFailure) and successes
-	// (RecordSuccess). Only the heavyweight container-runtime CB is
-	// currently wired.
-	CircuitBreaker runAgentCircuitBreaker
-}
-
-// runAgentCircuitBreaker is the narrow surface runAgent needs from the
-// container-runtime circuit breaker. Defined as an interface so tests
-// and future backends can substitute a fake without importing the
-// circuitbreaker package.
-type runAgentCircuitBreaker interface {
-	Allow() bool
-	RecordFailure()
-	RecordSuccess()
 }
 
 // agentResult is runAgent's return envelope. It bundles the parsed
@@ -136,9 +116,9 @@ type agentResult struct {
 // construction, Launch, stdout/stderr drain, wait, NDJSON parsing,
 // usage accumulation, and token-limit fallback. Spec construction
 // dispatches on the role's mount mode: mountReadWrite roles get the
-// full heavyweight spec (worktree mounts, board + sibling context,
-// per-task labels), while mountReadOnly and mountNone roles get an
-// inspector spec.
+// full heavyweight spec (task worktree, board context, per-task
+// labels), while mountReadOnly and mountNone roles get an inspector
+// spec.
 func (r *Runner) runAgent(
 	ctx context.Context,
 	role AgentRole,
@@ -309,8 +289,7 @@ var errEmptyOutput = errors.New("empty output")
 // launchOne builds the container spec, invokes backend.Launch, drains
 // the streams, and parses the NDJSON result for a single sub-agent
 // invocation. It dispatches on binding.MountMode to add the right volume
-// mounts and feeds optional heavyweight concerns (live-log tee,
-// circuit breaker) when supplied via opts.
+// mounts and feeds the optional live-log tee when supplied via opts.
 func (r *Runner) launchOne(
 	ctx context.Context,
 	role AgentRole,
@@ -321,12 +300,6 @@ func (r *Runner) launchOne(
 	task *store.Task,
 	opts runAgentOpts,
 ) (*agentResult, error) {
-	// Short-circuit on an open container-runtime circuit breaker. Only
-	// heavyweight callers wire this today; the header roles pass nil.
-	if opts.CircuitBreaker != nil && !opts.CircuitBreaker.Allow() {
-		return nil, fmt.Errorf("%s: container circuit breaker open: container runtime may be unavailable", role.Slug)
-	}
-
 	// Resolve the model with the explicit override > role-specific
 	// resolver > env-derived default. This mirrors the priority
 	// buildContainerSpecForSandbox applied before the migration.
@@ -335,8 +308,8 @@ func (r *Runner) launchOne(
 	var spec executor.ContainerSpec
 	switch binding.MountMode {
 	case mountReadWrite:
-		// Heavyweight spec builder already handles worktree mounts,
-		// board + sibling context, and per-task labels.
+		// Heavyweight spec builder already handles the task worktree,
+		// board context, and per-task labels.
 		spec = r.buildContainerSpecForSandbox(
 			containerName,
 			taskIDString(task),
@@ -344,7 +317,6 @@ func (r *Runner) launchOne(
 			opts.SessionID,
 			opts.WorktreeOverrides,
 			opts.BoardDir,
-			opts.SiblingMounts,
 			opts.ModelOverride,
 			sb,
 		)
@@ -366,9 +338,6 @@ func (r *Runner) launchOne(
 
 	handle, launchErr := r.backend.Launch(ctx, spec)
 	if launchErr != nil {
-		if opts.CircuitBreaker != nil {
-			opts.CircuitBreaker.RecordFailure()
-		}
 		return nil, fmt.Errorf("launch %s container: %w", role.Slug, launchErr)
 	}
 	if opts.OnLaunch != nil {
@@ -417,9 +386,7 @@ func (r *Runner) launchOne(
 		}
 		if exitCode != 0 {
 			// No wait error: distinguish this from a crash so the
-			// auto-retry classifier treats it as Unknown (no retry).
-			// Matches pre-migration behavior in the heavyweight
-			// runContainer path.
+			// failure classifier records it as Unknown.
 			return nil, fmt.Errorf("%s container exited with code %d: stderr=%s",
 				role.Slug, exitCode, truncate(string(rawStderr), 200))
 		}
@@ -446,12 +413,6 @@ func (r *Runner) launchOne(
 		logger.Runner.Warn(role.Slug+": container exited non-zero but produced valid output",
 			"code", exitCode, "sandbox", sb, "model", model)
 	}
-	// Successful happy-path → mark the circuit breaker healthy if one
-	// is configured. Opening-then-closing tracks runtime state when a
-	// transient engine issue resolved itself.
-	if opts.CircuitBreaker != nil {
-		opts.CircuitBreaker.RecordSuccess()
-	}
 	output.ActualSandbox = sb
 	return &agentResult{
 		Output:      output,
@@ -463,12 +424,8 @@ func (r *Runner) launchOne(
 
 // buildInspectorSpec produces a ContainerSpec for headless or read-only
 // inspector roles. For mountNone it returns the same spec
-// buildBaseContainerSpec produces. For mountReadOnly it layers every
-// configured workspace as a read-only volume plus the workspace
-// instructions file (CLAUDE.md / AGENTS.md) and sets WorkDir so the
-// agent has a natural CWD to inspect from. Worker-container mode is
-// intentionally not involved — inspector roles are short-lived and
-// cheap to spin up ephemerally.
+// buildBaseContainerSpec produces. For mountReadOnly it sets WorkDir to
+// the workspace folder so the agent has a natural CWD to inspect from.
 func (r *Runner) buildInspectorSpec(
 	containerName, model string,
 	sb harness.ID,
@@ -479,8 +436,8 @@ func (r *Runner) buildInspectorSpec(
 		return spec
 	}
 
-	// Host backend runs in a real workspace directory; cwd is the first
-	// configured workspace.
+	// Host backend runs in a real workspace directory; cwd is the
+	// workspace folder.
 	for _, ws := range r.currentWorkspaces() {
 		ws = strings.TrimSpace(ws)
 		if ws != "" {

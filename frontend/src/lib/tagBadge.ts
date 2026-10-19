@@ -2,7 +2,7 @@
 // tags that lead the card's meta line; everything else is a label the reader
 // can filter by.
 // Tags are one mono meta line under the title, never a row of tinted chips:
-// the card's color budget is spent on state (specs/shared/console-redesign/board.md).
+// the card's color budget is spent on state (specs/.archive/shared/console-redesign/board.md).
 
 export type TagKind = 'priority' | 'impact' | 'label';
 

@@ -3,7 +3,7 @@ import { createApp, nextTick } from 'vue';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import { createPinia } from 'pinia';
 
-// The card's color budget (specs/shared/console-redesign/board.md): one
+// The card's color budget (specs/.archive/shared/console-redesign/board.md): one
 // state pill and at most one qualifier pill on the first row, tags as a mono
 // meta line, and one ink action per column.
 vi.mock('../api/client', () => ({ api: vi.fn(async () => ({})), ApiError: class extends Error {} }));

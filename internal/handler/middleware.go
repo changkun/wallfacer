@@ -17,9 +17,8 @@ import (
 // These re-export constants used by MaxBytesMiddleware to enforce per-route
 // request body size limits.
 const (
-	BodyLimitDefault    = constants.BodyLimitDefault
-	BodyLimitFeedback   = constants.BodyLimitFeedback
-	BodyLimitWhiteboard = constants.BodyLimitWhiteboard
+	BodyLimitDefault  = constants.BodyLimitDefault
+	BodyLimitFeedback = constants.BodyLimitFeedback
 )
 
 // MaxBytesMiddleware limits the size of the request body for downstream handlers.
@@ -84,9 +83,8 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 }
 
 // BearerAuthMiddleware enforces bearer-token authentication on non-SSE routes.
-// SSE and WebSocket paths use a ?token= query parameter instead of the
-// Authorization header because EventSource and WebSocket APIs do not support
-// custom request headers. UI shell routes and embedded assets are public so
+// SSE paths use a ?token= query parameter instead of the Authorization
+// header because the EventSource API does not support custom request headers. UI shell routes and embedded assets are public so
 // the browser can load before it reads the injected local API key.
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
@@ -95,7 +93,7 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler { return next }
 	}
 	isSSEPath := func(path string) bool {
-		if path == "/api/tasks/stream" || path == "/api/git/stream" || path == "/api/terminal/ws" ||
+		if path == "/api/tasks/stream" || path == "/api/git/stream" ||
 			path == "/api/explorer/stream" || path == "/api/explorer/file/stream" || path == "/api/specs/stream" {
 			return true
 		}
@@ -103,11 +101,8 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// The SPA shell loads for everyone, and the Prometheus scrape
-			// carries no credential: /metrics is operational telemetry
-			// with no user data, and a scraper cannot present the key.
-			if ((r.Method == http.MethodGet || r.Method == http.MethodHead) && publicUIPath(r.URL.Path)) ||
-				(r.Method == http.MethodGet && r.URL.Path == "/metrics") {
+			// The SPA shell loads for everyone.
+			if (r.Method == http.MethodGet || r.Method == http.MethodHead) && publicUIPath(r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -149,10 +144,9 @@ func IsLoopbackPeer(remoteAddr string) bool {
 func publicUIPath(rawPath string) bool {
 	p := path.Clean(rawPath)
 	switch p {
-	case "/", "/favicon.ico",
-		"/analytics", "/chat", "/plan", "/whiteboard", "/mission", "/map", "/settings", "/docs":
+	case "/", "/favicon.ico", "/plan", "/settings":
 		return true
 	}
 	return strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/fonts/") ||
-		strings.HasPrefix(p, "/static/") || strings.HasPrefix(p, "/docs/")
+		strings.HasPrefix(p, "/static/")
 }

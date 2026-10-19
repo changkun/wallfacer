@@ -1,7 +1,6 @@
 // Shared test utilities for the cli package. These helpers resolve the
-// repository root and provide an fs.FS suitable for BuildMux, which reads
-// docs from a "docs/" subtree and serves the Vue SPA from a "frontend/dist/"
-// subtree.
+// repository root and provide an fs.FS suitable for BuildMux, which serves the
+// Vue SPA from a "frontend/dist/" subtree.
 package cli
 
 import (
@@ -24,8 +23,9 @@ func repoRoot(t *testing.T) string {
 	return filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
 }
 
-// testFS returns an fs.FS rooted at the repo root, used as the docs
-// filesystem for BuildMux (which reads docs/guide and docs/internals).
+// testFS returns an fs.FS rooted at the repo root, used as the SPA
+// filesystem for initServer, which mounts frontend/dist when it holds an
+// index.html.
 func testFS(t *testing.T) fs.FS {
 	t.Helper()
 	return os.DirFS(repoRoot(t))

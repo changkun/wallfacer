@@ -1,21 +1,12 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 92,
+  "route_count": 77,
   "routes": [
     {
       "method": "GET",
       "pattern": "/api/debug/health",
       "name": "Health",
       "description": "Operational health check: goroutine count, task counts, uptime.",
-      "tags": [
-        "debug"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/debug/spans",
-      "name": "GetSpanStats",
-      "description": "Aggregate span timing statistics across all tasks.",
       "tags": [
         "debug"
       ]
@@ -42,7 +33,7 @@
       "method": "GET",
       "pattern": "/api/tasks/{id}/board",
       "name": "TaskBoardManifest",
-      "description": "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+      "description": "Board manifest as it appeared to a specific task (is_self=true for that task).",
       "tags": [
         "tasks",
         "debug"
@@ -61,7 +52,7 @@
       "method": "GET",
       "pattern": "/api/config",
       "name": "GetConfig",
-      "description": "Get server configuration (workspaces, autoimplement flags, sandbox list).",
+      "description": "Get server configuration (workspaces, workspace groups, sandbox list).",
       "tags": [
         "config"
       ]
@@ -70,7 +61,7 @@
       "method": "PUT",
       "pattern": "/api/config",
       "name": "UpdateConfig",
-      "description": "Update server configuration (autoimplement, autosubmit, sandbox assignments).",
+      "description": "Update server configuration (workspace groups and their parallel limits).",
       "tags": [
         "config"
       ]
@@ -115,7 +106,7 @@
       "method": "GET",
       "pattern": "/api/workspaces",
       "name": "ListWorkspaces",
-      "description": "List workspaces visible to the caller, each flagged active or dormant.",
+      "description": "List workspaces, each flagged active or dormant (a dormant one waits to be re-pointed to one folder).",
       "tags": [
         "workspaces"
       ]
@@ -124,7 +115,7 @@
       "method": "POST",
       "pattern": "/api/workspaces",
       "name": "CreateWorkspace",
-      "description": "Create a workspace (stable id, random storage key) from a name and folder set.",
+      "description": "Create a workspace (stable id, random storage key) from a name and one folder; 400 when more than one folder is given.",
       "tags": [
         "workspaces"
       ]
@@ -133,7 +124,7 @@
       "method": "PUT",
       "pattern": "/api/workspaces/{id}",
       "name": "UpdateWorkspace",
-      "description": "Rename a workspace and/or replace its folder set without re-keying its history.",
+      "description": "Rename a workspace and/or re-point it to one folder without re-keying its history; re-pointing clears dormant. 400 when more than one folder is given.",
       "tags": [
         "workspaces"
       ]
@@ -142,7 +133,7 @@
       "method": "DELETE",
       "pattern": "/api/workspaces/{id}",
       "name": "DeleteWorkspace",
-      "description": "Delete a workspace record (its data directory is left on disk).",
+      "description": "Delete a workspace and wipe its task history and session data; folders on disk are not touched. Returns the resulting config.",
       "tags": [
         "workspaces"
       ]
@@ -151,7 +142,7 @@
       "method": "POST",
       "pattern": "/api/workspaces/{id}/activate",
       "name": "ActivateWorkspace",
-      "description": "Activate a workspace by id and switch the scoped task board.",
+      "description": "Activate a workspace by id and switch the scoped task board; 400 for a dormant workspace that still names several folders.",
       "tags": [
         "workspaces"
       ]
@@ -173,16 +164,6 @@
       "tags": [
         "specs",
         "sse"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/graph",
-      "name": "GetGraph",
-      "description": "Get the unified spec+task dependency graph (nodes, typed edges, critical path, blocked set) for the Map.",
-      "tags": [
-        "specs",
-        "tasks"
       ]
     },
     {
@@ -376,60 +357,6 @@
     },
     {
       "method": "GET",
-      "pattern": "/api/system-prompts",
-      "name": "ListSystemPrompts",
-      "description": "List all built-in system prompt templates with override status and content.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "GetSystemPrompt",
-      "description": "Get a single built-in system prompt template by name.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "PUT",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "UpdateSystemPrompt",
-      "description": "Write a user override for a built-in system prompt template; validates the template before writing.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "DELETE",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "DeleteSystemPrompt",
-      "description": "Remove the user override for a built-in system prompt template, restoring the embedded default.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/whiteboard",
-      "name": "GetWhiteboard",
-      "description": "Load the active workspace's whiteboard scene JSON (empty body when none saved yet).",
-      "tags": [
-        "whiteboard"
-      ]
-    },
-    {
-      "method": "PUT",
-      "pattern": "/api/whiteboard",
-      "name": "PutWhiteboard",
-      "description": "Save the active workspace's whiteboard scene JSON.",
-      "tags": [
-        "whiteboard"
-      ]
-    },
-    {
-      "method": "GET",
       "pattern": "/api/git/status",
       "name": "GitStatus",
       "description": "Git status for all mounted workspaces.",
@@ -508,24 +435,6 @@
       "description": "Open a workspace directory in the OS file manager.",
       "tags": [
         "git"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/usage",
-      "name": "GetUsageStats",
-      "description": "Aggregated token and cost usage statistics.",
-      "tags": [
-        "stats"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/stats",
-      "name": "GetStats",
-      "description": "Task status and workspace cost statistics. Optional ?workspace=\u003crepo-root-path\u003e restricts aggregation to tasks for that workspace (400 if no tasks match).",
-      "tags": [
-        "stats"
       ]
     },
     {
@@ -666,24 +575,6 @@
       ]
     },
     {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/review",
-      "name": "ReviewTask",
-      "description": "Run one review round for a waiting task on the reviewer model.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/tasks/{id}/review/transcript",
-      "name": "ReviewTranscript",
-      "description": "Read the task's newest review session: each round's findings, the feedback sent, and the task's reply.",
-      "tags": [
-        "tasks"
-      ]
-    },
-    {
       "method": "GET",
       "pattern": "/api/tasks/{id}/commits",
       "name": "TaskCommits",
@@ -810,33 +701,6 @@
       "description": "List backlog (and optionally waiting) tasks as virtual entries for the workspace explorer Task Prompts section.",
       "tags": [
         "explorer"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/auth/{provider}/start",
-      "name": "StartOAuth",
-      "description": "Start an OAuth authorization flow for the given provider (claude or codex).",
-      "tags": [
-        "auth"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/auth/{provider}/status",
-      "name": "OAuthStatus",
-      "description": "Poll the current status of an OAuth flow for the given provider.",
-      "tags": [
-        "auth"
-      ]
-    },
-    {
-      "method": "POST",
-      "pattern": "/api/auth/{provider}/cancel",
-      "name": "CancelOAuth",
-      "description": "Cancel an in-progress OAuth flow for the given provider.",
-      "tags": [
-        "auth"
       ]
     }
   ]

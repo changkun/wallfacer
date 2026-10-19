@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"latere.ai/x/wallfacer/internal/prompts"
-	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/spec"
 )
 
@@ -560,66 +559,8 @@ func TestWrapLine(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Planning auto-push wiring tests
+// Planning commits
 // ---------------------------------------------------------------------------
-
-// TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit verifies that the
-// planning commit pipeline calls MaybeAutoPushWorkspace on the runner after
-// commitPlanningRound returns a positive round number (i.e. a commit was made).
-// This mirrors the behavior of the "mark as done" flow for task cards, which
-// calls runner.Commit (and inside it maybeAutoPush) after moving a Waiting
-// task to Done.
-func TestPlanningCommit_AutoPushCalledAfterSuccessfulCommit(t *testing.T) {
-	ws := initGitTestRepo(t)
-	writeSpec(t, ws, "local/foo.md", "# Foo\n")
-
-	mock := &runner.MockRunner{}
-
-	// Simulate the per-workspace loop inside SendAgentMessage.
-	ctx := context.Background()
-	n, err := commitPlanningRound(ctx, ws, "draft foo spec", "drafted foo", nil, "")
-	if err != nil {
-		t.Fatalf("commitPlanningRound: %v", err)
-	}
-	if n == 0 {
-		t.Fatal("expected commitPlanningRound to return round > 0 for dirty specs/")
-	}
-	// This is the exact condition the handler uses.
-	if n > 0 {
-		mock.MaybeAutoPushWorkspace(ctx, ws)
-	}
-
-	calls := mock.AutoPushWorkspaceCalls()
-	if len(calls) != 1 {
-		t.Fatalf("expected 1 auto-push call, got %d: %v", len(calls), calls)
-	}
-	if calls[0] != ws {
-		t.Errorf("auto-push workspace = %q, want %q", calls[0], ws)
-	}
-}
-
-// TestPlanningCommit_AutoPushNotCalledWhenNoCommit verifies that
-// MaybeAutoPushWorkspace is NOT called when commitPlanningRound returns 0
-// (no specs/ changes pending — nothing to push).
-func TestPlanningCommit_AutoPushNotCalledWhenNoCommit(t *testing.T) {
-	ws := initGitTestRepo(t) // clean repo, no spec changes
-
-	mock := &runner.MockRunner{}
-
-	ctx := context.Background()
-	n, err := commitPlanningRound(ctx, ws, "noop", "nothing changed", nil, "")
-	if err != nil {
-		t.Fatalf("commitPlanningRound: %v", err)
-	}
-	// Simulate handler condition — only push when n > 0.
-	if n > 0 {
-		mock.MaybeAutoPushWorkspace(ctx, ws)
-	}
-
-	if calls := mock.AutoPushWorkspaceCalls(); len(calls) != 0 {
-		t.Errorf("expected no auto-push calls when nothing was committed, got %v", calls)
-	}
-}
 
 // TestCommitPlanningRound_IgnoresPollutedLocalIdentity verifies that a polluted
 // per-repo user.name/user.email (as left behind by a sandbox container agent
