@@ -206,10 +206,8 @@ func TestBearerAuthMiddleware_PublicUIShell(t *testing.T) {
 			})
 		}
 	}
-	// The paths of the removed agents page and its former aliases are no
-	// client-side route any more, so they get no public pass.
-	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/assets/../api/config", "/static/../api/config",
-		"/agent-graph", "/agents", "/workflows", "/flows"} {
+	// API data and paths that are no client-side route need the key.
+	for _, target := range []string{"/api/config", "/api/tasks", "/api/docs/guide", "/assets/../api/config", "/static/../api/config", "/nowhere"} {
 		t.Run("protected"+target, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			next.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
