@@ -247,28 +247,6 @@ var Routes = []Route{
 		Description: "Test sandbox configuration by running a lightweight probe task.",
 		Tags:        []string{"env"},
 	},
-	// --- System prompt templates (user-overridable built-in prompts) ---
-
-	{
-		Method: http.MethodGet, Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
-		Description: "List all built-in system prompt templates with override status and content.",
-		Tags:        []string{"system-prompts"},
-	},
-	{
-		Method: http.MethodGet, Pattern: "/api/system-prompts/{name}", Name: "GetSystemPrompt",
-		Description: "Get a single built-in system prompt template by name.",
-		Tags:        []string{"system-prompts"},
-	},
-	{
-		Method: http.MethodPut, Pattern: "/api/system-prompts/{name}", Name: "UpdateSystemPrompt",
-		Description: "Write a user override for a built-in system prompt template; validates the template before writing.",
-		Tags:        []string{"system-prompts"},
-	},
-	{
-		Method: http.MethodDelete, Pattern: "/api/system-prompts/{name}", Name: "DeleteSystemPrompt",
-		Description: "Remove the user override for a built-in system prompt template, restoring the embedded default.",
-		Tags:        []string{"system-prompts"},
-	},
 
 	// --- Git workspace operations ---
 

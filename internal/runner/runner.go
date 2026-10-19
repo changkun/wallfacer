@@ -24,7 +24,6 @@ import (
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/pkg/livelog"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/workspace"
 )
@@ -61,16 +60,15 @@ type RunnerConfig struct {
 	DefaultEnvFile     string
 	Workspaces         []string // workspace directory paths
 	WorktreesDir       string
-	CodexAuthPath      string           // host path to codex auth cache directory (default: ~/.codex)
-	HostClaudeBinary   string           // optional override for the `claude` binary path
-	HostCodexBinary    string           // optional override for the `codex` binary path
-	HostCursorBinary   string           // optional override for the `cursor-agent` binary path
-	HostOpenCodeBinary string           // optional override for the `opencode` binary path
-	HostPiBinary       string           // optional override for the `pi` binary path
-	AgentNice          int              // niceness for agent processes (0 ⇒ default, negative disables)
-	MaxAgents          int              // global concurrent agent-process budget (0 ⇒ unlimited)
-	TmpDir             string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
-	Prompts            *prompts.Manager // prompt template manager; nil = use prompts.Default
+	CodexAuthPath      string // host path to codex auth cache directory (default: ~/.codex)
+	HostClaudeBinary   string // optional override for the `claude` binary path
+	HostCodexBinary    string // optional override for the `codex` binary path
+	HostCursorBinary   string // optional override for the `cursor-agent` binary path
+	HostOpenCodeBinary string // optional override for the `opencode` binary path
+	HostPiBinary       string // optional override for the `pi` binary path
+	AgentNice          int    // niceness for agent processes (0 ⇒ default, negative disables)
+	MaxAgents          int    // global concurrent agent-process budget (0 ⇒ unlimited)
+	TmpDir             string // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	WorkspaceManager   *workspace.Manager
 	Reg                *metrics.Registry // optional metrics registry; nil disables metric collection
 }
@@ -89,7 +87,6 @@ type Runner struct {
 	tmpDir           string
 	workspaceManager *workspace.Manager
 	codexAuthPath    string
-	promptsMgr       *prompts.Manager                        // prompt template manager
 	worktreeMu       sync.Mutex                              // serializes all worktree filesystem operations on worktreesDir
 	repoMu           syncmap.Map[string, *sync.Mutex]        // per-repo mutex for serializing rebase+merge
 	taskProcesses    syncmap.Map[uuid.UUID, executor.Handle] // taskID → running agent process
@@ -308,10 +305,6 @@ func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
 // backend, and a background goroutine watching for store mutations to
 // invalidate the board context cache. Call Shutdown() to drain background work.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
-	mgr := cfg.Prompts
-	if mgr == nil {
-		mgr = prompts.Default
-	}
 	r := &Runner{
 		store:            s,
 		envFile:          cfg.EnvFile,
@@ -320,7 +313,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		worktreesDir:     cfg.WorktreesDir,
 		tmpDir:           cfg.TmpDir,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
-		promptsMgr:       mgr,
 		workspaceManager: cfg.WorkspaceManager,
 		shutdownCh:       make(chan struct{}),
 	}
@@ -488,11 +480,6 @@ func (r *Runner) WorktreesDir() string {
 // TmpDir returns the base directory for ephemeral files bind-mounted into containers.
 func (r *Runner) TmpDir() string {
 	return r.tmpDir
-}
-
-// Prompts returns the prompt template Manager used by this runner.
-func (r *Runner) Prompts() *prompts.Manager {
-	return r.promptsMgr
 }
 
 // SandboxBackend returns the sandbox backend used for container operations.

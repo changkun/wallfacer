@@ -83,7 +83,6 @@ type Interface interface {
 	WorktreesDir() string
 	TmpDir() string
 	EnvFile() string
-	Prompts() *prompts.Manager
 	WorkspaceManager() *workspace.Manager
 }
 

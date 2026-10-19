@@ -200,70 +200,29 @@ Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env fi
 
 ## System Prompt Templates
 
-### Embedded Templates
+Prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`) and rendered as shipped. Each template has a rendering function that executes it against its data type:
 
-Prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`):
-
-| Embedded file | API name | Used for |
+| Embedded file | Function | Used for |
 |---|---|---|
-| `title.tmpl` | `title` | Auto-generating task titles from prompts |
-| `commit.tmpl` | `commit_message` | Generating commit messages during the commit pipeline |
-| `test.tmpl` | `test_verification` | Test verification agent prompt |
-| `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
-| `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
-| `task_prompt_refine.tmpl` | `task_prompt_refine` | Task prompt refinement in Plan mode |
-| `spec.tmpl` | `spec` | Spec authoring |
-| `spec_system_empty.tmpl` | `spec_system_empty` | Plan session system prompt, empty spec tree |
-| `spec_system_nonempty.tmpl` | `spec_system_nonempty` | Plan session system prompt, existing spec tree |
+| `title.tmpl` | `Title` | Auto-generating task titles from prompts |
+| `commit.tmpl` | `CommitMessage` | Generating commit messages during the commit pipeline |
+| `test.tmpl` | `TestVerification` | Test verification agent prompt |
+| `oversight.tmpl` | `Oversight` | Oversight summarization of task activity |
+| `conflict.tmpl` | `ConflictResolution` | Rebase conflict resolution agent |
+| `task_prompt_refine.tmpl` | `TaskPromptRefine` | Task prompt refinement in Plan mode |
+| `spec.tmpl` | `Spec` | Spec authoring |
+| `spec_system_empty.tmpl` | `SpecSystemEmpty` | Plan session system prompt, empty spec tree |
+| `spec_system_nonempty.tmpl` | `SpecSystemNonempty` | Plan session system prompt, existing spec tree |
 
-### Override Storage
-
-User overrides are stored at `~/.wallfacer/prompts/<apiName>.tmpl`. The `Manager` checks this directory on every render call, no caching, so edits take effect immediately.
-
-### Render Pipeline
-
-```mermaid
-flowchart TD
-    Render["Manager.render(embeddedName, data)"] --> CheckDir{"userDir set?"}
-    CheckDir -->|no| Embedded["Execute embedded template"]
-    CheckDir -->|yes| ReadOverride["os.ReadFile(userDir/&lt;apiName&gt;.tmpl)"]
-    ReadOverride --> Found{"File exists?"}
-    Found -->|no| Embedded
-    Found -->|yes| ParseOverride["template.New().Funcs(funcMap).Parse(content)"]
-    ParseOverride --> ExecOverride["Execute override template with data"]
-    ExecOverride --> ExecOK{"Execution<br/>succeeded?"}
-    ExecOK -->|yes| Return["Return override result"]
-    ExecOK -->|no| LogWarn["Log warning"]
-    LogWarn --> Embedded
-    Embedded --> Return2["Return embedded result"]
-```
-
-Key design: a broken override never crashes the server. Parse or execution errors are logged as warnings and the embedded default is used instead.
+The templates and their data types ship together, so a template that fails to execute is a defect in the build: the rendering function panics rather than handing an agent a partial prompt.
 
 ### Template Function Map
 
-All templates (embedded and override) share a single `FuncMap`:
+All templates share a single `FuncMap`:
 
 - `add(a, b int) int`, integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
 - `mul(a, b float64) float64`, floating-point multiplication.
 - `sub(a, b float64) float64`, floating-point subtraction.
-
-### Validation
-
-`Manager.Validate(apiName, content)` performs a two-phase check:
-1. **Parse**: verifies template syntax.
-2. **Dry-run execute**: runs the template against a mock context struct (`mockContextFor()`) specific to each API name. This catches field-access errors (e.g., referencing `.NonExistentField`) at write time rather than at runtime.
-
-`PUT /api/system-prompts/{name}` calls `Validate` before writing the override file.
-
-### API Endpoints
-
-| Method | Path | Behavior |
-|---|---|---|
-| `GET /api/system-prompts` | Lists all nine templates with their content and override status |
-| `GET /api/system-prompts/{name}` | Returns a single template by API name |
-| `PUT /api/system-prompts/{name}` | Validates and writes override to `~/.wallfacer/prompts/<name>.tmpl` |
-| `DELETE /api/system-prompts/{name}` | Deletes the override file, restoring the embedded default |
 
 ## See Also
 

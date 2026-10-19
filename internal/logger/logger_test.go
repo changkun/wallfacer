@@ -493,7 +493,6 @@ func TestAdoptRoutesNamedLoggersThroughBase(t *testing.T) {
 		"git":      Git,
 		"handler":  Handler,
 		"recovery": Recovery,
-		"prompts":  Prompts,
 	}
 	for component, lg := range named {
 		buf.Reset()

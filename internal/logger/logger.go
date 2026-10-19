@@ -29,7 +29,6 @@ var (
 	Git      *slog.Logger
 	Handler  *slog.Logger
 	Recovery *slog.Logger
-	Prompts  *slog.Logger
 )
 
 // init sets up default text-format loggers so that any package importing logger
@@ -70,7 +69,6 @@ func Adopt(base *slog.Logger) {
 	Git = base.With("component", "git")
 	Handler = base.With("component", "handler")
 	Recovery = base.With("component", "recovery")
-	Prompts = base.With("component", "prompts")
 }
 
 // Fatal prints a user-friendly error to stderr and exits with code 1.

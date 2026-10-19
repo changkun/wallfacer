@@ -114,7 +114,6 @@ func (h *Handler) activeGroupInfos(ctx context.Context) []activeGroupInfo {
 // GET /api/config and reused by UpdateWorkspaces after a workspace switch.
 // When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
-	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()
 
 	groups, _ := workspace.LoadGroups(h.configDir)
@@ -202,7 +201,6 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"workspace_id":           h.activeWorkspaceID(),
 		"workspace_browser_path": workspaceBrowserPath,
 		"workspace_groups":       keyedGroups,
-		"prompts_dir":            promptsDir,
 		"sandbox_activities":     store.SandboxActivities,
 		"sandboxes":              harness.All(),
 		"default_sandbox":        harness.Claude,

@@ -2,7 +2,7 @@
 // the stdlib log/slog package.
 //
 // It defines pre-configured, named loggers for each subsystem (Main, Runner,
-// Store, Git, Handler, Recovery, Prompts) so that log output can be filtered
+// Store, Git, Handler, Recovery) so that log output can be filtered
 // and correlated by component. The text format uses a custom pretty handler
 // with color support for human readability; the JSON format uses the standard
 // slog JSON handler for structured log aggregation.

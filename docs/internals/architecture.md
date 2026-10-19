@@ -306,7 +306,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
 | Debug a failing rebase | `latere.ai/x/pkg/gitutil/ops.go` + `latere.ai/x/pkg/gitutil/stash.go` |
 | Understand why a task failed | `data/<key>/<uuid>/traces/` + `outputs/turn-NNNN.json` |
-| Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
+| Add a new system prompt | a `.tmpl` file in `internal/prompts/`, its data type and rendering function in `internal/prompts/prompts.go` |
 | Change the UI | `frontend/src/` (Vue components, composables, Pinia stores) |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
 | Change pub/sub behavior | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
@@ -324,7 +324,7 @@ Every `internal/` package and its role in the system:
 | `executor` | Agent-launch seam plus the single host-process implementation | `Backend`, `HostBackend`, `NewHostBackend()`, `ContainerSpec`, `Request` |
 | `handler` | HTTP API handlers organized by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
 | `harness` | Harness identities, capabilities, and stream parsers for the five subprocess harnesses (`claude`, `codex`, `cursor`, `opencode`, `pi`); replaces the deleted `sandbox` package | `ID`, `Claude`, `Codex`, `Cursor`, `OpenCode`, `Pi`, `Harness`, `Register()`, `Lookup()`, `Default()` |
-| `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
+| `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery` |
 | `oteltest` | Test-only: installs a recording OpenTelemetry SDK and a trace-header-recording HTTP server, so instrumentation is checked by the spans it ends and the `traceparent` that reaches the server | `Install()`, `SpanNames()`, `NewServer()`, `Server` |
 | `review` | Review of a waiting task's change by a reviewer on a second model: one round per call, findings sent back as feedback until approval, the round limit or the token budget; the session record lives beside the worktree | `Verifier`, `New()`, `Newest()` |
 | `runner` | Orchestration, turn loop, commit pipeline, worktree management (execs agents as host processes) | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
@@ -335,7 +335,7 @@ Every `internal/` package and its role in the system:
 | `constants` | Consolidated system parameters: timeouts, intervals, retry counts, size limits | Named constants grouped by concern |
 | `agentsession` | Long-lived workspace-scoped agent-session lifecycle; per-session `messages.jsonl` + `session.json` under `~/.wallfacer/agent-sessions/<fp>/`; slash-command template expansion; single-turn-at-a-time coordination | `Runtime`, `Manager`, `ConversationStore`, `CommandRegistry`, `SessionMeta`, `Slugify`, `Expand` |
 | `spec` | Spec document model: YAML frontmatter parse/write round-trip; seven-state lifecycle state machine; recursive tree builder; per-spec + cross-spec validation; atomic scaffold (`O_CREATE\|O_EXCL`); progress aggregation; impact analysis; roadmap README index resolution | `Spec`, `Status`, `Effort`, `StatusMachine`, `Tree`, `BuildTree()`, `ParseFile()`, `Scaffold()`, `ValidateSpec()`, `UpdateFrontmatter()`, `ResolveIndex()` |
-| `prompts` | System prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Manager`, `NewManager()`, `WorkspaceDataKey()`, `NewDataKey()` |
+| `prompts` | Embedded system prompt templates (title, commit, oversight, test, conflict, drift) and the data-key helpers used to scope per-workspace data directories | `Title()`, `CommitMessage()`, `Oversight()`, `WorkspaceDataKey()`, `NewDataKey()` |
 
 Shared utility packages under `internal/pkg/`:
 
@@ -389,7 +389,6 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 | `logger.Git` | `git` | Worktree and git operations |
 | `logger.Handler` | `handler` | HTTP request handling, automation watchers |
 | `logger.Recovery` | `recovery` | Orphaned task recovery on startup |
-| `logger.Prompts` | `prompts` | System prompt template management |
 
 `logger.Init(format)` configures all loggers. Two formats are supported:
 - **`"text"`** (default), Human-friendly output with ANSI colors (when stdout is a terminal), aligned columns: timestamp, 3-char level badge, 8-char component, source file:line, bold message, dim key=value pairs. Respects `NO_COLOR` and `TERM=dumb`.

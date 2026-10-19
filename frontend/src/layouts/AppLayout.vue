@@ -7,7 +7,6 @@ import Topbar from '../components/Topbar.vue';
 import CommandPalette from '../components/CommandPalette.vue';
 import WorkspacePicker from '../components/WorkspacePicker.vue';
 import WorkspaceEditModal from '../components/WorkspaceEditModal.vue';
-import SystemPromptsManager from '../components/SystemPromptsManager.vue';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import Toaster from '../components/Toaster.vue';
 import SpecChatPopup from '../components/plan/SpecChatPopup.vue';
@@ -171,7 +170,6 @@ watch(connected, (now) => {
     <CommandPalette v-model="ui.showPalette" />
     <WorkspacePicker v-model="ui.showWorkspaces" />
     <WorkspaceEditModal v-if="ui.editWorkspaceId" />
-    <SystemPromptsManager v-model="ui.showSystemPrompts" />
     <ConfirmDialog />
     <Toaster />
     <SpecChatPopup v-if="showChatPopup" />

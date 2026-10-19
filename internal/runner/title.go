@@ -11,6 +11,7 @@ import (
 	"latere.ai/x/wallfacer/internal/agents"
 	"latere.ai/x/wallfacer/internal/harness"
 	"latere.ai/x/wallfacer/internal/logger"
+	"latere.ai/x/wallfacer/internal/prompts"
 )
 
 // parseTitleResult extracts the trimmed title string from an
@@ -46,7 +47,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		}
 	}()
 
-	titlePrompt := r.promptsMgr.Title(prompt)
+	titlePrompt := prompts.Title(prompt)
 	res, err := r.runAgent(r.shutdownCtx, agents.Title, task, titlePrompt, runAgentOpts{
 		EmitSpanEvents: true,
 		TrackUsage:     true,
@@ -92,7 +93,7 @@ func (r *Runner) GenerateAgentSessionTitle(ctx context.Context, firstUserMessage
 	role := agents.Title
 	role.Harness = string(sb)
 
-	res, err := r.runAgent(ctx, role, nil, r.promptsMgr.Title(firstUserMessage), runAgentOpts{
+	res, err := r.runAgent(ctx, role, nil, prompts.Title(firstUserMessage), runAgentOpts{
 		ContainerName: "wallfacer-planttitle-" + uuid.NewString()[:8],
 		Labels:        map[string]string{"wallfacer.task.activity": "title_planning"},
 		ModelResolver: r.titleModelFromEnvForSandbox,

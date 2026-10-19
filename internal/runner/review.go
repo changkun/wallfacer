@@ -226,7 +226,7 @@ func (r *Runner) RunReviewer(ctx context.Context, task *store.Task, in ReviewerI
 		}
 	}
 
-	prompt := r.promptsMgr.Review(prompts.ReviewData{
+	prompt := prompts.Review(prompts.ReviewData{
 		Prompt:           task.Prompt,
 		Criteria:         strings.TrimSpace(task.Criteria),
 		Diff:             strings.TrimSpace(in.Diff),

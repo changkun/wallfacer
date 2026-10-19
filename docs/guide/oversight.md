@@ -37,13 +37,6 @@ POST /api/tasks/generate-oversight?limit=10
 
 Eligible tasks are those in a terminal or waiting state with at least one turn and no ready summary. The response reports how many tasks were queued (`queued`), their ids (`task_ids`), and the total count still without oversight (`total_without_oversight`).
 
-### Customizing the prompt
-
-The oversight agent's system prompt can be overridden by writing
-`~/.wallfacer/prompts/oversight.tmpl`, or through `PUT /api/system-prompts/oversight`.
-Delete the file, or send `DELETE /api/system-prompts/oversight`, to restore the
-built-in template.
-
 ## Task timeline
 
 Every task keeps an event-sourced audit trail. Events are appended, never rewritten, so the timeline is a faithful record of what happened and why.

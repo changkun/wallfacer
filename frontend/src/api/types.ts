@@ -178,7 +178,6 @@ export interface ServerConfig {
   workspace_id?: string;
   workspace_browser_path?: string;
   workspace_groups?: WorkspaceGroup[];
-  prompts_dir?: string;
   autoimplement: boolean;
   autotest: boolean;
   autosubmit: boolean;
@@ -246,12 +245,6 @@ export interface EnvUpdatePayload {
   archived_tasks_per_page?: number;
   auto_push_enabled?: boolean;
   auto_push_threshold?: number;
-}
-
-export interface SystemPromptTemplate {
-  name: string;
-  has_override: boolean;
-  content: string;
 }
 
 export interface SandboxTestResponse {

@@ -29,7 +29,6 @@ import (
 	"latere.ai/x/wallfacer/internal/executor"
 	"latere.ai/x/wallfacer/internal/handler"
 	"latere.ai/x/wallfacer/internal/logger"
-	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/runner"
 	"latere.ai/x/wallfacer/internal/store"
 	"latere.ai/x/wallfacer/internal/webserver"
@@ -219,7 +218,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 
 	reg := metrics.NewRegistry()
 
-	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:            cfg.EnvFile,
 		DefaultEnvFile:     filepath.Join(configDir, ".env"),
@@ -234,7 +232,6 @@ func initServer(configDir string, cfg ServerConfig, vueDist, docsFS fs.FS) *Serv
 		HostPiBinary:       envCfg.HostPiBinary,
 		AgentNice:          envCfg.AgentNice,
 		MaxAgents:          envCfg.MaxAgents,
-		Prompts:            prompts.NewManager(promptsDir),
 		WorkspaceManager:   wsMgr,
 		Reg:                reg,
 	})
@@ -983,12 +980,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"UpdateEnvConfig": h.UpdateEnvConfig,
 		"TestSandbox":     h.TestSandbox,
 
-		// System prompt templates.
-		"ListSystemPrompts":  h.ListSystemPrompts,
-		"GetSystemPrompt":    h.GetSystemPrompt,
-		"UpdateSystemPrompt": h.UpdateSystemPrompt,
-		"DeleteSystemPrompt": h.DeleteSystemPrompt,
-
 		// File explorer.
 		"ExplorerTree":        h.ExplorerTree,
 		"ExplorerStream":      h.ExplorerStream,
@@ -1076,9 +1067,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,
 		"TestSandbox":     handler.BodyLimitDefault,
-
-		// System prompt templates.
-		"UpdateSystemPrompt": handler.BodyLimitDefault,
 
 		// Workspace browser.
 		"MkdirWorkspace":  handler.BodyLimitDefault,

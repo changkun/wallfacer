@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 86,
+  "route_count": 82,
   "routes": [
     {
       "method": "GET",
@@ -353,42 +353,6 @@
       "description": "Test sandbox configuration by running a lightweight probe task.",
       "tags": [
         "env"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/system-prompts",
-      "name": "ListSystemPrompts",
-      "description": "List all built-in system prompt templates with override status and content.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "GET",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "GetSystemPrompt",
-      "description": "Get a single built-in system prompt template by name.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "PUT",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "UpdateSystemPrompt",
-      "description": "Write a user override for a built-in system prompt template; validates the template before writing.",
-      "tags": [
-        "system-prompts"
-      ]
-    },
-    {
-      "method": "DELETE",
-      "pattern": "/api/system-prompts/{name}",
-      "name": "DeleteSystemPrompt",
-      "description": "Remove the user override for a built-in system prompt template, restoring the embedded default.",
-      "tags": [
-        "system-prompts"
       ]
     },
     {

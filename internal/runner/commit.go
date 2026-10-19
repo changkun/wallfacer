@@ -422,7 +422,7 @@ func (r *Runner) GenerateCommitMessage(ctx context.Context, data prompts.CommitD
 	defer cancel()
 
 	containerName := "wallfacer-plancommit-" + uuid.NewString()[:8]
-	commitPrompt := r.promptsMgr.CommitMessage(data)
+	commitPrompt := prompts.CommitMessage(data)
 	labels := map[string]string{"wallfacer.task.activity": "commit_message_planning"}
 
 	initial := harness.Default()
@@ -567,7 +567,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
 	}
 
-	commitPrompt := r.promptsMgr.CommitMessage(prompts.CommitData{
+	commitPrompt := prompts.CommitMessage(prompts.CommitData{
 		Prompt:    prompt,
 		DiffStat:  diffStat,
 		RecentLog: recentLog,
@@ -788,7 +788,7 @@ func (r *Runner) resolveConflicts(
 ) error {
 	repoName := filepath.Base(repoPath)
 
-	prompt := r.promptsMgr.ConflictResolution(prompts.ConflictData{
+	prompt := prompts.ConflictResolution(prompts.ConflictData{
 		WorktreePath:  worktreePath,
 		DefaultBranch: defBranch,
 	})

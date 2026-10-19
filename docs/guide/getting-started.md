@@ -75,7 +75,6 @@ Everything is stored under `~/.wallfacer/`:
 | `data/` | Task board state and events |
 | `workspaces.json` | Workspace definitions |
 | `worktrees/` | Per-task git worktrees |
-| `prompts/` | User overrides for system prompt templates |
 | `agent-sessions/` | Chat and plan session history |
 | `tmp/` | Scratch space |
 

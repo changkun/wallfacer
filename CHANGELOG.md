@@ -109,6 +109,13 @@ committed: the commit log already holds that.
   `OPENAI_API_KEY` in `~/.wallfacer/.env`, which are unchanged; a token an
   earlier sign-in saved there keeps working.
 
+- Prompt template overrides: the `GET /api/system-prompts` and
+  `GET`, `PUT` and `DELETE /api/system-prompts/{name}` routes and the
+  `prompts_dir` field of `GET /api/config` are gone, `wallfacer doctor` no
+  longer prints a prompts directory, and every agent runs on the templates
+  built into the binary. Files under `~/.wallfacer/prompts/` stay on disk
+  unread.
+
 ### Fixed
 
 - A second Wallfacer instance on one machine, which starts on a free port when

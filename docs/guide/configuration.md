@@ -1,6 +1,6 @@
 # Configuration
 
-Wallfacer is configured through the Settings page, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompt templates. The `.env` file is created with a commented template on first run; edit it directly or through the Settings UI. The server re-reads it before each task run, so most changes take effect on the next task without a restart.
+Wallfacer is configured through the Settings page, environment variables in `~/.wallfacer/.env`, and CLI flags. The `.env` file is created with a commented template on first run; edit it directly or through the Settings UI. The server re-reads it before each task run, so most changes take effect on the next task without a restart.
 
 ## Settings page
 
@@ -58,24 +58,6 @@ Wallfacer passes the model through to OpenCode.
 ### About tab
 
 Version information, the project link, license, and a read-only system status block (goroutines, memory, active agents, circuit breaker state, task counts).
-
-## System prompt templates
-
-Built-in Go templates instruct each agent activity. Nine templates exist:
-
-| Template | Purpose |
-|---|---|
-| `title.tmpl` | Task title generation |
-| `commit.tmpl` | Commit message generation |
-| `test.tmpl` | Test verification agent |
-| `oversight.tmpl` | Oversight summary generation |
-| `conflict.tmpl` | Merge conflict resolution |
-| `task_prompt_refine.tmpl` | Task prompt refinement in Plan mode |
-| `spec.tmpl` | Spec authoring |
-| `spec_system_empty.tmpl` | Plan session system prompt (empty spec tree) |
-| `spec_system_nonempty.tmpl` | Plan session system prompt (existing spec tree) |
-
-Overrides live as files under `~/.wallfacer/prompts/`: creating `~/.wallfacer/prompts/title.tmpl` overrides the title template. The templates manager (`/api/system-prompts`) lists each template, shows whether an override exists, and validates edits as Go templates before saving; invalid templates are rejected with a parse error. Delete an override file (or use the delete endpoint) to restore the embedded default.
 
 ## CLI reference
 
@@ -207,7 +189,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `~/.wallfacer/data/` | Task board state and events |
 | `~/.wallfacer/workspaces.json` | Workspace definitions |
 | `~/.wallfacer/worktrees/` | Per-task git worktrees |
-| `~/.wallfacer/prompts/` | System prompt template overrides |
 | `~/.wallfacer/agent-sessions/` | Chat and Plan session history |
 | `~/.wallfacer/tmp/` | Scratch space |
 

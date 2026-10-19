@@ -36,11 +36,6 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `GET /api/env` | Get environment configuration (tokens masked) |
 | `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |
 | `POST /api/env/test` | Test harness configuration by running a lightweight probe task |
-| **System prompt templates** | |
-| `GET /api/system-prompts` | List all built-in system prompt templates with override status and content |
-| `GET /api/system-prompts/{name}` | Get a single built-in system prompt template by name |
-| `PUT /api/system-prompts/{name}` | Write a user override for a built-in system prompt template; validates before writing |
-| `DELETE /api/system-prompts/{name}` | Remove user override, restoring the embedded default |
 | **Git workspace operations** | |
 | `GET /api/git/status` | Git status for all mounted workspaces |
 | `GET /api/git/stream` | SSE stream of git status updates for all workspaces |
