@@ -518,6 +518,53 @@ func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
 	}
 }
 
+// TestLoadAll_TaskFromSeveralFolderWorkspace verifies that a task.json written
+// when a workspace could span several folders still loads: its worktree_paths
+// map keeps an entry per folder, and the retired mount_worktrees field is
+// ignored rather than failing the load.
+func TestLoadAll_TaskFromSeveralFolderWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	id := uuid.New()
+	taskDir := filepath.Join(dir, id.String())
+	if err := os.MkdirAll(filepath.Join(taskDir, "traces"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := json.Marshal(map[string]any{
+		"schema_version":  constants.CurrentTaskSchemaVersion,
+		"id":              id.String(),
+		"prompt":          "work across two repos",
+		"status":          string(TaskStatusWaiting),
+		"timeout":         60,
+		"mount_worktrees": true,
+		"branch_name":     "task/" + id.String()[:8],
+		"worktree_paths": map[string]string{
+			"/repos/api": "/worktrees/" + id.String() + "/api",
+			"/repos/web": "/worktrees/" + id.String() + "/web",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(taskDir, "task.json"), stored, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := newTestFileStore(t, dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	task, err := s.GetTask(bg(), id)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if task.Status != TaskStatusWaiting {
+		t.Errorf("Status = %q, want %q", task.Status, TaskStatusWaiting)
+	}
+	if len(task.WorktreePaths) != 2 || task.WorktreePaths["/repos/web"] == "" {
+		t.Errorf("WorktreePaths = %v, want both folders' worktrees", task.WorktreePaths)
+	}
+}
+
 // TestCreateTask_StampsSchemaVersion verifies that newly created tasks have
 // SchemaVersion = constants.CurrentTaskSchemaVersion both in memory and on disk.
 func TestCreateTask_StampsSchemaVersion(t *testing.T) {

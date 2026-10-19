@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"latere.ai/x/wallfacer/internal/envconfig"
 	"latere.ai/x/wallfacer/internal/logger"
 	"latere.ai/x/wallfacer/internal/prompts"
 	"latere.ai/x/wallfacer/internal/store"
@@ -26,7 +26,7 @@ func FileExists(path string) bool {
 // Callers receive copies (via cloneSnapshot) so they cannot mutate manager internals.
 type Snapshot struct {
 	WorkspaceID   string       // stable id of the active workspace (empty for ad-hoc/legacy path switches pre-migration)
-	Workspaces    []string     // sorted, deduplicated absolute paths (the active workspace's folders)
+	Workspaces    []string     // the active workspace's folder: empty (no workspace open) or one absolute path
 	Store         *store.Store // scoped task store for this workspace set (may be shared across snapshots)
 	ScopedDataDir string       // per-workspace-key data directory under the global data dir
 	Key           string       // the active workspace's stable DataKey; addresses ScopedDataDir and agent-session storage
@@ -52,13 +52,11 @@ func storeHasActiveTasks(s *store.Store) bool {
 		s.CountByStatus(store.TaskStatusWaiting) > 0
 }
 
-// pendingSwap carries the before/after snapshots and a cleanup callback
-// for an in-flight Switch operation. cleanup closes next.Store on failure
-// paths; it is cleared to a no-op once the swap commits successfully.
+// pendingSwap carries the before/after snapshots for an in-flight Switch
+// operation.
 type pendingSwap struct {
 	previous Snapshot
 	next     Snapshot
-	cleanup  func() // closes next.Store; set to a no-op after successful commit
 }
 
 // Manager coordinates workspace switching, store lifecycle, and change subscriptions.
@@ -67,9 +65,8 @@ type pendingSwap struct {
 // separate so that publishing to subscribers (which only needs subsMu) does not
 // block concurrent Snapshot reads (which only need mu.RLock).
 type Manager struct {
-	configDir string // ~/.wallfacer/ — workspace groups and instructions live here
+	configDir string // ~/.wallfacer/ — workspaces.json and instructions live here
 	dataDir   string // per-workspace scoped data directories
-	envFile   string // .env file path for persisting WALLFACER_WORKSPACES
 
 	mu           sync.RWMutex            // guards current, nextGen, and activeGroups
 	current      Snapshot                // the currently "viewed" workspace group
@@ -91,41 +88,51 @@ type Manager struct {
 	newStore func(dir string) (*store.Store, error)
 }
 
-// NewManager creates a Manager and switches to the initial workspace set.
-func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager, error) {
+// NewManager creates a Manager and switches to the initial workspace set. A
+// nil initial restores the most recently used workspace from workspaces.json,
+// which is the one record of the active workspace across restarts.
+func NewManager(configDir, dataDir string, initial []string) (*Manager, error) {
 	m := &Manager{
 		configDir:    configDir,
 		dataDir:      dataDir,
-		envFile:      envFile,
 		subs:         make(map[int]chan Snapshot),
 		activeGroups: make(map[string]*activeGroup),
 		newStore:     store.NewFileStore,
 	}
-	initial = m.startupWorkspaces(initial)
+	groups, err := LoadGroups(configDir)
+	if err != nil {
+		logger.Main.Warn("read saved workspaces at startup", "error", err)
+	}
+	if n := CountSeveralFolders(groups); n > 0 {
+		logger.Main.Warn("workspaces that name several folders are dormant until each is re-pointed to one folder; their task history is kept",
+			"count", n)
+	}
+	if initial == nil {
+		initial = startupWorkspaces(groups)
+	}
 	if _, err := m.Switch(initial); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-// startupWorkspaces determines the initial workspace set. The nil vs empty-slice
-// distinction is intentional: nil means "restore last session" (load from disk),
-// while an empty slice means "start with no workspaces" (suppress restore).
-func (m *Manager) startupWorkspaces(initial []string) []string {
-	if initial != nil {
-		return initial
-	}
-	groups, err := LoadGroups(m.configDir)
-	if err != nil || len(groups) == 0 {
-		return nil
-	}
+// startupWorkspaces picks the folder to restore when NewManager is given no
+// initial set (nil means "restore last session"; an explicit empty slice means
+// "start with no workspace" and never reaches here). groups is the saved list
+// in most-recently-used order.
+func startupWorkspaces(groups []Workspace) []string {
 	// Restore the most-recent group whose paths still validate. A saved
 	// group can reference a directory that was since deleted or moved (a
 	// /tmp throwaway workspace, an unmounted volume, a renamed repo); such
 	// a stale group must not fatal server startup. Skip invalid groups with
 	// a warning and fall through to the next; if none are valid, start with
-	// no workspace so the picker opens instead of crashing.
+	// no workspace so the picker opens instead of crashing. A dormant
+	// workspace waits for the owner to choose its folder, so it is never
+	// restored on its own.
 	for _, g := range groups {
+		if g.Dormant {
+			continue
+		}
 		if _, verr := validate(g.Folders); verr != nil {
 			logger.Main.Warn("skipping invalid saved workspace at startup",
 				"folders", g.Folders, "error", verr)
@@ -207,10 +214,10 @@ func (m *Manager) Unsubscribe(id int) {
 }
 
 // Switch validates and normalizes paths, then transitions the manager to the
-// new workspace set. It short-circuits when the normalized set matches the
-// current workspaces. All external side effects (store creation, instructions,
-// workspace groups, env file) are applied before the atomic swap; every
-// failure path closes the candidate store so it does not accumulate.
+// workspace on that folder (or to the empty "no workspace" state for no
+// paths). It short-circuits when the normalized folder matches the current
+// one. The workspace record and the store are resolved before the atomic
+// swap, so a failure leaves the manager unchanged.
 //
 // Multi-store lifecycle: if the previous group has running tasks
 // (taskCount > 0), its store is kept open in activeGroups. If switching to a
@@ -242,9 +249,9 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 }
 
 // activate installs `ws` as the current workspace: it opens or reuses the store
-// keyed by ws.DataKey (NOT by the folder paths), persists the active folder set
-// to the env file, performs the atomic snapshot swap, and publishes. ws.Folders
-// must already be validated/normalized and ws.DataKey must be non-empty.
+// keyed by ws.DataKey (NOT by the folder paths), performs the atomic snapshot
+// swap, and publishes. ws.Folders must already be validated/normalized and
+// ws.DataKey must be non-empty.
 //
 // Because the store is keyed by DataKey, changing a workspace's folders (via
 // UpdateFolders) keeps pointing at the same store; only Switch/SwitchByID, which
@@ -264,8 +271,8 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 	}
 	validated := ws.Folders
 
-	// Build the candidate snapshot. All external side effects happen here,
-	// before the atomic swap, so the manager is never left in a partial state.
+	// Build the candidate snapshot. The store is opened here, before the
+	// atomic swap, so the manager is never left in a partial state.
 	swap := pendingSwap{
 		next: Snapshot{
 			WorkspaceID:   ws.ID,
@@ -293,28 +300,7 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 		swap.next.Store = s
 	}
 
-	// cleanup is idempotent; called on every failure path to release the
-	// candidate store. Cleared to a no-op after the swap commits. Reused
-	// stores must NOT be closed on failure — they belong to an active group.
-	closed := false
-	swap.cleanup = func() {
-		if !closed && !reusedStore {
-			closed = true
-			swap.next.Store.Close()
-		}
-	}
-
-	if m.envFile != "" {
-		encoded := envconfig.FormatWorkspaces(validated)
-		if err := envconfig.Update(m.envFile, envconfig.Updates{
-			Workspaces: &encoded,
-		}); err != nil {
-			swap.cleanup()
-			return Snapshot{}, fmt.Errorf("persist workspaces: %w", err)
-		}
-	}
-
-	// All external effects succeeded: atomically install the new snapshot
+	// The store is open: atomically install the new snapshot
 	// and update activeGroups. The write lock ensures no concurrent reader
 	// sees a partially updated state (e.g. current.Store pointing to the
 	// previous group while current.Key already identifies the new one).
@@ -352,8 +338,6 @@ func (m *Manager) activate(ws Workspace) (Snapshot, error) {
 	snapshot := cloneSnapshot(m.current)
 	m.mu.Unlock()
 
-	// Mark the swap as committed so the cleanup no-op is safe, then publish.
-	swap.cleanup = func() {} // no-op: next.Store is now owned by m.current
 	m.publish(snapshot)
 
 	// Close the previous store outside the lock if it was marked for cleanup.
@@ -440,15 +424,19 @@ func (m *Manager) publish(snapshot Snapshot) {
 	}
 }
 
-// validate checks that all workspace paths are absolute, existing directories,
-// normalizes each to its lexically clean form, and returns a deduplicated,
-// sorted slice. Returns an error for any invalid path.
+// ErrSeveralFolders reports a request that names more than one folder for a
+// workspace. A workspace is one folder.
+var ErrSeveralFolders = errors.New("a workspace is one folder")
+
+// validate checks a workspace's folder: at most one distinct path, absolute,
+// naming an existing directory. Each path is normalized to its lexically clean
+// form and duplicates collapse, so the same folder named twice (or once with a
+// trailing slash) is still one folder. Returns nil for an empty or blank input
+// (the "no workspace open" state), a one-element slice otherwise, and an error
+// wrapping ErrSeveralFolders when more than one distinct folder is named.
 func validate(paths []string) ([]string, error) {
-	if len(paths) == 0 {
-		return nil, nil
-	}
 	seen := map[string]struct{}{}
-	validated := make([]string, 0, len(paths))
+	var validated []string
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -460,6 +448,16 @@ func validate(paths []string) ([]string, error) {
 		// Normalize to the lexically clean form so callers may pass paths with a
 		// trailing slash or redundant separators (e.g. from a UI folder picker).
 		path = filepath.Clean(path)
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		validated = append(validated, path)
+	}
+	if len(validated) > 1 {
+		return nil, fmt.Errorf("%w, but %d folders were given", ErrSeveralFolders, len(validated))
+	}
+	for _, path := range validated {
 		info, err := os.Stat(path)
 		if err != nil {
 			return nil, fmt.Errorf("workspace path invalid: %w", err)
@@ -467,13 +465,7 @@ func validate(paths []string) ([]string, error) {
 		if !info.IsDir() {
 			return nil, fmt.Errorf("workspace path is not a directory: %s", path)
 		}
-		if _, ok := seen[path]; ok {
-			continue
-		}
-		seen[path] = struct{}{}
-		validated = append(validated, path)
 	}
-	slices.Sort(validated)
 	return validated, nil
 }
 

@@ -15,8 +15,8 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | **Debug & monitoring** | |
 | `GET /api/debug/health` | Operational health check: goroutine count, task counts, uptime |
 | `GET /api/debug/runtime` | Live server internals: pending goroutines, memory, task states, running processes |
-| `GET /api/debug/board` | Board manifest as seen by a hypothetical new task (no self-task, no worktree mounts) |
-| `GET /api/tasks/{id}/board` | Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied) |
+| `GET /api/debug/board` | Board manifest as seen by a hypothetical new task (no self-task) |
+| `GET /api/tasks/{id}/board` | Board manifest as it appeared to a specific task (is_self=true for that task) |
 | **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
 | **Server configuration** | |
@@ -28,10 +28,10 @@ The REST routes are canonically defined in `internal/apicontract/routes.go`. `Bu
 | `POST /api/workspaces/mkdir` | Create a new directory under an absolute host path |
 | `POST /api/workspaces/rename` | Rename a file or directory at an absolute host path |
 | `GET /api/workspaces` | List workspace records (stable ID, name, folders, dormant flag, per-workspace limits) |
-| `POST /api/workspaces` | Create a workspace (random DataKey; not activated) |
-| `PUT /api/workspaces/{id}` | Update a workspace's name, folders, or per-workspace settings; identity and DataKey unchanged |
-| `DELETE /api/workspaces/{id}` | Delete a workspace record; 409 for the active workspace |
-| `POST /api/workspaces/{id}/activate` | Switch the scoped task board to this workspace |
+| `POST /api/workspaces` | Create a workspace on one folder (random DataKey; not activated); 400 for more than one folder |
+| `PUT /api/workspaces/{id}` | Update a workspace's name, its one folder (400 for more than one; re-pointing clears dormant), or per-workspace settings; identity and DataKey unchanged |
+| `DELETE /api/workspaces/{id}` | Delete a workspace and wipe its data; deleting the active one switches the board to the next usable workspace |
+| `POST /api/workspaces/{id}/activate` | Switch the scoped task board to this workspace; 400 for a dormant workspace that still names several folders |
 | **Environment configuration** | |
 | `GET /api/env` | Get environment configuration (tokens masked) |
 | `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |

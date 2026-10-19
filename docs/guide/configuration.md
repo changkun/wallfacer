@@ -75,6 +75,8 @@ wallfacer run [flags]
 | `-no-browser` | | `false` | Skip auto-opening the browser |
 | `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |
 
+The command takes flags only. A folder named on the command line is refused with exit status 2: the board reopens the most recently used workspace, and workspaces are created and switched in the workspace picker.
+
 Startup requires the `claude` binary on `PATH` (or `WALLFACER_HOST_CLAUDE_BINARY`); the server exits with an install hint otherwise.
 
 ### wallfacer status
@@ -152,7 +154,6 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 | `WALLFACER_SANDBOX_OVERSIGHT` | | Harness override for oversight |
 | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | | Harness override for commit messages |
 | `WALLFACER_HOST_CLAUDE_BINARY` | `$PATH` lookup | Explicit path to the `claude` binary; likewise `_CODEX_`, `_CURSOR_`, `_OPENCODE_`, `_PI_` variants |
-| `WALLFACER_WORKSPACES` | | Active workspace folders (colon-separated on Unix, semicolon on Windows) |
 
 ### Operational
 
@@ -186,7 +187,7 @@ All variables live in `~/.wallfacer/.env` unless set in the shell environment, w
 
 - [Getting Started](getting-started.md): installation and first run
 - [Concepts](concepts.md): the mental model and primitives
-- [Workspaces](workspaces.md): folder sets and per-workspace settings
+- [Workspaces](workspaces.md): the workspace folder and per-workspace settings
 - [Architecture](../internals/architecture.md): internals for contributors
 
 ### System keyring storage

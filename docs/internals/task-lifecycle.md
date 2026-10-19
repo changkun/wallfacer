@@ -88,6 +88,8 @@ Each pass through the loop in `runner.go` `Run()`:
 
 5. Accumulate token usage (`input_tokens`, `output_tokens`, cache tokens, `cost_usd`)
 6. Record per-turn usage as `TurnUsageRecord`
+
+The CWD comes from the task's worktree map (`agentWorkDir`, `internal/runner/container.go`): the worktree for the workspace folder when the task has one, else the first worktree in sorted folder order, and the live workspace folder only when the task has no worktree. A task created in one folder and resumed after the workspace was re-pointed therefore keeps working in its own worktree. A task stored with worktrees in several folders (from before a workspace became one folder) runs the same way; before its first turn `noteSeveralWorktrees` writes one system event on its timeline naming the folder the agent works in, and the commit pipeline still visits every folder's worktree.
 7. Check budget limits (`MaxCostUSD`, `MaxInputTokens`); if exceeded → `failed` with `FailureCategory = budget_exceeded`
 
 ## Session Continuity
@@ -193,9 +195,7 @@ After reviewing the verdict, the user can:
 
 ## Board Context
 
-Before each turn the runner writes a `board.json` manifest of all non-archived tasks to a host directory (the BoardDir) and passes its path to the agent via the `WALLFACER_BOARD_JSON` environment variable (`internal/runner/{container.go,execute.go}` `writeBoardDir`). The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn.
-
-When `MountWorktrees` is enabled on a task, eligible sibling worktree paths are written to a sibling manifest in the same BoardDir and surfaced to the agent via `WALLFACER_SIBLING_WORKTREES_JSON`.
+Before each turn the runner writes a `board.json` manifest of all non-archived tasks to a host directory (the BoardDir) and passes its path to the agent via the `WALLFACER_BOARD_JSON` environment variable (`internal/runner/{container.go,execute.go}` `writeBoardDir`). The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn. It names no other task's worktree: an agent sees the other tasks' prompts, status and branches, and works only in its own worktree.
 
 ## Data Models
 
@@ -339,34 +339,24 @@ Each `BoardTask` entry includes:
 | `stop_reason` | Last stop reason |
 | `usage` | Token/cost usage |
 | `branch_name` | Git branch name |
-| `worktree_mount` | Sibling worktree path exposed to the agent (if eligible) |
 | `created_at` / `updated_at` | Timestamps |
 
 `SessionID` is deliberately excluded from `BoardTask` to prevent session hijacking between tasks.
 
 ### How Board Context Is Assembled
 
-`generateBoardContextAndMounts` in `internal/runner/board.go` produces both the `board.json` bytes and the sibling worktree mount map:
+`generateBoardContext` in `internal/runner/board.go` produces the `board.json` bytes:
 
 1. Lists all non-archived tasks via `store.ListTasks`.
-2. Builds the set of workspace repo paths the self task operates on.
-3. Filters siblings to only those sharing at least one workspace.
+2. Builds the set of workspace repo paths the self task operates on (the keys of its worktree map, or the workspace folder when it has no worktree yet).
+3. Filters siblings to only those sharing that folder, so tasks from before the workspace was re-pointed drop out.
 4. For the self task: includes full `Prompt`, `Result`, and `Turns`.
 5. For siblings: truncates `Prompt` to 500 chars, `Result` to 1000 chars, zeros `Turns`.
-6. Determines eligible sibling worktree mounts (tasks in `waiting`, `failed`, or `done` with extant worktree directories).
-7. Marshals to JSON with indent; logs a warning if the manifest exceeds 64 KB.
+6. Marshals to JSON with indent; logs a warning if the manifest exceeds 64 KB.
 
 ### Caching
 
 Results are cached by `(boardChangeSeq, selfTaskID)`. The cache is invalidated when any store mutation increments the change sequence. Per-turn calls cost nearly nothing when no task has changed since the last generation.
-
-### Worktree Mounts
-
-When `MountWorktrees` is enabled, eligible sibling worktree paths are written to a sibling manifest in the BoardDir and surfaced to the agent via `WALLFACER_SIBLING_WORKTREES_JSON`. Eligibility is determined by `canMountWorktree`:
-
-- `waiting` or `failed` tasks: always eligible.
-- `done` tasks: eligible only if at least one worktree directory still exists on disk.
-- `backlog`, `in_progress`, `cancelled`: not eligible (no worktree, actively modified, or cleaned up).
 
 ### API Endpoints
 

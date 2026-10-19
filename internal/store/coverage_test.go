@@ -530,11 +530,10 @@ func TestStore_ListBlobs_NoDir(t *testing.T) {
 func TestCreateTask_DeprecatedWrapper(t *testing.T) {
 	s := newTestStore(t)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt:         "test prompt",
-		Timeout:        10,
-		MountWorktrees: true,
-		Kind:           TaskKindTask,
-		Tags:           []string{"tag1"},
+		Prompt:  "test prompt",
+		Timeout: 10,
+		Kind:    TaskKindTask,
+		Tags:    []string{"tag1"},
 	})
 	if err != nil {
 		t.Fatalf("CreateTaskWithOptions: %v", err)
@@ -544,9 +543,6 @@ func TestCreateTask_DeprecatedWrapper(t *testing.T) {
 	}
 	if task.Timeout != 10 {
 		t.Errorf("Timeout = %d, want 10", task.Timeout)
-	}
-	if !task.MountWorktrees {
-		t.Error("expected MountWorktrees=true")
 	}
 	if len(task.Tags) != 1 || task.Tags[0] != "tag1" {
 		t.Errorf("Tags = %v, want [tag1]", task.Tags)
@@ -983,7 +979,7 @@ func TestUpdateTaskBacklog_PartialUpdate(t *testing.T) {
 
 	newPrompt := "updated prompt"
 	newTimeout := 30
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newTimeout, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newTimeout, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1000,7 +996,7 @@ func TestUpdateTaskBacklog_SandboxByActivity(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "sandbox", Timeout: 5})
 
 	sba := map[SandboxActivity]harness.ID{SandboxActivityImplementation: harness.Claude}
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &sba, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &sba, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1015,7 +1011,7 @@ func TestUpdateTaskBacklog_BudgetClamp(t *testing.T) {
 
 	negCost := -1.0
 	negTokens := -100
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, &negCost, &negTokens); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &negCost, &negTokens); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -1027,21 +1023,17 @@ func TestUpdateTaskBacklog_BudgetClamp(t *testing.T) {
 	}
 }
 
-func TestUpdateTaskBacklog_FreshStartAndMount(t *testing.T) {
+func TestUpdateTaskBacklog_FreshStart(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "flags", Timeout: 5})
 
 	fs := true
-	mw := true
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fs, &mw, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fs, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
 		t.Error("FreshStart should be true")
-	}
-	if !got.MountWorktrees {
-		t.Error("MountWorktrees should be true")
 	}
 }
 
@@ -1554,7 +1546,6 @@ func TestCreateTaskWithOptions_WithAllOptionalFields(t *testing.T) {
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
 		Prompt:             "full opts",
 		Timeout:            30,
-		MountWorktrees:     true,
 		Kind:               TaskKindPlanning,
 		Tags:               []string{"tag1", "tag2"},
 		Sandbox:            harness.Claude,

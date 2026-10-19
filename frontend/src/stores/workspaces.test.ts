@@ -66,27 +66,35 @@ describe('workspaces store update', () => {
     const store = useWorkspacesStore();
     await store.list();
 
-    apiMock.mockResolvedValueOnce(ws({ id: 'w1', name: 'Renamed', folders: ['/a', '/b'] }));
-    const out = await store.update('w1', { name: 'Renamed', folders: ['/a', '/b'] });
-    expect(apiMock).toHaveBeenLastCalledWith('PUT', '/api/workspaces/w1', { name: 'Renamed', folders: ['/a', '/b'] });
+    apiMock.mockResolvedValueOnce(ws({ id: 'w1', name: 'Renamed', folders: ['/b'] }));
+    const out = await store.update('w1', { name: 'Renamed', folder: '/b' });
+    // A workspace is one folder; the wire carries it as a one-element list.
+    expect(apiMock).toHaveBeenLastCalledWith('PUT', '/api/workspaces/w1', { name: 'Renamed', folders: ['/b'] });
     expect(out.name).toBe('Renamed');
     expect(store.workspaces[0].name).toBe('Renamed');
-    expect(store.workspaces[0].folders).toEqual(['/a', '/b']);
+    expect(store.workspaces[0].folders).toEqual(['/b']);
   });
 
-  // Editing the ACTIVE workspace's folders must refetch /api/config so
+  it('sends no folders key when the folder is not part of the patch', async () => {
+    const store = useWorkspacesStore();
+    apiMock.mockResolvedValueOnce(ws({ id: 'w1', name: 'Renamed' }));
+    await store.update('w1', { name: 'Renamed' });
+    expect(apiMock).toHaveBeenLastCalledWith('PUT', '/api/workspaces/w1', { name: 'Renamed' });
+  });
+
+  // Re-pointing the ACTIVE workspace must refetch /api/config so
   // folder-derived views (the spec tree) refresh instead of
   // staying stale until a tab switch.
-  it('refetches config when the active workspace folders change', async () => {
+  it('refetches config when the active workspace is re-pointed', async () => {
     apiMock.mockResolvedValueOnce({ workspaces: [ws({ id: 'w1' })], active_id: 'w1' });
     const store = useWorkspacesStore();
     await store.list();
     useTaskStore().config = { workspace_id: 'w1' } as never; // w1 is active
 
     apiMock.mockReset();
-    apiMock.mockResolvedValueOnce(ws({ id: 'w1', folders: ['/a', '/b'] })); // PUT
-    apiMock.mockResolvedValueOnce({ workspaces: ['/a', '/b'], workspace_id: 'w1' }); // GET /api/config
-    await store.update('w1', { folders: ['/a', '/b'] });
+    apiMock.mockResolvedValueOnce(ws({ id: 'w1', folders: ['/b'] })); // PUT
+    apiMock.mockResolvedValueOnce({ workspaces: ['/b'], workspace_id: 'w1' }); // GET /api/config
+    await store.update('w1', { folder: '/b' });
     expect(apiMock).toHaveBeenCalledWith('GET', '/api/config');
   });
 
@@ -98,8 +106,19 @@ describe('workspaces store update', () => {
 
     apiMock.mockReset();
     apiMock.mockResolvedValueOnce(ws({ id: 'w2', folders: ['/c'] }));
-    await store.update('w2', { folders: ['/c'] });
+    await store.update('w2', { folder: '/c' });
     expect(apiMock).not.toHaveBeenCalledWith('GET', '/api/config');
+  });
+});
+
+describe('workspaces store create', () => {
+  it('creates a workspace on one folder', async () => {
+    const store = useWorkspacesStore();
+    apiMock.mockResolvedValueOnce(ws({ id: 'w9', name: 'New', folders: ['/n'] }));
+    const out = await store.create('New', '/n');
+    expect(apiMock).toHaveBeenLastCalledWith('POST', '/api/workspaces', { name: 'New', folders: ['/n'] });
+    expect(out.id).toBe('w9');
+    expect(store.workspaces.map(w => w.id)).toEqual(['w9']);
   });
 });
 

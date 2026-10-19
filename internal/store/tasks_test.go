@@ -703,7 +703,7 @@ func TestUpdateTaskBacklog_UpdatesPrompt(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 	newPrompt := "updated prompt"
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -717,7 +717,7 @@ func TestUpdateTaskBacklog_UpdatesTimeout(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	newTimeout := 30
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 30 {
@@ -730,7 +730,7 @@ func TestUpdateTaskBacklog_ClampsTimeout(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	big := 9999
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 1440 {
@@ -743,7 +743,7 @@ func TestUpdateTaskBacklog_UpdatesFreshStart(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	fresh := true
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
@@ -755,7 +755,7 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog with all nils: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -766,66 +766,8 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 
 func TestUpdateTaskBacklog_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil, nil); err == nil {
+	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil); err == nil {
 		t.Error("expected error for unknown task")
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MountWorktrees
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCreateTask_MountWorktrees(t *testing.T) {
-	s := newTestStore(t)
-	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mount test", Timeout: 5, MountWorktrees: true})
-	if err != nil {
-		t.Fatalf("CreateTask: %v", err)
-	}
-	if !task.MountWorktrees {
-		t.Error("expected MountWorktrees=true")
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.MountWorktrees {
-		t.Error("MountWorktrees should persist after reload")
-	}
-}
-
-func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
-
-	// Enable mount_worktrees.
-	enable := true
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil, nil, nil)
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.MountWorktrees {
-		t.Error("expected MountWorktrees=true after update")
-	}
-
-	// Disable mount_worktrees.
-	disable := false
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil, nil, nil)
-
-	got, _ = s.GetTask(bg(), task.ID)
-	if got.MountWorktrees {
-		t.Error("expected MountWorktrees=false after toggle off")
-	}
-}
-
-func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
-	s := newTestStore(t)
-	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mount retry", Timeout: 5, MountWorktrees: true})
-	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
-
-	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
-		t.Fatalf("ResetTaskForRetry: %v", err)
-	}
-
-	got, _ := s.GetTask(bg(), task.ID)
-	if !got.MountWorktrees {
-		t.Error("MountWorktrees should be preserved across retry")
 	}
 }
 

@@ -283,9 +283,8 @@ type Task struct {
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 	SnapshotDiffs    map[string]string `json:"snapshot_diffs,omitempty"`     // repoPath → diff text (non-git workspaces only)
 	CommitMessage    string            `json:"commit_message,omitempty"`     // generated commit message from the commit pipeline
-	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
-	Model            string            `json:"model,omitempty"`          // deprecated: retained for migration compatibility
-	ModelOverride    *string           `json:"model_override,omitempty"` // per-task model override; nil means use global default
+	Model            string            `json:"model,omitempty"`              // deprecated: retained for migration compatibility
+	ModelOverride    *string           `json:"model_override,omitempty"`     // per-task model override; nil means use global default
 
 	// Test verification fields.
 	IsTestRun        bool   `json:"is_test_run,omitempty"`         // true while the task is running as a test verifier

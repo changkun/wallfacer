@@ -91,14 +91,10 @@ type runAgentOpts struct {
 	// place of the raw workspaces so commits land on the task's
 	// branch.
 	WorktreeOverrides map[string]string
-	// BoardDir is the host directory holding board.json and the sibling
-	// worktree manifest, surfaced to the agent through environment
-	// variables. Only honored for mountReadWrite roles.
+	// BoardDir is the host directory holding board.json, surfaced to the
+	// agent through WALLFACER_BOARD_JSON. Only honored for mountReadWrite
+	// roles.
 	BoardDir string
-	// SiblingMounts maps shortID → (repoPath → worktreePath) for
-	// read-only mounts of other in-progress task worktrees, so the
-	// agent can reference sibling work without modifying it.
-	SiblingMounts map[string]map[string]string
 	// LiveLogWriter, when set, is tee'd alongside stdout and stderr
 	// during the container run so callers can stream output while the
 	// container is still alive. Heavyweight roles wire this to their
@@ -123,9 +119,9 @@ type agentResult struct {
 // construction, Launch, stdout/stderr drain, wait, NDJSON parsing,
 // usage accumulation, and token-limit fallback. Spec construction
 // dispatches on the role's mount mode: mountReadWrite roles get the
-// full heavyweight spec (worktree mounts, board + sibling context,
-// per-task labels), while mountReadOnly and mountNone roles get an
-// inspector spec.
+// full heavyweight spec (task worktree, board context, per-task
+// labels), while mountReadOnly and mountNone roles get an inspector
+// spec.
 func (r *Runner) runAgent(
 	ctx context.Context,
 	role AgentRole,
@@ -316,8 +312,8 @@ func (r *Runner) launchOne(
 	var spec executor.ContainerSpec
 	switch binding.MountMode {
 	case mountReadWrite:
-		// Heavyweight spec builder already handles worktree mounts,
-		// board + sibling context, and per-task labels.
+		// Heavyweight spec builder already handles the task worktree,
+		// board context, and per-task labels.
 		spec = r.buildContainerSpecForSandbox(
 			containerName,
 			taskIDString(task),
@@ -325,7 +321,6 @@ func (r *Runner) launchOne(
 			opts.SessionID,
 			opts.WorktreeOverrides,
 			opts.BoardDir,
-			opts.SiblingMounts,
 			opts.ModelOverride,
 			sb,
 		)
@@ -433,12 +428,8 @@ func (r *Runner) launchOne(
 
 // buildInspectorSpec produces a ContainerSpec for headless or read-only
 // inspector roles. For mountNone it returns the same spec
-// buildBaseContainerSpec produces. For mountReadOnly it layers every
-// configured workspace as a read-only volume plus the workspace
-// instructions file (CLAUDE.md / AGENTS.md) and sets WorkDir so the
-// agent has a natural CWD to inspect from. Worker-container mode is
-// intentionally not involved — inspector roles are short-lived and
-// cheap to spin up ephemerally.
+// buildBaseContainerSpec produces. For mountReadOnly it sets WorkDir to
+// the workspace folder so the agent has a natural CWD to inspect from.
 func (r *Runner) buildInspectorSpec(
 	containerName, model string,
 	sb harness.ID,
@@ -449,8 +440,8 @@ func (r *Runner) buildInspectorSpec(
 		return spec
 	}
 
-	// Host backend runs in a real workspace directory; cwd is the first
-	// configured workspace.
+	// Host backend runs in a real workspace directory; cwd is the
+	// workspace folder.
 	for _, ws := range r.currentWorkspaces() {
 		ws = strings.TrimSpace(ws)
 		if ws != "" {

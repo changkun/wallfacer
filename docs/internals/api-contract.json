@@ -33,7 +33,7 @@
       "method": "GET",
       "pattern": "/api/tasks/{id}/board",
       "name": "TaskBoardManifest",
-      "description": "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+      "description": "Board manifest as it appeared to a specific task (is_self=true for that task).",
       "tags": [
         "tasks",
         "debug"
@@ -106,7 +106,7 @@
       "method": "GET",
       "pattern": "/api/workspaces",
       "name": "ListWorkspaces",
-      "description": "List workspaces visible to the caller, each flagged active or dormant.",
+      "description": "List workspaces, each flagged active or dormant (a dormant one waits to be re-pointed to one folder).",
       "tags": [
         "workspaces"
       ]
@@ -115,7 +115,7 @@
       "method": "POST",
       "pattern": "/api/workspaces",
       "name": "CreateWorkspace",
-      "description": "Create a workspace (stable id, random storage key) from a name and folder set.",
+      "description": "Create a workspace (stable id, random storage key) from a name and one folder; 400 when more than one folder is given.",
       "tags": [
         "workspaces"
       ]
@@ -124,7 +124,7 @@
       "method": "PUT",
       "pattern": "/api/workspaces/{id}",
       "name": "UpdateWorkspace",
-      "description": "Rename a workspace and/or replace its folder set without re-keying its history.",
+      "description": "Rename a workspace and/or re-point it to one folder without re-keying its history; re-pointing clears dormant. 400 when more than one folder is given.",
       "tags": [
         "workspaces"
       ]
@@ -133,7 +133,7 @@
       "method": "DELETE",
       "pattern": "/api/workspaces/{id}",
       "name": "DeleteWorkspace",
-      "description": "Delete a workspace record (its data directory is left on disk).",
+      "description": "Delete a workspace and wipe its task history and session data; folders on disk are not touched. Returns the resulting config.",
       "tags": [
         "workspaces"
       ]
@@ -142,7 +142,7 @@
       "method": "POST",
       "pattern": "/api/workspaces/{id}/activate",
       "name": "ActivateWorkspace",
-      "description": "Activate a workspace by id and switch the scoped task board.",
+      "description": "Activate a workspace by id and switch the scoped task board; 400 for a dormant workspace that still names several folders.",
       "tags": [
         "workspaces"
       ]

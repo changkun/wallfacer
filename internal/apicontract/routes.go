@@ -45,7 +45,7 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/board", Name: "TaskBoardManifest",
-		Description: "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+		Description: "Board manifest as it appeared to a specific task (is_self=true for that task).",
 		Tags:        []string{"tasks", "debug"},
 	},
 
@@ -94,27 +94,27 @@ var Routes = []Route{
 	},
 	{
 		Method: http.MethodGet, Pattern: "/api/workspaces", Name: "ListWorkspaces",
-		Description: "List workspaces visible to the caller, each flagged active or dormant.",
+		Description: "List workspaces, each flagged active or dormant (a dormant one waits to be re-pointed to one folder).",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces", Name: "CreateWorkspace",
-		Description: "Create a workspace (stable id, random storage key) from a name and folder set.",
+		Description: "Create a workspace (stable id, random storage key) from a name and one folder; 400 when more than one folder is given.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPut, Pattern: "/api/workspaces/{id}", Name: "UpdateWorkspace",
-		Description: "Rename a workspace and/or replace its folder set without re-keying its history.",
+		Description: "Rename a workspace and/or re-point it to one folder without re-keying its history; re-pointing clears dormant. 400 when more than one folder is given.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodDelete, Pattern: "/api/workspaces/{id}", Name: "DeleteWorkspace",
-		Description: "Delete a workspace record (its data directory is left on disk).",
+		Description: "Delete a workspace and wipe its task history and session data; folders on disk are not touched. Returns the resulting config.",
 		Tags:        []string{"workspaces"},
 	},
 	{
 		Method: http.MethodPost, Pattern: "/api/workspaces/{id}/activate", Name: "ActivateWorkspace",
-		Description: "Activate a workspace by id and switch the scoped task board.",
+		Description: "Activate a workspace by id and switch the scoped task board; 400 for a dormant workspace that still names several folders.",
 		Tags:        []string{"workspaces"},
 	},
 

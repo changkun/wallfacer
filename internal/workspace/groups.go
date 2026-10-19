@@ -11,9 +11,9 @@ import (
 	"latere.ai/x/pkg/atomicfile"
 )
 
-// Workspace is an owned, stably-identified set of folder paths. Its identity
-// (ID) and its storage handle (DataKey) are independent of its membership
-// (Folders), so the owner may change folders without orphaning history.
+// Workspace is an owned, stably-identified folder. Its identity (ID) and its
+// storage handle (DataKey) are independent of the folder it points at, so the
+// owner may re-point it without orphaning history.
 //
 // ID and DataKey are empty on records loaded from the legacy
 // workspace-groups.json (which keyed identity off the path set). Migration
@@ -21,9 +21,15 @@ import (
 // the manager derives the scoped-data key from the folder paths exactly as
 // before, so legacy records keep working.
 type Workspace struct {
-	ID      string   `json:"id,omitempty"`       // stable UUIDv4, assigned once at creation/migration
-	Name    string   `json:"name,omitempty"`     // optional human label
-	Folders []string `json:"folders"`            // mutable; absolute, clean, sorted, deduped
+	ID   string `json:"id,omitempty"`   // stable UUIDv4, assigned once at creation/migration
+	Name string `json:"name,omitempty"` // optional human label
+
+	// Folders holds the workspace's one folder (absolute, clean). It stays a
+	// list on disk so a record written when a workspace could span several
+	// folders still loads whole: LoadGroups keeps every folder such a record
+	// names and marks it Dormant until the owner re-points it to one folder.
+	// A dormant record recovered from orphaned history may hold none.
+	Folders []string `json:"folders"`
 	DataKey string   `json:"data_key,omitempty"` // stable storage handle under data/<DataKey>
 
 	// MaxParallel, when non-nil, overrides WALLFACER_MAX_PARALLEL for this
@@ -32,9 +38,12 @@ type Workspace struct {
 	// absent field in on-disk JSON deserializes to nil rather than 0.
 	MaxParallel *int `json:"max_parallel,omitempty"`
 
-	// Dormant marks a workspace recovered from orphaned task history during
-	// migration: its DataKey addresses real history but its Folders may be
-	// empty or only best-effort recovered. The owner re-points it later.
+	// Dormant marks a workspace whose DataKey addresses real task history but
+	// whose folder the owner has yet to choose. Two kinds of record are
+	// dormant: history recovered from an orphaned data directory during
+	// migration (Folders empty or best-effort recovered), and a record that
+	// names several folders (see LoadGroups). Re-pointing the workspace to one
+	// folder (Manager.UpdateFolders) clears the flag and its tasks reappear.
 	Dormant bool `json:"dormant,omitempty"`
 
 	// CreatedAt/UpdatedAt are RFC3339 timestamps for bookkeeping. Empty on
@@ -78,6 +87,12 @@ func legacyGroupsFilePath(configDir string) string {
 // canonical workspaces.json and falls back to the legacy workspace-groups.json
 // (whose records the Workspace UnmarshalJSON still understands) so an
 // un-migrated install keeps working.
+//
+// A record that names several folders comes from before a workspace became
+// one folder. It loads with its ID, name, DataKey and every folder intact but
+// marked Dormant, so no folder is picked on the owner's behalf and its history
+// waits until the owner re-points it to one folder. The mark is persisted by
+// the next write of workspaces.json.
 func LoadGroups(configDir string) ([]Workspace, error) {
 	path := workspacesFilePath(configDir)
 	raw, err := os.ReadFile(path)
@@ -94,7 +109,25 @@ func LoadGroups(configDir string) ([]Workspace, error) {
 	if err := json.Unmarshal(raw, &groups); err != nil {
 		return nil, err
 	}
-	return NormalizeGroups(groups), nil
+	groups = NormalizeGroups(groups)
+	for i := range groups {
+		if len(groups[i].Folders) > 1 {
+			groups[i].Dormant = true
+		}
+	}
+	return groups, nil
+}
+
+// CountSeveralFolders returns how many workspaces name more than one folder.
+// Each one stays dormant until the owner re-points it to one folder.
+func CountSeveralFolders(groups []Workspace) int {
+	n := 0
+	for _, g := range groups {
+		if len(g.Folders) > 1 {
+			n++
+		}
+	}
+	return n
 }
 
 // SaveGroups writes workspaces to the canonical workspaces.json atomically.

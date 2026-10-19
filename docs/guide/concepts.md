@@ -22,7 +22,7 @@ The levels are access points, not a pipeline. Start a task directly when the fix
 
 ### Workspace
 
-A workspace is a named set of project folders with a stable identity. The identity survives renames and folder changes, so task history stays attached when the folder set evolves. Each workspace can carry its own parallelism cap. Workspaces are created, switched, and edited from the sidebar switcher; see [Workspaces](workspaces.md).
+A workspace is a named project folder with a stable identity. The identity survives renames and re-pointing to another folder, so task history stays attached when the folder changes. Work across several repositories uses one workspace per repository. Each workspace can carry its own parallelism cap. Workspaces are created, switched, and edited from the sidebar switcher; see [Workspaces](workspaces.md).
 
 ### Task
 

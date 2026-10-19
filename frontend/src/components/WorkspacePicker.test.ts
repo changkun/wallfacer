@@ -1,13 +1,14 @@
 // Wizard navigation for the Select Workspaces modal.
 //
-// The picker is a two step wizard: step 1 chooses folders, step 2 reviews
-// and activates. The "Next: Review" button (and the step 2 circle) must be
-// disabled until at least one folder is added, and advancing must reveal the
-// step 2 review pane. This pins that gating + navigation.
+// The picker is a two step wizard: step 1 chooses the workspace's one folder,
+// step 2 reviews and activates. The "Next: Name" button (and the step 2
+// circle) must be disabled until a folder is chosen, and advancing must reveal
+// the step 2 review pane. This pins that gating + navigation, single-folder
+// choice, and re-pointing a dormant workspace saved with several folders.
 //
 // The open watcher is not immediate, so mounting with modelValue:true does
 // not fire browse(), meaning no api call runs on mount. We drive the gate via
-// "+ Add current folder", which adds browsePath ('/') without any network.
+// "Use this folder", which chooses browsePath ('/') without any network.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp, h, nextTick, ref, type App } from 'vue';
@@ -16,12 +17,16 @@ import WorkspacePicker from './WorkspacePicker.vue';
 
 // Capture browse calls and feed canned directory listings so the picker can be
 // driven without a real backend.
-const apiCalls: { method: string; path: string }[] = [];
+const apiCalls: { method: string; path: string; body?: unknown }[] = [];
 let browseEntries: { name: string; path: string; is_git_repo: boolean }[] = [];
 let registryWorkspaces: { id: string; name: string; folders: string[]; dormant: boolean; active: boolean }[] = [];
 vi.mock('../api/client', () => ({
-  api: vi.fn((method: string, path: string) => {
-    apiCalls.push({ method, path });
+  api: vi.fn((method: string, path: string, body?: unknown) => {
+    apiCalls.push({ method, path, body });
+    if (method === 'PUT' && path.startsWith('/api/workspaces/')) {
+      const id = path.split('/').pop()!;
+      return Promise.resolve({ id, name: '', folders: [], dormant: false, active: false, ...(body as object) });
+    }
     if (path === '/api/workspaces' && method === 'GET') {
       return Promise.resolve({ workspaces: registryWorkspaces, active_id: '' });
     }
@@ -100,7 +105,7 @@ describe('WorkspacePicker wizard', () => {
   it('explains what a workspace contains and what activating it does', async () => {
     ({ app, host } = await mountOpen());
     const explanation = host!.querySelector('.dialog-sub')!.textContent;
-    expect(explanation).toContain('A workspace groups project folders');
+    expect(explanation).toContain('A workspace is one project folder');
     expect(explanation).toContain('task board');
     expect(explanation).toMatch(/agents/i);
   });
@@ -135,30 +140,67 @@ describe('WorkspacePicker wizard', () => {
     expect(apiCalls.some((c) => c.method === 'POST' && c.path === '/api/workspaces/a/activate')).toBe(true);
   });
 
-  it('sinks already-added folders to the bottom of the browse list', async () => {
+  it('chooses one folder: a second choice replaces the first', async () => {
     browseEntries = [
-      { name: 'alpha', path: '/home/u/alpha', is_git_repo: false },
-      { name: 'beta', path: '/home/u/beta', is_git_repo: false },
-      { name: 'gamma', path: '/home/u/gamma', is_git_repo: false },
+      { name: 'alpha', path: '/srv/alpha', is_git_repo: false },
+      { name: 'beta', path: '/srv/beta', is_git_repo: false },
     ];
     ({ app, host } = await mountOpen());
 
-    // Add the middle entry; it should move to the end of the list.
-    const addButtons = Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry__add'));
-    const betaRow = Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry')).find((r) =>
-      r.textContent?.includes('beta'),
-    );
-    (betaRow!.querySelector('.ws-entry__add') as HTMLButtonElement).click();
+    const row = (name: string) => Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry')).find((r) =>
+      r.textContent?.includes(name),
+    )!;
+    (row('alpha').querySelector('.ws-entry__choose') as HTMLButtonElement).click();
     await nextTick();
-    expect(addButtons.length).toBe(3);
+    expect(row('alpha').querySelector('.ws-entry__chosen')).not.toBeNull();
+    expect(host!.querySelector('.ws-step__count')!.textContent!.trim()).toBe('/srv/alpha');
 
-    const order = Array.from(host!.querySelectorAll<HTMLElement>('.ws-entry__name')).map(
-      (el) => el.textContent?.trim().replace(/git$/, '') ?? '',
-    );
-    expect(order).toEqual(['alpha', 'gamma', 'beta']);
+    (row('beta').querySelector('.ws-entry__choose') as HTMLButtonElement).click();
+    await nextTick();
+    expect(row('beta').querySelector('.ws-entry__chosen')).not.toBeNull();
+    expect(row('alpha').querySelector('.ws-entry__chosen')).toBeNull();
+    expect(host!.querySelectorAll('.ws-entry__chosen').length).toBe(1);
+    expect(host!.querySelector('.ws-step__count')!.textContent!.trim()).toBe('/srv/beta');
   });
 
-  it('disables Next until a folder is added, then advances to review', async () => {
+  it('re-points a dormant workspace saved with several folders to the one the owner keeps', async () => {
+    registryWorkspaces = [
+      { id: 'm', name: 'Pair', folders: ['/srv/api', '/srv/web'], dormant: true, active: false },
+    ];
+    ({ app, host } = await mountOpen());
+    await Promise.resolve();
+    await nextTick();
+    await nextTick();
+
+    // The list row says it has several folders; clicking it opens the
+    // re-point wizard instead of activating.
+    expect(host!.querySelector('.ws-list__badge--dormant')!.textContent).toContain('several folders');
+    (host!.querySelector('.ws-list__main') as HTMLButtonElement).click();
+    await nextTick();
+    expect(apiCalls.some((c) => c.path.includes('/activate'))).toBe(false);
+
+    // No folder is picked for the owner: Next stays disabled until one is kept.
+    const next = findByText(host!, 'button', 'Next: Name') as HTMLButtonElement;
+    expect(next.disabled).toBe(true);
+    expect(host!.querySelector('.ws-picker__former')!.textContent).toContain('several folders');
+    const keepWeb = findByText(host!, '.ws-picker__former-choose', '/srv/web') as HTMLButtonElement;
+    keepWeb.click();
+    await nextTick();
+    expect(next.disabled).toBe(false);
+
+    next.click();
+    await nextTick();
+    (findByText(host!, 'button', 'Activate') as HTMLButtonElement).click();
+    // Let the update -> activate chain settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+    const put = apiCalls.find((c) => c.method === 'PUT' && c.path === '/api/workspaces/m');
+    expect(put).toBeDefined();
+    expect((put!.body as { folders: string[] }).folders).toEqual(['/srv/web']);
+    expect(apiCalls.some((c) => c.method === 'POST' && c.path === '/api/workspaces/m/activate')).toBe(true);
+  });
+
+  it('disables Next until a folder is chosen, then advances to review', async () => {
     ({ app, host } = await mount());
 
     // jsdom does not lay out, so check v-show via the inline display style on
@@ -173,15 +215,17 @@ describe('WorkspacePicker wizard', () => {
     expect(next).not.toBeNull();
     expect((next as HTMLButtonElement).disabled).toBe(true);
 
-    // Add the browsed folder ('/'), which flips canProceed without browsing.
-    const addCurrent = findByText(host, 'button', '+ Add this folder');
-    expect(addCurrent).not.toBeNull();
-    (addCurrent as HTMLButtonElement).click();
+    const count = host.querySelector('.ws-step__count');
+    expect(count?.textContent?.trim()).toBe('No folder chosen');
+
+    // Choose the browsed folder ('/'), which flips canProceed without browsing.
+    const useCurrent = findByText(host, 'button', 'Use this folder');
+    expect(useCurrent).not.toBeNull();
+    (useCurrent as HTMLButtonElement).click();
     await nextTick();
 
     expect((next as HTMLButtonElement).disabled).toBe(false);
-    const count = findByText(host, '.ws-step__count', 'folder added');
-    expect(count?.textContent?.trim()).toBe('1 folder added');
+    expect(count?.textContent?.trim()).toBe('/');
 
     // Advance to step 2: the review pane shows, step 1 hides.
     (next as HTMLButtonElement).click();

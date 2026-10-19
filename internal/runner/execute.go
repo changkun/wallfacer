@@ -161,6 +161,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// existed may still name one in FlowID; the field is not read for
 	// dispatch, and the task's timeline says once that the fleet is gone.
 	r.noteRemovedFleet(bgCtx, task)
+	r.noteSeveralWorktrees(bgCtx, task)
 
 	isTestRun := task.IsTestRun
 
@@ -257,11 +258,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Each container invocation's values represent only that invocation's
 	// consumption, so we accumulate them directly without delta subtraction.
 
-	// Prepare board context and sibling mounts in a single fused call.
-	var siblingMounts map[string]map[string]string
+	// Prepare board context.
 	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: "board_context"})
 
-	boardJSON, siblingMounts, boardErr := r.generateBoardContextAndMounts(taskID, task.MountWorktrees)
+	boardJSON, boardErr := r.generateBoardContext(taskID)
 	if boardErr != nil {
 		logger.Runner.Warn("board context failed", "task", taskID, "error", boardErr)
 	}
@@ -285,15 +285,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		turns++
 		logger.Runner.Info("turn", "task", taskID, "turn", turns, "session", sessionID, "timeout", timeout)
 
-		// Refresh board.json and sibling mounts before each turn so they reflect latest state.
+		// Refresh board.json before each turn so it reflects the latest state.
 		if boardDir != "" {
 			boardRefreshLabel := fmt.Sprintf("board_context_%d", turns)
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 
-			if data, mounts, err := r.generateBoardContextAndMounts(taskID, task.MountWorktrees); err == nil {
+			if data, err := r.generateBoardContext(taskID); err == nil {
 				_ = os.WriteFile(filepath.Join(boardDir, "board.json"), data, 0644)
-
-				siblingMounts = mounts
 			}
 			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 
@@ -309,7 +307,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
-		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, modelOverride, runActivity)
+		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, modelOverride, runActivity)
 		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
 		if saveErr := r.taskStore(taskID).SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {

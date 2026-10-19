@@ -270,8 +270,8 @@ func (s *Store) UpdateTaskTags(_ context.Context, id uuid.UUID, tags []string) e
 	})
 }
 
-// UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]harness.ID, maxCostUSD *float64, maxInputTokens *int) error {
+// UpdateTaskBacklog edits prompt, timeout, fresh_start, per-activity sandboxes, and budget limits for backlog tasks.
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, sandboxByActivity *map[SandboxActivity]harness.ID, maxCostUSD *float64, maxInputTokens *int) error {
 	var loweredPrompt string
 	if prompt != nil {
 		loweredPrompt = strings.ToLower(*prompt)
@@ -285,9 +285,6 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 		}
 		if freshStart != nil {
 			t.FreshStart = *freshStart
-		}
-		if mountWorktrees != nil {
-			t.MountWorktrees = *mountWorktrees
 		}
 		if sandboxByActivity != nil {
 			t.SandboxByActivity = normalizeSandboxByActivity(*sandboxByActivity)

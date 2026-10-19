@@ -23,7 +23,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t2, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task two", Timeout: 10, MountWorktrees: true})
+	t2, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task two", Timeout: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 
 	// t3 stays in backlog.
 
-	data, _, err := r.generateBoardContextAndMounts(t2.ID, false)
+	data, err := r.generateBoardContext(t2.ID)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 func TestGenerateBoardContext_Empty(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 
-	data, _, err := r.generateBoardContextAndMounts([16]byte{}, false)
+	data, err := r.generateBoardContext([16]byte{})
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -109,79 +109,6 @@ func TestGenerateBoardContext_Empty(t *testing.T) {
 	}
 	if len(manifest.Tasks) != 0 {
 		t.Errorf("expected 0 tasks, got %d", len(manifest.Tasks))
-	}
-}
-
-// TestCanMountWorktree is a table-driven test for all task statuses.
-func TestCanMountWorktree(t *testing.T) {
-	tmpDir := t.TempDir()
-	existingWT := map[string]string{"/repo": tmpDir}
-	noWT := map[string]string(nil)
-
-	cases := []struct {
-		status store.TaskStatus
-		wt     map[string]string
-		want   bool
-	}{
-		{store.TaskStatusBacklog, existingWT, false},
-		{store.TaskStatusInProgress, existingWT, false},
-		{store.TaskStatusWaiting, existingWT, true},
-		{store.TaskStatusFailed, existingWT, true},
-		{store.TaskStatusDone, existingWT, true},
-		{store.TaskStatusDone, noWT, false},
-		{store.TaskStatusDone, map[string]string{"/repo": "/nonexistent/path"}, false},
-		{store.TaskStatusCancelled, existingWT, false},
-		{"archived", existingWT, false},
-	}
-
-	for _, tc := range cases {
-		got := canMountWorktree(tc.status, tc.wt)
-		if got != tc.want {
-			t.Errorf("canMountWorktree(%q, %v) = %v, want %v", tc.status, tc.wt, got, tc.want)
-		}
-	}
-}
-
-// TestBuildSiblingMounts verifies that buildSiblingMounts returns eligible
-// sibling worktrees and excludes the self task and ineligible statuses.
-func TestBuildSiblingMounts(t *testing.T) {
-	s, r := setupRunnerWithCmd(t, nil, "echo")
-	ctx := bg()
-
-	t1, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 5, MountWorktrees: true})
-	t2, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 5})
-	t3, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 5})
-
-	// Set t2 to waiting with worktree paths.
-	_ = s.ForceUpdateTaskStatus(ctx, t2.ID, "waiting")
-
-	wtDir := t.TempDir()
-	_ = s.UpdateTaskWorktrees(ctx, t2.ID, map[string]string{"/myrepo": wtDir}, "task/"+t2.ID.String()[:8])
-
-	// t3 stays in backlog (no worktrees).
-	_ = t3
-
-	_, mounts, err := r.generateBoardContextAndMounts(t1.ID, true)
-	if err != nil {
-		t.Fatalf("generateBoardContextAndMounts: %v", err)
-	}
-	if mounts == nil {
-		t.Fatal("expected non-nil sibling mounts")
-	}
-
-	shortID := t2.ID.String()[:8]
-	repos, ok := mounts[shortID]
-	if !ok {
-		t.Fatalf("expected mount for shortID %s", shortID)
-	}
-	if repos["/myrepo"] != wtDir {
-		t.Errorf("expected worktree path %q, got %q", wtDir, repos["/myrepo"])
-	}
-
-	// Self task should not appear.
-	selfShort := t1.ID.String()[:8]
-	if _, ok := mounts[selfShort]; ok {
-		t.Error("self task should not appear in sibling mounts")
 	}
 }
 
@@ -218,7 +145,7 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 		idByStatus[st] = task.ID.String()
 	}
 
-	data, _, err := r.generateBoardContextAndMounts([16]byte{}, false)
+	data, err := r.generateBoardContext([16]byte{})
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -253,54 +180,36 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 	}
 }
 
-// TestGenerateBoardContext_WorktreePath verifies that generateBoardContext
-// sets worktree_path to the sibling's host worktree for eligible siblings,
-// and that the self task has no worktree_path.
-func TestGenerateBoardContext_WorktreePath(t *testing.T) {
+// TestGenerateBoardContext_NoWorktreePaths verifies that board.json names no
+// other task's worktree: the agent sees other tasks' prompts, status and
+// branch, but not a path into their working copies.
+func TestGenerateBoardContext_NoWorktreePaths(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	// Create a sibling task in waiting status with a worktree directory.
-	sibling, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sibling task", Timeout: 5})
+	other, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "other task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = s.ForceUpdateTaskStatus(ctx, sibling.ID, store.TaskStatusWaiting)
-
+	_ = s.ForceUpdateTaskStatus(ctx, other.ID, store.TaskStatusWaiting)
 	wtDir := t.TempDir()
-	repoPath := "/home/user/myrepo"
-	_ = s.UpdateTaskWorktrees(ctx, sibling.ID, map[string]string{repoPath: wtDir}, "task/"+sibling.ID.String()[:8])
+	branch := "task/" + other.ID.String()[:8]
+	_ = s.UpdateTaskWorktrees(ctx, other.ID, map[string]string{"/home/user/myrepo": wtDir}, branch)
 
-	// Create a self task (stays in backlog).
 	self, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	data, _, err := r.generateBoardContextAndMounts(self.ID, true)
+	data, err := r.generateBoardContext(self.ID)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
-
-	var manifest BoardManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
+	if strings.Contains(string(data), "worktree_path") || strings.Contains(string(data), wtDir) {
+		t.Errorf("board.json exposes another task's worktree:\n%s", data)
 	}
-
-	for _, bt := range manifest.Tasks {
-		switch bt.ID {
-		case sibling.ID.String():
-			if bt.WorktreePath == nil {
-				t.Fatal("sibling WorktreePath should not be nil")
-			}
-			if *bt.WorktreePath != wtDir {
-				t.Errorf("WorktreePath = %q, want the sibling's worktree %q", *bt.WorktreePath, wtDir)
-			}
-		case self.ID.String():
-			if bt.WorktreePath != nil {
-				t.Errorf("self task WorktreePath should be nil, got %q", *bt.WorktreePath)
-			}
-		}
+	if !strings.Contains(string(data), branch) {
+		t.Errorf("board.json lost the other task's branch %q:\n%s", branch, data)
 	}
 }
 
@@ -322,7 +231,7 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 		t.Fatalf("SetTaskArchived: %v", err)
 	}
 
-	data, _, err := r.generateBoardContextAndMounts([16]byte{}, false)
+	data, err := r.generateBoardContext([16]byte{})
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -358,7 +267,7 @@ func waitBoardSeqStable(r *Runner) {
 	}
 }
 
-// TestBoardCacheHit asserts that a second call to generateBoardContextAndMounts
+// TestBoardCacheHit asserts that a second call to generateBoardContext
 // (with no intervening store mutations) completes in under 5 µs — the cache
 // hit path avoids store.ListTasks entirely.
 func TestBoardCacheHit(t *testing.T) {
@@ -380,7 +289,7 @@ func TestBoardCacheHit(t *testing.T) {
 	waitBoardSeqStable(r)
 
 	// Prime the cache.
-	if _, _, err := r.generateBoardContextAndMounts(selfID, false); err != nil {
+	if _, err := r.generateBoardContext(selfID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -394,7 +303,7 @@ func TestBoardCacheHit(t *testing.T) {
 	best := time.Duration(math.MaxInt64)
 	for range 10 {
 		start := time.Now()
-		_, _, err := r.generateBoardContextAndMounts(selfID, false)
+		_, err := r.generateBoardContext(selfID)
 		elapsed := time.Since(start)
 		if err != nil {
 			t.Fatal(err)
@@ -429,13 +338,13 @@ func BenchmarkGenerateBoardContext(b *testing.B) {
 	waitBoardSeqStable(r)
 
 	// Prime the cache with one call.
-	if _, _, err := r.generateBoardContextAndMounts(selfID, false); err != nil {
+	if _, err := r.generateBoardContext(selfID); err != nil {
 		b.Fatal(err)
 	}
 
 	b.ReportAllocs()
 	for b.Loop() {
-		_, _, err := r.generateBoardContextAndMounts(selfID, false)
+		_, err := r.generateBoardContext(selfID)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -522,7 +431,7 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 
 	_ = s.UpdateTaskResult(ctx, selfTask.ID, longResult, "sess-self", "max_tokens", 7)
 
-	data, _, err := r.generateBoardContextAndMounts(selfTask.ID, false)
+	data, err := r.generateBoardContext(selfTask.ID)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}

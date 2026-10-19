@@ -19,21 +19,22 @@ import (
 	"latere.ai/x/wallfacer/internal/store"
 )
 
-// setupWorktrees creates an isolated working directory for each workspace.
-// For git-backed workspaces a proper git worktree is created.
-// For non-git workspaces a snapshot copy is created and tracked with a local
-// git repo so that the same commit pipeline can be used for both cases.
+// setupWorktrees creates an isolated working directory for the workspace's
+// folder: a git worktree for a git-backed folder, or a snapshot copy tracked
+// with a local git repo for a non-git folder, so the same commit pipeline
+// serves both. A workspace is one folder, so a new task gets one entry.
 // Returns (worktreePaths, branchName, error).
 // Idempotent: if the worktree/snapshot directory already exists it is reused.
 func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, error) {
 	return r.ensureTaskWorktrees(taskID, nil, "")
 }
 
-// ensureTaskWorktrees creates or reuses worktrees for each workspace. When existing
-// is non-nil, only those repos are processed (reattach mode). Otherwise all configured
-// workspaces are used. For git repos a proper worktree is created; for non-git
-// workspaces a snapshot copy with a local git repo is set up instead. The worktreeMu
-// must be held by the caller (or this method acquires it internally).
+// ensureTaskWorktrees creates or reuses worktrees. When existing is non-empty,
+// exactly the folders it names are processed (reattach mode); a task stored
+// before a workspace became one folder may name several, and each keeps its
+// worktree. Otherwise the workspace's folder is used. For git repos a proper
+// worktree is created; for non-git folders a snapshot copy with a local git
+// repo is set up instead. The method acquires worktreeMu itself.
 func (r *Runner) ensureTaskWorktrees(taskID uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()

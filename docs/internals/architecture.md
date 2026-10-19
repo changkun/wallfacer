@@ -117,7 +117,7 @@ Task execution runs the turn loop in `internal/runner/execute.go`: impl, then te
 
 **Frontend** (`frontend/`), Vue 3 + TypeScript SPA (Vite, Vue Router, Pinia). Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
-**Workspace Manager** (`internal/workspace/`), Manages workspace records (stable UUID identity + mutable folder set, persisted in `workspaces.json`), DataKey-scoped stores, and hot-swapping between workspaces without server restart.
+**Workspace Manager** (`internal/workspace/`), Manages workspace records (stable UUID identity + one folder, persisted in `workspaces.json`), DataKey-scoped stores, and hot-swapping between workspaces without server restart.
 
 ### Two storage seams
 

@@ -71,11 +71,11 @@ export interface RetryRecord {
 }
 
 // --- Workspace registry (GET/POST/PUT/DELETE /api/workspaces) ---
-// A workspace is a first-class object with a stable id, owned by a user/org,
-// holding a mutable set of folder paths. Identity is decoupled from membership:
-// editing folders never loses history. `dormant` marks a workspace recovered
-// from history whose folders may need re-pointing; `active` marks the one whose
-// board is currently shown.
+// A workspace is a first-class object with a stable id and one folder.
+// Identity is decoupled from the folder: re-pointing never loses history.
+// `folders` holds that one folder; `dormant` marks a workspace whose folder is
+// still to be chosen, holding none (recovered history) or several (saved before
+// a workspace became one folder). `active` marks the one whose board is shown.
 export interface Workspace {
   id: string;
   name: string;

@@ -5,7 +5,6 @@ package envconfig
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -55,8 +54,6 @@ type Config struct {
 	HostCursorBinary   string // WALLFACER_HOST_CURSOR_BINARY, optional override of $PATH lookup
 	HostOpenCodeBinary string // WALLFACER_HOST_OPENCODE_BINARY, optional override of $PATH lookup
 	HostPiBinary       string // WALLFACER_HOST_PI_BINARY, optional override of $PATH lookup
-
-	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -92,7 +89,6 @@ var knownKeys = []string{
 	"WALLFACER_HOST_CURSOR_BINARY",
 	"WALLFACER_HOST_OPENCODE_BINARY",
 	"WALLFACER_HOST_PI_BINARY",
-	"WALLFACER_WORKSPACES",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -183,8 +179,6 @@ func Parse(path string) (Config, error) {
 			cfg.HostOpenCodeBinary = v
 		case "WALLFACER_HOST_PI_BINARY":
 			cfg.HostPiBinary = v
-		case "WALLFACER_WORKSPACES":
-			cfg.Workspaces = ParseWorkspaces(v)
 		}
 	}
 	cfg.OAuthToken = values["CLAUDE_CODE_OAUTH_TOKEN"]
@@ -204,36 +198,6 @@ func Parse(path string) (Config, error) {
 func ReadRaw(path string) (map[string]string, error) {
 	_, values, err := readConfigFile(path)
 	return values, err
-}
-
-// ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted
-// string (':' on Unix, ';' on Windows), trimming empty entries.
-func ParseWorkspaces(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	parts := filepath.SplitList(raw)
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		out = append(out, part)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-// FormatWorkspaces encodes workspaces for WALLFACER_WORKSPACES using the OS
-// path-list separator.
-func FormatWorkspaces(workspaces []string) string {
-	if len(workspaces) == 0 {
-		return ""
-	}
-	return strings.Join(workspaces, string(os.PathListSeparator))
 }
 
 // SandboxByActivity returns the per-activity sandbox type overrides derived from config.
@@ -353,7 +317,6 @@ type Updates struct {
 	AgentNice            *string
 	OversightInterval    *string
 	ArchivedTasksPerPage *string
-	Workspaces           *string
 }
 
 // Update merges changes into the env file at path.
@@ -378,7 +341,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_AGENT_NICE":              u.AgentNice,
 		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
-		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)
 }
