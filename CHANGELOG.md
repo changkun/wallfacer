@@ -154,6 +154,29 @@ committed: the commit log already holds that.
   `WALLFACER_WORKSPACES`, which the server wrote and never read, is ignored,
   and `wallfacer run` refuses folder arguments, which it used to ignore.
 
+- Batch create and task dependencies: the composer makes one task per
+  submit, `POST /api/tasks/batch` is gone, and a task has no **Depends on**
+  picker, blocked or ready badge, or Blocked by list. A spec's `depends_on`
+  stays in the spec tree, and dispatching a spec no longer copies it onto the
+  task. `depends_on` on `PATCH /api/tasks/{id}` is refused with 400, and a
+  stored task's `depends_on` drops the next time it is saved.
+
+- Title generation: a new task's title is the first line of its prompt,
+  without a leading `#`, cut at a word boundary to 60 characters, and a chat
+  thread is named the same way from its first message; `POST /api/tasks`
+  takes an optional `title` kept as given. `POST /api/tasks/generate-titles`,
+  `CLAUDE_TITLE_MODEL`, `CODEX_TITLE_MODEL` and `WALLFACER_SANDBOX_TITLE` are
+  gone; existing titles stay as they are. Oversight summaries run on the
+  default model, where they used the title model.
+
+- The test run: a waiting task has no **Test** button, verification tab or
+  acceptance criteria, and `POST /api/tasks/{id}/test`, the `?phase=test`
+  oversight and logs views and `WALLFACER_SANDBOX_TESTING` are gone. `criteria`,
+  `custom_pass_patterns` and `custom_fail_patterns` on task create and update
+  are refused with 400, and a stored task's test result fields drop the next
+  time it is saved. The credential check in Settings (`POST /api/env/test`)
+  answers `passed` in place of `last_test_result`.
+
 ### Fixed
 
 - A task resumed after its workspace was pointed at another folder runs in
