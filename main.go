@@ -41,10 +41,6 @@ func main() {
 		cli.RunStatus(configDir, args)
 	case "spec":
 		cli.RunSpec(configDir, args)
-	case "auth":
-		cli.RunAuth(configDir, args)
-	case "web":
-		cli.RunWeb(args, vueDist)
 	case "-help", "--help", "-h":
 		cli.PrintUsage()
 	default:

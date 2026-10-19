@@ -1,9 +1,7 @@
 name: Release
 
 # Self-contained release pipeline. Pushing a version tag (v*) verifies the
-# build, produces the CLI binaries, builds and pushes the wallfacerd image,
-# deploys the kustomize deploy/prod/ overlay to the shared `latere` namespace,
-# smokes the live surface, and only then publishes the GitHub release carrying
+# build, produces the CLI binaries, and publishes the GitHub release carrying
 # the binaries plus their supply-chain attestation (SHA256 checksums, an SPDX
 # SBOM, and keyless cosign signatures over both).
 #
@@ -20,24 +18,21 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
-  # Gate: tag pushes are not covered by test.yml (main/PR only), so the
-  # build/deploy must not run unchecked.
+  # Gate: tag pushes are not covered by ci.yml (main/PR only), so the
+  # binaries must not be built unchecked.
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       - run: cd frontend && bun install --frozen-lockfile
-      - run: cd frontend && bunx --bun vue-tsc --noEmit
-      - run: cd frontend && bunx --bun vite-ssg build
+      - run: cd frontend && bun run build
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go build -o /dev/null .
-      - run: go vet ./internal/webserver/...
 
   binary:
     needs: verify
@@ -80,85 +75,8 @@ jobs:
           path: wallfacer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
           if-no-files-found: error
 
-  image:
-    needs: verify
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v6
-        id: meta
-        with:
-          images: ghcr.io/changkun/wallfacerd
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Dockerfile.wallfacerd
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            VERSION=${{ github.ref_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    needs: image
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://wf.latere.ai
-    steps:
-      - uses: actions/checkout@v5
-      # DEPLOY_KUBECONFIG is the kubeconfig of wallfacerd-rollout, the
-      # identity in deploy/bootstrap/rollout-identity.yaml: it can apply
-      # deploy/prod and roll wallfacerd in its namespace, and nothing else.
-      - name: Write the kubeconfig
-        env:
-          KUBECONFIG_CONTENT: ${{ secrets.DEPLOY_KUBECONFIG }}
-        run: |
-          set -euo pipefail
-          install -m 700 -d "$RUNNER_TEMP/kube"
-          printf '%s' "$KUBECONFIG_CONTENT" > "$RUNNER_TEMP/kube/config"
-          chmod 600 "$RUNNER_TEMP/kube/config"
-          echo "KUBECONFIG=$RUNNER_TEMP/kube/config" >> "$GITHUB_ENV"
-      - name: Deploy to production
-        run: |
-          # docker/metadata-action publishes the semver tag without the leading v.
-          TAG="${GITHUB_REF_NAME#v}"
-          kubectl apply -k deploy/prod/
-          kubectl -n latere set image deployment/wallfacerd \
-            wallfacerd=ghcr.io/changkun/wallfacerd:${TAG}
-          kubectl -n latere rollout status deployment/wallfacerd --timeout=120s
-      - name: Smoke production & capture evidence
-        env:
-          BASE_URL: https://wf.latere.ai
-          TAG: ${{ github.ref_name }}
-          COMMIT: ${{ github.sha }}
-          BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          DEPLOY_URL: https://wf.latere.ai
-          OUTPUT_MD: release-evidence.md
-        run: tools/smoke/release.sh
-      - name: Mirror evidence to the run summary
-        run: cat release-evidence.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload release evidence
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence
-          path: release-evidence.md
-          if-no-files-found: error
-
   release:
-    needs: [binary, deploy]
+    needs: binary
     runs-on: ubuntu-latest
     # id-token: write mints the OIDC token cosign exchanges for a short-lived
     # Fulcio signing certificate (keyless signing — no long-lived key stored in
@@ -174,11 +92,6 @@ jobs:
           path: dist
           pattern: wallfacer-*
           merge-multiple: true
-      - name: Download release evidence
-        uses: actions/download-artifact@v8
-        with:
-          name: release-evidence
-          path: evidence
       - name: Generate SHA256 checksums
         working-directory: dist
         # One manifest over every published binary. Signing this file (below)
@@ -236,11 +149,6 @@ jobs:
           # Pre-releases: any tag with a -suffix (v0.0.7-alpha.6, v1.0.0-rc.1).
           prerelease=""
           [[ "$TAG" == *-* ]] && prerelease="--prerelease"
-          # Append the deploy evidence captured by the smoke job. It only exists
-          # because deploy was green, so its presence is itself proof prod
-          # shipped before the release published.
-          printf '\n\n' >> notes.md
-          cat evidence/release-evidence.md >> notes.md
           # dist/ now also holds SHA256SUMS, the SPDX SBOM, and the two cosign
           # bundles, so the glob attaches the attestation with the binaries.
           if gh release view "$TAG" >/dev/null 2>&1; then

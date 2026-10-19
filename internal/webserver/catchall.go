@@ -1,3 +1,4 @@
+// Package webserver holds the catch-all routes the console server mounts behind its API and SPA routes.
 package webserver
 
 import (

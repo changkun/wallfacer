@@ -20,7 +20,5 @@
 //	wallfacer run          # Start the task board server
 //	wallfacer status       # Print running board state to terminal
 //	wallfacer spec         # Spec document tools (new, validate)
-//	wallfacer auth         # Sign in to latere.ai (login, logout, whoami)
-//	wallfacer web          # Start the cloud web server (wallfacerd)
 //	wallfacer doctor       # Check prerequisites and configuration
 package main

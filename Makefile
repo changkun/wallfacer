@@ -4,7 +4,7 @@ SHELL            := /bin/bash
 -include .env
 export
 
-.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push web-frontend web-run web-dev web-docker
+.PHONY: build build-binary server frontend-build api-contract fmt hooks check lint-js lint-truncate test-all lint-all test-frontend e2e-lifecycle e2e-dependency-dag ui-test commit-seq push-once skills-check skills-pull skills-push
 
 # Full build gate: fmt + frontend assets + the shared bar and the repo's own
 # checks + binary.
@@ -124,19 +124,6 @@ skills-pull:
 skills-push:
 	./scripts/skills.sh push
 
-# ---- wallfacerd (wf.latere.ai) ----
-
-web-frontend: frontend-build                                             ## Build wallfacerd frontend for embedding
-
-web-run: web-frontend                                                    ## Run wallfacerd locally (embedded SPA)
-	go run . web -addr :8080
-
-web-dev:                                                                 ## Run wallfacerd dev stack (Go :8080 + Vite :5173)
-	go run . web -addr :8080 & cd frontend && bun run dev
-
-web-docker:                                                              ## Build wallfacerd Docker image
-	docker build -f Dockerfile.wallfacerd -t wallfacerd:dev .
-
 # Create one sequential commit with style-checked message + required body.
 # Usage:
 #   git add <files>
@@ -160,38 +147,6 @@ push-once:
 	./scripts/push-once.sh "$(REMOTE)" "$(BRANCH)"
 
 # Releases are automated. Push a version tag and the Release workflow
-# (.github/workflows/release.yml) builds the binaries, pushes the image,
-# deploys to k8s, and publishes the GitHub release with generated notes:
-#   git tag v0.0.7 && git push origin v0.0.7
-
-# ── Local production release ────────────────────────────────────────────────
-# Build natively (avoids the qemu bun/go crash when building Dockerfile.wallfacerd
-# on an arm64 host), push the image, and roll it out to the live cluster via
-# kubectl. The automated release.yml pipeline is the canonical path; this is the
-# local fallback while that is unavailable.
-#
-#   make release-prod                 # tag = short git sha
-#   make release-prod VERSION=0.0.7-alpha.24
-CONTAINER          ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
-RELEASE_IMAGE      ?= ghcr.io/changkun/wallfacerd
-RELEASE_NS         ?= latere
-RELEASE_DEPLOYMENT ?= wallfacerd
-RELEASE_URL        ?= https://wf.latere.ai
-
-.PHONY: release-prod
-release-prod: REL_VER := $(if $(VERSION),$(VERSION),$(shell git rev-parse --short HEAD))
-release-prod:
-	@test -n "$(CONTAINER)" || { echo "release-prod: no podman/docker found"; exit 1; }
-	@echo ">> [1/5] building frontend (native)"
-	$(MAKE) frontend-build
-	@echo ">> [2/5] cross-compiling linux/amd64 binary ($(REL_VER))"
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
-		-ldflags "-s -w -X latere.ai/x/wallfacer/internal/cli.Version=$(REL_VER)" \
-		-o deploy/prebuilt/wallfacer .
-	@echo ">> [3/5] building + pushing $(RELEASE_IMAGE):$(REL_VER)"
-	cd deploy/prebuilt && $(CONTAINER) build --platform linux/amd64 -t $(RELEASE_IMAGE):$(REL_VER) .
-	$(CONTAINER) push $(RELEASE_IMAGE):$(REL_VER)
-	@echo ">> [4/5] rolling out to $(RELEASE_NS)/$(RELEASE_DEPLOYMENT) (watch)"
-	kubectl set image deployment/$(RELEASE_DEPLOYMENT) $(RELEASE_DEPLOYMENT)=$(RELEASE_IMAGE):$(REL_VER) -n $(RELEASE_NS)
-	kubectl rollout status deployment/$(RELEASE_DEPLOYMENT) -n $(RELEASE_NS) --timeout=200s
-	@echo ">> [5/5] smoke" && curl -fsS $(RELEASE_URL)/livez && echo " <- livez ok ($(REL_VER) live)"
+# (.github/workflows/release.yml) builds the binaries and publishes the GitHub
+# release with the tag's CHANGELOG section:
+#   go tool lateregate release vX.Y.Z

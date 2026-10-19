@@ -34,14 +34,11 @@ func TestReleasePublicationCanBeRetriedAfterCreation(t *testing.T) {
 		lines = append(lines, strings.TrimPrefix(line, "          "))
 	}
 	dir := t.TempDir()
-	for _, sub := range []string{"dist", "evidence"} {
-		if err := os.Mkdir(filepath.Join(dir, sub), 0o755); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.Mkdir(filepath.Join(dir, "dist"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	files := map[string]string{
-		"dist/wallfacer":               "binary",
-		"evidence/release-evidence.md": "smoke passed\n",
+		"dist/wallfacer": "binary",
 		"gh": `#!/bin/sh
 set -eu
 printf '%s\n' "$1 $2" >> "$RELEASE_TEST_TRACE"

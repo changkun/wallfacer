@@ -21,8 +21,6 @@ frontend/dist/*
 !assets/*.png
 .playwright-mcp/
 frontend/test-results/
-release-evidence.md
-deploy/prebuilt/wallfacer
 
 # Local dev workspace
 go.work
