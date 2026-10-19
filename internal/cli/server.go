@@ -509,6 +509,11 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 		fs.PrintDefaults()
 	}
 	_ = fs.Parse(args)
+	if err := checkRunArgs(fs.Args()); err != nil {
+		fmt.Fprintf(os.Stderr, "wallfacer: %v\n\n", err)
+		fs.Usage()
+		os.Exit(2)
+	}
 
 	requireClaudeOrExit(*envFile)
 
@@ -535,6 +540,19 @@ func RunServer(configDir string, args []string, vueDist, docsFS fs.FS) {
 	if err := sc.Serve(); err != nil {
 		logger.Fatal("server", "error", err)
 	}
+}
+
+// checkRunArgs refuses positional arguments to `wallfacer run`. The command
+// takes flags only: the board reopens the most recently used workspace, and a
+// workspace (one folder) is chosen in the board's workspace picker. Refusing
+// keeps a folder named on the command line, or several of them, from being
+// silently ignored.
+func checkRunArgs(args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("wallfacer run takes no folder arguments (got %s); choose the workspace folder in the workspace picker on the board",
+		strings.Join(args, " "))
 }
 
 // listenHost returns the host part of a listen address such as ":8080" or
