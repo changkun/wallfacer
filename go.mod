@@ -2,7 +2,7 @@ module latere.ai/x/wallfacer
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0

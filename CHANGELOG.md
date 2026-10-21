@@ -211,6 +211,8 @@ committed: the commit log already holds that.
 - `wallfacer run -addr` with an address that has no port, such as
   `-addr 127.0.0.1`, stops at startup with an error naming the address, where
   the server listened on every network interface at a random port.
+- **Built with Go 1.27.3,** which fixes GO-2026-6809, a flaw in the
+  standard library's certificate verification that this code can reach.
 
 ### Security
 
